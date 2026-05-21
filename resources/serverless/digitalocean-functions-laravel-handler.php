@@ -124,9 +124,16 @@ if (! function_exists('main')) {
 
             $request = dply_do_functions_request($args);
 
+            // Capture this request's Laravel log records — DigitalOcean
+            // Functions never persists them, so the visit report below is
+            // dply's only window into what the app logged while serving.
+            $drainLogs = dply_do_functions_attach_log_capture($app);
+
             /** @var Kernel $kernel */
             $kernel = $app->make(Kernel::class);
+            $startedAt = microtime(true);
             $response = $kernel->handle($request);
+            $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
             $body = $response->getContent();
             $kernel->terminate($request, $response);
 
@@ -134,6 +141,13 @@ if (! function_exists('main')) {
             foreach ($response->headers->allPreserveCaseWithoutCookies() as $name => $values) {
                 $headers[$name] = implode(', ', array_map('strval', (array) $values));
             }
+
+            // Report this request to dply's ingest endpoint. Skipped for
+            // dply-initiated invocations (ticks / the Logs-page test button)
+            // — dply already captures those inline.
+            dply_do_functions_report_visit(
+                $args, $envFile, $request, $response, $durationMs, $drainLogs
+            );
 
             return [
                 'statusCode' => $response->getStatusCode(),
@@ -233,5 +247,152 @@ if (! function_exists('dply_do_functions_request')) {
         return Request::createFromBase(
             Request::create($uri, $method, $parameters, [], [], $server, $body)
         );
+    }
+}
+
+if (! function_exists('dply_do_functions_attach_log_capture')) {
+    /**
+     * Push an in-memory Monolog handler onto the app's default log channel
+     * so this request's log records can be shipped to dply afterwards.
+     *
+     * Returns a drain callable: invoke it once after the request to get the
+     * captured lines (a list of strings). Logging is strictly best-effort —
+     * any failure here yields an empty drain and never touches the request.
+     *
+     * @return callable(): array<int, string>
+     */
+    function dply_do_functions_attach_log_capture(mixed $app): callable
+    {
+        try {
+            $stream = fopen('php://temp', 'r+b');
+            if ($stream === false) {
+                return static fn (): array => [];
+            }
+
+            // Level 100 = DEBUG — an int so this works under Monolog 2 and 3.
+            $handler = new \Monolog\Handler\StreamHandler($stream, 100);
+            $app->make('log')->channel()->getLogger()->pushHandler($handler);
+
+            return static function () use ($handler, $stream): array {
+                try {
+                    $handler->close();
+                    rewind($stream);
+                    $raw = rtrim((string) stream_get_contents($stream), "\n");
+                    fclose($stream);
+
+                    return $raw === '' ? [] : explode("\n", $raw);
+                } catch (\Throwable $e) {
+                    return [];
+                }
+            };
+        } catch (\Throwable $e) {
+            return static fn (): array => [];
+        }
+    }
+}
+
+if (! function_exists('dply_do_functions_report_visit')) {
+    /**
+     * Fire-and-forget POST one request's record to dply's ingest endpoint.
+     *
+     * DigitalOcean Functions never persists an activation for organic web
+     * traffic, so this is dply's only record of it. It is best-effort: a
+     * tight cURL timeout bounds the latency it adds, and any failure is
+     * swallowed — a logging hiccup must never affect the user's request.
+     *
+     * No-ops when: the request was dply-initiated (a tick or the Logs-page
+     * test button — dply captured it inline already); ingest isn't
+     * configured; or the ingest host is local (the dev control plane isn't
+     * reachable from DigitalOcean).
+     *
+     * @param  array<string, mixed>  $args
+     * @param  array<string, string>  $envFile
+     * @param  callable(): array<int, string>  $drainLogs
+     */
+    function dply_do_functions_report_visit(
+        array $args,
+        array $envFile,
+        \Illuminate\Http\Request $request,
+        \Symfony\Component\HttpFoundation\Response $response,
+        int $durationMs,
+        callable $drainLogs,
+    ): void {
+        $logLines = $drainLogs();
+
+        $headers = is_array($args['__ow_headers'] ?? null) ? $args['__ow_headers'] : [];
+        foreach (['x-dply-run', 'x-dply-source'] as $marker) {
+            if (trim((string) ($headers[$marker] ?? '')) !== '') {
+                return;
+            }
+        }
+
+        $resolve = static fn (string $key): string => trim(
+            (string) ($envFile[$key] ?? (getenv($key) ?: ''))
+        );
+        $url = $resolve('DPLY_LOG_INGEST_URL');
+        $secret = $resolve('DPLY_LOG_INGEST_SECRET');
+        if ($url === '' || $secret === '') {
+            return;
+        }
+
+        $host = (string) parse_url($url, PHP_URL_HOST);
+        if ($host === '' || $host === 'localhost' || $host === '127.0.0.1' || str_ends_with($host, '.local')) {
+            return;
+        }
+
+        // Per-request detail for the Visits tab. The function sits behind
+        // Cloudflare, so the real client IP + country arrive as cf-* headers.
+        $reqHeaders = $request->headers;
+        $body = $response->getContent();
+        $context = array_filter([
+            'ip' => $reqHeaders->get('cf-connecting-ip')
+                ?: trim((string) explode(',', (string) $reqHeaders->get('x-forwarded-for'))[0]),
+            'country' => $reqHeaders->get('cf-ipcountry'),
+            'route' => $request->route()?->getName(),
+            'query' => $request->getQueryString(),
+            'content_type' => $response->headers->get('content-type'),
+            'response_bytes' => is_string($body) ? strlen($body) : 0,
+            'memory_mb' => round(memory_get_peak_usage(true) / 1048576, 1),
+            'php' => PHP_VERSION,
+            'scheme' => $reqHeaders->get('x-forwarded-proto') ?: $request->getScheme(),
+            'host' => $request->getHost(),
+            'referer' => $reqHeaders->get('referer'),
+            'user_agent' => $reqHeaders->get('user-agent'),
+        ], static fn ($v): bool => $v !== null && $v !== '');
+
+        $payload = json_encode([
+            'method' => $request->getMethod(),
+            'path' => $request->getPathInfo(),
+            'status' => $response->getStatusCode(),
+            'duration_ms' => $durationMs,
+            'logs' => array_slice($logLines, -200),
+            'context' => $context,
+        ], JSON_UNESCAPED_SLASHES);
+        if (! is_string($payload)) {
+            return;
+        }
+
+        try {
+            $ch = curl_init($url);
+            if ($ch === false) {
+                return;
+            }
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $payload,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'X-Dply-Signature: '.hash_hmac('sha256', $payload, $secret),
+                ],
+                CURLOPT_TIMEOUT_MS => 800,
+                CURLOPT_CONNECTTIMEOUT_MS => 400,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_NOSIGNAL => true,
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Throwable $e) {
+            // Fire-and-forget — swallow everything.
+        }
     }
 }

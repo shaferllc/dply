@@ -6,10 +6,12 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Serverless\InvokeFunctionTick;
+use Illuminate\Support\Collection;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -101,15 +103,14 @@ class Schedule extends Component
         $entry = $tick->tickSite($this->site->fresh(), 'schedule');
 
         if ($entry === null) {
-            $this->toastError(__('Cannot tick — the function has no invocation URL or webhook secret set yet. Deploy the function first.'));
+            $this->toastError(__('Cannot tick — the function has no webhook secret set yet. Deploy the function first.'));
 
             return;
         }
 
-        $ok = ($entry['status'] ?? '') === 'ok';
-        $http = $entry['http_status'] ?? '—';
-        $this->toastSuccess($ok
-            ? __('Scheduler tick fired — HTTP :status, :ms ms.', ['status' => $http, 'ms' => (int) ($entry['duration_ms'] ?? 0)])
+        $http = $entry->status_code ?? '—';
+        $this->toastSuccess($entry->success
+            ? __('Scheduler tick fired — HTTP :status, :ms ms.', ['status' => $http, 'ms' => $entry->duration_ms])
             : __('Scheduler tick fired but reported a failure — HTTP :status. Check the history below.', ['status' => $http]));
     }
 
@@ -133,14 +134,26 @@ class Schedule extends Component
      */
     public function showTick(string $at): void
     {
-        $meta = $this->site->fresh()?->meta;
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $tickHistory = is_array($serverless['tick_history'] ?? null) ? $serverless['tick_history'] : [];
+        $this->selectedTick = $this->tickHistory()
+            ->first(fn (array $entry): bool => (string) ($entry['at'] ?? '') === $at);
+    }
 
-        $this->selectedTick = collect($tickHistory)
-            ->first(fn ($entry): bool => is_array($entry)
-                && ($entry['task'] ?? null) === 'schedule'
-                && (string) ($entry['at'] ?? '') === $at);
+    /**
+     * The site's recent `schedule` ticks, newest-first, in the legacy
+     * tick-history array shape the view consumes.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function tickHistory(): Collection
+    {
+        return FunctionInvocation::query()
+            ->where('site_id', $this->site->id)
+            ->where('source', FunctionInvocation::SOURCE_TICK)
+            ->where('task', 'schedule')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (FunctionInvocation $invocation): array => $invocation->toTickEntry());
     }
 
     public function closeTick(): void
@@ -152,17 +165,9 @@ class Schedule extends Component
     {
         $runtimeMode = $this->site->runtimeTargetMode();
 
-        // Fresh read on every render so wire:poll picks up the tick command's
-        // history writes without us re-mounting.
-        $this->site->refresh();
-        $serverless = is_array($this->site->meta['serverless'] ?? null) ? $this->site->meta['serverless'] : [];
-        $tickHistory = is_array($serverless['tick_history'] ?? null) ? $serverless['tick_history'] : [];
         // The Schedule page only cares about scheduler-task ticks. Queue ticks
         // appear on Workers; keep the two views' histories independent.
-        $scheduleHistory = collect($tickHistory)
-            ->filter(fn ($entry): bool => is_array($entry) && ($entry['task'] ?? null) === 'schedule')
-            ->reverse()
-            ->values();
+        $scheduleHistory = $this->tickHistory();
 
         return view('livewire.sites.schedule', [
             'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
@@ -172,7 +177,7 @@ class Schedule extends Component
             'laravel_tab' => 'commands',
             'section' => 'schedule',
             'scheduleHistory' => $scheduleHistory,
-            'lastTickAt' => $serverless['last_tick_at'] ?? null,
+            'lastTickAt' => $scheduleHistory->first()['at'] ?? null,
             // Auto-detect the "stale secret" symptom in the most recent tick so
             // the page can surface a specific remedy (redeploy) rather than
             // making the operator parse the function's error body themselves.

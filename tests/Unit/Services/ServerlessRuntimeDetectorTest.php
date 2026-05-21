@@ -8,8 +8,11 @@ use Tests\TestCase;
 
 class ServerlessRuntimeDetectorTest extends TestCase
 {
-    public function test_detects_rails_when_gemfile_and_application_rb_present(): void
+    public function test_ruby_repo_falls_through_to_unknown_since_do_functions_has_no_ruby_runtime(): void
     {
+        // DigitalOcean Functions (managed OpenWhisk) ships no Ruby runtime,
+        // so a Rails repo must not claim a `rails` framework it can never
+        // deploy — it falls through to `unknown` like any unrecognized repo.
         $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
         File::makeDirectory($dir, 0755, true);
         File::makeDirectory($dir.'/config', 0755, true);
@@ -21,14 +24,13 @@ class ServerlessRuntimeDetectorTest extends TestCase
             $result = $detector->detect($dir, [
                 'supports_php_runtime' => true,
                 'supports_node_runtime' => true,
-                'default_runtime' => 'ruby:3.3',
-                'default_entrypoint' => 'index',
+                'default_runtime' => 'nodejs:18',
+                'default_entrypoint' => 'main',
                 'default_package' => 'default',
             ]);
 
-            $this->assertSame('rails', $result['framework']);
-            $this->assertSame('ruby', $result['language']);
-            $this->assertSame('high', $result['confidence']);
+            $this->assertSame('unknown', $result['framework']);
+            $this->assertSame('unknown', $result['language']);
         } finally {
             File::deleteDirectory($dir);
         }

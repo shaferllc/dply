@@ -56,6 +56,20 @@ class ServerlessEnvironmentPreparer
             $managed = ltrim(rtrim($managed, "\r\n")."\nDPLY_COMMAND_SECRET=".trim((string) $site->webhook_secret)."\n", "\n");
         }
 
+        // Log shipping — the function's handler POSTs each request it serves
+        // to dply's ingest endpoint, HMAC-signed with the ingest secret. The
+        // secret is always injected (stable, minted once); the URL only when
+        // it is publicly reachable — a function on DigitalOcean cannot POST
+        // to a local *.test / loopback APP_URL, so in dev we inject no URL
+        // and the handler skips reporting cleanly.
+        if ($isLaravel) {
+            $managed = $this->setEnvKey($managed, 'DPLY_LOG_INGEST_SECRET', $this->logIngestSecret($site));
+            $ingestUrl = $this->logIngestUrl($site);
+            if ($ingestUrl !== '') {
+                $managed = $this->setEnvKey($managed, 'DPLY_LOG_INGEST_URL', $ingestUrl);
+            }
+        }
+
         // Persist so the value is stable and editable in the Environment panel.
         if ($managed !== $original) {
             $site->forceFill(['env_file_content' => $managed])->save();
@@ -99,6 +113,77 @@ class ServerlessEnvironmentPreparer
         }
 
         $site->forceFill(['env_file_content' => implode("\n", $lines)])->save();
+    }
+
+    /**
+     * The site's stable log-ingest secret — minted once on the first deploy,
+     * persisted in `meta.serverless.log_ingest_secret`, and reused after.
+     * The ingest endpoint verifies the function's visit reports against it.
+     */
+    private function logIngestSecret(Site $site): string
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $secret = trim((string) ($serverless['log_ingest_secret'] ?? ''));
+
+        if ($secret === '') {
+            $secret = bin2hex(random_bytes(24));
+            $serverless['log_ingest_secret'] = $secret;
+            $meta['serverless'] = $serverless;
+            $site->forceFill(['meta' => $meta])->save();
+        }
+
+        return $secret;
+    }
+
+    /**
+     * The URL the deployed function POSTs its per-request visit logs to —
+     * or an empty string when reporting can't work and should be skipped.
+     *
+     * The function runs on DigitalOcean and must reach dply over the public
+     * internet, so this is built from DPLY_PUBLIC_APP_URL — the operator's
+     * public / tunnel URL that server-metrics callbacks already rely on.
+     * APP_URL is no fallback: in development it is typically a local *.test
+     * domain unreachable from DigitalOcean. Unset means no URL is injected
+     * and the handler skips reporting.
+     */
+    private function logIngestUrl(Site $site): string
+    {
+        $public = trim((string) config('dply.public_app_url', ''));
+        if ($public === '') {
+            return '';
+        }
+
+        // DPLY_PUBLIC_APP_URL is often set to a bare hostname — add a scheme.
+        if (preg_match('~^https?://~i', $public) !== 1) {
+            $public = 'https://'.$public;
+        }
+
+        return rtrim($public, '/').'/hooks/functions/'.$site->id.'/log';
+    }
+
+    /**
+     * Replace a key's line in a .env string, or append it when absent.
+     */
+    private function setEnvKey(string $env, string $key, string $value): string
+    {
+        $lines = $env === '' ? [] : (preg_split('/\r\n|\r|\n/', $env) ?: []);
+        $entry = $key.'='.$this->envValue($value);
+        $replaced = false;
+
+        foreach ($lines as $index => $line) {
+            if (preg_match('/^\s*'.preg_quote($key, '/').'\s*=/', (string) $line) === 1) {
+                $lines[$index] = $entry;
+                $replaced = true;
+                break;
+            }
+        }
+
+        if (! $replaced) {
+            $lines[] = $entry;
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

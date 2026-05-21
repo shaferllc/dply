@@ -101,18 +101,30 @@
     </a>
 
     <div class="flex flex-wrap items-center gap-3 pt-1">
-        <button type="button"
-                wire:click="redeployServerlessFunction"
-                wire:loading.attr="disabled"
-                wire:target="redeployServerlessFunction"
-                class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
-            <span wire:loading.remove wire:target="redeployServerlessFunction">{{ __('Deploy / redeploy') }}</span>
-            <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting deploy…') }}</span>
-        </button>
-        <a href="{{ route('serverless.journey', ['server' => $server, 'site' => $site]) }}"
-           class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
-            {{ __('Deploy journey') }}
-        </a>
+        @if ($isActive)
+            {{-- The function is live — redeploys + history belong on the
+                 Deployments tab. Overview stays a glance, not an action bar. --}}
+            <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}"
+               wire:navigate
+               class="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-forest hover:underline">
+                {{ __('Manage deploys') }}
+                <x-heroicon-o-arrow-right class="h-4 w-4" />
+            </a>
+        @else
+            {{-- Not live yet — the first deploy is the operator's next step. --}}
+            <button type="button"
+                    wire:click="redeployServerlessFunction"
+                    wire:loading.attr="disabled"
+                    wire:target="redeployServerlessFunction"
+                    class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
+                <span wire:loading.remove wire:target="redeployServerlessFunction">{{ __('Deploy function') }}</span>
+                <span wire:loading wire:target="redeployServerlessFunction">{{ __('Starting deploy…') }}</span>
+            </button>
+            <a href="{{ route('serverless.journey', ['server' => $server, 'site' => $site]) }}"
+               class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+                {{ __('Deploy journey') }}
+            </a>
+        @endif
     </div>
 </section>
 

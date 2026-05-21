@@ -27,7 +27,12 @@
     $runtimeMode = $site->runtimeTargetMode();
     $runtimePlatform = $site->runtimeTargetPlatform();
     $runtimeFamily = $site->runtimeTargetFamily();
-    $isContainerWorkspace = in_array($runtimeMode, ['docker', 'kubernetes', 'serverless'], true);
+    // A SiteType::Container edge app has runtimeTargetMode() === 'vm' (there is
+    // no "edge container" runtime family), so the mode check alone misses it.
+    // usesContainerRuntime() catches container-type sites and backend-bound
+    // sites so the container dashboard renders and the VM overview is hidden.
+    $isContainerWorkspace = in_array($runtimeMode, ['docker', 'kubernetes', 'serverless'], true)
+        || $site->usesContainerRuntime();
     $settingsSidebarItems = \App\Support\SiteSettingsSidebar::items($site, $server);
     $routingTabIcons = [
         'domains' => 'heroicon-o-globe-alt',

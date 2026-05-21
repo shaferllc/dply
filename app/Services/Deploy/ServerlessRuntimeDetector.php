@@ -65,28 +65,11 @@ final class ServerlessRuntimeDetector
             ];
         }
 
-        if ($this->looksLikeRails($workingDirectory)) {
-            $reasons[] = 'Detected Rails markers such as Gemfile with config/application.rb or bin/rails.';
-            $unsupportedForTarget = ! (bool) ($capabilities['supports_php_runtime'] ?? false);
-
-            if ($unsupportedForTarget) {
-                $warnings[] = 'This repository looks like Ruby on Rails, but the selected serverless target does not advertise a Ruby runtime.';
-            }
-
-            return [
-                'framework' => 'rails',
-                'language' => 'ruby',
-                'runtime' => $unsupportedForTarget ? '' : (string) ($capabilities['default_runtime'] ?? ''),
-                'entrypoint' => $unsupportedForTarget ? '' : (string) ($capabilities['default_entrypoint'] ?? 'index'),
-                'build_command' => 'bundle install && bundle exec rails assets:precompile',
-                'artifact_output_path' => '.',
-                'package' => (string) ($capabilities['default_package'] ?? 'default'),
-                'confidence' => 'high',
-                'reasons' => $reasons,
-                'warnings' => $warnings,
-                'unsupported_for_target' => $unsupportedForTarget,
-            ];
-        }
+        // No Rails/Ruby branch: DigitalOcean Functions (managed OpenWhisk)
+        // ships no Ruby runtime — Node, Python, PHP, and Go only. A Ruby repo
+        // therefore falls through to `unknown` rather than claiming a `rails`
+        // framework it can never deploy. (VM/container Rails detection lives
+        // in RuntimeDetection\RubyRuntimeDetector and is unaffected.)
 
         $pythonStack = $this->detectPythonStack($workingDirectory, $capabilities);
         if ($pythonStack !== null) {
@@ -248,16 +231,6 @@ final class ServerlessRuntimeDetector
         $require = is_array($composerJson['require'] ?? null) ? $composerJson['require'] : [];
 
         return array_key_exists('laravel/framework', $require);
-    }
-
-    private function looksLikeRails(string $workingDirectory): bool
-    {
-        if (! is_file($workingDirectory.'/Gemfile')) {
-            return false;
-        }
-
-        return is_file($workingDirectory.'/config/application.rb')
-            || is_file($workingDirectory.'/bin/rails');
     }
 
     /**

@@ -495,6 +495,17 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(300)->by($request->ip());
         });
 
+        // Per-request log POSTs from deployed serverless functions. Keyed by
+        // site so one busy function can't starve another; generous because a
+        // function fires this once per request it serves. Over the limit the
+        // handler's fire-and-forget POST just 429s and the row is dropped.
+        RateLimiter::for('function-log-ingest', function (Request $request) {
+            $site = $request->route('site');
+            $key = $site instanceof Site ? 'fli:'.$site->id : 'fli-ip:'.$request->ip();
+
+            return Limit::perMinute((int) config('sites.function_log_ingest_per_minute', 1000))->by($key);
+        });
+
         RateLimiter::for('metrics-guest-push', function (Request $request) {
             $sid = $request->input('server_id');
 

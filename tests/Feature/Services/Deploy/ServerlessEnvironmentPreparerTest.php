@@ -54,6 +54,49 @@ class ServerlessEnvironmentPreparerTest extends TestCase
         $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->webhook_secret, $managed);
     }
 
+    public function test_it_injects_a_stable_log_ingest_secret(): void
+    {
+        $site = Site::factory()->create(['env_file_content' => null]);
+
+        (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+        $managed = (string) $site->fresh()->env_file_content;
+        $this->assertMatchesRegularExpression('/DPLY_LOG_INGEST_SECRET=[a-f0-9]{48}/', $managed);
+
+        // The secret is persisted on the site and stable across deploys.
+        $secret = data_get($site->fresh()->meta, 'serverless.log_ingest_secret');
+        $this->assertNotEmpty($secret);
+
+        (new ServerlessEnvironmentPreparer)->prepare($site->fresh(), $this->dir, true);
+        $this->assertSame($secret, data_get($site->fresh()->meta, 'serverless.log_ingest_secret'));
+    }
+
+    public function test_it_skips_the_ingest_url_when_no_public_url_is_configured(): void
+    {
+        // No DPLY_PUBLIC_APP_URL — a function on DigitalOcean could not reach
+        // a local APP_URL, so no ingest URL is injected.
+        config(['dply.public_app_url' => null]);
+        $site = Site::factory()->create(['env_file_content' => null]);
+
+        (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+        $this->assertStringNotContainsString('DPLY_LOG_INGEST_URL=', (string) $site->fresh()->env_file_content);
+    }
+
+    public function test_it_builds_the_ingest_url_from_the_public_app_url(): void
+    {
+        // A bare hostname (a common DPLY_PUBLIC_APP_URL value) gets a scheme.
+        config(['dply.public_app_url' => 'dply.tunnel.example']);
+        $site = Site::factory()->create(['env_file_content' => null]);
+
+        (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
+
+        $this->assertStringContainsString(
+            'DPLY_LOG_INGEST_URL=https://dply.tunnel.example/hooks/functions/'.$site->id.'/log',
+            (string) $site->fresh()->env_file_content,
+        );
+    }
+
     public function test_it_keeps_an_existing_app_key(): void
     {
         $existing = "APP_ENV=production\nAPP_KEY=base64:keepme0000000000000000000000000000000000000=\n";

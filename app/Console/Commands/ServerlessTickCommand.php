@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Site;
+use App\Services\Serverless\InvokeFunctionTick;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -15,10 +15,13 @@ use Throwable;
  *
  * DigitalOcean Functions has no long-running process, so dply's own
  * scheduler stands in as the cron: every minute this invokes each enabled
- * function with a signed header that puts the adapter into command mode,
- * running the Laravel scheduler and draining the queue. The shared secret
- * is the site's webhook_secret, which the deploy also injects into the
- * function as DPLY_COMMAND_SECRET.
+ * function. A background-enabled function gets a `schedule` and a `queue`
+ * tick (which also keep it warm); a keep-warm-only function gets a plain
+ * `keep-warm` tick.
+ *
+ * Each tick goes through {@see InvokeFunctionTick}, which records it as a
+ * `source=tick` FunctionInvocation — the same path the in-UI "Tick now"
+ * buttons use.
  */
 class ServerlessTickCommand extends Command
 {
@@ -26,7 +29,7 @@ class ServerlessTickCommand extends Command
 
     protected $description = 'Run the Laravel scheduler and queue worker on background-enabled serverless functions.';
 
-    public function handle(): int
+    public function handle(InvokeFunctionTick $tick): int
     {
         $sites = Site::query()
             ->where('status', Site::STATUS_FUNCTIONS_ACTIVE)
@@ -42,23 +45,20 @@ class ServerlessTickCommand extends Command
                 continue;
             }
 
-            $url = data_get($site->meta, 'serverless.action_url');
-            if (! is_string($url) || $url === '') {
-                continue;
-            }
+            // A background function needs scheduler + queue work; those ticks
+            // also keep it warm, so keep-warm-only is the fallback.
+            $tasks = $background ? ['schedule', 'queue'] : ['keep-warm'];
 
-            if ($background) {
-                // The scheduler / queue ticks also keep the function warm.
-                $secret = trim((string) $site->webhook_secret);
-                if ($secret === '') {
-                    continue;
+            foreach ($tasks as $task) {
+                try {
+                    $tick->tickSite($site, $task);
+                } catch (Throwable $e) {
+                    Log::warning('serverless.tick.failed', [
+                        'site_id' => $site->id,
+                        'task' => $task,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
-                foreach (['schedule', 'queue'] as $task) {
-                    $this->ping($site, $url, ['X-Dply-Run' => $task, 'X-Dply-Secret' => $secret], $task);
-                }
-            } else {
-                // Keep-warm only — a plain request to hold a warm container.
-                $this->ping($site, $url, [], 'keep-warm');
             }
 
             $ticked++;
@@ -67,21 +67,5 @@ class ServerlessTickCommand extends Command
         $this->info('Ticked '.$ticked.' serverless function(s).');
 
         return self::SUCCESS;
-    }
-
-    /**
-     * @param  array<string, string>  $headers
-     */
-    private function ping(Site $site, string $url, array $headers, string $task): void
-    {
-        try {
-            Http::withHeaders($headers)->timeout(70)->get($url);
-        } catch (Throwable $e) {
-            Log::warning('serverless.tick.failed', [
-                'site_id' => $site->id,
-                'task' => $task,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 }

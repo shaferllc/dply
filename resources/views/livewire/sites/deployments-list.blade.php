@@ -25,6 +25,27 @@
                 compact
             />
 
+            @if ($site->server?->isDigitalOceanFunctionsHost())
+                {{-- The live deploy journey is the redeploy surface: it shows
+                     the latest deploy, a Redeploy button, and watches a deploy
+                     run — redeploy → watch → history, all in one tab. --}}
+                <livewire:serverless.journey
+                    :server="$server"
+                    :site="$site"
+                    :embedded="true"
+                    wire:key="deploy-journey-{{ $site->id }}"
+                />
+            @else
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
+                    <p class="text-sm text-brand-moss">{{ __('Trigger a fresh deploy of the current repository state.') }}</p>
+                    <button type="button" wire:click="redeploy" wire:loading.attr="disabled" wire:target="redeploy"
+                            class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60">
+                        <span wire:loading.remove wire:target="redeploy">{{ __('Deploy / redeploy') }}</span>
+                        <span wire:loading wire:target="redeploy">{{ __('Starting deploy…') }}</span>
+                    </button>
+                </div>
+            @endif
+
             <div class="flex flex-wrap items-end gap-3">
         <div>
             <label for="status_filter" class="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Status') }}</label>

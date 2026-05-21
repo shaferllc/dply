@@ -45,6 +45,7 @@ final class LocalRuntimeDetector
             'supports_php_runtime' => true,
             'supports_node_runtime' => true,
             'supports_python_runtime' => true,
+            'supports_go_runtime' => true,
             'default_runtime' => 'nodejs:20',
             'default_python_runtime' => 'python3.12',
             'default_entrypoint' => 'index',

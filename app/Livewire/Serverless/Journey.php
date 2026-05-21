@@ -35,15 +35,23 @@ class Journey extends Component
     public string $siteId = '';
 
     /**
-     * Set when the operator hits "Retry deploy" — keeps the page polling
-     * through the gap before a worker creates the fresh deployment row.
+     * The latest deployment id at the moment a deploy was triggered from
+     * this page (retry or redeploy). While the newest row still matches it,
+     * the worker hasn't created the fresh deployment yet — so the page keeps
+     * polling to bridge that gap. Cleared once a newer row appears.
      */
-    public bool $retrying = false;
+    public ?string $sinceDeploymentId = null;
 
     /** Whether the cancel-deploy confirmation modal is open. */
     public bool $confirmingCancel = false;
 
-    public function mount(Server $server, Site $site): void
+    /**
+     * Rendered as a panel inside another page (the Deployments tab) rather
+     * than as a standalone route — drops the breadcrumb and page padding.
+     */
+    public bool $embedded = false;
+
+    public function mount(Server $server, Site $site, bool $embedded = false): void
     {
         abort_unless($site->server_id === $server->id, 404);
         abort_unless($server->isDigitalOceanFunctionsHost(), 404);
@@ -51,6 +59,7 @@ class Journey extends Component
 
         $this->serverId = $server->id;
         $this->siteId = $site->id;
+        $this->embedded = $embedded;
     }
 
     private function server(): Server
@@ -93,12 +102,29 @@ class Journey extends Component
      */
     public function retryDeploy(): void
     {
+        $this->dispatchDeploy(__('Retrying the deploy…'));
+    }
+
+    /**
+     * Redeploy a function that is already live — the same control, reused.
+     */
+    public function redeploy(): void
+    {
+        $this->dispatchDeploy(__('Redeploying…'));
+    }
+
+    /**
+     * Queue a deploy and remember the deployment row we triggered from, so
+     * the page bridges the gap until the worker creates the new one.
+     */
+    private function dispatchDeploy(string $toast): void
+    {
         $site = $this->site();
         $this->authorize('update', $site);
 
+        $this->sinceDeploymentId = $this->latestDeployment()?->id ?? '';
         RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
-        $this->retrying = true;
-        $this->toastSuccess(__('Retrying the deploy…'));
+        $this->toastSuccess($toast);
     }
 
     public function openCancelModal(): void
@@ -145,8 +171,14 @@ class Journey extends Component
         $namespaceReady = ! empty($hostConfig['api_host'] ?? null);
         $serverErrored = $server->status === Server::STATUS_ERROR;
 
-        $live = $site->status === Site::STATUS_FUNCTIONS_ACTIVE;
+        $siteActive = $site->status === Site::STATUS_FUNCTIONS_ACTIVE;
         $deployStatus = $deployment?->status;
+        $deployRunning = $deployStatus === SiteDeployment::STATUS_RUNNING;
+
+        // "Live" means the function is up AND nothing is mid-deploy — so a
+        // redeploy of an already-live function correctly reads as in-flight
+        // rather than instantly "done".
+        $live = $siteActive && ! $deployRunning && $deployStatus !== SiteDeployment::STATUS_FAILED;
 
         // Fine-grained sub-steps the deploy pipeline records as it runs —
         // checkout, dependencies, adapter, package, upload. A failed deploy
@@ -175,8 +207,9 @@ class Journey extends Component
         // Stage 3 — checkout, artifact build, action deploy.
         $deployState = match (true) {
             $namespaceState !== 'done' => 'pending',
+            $deployRunning => 'active',
             $deployStatus === SiteDeployment::STATUS_FAILED => 'failed',
-            $live || $deployStatus === SiteDeployment::STATUS_SUCCESS => 'done',
+            $deployStatus === SiteDeployment::STATUS_SUCCESS || $siteActive => 'done',
             default => 'active',
         };
 
@@ -219,13 +252,16 @@ class Journey extends Component
             ],
         ];
 
-        // A fresh deploy has been picked up — the retry gap is closed.
-        if ($deployState !== 'failed') {
-            $this->retrying = false;
+        // Bridge the gap after a deploy is triggered here: keep polling
+        // until a newer deployment row replaces the one we triggered from.
+        $bridging = $this->sinceDeploymentId !== null
+            && ($deployment?->id ?? '') === $this->sinceDeploymentId;
+        if (! $bridging) {
+            $this->sinceDeploymentId = null;
         }
 
         $failed = $namespaceState === 'failed' || $deployState === 'failed';
-        $shouldPoll = ! $live && (! $failed || $this->retrying);
+        $shouldPoll = $bridging || (! $live && ! $failed);
 
         // A deploy can be cancelled while its step pipeline is running.
         $cancellable = $deployState === 'active' && $deployStatus === SiteDeployment::STATUS_RUNNING;
@@ -234,11 +270,12 @@ class Journey extends Component
 
         $actionUrl = is_string($config['action_url'] ?? null) ? $config['action_url'] : null;
 
-        // Wall-clock elapsed — anchored on when the function was created,
-        // frozen at the deploy's finish once live.
-        $anchor = $site->created_at;
-        $endpoint = ($live && $deployment?->finished_at) ? $deployment->finished_at : now();
+        // Elapsed — anchored on the current deploy's start (falling back to
+        // the site's creation before any deploy exists), frozen at finish.
+        $anchor = $deployment?->started_at ?? $site->created_at;
+        $endpoint = ($deployment?->finished_at && ! $deployRunning) ? $deployment->finished_at : now();
         $elapsedSeconds = $anchor ? max(0, (int) $anchor->diffInSeconds($endpoint)) : 0;
+        $elapsedLabel = $live ? __('Deployed in') : __('Elapsed');
 
         // Weighted progress across the four stages; the deploy stage scales
         // by how many of its sub-steps have completed.
@@ -256,6 +293,7 @@ class Journey extends Component
         $percent = max(0, min(100, $percent));
 
         $headline = match (true) {
+            $bridging => __('Starting deploy…'),
             $live => __('Function is live'),
             $cancelled => __('Deploy cancelled'),
             $failed => __('Deploy stopped'),
@@ -263,6 +301,12 @@ class Journey extends Component
             $namespaceState === 'active' => __('Provisioning namespace…'),
             default => __('Starting deploy…'),
         };
+
+        // Page title — the panel is reused for both an in-flight deploy and
+        // the resting "this is the last deploy" view.
+        $title = ($live && ! $bridging)
+            ? __('Latest deployment')
+            : __('Deploying :name', ['name' => $site->name]);
 
         // Function facts — populated progressively as the deploy resolves them.
         $facts = [
@@ -295,8 +339,10 @@ class Journey extends Component
             'actionUrl' => $actionUrl,
             'log' => $deployment?->log_output ?? '',
             'headline' => $headline,
+            'title' => $title,
             'percent' => $percent,
             'elapsedHuman' => $this->humanizeSeconds($elapsedSeconds),
+            'elapsedLabel' => $elapsedLabel,
             'facts' => $facts,
             'deployDuration' => $this->formatDuration($deployDurationMs),
             'deployStartedAt' => $deployment?->started_at,

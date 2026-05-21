@@ -169,6 +169,34 @@ class JourneyTest extends TestCase
         Bus::assertDispatched(RunSiteDeploymentJob::class);
     }
 
+    public function test_redeploy_dispatches_a_deployment_for_a_live_function(): void
+    {
+        Bus::fake();
+        [$server, $site] = $this->makeFunction(
+            serverStatus: Server::STATUS_READY,
+            serverMeta: ['digitalocean_functions' => ['api_host' => 'https://faas.example']],
+            siteStatus: Site::STATUS_FUNCTIONS_ACTIVE,
+        );
+        SiteDeployment::query()->create([
+            'site_id' => $site->id,
+            'project_id' => $site->project_id,
+            'trigger' => SiteDeployment::TRIGGER_MANUAL,
+            'status' => SiteDeployment::STATUS_SUCCESS,
+            'started_at' => now()->subMinute(),
+            'finished_at' => now()->subMinute(),
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessJourney::class, ['server' => $server, 'site' => $site])
+            ->assertSee('Function is live')
+            ->assertSee('Redeploy')
+            ->call('redeploy')
+            // The bridge keeps the page polling until the new deploy appears.
+            ->assertSet('sinceDeploymentId', fn ($v): bool => $v !== null);
+
+        Bus::assertDispatched(RunSiteDeploymentJob::class);
+    }
+
     public function test_rejects_a_site_that_is_not_on_the_given_host(): void
     {
         [$server] = $this->makeFunction();

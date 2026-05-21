@@ -6,6 +6,7 @@ use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\EdgeDeployWebhookController;
+use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\SiteDeployWebhookController;
@@ -124,6 +125,13 @@ Route::match(['post', 'options'], '/hooks/edge/{site}/redeploy', EdgeDeployWebho
 Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.edge.github');
+
+// Per-request log records POSTed by a deployed serverless function's handler
+// — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
+// inside the controller; high throttle since it fires once per app request.
+Route::post('/hooks/functions/{site}/log', FunctionLogIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.functions.log');
 
 // Friendly public URL for a serverless function — dply proxies it through
 // to the function's raw DigitalOcean Functions invocation URL.

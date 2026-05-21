@@ -6,6 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -13,6 +14,7 @@ use App\Services\Serverless\InvokeFunctionTick;
 use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -166,15 +168,14 @@ class Workers extends Component
         $entry = $tick->tickSite($this->site->fresh(), 'queue');
 
         if ($entry === null) {
-            $this->toastError(__('Cannot tick — the function has no invocation URL or webhook secret set yet. Deploy the function first.'));
+            $this->toastError(__('Cannot tick — the function has no webhook secret set yet. Deploy the function first.'));
 
             return;
         }
 
-        $ok = ($entry['status'] ?? '') === 'ok';
-        $http = $entry['http_status'] ?? '—';
-        $this->toastSuccess($ok
-            ? __('Queue tick fired — HTTP :status, :ms ms.', ['status' => $http, 'ms' => (int) ($entry['duration_ms'] ?? 0)])
+        $http = $entry->status_code ?? '—';
+        $this->toastSuccess($entry->success
+            ? __('Queue tick fired — HTTP :status, :ms ms.', ['status' => $http, 'ms' => $entry->duration_ms])
             : __('Queue tick fired but reported a failure — HTTP :status. Check the history below.', ['status' => $http]));
     }
 
@@ -381,14 +382,26 @@ class Workers extends Component
      */
     public function showTick(string $at): void
     {
-        $meta = $this->site->fresh()?->meta;
-        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-        $tickHistory = is_array($serverless['tick_history'] ?? null) ? $serverless['tick_history'] : [];
+        $this->selectedTick = $this->tickHistory()
+            ->first(fn (array $entry): bool => (string) ($entry['at'] ?? '') === $at);
+    }
 
-        $this->selectedTick = collect($tickHistory)
-            ->first(fn ($entry): bool => is_array($entry)
-                && ($entry['task'] ?? null) === 'queue'
-                && (string) ($entry['at'] ?? '') === $at);
+    /**
+     * The site's recent `queue` ticks, newest-first, in the legacy
+     * tick-history array shape the view consumes.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function tickHistory(): Collection
+    {
+        return FunctionInvocation::query()
+            ->where('site_id', $this->site->id)
+            ->where('source', FunctionInvocation::SOURCE_TICK)
+            ->where('task', 'queue')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (FunctionInvocation $invocation): array => $invocation->toTickEntry());
     }
 
     public function closeTick(): void
@@ -402,14 +415,10 @@ class Workers extends Component
 
         $this->site->refresh();
         $serverless = is_array($this->site->meta['serverless'] ?? null) ? $this->site->meta['serverless'] : [];
-        $tickHistory = is_array($serverless['tick_history'] ?? null) ? $serverless['tick_history'] : [];
-        // Workers cares only about queue-task ticks. ServerlessTickCommand
-        // pings the function once per task type, so a single tick produces
-        // both a `schedule` and a `queue` entry; we slice the queue half here.
-        $queueHistory = collect($tickHistory)
-            ->filter(fn ($entry): bool => is_array($entry) && ($entry['task'] ?? null) === 'queue')
-            ->reverse()
-            ->values();
+        // Workers cares only about queue-task ticks; the Schedule page shows
+        // the scheduler half. Each ServerlessTickCommand pass records one row
+        // per task type.
+        $queueHistory = $this->tickHistory();
 
         $latestQueue = $queueHistory->first();
         $lastQueueStatus = is_array($latestQueue) ? ($latestQueue['status'] ?? null) : null;
@@ -429,7 +438,7 @@ class Workers extends Component
             'laravel_tab' => 'commands',
             'section' => 'workers',
             'queueHistory' => $queueHistory,
-            'lastTickAt' => $serverless['last_tick_at'] ?? null,
+            'lastTickAt' => $queueHistory->first()['at'] ?? null,
             'secretMismatchDetected' => $this->detectSecretMismatch($queueHistory->first()),
             'dns' => is_array($serverless['dns'] ?? null) ? $serverless['dns'] : [],
             'workerRows' => $workerRows,

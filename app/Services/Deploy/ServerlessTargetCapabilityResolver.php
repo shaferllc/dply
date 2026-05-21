@@ -16,6 +16,7 @@ final class ServerlessTargetCapabilityResolver
      *     supports_php_runtime: bool,
      *     supports_node_runtime: bool,
      *     supports_python_runtime: bool,
+     *     supports_go_runtime: bool,
      *     default_runtime: string,
      *     default_python_runtime: string,
      *     default_entrypoint: string,
@@ -37,6 +38,7 @@ final class ServerlessTargetCapabilityResolver
      *     supports_php_runtime: bool,
      *     supports_node_runtime: bool,
      *     supports_python_runtime: bool,
+     *     supports_go_runtime: bool,
      *     default_runtime: string,
      *     default_python_runtime: string,
      *     default_entrypoint: string,
@@ -51,11 +53,13 @@ final class ServerlessTargetCapabilityResolver
             return [
                 'target' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
                 'supports_runtime_detection' => true,
-                // DigitalOcean Functions runs PHP natively (no Bref needed —
-                // that's the AWS Lambda path).
+                // DigitalOcean Functions (managed Apache OpenWhisk) ships
+                // exactly four tenant runtimes: Node.js, Python, PHP, and Go.
+                // PHP runs natively — no Bref needed; that's the Lambda path.
                 'supports_php_runtime' => true,
                 'supports_node_runtime' => true,
-                'supports_python_runtime' => false,
+                'supports_python_runtime' => true,
+                'supports_go_runtime' => true,
                 'default_runtime' => 'nodejs:18',
                 'default_python_runtime' => 'python3.12',
                 // OpenWhisk `exec.main` — the handler function name, not a
@@ -73,6 +77,7 @@ final class ServerlessTargetCapabilityResolver
                 'supports_php_runtime' => true,
                 'supports_node_runtime' => true,
                 'supports_python_runtime' => true,
+                'supports_go_runtime' => true,
                 'default_runtime' => 'provided.al2023',
                 'default_python_runtime' => 'python3.12',
                 'default_entrypoint' => 'public/index.php',
@@ -87,6 +92,7 @@ final class ServerlessTargetCapabilityResolver
             'supports_php_runtime' => false,
             'supports_node_runtime' => false,
             'supports_python_runtime' => false,
+            'supports_go_runtime' => false,
             'default_runtime' => '',
             'default_python_runtime' => 'python3.12',
             'default_entrypoint' => '',

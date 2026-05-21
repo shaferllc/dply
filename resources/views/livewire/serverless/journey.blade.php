@@ -1,17 +1,19 @@
 <div @if ($shouldPoll) wire:poll.3s @endif>
-    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-breadcrumb-trail :items="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Serverless'), 'icon' => 'sparkles'],
-            ['label' => $site->name, 'icon' => 'bolt'],
-        ]" />
+    <div @class(['max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8' => ! $embedded])>
+        @unless ($embedded)
+            <x-breadcrumb-trail :items="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Serverless'), 'icon' => 'sparkles'],
+                ['label' => $site->name, 'icon' => 'bolt'],
+            ]" />
+        @endunless
 
         <div class="dply-card overflow-hidden">
             {{-- Hero --}}
             <div class="p-6 sm:p-8 border-b border-brand-ink/10">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <h1 class="text-xl font-bold text-brand-ink">{{ __('Deploying :name', ['name' => $site->name]) }}</h1>
+                        <h1 class="text-xl font-bold text-brand-ink">{{ $title }}</h1>
                         <p class="mt-1 text-sm text-brand-moss">
                             <span class="font-mono">{{ $site->git_repository_url }}</span>@if ($site->git_branch)<span class="text-brand-moss/60"> · {{ $site->git_branch }}</span>@endif
                         </p>
@@ -36,7 +38,7 @@
                 <div class="mt-5">
                     <div class="flex items-center justify-between text-xs font-medium text-brand-moss">
                         <span>{{ $percent }}% {{ __('complete') }}</span>
-                        <span>{{ __('Elapsed') }} {{ $elapsedHuman }}</span>
+                        <span>{{ $elapsedLabel }} {{ $elapsedHuman }}</span>
                     </div>
                     <div class="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-brand-ink/10">
                         <div @class([
@@ -161,17 +163,27 @@
                         </button>
                     @endif
 
+                    @if ($live)
+                        <button type="button" wire:click="redeploy" wire:loading.attr="disabled" wire:target="redeploy"
+                                class="inline-flex items-center rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                            <span wire:loading.remove wire:target="redeploy">{{ __('Redeploy') }}</span>
+                            <span wire:loading wire:target="redeploy">{{ __('Starting…') }}</span>
+                        </button>
+                    @endif
+
                     @if ($live && $actionUrl)
                         <a href="{{ $actionUrl }}" target="_blank" rel="noopener"
-                           class="inline-flex items-center rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                           class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
                             {{ __('Open function') }}
                         </a>
                     @endif
 
-                    <a href="{{ route('sites.show', [$server->id, $site->id]) }}" wire:navigate
-                       class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
-                        {{ __('Go to dashboard') }}
-                    </a>
+                    @unless ($embedded)
+                        <a href="{{ route('sites.show', [$server->id, $site->id]) }}" wire:navigate
+                           class="inline-flex items-center rounded-xl border-2 border-brand-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+                            {{ __('Go to dashboard') }}
+                        </a>
+                    @endunless
                 </div>
             @endif
         </div>

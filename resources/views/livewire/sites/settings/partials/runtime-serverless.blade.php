@@ -178,6 +178,5 @@
     {{-- 4. CLI parity --}}
     <x-cli-snippet :commands="[
         ['label' => __('Deploy / redeploy the function'), 'command' => 'dply:site:deploy '.$site->slug],
-        ['label' => __('Tail activation logs'), 'command' => 'serverless:logs '.$site->slug],
     ]" />
 </div>

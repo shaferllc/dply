@@ -256,34 +256,38 @@ class SiteBackgroundPagesTest extends TestCase
         $user = $this->actingOrgOwner();
         [$server, $site] = $this->makeFunctionsSite($user);
 
-        $olderAt = now()->subMinute()->toIso8601String();
         $olderBody = str_repeat('A', 200).'OLD-TAIL-MARKER';
-        $site->forceFill(['meta' => [
-            'runtime_profile' => 'digitalocean_functions_web',
-            'serverless' => [
-                'scheduler_enabled' => true,
-                'tick_history' => [
-                    [
-                        'at' => $olderAt,
-                        'task' => 'schedule',
-                        'status' => 'failed',
-                        'http_status' => 500,
-                        'duration_ms' => 5466,
-                        'body_preview' => $olderBody,
-                        'error' => null,
-                    ],
-                    [
-                        'at' => now()->toIso8601String(),
-                        'task' => 'schedule',
-                        'status' => 'ok',
-                        'http_status' => 200,
-                        'duration_ms' => 42,
-                        'body_preview' => 'most recent tick',
-                        'error' => null,
-                    ],
-                ],
-            ],
-        ]])->save();
+        $older = \App\Models\FunctionInvocation::query()->create([
+            'site_id' => $site->id,
+            'source' => \App\Models\FunctionInvocation::SOURCE_TICK,
+            'task' => 'schedule',
+            'method' => 'GET',
+            'path' => '/',
+            'status_code' => 500,
+            'success' => false,
+            'duration_ms' => 5466,
+            'cold' => false,
+            'activation_id' => 'act-old',
+            'log_lines' => [],
+            'result_excerpt' => $olderBody,
+            'created_at' => now()->subMinute(),
+        ]);
+        \App\Models\FunctionInvocation::query()->create([
+            'site_id' => $site->id,
+            'source' => \App\Models\FunctionInvocation::SOURCE_TICK,
+            'task' => 'schedule',
+            'method' => 'GET',
+            'path' => '/',
+            'status_code' => 200,
+            'success' => true,
+            'duration_ms' => 42,
+            'cold' => false,
+            'activation_id' => 'act-new',
+            'log_lines' => [],
+            'result_excerpt' => 'most recent tick',
+            'created_at' => now(),
+        ]);
+        $olderAt = $older->refresh()->created_at->toIso8601String();
 
         Livewire::actingAs($user)
             ->test(Schedule::class, ['server' => $server, 'site' => $site])

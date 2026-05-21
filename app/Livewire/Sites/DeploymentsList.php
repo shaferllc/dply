@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -21,6 +24,7 @@ use Livewire\WithPagination;
  */
 class DeploymentsList extends Component
 {
+    use DispatchesToastNotifications;
     use WithPagination;
 
     public Server $server;
@@ -69,6 +73,19 @@ class DeploymentsList extends Component
         $this->statusFilter = '';
         $this->triggerFilter = '';
         $this->resetPage();
+    }
+
+    /**
+     * Trigger a fresh deploy. Used by non-serverless runtimes — a serverless
+     * function redeploys through the embedded journey panel instead, which
+     * also watches the deploy run.
+     */
+    public function redeploy(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+        $this->toastSuccess(__('Deployment queued.'));
     }
 
     public function render(): View

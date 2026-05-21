@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Sites\DeploymentsList;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class SiteDeploymentsListPageTest extends TestCase
@@ -102,6 +106,51 @@ class SiteDeploymentsListPageTest extends TestCase
     /**
      * @return array{0: User, 1: Server, 2: Site}
      */
+    public function test_redeploy_action_queues_a_deployment(): void
+    {
+        Queue::fake();
+        [$user, $server, $site] = $this->makeUserSite();
+
+        Livewire::actingAs($user)
+            ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+            ->call('redeploy');
+
+        Queue::assertPushed(RunSiteDeploymentJob::class, fn ($job): bool => $job->site->is($site));
+    }
+
+    public function test_serverless_deployments_tab_embeds_the_journey_with_a_redeploy_control(): void
+    {
+        [$user, $server, $site] = $this->makeFunctionsSite();
+
+        Livewire::actingAs($user)
+            ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+            // The embedded journey panel is the redeploy surface.
+            ->assertSeeLivewire('serverless.journey')
+            ->assertSee('Redeploy');
+    }
+
+    private function makeFunctionsSite(): array
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        ]);
+
+        return [$user, $server, $site];
+    }
+
     private function makeUserSite(): array
     {
         $user = User::factory()->create();
