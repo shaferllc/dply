@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CancelServerProvisionController;
+use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
@@ -19,6 +20,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Edge\Create as EdgeCreate;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Serverless\Create as ServerlessCreate;
+use App\Livewire\Serverless\Index as ServerlessIndex;
 use App\Livewire\Serverless\Journey as ServerlessJourney;
 use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
@@ -123,6 +125,31 @@ Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhook
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.edge.github');
 
+// Friendly public URL for a serverless function — dply proxies it through
+// to the function's raw DigitalOcean Functions invocation URL.
+Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
+    ->where('path', '.*')
+    ->name('serverless.proxy');
+
+// Live function hostnames: a deployed function answers at
+// {slug}.{DPLY_TESTING_DOMAINS entry}. Each configured testing domain gets a
+// wildcard-subdomain route that proxies to the function. (Production needs
+// *.{domain} DNS + TLS pointed at the dply app for these to resolve.)
+foreach ((array) config('services.digitalocean.testing_domains', []) as $functionDomain) {
+    $functionDomain = trim((string) $functionDomain);
+    if ($functionDomain === '') {
+        continue;
+    }
+
+    Route::domain('{slug}.'.$functionDomain)
+        ->any('/{path?}', ServerlessFunctionProxyController::class)
+        ->where('path', '.*')
+        ->withoutMiddleware([
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+            \App\Http\Middleware\RedirectGuestsToComingSoon::class,
+        ]);
+}
+
 Route::get('/', function () {
     return view('welcome');
 });
@@ -219,6 +246,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('edge', EdgeIndex::class)->name('edge.index');
         Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
     });
+    Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
     Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
@@ -262,6 +290,16 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         // overview.
         if (($server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES) {
             return redirect()->route('servers.cluster', $server);
+        }
+
+        // A serverless function is not a server — the DO Functions namespace
+        // is an implementation detail. Send the operator straight to the
+        // function workspace instead of a server-shaped overview.
+        if ($server->isDigitalOceanFunctionsHost()) {
+            $function = $server->sites()->orderBy('created_at')->first();
+            if ($function !== null) {
+                return redirect()->route('sites.show', ['server' => $server, 'site' => $function]);
+            }
         }
 
         // Journey page is SSH/VM-shaped — only VM hosts have a provision task

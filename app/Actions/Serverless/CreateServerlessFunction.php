@@ -91,6 +91,9 @@ class CreateServerlessFunction
             ],
         ]);
 
+        // Give the function a friendly, dply-hosted URL straight away.
+        $site->ensureServerlessProxySlug();
+
         // Provision the namespace, then the job chains to the function deploy.
         ProvisionServerlessHostJob::dispatch($server->id);
 

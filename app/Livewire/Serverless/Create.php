@@ -149,6 +149,7 @@ class Create extends Component
 
         return view('livewire.serverless.create', [
             'credentials' => $credentials,
+            'functionFee' => app(\App\Services\Serverless\ServerlessCostEstimator::class)->functionFee(),
             'runtimes' => [
                 'nodejs:18' => 'Node.js 18',
                 'nodejs:20' => 'Node.js 20',

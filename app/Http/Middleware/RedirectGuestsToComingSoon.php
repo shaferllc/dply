@@ -29,6 +29,12 @@ class RedirectGuestsToComingSoon
             return $next($request);
         }
 
+        // Serverless function URLs are public HTTP endpoints — every caller
+        // of a deployed function is a guest by definition.
+        if ($request->is('fn/*')) {
+            return $next($request);
+        }
+
         if ($this->routeIsAllowed($request)) {
             return $next($request);
         }

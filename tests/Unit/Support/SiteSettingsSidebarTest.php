@@ -154,4 +154,35 @@ class SiteSettingsSidebarTest extends TestCase
         $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
         $this->assertContains('rails-stack', $ids);
     }
+
+    public function test_serverless_function_drops_host_only_sections(): void
+    {
+        $server = new Server;
+        $server->meta = ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS];
+
+        $site = new Site;
+        $site->setRelation('server', $server);
+        $site->server_id = $server->id;
+        $site->meta = ['runtime_profile' => 'digitalocean_functions_web'];
+
+        $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+        foreach (['routing', 'dns', 'system-user', 'basic-auth'] as $excluded) {
+            $this->assertNotContains($excluded, $ids, $excluded.' should not appear for a serverless function');
+        }
+        $this->assertContains('environment', $ids);
+        $this->assertContains('deploy', $ids);
+        $this->assertContains('repository', $ids);
+    }
+
+    public function test_docker_workspace_keeps_host_sections(): void
+    {
+        $server = $this->makeContainerServer();
+        $site = $this->makeSite($server);
+
+        $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+        $this->assertContains('routing', $ids);
+        $this->assertContains('system-user', $ids);
+    }
 }

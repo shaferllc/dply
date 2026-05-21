@@ -28,6 +28,9 @@ class DigitalOceanFunctionsLaravelBuildTest extends TestCase
             'name' => 'demo/laravel-fn',
             'require' => ['laravel/framework' => '^13.0'],
         ], JSON_PRETTY_PRINT));
+        // A .dplyignore custom exclusion plus a file it should drop.
+        File::put($origin.'/.dplyignore', "# build noise\nsecret-notes.txt\n");
+        File::put($origin.'/secret-notes.txt', 'shh');
 
         $this->runProcess(['git', 'init', '-b', 'main'], $origin);
         $this->runProcess(['git', 'config', 'user.email', 'tests@example.com'], $origin);
@@ -48,6 +51,7 @@ class DigitalOceanFunctionsLaravelBuildTest extends TestCase
             'git_repository_url' => $origin,
             'git_branch' => 'main',
             'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'post_deploy_command' => 'printf "deploy-ran" > deploy-marker.txt',
             'meta' => [
                 'runtime_profile' => 'digitalocean_functions_web',
                 // `true` stands in for `composer install` so the test stays
@@ -68,8 +72,19 @@ class DigitalOceanFunctionsLaravelBuildTest extends TestCase
         $this->assertTrue($zip->open($result['artifact_path']) === true);
         $this->assertNotFalse($zip->locateName('index.php'), 'adapter index.php should be in the artifact');
         $handler = (string) $zip->getFromName('index.php');
+        $this->assertNotFalse($zip->locateName('.env'), 'managed .env should be in the artifact');
+        $env = (string) $zip->getFromName('.env');
+        $this->assertNotFalse($zip->locateName('deploy-marker.txt'), 'the deploy command should have run');
+        $this->assertNotFalse($zip->locateName('composer.json'), 'app files should still be packaged');
+        // Artifact slimming — VCS metadata and .dplyignore entries are dropped.
+        $this->assertFalse($zip->locateName('.git/HEAD'), '.git must not be in the artifact');
+        $this->assertFalse($zip->locateName('secret-notes.txt'), '.dplyignore entries must be excluded');
         $zip->close();
         $this->assertStringContainsString('function main(array $args)', $handler);
+
+        // A Laravel function is given a stable, managed APP_KEY.
+        $this->assertMatchesRegularExpression('/APP_KEY=base64:.+/', $env);
+        $this->assertMatchesRegularExpression('/APP_KEY=base64:.+/', (string) $site->fresh()->env_file_content);
 
         // The deployer reads entrypoint as OpenWhisk `exec.main`.
         $this->assertSame('main', $site->fresh()->serverlessResolvedConfig()['entrypoint']);

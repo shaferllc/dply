@@ -22,12 +22,43 @@ final class DigitalOceanFunctionsActionDeployer
     public function deploy(Site $site): array
     {
         $site->loadMissing('server', 'domains');
+        $this->assertFunctionsHost($site->server);
 
-        $server = $site->server;
+        $buildResult = $this->artifactBuilder->build($site);
+
+        return $this->pushArtifact($site, $buildResult['artifact_path'], $buildResult['output']);
+    }
+
+    /**
+     * Re-deploy a previously built artifact without rebuilding — the rollback
+     * path. The artifact is one recorded in `serverless.artifact_history`.
+     *
+     * @return array{output: string, revision_id: ?string, url: ?string}
+     */
+    public function redeployArtifact(Site $site, string $artifactPath): array
+    {
+        $site->loadMissing('server', 'domains');
+        $this->assertFunctionsHost($site->server);
+
+        return $this->pushArtifact($site, $artifactPath, 'Rollback — re-deploying a previous artifact.');
+    }
+
+    private function assertFunctionsHost(?Server $server): void
+    {
         if (! $server instanceof Server || ! $server->isDigitalOceanFunctionsHost()) {
             throw new \RuntimeException('DigitalOcean Functions deploy requires a Functions-backed host.');
         }
+    }
 
+    /**
+     * Upload an artifact zip to the OpenWhisk action and record the result.
+     * Shared by a fresh deploy and a rollback.
+     *
+     * @return array{output: string, revision_id: ?string, url: ?string}
+     */
+    private function pushArtifact(Site $site, string $artifactPath, string $buildOutput): array
+    {
+        $server = $site->server;
         $serverMeta = is_array($server->meta) ? $server->meta : [];
         $hostConfig = is_array($serverMeta['digitalocean_functions'] ?? null) ? $serverMeta['digitalocean_functions'] : [];
         $siteMeta = is_array($site->meta) ? $site->meta : [];
@@ -39,9 +70,6 @@ final class DigitalOceanFunctionsActionDeployer
         if ($apiHost === '' || $namespace === '' || $accessKey === '') {
             throw new \RuntimeException('DigitalOcean Functions host metadata is incomplete. Save API host, namespace, and access key first.');
         }
-
-        $buildResult = $this->artifactBuilder->build($site);
-        $artifactPath = $buildResult['artifact_path'];
 
         // Resolve runtime config AFTER the build — the artifact builder
         // detects the framework and persists the corrected runtime / entry
@@ -103,6 +131,17 @@ final class DigitalOceanFunctionsActionDeployer
         $revisionId = is_array($json) && isset($json['version']) ? (string) $json['version'] : null;
 
         $functionsConfig = $site->serverlessConfig();
+
+        // Keep the last few artifacts so a bad deploy can be rolled back to a
+        // known-good one without rebuilding.
+        $history = is_array($functionsConfig['artifact_history'] ?? null) ? $functionsConfig['artifact_history'] : [];
+        array_unshift($history, [
+            'artifact_path' => $realArtifactPath,
+            'revision_id' => $revisionId,
+            'deployed_at' => now()->toIso8601String(),
+        ]);
+        $history = array_slice($history, 0, 5);
+
         $siteMeta['serverless'] = array_merge($functionsConfig, [
             'target' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
             'package' => $package,
@@ -113,20 +152,28 @@ final class DigitalOceanFunctionsActionDeployer
             'last_deployed_at' => now()->toIso8601String(),
             'last_revision_id' => $revisionId,
             'action_url' => $this->actionWebUrl($apiHost, $namespace, $package, $actionName),
+            'artifact_history' => $history,
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
         $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
+        // Smoke-test the freshly deployed function so a broken runtime is
+        // caught here — and shown on the deploy journey — instead of by the
+        // operator hitting the URL. The deploy itself still succeeds: the
+        // action IS deployed; this only reports whether it answers.
+        $health = $this->smokeTest($site, (string) $siteMeta['serverless']['action_url']);
+
         return [
             'output' => implode("\n", array_filter([
-                $buildResult['output'] !== '' ? $buildResult['output'] : null,
+                $buildOutput !== '' ? $buildOutput : null,
                 'DigitalOcean Functions deploy completed.',
                 'Namespace: '.$namespace,
                 'Package: '.$package,
                 'Action: '.$actionName,
                 'Runtime: '.$kind,
                 $revisionId ? 'Revision: '.$revisionId : null,
+                'Health check: '.$health,
             ])),
             'revision_id' => $revisionId,
             'url' => $siteMeta['serverless']['action_url'],
@@ -165,6 +212,39 @@ final class DigitalOceanFunctionsActionDeployer
         if (! $response->successful() && $response->status() !== 404) {
             throw new \RuntimeException('DigitalOcean Functions delete failed: HTTP '.$response->status().' '.$response->body());
         }
+    }
+
+    /**
+     * GET the freshly deployed function once and record the result as a
+     * `verify` journey sub-step. A 2xx/3xx means it boots and answers; any
+     * other status — or an unreachable host — is surfaced. This never fails
+     * the deploy: the action IS deployed; this only reports whether it runs.
+     */
+    private function smokeTest(Site $site, string $actionUrl): string
+    {
+        if ($actionUrl === '') {
+            return 'skipped (no invocation URL).';
+        }
+
+        $this->progress->active($site, 'verify', 'Verifying the function');
+
+        try {
+            $status = Http::timeout(30)->get($actionUrl)->status();
+        } catch (\Throwable $e) {
+            $this->progress->step($site, 'verify', 'Function is unreachable', ServerlessDeployProgress::STATE_FAILED, $e->getMessage());
+
+            return 'unreachable — '.$e->getMessage();
+        }
+
+        if ($status >= 200 && $status < 400) {
+            $this->progress->done($site, 'verify', 'Function responded', 'HTTP '.$status);
+
+            return 'HTTP '.$status.' — function is responding.';
+        }
+
+        $this->progress->step($site, 'verify', 'Function returned an error', ServerlessDeployProgress::STATE_FAILED, 'HTTP '.$status);
+
+        return 'HTTP '.$status.' — function deployed but is returning an error.';
     }
 
     private function actionName(Site $site): string

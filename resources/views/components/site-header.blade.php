@@ -160,6 +160,12 @@
                                             {{ __('Edge sites') }}
                                         </x-dropdown-link>
                                     @endfeature
+                                    <x-dropdown-link :href="route('serverless.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-bolt class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Serverless') }}
+                                    </x-dropdown-link>
                                     @feature('surface.fleet')
                                         <x-dropdown-link :href="route('fleet.health')">
                                             <x-slot name="icon">

@@ -100,6 +100,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // of the backend reporting ready.
         $schedule->command(EdgePollStatusCommand::class)->everyMinute();
 
+        // Drive the Laravel scheduler + queue worker on serverless functions
+        // — DigitalOcean Functions has no long-running process of its own.
+        $schedule->command(\App\Console\Commands\ServerlessTickCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping();
+
         $schedule->command(\App\Console\Commands\SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
@@ -210,6 +216,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'hooks/*',
             'webhook/*',
             'webauthn/*',
+            'fn/*',
         ]);
 
         $middleware->appendToGroup('web', [

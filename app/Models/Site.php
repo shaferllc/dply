@@ -1584,6 +1584,58 @@ class Site extends Model
     }
 
     /**
+     * The function's globally-unique friendly slug — the one that gives it a
+     * clean dply-hosted URL ({app}/fn/{slug}) instead of the raw DigitalOcean
+     * Functions invocation URL. Generated and persisted on first access.
+     */
+    public function ensureServerlessProxySlug(): string
+    {
+        $existing = (string) ($this->serverlessConfig()['proxy_slug'] ?? '');
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $base = \Illuminate\Support\Str::slug((string) $this->name) ?: 'fn';
+        $slug = $base;
+        while (static::query()
+            ->where('meta->serverless->proxy_slug', $slug)
+            ->whereKeyNot($this->getKey())
+            ->exists()) {
+            $slug = $base.'-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(4));
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $serverless['proxy_slug'] = $slug;
+        $meta['serverless'] = $serverless;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $slug;
+    }
+
+    /**
+     * The function's live hostname — its proxy slug under a deterministically
+     * chosen DPLY_TESTING_DOMAINS entry (e.g. orders-api.dply.cc), matching
+     * how VM sites get a testing hostname. Null when no testing domains are
+     * configured, in which case the path URL (/fn/{slug}) is the address.
+     */
+    public function serverlessFunctionHost(): ?string
+    {
+        $domains = array_values(array_filter(
+            (array) config('services.digitalocean.testing_domains', []),
+            static fn ($domain): bool => is_string($domain) && trim($domain) !== '',
+        ));
+
+        if ($domains === []) {
+            return null;
+        }
+
+        $domain = trim((string) $domains[abs(crc32((string) $this->getKey())) % count($domains)]);
+
+        return $this->ensureServerlessProxySlug().'.'.$domain;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function serverlessResolvedConfig(): array

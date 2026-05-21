@@ -91,7 +91,8 @@
                     </div>
 
                     <div class="rounded-lg bg-brand-cream/50 border border-brand-ink/10 px-4 py-3 text-xs text-brand-moss">
-                        {{ __('Billed at a flat per-function fee once the function is live — not as a server. See your billing page for the current rate.') }}
+                        <span class="font-semibold text-brand-ink">{{ __('Estimated cost:') }} ${{ number_format($functionFee, 2) }}/mo</span>
+                        — {{ __('a flat dply per-function fee once the function is live. Databases or Redis you add later are billed separately by DigitalOcean (shown before you provision them).') }}
                     </div>
 
                     <div class="flex justify-end gap-3 pt-2">

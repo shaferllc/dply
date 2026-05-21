@@ -442,6 +442,97 @@ class DigitalOceanService
     }
 
     /**
+     * Create a DigitalOcean Managed Database cluster. It returns immediately
+     * with status `creating`; poll {@see getDatabaseCluster()} until `online`.
+     *
+     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function createDatabaseCluster(string $engine, string $region, string $size, string $name): array
+    {
+        $response = $this->request('post', '/databases', [
+            'name' => $name,
+            'engine' => $engine,
+            'region' => $region,
+            'size' => $size,
+            'num_nodes' => 1,
+        ]);
+        $this->assertSuccess($response, 'create database cluster');
+
+        return $this->normalizeDatabaseCluster($response->json('database'));
+    }
+
+    /**
+     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function getDatabaseCluster(string $id): array
+    {
+        $response = $this->request('get', '/databases/'.$id);
+        $this->assertSuccess($response, 'get database cluster');
+
+        return $this->normalizeDatabaseCluster($response->json('database'));
+    }
+
+    /**
+     * Create a transaction-mode connection pool (PgBouncer) on a Postgres
+     * cluster. Serverless functions open a fresh connection on every cold
+     * start; a pool multiplexes those onto a small set of backend
+     * connections so the cluster's connection limit is not exhausted.
+     *
+     * @return array{name: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function createDatabaseConnectionPool(string $clusterId, string $name, string $database, string $user, int $size = 10): array
+    {
+        $response = $this->request('post', '/databases/'.$clusterId.'/pools', [
+            'name' => $name,
+            'mode' => 'transaction',
+            'size' => $size,
+            'db' => $database,
+            'user' => $user,
+        ]);
+        $this->assertSuccess($response, 'create database connection pool');
+
+        $pool = $response->json('pool');
+        $pool = is_array($pool) ? $pool : [];
+        $connection = is_array($pool['connection'] ?? null) ? $pool['connection'] : [];
+
+        return [
+            'name' => (string) ($pool['name'] ?? $name),
+            'connection' => [
+                'host' => (string) ($connection['host'] ?? ''),
+                'port' => (int) ($connection['port'] ?? 0),
+                'user' => (string) ($connection['user'] ?? ''),
+                'password' => (string) ($connection['password'] ?? ''),
+                'database' => (string) ($connection['database'] ?? ''),
+                'ssl' => (bool) ($connection['ssl'] ?? true),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    private function normalizeDatabaseCluster(mixed $database): array
+    {
+        $database = is_array($database) ? $database : [];
+        $connection = is_array($database['connection'] ?? null) ? $database['connection'] : [];
+
+        return [
+            'id' => (string) ($database['id'] ?? ''),
+            'status' => (string) ($database['status'] ?? ''),
+            'engine' => (string) ($database['engine'] ?? ''),
+            'connection' => [
+                'host' => (string) ($connection['host'] ?? ''),
+                'port' => (int) ($connection['port'] ?? 0),
+                'user' => (string) ($connection['user'] ?? ''),
+                'password' => (string) ($connection['password'] ?? ''),
+                'database' => (string) ($connection['database'] ?? ''),
+                'uri' => (string) ($connection['uri'] ?? ''),
+                'ssl' => (bool) ($connection['ssl'] ?? true),
+            ],
+        ];
+    }
+
+    /**
      * Validate token with a lightweight account endpoint.
      */
     public function validateToken(): void

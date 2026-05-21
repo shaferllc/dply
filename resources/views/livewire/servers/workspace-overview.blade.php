@@ -6,7 +6,13 @@
     // VM-shaped "setup in progress" hero instead of the at-a-glance overview
     // (and the new "Add your first container app" CTA below).
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
-    $setupIncomplete = ! $isContainerHost && (
+    // Only VM hosts run the setup journey. Container, serverless (DO
+    // Functions), and other non-VM hosts have no setup script — their
+    // setup_status stays null — so they are complete the moment they are
+    // STATUS_READY. Gating on isVmHost() instead of an explicit host-kind
+    // list keeps every non-VM host out of the VM-shaped "setup in progress"
+    // hero.
+    $setupIncomplete = $server->isVmHost() && (
         $server->status !== \App\Models\Server::STATUS_READY
         || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE
     );

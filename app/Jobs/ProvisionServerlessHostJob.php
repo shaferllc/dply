@@ -50,6 +50,14 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
 
         // Already provisioned — skip the API call, just (re)deploy functions.
         if (! empty($meta['digitalocean_functions']['api_host'] ?? null)) {
+            // A functions namespace has no SSH setup phase — make sure the
+            // host reads as fully ready so the workspace navigation shows.
+            if ($server->status !== Server::STATUS_READY || $server->setup_status !== Server::SETUP_STATUS_DONE) {
+                $server->update([
+                    'status' => Server::STATUS_READY,
+                    'setup_status' => Server::SETUP_STATUS_DONE,
+                ]);
+            }
             $this->deployConfiguredFunctions($server);
 
             return;
@@ -100,6 +108,8 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
         $server->update([
             'meta' => $meta,
             'status' => Server::STATUS_READY,
+            // No SSH setup phase for a functions namespace — it is done.
+            'setup_status' => Server::SETUP_STATUS_DONE,
         ]);
 
         $this->deployConfiguredFunctions($server);

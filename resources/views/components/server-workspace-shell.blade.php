@@ -9,7 +9,16 @@
     $card = 'dply-card overflow-hidden';
     $navLink = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors';
     $workspaceNav = server_workspace_nav_for_server($server);
-    $showNavigation = $showNavigation ?? ($server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE);
+    // A host is navigable once READY. VM hosts additionally wait for the
+    // setup script (setup_status === done); hosts with no SSH setup phase
+    // — serverless / functions namespaces — are ready as soon as they are.
+    $showNavigation = $showNavigation ?? (
+        $server->status === \App\Models\Server::STATUS_READY
+        && (
+            $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE
+            || ! $server->hostCapabilities()->supportsSsh()
+        )
+    );
 @endphp
 
 @php

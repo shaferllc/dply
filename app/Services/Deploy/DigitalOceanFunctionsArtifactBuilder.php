@@ -20,6 +20,7 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly BrefInjector $brefInjector,
         private readonly DigitalOceanFunctionsLaravelAdapter $laravelAdapter,
         private readonly ServerlessDeployProgress $progress,
+        private readonly ServerlessEnvironmentPreparer $environmentPreparer,
     ) {}
 
     /**
@@ -95,6 +96,15 @@ class DigitalOceanFunctionsArtifactBuilder
             $this->progress->done($site, 'adapter', 'Injected Laravel adapter');
         }
 
+        // Bundle dply's managed environment into the artifact (and mint a
+        // stable APP_KEY for Laravel) — the function has no other way to
+        // receive configuration.
+        $envLog = $this->environmentPreparer->prepare(
+            $site,
+            $checkout['working_directory'],
+            $detected['framework'] === 'laravel',
+        );
+
         if ($buildCommand === '') {
             throw new \RuntimeException('Dply could not determine a build command for this serverless site. Open Advanced settings and set one manually.');
         }
@@ -111,11 +121,22 @@ class DigitalOceanFunctionsArtifactBuilder
             'artifact_output_path' => $artifactOutputPath,
         ]);
 
-        $log = array_filter([$checkout['output'], ...$brefLog, ...$laravelAdapterLog]);
+        $log = array_filter([$checkout['output'], ...$brefLog, ...$laravelAdapterLog, $envLog]);
 
         $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);
         $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
         $this->progress->done($site, 'dependencies', 'Installed dependencies');
+
+        // Deploy commands — migrations, cache warming, etc. Run in the build
+        // environment after dependencies + the prepared .env are in place, so
+        // they see the function's real configuration. A failure aborts the
+        // deploy rather than shipping a half-migrated app.
+        $deployCommand = trim((string) $site->post_deploy_command);
+        if ($deployCommand !== '') {
+            $this->progress->active($site, 'commands', 'Running deploy commands', $deployCommand);
+            $log[] = $this->runShell($deployCommand, $checkout['working_directory']);
+            $this->progress->done($site, 'commands', 'Ran deploy commands');
+        }
 
         $sourcePath = $checkout['working_directory'].'/'.ltrim($artifactOutputPath, '/');
         if (! file_exists($sourcePath)) {
@@ -130,7 +151,7 @@ class DigitalOceanFunctionsArtifactBuilder
         if (is_file($sourcePath) && str_ends_with(strtolower($sourcePath), '.zip')) {
             File::copy($sourcePath, $artifactPath);
         } else {
-            $this->zipPath($sourcePath, $artifactPath);
+            $this->zipPath($sourcePath, $artifactPath, $this->zipExclusions($checkout['working_directory']));
         }
         $this->progress->done($site, 'package', 'Packaged artifact');
 
@@ -185,7 +206,64 @@ class DigitalOceanFunctionsArtifactBuilder
         return trim($process->getOutput());
     }
 
-    private function zipPath(string $sourcePath, string $artifactPath): void
+    /** Paths never worth shipping in a serverless action artifact. */
+    private const DEFAULT_EXCLUSIONS = [
+        '.git', '.github', '.gitlab', 'node_modules', '.idea', '.vscode', '.DS_Store',
+    ];
+
+    /**
+     * Build the artifact exclusion list — sensible defaults plus anything in
+     * a repo-root `.dplyignore` (gitignore-style: one path per line, `#`
+     * comments). Keeps the action zip lean and well under the size limit.
+     *
+     * @return list<string>
+     */
+    private function zipExclusions(string $workingDirectory): array
+    {
+        $patterns = self::DEFAULT_EXCLUSIONS;
+
+        $ignoreFile = rtrim($workingDirectory, '/').'/.dplyignore';
+        if (is_file($ignoreFile)) {
+            foreach (file($ignoreFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+                $line = trim($line);
+                if ($line === '' || str_starts_with($line, '#')) {
+                    continue;
+                }
+                $patterns[] = trim($line, '/');
+            }
+        }
+
+        return array_values(array_unique($patterns));
+    }
+
+    /**
+     * @param  list<string>  $patterns
+     */
+    private function isExcluded(string $localName, array $patterns): bool
+    {
+        $localName = str_replace(DIRECTORY_SEPARATOR, '/', $localName);
+        $segments = explode('/', $localName);
+
+        foreach ($patterns as $pattern) {
+            if ($pattern === '') {
+                continue;
+            }
+            if ($localName === $pattern
+                || str_starts_with($localName, $pattern.'/')
+                || in_array($pattern, $segments, true)
+                || fnmatch($pattern, $localName)
+                || fnmatch($pattern, basename($localName))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<string>  $excludePatterns
+     */
+    private function zipPath(string $sourcePath, string $artifactPath, array $excludePatterns = []): void
     {
         $zip = new ZipArchive;
         if ($zip->open($artifactPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
@@ -200,7 +278,7 @@ class DigitalOceanFunctionsArtifactBuilder
 
             foreach ($iterator as $item) {
                 $localName = ltrim(str_replace($sourcePath, '', $item->getPathname()), DIRECTORY_SEPARATOR);
-                if ($localName === '') {
+                if ($localName === '' || $this->isExcluded($localName, $excludePatterns)) {
                     continue;
                 }
 

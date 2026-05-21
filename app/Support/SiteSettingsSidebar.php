@@ -127,11 +127,20 @@ final class SiteSettingsSidebar
             ? self::insertBackgroundGroup($withWebserver)
             : $withWebserver;
 
+        // A serverless function has no host to manage — there is no web
+        // server to route, no DNS zone, no system user, and no dply-managed
+        // proxy to enforce basic auth. Drop those sections (functions only;
+        // docker / kubernetes workspaces keep them).
+        $serverlessExcluded = $site->usesFunctionsRuntime()
+            ? ['routing', 'dns', 'system-user', 'basic-auth']
+            : [];
+
         return self::flagSupervisorSetup(
             collect($withBackground)
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
+                ->reject(fn (array $item): bool => in_array($item['id'] ?? null, $serverlessExcluded, true))
                 ->values()
                 ->all(),
             $server,

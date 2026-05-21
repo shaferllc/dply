@@ -744,6 +744,8 @@ class SiteTest extends TestCase
             'https://faas-nyc1-example.doserverless.co/api/v1/namespaces/*' => Http::response([
                 'version' => '7',
             ], 200),
+            // The post-deploy health check GETs the web invocation URL.
+            'https://faas-nyc1-example.doserverless.co/api/v1/web/*' => Http::response('ok', 200),
         ]);
 
         $origin = storage_path('framework/testing/functions-deploy-repo-'.uniqid());
@@ -797,6 +799,8 @@ class SiteTest extends TestCase
         $this->assertSame('7', data_get($site->meta, 'serverless.last_revision_id'));
         $this->assertNotNull(data_get($site->meta, 'serverless.artifact_path'));
         $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
+        // The post-deploy health check ran and the function answered.
+        $this->assertStringContainsString('Health check: HTTP 200', (string) $deployment->log_output);
 
         // The action API uses the `_` namespace placeholder (not the literal
         // namespace, which 404s) and marks the action web-exported.

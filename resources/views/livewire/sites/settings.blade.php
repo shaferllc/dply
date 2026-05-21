@@ -562,29 +562,17 @@
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div>
                                     <h2 class="text-lg font-semibold text-slate-900">{{ __('Deploy') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Keep repository source, no-downtime rollout strategy, deploy scripts, hooks, and release/log access together here. Deploy execution itself stays on the site overview page.') }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('Repository, rollout strategy, pipeline steps, and hooks. Deploy execution lives on the site overview.') }}</p>
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-sm">
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open deploy actions') }}</a>
                                     <a href="{{ route('sites.commits', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Commits') }}</a>
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open site logs') }}</a>
-                                    <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open server logs') }}</a>
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Site logs') }}</a>
+                                    <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Server logs') }}</a>
                                 </div>
                             </div>
 
-                            @include('livewire.sites.settings.partials.engine-http-cache')
-
                             <form wire:submit="saveGit" class="space-y-4">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <p class="text-sm font-semibold text-slate-900">{{ __('Repository and branch') }}</p>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Choose what Dply checks out for each deploy and keep the legacy post-deploy command with the repo configuration so the pipeline reads from top to bottom.') }}</p>
-                                </div>
                                 @if ($functionsHost)
-                                    <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                                        <p class="font-medium">{{ __('Serverless deploy target') }}</p>
-                                        <p class="mt-1">{{ __('Serverless deploys clone the repository on the queue worker, run the configured build command, package the build output, and publish the resulting artifact for the selected target.') }}</p>
-                                    </div>
-
                                     <div>
                                         <x-input-label for="functions_repo_source" value="Repository source" />
                                         <select id="functions_repo_source" wire:model.live="functions_repo_source" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
@@ -641,6 +629,12 @@
                                         <p class="mt-1 text-sm text-brand-moss">{{ __('Optional for monorepos.') }}</p>
                                         <x-input-error :messages="$errors->get('functions_repository_subdirectory')" class="mt-1" />
                                     </div>
+                                    <div>
+                                        <x-input-label for="post_deploy_command" value="Deploy command" />
+                                        <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="php artisan migrate --force"></textarea>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Runs in the build environment after dependencies install and the environment is prepared, before the function is packaged — use it for migrations and cache warming. A non-zero exit aborts the deploy.') }}</p>
+                                        <x-input-error :messages="$errors->get('post_deploy_command')" class="mt-1" />
+                                    </div>
                                 @else
                                     <div>
                                         <x-input-label for="post_deploy_command" value="Post-deploy command" />
@@ -650,25 +644,15 @@
 
                                 @if ($functionsHost && $functionsDetection !== [])
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 space-y-3">
-                                        <div class="flex flex-wrap items-start justify-between gap-3">
-                                            <div>
-                                                <p class="text-sm font-semibold text-brand-ink">{{ __('Detected setup') }}</p>
-                                                <p class="mt-1 text-sm text-brand-moss">{{ __('Dply inspected the configured repository and inferred a starting runtime/build setup for this target.') }}</p>
+                                        <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+                                            <div class="flex flex-wrap items-center gap-3">
+                                                <span class="font-semibold text-brand-ink">{{ __('Detected') }}</span>
+                                                <span class="text-brand-moss">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }} · {{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</span>
                                             </div>
                                             <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
                                                 {{ strtoupper((string) ($functionsDetection['confidence'] ?? 'low')) }}
                                             </span>
                                         </div>
-                                        <dl class="grid gap-3 md:grid-cols-2">
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Framework') }}</p>
-                                                <p class="mt-1 text-sm font-medium text-brand-ink">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }}</p>
-                                            </div>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Language') }}</p>
-                                                <p class="mt-1 text-sm font-medium text-brand-ink">{{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</p>
-                                            </div>
-                                        </dl>
                                         @if (count($functionsDetection['warnings'] ?? []) > 0)
                                             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
                                                 @foreach (($functionsDetection['warnings'] ?? []) as $warning)
@@ -713,48 +697,7 @@
                                 </div>
                             </form>
 
-                            @if ($functionsHost)
-                                @php
-                                    $functionsConfig = $site->serverlessConfig();
-                                    $serverlessTargetLabel = $server->isAwsLambdaHost() ? __('AWS Lambda') : __('DigitalOcean Functions');
-                                @endphp
-                                <div class="grid gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 md:grid-cols-2">
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Target') }}</p>
-                                        <p class="mt-1 text-sm font-medium text-brand-ink">{{ $serverlessTargetLabel }}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Runtime') }}</p>
-                                        <p class="mt-1 font-mono text-sm text-brand-ink">{{ $functionsConfig['runtime'] ?? $functions_runtime ?? '—' }}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Entrypoint') }}</p>
-                                        <p class="mt-1 font-mono text-sm text-brand-ink">{{ $functionsConfig['entrypoint'] ?? $functions_entrypoint ?? '—' }}</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Latest managed artifact') }}</p>
-                                        <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['artifact_path'] ?? __('Not built yet') }}</p>
-                                    </div>
-                                    @if (! empty($functionsConfig['function_arn']))
-                                        <div class="md:col-span-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Function ARN') }}</p>
-                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['function_arn'] }}</p>
-                                        </div>
-                                    @endif
-                                    @if (! empty($functionsConfig['function_url']))
-                                        <div class="md:col-span-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Function URL') }}</p>
-                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['function_url'] }}</p>
-                                        </div>
-                                    @endif
-                                    @if (! empty($functionsConfig['action_url']))
-                                        <div class="md:col-span-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Published action URL') }}</p>
-                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['action_url'] }}</p>
-                                        </div>
-                                    @endif
-                                </div>
-                            @elseif ($site->git_deploy_key_public)
+                            @if (! $functionsHost && $site->git_deploy_key_public)
                                 <div>
                                     <p class="text-sm text-brand-moss">{{ __('Public key (add to your Git provider deploy keys):') }}</p>
                                     <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ $site->git_deploy_key_public }}</pre>
@@ -840,7 +783,7 @@
 
                                     <div>
                                         <h3 class="text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h3>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, PHP-FPM, cron, Supervisor, and extra Nginx directives. Stack-specific options (for example Octane) appear when detection matches.') }}</p>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, scheduler, Supervisor, and extra Nginx directives. Runtime ports and users live on Runtime / Stack / System user.') }}</p>
                                     </div>
 
                                     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -853,50 +796,6 @@
                                             <x-input-label for="deployment_environment" value="Environment group" />
                                             <x-text-input id="deployment_environment" wire:model="deployment_environment" class="mt-1 block w-full text-sm" />
                                             <p class="mt-2 text-sm text-brand-moss">{{ __('Used when resolving key/value environment variables for deploys.') }}</p>
-                                        </div>
-                                        @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowOctaneRuntimeUi())
-                                            <div>
-                                                <x-input-label for="octane_port" value="Octane port" />
-                                                <x-text-input id="octane_port" wire:model="octane_port" placeholder="8000" class="mt-1 block w-full font-mono text-sm" />
-                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Mirrors Runtime settings; used for Supervisor `octane:start` command line.') }}</p>
-                                            </div>
-                                            <div>
-                                                <x-input-label for="octane_server" value="{{ __('Octane application server') }}" />
-                                                <select id="octane_server" wire:model="octane_server" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    @foreach (\App\Models\Site::OCTANE_SERVERS as $server)
-                                                        <option value="{{ $server }}">{{ str($server)->replace('_', ' ')->title() }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                        @endif
-                                        @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowLaravelReverbRuntimeUi())
-                                            <div>
-                                                <x-input-label for="laravel_reverb_port_deploy" value="{{ __('Reverb port') }}" />
-                                                <x-text-input id="laravel_reverb_port_deploy" type="number" wire:model="laravel_reverb_port" placeholder="8080" class="mt-1 block w-full max-w-xs font-mono text-sm" min="1" max="65535" />
-                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Mirrors Laravel stack settings; used for Supervisor and managed web server WebSocket proxies.') }}</p>
-                                            </div>
-                                            <div>
-                                                <x-input-label for="laravel_reverb_ws_path_deploy" value="{{ __('Reverb WebSocket path') }}" />
-                                                <x-text-input id="laravel_reverb_ws_path_deploy" wire:model="laravel_reverb_ws_path" placeholder="/app" class="mt-1 block w-full max-w-xs font-mono text-sm" />
-                                            </div>
-                                        @endif
-                                        @if ($site->shouldShowRailsRuntimeSettings())
-                                            <div class="sm:col-span-2">
-                                                <x-input-label for="rails_env_deploy" value="RAILS_ENV" />
-                                                <x-text-input id="rails_env_deploy" wire:model="rails_env" class="mt-1 block w-full max-w-md font-mono text-sm" placeholder="production" />
-                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Same value as Settings → Runtime. Stored for deploy scripts and operator reference.') }}</p>
-                                                <x-input-error :messages="$errors->get('rails_env')" class="mt-1" />
-                                            </div>
-                                        @endif
-                                        @if (! $this->shouldShowSystemUserPanel())
-                                            <div>
-                                                <x-input-label for="php_fpm_user" value="PHP-FPM pool user" />
-                                                <x-text-input id="php_fpm_user" wire:model="php_fpm_user" class="mt-1 block w-full text-sm" placeholder="www-data" />
-                                            </div>
-                                        @endif
-                                        <div class="lg:col-span-2 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Rollback context') }}</p>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('Deploy history and release rollback stay on the site overview page so operators can launch, inspect, and recover from one place.') }}</p>
                                         </div>
                                     </div>
 
@@ -980,26 +879,29 @@
                                 </div>
 
                                 @if (! $functionsHost)
-                                    <form wire:submit="addDeployPipelineStep" class="flex flex-wrap items-end gap-3">
-                                        <div>
-                                            <label for="new_deploy_step_type" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Step') }}</label>
-                                            <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-slate-300 shadow-sm text-sm">
-                                                @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
-                                                    <option value="{{ $value }}">{{ $label }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="min-w-[220px] flex-1">
-                                            <label for="new_deploy_step_command" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('npm script / custom command') }}</label>
-                                            <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
-                                            <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
-                                        </div>
-                                        <div>
-                                            <label for="new_deploy_step_timeout" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                                            <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
-                                        </div>
-                                        <x-primary-button type="submit">{{ __('Add step') }}</x-primary-button>
-                                    </form>
+                                    <details class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                        <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a pipeline step') }}</summary>
+                                        <form wire:submit="addDeployPipelineStep" class="mt-4 flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <label for="new_deploy_step_type" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Step') }}</label>
+                                                <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-slate-300 shadow-sm text-sm">
+                                                    @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
+                                                        <option value="{{ $value }}">{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="min-w-[220px] flex-1">
+                                                <label for="new_deploy_step_command" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('npm script / custom command') }}</label>
+                                                <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
+                                                <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <label for="new_deploy_step_timeout" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
+                                                <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                                            </div>
+                                            <x-primary-button type="submit">{{ __('Add step') }}</x-primary-button>
+                                        </form>
+                                    </details>
                                 @endif
                             </section>
 
@@ -1007,12 +909,9 @@
                                 @php
                                     $dockerRuntime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
                                 @endphp
-                                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                                    <div>
-                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Runtime target') }}</p>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Deploys sync the repository to the Docker host, write these managed files, and run `docker compose up -d --build`.') }}</p>
-                                    </div>
-                                    <div class="grid gap-4 xl:grid-cols-2">
+                                <details class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                                    <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Runtime target') }} <span class="font-normal text-brand-moss">— {{ __('Compose / Dockerfile (`docker compose up -d --build` on deploy)') }}</span></summary>
+                                    <div class="mt-4 grid gap-4 xl:grid-cols-2">
                                         <div>
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Compose file') }}</p>
                                             <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
@@ -1022,28 +921,20 @@
                                             <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
                                         </div>
                                     </div>
-                                </div>
+                                </details>
                             @endif
 
                             @if ($site->usesKubernetesRuntime())
                                 @php
                                     $kubernetesRuntime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
                                 @endphp
-                                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Runtime target') }}</p>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('This runtime currently stores the generated manifest and namespace so the cluster apply step stays inspectable while live execution work continues.') }}</p>
-                                        </div>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
-                                            {{ $kubernetesRuntime['namespace'] ?? __('default') }}
-                                        </span>
-                                    </div>
-                                    <div>
+                                <details class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                                    <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Runtime target') }} <span class="font-normal text-brand-moss">— {{ __('Manifest for namespace') }} <code>{{ $kubernetesRuntime['namespace'] ?? 'default' }}</code></span></summary>
+                                    <div class="mt-4">
                                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Manifest') }}</p>
                                         <pre class="mt-2 max-h-96 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
                                     </div>
-                                </div>
+                                </details>
                             @endif
 
                             <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
@@ -1079,34 +970,36 @@
                                     @endforeach
                                 </div>
 
-                                <form wire:submit="addDeployHook" class="space-y-3">
-                                    <select wire:model="new_hook_phase" class="rounded-md border-slate-300 text-sm">
-                                        <option value="before_clone">before_clone</option>
-                                        <option value="after_clone">after_clone</option>
-                                        <option value="after_activate">after_activate</option>
-                                    </select>
-                                    <div class="flex flex-wrap items-end gap-3">
-                                        <div>
-                                            <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Sort order') }}</label>
-                                            <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" />
+                                <details class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                    <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a hook') }}</summary>
+                                    <form wire:submit="addDeployHook" class="mt-4 space-y-3">
+                                        <select wire:model="new_hook_phase" class="rounded-md border-slate-300 text-sm">
+                                            <option value="before_clone">before_clone</option>
+                                            <option value="after_clone">after_clone</option>
+                                            <option value="after_activate">after_activate</option>
+                                        </select>
+                                        <div class="flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Sort order') }}</label>
+                                                <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" />
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
+                                                <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                                            <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
-                                        </div>
-                                    </div>
-                                    <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
-                                    <x-primary-button type="submit">{{ __('Add hook') }}</x-primary-button>
-                                </form>
+                                        <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
+                                        <x-primary-button type="submit">{{ __('Add hook') }}</x-primary-button>
+                                    </form>
+                                </details>
                             </section>
 
-                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
-                                <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>
-                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Use these placeholders in custom steps, legacy post-deploy commands, and hook scripts when you need deploy context without hard-coding site-specific values.') }}</p>
-                                </div>
-
-                                <dl class="grid gap-3 md:grid-cols-2">
+                            <details class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
+                                <summary class="cursor-pointer list-none">
+                                    <h3 class="inline text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>
+                                    <span class="ml-2 text-sm text-brand-moss">— {{ __('placeholders for custom steps, post-deploy commands, and hook scripts') }}</span>
+                                </summary>
+                                <dl class="mt-4 grid gap-3 md:grid-cols-2">
                                     @foreach ($deployVariableReference as $token => $description)
                                         <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
                                             <dt class="font-mono text-sm text-brand-ink">{{ $token }}</dt>
@@ -1114,7 +1007,7 @@
                                         </div>
                                     @endforeach
                                 </dl>
-                            </section>
+                            </details>
                         </section>
 
                         <x-cli-snippet :commands="[
@@ -1145,7 +1038,11 @@
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'logs')
-                        @include('livewire.sites.settings.partials.logs')
+                        @if ($site->usesFunctionsRuntime())
+                            @livewire('serverless.logs-panel', ['site' => $site], key('serverless-logs-'.$site->id))
+                        @else
+                            @include('livewire.sites.settings.partials.logs')
+                        @endif
                     @elseif ($section === 'notifications')
                         @include('livewire.sites.settings.partials.notifications')
                     @elseif ($section === 'basic-auth')
