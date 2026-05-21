@@ -6,11 +6,14 @@
 {{--
     Hover/focus tooltip for icon-only buttons and similar triggers.
 
-    Positioning: the bubble renders with `position: fixed` and Alpine computes
-    its `top`/`left` from the wrapper's getBoundingClientRect(). This lets the
-    tooltip escape ancestor `overflow:hidden` clipping — relevant inside the
-    workspace cards which clip rounded corners. Listens for window scroll/
-    resize while open so the bubble tracks the trigger.
+    Positioning: the bubble is teleported to <body> and rendered with
+    `position: fixed`; Alpine computes its `top`/`left` from the wrapper's
+    getBoundingClientRect(). Teleport is what actually frees it — a `fixed`
+    element is still trapped (and clipped) by any ancestor that has a
+    `transform` or `filter`, which the workspace cards / transitions do, so
+    plain `fixed` was getting cut off mid-word. As a direct child of <body>
+    nothing can clip it. Listens for window scroll/resize while open so the
+    bubble tracks the trigger.
 
     Scoping: every wrapper is its own Alpine root, so hovering one button
     never triggers another button's tooltip — solves the "all tooltips fire
@@ -68,17 +71,19 @@
 >
     {{ $slot }}
     @if ($label !== '')
-        <span
-            x-ref="tip"
-            x-show="open"
-            x-cloak
-            x-on:scroll.window.passive="open && compute()"
-            x-on:resize.window.passive="open && compute()"
-            x-bind:style="`top: ${position.top}px; left: ${position.left}px;`"
-            role="tooltip"
-            class="pointer-events-none fixed z-[60] whitespace-nowrap rounded-md bg-brand-ink/95 px-2 py-1 text-[11px] font-medium text-brand-cream shadow-lg ring-1 ring-brand-ink/40"
-        >
-            {{ $label }}
-        </span>
+        <template x-teleport="body">
+            <span
+                x-ref="tip"
+                x-show="open"
+                x-cloak
+                x-on:scroll.window.passive="open && compute()"
+                x-on:resize.window.passive="open && compute()"
+                x-bind:style="`top: ${position.top}px; left: ${position.left}px;`"
+                role="tooltip"
+                class="pointer-events-none fixed z-[60] whitespace-nowrap rounded-md bg-brand-ink/95 px-2 py-1 text-[11px] font-medium text-brand-cream shadow-lg ring-1 ring-brand-ink/40"
+            >
+                {{ $label }}
+            </span>
+        </template>
     @endif
 </span>

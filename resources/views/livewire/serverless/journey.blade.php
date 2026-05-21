@@ -51,17 +51,43 @@
                 </div>
             </div>
 
-            @if ($live)
-                <div class="m-6 sm:m-8 mb-0">
-                    <x-alert tone="success">{{ __('Your function is live and answering requests.') }}</x-alert>
-                </div>
-            @elseif ($cancelled)
-                <div class="m-6 sm:m-8 mb-0">
-                    <x-alert tone="warning">{{ __('The deploy was cancelled. Retry when you are ready.') }}</x-alert>
-                </div>
-            @elseif ($failed)
-                <div class="m-6 sm:m-8 mb-0">
-                    <x-alert tone="error">{{ __('The deploy stopped. Review the log below and retry the step that failed.') }}</x-alert>
+            @php
+                $banner = match (true) {
+                    $live => [
+                        'icon' => 'heroicon-o-check-circle',
+                        'title' => __('Your function is live'),
+                        'detail' => __('It\'s deployed and answering requests.'),
+                        'ring' => 'border-brand-forest/25', 'wash' => 'bg-brand-forest/5',
+                        'badge' => 'bg-brand-forest/15 text-brand-forest',
+                    ],
+                    $cancelled => [
+                        'icon' => 'heroicon-o-pause-circle',
+                        'title' => __('Deploy cancelled'),
+                        'detail' => __('Nothing was rolled back — retry when you are ready.'),
+                        'ring' => 'border-brand-gold/40', 'wash' => 'bg-brand-gold/10',
+                        'badge' => 'bg-brand-gold/25 text-brand-ink',
+                    ],
+                    $failed => [
+                        'icon' => 'heroicon-o-exclamation-triangle',
+                        'title' => __('Deploy stopped'),
+                        'detail' => __('Review the log below, then retry the step that failed.'),
+                        'ring' => 'border-rose-200', 'wash' => 'bg-rose-50',
+                        'badge' => 'bg-rose-100 text-rose-700',
+                    ],
+                    default => null,
+                };
+            @endphp
+            @if ($banner)
+                <div class="m-6 mb-0 sm:m-8 sm:mb-0">
+                    <div class="flex items-center gap-3 rounded-xl border {{ $banner['ring'] }} {{ $banner['wash'] }} px-4 py-3.5">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $banner['badge'] }}">
+                            <x-dynamic-component :component="$banner['icon']" class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-brand-ink">{{ $banner['title'] }}</p>
+                            <p class="text-xs text-brand-moss">{{ $banner['detail'] }}</p>
+                        </div>
+                    </div>
                 </div>
             @endif
 

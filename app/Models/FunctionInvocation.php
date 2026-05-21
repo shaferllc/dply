@@ -36,6 +36,7 @@ class FunctionInvocation extends Model
 
     protected $fillable = [
         'site_id',
+        'function_action_id',
         'source',
         'task',
         'method',
@@ -67,6 +68,12 @@ class FunctionInvocation extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    /** The action this invocation hit — null for rows not yet backfilled. */
+    public function functionAction(): BelongsTo
+    {
+        return $this->belongsTo(FunctionAction::class);
     }
 
     /** dply-initiated invocations — what the Activations tab shows. */
