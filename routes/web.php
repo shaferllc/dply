@@ -366,6 +366,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). Distinct from VM `routing` which edits nginx.
     Route::livewire('servers/{server}/sites/{site}/routing', \App\Livewire\Sites\ServerlessRouting::class)->name('sites.routing');
+    // DEPLOY group for serverless workspaces — Repository page that
+    // browses the connected repo: overview (commits + README), file
+    // tree, branches, and the connection config (account / repo /
+    // deploy key / webhook). VM sites keep the legacy section partial
+    // at `?section=repository`.
+    Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
     Route::livewire('servers/{server}/sites/{site}/caching', \App\Livewire\Sites\Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The

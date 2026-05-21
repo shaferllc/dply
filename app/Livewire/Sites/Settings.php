@@ -381,6 +381,19 @@ class Settings extends Show
             return;
         }
 
+        // Serverless workspaces use the dedicated `sites.repository` Livewire
+        // page (file browser, branch picker, connection panel) instead of
+        // the legacy section-router config form. Catch back-compat links
+        // and the sidebar pre-route-update before they hit this component.
+        if ($section === 'repository' && in_array($site->runtimeTargetMode(), ['docker', 'kubernetes', 'serverless'], true)) {
+            $this->redirect(route('sites.repository', [
+                'server' => $server,
+                'site' => $site,
+            ]), navigate: true);
+
+            return;
+        }
+
         $allowed = array_keys(config('site_settings.workspace_tabs', []));
 
         if (! in_array($section, $allowed, true)) {

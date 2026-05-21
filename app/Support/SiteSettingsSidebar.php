@@ -57,7 +57,10 @@ final class SiteSettingsSidebar
                 ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
                 // Deployments is the history list — recipe (URL/branch/pipeline/hooks/etc.) lives on Repository (section=repository), per Q3.
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
-                ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'],
+                // Serverless Repository is a dedicated Livewire page (browse
+                // files / branches / switch repo) — distinct from the VM
+                // section-router partial that just shows the config form.
+                ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy', 'route' => 'sites.repository'],
                 ['id' => 'commits', 'label' => __('Commits'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'deploy', 'route' => 'sites.commits'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
