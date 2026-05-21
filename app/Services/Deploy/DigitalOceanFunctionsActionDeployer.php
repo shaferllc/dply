@@ -4,6 +4,7 @@ namespace App\Services\Deploy;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployHook;
 use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
 use Illuminate\Support\Facades\Http;
 
@@ -16,6 +17,7 @@ final class DigitalOceanFunctionsActionDeployer
         private readonly DeploymentRevisionTracker $revisionTracker,
         private readonly ServerlessDeployProgress $progress,
         private readonly ServerlessFunctionDnsProvisioner $dnsProvisioner,
+        private readonly ServerlessDeployHookRunner $hookRunner,
     ) {}
 
     /**
@@ -27,8 +29,35 @@ final class DigitalOceanFunctionsActionDeployer
         $this->assertFunctionsHost($site->server);
 
         $buildResult = $this->artifactBuilder->build($site);
+        $result = $this->pushArtifact($site, $buildResult['artifact_path'], $buildResult['output']);
 
-        return $this->pushArtifact($site, $buildResult['artifact_path'], $buildResult['output']);
+        // after_activate hooks — the action is uploaded and smoke-tested, so
+        // the function is live; run post-deploy shell (warm-up, notify, …).
+        $hookLog = $this->runActivateHooks($site, $buildResult['working_directory']);
+        if ($hookLog !== '') {
+            $result['output'] .= "\n".$hookLog;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Run after_activate deploy hooks as a journey sub-step, returning the
+     * transcript (empty when the site configures none).
+     */
+    private function runActivateHooks(Site $site, string $workingDirectory): string
+    {
+        $site->loadMissing('deployHooks');
+        if ($site->deployHooks->where('phase', SiteDeployHook::PHASE_AFTER_ACTIVATE)->isEmpty()) {
+            return '';
+        }
+
+        $label = ServerlessDeployHookRunner::PHASE_LABELS[SiteDeployHook::PHASE_AFTER_ACTIVATE].' hooks';
+        $this->progress->active($site, 'hooks_activate', $label);
+        $output = $this->hookRunner->runPhase($site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $workingDirectory);
+        $this->progress->done($site, 'hooks_activate', $label);
+
+        return $output;
     }
 
     /**

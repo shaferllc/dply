@@ -35,6 +35,11 @@
                     :embedded="true"
                     wire:key="deploy-journey-{{ $site->id }}"
                 />
+
+                <livewire:sites.deploy-hooks
+                    :site="$site"
+                    wire:key="deploy-hooks-{{ $site->id }}"
+                />
             @else
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
                     <p class="text-sm text-brand-moss">{{ __('Trigger a fresh deploy of the current repository state.') }}</p>

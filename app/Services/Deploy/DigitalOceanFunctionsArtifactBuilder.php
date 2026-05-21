@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Models\Site;
+use App\Models\SiteDeployHook;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
@@ -21,10 +22,11 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly DigitalOceanFunctionsLaravelAdapter $laravelAdapter,
         private readonly ServerlessDeployProgress $progress,
         private readonly ServerlessEnvironmentPreparer $environmentPreparer,
+        private readonly ServerlessDeployHookRunner $hookRunner,
     ) {}
 
     /**
-     * @return array{artifact_path: string, output: string}
+     * @return array{artifact_path: string, working_directory: string, output: string}
      */
     public function build(Site $site): array
     {
@@ -49,6 +51,12 @@ class DigitalOceanFunctionsArtifactBuilder
                 : null,
         );
         $this->progress->done($site, 'checkout', 'Cloned repository');
+
+        // before_clone hooks — operator shell that runs after checkout but
+        // before the build (e.g. `npm ci && npm run build`).
+        $beforeBuildHookLog = $this->runHooks(
+            $site, SiteDeployHook::PHASE_BEFORE_CLONE, 'hooks_before', $checkout['working_directory']
+        );
 
         // AWS Lambda PHP targets run via Bref — auto-inject it into the
         // checked-out app so the user's repo carries no serverless boilerplate.
@@ -121,11 +129,20 @@ class DigitalOceanFunctionsArtifactBuilder
             'artifact_output_path' => $artifactOutputPath,
         ]);
 
-        $log = array_filter([$checkout['output'], ...$brefLog, ...$laravelAdapterLog, $envLog]);
+        $log = array_filter([$checkout['output'], $beforeBuildHookLog, ...$brefLog, ...$laravelAdapterLog, $envLog]);
 
         $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);
         $log[] = $this->runShell($buildCommand, $checkout['working_directory']);
         $this->progress->done($site, 'dependencies', 'Installed dependencies');
+
+        // after_clone hooks — operator shell that runs once dependencies are
+        // installed but before the artifact is packaged.
+        $afterBuildHookLog = $this->runHooks(
+            $site, SiteDeployHook::PHASE_AFTER_CLONE, 'hooks_after', $checkout['working_directory']
+        );
+        if ($afterBuildHookLog !== '') {
+            $log[] = $afterBuildHookLog;
+        }
 
         // Deploy commands — migrations, cache warming, etc. Run in the build
         // environment after dependencies + the prepared .env are in place, so
@@ -157,6 +174,7 @@ class DigitalOceanFunctionsArtifactBuilder
 
         return [
             'artifact_path' => $artifactPath,
+            'working_directory' => $checkout['working_directory'],
             'output' => trim(implode("\n", array_filter(array_merge(
                 $log,
                 [
@@ -167,6 +185,25 @@ class DigitalOceanFunctionsArtifactBuilder
                 ]
             )))),
         ];
+    }
+
+    /**
+     * Run a deploy-hook phase as a journey sub-step, returning its transcript
+     * (empty when the site has no hooks for the phase, so the step is skipped).
+     */
+    private function runHooks(Site $site, string $phase, string $stepKey, string $workingDirectory): string
+    {
+        $site->loadMissing('deployHooks');
+        if ($site->deployHooks->where('phase', $phase)->isEmpty()) {
+            return '';
+        }
+
+        $label = ServerlessDeployHookRunner::PHASE_LABELS[$phase].' hooks';
+        $this->progress->active($site, $stepKey, $label);
+        $output = $this->hookRunner->runPhase($site, $phase, $workingDirectory);
+        $this->progress->done($site, $stepKey, $label);
+
+        return $output;
     }
 
     private function artifactFilename(Site $site): string
