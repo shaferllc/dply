@@ -79,7 +79,7 @@
             @endphp
             @if ($banner)
                 <div class="m-6 mb-0 sm:m-8 sm:mb-0">
-                    <div class="flex items-center gap-3 rounded-xl border {{ $banner['ring'] }} {{ $banner['wash'] }} px-4 py-3.5">
+                    <div class="flex max-w-xl items-center gap-3 rounded-xl border {{ $banner['ring'] }} {{ $banner['wash'] }} px-4 py-3.5">
                         <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $banner['badge'] }}">
                             <x-dynamic-component :component="$banner['icon']" class="h-5 w-5" />
                         </span>
