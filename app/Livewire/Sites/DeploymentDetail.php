@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -56,9 +57,29 @@ class DeploymentDetail extends Component
             ? $this->deployment->phase_results
             : [];
 
+        // Render whichever phases the deployment actually recorded. VM deploys
+        // use build/swap/release/restart; serverless deploys record a single
+        // "serverless" phase. Known phases come first in their canonical order,
+        // then any others fall in afterwards so nothing is silently dropped.
+        $canonicalOrder = ['build', 'swap', 'release', 'restart', 'serverless'];
+        $phases = array_values(array_unique([
+            ...array_filter($canonicalOrder, static fn (string $p): bool => isset($phaseResults[$p])),
+            ...array_keys($phaseResults),
+        ]));
+
+        $runtimeMode = $this->site->runtimeTargetMode();
+
         return view('livewire.sites.deployment-detail', [
             'phaseResults' => $phaseResults,
-            'phases' => ['build', 'swap', 'release', 'restart'],
+            'phases' => $phases,
+            // Sidebar context — keeps the workspace nav visible so operators
+            // can pivot between deployment history and the rest of the site.
+            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
+            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
+            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
+            'routingTab' => 'domains',
+            'laravel_tab' => 'commands',
+            'section' => 'deploy',
         ])->layout('layouts.app');
     }
 }

@@ -79,7 +79,7 @@ class Repository extends Component
 
         $this->connectionRepositoryUrl = (string) ($site->git_repository_url ?? '');
         $this->connectionBranch = (string) ($site->git_branch ?? '');
-        $this->connectionAccountId = (string) ($site->meta['git_source_control_account_id'] ?? '');
+        $this->connectionAccountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
     }
 
     /* ──────────── Files navigation ──────────── */
@@ -255,7 +255,7 @@ class Repository extends Component
             'branchInUse' => $branchInUse,
             'currentBranch' => (string) ($this->site->git_branch ?: 'main'),
             'currentRepositoryUrl' => (string) ($this->site->git_repository_url ?: ''),
-            'providerKind' => (string) ($this->site->meta['git_provider_kind'] ?? ''),
+            'providerKind' => (string) ($this->site->repositoryMeta()['git_provider_kind'] ?? ''),
         ];
 
         return view('livewire.sites.repository', match ($this->tab) {
@@ -331,7 +331,7 @@ class Repository extends Component
         return [
             'connectionAccounts' => $accounts,
             'connectionRepositories' => $repositories,
-            'connectionQuickDeploy' => (bool) ($this->site->meta['quick_deploy_enabled'] ?? false),
+            'connectionQuickDeploy' => (bool) ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? ($this->site->meta['quick_deploy_enabled'] ?? false)),
             'connectionDeployHookUrl' => method_exists($this->site, 'deployHookUrl') ? $this->site->deployHookUrl() : null,
         ];
     }

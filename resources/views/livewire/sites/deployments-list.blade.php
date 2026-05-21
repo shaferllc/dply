@@ -63,8 +63,10 @@
                     <tr>
                         <th class="px-4 py-3">{{ __('Status') }}</th>
                         <th class="px-4 py-3">{{ __('Started') }}</th>
+                        <th class="px-4 py-3">{{ __('Finished') }}</th>
                         <th class="px-4 py-3">{{ __('Duration') }}</th>
                         <th class="px-4 py-3">{{ __('Trigger') }}</th>
+                        <th class="px-4 py-3">{{ __('Commit') }}</th>
                         <th class="px-4 py-3">{{ __('Phases') }}</th>
                         <th class="px-4 py-3">{{ __('Deploy ID') }}</th>
                     </tr>
@@ -80,10 +82,20 @@
                                     'bg-amber-100 text-amber-900' => $deployment->status === 'running',
                                     'bg-slate-100 text-slate-700' => ! in_array($deployment->status, ['success', 'failed', 'running']),
                                 ])>{{ $deployment->status }}</span>
+                                @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
+                                    <span class="mt-1 block font-mono text-[10px] text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
+                                @endif
                             </td>
                             <td class="px-4 py-3 text-slate-600">
                                 @if ($deployment->started_at)
                                     <span title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
+                                @else
+                                    <span class="text-slate-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-slate-600">
+                                @if ($deployment->finished_at)
+                                    <span title="{{ $deployment->finished_at->toIso8601String() }}">{{ $deployment->finished_at->diffForHumans() }}</span>
                                 @else
                                     <span class="text-slate-400">—</span>
                                 @endif
@@ -98,6 +110,13 @@
                                 @endif
                             </td>
                             <td class="px-4 py-3 text-slate-700">{{ $deployment->trigger ?: '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-600">
+                                @if ($deployment->git_sha)
+                                    <span title="{{ $deployment->git_sha }}">{{ \Illuminate\Support\Str::limit($deployment->git_sha, 7, '') }}</span>
+                                @else
+                                    <span class="font-sans text-slate-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap gap-1">
                                     @foreach (['build', 'swap', 'release', 'restart'] as $phase)

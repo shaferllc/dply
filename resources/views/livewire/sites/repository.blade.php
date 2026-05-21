@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+<div class="max-w-7xl mx-auto px-4 pt-8 pb-16 sm:px-6 lg:px-8">
     <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
         <ol class="flex flex-wrap items-center gap-2">
             <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
@@ -34,26 +34,23 @@
 
             @php
                 $tabs = [
-                    ['id' => 'overview',   'label' => __('Overview')],
-                    ['id' => 'files',      'label' => __('Files')],
-                    ['id' => 'branches',   'label' => __('Branches')],
-                    ['id' => 'connection', 'label' => __('Connection')],
+                    ['id' => 'overview',   'label' => __('Overview'),   'icon' => 'heroicon-o-home'],
+                    ['id' => 'files',      'label' => __('Files'),      'icon' => 'heroicon-o-folder'],
+                    ['id' => 'branches',   'label' => __('Branches'),   'icon' => 'heroicon-o-rectangle-stack'],
+                    ['id' => 'connection', 'label' => __('Connection'), 'icon' => 'heroicon-o-link'],
                 ];
             @endphp
 
-            <nav class="-mb-px flex flex-wrap gap-x-6 gap-y-1 border-b border-brand-ink/10 text-sm" aria-label="{{ __('Repository tabs') }}">
+            <x-server-workspace-tablist :aria-label="__('Repository sections')" class="!mb-0">
                 @foreach ($tabs as $entry)
-                    <button
-                        type="button"
+                    <x-server-workspace-tab
+                        id="repository-tab-{{ $entry['id'] }}"
+                        :active="$tab === $entry['id']"
+                        :icon="$entry['icon']"
                         wire:click="$set('tab', '{{ $entry['id'] }}')"
-                        @class([
-                            'whitespace-nowrap border-b-2 px-1 py-2 font-medium transition-colors',
-                            'border-brand-ink text-brand-ink' => $tab === $entry['id'],
-                            'border-transparent text-brand-moss hover:border-brand-mist hover:text-brand-ink' => $tab !== $entry['id'],
-                        ])
-                    >{{ $entry['label'] }}</button>
+                    >{{ $entry['label'] }}</x-server-workspace-tab>
                 @endforeach
-            </nav>
+            </x-server-workspace-tablist>
 
             <div wire:key="repository-tab-{{ $tab }}-{{ $branchInUse }}-{{ $filesPath }}">
                 @includeWhen($tab === 'overview',   'livewire.sites.repository.partials.overview')

@@ -146,8 +146,8 @@ class ServerlessRepositoryTest extends TestCase
         $site->refresh();
         $this->assertSame('git@github.com:acme/billing.git', $site->git_repository_url);
         $this->assertSame('staging', $site->git_branch);
-        $this->assertSame((string) $account->id, (string) ($site->meta['git_source_control_account_id'] ?? ''));
-        $this->assertSame('github', (string) ($site->meta['git_provider_kind'] ?? ''));
+        $this->assertSame((string) $account->id, (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? ''));
+        $this->assertSame('github', (string) ($site->repositoryMeta()['git_provider_kind'] ?? ''));
     }
 
     public function test_branches_tab_calls_provider_api_and_lists_branches(): void
@@ -204,19 +204,22 @@ class ServerlessRepositoryTest extends TestCase
             ->assertSee('src');
     }
 
-    public function test_serverless_section_repository_redirects_to_new_route(): void
+    public function test_sites_repository_url_resolves_to_new_livewire_page(): void
     {
+        // Sanity: /servers/{server}/sites/{site}/repository must route to the
+        // new dedicated Livewire page rather than fall through to the wildcard
+        // sites.show section dispatcher. The path-based route is registered
+        // before the wildcard so it wins; this guards against regressions in
+        // route ordering.
         [$user, $server, $site] = $this->functionSite();
+        Http::fake();
 
-        $response = $this->actingAs($user)->get(route('sites.show', [
-            'server' => $server,
-            'site' => $site,
-            'section' => 'repository',
-        ]));
-
-        $response->assertRedirect(route('sites.repository', [
+        $response = $this->actingAs($user)->get(route('sites.repository', [
             'server' => $server,
             'site' => $site,
         ]));
+
+        $response->assertOk();
+        $response->assertSee('Repository');
     }
 }

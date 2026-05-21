@@ -1,4 +1,4 @@
-<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+<div class="max-w-7xl mx-auto px-4 pt-8 pb-16 sm:px-6 lg:px-8">
     <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
         <ol class="flex flex-wrap items-center gap-2">
             <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
@@ -27,27 +27,24 @@
 
             @php
                 $tabs = [
-                    ['id' => 'hostname',   'label' => __('Hostname & DNS')],
-                    ['id' => 'domains',    'label' => __('Custom domains')],
-                    ['id' => 'redirects',  'label' => __('Redirects')],
-                    ['id' => 'headers',    'label' => __('Headers & CORS')],
-                    ['id' => 'invocation', 'label' => __('Invocation URLs')],
+                    ['id' => 'hostname',   'label' => __('Hostname & DNS'), 'icon' => 'heroicon-o-globe-alt'],
+                    ['id' => 'domains',    'label' => __('Custom domains'), 'icon' => 'heroicon-o-link'],
+                    ['id' => 'redirects',  'label' => __('Redirects'),      'icon' => 'heroicon-o-arrow-uturn-right'],
+                    ['id' => 'headers',    'label' => __('Headers & CORS'), 'icon' => 'heroicon-o-shield-check'],
+                    ['id' => 'invocation', 'label' => __('Invocation URLs'),'icon' => 'heroicon-o-bolt'],
                 ];
             @endphp
 
-            <nav class="-mb-px flex flex-wrap gap-x-6 gap-y-1 border-b border-brand-ink/10 text-sm" aria-label="{{ __('Routing tabs') }}">
+            <x-server-workspace-tablist :aria-label="__('Routing sections')" class="!mb-0">
                 @foreach ($tabs as $entry)
-                    <button
-                        type="button"
+                    <x-server-workspace-tab
+                        id="routing-tab-{{ $entry['id'] }}"
+                        :active="$tab === $entry['id']"
+                        :icon="$entry['icon']"
                         wire:click="$set('tab', '{{ $entry['id'] }}')"
-                        @class([
-                            'whitespace-nowrap border-b-2 px-1 py-2 font-medium transition-colors',
-                            'border-brand-ink text-brand-ink' => $tab === $entry['id'],
-                            'border-transparent text-brand-moss hover:border-brand-mist hover:text-brand-ink' => $tab !== $entry['id'],
-                        ])
-                    >{{ $entry['label'] }}</button>
+                    >{{ $entry['label'] }}</x-server-workspace-tab>
                 @endforeach
-            </nav>
+            </x-server-workspace-tablist>
 
             <div wire:key="routing-tab-{{ $tab }}">
                 @includeWhen($tab === 'hostname',   'livewire.sites.serverless-routing.partials.hostname')

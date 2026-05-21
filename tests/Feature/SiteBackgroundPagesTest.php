@@ -208,27 +208,27 @@ class SiteBackgroundPagesTest extends TestCase
         }
     }
 
-    public function test_section_repository_url_renders_the_recipe(): void
+    public function test_section_repository_url_renders_the_repository_workspace(): void
     {
-        // Per Q3/Q11, Repository = the deploy *recipe* (Source → Build →
-        // Pipeline → Hooks → Activate/Rollout). Both `section=deploy` (legacy
-        // alias) and `section=repository` (current canonical) render the same
-        // page so the sidebar's "Repository" label leads where it claims.
+        // Repository for serverless workspaces is now a dedicated Livewire
+        // page (tabbed: Overview / Files / Branches / Connection) — the
+        // sidebar item points at `sites.repository`, and the bare
+        // `/repository` URL resolves there directly (the path route is
+        // registered before the wildcard `sites.show` dispatcher).
         $user = $this->actingOrgOwner();
         [$server, $site] = $this->makeFunctionsSite($user);
 
-        $repositoryResponse = $this->actingAs($user)->get(route('sites.show', [
+        $repositoryResponse = $this->actingAs($user)->get(route('sites.repository', [
             'server' => $server,
             'site' => $site,
-            'section' => 'repository',
         ], false));
 
         $repositoryResponse->assertOk()
             ->assertSee('Repository')
-            ->assertSee('Repository URL')
-            ->assertSee('Branch')
-            ->assertSee('Pipeline')
-            ->assertSee('Deploy hooks');
+            ->assertSee('Overview')
+            ->assertSee('Files')
+            ->assertSee('Branches')
+            ->assertSee('Connection');
     }
 
     public function test_sidebar_deployments_item_routes_to_history_list(): void
