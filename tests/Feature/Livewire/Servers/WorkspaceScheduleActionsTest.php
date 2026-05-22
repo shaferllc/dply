@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Servers\ServerCronSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Mockery;
 use Tests\Concerns\WithFeatures;
@@ -22,6 +23,11 @@ use Tests\Concerns\WithFeatures;
 uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
+
+beforeEach(function () {
+    Feature::define('workspace.schedule', fn () => true);
+    Feature::flushCache();
+});
 
 /** @return array{User, Server, Site, ServerCronJob, ServerSchedulerHeartbeat} */
 function setupWithScheduler(bool $enabled = true): array
@@ -65,7 +71,7 @@ function stubSynchronizer(): void
     $stub = Mockery::mock(ServerCronSynchronizer::class);
     $stub->shouldReceive('sync')->andReturn('DPLY_CRON_EXIT:0');
     $stub->shouldReceive('invalidExpressions')->andReturn([]);
-    $this->app->instance(ServerCronSynchronizer::class, $stub);
+    app()->instance(ServerCronSynchronizer::class, $stub);
 }
 test('toggle pause flips cron enabled and audits', function () {
     stubSynchronizer();

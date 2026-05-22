@@ -94,6 +94,9 @@ test('merges runtime default with existing entries', function () {
 });
 class InstallRuntimeRecordingShell implements RemoteShell
 {
+    /** @var array<int, string> */
+    public array $execCalls = [];
+
     public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;

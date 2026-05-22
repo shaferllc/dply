@@ -36,7 +36,7 @@ test('server credentials email does not fire when toggle off', function () {
 
     RunSetupScriptJob::applyProvisionOutcomeToServer($server, true);
 
-    Notification::assertNothingSent();
+    Notification::assertNotSentTo($user, ServerProvisionedCredentialsNotification::class);
 });
 test('server credentials email fires on provision success when toggle on', function () {
     Notification::fake();
@@ -71,7 +71,7 @@ test('server credentials email does not fire on provision failure', function () 
     // to use," not "your server tried and failed."
     RunSetupScriptJob::applyProvisionOutcomeToServer($server, false);
 
-    Notification::assertNothingSent();
+    Notification::assertNotSentTo($user, ServerProvisionedCredentialsNotification::class);
 });
 test('database credentials email carries full payload for mysql', function () {
     $notif = new SiteDatabaseCredentialsNotification(

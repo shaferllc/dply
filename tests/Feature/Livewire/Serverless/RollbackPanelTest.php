@@ -17,25 +17,28 @@ uses(RefreshDatabase::class);
 
 /**
  * @param  list<array<string, mixed>>  $history
+ * @return array{0: User, 1: Site}
  */
-function functionSite(array $history): Site
+function functionSite(array $history): array
 {
-    $this->user = User::factory()->create();
+    $user = User::factory()->create();
     $org = Organization::factory()->create();
-    $org->users()->attach($this->user->id, ['role' => 'owner']);
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
     $server = Server::factory()->create([
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'organization_id' => $org->id,
         'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
     ]);
 
-    return Site::factory()->create([
+    $site = Site::factory()->create([
         'server_id' => $server->id,
         'organization_id' => $org->id,
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'meta' => ['serverless' => ['artifact_history' => $history]],
     ]);
+
+    return [$user, $site];
 }
 
 test('it rolls back to an earlier artifact', function () {
@@ -45,12 +48,12 @@ test('it rolls back to an earlier artifact', function () {
     File::ensureDirectoryExists(dirname($artifact));
     File::put($artifact, 'zip-bytes');
 
-    $site = functionSite([
+    [$user, $site] = functionSite([
         ['artifact_path' => '/tmp/current.zip', 'revision_id' => '8', 'deployed_at' => now()->toIso8601String()],
         ['artifact_path' => $artifact, 'revision_id' => '7', 'deployed_at' => now()->subHour()->toIso8601String()],
     ]);
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(RollbackPanel::class, ['site' => $site])
         ->call('rollback', 1);
 
@@ -62,11 +65,11 @@ test('it rolls back to an earlier artifact', function () {
 
 test('it will not roll back to the live deploy', function () {
     Bus::fake();
-    $site = functionSite([
+    [$user, $site] = functionSite([
         ['artifact_path' => '/tmp/current.zip', 'revision_id' => '8'],
     ]);
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(RollbackPanel::class, ['site' => $site])
         ->call('rollback', 0);
 

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Actions\Serverless\CreateServerlessFunctionTest;
 
+use App\Actions\Serverless\CreateServerlessFunction;
 use App\Jobs\ProvisionServerlessHostJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -14,7 +15,7 @@ use InvalidArgumentException;
 
 uses(RefreshDatabase::class);
 
-function handle(array $overrides = []): Site
+function createFunction(array $overrides = []): Site
 {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -28,7 +29,7 @@ function handle(array $overrides = []): Site
         'credentials' => ['token' => 'dop_v1_test'],
     ]);
 
-    return handle($user, $org, array_merge([
+    return app(CreateServerlessFunction::class)->handle($user, $org, array_merge([
         'name' => 'My API',
         'repo' => 'acme/api',
         'branch' => 'main',
@@ -41,7 +42,7 @@ function handle(array $overrides = []): Site
 test('creates a serverless host and function site', function () {
     Bus::fake();
 
-    $site = handle();
+    $site = createFunction();
 
     $server = Server::find($site->server_id);
     expect($server->isServerlessHost())->toBeTrue();
@@ -61,7 +62,7 @@ test('creates a serverless host and function site', function () {
 test('dispatches the namespace provision job', function () {
     Bus::fake();
 
-    $site = handle();
+    $site = createFunction();
 
     Bus::assertDispatched(
         ProvisionServerlessHostJob::class,
@@ -72,7 +73,7 @@ test('dispatches the namespace provision job', function () {
 test('normalizes a full github url to owner repo', function () {
     Bus::fake();
 
-    $site = handle(['repo' => 'https://github.com/acme/widgets.git']);
+    $site = createFunction(['repo' => 'https://github.com/acme/widgets.git']);
 
     expect($site->git_repository_url)->toBe('acme/widgets');
 });
@@ -81,7 +82,7 @@ test('rejects an empty repository', function () {
     Bus::fake();
 
     $this->expectException(InvalidArgumentException::class);
-    handle(['repo' => '']);
+    createFunction(['repo' => '']);
 });
 
 test('function site is not billed until active', function () {
@@ -89,7 +90,7 @@ test('function site is not billed until active', function () {
 
     // Fresh function is `functions_configured`, not `functions_active` —
     // the billing computer only counts active functions.
-    $site = handle();
+    $site = createFunction();
 
     $this->assertNotSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
 });
@@ -99,7 +100,7 @@ test('auto runtime is stored unset for deploy time detection', function () {
 
     // `auto` leaves the runtime empty so ServerlessRuntimeDetector picks
     // it from the repo at deploy time; an explicit value is kept verbatim.
-    $site = handle(['runtime' => 'auto']);
+    $site = createFunction(['runtime' => 'auto']);
 
     expect($site->meta['serverless']['runtime'])->toBe('');
 });

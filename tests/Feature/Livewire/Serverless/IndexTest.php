@@ -18,18 +18,18 @@ beforeEach(function () {
     $this->org->users()->attach($this->user->id, ['role' => 'owner']);
 });
 
-function makeFunction(Organization $org, string $name): Site
+function makeFunction(User $user, Organization $org, string $name): Site
 {
     $server = Server::factory()->create([
         'organization_id' => $org->id,
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
     ]);
 
     return Site::factory()->create([
         'server_id' => $server->id,
         'organization_id' => $org->id,
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'name' => $name,
         'meta' => ['runtime_profile' => 'digitalocean_functions_web'],
     ]);
@@ -42,7 +42,7 @@ test('it shows the empty state with no functions', function () {
 });
 
 test('it lists the organizations functions', function () {
-    makeFunction($this->org, 'Orders API');
+    makeFunction($this->user, $this->org, 'Orders API');
 
     Livewire::actingAs($this->user)
         ->test(ServerlessIndex::class)
@@ -51,7 +51,7 @@ test('it lists the organizations functions', function () {
 });
 
 test('it does not list another organizations functions', function () {
-    makeFunction(Organization::factory()->create(), 'Someone Elses Function');
+    makeFunction($this->user, Organization::factory()->create(), 'Someone Elses Function');
 
     Livewire::actingAs($this->user)
         ->test(ServerlessIndex::class)

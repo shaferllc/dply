@@ -2,9 +2,15 @@
 
 namespace Tests\Feature\Marketing\PricingPageTest;
 
+use Laravel\Pennant\Feature;
 use Tests\Concerns\WithFeatures;
 
 uses(WithFeatures::class);
+
+beforeEach(function () {
+    Feature::define('global.billing_enabled', fn () => true);
+    Feature::flushCache();
+});
 
 test('pricing page renders new standard and enterprise cards', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));

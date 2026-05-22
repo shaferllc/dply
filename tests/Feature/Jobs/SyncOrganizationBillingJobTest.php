@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Config;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->basePriceId = 'price_test_base_monthly';
     Config::set('subscription.standard.stripe.base_monthly', $this->basePriceId);
 });
 

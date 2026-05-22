@@ -16,21 +16,22 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-function functionSite(): Site
+/** @return array{0: User, 1: Site} */
+function functionSite(): array
 {
-    $this->user = User::factory()->create();
+    $user = User::factory()->create();
     $org = Organization::factory()->create();
-    $org->users()->attach($this->user->id, ['role' => 'owner']);
+    $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
     $credential = ProviderCredential::factory()->create([
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'provider' => 'digitalocean',
         'credentials' => ['api_token' => 'tok-123'],
     ]);
 
     $server = Server::factory()->create([
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'organization_id' => $org->id,
         'provider_credential_id' => $credential->id,
         'meta' => [
@@ -43,12 +44,14 @@ function functionSite(): Site
         ],
     ]);
 
-    return Site::factory()->create([
+    $site = Site::factory()->create([
         'server_id' => $server->id,
         'organization_id' => $org->id,
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'meta' => ['serverless' => ['action_name' => 'laravel-demo']],
     ]);
+
+    return [$user, $site];
 }
 /** Fake every OpenWhisk endpoint the panel touches. */
 function fakeOpenWhisk(): void
@@ -94,9 +97,9 @@ function fakeOpenWhisk(): void
 }
 test('inspector renders the live action doc', function () {
     fakeOpenWhisk();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->assertSee('laravel-demo')
         ->assertSee('php:8.4')
@@ -104,9 +107,9 @@ test('inspector renders the live action doc', function () {
 });
 test('triggers tab lists and creates a trigger', function () {
     fakeOpenWhisk();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('setTab', 'triggers')
         ->assertSee('nightly')
@@ -126,9 +129,9 @@ test('adding a schedule preset creates a do scheduled trigger', function () {
 
         return Http::response([], 200);
     });
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('setTab', 'triggers')
         ->call('addSchedulePreset', 'hourly');
@@ -140,9 +143,9 @@ test('adding a schedule preset creates a do scheduled trigger', function () {
 });
 test('custom schedule rejects a bad cron', function () {
     Http::fake();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('setTab', 'triggers')
         ->set('newScheduleCron', 'not-a-cron')
@@ -151,9 +154,9 @@ test('custom schedule rejects a bad cron', function () {
 });
 test('create trigger rejects invalid json params', function () {
     fakeOpenWhisk();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('setTab', 'triggers')
         ->set('newTriggerName', 'bad')
@@ -163,9 +166,9 @@ test('create trigger rejects invalid json params', function () {
 });
 test('delete action calls openwhisk', function () {
     fakeOpenWhisk();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('deleteAction');
 
@@ -174,9 +177,9 @@ test('delete action calls openwhisk', function () {
 });
 test('console invokes the function', function () {
     fakeOpenWhisk();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('setTab', 'console')
         ->set('consolePath', '/health')
@@ -191,9 +194,9 @@ test('console invokes the function', function () {
 });
 test('set tab rejects unknown tabs', function () {
     fakeOpenWhisk();
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(PlatformPanel::class, ['site' => $site])
         ->call('setTab', 'bogus')
         ->assertSet('tab', 'inspector');

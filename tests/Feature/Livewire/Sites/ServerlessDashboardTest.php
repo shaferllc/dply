@@ -52,10 +52,11 @@ test('general section shows the invocation url for a deployed function', functio
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertOk()
-        ->assertSee('Invocation URL')
+        ->assertSee('Function URL')
+        ->assertSee('Direct:')
         ->assertSee('faas-nyc1.doserverless.co')
         ->assertSee('nodejs:20')
-        ->assertSee('Deploy / redeploy');
+        ->assertSee('Manage deploys');
 });
 
 test('pre deploy function shows a pending url notice', function () {
@@ -65,7 +66,8 @@ test('pre deploy function shows a pending url notice', function () {
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site->fresh(), 'section' => 'general'])
         ->assertOk()
-        ->assertSee('appears here once the first deploy completes');
+        ->assertSee('Live once the first deploy completes.')
+        ->assertSee('Deploy function');
 });
 
 test('deploy redeploy button dispatches a deployment and redirects to the journey', function () {

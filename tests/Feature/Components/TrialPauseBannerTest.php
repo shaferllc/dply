@@ -5,13 +5,14 @@ namespace Tests\Feature\Components\TrialPauseBannerTest;
 use App\Models\Organization;
 use App\Models\Subscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Config;
 
 uses(RefreshDatabase::class);
 
-function render(Organization $org): string
+function renderTrialPauseBanner(Organization $org): string
 {
-    return render('<x-trial-pause-banner :organization="$organization" />', [
+    return Blade::render('<x-trial-pause-banner :organization="$organization" />', [
         'organization' => $org->fresh(),
     ]);
 }
@@ -19,7 +20,7 @@ function render(Organization $org): string
 test('active trial shows countdown with subscribe cta', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(9)]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringContainsString('days left in your trial', $html);
     $this->assertStringContainsString('Subscribe', $html);
@@ -28,7 +29,7 @@ test('active trial shows countdown with subscribe cta', function () {
 test('active trial is calm when more than three days left', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(9)]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     // Calm styling — brand-gold border, not amber.
     $this->assertStringContainsString('border-brand-gold/30', $html);
@@ -38,7 +39,7 @@ test('active trial is calm when more than three days left', function () {
 test('active trial escalates to amber in final three days', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(2)]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringContainsString('border-amber-300', $html);
 });
@@ -46,7 +47,7 @@ test('active trial escalates to amber in final three days', function () {
 test('trial ending tomorrow uses singular copy', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->addHours(20)]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringContainsString('ends tomorrow', $html);
 });
@@ -54,7 +55,7 @@ test('trial ending tomorrow uses singular copy', function () {
 test('expired soft still renders pause banner', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(5)]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringContainsString('Deploys are paused', $html);
     $this->assertStringContainsString('your trial has ended', $html);
@@ -70,7 +71,7 @@ test('expired soft after cancellation says subscription ended', function () {
             'ends_at' => now()->subDays(5),
         ]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringContainsString('Deploys are paused', $html);
     $this->assertStringContainsString('your subscription ended', $html);
@@ -85,7 +86,7 @@ test('subscribed org shows no banner', function () {
         ->active()
         ->create(['organization_id' => $org->id]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringNotContainsString('trial', strtolower($html));
     $this->assertStringNotContainsString('paused', strtolower($html));
@@ -103,7 +104,7 @@ test('grace period shows resume banner with end date', function () {
             'ends_at' => now()->addDays(12), // canceled, still in grace
         ]);
 
-    $html = render($org);
+    $html = renderTrialPauseBanner($org);
 
     $this->assertStringContainsString('Your subscription ends', $html);
     $this->assertStringContainsString('Resume subscription', $html);

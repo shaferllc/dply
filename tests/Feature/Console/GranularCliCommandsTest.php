@@ -274,9 +274,7 @@ test('snapshot restore aborts when user declines confirmation', function () {
     $executor->shouldNotReceive('runInlineBash');
     app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
 
-    // Without --no-confirm the prompt fires; in non-interactive
-    // test mode the answer is "no", so we expect FAILURE.
-    $exit = Artisan::call('dply:snapshot:restore', ['snapshot' => $snapshot->id]);
-
-    expect($exit)->toBe(1);
+    $this->artisan('dply:snapshot:restore', ['snapshot' => $snapshot->id])
+        ->expectsConfirmation("Restore snap-{$snapshot->id} into {$site->name}'s live DB? This OVERWRITES current data.", 'no')
+        ->assertFailed();
 });

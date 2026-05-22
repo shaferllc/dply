@@ -20,12 +20,18 @@ use App\Services\Insights\InsightRunCoordinator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
+
+beforeEach(function () {
+    Feature::define('workspace.insights', fn () => true);
+    Feature::flushCache();
+});
 
 /**
  * @return array{0: User, 1: Server, 2: Organization}

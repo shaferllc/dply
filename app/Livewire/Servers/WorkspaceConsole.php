@@ -9,7 +9,7 @@ use App\Livewire\Servers\Concerns\RunsServerConsoleCommands;
 use App\Models\Server;
 use App\Services\Servers\DplyCliInstaller;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 use App\Support\Console\ConsoleArgspecs;
 use App\Support\Console\ConsoleCatalog;
 use Illuminate\Contracts\View\View;
@@ -150,7 +150,7 @@ echo "===DPLY-PROBE-SEPARATOR==="
 SH;
 
         try {
-            $ssh = new SshConnection($this->server);
+            $ssh = app(SshConnectionFactory::class)->forServer($this->server);
 
             // Composite CLI probe — all three pieces in one exec so we know
             // exactly which parts of a prior install survived. Prefixed lines

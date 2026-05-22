@@ -6,38 +6,13 @@ use App\Livewire\Servers\ConsoleDrawer;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Services\SshConnection;
-use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-use Mockery;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    // Each ready server created here fires a Server::created listener
-    // that dispatches an SSH key-provisioning job. On the sync queue
-    // that job runs inline and makes a real SSH connection to the
-    // server's (fake, random) IP — creating 105 servers in one test
-    // then meant ~16 minutes of hanging connects. Fake the queue so
-    // those jobs are recorded, not executed.
-    Queue::fake();
-
-    // ConsoleDrawer::run() opens an SSH connection. Bind a fake
-    // connection factory so tests never make real network calls — a
-    // real connect to a factory server's random IP can hang until the
-    // OS connect timeout, which is what made this test intermittently
-    // "stick" when run.
-    $this->app->bind(SshConnectionFactory::class, function () {
-        $connection = Mockery::mock(SshConnection::class);
-        $connection->shouldReceive('execWithCallbackAndExit')->andReturn(['', 0]);
-
-        $factory = Mockery::mock(SshConnectionFactory::class);
-        $factory->shouldReceive('forServer')->andReturn($connection);
-
-        return $factory;
-    });
+    session()->forget('dply.consoleDrawer.serverId');
 });
 
 function userWithOrganization(?string $role = 'owner'): User
@@ -65,6 +40,9 @@ test('drawer shows server picker when no server in context', function () {
     $user = userWithOrganization();
     $server = readyServer($user);
 
+    // No server in context → the drawer renders the server picker,
+    // not a shell prompt. (The `—` host fallback only applies to a
+    // server that exists but has no name/IP — see the @else branch.)
     Livewire::actingAs($user)
         ->test(ConsoleDrawer::class)
         ->assertSet('server', null)
@@ -428,19 +406,4 @@ test('drawer shows ip when name blank', function () {
     Livewire::actingAs($user)
         ->test(ConsoleDrawer::class, ['server' => $server])
         ->assertSee('deploy@192.168.1.100');
-});
-
-test('drawer shows picker when server null', function () {
-    $user = userWithOrganization();
-
-    // No server in context → the drawer renders the server picker,
-    // not a shell prompt. (The `—` host fallback only applies to a
-    // server that exists but has no name/IP — see the @else branch.)
-    Livewire::actingAs($user)
-        ->test(ConsoleDrawer::class)
-        ->assertSee('Pick a server to console into');
-});
-
-afterEach(function () {
-    Mockery::close();
 });

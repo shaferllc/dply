@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\PreflightSchedulerOnSite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Mockery;
 use Tests\Concerns\WithFeatures;
@@ -20,6 +21,11 @@ use Tests\Concerns\WithFeatures;
 uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
+
+beforeEach(function () {
+    Feature::define('workspace.schedule', fn () => true);
+    Feature::flushCache();
+});
 
 /** @return array{User, Server, Site} */
 function setupServerWithSite(): array
@@ -63,7 +69,7 @@ function stubPreflight(array $results): PreflightSchedulerOnSite
             fn (array $check): bool => $check['status'] === 'warn',
         )),
     );
-    $this->app->instance(PreflightSchedulerOnSite::class, $stub);
+    app()->instance(PreflightSchedulerOnSite::class, $stub);
 
     return $stub;
 }
@@ -183,7 +189,7 @@ test('enable rejects invalid cron expression before ssh', function () {
     // The preflight stub mustn't be called — bad cron is a pre-SSH guard.
     $stub = Mockery::mock(PreflightSchedulerOnSite::class);
     $stub->shouldNotReceive('run');
-    $this->app->instance(PreflightSchedulerOnSite::class, $stub);
+    app()->instance(PreflightSchedulerOnSite::class, $stub);
 
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])

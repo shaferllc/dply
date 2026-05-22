@@ -53,6 +53,20 @@ class FakeRemoteShell extends SshConnection
         return '';
     }
 
+    /**
+     * @param  callable(string):void  $chunkCallback
+     * @return array{0: string, 1: ?int}
+     */
+    public function execWithCallbackAndExit(string $command, callable $chunkCallback, int $timeoutSeconds = 120): array
+    {
+        $out = $this->exec($command, $timeoutSeconds);
+        if ($out !== '') {
+            $chunkCallback($out);
+        }
+
+        return [$out, 0];
+    }
+
     public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
     {
         $this->putFiles[] = [$remotePath, $contents];

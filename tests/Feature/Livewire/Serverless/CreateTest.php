@@ -21,11 +21,11 @@ beforeEach(function () {
     $this->org->users()->attach($this->user->id, ['role' => 'owner']);
 });
 
-function withCredential(): void
+function withCredential(User $user, Organization $org): void
 {
     ProviderCredential::query()->create([
-        'organization_id' => $this->org->id,
-        'user_id' => $this->user->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
         'provider' => 'digitalocean',
         'name' => 'DO main',
         'credentials' => ['token' => 'dop_v1_test'],
@@ -39,7 +39,7 @@ test('shows a warning when no digitalocean credential exists', function () {
 });
 
 test('load php demo prefills the form', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -51,7 +51,7 @@ test('load php demo prefills the form', function () {
 });
 
 test('load laravel demo prefills the form', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -63,7 +63,7 @@ test('load laravel demo prefills the form', function () {
 });
 
 test('php is an offered runtime', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -71,7 +71,7 @@ test('php is an offered runtime', function () {
 });
 
 test('validation rejects empty name and repo', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -83,7 +83,7 @@ test('validation rejects empty name and repo', function () {
 
 test('happy path creates function and redirects', function () {
     Bus::fake();
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -104,7 +104,7 @@ test('happy path creates function and redirects', function () {
 });
 
 test('runtime defaults to auto detect', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -114,7 +114,7 @@ test('runtime defaults to auto detect', function () {
 
 test('auto detect creates a function with an unset runtime', function () {
     Bus::fake();
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -132,7 +132,7 @@ test('auto detect creates a function with an unset runtime', function () {
 });
 
 test('validation rejects an unknown runtime', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     Livewire::actingAs($this->user)
         ->test(ServerlessCreate::class)
@@ -144,7 +144,7 @@ test('validation rejects an unknown runtime', function () {
 });
 
 test('detect from repository renders panel', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
     fakeServerlessCheckout(function (string $dir): void {
         file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
     });
@@ -159,7 +159,7 @@ test('detect from repository renders panel', function () {
 });
 
 test('detect from repository prefills runtime dropdown', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
     fakeServerlessCheckout(function (string $dir): void {
         file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
     });
@@ -173,7 +173,7 @@ test('detect from repository prefills runtime dropdown', function () {
 });
 
 test('detect from repository does not overwrite picked runtime', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
     fakeServerlessCheckout(function (string $dir): void {
         file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
     });
@@ -189,7 +189,7 @@ test('detect from repository does not overwrite picked runtime', function () {
 });
 
 test('detect from repository leaves dropdown on auto when nothing detected', function () {
-    withCredential();
+    withCredential($this->user, $this->org);
 
     // An empty checkout — no framework markers, no raw main() entry file.
     fakeServerlessCheckout(fn (string $dir) => null);
@@ -213,7 +213,7 @@ function fakeServerlessCheckout(callable $populate): string
     mkdir($dir, 0o755, true);
     $populate($dir);
 
-    $this->app->instance(ServerlessRepositoryCheckout::class, new class($dir)
+    app()->instance(ServerlessRepositoryCheckout::class, new class($dir)
     {
         public function __construct(private string $dir) {}
 

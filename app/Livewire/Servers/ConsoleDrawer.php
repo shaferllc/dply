@@ -71,6 +71,7 @@ class ConsoleDrawer extends Component
                 $this->verifyActiveServer(refresh: false);
             }
         }
+
     }
 
     public function selectServer(string $id): void
@@ -196,11 +197,6 @@ class ConsoleDrawer extends Component
 
     public function render(): View
     {
-        // Verify server on each render if set but not verified
-        if ($this->server !== null && ! $this->serverVerified && ! $this->serverLoading) {
-            $this->verifyActiveServer();
-        }
-
         return view('livewire.servers.console-drawer', [
             // Only fetch the picker list when we need it — avoids a DB query
             // on every server-page render where the active server is set.

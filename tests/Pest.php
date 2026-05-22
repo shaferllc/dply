@@ -1,5 +1,6 @@
 <?php
 
+use Tests\Concerns\FakesRemoteServerAccess;
 use Tests\TestCase;
 
 /*
@@ -14,3 +15,5 @@ use Tests\TestCase;
 */
 
 uses(TestCase::class)->in('Feature', 'Unit');
+
+uses(FakesRemoteServerAccess::class)->in('Feature');

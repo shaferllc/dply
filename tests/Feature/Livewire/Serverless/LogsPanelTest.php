@@ -17,15 +17,16 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-function functionSite(): Site
+/** @return array{0: User, 1: Site} */
+function functionSite(): array
 {
-    $this->user = User::factory()->create();
+    $user = User::factory()->create();
     $org = Organization::factory()->create();
-    $org->users()->attach($this->user->id, ['role' => 'owner']);
+    $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
     $server = Server::factory()->create([
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'organization_id' => $org->id,
         'meta' => [
             'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
@@ -37,12 +38,14 @@ function functionSite(): Site
         ],
     ]);
 
-    return Site::factory()->create([
+    $site = Site::factory()->create([
         'server_id' => $server->id,
         'organization_id' => $org->id,
-        'user_id' => $this->user->id,
+        'user_id' => $user->id,
         'meta' => ['serverless' => ['action_name' => 'laravel-demo']],
     ]);
+
+    return [$user, $site];
 }
 /**
  * @param  array<string, mixed>  $attrs
@@ -66,42 +69,42 @@ function invocation(Site $site, array $attrs): FunctionInvocation
     ], $attrs));
 }
 test('activations tab lists operational invocations', function () {
-    $site = functionSite();
+    [$user, $site] = functionSite();
     invocation($site, ['source' => 'tick', 'task' => 'schedule', 'path' => '/scheduled-run']);
     invocation($site, ['source' => 'test', 'path' => '/test-hit']);
 
     // A web row must NOT appear on the Activations tab.
     invocation($site, ['source' => 'web', 'path' => '/organic-only']);
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(LogsPanel::class, ['site' => $site])
         ->assertSee('/scheduled-run')
         ->assertSee('/test-hit')
         ->assertDontSee('/organic-only');
 });
 test('visits tab lists web invocations', function () {
-    $site = functionSite();
+    [$user, $site] = functionSite();
     invocation($site, ['source' => 'web', 'path' => '/organic-visit']);
     invocation($site, ['source' => 'tick', 'task' => 'queue', 'path' => '/queue-tick']);
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(LogsPanel::class, ['site' => $site])
         ->call('setTab', 'visits')
         ->assertSee('/organic-visit')
         ->assertDontSee('/queue-tick');
 });
 test('runtime tab flattens log lines oldest first', function () {
-    $site = functionSite();
+    [$user, $site] = functionSite();
     invocation($site, ['log_lines' => ['second line'], 'created_at' => now()]);
     invocation($site, ['log_lines' => ['first line'], 'created_at' => now()->subMinute()]);
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(LogsPanel::class, ['site' => $site])
         ->call('setTab', 'runtime')
         ->assertSeeInOrder(['first line', 'second line']);
 });
 test('deploy tab lists function deployments', function () {
-    $site = functionSite();
+    [$user, $site] = functionSite();
     SiteDeployment::query()->create([
         'site_id' => $site->id,
         'project_id' => $site->project_id,
@@ -117,16 +120,16 @@ test('deploy tab lists function deployments', function () {
         'finished_at' => now()->subMinute(),
     ]);
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(LogsPanel::class, ['site' => $site])
         ->call('setTab', 'deploy')
         ->assertSee('Build artifact')
         ->assertSee('Uploaded function bundle to OpenWhisk');
 });
 test('set tab rejects unknown tabs', function () {
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(LogsPanel::class, ['site' => $site])
         ->call('setTab', 'bogus')
         ->assertSet('tab', 'activations');
@@ -146,9 +149,9 @@ test('send test request invokes the function and records a test row', function (
         ], 200),
     ]);
 
-    $site = functionSite();
+    [$user, $site] = functionSite();
 
-    Livewire::actingAs($this->user)
+    Livewire::actingAs($user)
         ->test(LogsPanel::class, ['site' => $site])
         ->set('testPath', '/health')
         ->call('sendTestRequest')

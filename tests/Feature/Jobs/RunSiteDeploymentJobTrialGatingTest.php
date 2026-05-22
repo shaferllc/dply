@@ -10,8 +10,13 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+});
 
 test('skipped deployment recorded when org trial expired', function () {
     $user = User::factory()->create();

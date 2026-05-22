@@ -83,6 +83,8 @@ test('idempotent deploy returns 409 while inflight', function () {
 });
 
 test('sync deploy with idempotency key caches result', function () {
+    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+
     $this->mock(SiteGitDeployer::class, function ($mock) {
         $mock->shouldReceive('run')->once()->andReturn(['output' => 'ok', 'sha' => 'abc123']);
     });
