@@ -1,26 +1,20 @@
 <?php
 
-namespace Tests\Unit;
 
+namespace Tests\Unit\NotificationChannelTypesForUiTest;
 use App\Models\NotificationChannel;
-use Tests\TestCase;
 
-class NotificationChannelTypesForUiTest extends TestCase
-{
-    public function test_types_for_ui_intersects_with_config(): void
-    {
-        config(['notification_channels.enabled_types' => ['slack', 'webhook']]);
+test('types for ui intersects with config', function () {
+    config(['notification_channels.enabled_types' => ['slack', 'webhook']]);
 
-        $this->assertSame(['slack', 'webhook'], NotificationChannel::typesForUi());
-    }
+    expect(NotificationChannel::typesForUi())->toBe(['slack', 'webhook']);
+});
 
-    public function test_types_for_ui_preserves_type_when_disabled_in_config(): void
-    {
-        config(['notification_channels.enabled_types' => ['slack']]);
+test('types for ui preserves type when disabled in config', function () {
+    config(['notification_channels.enabled_types' => ['slack']]);
 
-        $types = NotificationChannel::typesForUi(NotificationChannel::TYPE_WEBHOOK);
+    $types = NotificationChannel::typesForUi(NotificationChannel::TYPE_WEBHOOK);
 
-        $this->assertContains(NotificationChannel::TYPE_WEBHOOK, $types);
-        $this->assertContains(NotificationChannel::TYPE_SLACK, $types);
-    }
-}
+    expect($types)->toContain(NotificationChannel::TYPE_WEBHOOK);
+    expect($types)->toContain(NotificationChannel::TYPE_SLACK);
+});

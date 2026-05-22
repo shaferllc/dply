@@ -2,65 +2,50 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit;
-
+namespace Tests\Unit\DotEnvFileWriterTest;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
-use PHPUnit\Framework\TestCase;
+test('renders simple pairs', function () {
+    $w = new DotEnvFileWriter;
+    $out = $w->render(['B' => 'two', 'A' => 'one']);
 
-class DotEnvFileWriterTest extends TestCase
-{
-    public function test_renders_simple_pairs(): void
-    {
-        $w = new DotEnvFileWriter;
-        $out = $w->render(['B' => 'two', 'A' => 'one']);
+    expect($out)->toBe("A=one\nB=two\n");
+});
+test('quotes values with whitespace and specials', function () {
+    $w = new DotEnvFileWriter;
+    $out = $w->render([
+        'PLAIN' => 'simple',
+        'WITH_SPACE' => 'two words',
+        'WITH_HASH' => 'a#b',
+        'WITH_EQ' => 'a=b',
+    ]);
 
-        $this->assertSame("A=one\nB=two\n", $out);
-    }
+    $this->assertStringContainsString('PLAIN=simple', $out);
+    $this->assertStringContainsString('WITH_SPACE="two words"', $out);
+    $this->assertStringContainsString('WITH_HASH="a#b"', $out);
+    $this->assertStringContainsString('WITH_EQ="a=b"', $out);
+});
+test('escapes quotes and backslashes inside quoted values', function () {
+    $w = new DotEnvFileWriter;
+    $out = $w->render(['PATH_LIKE' => 'a\\b "c"']);
 
-    public function test_quotes_values_with_whitespace_and_specials(): void
-    {
-        $w = new DotEnvFileWriter;
-        $out = $w->render([
-            'PLAIN' => 'simple',
-            'WITH_SPACE' => 'two words',
-            'WITH_HASH' => 'a#b',
-            'WITH_EQ' => 'a=b',
-        ]);
+    $this->assertStringContainsString('PATH_LIKE="a\\\\b \\"c\\""', $out);
+});
+test('round trips through parser', function () {
+    $original = [
+        'PLAIN' => 'x',
+        'SPACED' => 'a b c',
+        'HASH' => 'a#b',
+        'QUOTED' => 'has "quotes"',
+        'EMPTY' => '',
+    ];
+    $rendered = (new DotEnvFileWriter)->render($original);
+    $parsed = (new DotEnvFileParser)->parse($rendered);
 
-        $this->assertStringContainsString('PLAIN=simple', $out);
-        $this->assertStringContainsString('WITH_SPACE="two words"', $out);
-        $this->assertStringContainsString('WITH_HASH="a#b"', $out);
-        $this->assertStringContainsString('WITH_EQ="a=b"', $out);
-    }
-
-    public function test_escapes_quotes_and_backslashes_inside_quoted_values(): void
-    {
-        $w = new DotEnvFileWriter;
-        $out = $w->render(['PATH_LIKE' => 'a\\b "c"']);
-
-        $this->assertStringContainsString('PATH_LIKE="a\\\\b \\"c\\""', $out);
-    }
-
-    public function test_round_trips_through_parser(): void
-    {
-        $original = [
-            'PLAIN' => 'x',
-            'SPACED' => 'a b c',
-            'HASH' => 'a#b',
-            'QUOTED' => 'has "quotes"',
-            'EMPTY' => '',
-        ];
-        $rendered = (new DotEnvFileWriter)->render($original);
-        $parsed = (new DotEnvFileParser)->parse($rendered);
-
-        $this->assertSame([], $parsed['errors']);
-        ksort($original);
-        $this->assertSame($original, $parsed['variables']);
-    }
-
-    public function test_empty_input_produces_empty_output(): void
-    {
-        $this->assertSame('', (new DotEnvFileWriter)->render([]));
-    }
-}
+    expect($parsed['errors'])->toBe([]);
+    ksort($original);
+    expect($parsed['variables'])->toBe($original);
+});
+test('empty input produces empty output', function () {
+    expect((new DotEnvFileWriter)->render([]))->toBe('');
+});

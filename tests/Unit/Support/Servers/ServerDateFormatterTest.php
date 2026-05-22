@@ -2,107 +2,81 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Support\Servers;
-
+namespace Tests\Unit\Support\Servers\ServerDateFormatterTest;
 use App\Models\Server;
 use App\Support\Servers\ServerDateFormatter;
 use Illuminate\Support\Carbon;
-use Tests\TestCase;
-
-class ServerDateFormatterTest extends TestCase
+function serverWithMeta(array $meta): Server
 {
-    private function serverWithMeta(array $meta): Server
-    {
-        $server = new Server;
-        // forceFill bypasses fillable and lets us set meta without saving.
-        $server->forceFill(['meta' => $meta]);
+    $server = new Server;
 
-        return $server;
-    }
+    // forceFill bypasses fillable and lets us set meta without saving.
+    $server->forceFill(['meta' => $meta]);
 
-    public function test_null_input_returns_null(): void
-    {
-        $this->assertNull(ServerDateFormatter::format(null, null));
-        $this->assertNull(ServerDateFormatter::format('', null));
-    }
-
-    public function test_default_when_no_preference_is_absolute_utc(): void
-    {
-        $dt = Carbon::parse('2026-05-05T04:59:02Z');
-        $server = $this->serverWithMeta([]);
-
-        $this->assertSame('2026-05-05 04:59:02 UTC', ServerDateFormatter::format($dt, $server));
-    }
-
-    public function test_iso8601_format_emits_z_suffix(): void
-    {
-        $dt = Carbon::parse('2026-05-05T04:59:02Z');
-        $server = $this->serverWithMeta(['date_format' => 'iso8601']);
-
-        $this->assertSame('2026-05-05T04:59:02Z', ServerDateFormatter::format($dt, $server));
-    }
-
-    public function test_absolute_local_uses_server_meta_timezone(): void
-    {
-        $dt = Carbon::parse('2026-05-05T04:59:02Z');
-        $server = $this->serverWithMeta([
-            'date_format' => 'absolute_local',
-            'timezone' => 'America/New_York', // EDT in May → UTC-4
-        ]);
-
-        // 04:59:02 UTC → 00:59:02 EDT
-        $this->assertSame('2026-05-05 00:59:02 EDT', ServerDateFormatter::format($dt, $server));
-    }
-
-    public function test_short_local_format(): void
-    {
-        $dt = Carbon::parse('2026-05-05T04:59:02Z');
-        $server = $this->serverWithMeta([
-            'date_format' => 'short_local',
-            'timezone' => 'America/New_York',
-        ]);
-
-        $this->assertSame('May 5 · 12:59 AM', ServerDateFormatter::format($dt, $server));
-    }
-
-    public function test_relative_format_uses_diff_for_humans(): void
-    {
-        Carbon::setTestNow('2026-05-05T05:00:00Z');
-        try {
-            $dt = Carbon::parse('2026-05-05T04:59:02Z'); // 58 seconds ago
-            $server = $this->serverWithMeta(['date_format' => 'relative']);
-
-            // diffForHumans(parts: 1) collapses 58s to "less than a minute" or "58 seconds ago"
-            // depending on Carbon version; both contain "ago".
-            $rendered = ServerDateFormatter::format($dt, $server);
-            $this->assertNotNull($rendered);
-            $this->assertStringContainsString('ago', $rendered);
-        } finally {
-            Carbon::setTestNow();
-        }
-    }
-
-    public function test_unknown_key_falls_back_to_default(): void
-    {
-        $dt = Carbon::parse('2026-05-05T04:59:02Z');
-        $server = $this->serverWithMeta(['date_format' => 'totally-made-up-key']);
-
-        // Unknown key resolves to the default (absolute_utc).
-        $this->assertSame('2026-05-05 04:59:02 UTC', ServerDateFormatter::format($dt, $server));
-    }
-
-    public function test_resolve_key_returns_default_for_null_server(): void
-    {
-        $this->assertSame('absolute_utc', ServerDateFormatter::resolveKey(null));
-    }
-
-    public function test_string_input_is_parsed(): void
-    {
-        $server = $this->serverWithMeta(['date_format' => 'iso8601']);
-
-        $this->assertSame(
-            '2026-05-05T04:59:02Z',
-            ServerDateFormatter::format('2026-05-05 04:59:02 UTC', $server),
-        );
-    }
+    return $server;
 }
+test('null input returns null', function () {
+    expect(ServerDateFormatter::format(null, null))->toBeNull();
+    expect(ServerDateFormatter::format('', null))->toBeNull();
+});
+test('default when no preference is absolute utc', function () {
+    $dt = Carbon::parse('2026-05-05T04:59:02Z');
+    $server = serverWithMeta([]);
+
+    expect(ServerDateFormatter::format($dt, $server))->toBe('2026-05-05 04:59:02 UTC');
+});
+test('iso8601 format emits z suffix', function () {
+    $dt = Carbon::parse('2026-05-05T04:59:02Z');
+    $server = serverWithMeta(['date_format' => 'iso8601']);
+
+    expect(ServerDateFormatter::format($dt, $server))->toBe('2026-05-05T04:59:02Z');
+});
+test('absolute local uses server meta timezone', function () {
+    $dt = Carbon::parse('2026-05-05T04:59:02Z');
+    $server = serverWithMeta([
+        'date_format' => 'absolute_local',
+        'timezone' => 'America/New_York', // EDT in May → UTC-4
+    ]);
+
+    // 04:59:02 UTC → 00:59:02 EDT
+    expect(ServerDateFormatter::format($dt, $server))->toBe('2026-05-05 00:59:02 EDT');
+});
+test('short local format', function () {
+    $dt = Carbon::parse('2026-05-05T04:59:02Z');
+    $server = serverWithMeta([
+        'date_format' => 'short_local',
+        'timezone' => 'America/New_York',
+    ]);
+
+    expect(ServerDateFormatter::format($dt, $server))->toBe('May 5 · 12:59 AM');
+});
+test('relative format uses diff for humans', function () {
+    Carbon::setTestNow('2026-05-05T05:00:00Z');
+    try {
+        $dt = Carbon::parse('2026-05-05T04:59:02Z'); // 58 seconds ago
+        $server = serverWithMeta(['date_format' => 'relative']);
+
+        // diffForHumans(parts: 1) collapses 58s to "less than a minute" or "58 seconds ago"
+        // depending on Carbon version; both contain "ago".
+        $rendered = ServerDateFormatter::format($dt, $server);
+        expect($rendered)->not->toBeNull();
+        $this->assertStringContainsString('ago', $rendered);
+    } finally {
+        Carbon::setTestNow();
+    }
+});
+test('unknown key falls back to default', function () {
+    $dt = Carbon::parse('2026-05-05T04:59:02Z');
+    $server = serverWithMeta(['date_format' => 'totally-made-up-key']);
+
+    // Unknown key resolves to the default (absolute_utc).
+    expect(ServerDateFormatter::format($dt, $server))->toBe('2026-05-05 04:59:02 UTC');
+});
+test('resolve key returns default for null server', function () {
+    expect(ServerDateFormatter::resolveKey(null))->toBe('absolute_utc');
+});
+test('string input is parsed', function () {
+    $server = serverWithMeta(['date_format' => 'iso8601']);
+
+    expect(ServerDateFormatter::format('2026-05-05 04:59:02 UTC', $server))->toBe('2026-05-05T04:59:02Z');
+});

@@ -1,53 +1,44 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\SiteCloneStrategyResolverTest;
 use App\Models\Site;
 use App\Services\Sites\Clone\ContainerSiteCloneStrategy;
 use App\Services\Sites\Clone\ServerlessSiteCloneStrategy;
 use App\Services\Sites\Clone\SiteCloneStrategyResolver;
 use App\Services\Sites\Clone\VmSiteCloneStrategy;
-use Tests\TestCase;
 
-class SiteCloneStrategyResolverTest extends TestCase
-{
-    public function test_selects_vm_strategy_for_vm_profile(): void
-    {
-        $resolver = app(SiteCloneStrategyResolver::class);
-        $site = new Site(['meta' => ['runtime_profile' => 'vm_web']]);
+test('selects vm strategy for vm profile', function () {
+    $resolver = app(SiteCloneStrategyResolver::class);
+    $site = new Site(['meta' => ['runtime_profile' => 'vm_web']]);
 
-        $this->assertInstanceOf(VmSiteCloneStrategy::class, $resolver->for($site));
-    }
+    expect($resolver->for($site))->toBeInstanceOf(VmSiteCloneStrategy::class);
+});
 
-    public function test_selects_serverless_strategy_for_functions_runtime(): void
-    {
-        $resolver = app(SiteCloneStrategyResolver::class);
-        $site = new Site(['meta' => ['runtime_profile' => 'digitalocean_functions_web']]);
+test('selects serverless strategy for functions runtime', function () {
+    $resolver = app(SiteCloneStrategyResolver::class);
+    $site = new Site(['meta' => ['runtime_profile' => 'digitalocean_functions_web']]);
 
-        $this->assertInstanceOf(ServerlessSiteCloneStrategy::class, $resolver->for($site));
-    }
+    expect($resolver->for($site))->toBeInstanceOf(ServerlessSiteCloneStrategy::class);
+});
 
-    public function test_selects_serverless_strategy_for_aws_lambda_profile(): void
-    {
-        $resolver = app(SiteCloneStrategyResolver::class);
-        $site = new Site(['meta' => ['runtime_profile' => 'aws_lambda_bref_web']]);
+test('selects serverless strategy for aws lambda profile', function () {
+    $resolver = app(SiteCloneStrategyResolver::class);
+    $site = new Site(['meta' => ['runtime_profile' => 'aws_lambda_bref_web']]);
 
-        $this->assertInstanceOf(ServerlessSiteCloneStrategy::class, $resolver->for($site));
-    }
+    expect($resolver->for($site))->toBeInstanceOf(ServerlessSiteCloneStrategy::class);
+});
 
-    public function test_selects_container_strategy_for_docker(): void
-    {
-        $resolver = app(SiteCloneStrategyResolver::class);
-        $site = new Site(['meta' => ['runtime_profile' => 'docker_web']]);
+test('selects container strategy for docker', function () {
+    $resolver = app(SiteCloneStrategyResolver::class);
+    $site = new Site(['meta' => ['runtime_profile' => 'docker_web']]);
 
-        $this->assertInstanceOf(ContainerSiteCloneStrategy::class, $resolver->for($site));
-    }
+    expect($resolver->for($site))->toBeInstanceOf(ContainerSiteCloneStrategy::class);
+});
 
-    public function test_selects_container_strategy_for_kubernetes(): void
-    {
-        $resolver = app(SiteCloneStrategyResolver::class);
-        $site = new Site(['meta' => ['runtime_profile' => 'kubernetes_web']]);
+test('selects container strategy for kubernetes', function () {
+    $resolver = app(SiteCloneStrategyResolver::class);
+    $site = new Site(['meta' => ['runtime_profile' => 'kubernetes_web']]);
 
-        $this->assertInstanceOf(ContainerSiteCloneStrategy::class, $resolver->for($site));
-    }
-}
+    expect($resolver->for($site))->toBeInstanceOf(ContainerSiteCloneStrategy::class);
+});

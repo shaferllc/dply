@@ -3,7 +3,7 @@
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\Server;
-use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 use Illuminate\Support\Str;
 
 /**
@@ -101,7 +101,7 @@ trait RunsServerConsoleCommands
         $startedAt = microtime(true);
 
         try {
-            $ssh = new SshConnection($this->server);
+            $ssh = app(SshConnectionFactory::class)->forServer($this->server);
             [$out, $exit] = $ssh->execWithCallbackAndExit(
                 $cmd.' 2>&1',
                 static fn (string $chunk) => null,

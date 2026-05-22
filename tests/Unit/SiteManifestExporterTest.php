@@ -2,96 +2,85 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit;
-
+namespace Tests\Unit\SiteManifestExporterTest;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Services\Sites\SiteManifestExporter;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-class SiteManifestExporterTest extends TestCase
-{
-    use RefreshDatabase;
+test('exports runtime version build release', function () {
+    $server = Server::factory()->create();
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'node',
+        'runtime_version' => '20.10.0',
+        'build_command' => 'npm run build',
+        'start_command' => 'node server.js',
+    ]);
 
-    public function test_exports_runtime_version_build_release(): void
-    {
-        $server = Server::factory()->create();
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'node',
-            'runtime_version' => '20.10.0',
-            'build_command' => 'npm run build',
-            'start_command' => 'node server.js',
-        ]);
+    $rendered = (new SiteManifestExporter)->render($site);
+    $parsed = Yaml::parse($rendered);
 
-        $rendered = (new SiteManifestExporter)->render($site);
-        $parsed = Yaml::parse($rendered);
+    expect($parsed['runtime'])->toBe('node');
+    expect($parsed['version'])->toBe('20.10.0');
+    expect($parsed['build'])->toBe(['npm run build']);
+    expect($parsed['release'])->toBe(['node server.js']);
+});
+test('exports processes with scale when not one', function () {
+    $server = Server::factory()->create();
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'php',
+    ]);
 
-        $this->assertSame('node', $parsed['runtime']);
-        $this->assertSame('20.10.0', $parsed['version']);
-        $this->assertSame(['npm run build'], $parsed['build']);
-        $this->assertSame(['node server.js'], $parsed['release']);
-    }
+    // Site::created hook auto-creates a 'web' process at scale=1.
+    SiteProcess::factory()->create([
+        'site_id' => $site->id,
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'queue',
+        'command' => 'php artisan queue:work',
+        'scale' => 3,
+        'is_active' => true,
+    ]);
 
-    public function test_exports_processes_with_scale_when_not_one(): void
-    {
-        $server = Server::factory()->create();
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'php',
-        ]);
-        // Site::created hook auto-creates a 'web' process at scale=1.
-        SiteProcess::factory()->create([
-            'site_id' => $site->id,
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'queue',
-            'command' => 'php artisan queue:work',
-            'scale' => 3,
-            'is_active' => true,
-        ]);
+    $parsed = Yaml::parse((new SiteManifestExporter)->render($site));
 
-        $parsed = Yaml::parse((new SiteManifestExporter)->render($site));
+    expect($parsed['processes'])->toHaveKey('queue');
+    expect($parsed['processes']['queue']['command'])->toBe('php artisan queue:work');
+    expect($parsed['processes']['queue']['scale'])->toBe(3);
 
-        $this->assertArrayHasKey('queue', $parsed['processes']);
-        $this->assertSame('php artisan queue:work', $parsed['processes']['queue']['command']);
-        $this->assertSame(3, $parsed['processes']['queue']['scale']);
-        // Web is scale=1 so the scale key is omitted.
-        $this->assertArrayNotHasKey('scale', $parsed['processes']['web']);
-    }
+    // Web is scale=1 so the scale key is omitted.
+    $this->assertArrayNotHasKey('scale', $parsed['processes']['web']);
+});
+test('omits empty fields', function () {
+    $server = Server::factory()->create();
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'static',
+        'runtime_version' => null,
+        'build_command' => null,
+        'start_command' => null,
+    ]);
 
-    public function test_omits_empty_fields(): void
-    {
-        $server = Server::factory()->create();
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'static',
-            'runtime_version' => null,
-            'build_command' => null,
-            'start_command' => null,
-        ]);
-        // Remove auto-created web process so the output is truly minimal.
-        $site->processes()->delete();
+    // Remove auto-created web process so the output is truly minimal.
+    $site->processes()->delete();
 
-        $rendered = (new SiteManifestExporter)->render($site);
-        $parsed = Yaml::parse($rendered);
+    $rendered = (new SiteManifestExporter)->render($site);
+    $parsed = Yaml::parse($rendered);
 
-        $this->assertSame(['runtime' => 'static'], $parsed);
-    }
+    expect($parsed)->toBe(['runtime' => 'static']);
+});
+test('rendered manifest starts with provenance header', function () {
+    $server = Server::factory()->create();
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'php',
+    ]);
 
-    public function test_rendered_manifest_starts_with_provenance_header(): void
-    {
-        $server = Server::factory()->create();
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'php',
-        ]);
+    $rendered = (new SiteManifestExporter)->render($site);
 
-        $rendered = (new SiteManifestExporter)->render($site);
-
-        $this->assertStringStartsWith('# Generated by dply:site:export-manifest', $rendered);
-        $this->assertStringContainsString($site->id, $rendered);
-    }
-}
+    expect($rendered)->toStartWith('# Generated by dply:site:export-manifest');
+    $this->assertStringContainsString($site->id, $rendered);
+});

@@ -1,75 +1,60 @@
 <?php
 
-namespace Tests\Unit;
 
+namespace Tests\Unit\OrganizationPolicyTest;
 use App\Models\Organization;
 use App\Models\User;
 use App\Policies\OrganizationPolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class OrganizationPolicyTest extends TestCase
-{
-    use RefreshDatabase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-    protected OrganizationPolicy $policy;
+beforeEach(function () {
+    $this->policy = new OrganizationPolicy;
+});
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->policy = new OrganizationPolicy;
-    }
+test('view allows member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'member']);
 
-    public function test_view_allows_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'member']);
+    expect($this->policy->view($user, $org))->toBeTrue();
+});
 
-        $this->assertTrue($this->policy->view($user, $org));
-    }
+test('view denies non member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
 
-    public function test_view_denies_non_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
+    expect($this->policy->view($user, $org))->toBeFalse();
+});
 
-        $this->assertFalse($this->policy->view($user, $org));
-    }
+test('update allows admin', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'admin']);
 
-    public function test_update_allows_admin(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'admin']);
+    expect($this->policy->update($user, $org))->toBeTrue();
+});
 
-        $this->assertTrue($this->policy->update($user, $org));
-    }
+test('update denies member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'member']);
 
-    public function test_update_denies_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'member']);
+    expect($this->policy->update($user, $org))->toBeFalse();
+});
 
-        $this->assertFalse($this->policy->update($user, $org));
-    }
+test('delete allows only owner', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-    public function test_delete_allows_only_owner(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+    expect($this->policy->delete($user, $org))->toBeTrue();
+});
 
-        $this->assertTrue($this->policy->delete($user, $org));
-    }
+test('delete denies admin', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'admin']);
 
-    public function test_delete_denies_admin(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'admin']);
-
-        $this->assertFalse($this->policy->delete($user, $org));
-    }
-}
+    expect($this->policy->delete($user, $org))->toBeFalse();
+});

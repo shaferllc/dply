@@ -1,105 +1,95 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\ServerMetricsCollectorParseShaTest;
 use App\Services\Servers\ServerMetricsCollector;
 use PHPUnit\Framework\Attributes\CoversClass;
-use ReflectionMethod;
-use Tests\TestCase;
 
-#[CoversClass(ServerMetricsCollector::class)]
-class ServerMetricsCollectorParseShaTest extends TestCase
-{
-    public function test_parse_remote_script_sha_from_buffer(): void
-    {
-        $collector = app(ServerMetricsCollector::class);
-        $m = new ReflectionMethod(ServerMetricsCollector::class, 'parseRemoteScriptShaFromBuffer');
-        $m->setAccessible(true);
+test('parse remote script sha from buffer', function () {
+    $collector = app(ServerMetricsCollector::class);
+    $m = new ReflectionMethod(ServerMetricsCollector::class, 'parseRemoteScriptShaFromBuffer');
+    $m->setAccessible(true);
 
-        $buf = "DPLY_SCRIPT_SHA=abc123missing\n{\"cpu_pct\":1}\n";
-        $this->assertSame('abc123missing', $m->invoke($collector, $buf));
+    $buf = "DPLY_SCRIPT_SHA=abc123missing\n{\"cpu_pct\":1}\n";
+    expect($m->invoke($collector, $buf))->toBe('abc123missing');
 
-        $buf2 = "noise\nDPLY_SCRIPT_SHA=deadbeef\n{\"x\":1}";
-        $this->assertSame('deadbeef', $m->invoke($collector, $buf2));
+    $buf2 = "noise\nDPLY_SCRIPT_SHA=deadbeef\n{\"x\":1}";
+    expect($m->invoke($collector, $buf2))->toBe('deadbeef');
 
-        $this->assertNull($m->invoke($collector, '{"cpu_pct":1}'));
-    }
+    expect($m->invoke($collector, '{"cpu_pct":1}'))->toBeNull();
+});
 
-    public function test_metrics_parse_failure_message_classifies_common_failures(): void
-    {
-        $collector = app(ServerMetricsCollector::class);
-        $method = new ReflectionMethod(ServerMetricsCollector::class, 'metricsParseFailureMessage');
-        $method->setAccessible(true);
+test('metrics parse failure message classifies common failures', function () {
+    $collector = app(ServerMetricsCollector::class);
+    $method = new ReflectionMethod(ServerMetricsCollector::class, 'metricsParseFailureMessage');
+    $method->setAccessible(true);
 
-        $this->assertStringContainsString(
-            'returned no output over SSH',
-            $method->invoke($collector, '', null)
-        );
+    $this->assertStringContainsString(
+        'returned no output over SSH',
+        $method->invoke($collector, '', null)
+    );
 
-        $this->assertStringContainsString(
-            'monitor script is missing',
-            $method->invoke($collector, "DPLY_SCRIPT_SHA=MISSING\n", 'MISSING')
-        );
+    $this->assertStringContainsString(
+        'monitor script is missing',
+        $method->invoke($collector, "DPLY_SCRIPT_SHA=MISSING\n", 'MISSING')
+    );
 
-        $this->assertStringContainsString(
-            'shell output instead of metrics JSON',
-            $method->invoke($collector, "DPLY_SCRIPT_SHA=abc123\nLast login: today\n", 'abc123')
-        );
-    }
+    $this->assertStringContainsString(
+        'shell output instead of metrics JSON',
+        $method->invoke($collector, "DPLY_SCRIPT_SHA=abc123\nLast login: today\n", 'abc123')
+    );
+});
 
-    public function test_extract_metrics_json_line_prefers_marked_payload(): void
-    {
-        $collector = app(ServerMetricsCollector::class);
-        $method = new ReflectionMethod(ServerMetricsCollector::class, 'extractMetricsJsonLine');
-        $method->setAccessible(true);
+test('extract metrics json line prefers marked payload', function () {
+    $collector = app(ServerMetricsCollector::class);
+    $method = new ReflectionMethod(ServerMetricsCollector::class, 'extractMetricsJsonLine');
+    $method->setAccessible(true);
 
-        $buffer = implode("\n", [
-            'Last login: today',
-            'DPLY_SCRIPT_SHA=abc123',
-            'DPLY_METRICS_JSON_BEGIN',
-            '{"cpu_pct":1}',
-            'DPLY_METRICS_JSON_END',
-            'logout',
-        ]);
+    $buffer = implode("\n", [
+        'Last login: today',
+        'DPLY_SCRIPT_SHA=abc123',
+        'DPLY_METRICS_JSON_BEGIN',
+        '{"cpu_pct":1}',
+        'DPLY_METRICS_JSON_END',
+        'logout',
+    ]);
 
-        $this->assertSame('{"cpu_pct":1}', $method->invoke($collector, $buffer));
-    }
+    expect($method->invoke($collector, $buffer))->toBe('{"cpu_pct":1}');
+});
 
-    public function test_normalize_payload_preserves_extended_metrics_types(): void
-    {
-        $collector = app(ServerMetricsCollector::class);
+test('normalize payload preserves extended metrics types', function () {
+    $collector = app(ServerMetricsCollector::class);
 
-        $normalized = $collector->normalizePayload([
-            'cpu_pct' => '10.55',
-            'mem_pct' => '20.0',
-            'disk_pct' => '30.1',
-            'load_1m' => '0.52',
-            'load_5m' => '0.31',
-            'load_15m' => '0.21',
-            'mem_total_kb' => '1000000',
-            'mem_available_kb' => '640000',
-            'swap_total_kb' => '512000',
-            'swap_used_kb' => '128000',
-            'disk_total_bytes' => '100000000',
-            'disk_used_bytes' => '50000000',
-            'disk_free_bytes' => '50000000',
-            'inode_pct_root' => '43.8',
-            'cpu_count' => '8',
-            'load_per_cpu_1m' => '0.06',
-            'uptime_seconds' => '7200',
-            'rx_bytes_per_sec' => '8192.25',
-            'tx_bytes_per_sec' => '4096.13',
-        ]);
+    $normalized = $collector->normalizePayload([
+        'cpu_pct' => '10.55',
+        'mem_pct' => '20.0',
+        'disk_pct' => '30.1',
+        'load_1m' => '0.52',
+        'load_5m' => '0.31',
+        'load_15m' => '0.21',
+        'mem_total_kb' => '1000000',
+        'mem_available_kb' => '640000',
+        'swap_total_kb' => '512000',
+        'swap_used_kb' => '128000',
+        'disk_total_bytes' => '100000000',
+        'disk_used_bytes' => '50000000',
+        'disk_free_bytes' => '50000000',
+        'inode_pct_root' => '43.8',
+        'cpu_count' => '8',
+        'load_per_cpu_1m' => '0.06',
+        'uptime_seconds' => '7200',
+        'rx_bytes_per_sec' => '8192.25',
+        'tx_bytes_per_sec' => '4096.13',
+    ]);
 
-        $this->assertSame(10.55, $normalized['cpu_pct']);
-        $this->assertSame(640000, $normalized['mem_available_kb']);
-        $this->assertSame(128000, $normalized['swap_used_kb']);
-        $this->assertSame(50000000, $normalized['disk_free_bytes']);
-        $this->assertSame(43.8, $normalized['inode_pct_root']);
-        $this->assertSame(8, $normalized['cpu_count']);
-        $this->assertSame(0.06, $normalized['load_per_cpu_1m']);
-        $this->assertSame(7200, $normalized['uptime_seconds']);
-        $this->assertSame(8192.25, $normalized['rx_bytes_per_sec']);
-        $this->assertSame(4096.13, $normalized['tx_bytes_per_sec']);
-    }
-}
+    expect($normalized['cpu_pct'])->toBe(10.55);
+    expect($normalized['mem_available_kb'])->toBe(640000);
+    expect($normalized['swap_used_kb'])->toBe(128000);
+    expect($normalized['disk_free_bytes'])->toBe(50000000);
+    expect($normalized['inode_pct_root'])->toBe(43.8);
+    expect($normalized['cpu_count'])->toBe(8);
+    expect($normalized['load_per_cpu_1m'])->toBe(0.06);
+    expect($normalized['uptime_seconds'])->toBe(7200);
+    expect($normalized['rx_bytes_per_sec'])->toBe(8192.25);
+    expect($normalized['tx_bytes_per_sec'])->toBe(4096.13);
+});

@@ -2,145 +2,124 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services;
-
+namespace Tests\Unit\Services\DigitalOceanServiceSnapshotTest;
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
-use Tests\TestCase;
+test('power off droplet returns action payload', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/droplets/42/actions' => Http::response([
+            'action' => [
+                'id' => 7001,
+                'status' => 'in-progress',
+                'type' => 'power_off',
+            ],
+        ], 201),
+    ]);
 
-class DigitalOceanServiceSnapshotTest extends TestCase
-{
-    public function test_power_off_droplet_returns_action_payload(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets/42/actions' => Http::response([
-                'action' => [
-                    'id' => 7001,
-                    'status' => 'in-progress',
-                    'type' => 'power_off',
-                ],
-            ], 201),
-        ]);
+    $svc = new DigitalOceanService('tok');
+    $action = $svc->powerOffDroplet(42);
 
-        $svc = new DigitalOceanService('tok');
-        $action = $svc->powerOffDroplet(42);
+    expect($action['id'])->toBe(7001);
+    expect($action['status'])->toBe('in-progress');
 
-        $this->assertSame(7001, $action['id']);
-        $this->assertSame('in-progress', $action['status']);
+    Http::assertSent(function ($request) {
+        return $request->method() === 'POST'
+            && str_contains($request->url(), '/droplets/42/actions')
+            && $request->data() === ['type' => 'power_off'];
+    });
+});
+test('snapshot droplet sends name in body', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/droplets/99/actions' => Http::response([
+            'action' => ['id' => 8002, 'status' => 'in-progress', 'type' => 'snapshot'],
+        ], 201),
+    ]);
 
-        Http::assertSent(function ($request) {
-            return $request->method() === 'POST'
-                && str_contains($request->url(), '/droplets/42/actions')
-                && $request->data() === ['type' => 'power_off'];
-        });
-    }
+    $svc = new DigitalOceanService('tok');
+    $action = $svc->snapshotDroplet(99, 'dply-base-test');
 
-    public function test_snapshot_droplet_sends_name_in_body(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/droplets/99/actions' => Http::response([
-                'action' => ['id' => 8002, 'status' => 'in-progress', 'type' => 'snapshot'],
-            ], 201),
-        ]);
+    expect($action['id'])->toBe(8002);
+    Http::assertSent(function ($request) {
+        return $request->method() === 'POST'
+            && $request->data() === ['type' => 'snapshot', 'name' => 'dply-base-test'];
+    });
+});
+test('snapshot droplet rejects blank name', function () {
+    $svc = new DigitalOceanService('tok');
+    $this->expectException(\InvalidArgumentException::class);
+    $svc->snapshotDroplet(99, '   ');
+});
+test('wait for droplet action polls until completed', function () {
+    Http::fakeSequence('api.digitalocean.com/v2/droplets/77/actions/5000')
+        ->push(['action' => ['id' => 5000, 'status' => 'in-progress']], 200)
+        ->push(['action' => ['id' => 5000, 'status' => 'in-progress']], 200)
+        ->push(['action' => ['id' => 5000, 'status' => 'completed']], 200);
 
-        $svc = new DigitalOceanService('tok');
-        $action = $svc->snapshotDroplet(99, 'dply-base-test');
+    $svc = new DigitalOceanService('tok');
+    $ticks = [];
+    $action = $svc->waitForDropletAction(
+        77,
+        5000,
+        timeoutSeconds: 60,
+        pollSeconds: 2,
+        onTick: function (array $a) use (&$ticks): void {
+            $ticks[] = $a['status'] ?? null;
+        },
+    );
 
-        $this->assertSame(8002, $action['id']);
-        Http::assertSent(function ($request) {
-            return $request->method() === 'POST'
-                && $request->data() === ['type' => 'snapshot', 'name' => 'dply-base-test'];
-        });
-    }
+    expect($action['status'])->toBe('completed');
+    expect($ticks)->toBe(['in-progress', 'in-progress', 'completed']);
+});
+test('wait for droplet action throws on errored status', function () {
+    Http::fake([
+        'api.digitalocean.com/v2/droplets/77/actions/5001' => Http::response(
+            ['action' => ['id' => 5001, 'status' => 'errored']],
+            200
+        ),
+    ]);
 
-    public function test_snapshot_droplet_rejects_blank_name(): void
-    {
-        $svc = new DigitalOceanService('tok');
-        $this->expectException(\InvalidArgumentException::class);
-        $svc->snapshotDroplet(99, '   ');
-    }
+    $svc = new DigitalOceanService('tok');
+    $this->expectException(\RuntimeException::class);
+    $svc->waitForDropletAction(77, 5001, timeoutSeconds: 60, pollSeconds: 2);
+});
+test('get snapshots filters by resource type', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/snapshots*' => Http::response([
+            'snapshots' => [['id' => '1', 'name' => 'a'], ['id' => '2', 'name' => 'b']],
+        ], 200),
+    ]);
 
-    public function test_wait_for_droplet_action_polls_until_completed(): void
-    {
-        Http::fakeSequence('api.digitalocean.com/v2/droplets/77/actions/5000')
-            ->push(['action' => ['id' => 5000, 'status' => 'in-progress']], 200)
-            ->push(['action' => ['id' => 5000, 'status' => 'in-progress']], 200)
-            ->push(['action' => ['id' => 5000, 'status' => 'completed']], 200);
+    $svc = new DigitalOceanService('tok');
+    $snapshots = $svc->getSnapshots('droplet');
 
-        $svc = new DigitalOceanService('tok');
-        $ticks = [];
-        $action = $svc->waitForDropletAction(
-            77,
-            5000,
-            timeoutSeconds: 60,
-            pollSeconds: 2,
-            onTick: function (array $a) use (&$ticks): void {
-                $ticks[] = $a['status'] ?? null;
-            },
-        );
+    expect($snapshots)->toHaveCount(2);
+    Http::assertSent(function ($request) {
+        return str_contains($request->url(), 'resource_type=droplet');
+    });
+});
+test('delete snapshot calls api', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/snapshots/abc' => Http::response('', 204),
+    ]);
 
-        $this->assertSame('completed', $action['status']);
-        $this->assertSame(['in-progress', 'in-progress', 'completed'], $ticks);
-    }
+    $svc = new DigitalOceanService('tok');
+    $svc->deleteSnapshot('abc');
 
-    public function test_wait_for_droplet_action_throws_on_errored_status(): void
-    {
-        Http::fake([
-            'api.digitalocean.com/v2/droplets/77/actions/5001' => Http::response(
-                ['action' => ['id' => 5001, 'status' => 'errored']],
-                200
-            ),
-        ]);
+    Http::assertSent(function ($request) {
+        return $request->method() === 'DELETE'
+            && str_contains($request->url(), '/snapshots/abc');
+    });
+});
+test('delete ssh key url encodes fingerprint', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/account/keys/*' => Http::response('', 204),
+    ]);
 
-        $svc = new DigitalOceanService('tok');
-        $this->expectException(\RuntimeException::class);
-        $svc->waitForDropletAction(77, 5001, timeoutSeconds: 60, pollSeconds: 2);
-    }
+    $svc = new DigitalOceanService('tok');
+    $svc->deleteSshKey('aa:bb:cc:dd');
 
-    public function test_get_snapshots_filters_by_resource_type(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/snapshots*' => Http::response([
-                'snapshots' => [['id' => '1', 'name' => 'a'], ['id' => '2', 'name' => 'b']],
-            ], 200),
-        ]);
-
-        $svc = new DigitalOceanService('tok');
-        $snapshots = $svc->getSnapshots('droplet');
-
-        $this->assertCount(2, $snapshots);
-        Http::assertSent(function ($request) {
-            return str_contains($request->url(), 'resource_type=droplet');
-        });
-    }
-
-    public function test_delete_snapshot_calls_api(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/snapshots/abc' => Http::response('', 204),
-        ]);
-
-        $svc = new DigitalOceanService('tok');
-        $svc->deleteSnapshot('abc');
-
-        Http::assertSent(function ($request) {
-            return $request->method() === 'DELETE'
-                && str_contains($request->url(), '/snapshots/abc');
-        });
-    }
-
-    public function test_delete_ssh_key_url_encodes_fingerprint(): void
-    {
-        Http::fake([
-            'https://api.digitalocean.com/v2/account/keys/*' => Http::response('', 204),
-        ]);
-
-        $svc = new DigitalOceanService('tok');
-        $svc->deleteSshKey('aa:bb:cc:dd');
-
-        Http::assertSent(function ($request) {
-            return $request->method() === 'DELETE'
-                && str_contains($request->url(), '/account/keys/aa%3Abb%3Acc%3Add');
-        });
-    }
-}
+    Http::assertSent(function ($request) {
+        return $request->method() === 'DELETE'
+            && str_contains($request->url(), '/account/keys/aa%3Abb%3Acc%3Add');
+    });
+});

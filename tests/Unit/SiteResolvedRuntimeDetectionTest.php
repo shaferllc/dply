@@ -1,144 +1,134 @@
 <?php
 
-namespace Tests\Unit;
 
+namespace Tests\Unit\SiteResolvedRuntimeDetectionTest;
 use App\Models\Site;
-use Tests\TestCase;
 
-class SiteResolvedRuntimeDetectionTest extends TestCase
-{
-    public function test_resolved_detection_prefers_docker_meta_over_kubernetes_and_serverless(): void
-    {
-        $site = new Site([
-            'meta' => [
-                'docker_runtime' => [
-                    'detected' => [
-                        'framework' => 'laravel',
-                        'language' => 'php',
-                        'confidence' => 'high',
-                    ],
-                ],
-                'kubernetes_runtime' => [
-                    'detected' => [
-                        'framework' => 'nextjs',
-                        'language' => 'node',
-                    ],
-                ],
-                'serverless' => [
-                    'detected_runtime' => [
-                        'framework' => 'vite_static',
-                        'language' => 'node',
-                    ],
+test('resolved detection prefers docker meta over kubernetes and serverless', function () {
+    $site = new Site([
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'confidence' => 'high',
                 ],
             ],
-        ]);
-
-        $resolved = $site->resolvedRuntimeAppDetection();
-
-        $this->assertNotNull($resolved);
-        $this->assertSame('docker', $resolved['source']);
-        $this->assertSame('laravel', $resolved['framework']);
-        $this->assertSame('php', $resolved['language']);
-        $this->assertSame('high', $resolved['confidence']);
-    }
-
-    public function test_resolved_detection_includes_laravel_octane_when_present_in_blob(): void
-    {
-        $site = new Site([
-            'meta' => [
-                'docker_runtime' => [
-                    'detected' => [
-                        'framework' => 'laravel',
-                        'language' => 'php',
-                        'laravel_octane' => true,
-                    ],
+            'kubernetes_runtime' => [
+                'detected' => [
+                    'framework' => 'nextjs',
+                    'language' => 'node',
                 ],
             ],
-        ]);
-
-        $resolved = $site->resolvedRuntimeAppDetection();
-
-        $this->assertNotNull($resolved);
-        $this->assertTrue($resolved['laravel_octane']);
-    }
-
-    public function test_resolved_detection_falls_through_to_kubernetes_when_docker_empty(): void
-    {
-        $site = new Site([
-            'meta' => [
-                'docker_runtime' => ['detected' => []],
-                'kubernetes_runtime' => [
-                    'detected' => [
-                        'framework' => 'nuxt',
-                        'language' => 'node',
-                        'confidence' => 'medium',
-                    ],
+            'serverless' => [
+                'detected_runtime' => [
+                    'framework' => 'vite_static',
+                    'language' => 'node',
                 ],
             ],
-        ]);
+        ],
+    ]);
 
-        $resolved = $site->resolvedRuntimeAppDetection();
+    $resolved = $site->resolvedRuntimeAppDetection();
 
-        $this->assertNotNull($resolved);
-        $this->assertSame('kubernetes', $resolved['source']);
-        $this->assertSame('nuxt', $resolved['framework']);
-    }
+    expect($resolved)->not->toBeNull();
+    expect($resolved['source'])->toBe('docker');
+    expect($resolved['framework'])->toBe('laravel');
+    expect($resolved['language'])->toBe('php');
+    expect($resolved['confidence'])->toBe('high');
+});
 
-    public function test_resolved_detection_uses_serverless_detected_runtime_shape(): void
-    {
-        $site = new Site([
-            'meta' => [
-                'serverless' => [
-                    'detected_runtime' => [
-                        'framework' => 'laravel',
-                        'language' => 'php',
-                        'confidence' => 'high',
-                        'warnings' => ['Test warning'],
-                    ],
+test('resolved detection includes laravel octane when present in blob', function () {
+    $site = new Site([
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'laravel_octane' => true,
                 ],
             ],
-        ]);
+        ],
+    ]);
 
-        $resolved = $site->resolvedRuntimeAppDetection();
+    $resolved = $site->resolvedRuntimeAppDetection();
 
-        $this->assertNotNull($resolved);
-        $this->assertSame('serverless', $resolved['source']);
-        $this->assertSame(['Test warning'], $resolved['warnings']);
-    }
+    expect($resolved)->not->toBeNull();
+    expect($resolved['laravel_octane'])->toBeTrue();
+});
 
-    public function test_resolved_detection_returns_null_when_only_unknown_framework_and_language(): void
-    {
-        $site = new Site([
-            'meta' => [
-                'docker_runtime' => [
-                    'detected' => [
-                        'framework' => 'unknown',
-                        'language' => 'unknown',
-                    ],
+test('resolved detection falls through to kubernetes when docker empty', function () {
+    $site = new Site([
+        'meta' => [
+            'docker_runtime' => ['detected' => []],
+            'kubernetes_runtime' => [
+                'detected' => [
+                    'framework' => 'nuxt',
+                    'language' => 'node',
+                    'confidence' => 'medium',
                 ],
             ],
-        ]);
+        ],
+    ]);
 
-        $this->assertNull($site->resolvedRuntimeAppDetection());
-    }
+    $resolved = $site->resolvedRuntimeAppDetection();
 
-    public function test_runtime_profile_label_maps_known_profiles(): void
-    {
-        $site = new Site;
+    expect($resolved)->not->toBeNull();
+    expect($resolved['source'])->toBe('kubernetes');
+    expect($resolved['framework'])->toBe('nuxt');
+});
 
-        $site->meta = ['runtime_profile' => 'vm_web'];
-        $this->assertSame('BYO VM', $site->runtimeProfileLabel());
+test('resolved detection uses serverless detected runtime shape', function () {
+    $site = new Site([
+        'meta' => [
+            'serverless' => [
+                'detected_runtime' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'confidence' => 'high',
+                    'warnings' => ['Test warning'],
+                ],
+            ],
+        ],
+    ]);
 
-        $site->meta = ['runtime_profile' => 'docker_web'];
-        $this->assertSame('Docker', $site->runtimeProfileLabel());
+    $resolved = $site->resolvedRuntimeAppDetection();
 
-        $site->meta = ['runtime_profile' => 'kubernetes_web'];
-        $this->assertSame('Kubernetes', $site->runtimeProfileLabel());
+    expect($resolved)->not->toBeNull();
+    expect($resolved['source'])->toBe('serverless');
+    expect($resolved['warnings'])->toBe(['Test warning']);
+});
 
-        $site->meta = ['runtime_profile' => 'digitalocean_functions_web'];
-        $this->assertSame('DigitalOcean Functions', $site->runtimeProfileLabel());
+test('resolved detection returns null when only unknown framework and language', function () {
+    $site = new Site([
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'unknown',
+                    'language' => 'unknown',
+                ],
+            ],
+        ],
+    ]);
 
-        $site->meta = ['runtime_profile' => 'aws_lambda_bref_web'];
-        $this->assertSame('AWS Lambda', $site->runtimeProfileLabel());
-    }
-}
+    expect($site->resolvedRuntimeAppDetection())->toBeNull();
+});
+
+test('runtime profile label maps known profiles', function () {
+    $site = new Site;
+
+    $site->meta = ['runtime_profile' => 'vm_web'];
+    expect($site->runtimeProfileLabel())->toBe('BYO VM');
+
+    $site->meta = ['runtime_profile' => 'docker_web'];
+    expect($site->runtimeProfileLabel())->toBe('Docker');
+
+    $site->meta = ['runtime_profile' => 'kubernetes_web'];
+    expect($site->runtimeProfileLabel())->toBe('Kubernetes');
+
+    $site->meta = ['runtime_profile' => 'digitalocean_functions_web'];
+    expect($site->runtimeProfileLabel())->toBe('DigitalOcean Functions');
+
+    $site->meta = ['runtime_profile' => 'aws_lambda_bref_web'];
+    expect($site->runtimeProfileLabel())->toBe('AWS Lambda');
+});

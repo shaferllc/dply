@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\Imports;
 
-use App\Contracts\RemoteShell;
 use App\Models\Server;
+use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 
 /**
@@ -16,7 +16,7 @@ final class FakeSshConnectionFactory extends SshConnectionFactory
 {
     public function __construct(private RecordingShell $shell) {}
 
-    public function forServer(Server $server): RemoteShell
+    public function forServer(Server $server): SshConnection
     {
         return $this->shell;
     }

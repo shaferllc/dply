@@ -1,50 +1,38 @@
 <?php
 
-namespace Tests\Unit;
 
+namespace Tests\Unit\SitePolicyTest;
 use App\Models\Organization;
 use App\Models\User;
 use App\Policies\SitePolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class SitePolicyTest extends TestCase
-{
-    use RefreshDatabase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-    protected SitePolicy $policy;
+beforeEach(function () {
+    $this->policy = new SitePolicy;
+});
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->policy = new SitePolicy;
-    }
+test('create denies without current organization', function () {
+    $user = User::factory()->create();
+    expect($user->currentOrganization())->toBeNull();
 
-    public function test_create_denies_without_current_organization(): void
-    {
-        $user = User::factory()->create();
-        $this->assertNull($user->currentOrganization());
+    expect($this->policy->create($user))->toBeFalse();
+});
 
-        $this->assertFalse($this->policy->create($user));
-    }
+test('create allows when org under limit', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
-    public function test_create_allows_when_org_under_limit(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        session(['current_organization_id' => $org->id]);
+    expect($this->policy->create($user))->toBeTrue();
+});
 
-        $this->assertTrue($this->policy->create($user));
-    }
+test('create denies deployer', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'deployer']);
+    session(['current_organization_id' => $org->id]);
 
-    public function test_create_denies_deployer(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'deployer']);
-        session(['current_organization_id' => $org->id]);
-
-        $this->assertFalse($this->policy->create($user));
-    }
-}
+    expect($this->policy->create($user))->toBeFalse();
+});

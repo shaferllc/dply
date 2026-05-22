@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Support\Imports;
 
-use App\Contracts\RemoteShell;
+use App\Services\SshConnection;
 
 /**
- * Test double for App\Contracts\RemoteShell. Records every exec/putFile
+ * Test double for App\Services\SshConnection. Records every exec/putFile
  * invocation and returns scripted responses in order. Lets handler tests
  * pin exact command pipelines without opening real sockets.
+ *
+ * Extends the concrete SshConnection (rather than just implementing
+ * RemoteShell) so it can be returned from a faked SshConnectionFactory,
+ * whose forServer() is typed against the concrete connection.
  */
-final class RecordingShell implements RemoteShell
+final class RecordingShell extends SshConnection
 {
     /** @var list<string> */
     public array $commands = [];
@@ -21,6 +25,11 @@ final class RecordingShell implements RemoteShell
 
     /** @var array<string, string> remote_path → contents written */
     public array $written = [];
+
+    public function __construct()
+    {
+        // Skip SshConnection's constructor — no Server, no socket.
+    }
 
     public function exec(string $command, int $timeoutSeconds = 120): string
     {

@@ -1,34 +1,27 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\InsightSettingsRepositoryTest;
 use App\Models\Organization;
 use App\Services\Insights\InsightSettingsRepository;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 
-class InsightSettingsRepositoryTest extends TestCase
-{
-    use RefreshDatabase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-    #[Test]
-    public function default_enabled_map_turns_off_pro_insights_without_subscription(): void
-    {
-        // Heartbeat default_enabled is env-driven (INSIGHTS_HEARTBEAT_DEFAULT_ENABLED).
-        // Pin it to false here so the test doesn't depend on the developer's local env.
-        config(['insights.insights.insights_pipeline_heartbeat.default_enabled' => false]);
+test('default enabled map turns off pro insights without subscription', function () {
+    // Heartbeat default_enabled is env-driven (INSIGHTS_HEARTBEAT_DEFAULT_ENABLED).
+    // Pin it to false here so the test doesn't depend on the developer's local env.
+    config(['insights.insights.insights_pipeline_heartbeat.default_enabled' => false]);
 
-        $org = Organization::factory()->create();
-        $repo = new InsightSettingsRepository;
+    $org = Organization::factory()->create();
+    $repo = new InsightSettingsRepository;
 
-        $map = $repo->defaultEnabledMap($org);
+    $map = $repo->defaultEnabledMap($org);
 
-        $this->assertArrayHasKey('npm_vulnerabilities', $map);
-        $this->assertFalse($map['npm_vulnerabilities']);
-        $this->assertArrayHasKey('cpu_ram_usage', $map);
-        $this->assertTrue($map['cpu_ram_usage']);
-        $this->assertArrayHasKey('insights_pipeline_heartbeat', $map);
-        $this->assertFalse($map['insights_pipeline_heartbeat']);
-    }
-}
+    expect($map)->toHaveKey('npm_vulnerabilities');
+    expect($map['npm_vulnerabilities'])->toBeFalse();
+    expect($map)->toHaveKey('cpu_ram_usage');
+    expect($map['cpu_ram_usage'])->toBeTrue();
+    expect($map)->toHaveKey('insights_pipeline_heartbeat');
+    expect($map['insights_pipeline_heartbeat'])->toBeFalse();
+});

@@ -1,15 +1,11 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\ServerInventoryOsDetectorTest;
 use App\Services\Servers\ServerInventoryOsDetector;
-use PHPUnit\Framework\TestCase;
 
-class ServerInventoryOsDetectorTest extends TestCase
-{
-    public function test_maps_ubuntu_22_04(): void
-    {
-        $raw = <<<'EOS'
+test('maps ubuntu 22 04', function () {
+    $raw = <<<'EOS'
 PRETTY_NAME="Ubuntu 22.04.5 LTS"
 NAME="Ubuntu"
 VERSION_ID="22.04"
@@ -18,14 +14,13 @@ ID=ubuntu
 VERSION_CODENAME=jammy
 EOS;
 
-        $r = ServerInventoryOsDetector::fromOsRelease($raw);
-        $this->assertSame('ubuntu-22-04', $r['key']);
-        $this->assertStringContainsString('Ubuntu 22.04', (string) $r['pretty']);
-    }
+    $r = ServerInventoryOsDetector::fromOsRelease($raw);
+    expect($r['key'])->toBe('ubuntu-22-04');
+    $this->assertStringContainsString('Ubuntu 22.04', (string) $r['pretty']);
+});
 
-    public function test_maps_debian_12_bookworm(): void
-    {
-        $raw = <<<'EOS'
+test('maps debian 12 bookworm', function () {
+    $raw = <<<'EOS'
 PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"
 NAME="Debian GNU/Linux"
 VERSION_ID="12"
@@ -34,14 +29,12 @@ ID=debian
 VERSION_CODENAME=bookworm
 EOS;
 
-        $r = ServerInventoryOsDetector::fromOsRelease($raw);
-        $this->assertSame('debian-12', $r['key']);
-    }
+    $r = ServerInventoryOsDetector::fromOsRelease($raw);
+    expect($r['key'])->toBe('debian-12');
+});
 
-    public function test_empty_returns_nulls(): void
-    {
-        $r = ServerInventoryOsDetector::fromOsRelease('');
-        $this->assertNull($r['key']);
-        $this->assertNull($r['pretty']);
-    }
-}
+test('empty returns nulls', function () {
+    $r = ServerInventoryOsDetector::fromOsRelease('');
+    expect($r['key'])->toBeNull();
+    expect($r['pretty'])->toBeNull();
+});

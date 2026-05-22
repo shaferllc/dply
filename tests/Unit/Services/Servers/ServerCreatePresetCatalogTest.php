@@ -2,160 +2,126 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Servers;
-
+namespace Tests\Unit\Services\Servers\ServerCreatePresetCatalogTest;
 use App\Services\Servers\ServerCreatePresetCatalog;
-use PHPUnit\Framework\TestCase;
+test('catalog lists the v1 presets in order', function () {
+    $ids = array_column((new ServerCreatePresetCatalog)->all(), 'id');
 
-class ServerCreatePresetCatalogTest extends TestCase
-{
-    public function test_catalog_lists_the_v1_presets_in_order(): void
-    {
-        $ids = array_column((new ServerCreatePresetCatalog)->all(), 'id');
+    expect($ids)->toBe([
+        'laravel',
+        'rails',
+        'nextjs',
+        'django',
+        'polyglot',
+        'wordpress',
+        'static',
+        'database',
+        'custom',
+    ]);
+});
+test('wordpress preset uses mariadb redis php 84', function () {
+    $wp = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_WORDPRESS);
 
-        $this->assertSame([
-            'laravel',
-            'rails',
-            'nextjs',
-            'django',
-            'polyglot',
-            'wordpress',
-            'static',
-            'database',
-            'custom',
-        ], $ids);
-    }
+    expect($wp)->not->toBeNull();
+    expect($wp['role'])->toBe('application');
+    expect($wp['webserver'])->toBe('nginx');
+    expect($wp['php_version'])->toBe('8.4');
+    expect($wp['database'])->toBe('mariadb114');
+    expect($wp['cache'])->toBe('redis');
+    expect($wp['runtimes'])->toBe([]);
+    expect($wp['featured'])->toBeTrue();
+});
+test('polyglot preset carries all four non php runtimes', function () {
+    $polyglot = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_POLYGLOT);
 
-    public function test_wordpress_preset_uses_mariadb_redis_php_84(): void
-    {
-        $wp = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_WORDPRESS);
+    expect($polyglot)->not->toBeNull();
+    expect(array_keys($polyglot['runtimes']))->toEqualCanonicalizing(['node', 'python', 'ruby', 'go']);
 
-        $this->assertNotNull($wp);
-        $this->assertSame('application', $wp['role']);
-        $this->assertSame('nginx', $wp['webserver']);
-        $this->assertSame('8.4', $wp['php_version']);
-        $this->assertSame('mariadb114', $wp['database']);
-        $this->assertSame('redis', $wp['cache']);
-        $this->assertSame([], $wp['runtimes']);
-        $this->assertTrue($wp['featured']);
-    }
+    // Plus PHP through the dedicated php_version slot, since PHP uses
+    // ondrej/php apt rather than mise.
+    expect($polyglot['php_version'])->toBe('8.4');
+    expect($polyglot['featured'])->toBeTrue();
+});
+test('laravel preset pins mysql 84 and redis', function () {
+    $laravel = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_LARAVEL);
 
-    public function test_polyglot_preset_carries_all_four_non_php_runtimes(): void
-    {
-        $polyglot = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_POLYGLOT);
+    expect($laravel)->not->toBeNull();
+    expect($laravel['database'])->toBe('mysql84');
+    expect($laravel['cache'])->toBe('redis');
+    expect($laravel['php_version'])->toBe('8.4');
+    expect($laravel['runtimes'])->toBe([]);
+});
+test('rails preset uses postgres 17 with ruby runtime', function () {
+    $rails = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_RAILS);
 
-        $this->assertNotNull($polyglot);
-        $this->assertEqualsCanonicalizing(
-            ['node', 'python', 'ruby', 'go'],
-            array_keys($polyglot['runtimes']),
-        );
-        // Plus PHP through the dedicated php_version slot, since PHP uses
-        // ondrej/php apt rather than mise.
-        $this->assertSame('8.4', $polyglot['php_version']);
-        $this->assertTrue($polyglot['featured']);
-    }
+    expect($rails)->not->toBeNull();
+    expect($rails['database'])->toBe('postgres17');
+    expect($rails['cache'])->toBe('redis');
+    expect($rails['php_version'])->toBeNull();
+    expect($rails['runtimes'])->toBe(['ruby' => '3.3']);
+});
+test('static preset clears php db and cache', function () {
+    $static = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_STATIC);
 
-    public function test_laravel_preset_pins_mysql_84_and_redis(): void
-    {
-        $laravel = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_LARAVEL);
+    expect($static)->not->toBeNull();
+    expect($static['role'])->toBe('static');
+    expect($static['php_version'])->toBeNull();
+    expect($static['database'])->toBeNull();
+    expect($static['cache'])->toBeNull();
+    expect($static['runtimes'])->toBe([]);
+});
+test('database node preset has no webserver', function () {
+    $db = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_DATABASE);
 
-        $this->assertNotNull($laravel);
-        $this->assertSame('mysql84', $laravel['database']);
-        $this->assertSame('redis', $laravel['cache']);
-        $this->assertSame('8.4', $laravel['php_version']);
-        $this->assertSame([], $laravel['runtimes']);
-    }
+    expect($db)->not->toBeNull();
+    expect($db['role'])->toBe('database');
+    expect($db['webserver'])->toBeNull();
+    expect($db['database'])->toBe('postgres17');
+});
+test('custom preset is empty escape hatch', function () {
+    $custom = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_CUSTOM);
 
-    public function test_rails_preset_uses_postgres_17_with_ruby_runtime(): void
-    {
-        $rails = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_RAILS);
+    expect($custom)->not->toBeNull();
+    expect($custom['role'])->toBe('plain');
+    expect($custom['webserver'])->toBeNull();
+    expect($custom['php_version'])->toBeNull();
+    expect($custom['database'])->toBeNull();
+    expect($custom['cache'])->toBeNull();
+    expect($custom['runtimes'])->toBe([]);
+    expect($custom['featured'])->toBeFalse();
+});
+test('to server meta for polyglot emits runtime defaults', function () {
+    $meta = (new ServerCreatePresetCatalog)->toServerMeta(ServerCreatePresetCatalog::ID_POLYGLOT);
 
-        $this->assertNotNull($rails);
-        $this->assertSame('postgres17', $rails['database']);
-        $this->assertSame('redis', $rails['cache']);
-        $this->assertNull($rails['php_version']);
-        $this->assertSame(['ruby' => '3.3'], $rails['runtimes']);
-    }
+    expect($meta['preset'])->toBe('polyglot');
+    expect($meta['server_role'])->toBe('application');
+    expect($meta['webserver'])->toBe('nginx');
+    expect($meta['php_version'])->toBe('8.4');
+    expect($meta['database'])->toBe('postgres17');
+    expect($meta['cache_service'])->toBe('redis');
+    expect(array_keys($meta['runtime_defaults']))->toEqualCanonicalizing(['node', 'python', 'ruby', 'go']);
+});
+test('to server meta omits null fields', function () {
+    $meta = (new ServerCreatePresetCatalog)->toServerMeta(ServerCreatePresetCatalog::ID_STATIC);
 
-    public function test_static_preset_clears_php_db_and_cache(): void
-    {
-        $static = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_STATIC);
+    $this->assertArrayNotHasKey('php_version', $meta);
+    $this->assertArrayNotHasKey('database', $meta);
+    $this->assertArrayNotHasKey('cache_service', $meta);
+    $this->assertArrayNotHasKey('runtime_defaults', $meta);
+});
+test('to server meta returns empty for unknown preset', function () {
+    expect((new ServerCreatePresetCatalog)->toServerMeta('made-up-preset'))->toBe([]);
+});
+test('featured presets include the polyglot pitch', function () {
+    $featured = array_filter(
+        (new ServerCreatePresetCatalog)->all(),
+        fn (array $p) => $p['featured'],
+    );
 
-        $this->assertNotNull($static);
-        $this->assertSame('static', $static['role']);
-        $this->assertNull($static['php_version']);
-        $this->assertNull($static['database']);
-        $this->assertNull($static['cache']);
-        $this->assertSame([], $static['runtimes']);
-    }
-
-    public function test_database_node_preset_has_no_webserver(): void
-    {
-        $db = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_DATABASE);
-
-        $this->assertNotNull($db);
-        $this->assertSame('database', $db['role']);
-        $this->assertNull($db['webserver']);
-        $this->assertSame('postgres17', $db['database']);
-    }
-
-    public function test_custom_preset_is_empty_escape_hatch(): void
-    {
-        $custom = (new ServerCreatePresetCatalog)->find(ServerCreatePresetCatalog::ID_CUSTOM);
-
-        $this->assertNotNull($custom);
-        $this->assertSame('plain', $custom['role']);
-        $this->assertNull($custom['webserver']);
-        $this->assertNull($custom['php_version']);
-        $this->assertNull($custom['database']);
-        $this->assertNull($custom['cache']);
-        $this->assertSame([], $custom['runtimes']);
-        $this->assertFalse($custom['featured']);
-    }
-
-    public function test_to_server_meta_for_polyglot_emits_runtime_defaults(): void
-    {
-        $meta = (new ServerCreatePresetCatalog)->toServerMeta(ServerCreatePresetCatalog::ID_POLYGLOT);
-
-        $this->assertSame('polyglot', $meta['preset']);
-        $this->assertSame('application', $meta['server_role']);
-        $this->assertSame('nginx', $meta['webserver']);
-        $this->assertSame('8.4', $meta['php_version']);
-        $this->assertSame('postgres17', $meta['database']);
-        $this->assertSame('redis', $meta['cache_service']);
-        $this->assertEqualsCanonicalizing(
-            ['node', 'python', 'ruby', 'go'],
-            array_keys($meta['runtime_defaults']),
-        );
-    }
-
-    public function test_to_server_meta_omits_null_fields(): void
-    {
-        $meta = (new ServerCreatePresetCatalog)->toServerMeta(ServerCreatePresetCatalog::ID_STATIC);
-
-        $this->assertArrayNotHasKey('php_version', $meta);
-        $this->assertArrayNotHasKey('database', $meta);
-        $this->assertArrayNotHasKey('cache_service', $meta);
-        $this->assertArrayNotHasKey('runtime_defaults', $meta);
-    }
-
-    public function test_to_server_meta_returns_empty_for_unknown_preset(): void
-    {
-        $this->assertSame([], (new ServerCreatePresetCatalog)->toServerMeta('made-up-preset'));
-    }
-
-    public function test_featured_presets_include_the_polyglot_pitch(): void
-    {
-        $featured = array_filter(
-            (new ServerCreatePresetCatalog)->all(),
-            fn (array $p) => $p['featured'],
-        );
-
-        $featuredIds = array_column($featured, 'id');
-        $this->assertContains('polyglot', $featuredIds);
-        $this->assertContains('laravel', $featuredIds);
-        $this->assertContains('rails', $featuredIds);
-        $this->assertContains('nextjs', $featuredIds);
-        $this->assertContains('django', $featuredIds);
-    }
-}
+    $featuredIds = array_column($featured, 'id');
+    expect($featuredIds)->toContain('polyglot');
+    expect($featuredIds)->toContain('laravel');
+    expect($featuredIds)->toContain('rails');
+    expect($featuredIds)->toContain('nextjs');
+    expect($featuredIds)->toContain('django');
+});

@@ -2,47 +2,33 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Support\Servers;
-
+namespace Tests\Unit\Support\Servers\CachePatternCatalogTest;
 use App\Support\Servers\CachePatternCatalog;
-use Tests\TestCase;
-
-class CachePatternCatalogTest extends TestCase
-{
-    public function test_catalog_entries_have_the_documented_shape(): void
-    {
-        foreach (CachePatternCatalog::all() as $entry) {
-            $this->assertSame(
-                ['pattern', 'description', 'group'],
-                array_keys($entry),
-                'Pattern catalog entries must keep the documented keys.',
-            );
-            $this->assertNotEmpty($entry['pattern']);
-            $this->assertNotEmpty($entry['description']);
-            $this->assertNotEmpty($entry['group']);
-        }
+test('catalog entries have the documented shape', function () {
+    foreach (CachePatternCatalog::all() as $entry) {
+        expect(array_keys($entry))->toBe(['pattern', 'description', 'group'], 'Pattern catalog entries must keep the documented keys.');
+        expect($entry['pattern'])->not->toBeEmpty();
+        expect($entry['description'])->not->toBeEmpty();
+        expect($entry['group'])->not->toBeEmpty();
     }
+});
+test('catalog includes essential starters', function () {
+    $patterns = array_column(CachePatternCatalog::all(), 'pattern');
 
-    public function test_catalog_includes_essential_starters(): void
-    {
-        $patterns = array_column(CachePatternCatalog::all(), 'pattern');
-        // These are the patterns operators reach for first — losing them would defeat the
-        // point of the autocomplete.
-        foreach (['*', 'session:*', 'cache:*'] as $essential) {
-            $this->assertContains($essential, $patterns, "Catalog is missing the {$essential} pattern.");
-        }
+    // These are the patterns operators reach for first — losing them would defeat the
+    // point of the autocomplete.
+    foreach (['*', 'session:*', 'cache:*'] as $essential) {
+        expect($patterns)->toContain($essential, "Catalog is missing the {$essential} pattern.");
     }
+});
+test('grouped view partitions the full catalog', function () {
+    $flat = CachePatternCatalog::all();
+    $grouped = CachePatternCatalog::byGroup();
 
-    public function test_grouped_view_partitions_the_full_catalog(): void
-    {
-        $flat = CachePatternCatalog::all();
-        $grouped = CachePatternCatalog::byGroup();
-
-        $flattenedCount = 0;
-        foreach ($grouped as $entries) {
-            $flattenedCount += count($entries);
-        }
-        $this->assertSame(count($flat), $flattenedCount);
-        $this->assertNotEmpty($grouped);
+    $flattenedCount = 0;
+    foreach ($grouped as $entries) {
+        $flattenedCount += count($entries);
     }
-}
+    expect($flattenedCount)->toBe(count($flat));
+    expect($grouped)->not->toBeEmpty();
+});

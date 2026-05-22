@@ -1,42 +1,36 @@
 <?php
 
-namespace Tests\Unit;
 
+namespace Tests\Unit\SiteRuntimeProfileTest;
 use App\Models\Server;
 use App\Models\Site;
-use Tests\TestCase;
 
-class SiteRuntimeProfileTest extends TestCase
-{
-    public function test_sites_on_docker_hosts_default_to_docker_runtime_profile(): void
-    {
-        $server = new Server([
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_DOCKER,
-            ],
-        ]);
+test('sites on docker hosts default to docker runtime profile', function () {
+    $server = new Server([
+        'meta' => [
+            'host_kind' => Server::HOST_KIND_DOCKER,
+        ],
+    ]);
 
-        $site = new Site;
-        $site->setRelation('server', $server);
+    $site = new Site;
+    $site->setRelation('server', $server);
 
-        $this->assertSame('docker_web', $site->runtimeProfile());
-        $this->assertTrue($site->usesDockerRuntime());
-        $this->assertFalse($site->usesKubernetesRuntime());
-    }
+    expect($site->runtimeProfile())->toBe('docker_web');
+    expect($site->usesDockerRuntime())->toBeTrue();
+    expect($site->usesKubernetesRuntime())->toBeFalse();
+});
 
-    public function test_sites_on_kubernetes_hosts_default_to_kubernetes_runtime_profile(): void
-    {
-        $server = new Server([
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_KUBERNETES,
-            ],
-        ]);
+test('sites on kubernetes hosts default to kubernetes runtime profile', function () {
+    $server = new Server([
+        'meta' => [
+            'host_kind' => Server::HOST_KIND_KUBERNETES,
+        ],
+    ]);
 
-        $site = new Site;
-        $site->setRelation('server', $server);
+    $site = new Site;
+    $site->setRelation('server', $server);
 
-        $this->assertSame('kubernetes_web', $site->runtimeProfile());
-        $this->assertTrue($site->usesKubernetesRuntime());
-        $this->assertFalse($site->usesDockerRuntime());
-    }
-}
+    expect($site->runtimeProfile())->toBe('kubernetes_web');
+    expect($site->usesKubernetesRuntime())->toBeTrue();
+    expect($site->usesDockerRuntime())->toBeFalse();
+});

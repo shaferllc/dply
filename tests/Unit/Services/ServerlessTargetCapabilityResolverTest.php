@@ -2,51 +2,40 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services;
-
+namespace Tests\Unit\Services\ServerlessTargetCapabilityResolverTest;
 use App\Models\Server;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
-use Tests\TestCase;
+test('digitalocean functions advertises all four openwhisk runtimes', function () {
+    $server = (new Server)->forceFill([
+        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
+    ]);
 
-class ServerlessTargetCapabilityResolverTest extends TestCase
-{
-    public function test_digitalocean_functions_advertises_all_four_openwhisk_runtimes(): void
-    {
-        $server = (new Server)->forceFill([
-            'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
-        ]);
+    $capabilities = (new ServerlessTargetCapabilityResolver)->forServer($server);
 
-        $capabilities = (new ServerlessTargetCapabilityResolver)->forServer($server);
+    // DO Functions = managed Apache OpenWhisk: Node, Python, PHP, Go.
+    expect($capabilities['supports_php_runtime'])->toBeTrue();
+    expect($capabilities['supports_node_runtime'])->toBeTrue();
+    expect($capabilities['supports_python_runtime'])->toBeTrue();
+    expect($capabilities['supports_go_runtime'])->toBeTrue();
+});
+test('aws lambda advertises all four runtimes', function () {
+    $server = (new Server)->forceFill([
+        'meta' => ['host_kind' => Server::HOST_KIND_AWS_LAMBDA],
+    ]);
 
-        // DO Functions = managed Apache OpenWhisk: Node, Python, PHP, Go.
-        $this->assertTrue($capabilities['supports_php_runtime']);
-        $this->assertTrue($capabilities['supports_node_runtime']);
-        $this->assertTrue($capabilities['supports_python_runtime']);
-        $this->assertTrue($capabilities['supports_go_runtime']);
-    }
+    $capabilities = (new ServerlessTargetCapabilityResolver)->forServer($server);
 
-    public function test_aws_lambda_advertises_all_four_runtimes(): void
-    {
-        $server = (new Server)->forceFill([
-            'meta' => ['host_kind' => Server::HOST_KIND_AWS_LAMBDA],
-        ]);
+    expect($capabilities['supports_php_runtime'])->toBeTrue();
+    expect($capabilities['supports_node_runtime'])->toBeTrue();
+    expect($capabilities['supports_python_runtime'])->toBeTrue();
+    expect($capabilities['supports_go_runtime'])->toBeTrue();
+});
+test('unknown target advertises no runtimes', function () {
+    $capabilities = (new ServerlessTargetCapabilityResolver)->forServer(null);
 
-        $capabilities = (new ServerlessTargetCapabilityResolver)->forServer($server);
-
-        $this->assertTrue($capabilities['supports_php_runtime']);
-        $this->assertTrue($capabilities['supports_node_runtime']);
-        $this->assertTrue($capabilities['supports_python_runtime']);
-        $this->assertTrue($capabilities['supports_go_runtime']);
-    }
-
-    public function test_unknown_target_advertises_no_runtimes(): void
-    {
-        $capabilities = (new ServerlessTargetCapabilityResolver)->forServer(null);
-
-        $this->assertSame('unknown', $capabilities['target']);
-        $this->assertFalse($capabilities['supports_php_runtime']);
-        $this->assertFalse($capabilities['supports_node_runtime']);
-        $this->assertFalse($capabilities['supports_python_runtime']);
-        $this->assertFalse($capabilities['supports_go_runtime']);
-    }
-}
+    expect($capabilities['target'])->toBe('unknown');
+    expect($capabilities['supports_php_runtime'])->toBeFalse();
+    expect($capabilities['supports_node_runtime'])->toBeFalse();
+    expect($capabilities['supports_python_runtime'])->toBeFalse();
+    expect($capabilities['supports_go_runtime'])->toBeFalse();
+});

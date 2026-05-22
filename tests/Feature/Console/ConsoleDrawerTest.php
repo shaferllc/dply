@@ -6,7 +6,10 @@ use App\Livewire\Servers\ConsoleDrawer;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Mockery;
 use Tests\TestCase;
@@ -19,6 +22,34 @@ use Tests\TestCase;
 final class ConsoleDrawerTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Each ready server created here fires a Server::created listener
+        // that dispatches an SSH key-provisioning job. On the sync queue
+        // that job runs inline and makes a real SSH connection to the
+        // server's (fake, random) IP — creating 105 servers in one test
+        // then meant ~16 minutes of hanging connects. Fake the queue so
+        // those jobs are recorded, not executed.
+        Queue::fake();
+
+        // ConsoleDrawer::run() opens an SSH connection. Bind a fake
+        // connection factory so tests never make real network calls — a
+        // real connect to a factory server's random IP can hang until the
+        // OS connect timeout, which is what made this test intermittently
+        // "stick" when run.
+        $this->app->bind(SshConnectionFactory::class, function () {
+            $connection = Mockery::mock(SshConnection::class);
+            $connection->shouldReceive('execWithCallbackAndExit')->andReturn(['', 0]);
+
+            $factory = Mockery::mock(SshConnectionFactory::class);
+            $factory->shouldReceive('forServer')->andReturn($connection);
+
+            return $factory;
+        });
+    }
 
     protected function userWithOrganization(?string $role = 'owner'): User
     {

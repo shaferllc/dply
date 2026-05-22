@@ -1,423 +1,382 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\ConsoleArgspecsTest;
 use App\Models\Server;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Support\Console\ConsoleArgspecs;
 use App\Support\Servers\ServerInstalledServices;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 /**
- * Unit tests for the ConsoleArgspecs service.
- *
- * @covers \App\Support\Console\ConsoleArgspecs
+ * Create a Server and seed a stack_summary artifact so ServerInstalledServices
+ * resolves real tags (instead of fail-open 'unknown').
  */
-final class ConsoleArgspecsTest extends TestCase
+function serverWithStack(array $summary): Server
 {
-    use RefreshDatabase;
-
-    /**
-     * Create a Server and seed a stack_summary artifact so ServerInstalledServices
-     * resolves real tags (instead of fail-open 'unknown').
-     */
-    private function serverWithStack(array $summary): Server
-    {
-        $server = Server::factory()->create(['meta' => []]);
-        $run = ServerProvisionRun::create([
-            'server_id' => $server->id,
-            'attempt' => 1,
-            'status' => 'completed',
-        ]);
-        ServerProvisionArtifact::create([
-            'server_provision_run_id' => $run->id,
-            'type' => 'stack_summary',
-            'key' => 'stack_summary',
-            'label' => 'stack summary',
-            'metadata' => $summary,
-        ]);
-        ServerInstalledServices::flushCaches();
-
-        return $server;
-    }
-
-    public function test_argspecs_returns_array(): void
-    {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => [],
-            ],
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        $this->assertIsArray($argspecs);
-    }
-
-    public function test_systemctl_argspec_has_positional_arguments(): void
-    {
-        $server = Server::factory()->create(['meta' => []]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        $this->assertArrayHasKey('systemctl', $argspecs);
-        $this->assertArrayHasKey('positional', $argspecs['systemctl']);
-
-        $positional = $argspecs['systemctl']['positional'];
-        $this->assertArrayHasKey(1, $positional); // verbs
-        $this->assertArrayHasKey(2, $positional); // units
-
-        // Should have common verbs
-        $this->assertContains('start', $positional[1]);
-        $this->assertContains('stop', $positional[1]);
-        $this->assertContains('restart', $positional[1]);
-        $this->assertContains('reload', $positional[1]);
-        $this->assertContains('status', $positional[1]);
-        $this->assertContains('enable', $positional[1]);
-        $this->assertContains('disable', $positional[1]);
-    }
-
-    public function test_systemctl_units_include_nginx_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['nginx']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('nginx', $units);
-    }
-
-    public function test_systemctl_units_include_apache_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['apache']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('apache2', $units);
-    }
-
-    public function test_systemctl_units_include_caddy_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['caddy']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('caddy', $units);
-    }
-
-    public function test_systemctl_units_include_php_fpm_when_php_installed(): void
-    {
-        $server = $this->serverWithStack([
-            'expected_services' => ['php'],
-            'php_version' => '8.3',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('php8.3-fpm', $units);
-    }
-
-    public function test_systemctl_units_fallback_php_fpm_when_version_unknown(): void
-    {
-        // php_version intentionally missing
-        $server = $this->serverWithStack(['expected_services' => ['php']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('php-fpm', $units);
-    }
-
-    public function test_systemctl_units_include_mysql_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['mysql']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('mysql', $units);
-        $this->assertContains('mariadb', $units);
-    }
-
-    public function test_systemctl_units_include_postgres_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['postgres']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('postgresql', $units);
-    }
-
-    public function test_systemctl_units_include_redis_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['redis']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('redis-server', $units);
-    }
-
-    public function test_systemctl_units_include_valkey_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['valkey']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('valkey-server', $units);
-    }
-
-    public function test_systemctl_units_include_memcached_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['memcached']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('memcached', $units);
-    }
-
-    public function test_systemctl_units_include_supervisor_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['supervisor']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('supervisor', $units);
-    }
-
-    public function test_systemctl_units_include_docker_when_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['docker']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('docker', $units);
-    }
-
-    public function test_systemctl_units_always_include_system_units(): void
-    {
-        $server = Server::factory()->create(['meta' => []]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        // These should always be present regardless of services
-        $this->assertContains('cron', $units);
-        $this->assertContains('ssh', $units);
-        $this->assertContains('ufw', $units);
-    }
-
-    public function test_systemctl_units_are_unique(): void
-    {
-        // Test that units don't duplicate when multiple conditions match
-        $server = $this->serverWithStack([
-            'expected_services' => ['nginx', 'php', 'mysql'],
-            'php_version' => '8.3',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertEquals($units, array_unique($units));
-    }
-
-    public function test_service_argspec_exists(): void
-    {
-        $server = Server::factory()->create(['meta' => []]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        $this->assertArrayHasKey('service', $argspecs);
-        $this->assertArrayHasKey('positional', $argspecs['service']);
-    }
-
-    public function test_journalctl_argspec_has_after_flag(): void
-    {
-        $server = $this->serverWithStack([
-            'expected_services' => ['nginx', 'php'],
-            'php_version' => '8.3',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        $this->assertArrayHasKey('journalctl', $argspecs);
-        $this->assertArrayHasKey('after_flag', $argspecs['journalctl']);
-
-        $afterFlag = $argspecs['journalctl']['after_flag'];
-        $this->assertArrayHasKey('-u', $afterFlag);
-        $this->assertArrayHasKey('--unit', $afterFlag);
-
-        // Both should suggest same units
-        $this->assertEquals($afterFlag['-u'], $afterFlag['--unit']);
-        $this->assertContains('nginx', $afterFlag['-u']);
-        $this->assertContains('php8.3-fpm', $afterFlag['-u']);
-    }
-
-    public function test_tail_argspec_has_log_paths(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['nginx']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        $this->assertArrayHasKey('tail', $argspecs);
-        $this->assertArrayHasKey('positional', $argspecs['tail']);
-        $this->assertArrayHasKey(1, $argspecs['tail']['positional']);
-
-        $paths = $argspecs['tail']['positional'][1];
-        $this->assertContains('/var/log/syslog', $paths);
-        $this->assertContains('/var/log/auth.log', $paths);
-        $this->assertContains('/var/log/nginx/error.log', $paths);
-        $this->assertContains('/var/log/nginx/access.log', $paths);
-    }
-
-    public function test_less_argspec_matches_tail(): void
-    {
-        $server = $this->serverWithStack([
-            'expected_services' => ['nginx', 'php'],
-            'php_version' => '8.3',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        $this->assertArrayHasKey('less', $argspecs);
-        $this->assertEquals(
-            $argspecs['tail']['positional'][1],
-            $argspecs['less']['positional'][1]
-        );
-    }
-
-    public function test_php_log_paths_use_versioned_path(): void
-    {
-        $server = $this->serverWithStack([
-            'expected_services' => ['php'],
-            'php_version' => '8.2',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/php8.2-fpm.log', $paths);
-    }
-
-    public function test_php_log_paths_fallback_when_version_unknown(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['php']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/php-fpm.log', $paths);
-    }
-
-    public function test_caddy_log_paths_included_when_caddy_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['caddy']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/caddy/access.log', $paths);
-    }
-
-    public function test_mysql_log_paths_included_when_mysql_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['mysql']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/mysql/error.log', $paths);
-    }
-
-    public function test_postgres_log_paths_included_when_postgres_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['postgres']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/postgresql/', $paths);
-    }
-
-    public function test_redis_log_paths_included_when_redis_installed(): void
-    {
-        $server = $this->serverWithStack(['expected_services' => ['redis']]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/redis/redis-server.log', $paths);
-    }
-
-    public function test_ufw_log_paths_included_when_ufw_installed(): void
-    {
-        $server = Server::factory()->create([
-            'meta' => [
-                'expected_services' => ['ufw'],
-            ],
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertContains('/var/log/ufw.log', $paths);
-    }
-
-    public function test_empty_server_has_basic_argspecs(): void
-    {
-        $server = Server::factory()->create(['meta' => []]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-
-        // Should always have systemctl and service
-        $this->assertArrayHasKey('systemctl', $argspecs);
-        $this->assertArrayHasKey('service', $argspecs);
-        $this->assertArrayHasKey('journalctl', $argspecs);
-        $this->assertArrayHasKey('tail', $argspecs);
-        $this->assertArrayHasKey('less', $argspecs);
-    }
-
-    public function test_log_paths_are_unique(): void
-    {
-        $server = $this->serverWithStack([
-            'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'ufw'],
-            'php_version' => '8.3',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $paths = $argspecs['tail']['positional'][1];
-
-        $this->assertEquals($paths, array_unique($paths));
-    }
-
-    public function test_combined_server_has_all_relevant_units(): void
-    {
-        $server = $this->serverWithStack([
-            'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'supervisor', 'docker'],
-            'php_version' => '8.3',
-        ]);
-
-        $argspecs = ConsoleArgspecs::for($server);
-        $units = $argspecs['systemctl']['positional'][2];
-
-        $this->assertContains('nginx', $units);
-        $this->assertContains('php8.3-fpm', $units);
-        $this->assertContains('mysql', $units);
-        $this->assertContains('redis-server', $units);
-        $this->assertContains('supervisor', $units);
-        $this->assertContains('docker', $units);
-        $this->assertContains('cron', $units);
-        $this->assertContains('ssh', $units);
-        $this->assertContains('ufw', $units);
-    }
+    $server = Server::factory()->create(['meta' => []]);
+    $run = ServerProvisionRun::create([
+        'server_id' => $server->id,
+        'attempt' => 1,
+        'status' => 'completed',
+    ]);
+    ServerProvisionArtifact::create([
+        'server_provision_run_id' => $run->id,
+        'type' => 'stack_summary',
+        'key' => 'stack_summary',
+        'label' => 'stack summary',
+        'metadata' => $summary,
+    ]);
+    ServerInstalledServices::flushCaches();
+
+    return $server;
 }
+
+test('argspecs returns array', function () {
+    $server = Server::factory()->create([
+        'meta' => [
+            'expected_services' => [],
+        ],
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    expect($argspecs)->toBeArray();
+});
+
+test('systemctl argspec has positional arguments', function () {
+    $server = Server::factory()->create(['meta' => []]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    expect($argspecs)->toHaveKey('systemctl');
+    expect($argspecs['systemctl'])->toHaveKey('positional');
+
+    $positional = $argspecs['systemctl']['positional'];
+    expect($positional)->toHaveKey(1);
+    // verbs
+    expect($positional)->toHaveKey(2);
+
+    // units
+    // Should have common verbs
+    expect($positional[1])->toContain('start');
+    expect($positional[1])->toContain('stop');
+    expect($positional[1])->toContain('restart');
+    expect($positional[1])->toContain('reload');
+    expect($positional[1])->toContain('status');
+    expect($positional[1])->toContain('enable');
+    expect($positional[1])->toContain('disable');
+});
+
+test('systemctl units include nginx when installed', function () {
+    $server = serverWithStack(['expected_services' => ['nginx']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('nginx');
+});
+
+test('systemctl units include apache when installed', function () {
+    $server = serverWithStack(['expected_services' => ['apache']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('apache2');
+});
+
+test('systemctl units include caddy when installed', function () {
+    $server = serverWithStack(['expected_services' => ['caddy']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('caddy');
+});
+
+test('systemctl units include php fpm when php installed', function () {
+    $server = serverWithStack([
+        'expected_services' => ['php'],
+        'php_version' => '8.3',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('php8.3-fpm');
+});
+
+test('systemctl units fallback php fpm when version unknown', function () {
+    // php_version intentionally missing
+    $server = serverWithStack(['expected_services' => ['php']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('php-fpm');
+});
+
+test('systemctl units include mysql when installed', function () {
+    $server = serverWithStack(['expected_services' => ['mysql']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('mysql');
+    expect($units)->toContain('mariadb');
+});
+
+test('systemctl units include postgres when installed', function () {
+    $server = serverWithStack(['expected_services' => ['postgres']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('postgresql');
+});
+
+test('systemctl units include redis when installed', function () {
+    $server = serverWithStack(['expected_services' => ['redis']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('redis-server');
+});
+
+test('systemctl units include valkey when installed', function () {
+    $server = serverWithStack(['expected_services' => ['valkey']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('valkey-server');
+});
+
+test('systemctl units include memcached when installed', function () {
+    $server = serverWithStack(['expected_services' => ['memcached']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('memcached');
+});
+
+test('systemctl units include supervisor when installed', function () {
+    $server = serverWithStack(['expected_services' => ['supervisor']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('supervisor');
+});
+
+test('systemctl units include docker when installed', function () {
+    $server = serverWithStack(['expected_services' => ['docker']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('docker');
+});
+
+test('systemctl units always include system units', function () {
+    $server = Server::factory()->create(['meta' => []]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    // These should always be present regardless of services
+    expect($units)->toContain('cron');
+    expect($units)->toContain('ssh');
+    expect($units)->toContain('ufw');
+});
+
+test('systemctl units are unique', function () {
+    // Test that units don't duplicate when multiple conditions match
+    $server = serverWithStack([
+        'expected_services' => ['nginx', 'php', 'mysql'],
+        'php_version' => '8.3',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect(array_unique($units))->toEqual($units);
+});
+
+test('service argspec exists', function () {
+    $server = Server::factory()->create(['meta' => []]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    expect($argspecs)->toHaveKey('service');
+    expect($argspecs['service'])->toHaveKey('positional');
+});
+
+test('journalctl argspec has after flag', function () {
+    $server = serverWithStack([
+        'expected_services' => ['nginx', 'php'],
+        'php_version' => '8.3',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    expect($argspecs)->toHaveKey('journalctl');
+    expect($argspecs['journalctl'])->toHaveKey('after_flag');
+
+    $afterFlag = $argspecs['journalctl']['after_flag'];
+    expect($afterFlag)->toHaveKey('-u');
+    expect($afterFlag)->toHaveKey('--unit');
+
+    // Both should suggest same units
+    expect($afterFlag['--unit'])->toEqual($afterFlag['-u']);
+    expect($afterFlag['-u'])->toContain('nginx');
+    expect($afterFlag['-u'])->toContain('php8.3-fpm');
+});
+
+test('tail argspec has log paths', function () {
+    $server = serverWithStack(['expected_services' => ['nginx']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    expect($argspecs)->toHaveKey('tail');
+    expect($argspecs['tail'])->toHaveKey('positional');
+    expect($argspecs['tail']['positional'])->toHaveKey(1);
+
+    $paths = $argspecs['tail']['positional'][1];
+    expect($paths)->toContain('/var/log/syslog');
+    expect($paths)->toContain('/var/log/auth.log');
+    expect($paths)->toContain('/var/log/nginx/error.log');
+    expect($paths)->toContain('/var/log/nginx/access.log');
+});
+
+test('less argspec matches tail', function () {
+    $server = serverWithStack([
+        'expected_services' => ['nginx', 'php'],
+        'php_version' => '8.3',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    expect($argspecs)->toHaveKey('less');
+    expect($argspecs['less']['positional'][1])->toEqual($argspecs['tail']['positional'][1]);
+});
+
+test('php log paths use versioned path', function () {
+    $server = serverWithStack([
+        'expected_services' => ['php'],
+        'php_version' => '8.2',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/php8.2-fpm.log');
+});
+
+test('php log paths fallback when version unknown', function () {
+    $server = serverWithStack(['expected_services' => ['php']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/php-fpm.log');
+});
+
+test('caddy log paths included when caddy installed', function () {
+    $server = serverWithStack(['expected_services' => ['caddy']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/caddy/access.log');
+});
+
+test('mysql log paths included when mysql installed', function () {
+    $server = serverWithStack(['expected_services' => ['mysql']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/mysql/error.log');
+});
+
+test('postgres log paths included when postgres installed', function () {
+    $server = serverWithStack(['expected_services' => ['postgres']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/postgresql/');
+});
+
+test('redis log paths included when redis installed', function () {
+    $server = serverWithStack(['expected_services' => ['redis']]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/redis/redis-server.log');
+});
+
+test('ufw log paths included when ufw installed', function () {
+    $server = Server::factory()->create([
+        'meta' => [
+            'expected_services' => ['ufw'],
+        ],
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect($paths)->toContain('/var/log/ufw.log');
+});
+
+test('empty server has basic argspecs', function () {
+    $server = Server::factory()->create(['meta' => []]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+
+    // Should always have systemctl and service
+    expect($argspecs)->toHaveKey('systemctl');
+    expect($argspecs)->toHaveKey('service');
+    expect($argspecs)->toHaveKey('journalctl');
+    expect($argspecs)->toHaveKey('tail');
+    expect($argspecs)->toHaveKey('less');
+});
+
+test('log paths are unique', function () {
+    $server = serverWithStack([
+        'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'ufw'],
+        'php_version' => '8.3',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $paths = $argspecs['tail']['positional'][1];
+
+    expect(array_unique($paths))->toEqual($paths);
+});
+
+test('combined server has all relevant units', function () {
+    $server = serverWithStack([
+        'expected_services' => ['nginx', 'php', 'mysql', 'redis', 'supervisor', 'docker'],
+        'php_version' => '8.3',
+    ]);
+
+    $argspecs = ConsoleArgspecs::for($server);
+    $units = $argspecs['systemctl']['positional'][2];
+
+    expect($units)->toContain('nginx');
+    expect($units)->toContain('php8.3-fpm');
+    expect($units)->toContain('mysql');
+    expect($units)->toContain('redis-server');
+    expect($units)->toContain('supervisor');
+    expect($units)->toContain('docker');
+    expect($units)->toContain('cron');
+    expect($units)->toContain('ssh');
+    expect($units)->toContain('ufw');
+});

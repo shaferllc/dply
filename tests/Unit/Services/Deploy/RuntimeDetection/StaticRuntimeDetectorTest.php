@@ -2,177 +2,141 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Deploy\RuntimeDetection;
-
+namespace Tests\Unit\Services\Deploy\RuntimeDetection\StaticRuntimeDetectorTest;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
-use PHPUnit\Framework\TestCase;
+beforeEach(function () {
+    $this->tempDir = sys_get_temp_dir().'/dply-static-detector-'.uniqid();
+    mkdir($this->tempDir);
+});
+afterEach(function () {
+    removeDir($this->tempDir);
+});
+test('runtime method returns static', function () {
+    expect((new StaticRuntimeDetector)->runtime())->toBe('static');
+});
+test('returns null when no static signals', function () {
+    expect((new StaticRuntimeDetector)->detect($this->tempDir))->toBeNull();
+});
+test('plain index html yields static runtime with medium confidence', function () {
+    file_put_contents($this->tempDir.'/index.html', '<html></html>');
 
-class StaticRuntimeDetectorTest extends TestCase
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->runtime)->toBe('static');
+    expect($result->framework)->toBe('static');
+    expect($result->confidence)->toBe('medium');
+    expect($result->buildCommand)->toBeNull();
+    expect($result->startCommand)->toBeNull();
+    expect($result->appPort)->toBeNull();
+    expect($result->detectedFiles)->toContain('index.html');
+});
+test('detects jekyll from config yml', function () {
+    file_put_contents(
+        $this->tempDir.'/_config.yml',
+        "title: My Blog\ntheme: minima\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->framework)->toBe('jekyll');
+    expect($result->confidence)->toBe('high');
+    expect($result->buildCommand)->toBe('bundle exec jekyll build');
+    expect($result->startCommand)->toBeNull();
+});
+test('detects hugo from hugo toml', function () {
+    file_put_contents(
+        $this->tempDir.'/hugo.toml',
+        "baseURL = \"https://example.com\"\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->framework)->toBe('hugo');
+    expect($result->buildCommand)->toBe('hugo --minify');
+});
+test('detects hugo from config toml with hugo keys', function () {
+    file_put_contents(
+        $this->tempDir.'/config.toml',
+        "baseURL = \"https://example.com\"\ntheme = \"ananke\"\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->framework)->toBe('hugo');
+});
+test('does not detect hugo from unrelated config toml', function () {
+    file_put_contents(
+        $this->tempDir.'/config.toml',
+        "[some_app]\nport = 3000\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    // No `index.html` and no Hugo signals — nothing to report.
+    expect($result)->toBeNull();
+});
+test('detects eleventy from dotted config', function () {
+    file_put_contents(
+        $this->tempDir.'/.eleventy.js',
+        "module.exports = function() {};\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->framework)->toBe('eleventy');
+    expect($result->buildCommand)->toBe('npx @11ty/eleventy');
+});
+test('detects eleventy from modern config filenames', function () {
+    file_put_contents(
+        $this->tempDir.'/eleventy.config.mjs',
+        "export default {};\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->framework)->toBe('eleventy');
+});
+test('framework wins over plain index html', function () {
+    file_put_contents($this->tempDir.'/_config.yml', "title: Hi\n");
+    file_put_contents($this->tempDir.'/index.html', '<html></html>');
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->framework)->toBe('jekyll');
+    expect($result->confidence)->toBe('high');
+});
+test('reasons describe each inference', function () {
+    file_put_contents(
+        $this->tempDir.'/hugo.toml',
+        "baseURL = \"https://example.com\"\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    $combined = implode("\n", $result->reasons);
+    $this->assertStringContainsString('hugo.toml', $combined);
+    $this->assertStringContainsString('hugo', $combined);
+    $this->assertStringContainsString('build', $combined);
+});
+function removeDir(string $dir): void
 {
-    private string $tempDir;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->tempDir = sys_get_temp_dir().'/dply-static-detector-'.uniqid();
-        mkdir($this->tempDir);
+    if (! is_dir($dir)) {
+        return;
     }
-
-    protected function tearDown(): void
-    {
-        $this->removeDir($this->tempDir);
-        parent::tearDown();
-    }
-
-    public function test_runtime_method_returns_static(): void
-    {
-        $this->assertSame('static', (new StaticRuntimeDetector)->runtime());
-    }
-
-    public function test_returns_null_when_no_static_signals(): void
-    {
-        $this->assertNull((new StaticRuntimeDetector)->detect($this->tempDir));
-    }
-
-    public function test_plain_index_html_yields_static_runtime_with_medium_confidence(): void
-    {
-        file_put_contents($this->tempDir.'/index.html', '<html></html>');
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('static', $result->runtime);
-        $this->assertSame('static', $result->framework);
-        $this->assertSame('medium', $result->confidence);
-        $this->assertNull($result->buildCommand);
-        $this->assertNull($result->startCommand);
-        $this->assertNull($result->appPort);
-        $this->assertContains('index.html', $result->detectedFiles);
-    }
-
-    public function test_detects_jekyll_from_config_yml(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/_config.yml',
-            "title: My Blog\ntheme: minima\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('jekyll', $result->framework);
-        $this->assertSame('high', $result->confidence);
-        $this->assertSame('bundle exec jekyll build', $result->buildCommand);
-        $this->assertNull($result->startCommand);
-    }
-
-    public function test_detects_hugo_from_hugo_toml(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/hugo.toml',
-            "baseURL = \"https://example.com\"\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('hugo', $result->framework);
-        $this->assertSame('hugo --minify', $result->buildCommand);
-    }
-
-    public function test_detects_hugo_from_config_toml_with_hugo_keys(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/config.toml',
-            "baseURL = \"https://example.com\"\ntheme = \"ananke\"\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('hugo', $result->framework);
-    }
-
-    public function test_does_not_detect_hugo_from_unrelated_config_toml(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/config.toml',
-            "[some_app]\nport = 3000\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        // No `index.html` and no Hugo signals — nothing to report.
-        $this->assertNull($result);
-    }
-
-    public function test_detects_eleventy_from_dotted_config(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/.eleventy.js',
-            "module.exports = function() {};\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('eleventy', $result->framework);
-        $this->assertSame('npx @11ty/eleventy', $result->buildCommand);
-    }
-
-    public function test_detects_eleventy_from_modern_config_filenames(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/eleventy.config.mjs',
-            "export default {};\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('eleventy', $result->framework);
-    }
-
-    public function test_framework_wins_over_plain_index_html(): void
-    {
-        file_put_contents($this->tempDir.'/_config.yml', "title: Hi\n");
-        file_put_contents($this->tempDir.'/index.html', '<html></html>');
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $this->assertSame('jekyll', $result->framework);
-        $this->assertSame('high', $result->confidence);
-    }
-
-    public function test_reasons_describe_each_inference(): void
-    {
-        file_put_contents(
-            $this->tempDir.'/hugo.toml',
-            "baseURL = \"https://example.com\"\n",
-        );
-
-        $result = (new StaticRuntimeDetector)->detect($this->tempDir);
-
-        $this->assertNotNull($result);
-        $combined = implode("\n", $result->reasons);
-        $this->assertStringContainsString('hugo.toml', $combined);
-        $this->assertStringContainsString('hugo', $combined);
-        $this->assertStringContainsString('build', $combined);
-    }
-
-    private function removeDir(string $dir): void
-    {
-        if (! is_dir($dir)) {
-            return;
+    foreach (scandir($dir) as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
         }
-        foreach (scandir($dir) as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-            $path = $dir.'/'.$entry;
-            is_dir($path) ? $this->removeDir($path) : @unlink($path);
-        }
-        @rmdir($dir);
+        $path = $dir.'/'.$entry;
+        is_dir($path) ? removeDir($path) : @unlink($path);
     }
+    @rmdir($dir);
 }

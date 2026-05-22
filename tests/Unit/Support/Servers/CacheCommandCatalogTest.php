@@ -2,73 +2,52 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Support\Servers;
-
+namespace Tests\Unit\Support\Servers\CacheCommandCatalogTest;
 use App\Support\Servers\CacheCommandCatalog;
-use Tests\TestCase;
+test('catalog entries have the documented shape', function () {
+    foreach (CacheCommandCatalog::respFamily() as $entry) {
+        expect(array_keys($entry))->toBe(['name', 'syntax', 'summary', 'group', 'mutating'], 'Catalog entries must keep their documented keys (name, syntax, summary, group, mutating).');
+        expect($entry['name'])->not->toBeEmpty();
+        expect($entry['syntax'])->not->toBeEmpty();
+        expect($entry['summary'])->not->toBeEmpty();
+        expect($entry['group'])->not->toBeEmpty();
+        expect($entry['mutating'])->toBeBool();
+    }
+});
+test('catalog includes core commands operators expect', function () {
+    $names = array_column(CacheCommandCatalog::respFamily(), 'name');
 
-/**
- * Lock the curated REPL catalog: its shape is stable, the bread-and-butter verbs are present,
- * and `mutating` flags don't flip silently (the workspace REPL renders a "mutating" badge that
- * tells operators which commands need the unlock toggle, so this is user-visible signal).
- */
-class CacheCommandCatalogTest extends TestCase
-{
-    public function test_catalog_entries_have_the_documented_shape(): void
-    {
-        foreach (CacheCommandCatalog::respFamily() as $entry) {
-            $this->assertSame(
-                ['name', 'syntax', 'summary', 'group', 'mutating'],
-                array_keys($entry),
-                'Catalog entries must keep their documented keys (name, syntax, summary, group, mutating).',
-            );
-            $this->assertNotEmpty($entry['name']);
-            $this->assertNotEmpty($entry['syntax']);
-            $this->assertNotEmpty($entry['summary']);
-            $this->assertNotEmpty($entry['group']);
-            $this->assertIsBool($entry['mutating']);
-        }
+    // If any of these go missing the autocomplete becomes useless — they're the verbs an
+    // operator types within the first thirty seconds of opening the REPL.
+    foreach (['GET', 'SET', 'DEL', 'KEYS', 'SCAN', 'INFO', 'PING', 'TTL', 'EXPIRE', 'CONFIG GET', 'CLIENT LIST'] as $expected) {
+        expect($names)->toContain($expected, "Catalog is missing the {$expected} command.");
+    }
+});
+test('mutating flag is correct for known commands', function () {
+    $byName = [];
+    foreach (CacheCommandCatalog::respFamily() as $entry) {
+        $byName[$entry['name']] = $entry;
     }
 
-    public function test_catalog_includes_core_commands_operators_expect(): void
-    {
-        $names = array_column(CacheCommandCatalog::respFamily(), 'name');
-        // If any of these go missing the autocomplete becomes useless — they're the verbs an
-        // operator types within the first thirty seconds of opening the REPL.
-        foreach (['GET', 'SET', 'DEL', 'KEYS', 'SCAN', 'INFO', 'PING', 'TTL', 'EXPIRE', 'CONFIG GET', 'CLIENT LIST'] as $expected) {
-            $this->assertContains($expected, $names, "Catalog is missing the {$expected} command.");
-        }
+    expect($byName['GET']['mutating'])->toBeFalse('GET must be read-only.');
+    expect($byName['INFO']['mutating'])->toBeFalse('INFO must be read-only.');
+    expect($byName['KEYS']['mutating'])->toBeFalse('KEYS must be read-only.');
+    expect($byName['SET']['mutating'])->toBeTrue('SET must be flagged mutating.');
+    expect($byName['DEL']['mutating'])->toBeTrue('DEL must be flagged mutating.');
+    expect($byName['FLUSHALL']['mutating'])->toBeTrue('FLUSHALL must be flagged mutating.');
+    expect($byName['CONFIG SET']['mutating'])->toBeTrue('CONFIG SET must be flagged mutating.');
+});
+test('grouped view returns same data partitioned by group', function () {
+    $flat = CacheCommandCatalog::respFamily();
+    $grouped = CacheCommandCatalog::respFamilyByGroup();
+
+    // Re-flatten the grouped view and compare counts. We don't compare arrays directly
+    // because grouped order != flat order.
+    $flattenedCount = 0;
+    foreach ($grouped as $cmds) {
+        $flattenedCount += count($cmds);
     }
 
-    public function test_mutating_flag_is_correct_for_known_commands(): void
-    {
-        $byName = [];
-        foreach (CacheCommandCatalog::respFamily() as $entry) {
-            $byName[$entry['name']] = $entry;
-        }
-
-        $this->assertFalse($byName['GET']['mutating'], 'GET must be read-only.');
-        $this->assertFalse($byName['INFO']['mutating'], 'INFO must be read-only.');
-        $this->assertFalse($byName['KEYS']['mutating'], 'KEYS must be read-only.');
-        $this->assertTrue($byName['SET']['mutating'], 'SET must be flagged mutating.');
-        $this->assertTrue($byName['DEL']['mutating'], 'DEL must be flagged mutating.');
-        $this->assertTrue($byName['FLUSHALL']['mutating'], 'FLUSHALL must be flagged mutating.');
-        $this->assertTrue($byName['CONFIG SET']['mutating'], 'CONFIG SET must be flagged mutating.');
-    }
-
-    public function test_grouped_view_returns_same_data_partitioned_by_group(): void
-    {
-        $flat = CacheCommandCatalog::respFamily();
-        $grouped = CacheCommandCatalog::respFamilyByGroup();
-
-        // Re-flatten the grouped view and compare counts. We don't compare arrays directly
-        // because grouped order != flat order.
-        $flattenedCount = 0;
-        foreach ($grouped as $cmds) {
-            $flattenedCount += count($cmds);
-        }
-
-        $this->assertSame(count($flat), $flattenedCount);
-        $this->assertGreaterThan(50, $flattenedCount, 'Catalog should not have shrunk past a useful size.');
-    }
-}
+    expect($flattenedCount)->toBe(count($flat));
+    expect($flattenedCount)->toBeGreaterThan(50, 'Catalog should not have shrunk past a useful size.');
+});

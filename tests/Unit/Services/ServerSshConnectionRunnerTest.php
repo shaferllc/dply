@@ -1,45 +1,39 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\ServerSshConnectionRunnerTest;
 use App\Models\Server;
-use App\Services\Servers\ServerSshConnectionRunner;
-use App\Services\SshConnection;
-use Tests\TestCase;
+use \App\Services\SshConnection;
+use \App\Services\Servers\ServerSshConnectionRunner;
 
-class ServerSshConnectionRunnerTest extends TestCase
-{
-    public function test_root_first_fallback_uses_recovery_then_operational_roles(): void
+test('root first fallback uses recovery then operational roles', function () {
+    $server = new Server([
+        'ssh_user' => 'deploy',
+    ]);
+
+    $runner = new class extends ServerSshConnectionRunner
     {
-        $server = new Server([
-            'ssh_user' => 'deploy',
-        ]);
-
-        $runner = new class extends ServerSshConnectionRunner
+        function makeConnection(Server $server, string $loginUser, string $credentialRole): SshConnection
         {
-            public array $created = [];
+            $this->created[] = [$loginUser, $credentialRole];
 
-            protected function makeConnection(Server $server, string $loginUser, string $credentialRole): SshConnection
+            return new class($server, $loginUser, $credentialRole) extends SshConnection
             {
-                $this->created[] = [$loginUser, $credentialRole];
-
-                return new class($server, $loginUser, $credentialRole) extends SshConnection
+                function disconnect(): void
                 {
-                    public function disconnect(): void {}
-                };
-            }
-        };
-
-        try {
-            $runner->run($server, function () {
-                throw new \RuntimeException('first attempt failed');
-            }, true, true);
-        } catch (\RuntimeException) {
+                }
+            };
         }
-
-        $this->assertSame([
-            ['root', 'recovery'],
-            ['deploy', 'operational'],
-        ], $runner->created);
+    };
+    try {
+        $runner->run($server, function () {
+            throw new \RuntimeException('first attempt failed');
+        }, true, true);
+    } catch (\RuntimeException) {
     }
-}
+
+    expect($runner->created)->toBe([
+        ['root', 'recovery'],
+        ['deploy', 'operational'],
+    ]);
+});

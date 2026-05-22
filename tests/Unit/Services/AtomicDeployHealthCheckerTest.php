@@ -1,19 +1,14 @@
 <?php
 
-namespace Tests\Unit\Services;
 
+namespace Tests\Unit\Services\AtomicDeployHealthCheckerTest;
 use App\Services\Sites\AtomicDeployHealthChecker;
-use PHPUnit\Framework\TestCase;
 
-class AtomicDeployHealthCheckerTest extends TestCase
-{
-    public function test_normalize_path(): void
-    {
-        $c = new AtomicDeployHealthChecker;
+test('normalize path', function () {
+    $c = new AtomicDeployHealthChecker;
 
-        $this->assertSame('/', $c->normalizePath(''));
-        $this->assertSame('/health', $c->normalizePath('/health'));
-        $this->assertSame('/health', $c->normalizePath('health'));
-        $this->assertSame('/v1/up', $c->normalizePath('/v1/up'));
-    }
-}
+    expect($c->normalizePath(''))->toBe('/');
+    expect($c->normalizePath('/health'))->toBe('/health');
+    expect($c->normalizePath('health'))->toBe('/health');
+    expect($c->normalizePath('/v1/up'))->toBe('/v1/up');
+});
