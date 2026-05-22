@@ -215,7 +215,9 @@ final class ConsoleDrawerTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(ConsoleDrawer::class);
 
-        $available = $component->instance()->{'availableServers'}();
+        // availableServers() is a protected helper — bind a closure to the
+        // component instance to reach it without widening its visibility.
+        $available = (fn () => $this->availableServers())->call($component->instance());
 
         $this->assertCount(1, $available);
         $this->assertEquals($readyServer->id, $available->first()->id);
@@ -237,7 +239,9 @@ final class ConsoleDrawerTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(ConsoleDrawer::class);
 
-        $available = $component->instance()->{'availableServers'}();
+        // availableServers() is a protected helper — bind a closure to the
+        // component instance to reach it without widening its visibility.
+        $available = (fn () => $this->availableServers())->call($component->instance());
 
         $this->assertCount(1, $available);
         $this->assertEquals($server->id, $available->first()->id);
@@ -255,7 +259,9 @@ final class ConsoleDrawerTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(ConsoleDrawer::class);
 
-        $available = $component->instance()->{'availableServers'}();
+        // availableServers() is a protected helper — bind a closure to the
+        // component instance to reach it without widening its visibility.
+        $available = (fn () => $this->availableServers())->call($component->instance());
 
         $this->assertCount(100, $available);
     }
@@ -271,7 +277,9 @@ final class ConsoleDrawerTest extends TestCase
         $component = Livewire::actingAs($user)
             ->test(ConsoleDrawer::class);
 
-        $available = $component->instance()->{'availableServers'}();
+        // availableServers() is a protected helper — bind a closure to the
+        // component instance to reach it without widening its visibility.
+        $available = (fn () => $this->availableServers())->call($component->instance());
 
         $this->assertEquals('Alpha Server', $available[0]->name);
         $this->assertEquals('Beta Server', $available[1]->name);
@@ -396,11 +404,13 @@ final class ConsoleDrawerTest extends TestCase
             ->assertSet('server', null);
     }
 
-    public function test_drawer_prompt_shows_root_when_ssh_user_null(): void
+    public function test_drawer_prompt_shows_root_when_ssh_user_blank(): void
     {
         $user = $this->userWithOrganization();
+        // servers.ssh_user is NOT NULL — a blank value exercises the
+        // prompt's `?: 'root'` fallback and is the real-world case.
         $server = $this->readyServer($user, [
-            'ssh_user' => null,
+            'ssh_user' => '',
             'name' => 'test-server',
         ]);
 
@@ -409,11 +419,13 @@ final class ConsoleDrawerTest extends TestCase
             ->assertSee('root@test-server');
     }
 
-    public function test_drawer_shows_ip_when_name_null(): void
+    public function test_drawer_shows_ip_when_name_blank(): void
     {
         $user = $this->userWithOrganization();
+        // servers.name is NOT NULL — a blank name exercises the prompt's
+        // name -> ip fallback (`$server->name ?: $server->ip_address`).
         $server = $this->readyServer($user, [
-            'name' => null,
+            'name' => '',
             'ip_address' => '192.168.1.100',
         ]);
 
@@ -422,13 +434,16 @@ final class ConsoleDrawerTest extends TestCase
             ->assertSee('deploy@192.168.1.100');
     }
 
-    public function test_drawer_shows_dash_when_server_null(): void
+    public function test_drawer_shows_picker_when_server_null(): void
     {
         $user = $this->userWithOrganization();
 
+        // No server in context → the drawer renders the server picker,
+        // not a shell prompt. (The `—` host fallback only applies to a
+        // server that exists but has no name/IP — see the @else branch.)
         Livewire::actingAs($user)
             ->test(ConsoleDrawer::class)
-            ->assertSee('—');
+            ->assertSee('Pick a server to console into');
     }
 
     protected function tearDown(): void
