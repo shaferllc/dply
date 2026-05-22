@@ -17,7 +17,7 @@ uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
 function actingInOrg(User $user, Organization $org): void
 {
-    $this->actingAs($user);
+    test()->actingAs($user);
     session(['current_organization_id' => $org->id]);
 }
 

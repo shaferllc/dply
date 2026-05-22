@@ -423,19 +423,19 @@ test('job records audit event on success', function () {
         // Production `executeStageInstall` takes an additional ConsoleEmitter for streaming
         // apt output into the banner; the no-op test override matches that signature so the
         // anonymous-class declaration stays binary-compatible with the parent.
-        function executeStageInstall(\App\Models\Server $server, \App\Services\ConsoleActions\ConsoleEmitter $emitter): void
+        protected function executeStageInstall(\App\Models\Server $server, \App\Services\ConsoleActions\ConsoleEmitter $emitter): void
         {
         }
-        function executeStageProvision(\App\Models\Server $server, array $preflight): void
+        protected function executeStageProvision(\App\Models\Server $server, array $preflight): void
         {
         }
-        function executeStageValidate(\App\Models\Server $server): void
+        protected function executeStageValidate(\App\Models\Server $server): void
         {
         }
-        function executeStageCutover(\App\Models\Server $server, string $from): void
+        protected function executeStageCutover(\App\Models\Server $server, string $from): void
         {
         }
-        function executeStageDisableOld(\App\Models\Server $server, string $from): void
+        protected function executeStageDisableOld(\App\Models\Server $server, string $from): void
         {
         }
     };

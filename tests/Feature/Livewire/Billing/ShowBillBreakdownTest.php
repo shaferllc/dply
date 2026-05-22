@@ -29,8 +29,8 @@ test('empty fleet shows base only', function () {
 });
 
 test('billable servers show in fleet table with their tier fees', function () {
-    $matureM = server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
-    $matureL = server(cpuCount: 8, memMb: 16384, ageDays: 5, name: 'db-1');
+    $matureM = server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
+    $matureL = server(org: $this->org, cpuCount: 8, memMb: 16384, ageDays: 5, name: 'db-1');
 
     Livewire::actingAs($this->admin)
         ->test(BillingShow::class, ['organization' => $this->org])
@@ -45,7 +45,7 @@ test('billable servers show in fleet table with their tier fees', function () {
 });
 
 test('fresh servers are listed but marked not billed', function () {
-    server(cpuCount: 4, memMb: 8192, ageDays: 0, name: 'fresh-server');
+    server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 0, name: 'fresh-server');
 
     $component = Livewire::actingAs($this->admin)
         ->test(BillingShow::class, ['organization' => $this->org]);
@@ -59,7 +59,7 @@ test('fresh servers are listed but marked not billed', function () {
 });
 
 test('non ready servers are marked not billed with status reason', function () {
-    $server = server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'broken-1');
+    $server = server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'broken-1');
     $server->update(['status' => Server::STATUS_ERROR]);
 
     Livewire::actingAs($this->admin)
@@ -70,9 +70,9 @@ test('non ready servers are marked not billed with status reason', function () {
 });
 
 test('tier line items aggregate quantity per tier', function () {
-    server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'app-1');
-    server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'app-2');
-    server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'app-3');
+    server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'app-1');
+    server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'app-2');
+    server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'app-3');
 
     $component = Livewire::actingAs($this->admin)
         ->test(BillingShow::class, ['organization' => $this->org]);
@@ -86,7 +86,7 @@ test('tier line items aggregate quantity per tier', function () {
 });
 
 test('yearly total applies annual discount', function () {
-    server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
+    server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
 
     $component = Livewire::actingAs($this->admin)
         ->test(BillingShow::class, ['organization' => $this->org]);
@@ -111,7 +111,7 @@ test('subscribe buttons show when org has a stripe id but no subscription', func
 });
 
 test('run rate line appears in the bill hero', function () {
-    server(cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
+    server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
 
     Livewire::actingAs($this->admin)
         ->test(BillingShow::class, ['organization' => $this->org])
@@ -121,10 +121,10 @@ test('run rate line appears in the bill hero', function () {
         ->assertSee('per server-day');
 });
 
-function server(int $cpuCount, int $memMb, int $ageDays, string $name): Server
+function server(Organization $org, int $cpuCount, int $memMb, int $ageDays, string $name): Server
 {
     $server = Server::factory()->create([
-        'organization_id' => $this->org->id,
+        'organization_id' => $org->id,
         'status' => Server::STATUS_READY,
         'name' => $name,
         'created_at' => now()->subDays($ageDays),

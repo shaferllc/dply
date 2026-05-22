@@ -30,12 +30,12 @@ test('job provisions units for node site', function () {
     {
         function __construct(private RemoteShell $shell)
         {
-            __construct(new SiteSystemdUnitBuilder);
+            parent::__construct(new SiteSystemdUnitBuilder);
         }
 
         function provision(Site $site, ?\Closure $shellFactory = null): array
         {
-            return provision($site, fn () => $this->shell);
+            return parent::provision($site, fn () => $this->shell);
         }
     };
     $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
@@ -108,12 +108,12 @@ test('job provisions units for each non web process', function () {
     {
         function __construct(private RemoteShell $shell)
         {
-            __construct(new SiteSystemdUnitBuilder);
+            parent::__construct(new SiteSystemdUnitBuilder);
         }
 
         function provision(Site $site, ?\Closure $shellFactory = null): array
         {
-            return provision($site, fn () => $this->shell);
+            return parent::provision($site, fn () => $this->shell);
         }
     };
 

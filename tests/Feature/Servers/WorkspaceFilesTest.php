@@ -43,9 +43,9 @@ function bindFakeReader(array $entries): void
         filter: null,
     );
 
-    $fake = $this->createMock(ServerFileBrowserRemoteReader::class);
-    $fake->method('list')->willReturn($listing);
-    $this->app->instance(ServerFileBrowserRemoteReader::class, $fake);
+    $fake = \Mockery::mock(ServerFileBrowserRemoteReader::class);
+    $fake->shouldReceive('list')->andReturn($listing);
+    app()->instance(ServerFileBrowserRemoteReader::class, $fake);
 }
 test('owner can load server files page with default path under deploy home', function () {
     $user = actingOrgUser('owner');

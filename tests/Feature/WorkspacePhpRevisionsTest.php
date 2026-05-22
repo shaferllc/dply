@@ -47,7 +47,7 @@ function stubPhpManager(): void
             ['id' => '8.3', 'label' => 'PHP 8.3', 'is_supported' => true, 'is_installed' => true, 'site_count' => 0],
         ],
     ]);
-    $this->app->instance(ServerPhpManager::class, $manager);
+    app()->instance(ServerPhpManager::class, $manager);
 }
 
 /** Build a server + a partial-mocked editor whose remote ops are stubbed. */
@@ -68,7 +68,7 @@ function stubEditor(Server $server, string $liveContent, string $version = '8.3'
     ]);
     $editor->shouldReceive('readRemoteTarget')->andReturn($liveContent);
 
-    $this->app->instance(ServerPhpConfigEditor::class, $editor);
+    app()->instance(ServerPhpConfigEditor::class, $editor);
 
     return $editor;
 }

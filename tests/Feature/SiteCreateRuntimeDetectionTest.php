@@ -413,9 +413,9 @@ function makeServerWithUser(): array
 }
 function fakeClonerThatProducesNodeRepoWithBullmq(): void
 {
-    $this->app->instance(GitCloner::class, new class implements GitCloner
+    app()->instance(GitCloner::class, new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             mkdir($destination, 0o755, true);
             file_put_contents(
@@ -436,5 +436,5 @@ function fakeClonerThatProducesNodeRepoWithBullmq(): void
     // RepositoryRuntimePreview is constructed per-request; rebinding the
     // GitCloner above is enough — Livewire will resolve the preview
     // fresh on each call to detectFromRepository.
-    unset($this->app[RepositoryRuntimePreview::class]);
+    unset(app()[RepositoryRuntimePreview::class]);
 }

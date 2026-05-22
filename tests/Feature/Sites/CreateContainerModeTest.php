@@ -207,7 +207,7 @@ function stubInspector(string $targetKind = 'docker'): void
 
     $stub = Mockery::mock(LocalRepositoryInspector::class);
     $stub->shouldReceive('inspect')->andReturn($payload);
-    $this->app->instance(LocalRepositoryInspector::class, $stub);
+    app()->instance(LocalRepositoryInspector::class, $stub);
 }
 function userWithOrganization(): User
 {

@@ -44,10 +44,10 @@ function ownerWithRedisInstance(): array
 
 function fakeSuccessfulSsh(): void
 {
-    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
-        $mock->shouldReceive('runInlineBash')
-            ->andReturn(new ProcessOutput(buffer: '', exitCode: 0));
-    });
+    $mock = \Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $mock->shouldReceive('runInlineBash')
+        ->andReturn(new ProcessOutput(buffer: '', exitCode: 0));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $mock);
 }
 
 test('expose writes firewall rule and dispatches apply', function () {

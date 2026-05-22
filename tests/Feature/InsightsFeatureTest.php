@@ -380,7 +380,7 @@ test('reopened finding clears prior acknowledgement', function () {
         'payload' => ['cpu_pct' => 95, 'mem_pct' => 10, 'disk_pct' => 10, 'load_1m' => 0.5],
     ]);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding = InsightFinding::query()
         ->where('server_id', $server->id)
@@ -398,7 +398,7 @@ test('reopened finding clears prior acknowledgement', function () {
         'captured_at' => now()->addMinute(),
         'payload' => ['cpu_pct' => 10, 'mem_pct' => 10, 'disk_pct' => 10, 'load_1m' => 0.5],
     ]);
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding->refresh();
     expect($finding->status)->toBe(InsightFinding::STATUS_RESOLVED);
@@ -408,7 +408,7 @@ test('reopened finding clears prior acknowledgement', function () {
         'captured_at' => now()->addMinutes(2),
         'payload' => ['cpu_pct' => 95, 'mem_pct' => 10, 'disk_pct' => 10, 'load_1m' => 0.5],
     ]);
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding->refresh();
     expect($finding->status)->toBe(InsightFinding::STATUS_OPEN);
@@ -430,7 +430,7 @@ test('insight run coordinator resolves when condition clears', function () {
         ],
     ]);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $open = InsightFinding::query()
         ->where('server_id', $server->id)
@@ -450,7 +450,7 @@ test('insight run coordinator resolves when condition clears', function () {
         ],
     ]);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $openAfter = InsightFinding::query()
         ->where('server_id', $server->id)
@@ -474,7 +474,7 @@ test('coordinator skips runner when required stack tag is absent', function () {
     // no mysql
     registerStubInsight('stub_requires_mysql', requires: ['mysql']);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     expect(InsightFinding::query()
         ->where('server_id', $server->id)
@@ -488,7 +488,7 @@ test('coordinator runs runner when required stack tag is present', function () {
 
     registerStubInsight('stub_requires_mysql', requires: ['mysql']);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     expect(InsightFinding::query()
         ->where('server_id', $server->id)
@@ -503,7 +503,7 @@ test('coordinator fails open when stack summary is unknown', function () {
     // No stack-summary artifact seeded → tagsFor() returns 'unknown'.
     registerStubInsight('stub_requires_mysql', requires: ['mysql']);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     expect(InsightFinding::query()
         ->where('server_id', $server->id)
@@ -517,7 +517,7 @@ test('recorder persists kind from candidate', function () {
 
     registerStubInsight('stub_suggestion', requires: [], kind: InsightFinding::KIND_SUGGESTION);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding = InsightFinding::query()
         ->where('server_id', $server->id)
@@ -533,7 +533,7 @@ test('recorder defaults kind to problem when unspecified', function () {
     registerStubInsight('stub_problem_default', requires: []);
 
     // kind default
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding = InsightFinding::query()
         ->where('server_id', $server->id)
@@ -549,7 +549,7 @@ test('package security updates runner emits warning when security updates presen
     stubRemoteBashOutput("total=12\nsecurity=3\n");
 
     $runner = app(PackageSecurityUpdatesInsightRunner::class);
-    $candidates = run($server->fresh(), null, []);
+    $candidates = $runner->run($server->fresh(), null, []);
 
     expect($candidates)->toHaveCount(1);
     $c = $candidates[0];
@@ -567,7 +567,7 @@ test('package security updates runner escalates to critical above ten', function
     stubRemoteBashOutput("total=42\nsecurity=15\n");
 
     $runner = app(PackageSecurityUpdatesInsightRunner::class);
-    $candidates = run($server->fresh(), null, []);
+    $candidates = $runner->run($server->fresh(), null, []);
 
     expect($candidates)->toHaveCount(1);
     expect($candidates[0]->severity)->toBe(InsightFinding::SEVERITY_CRITICAL);
@@ -579,7 +579,7 @@ test('package security updates runner skips when no security updates', function 
     stubRemoteBashOutput("total=2\nsecurity=0\n");
 
     $runner = app(PackageSecurityUpdatesInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('package security updates runner skips when apt not present', function () {
@@ -588,7 +588,7 @@ test('package security updates runner skips when apt not present', function () {
     stubRemoteBashOutput("no-apt\n");
 
     $runner = app(PackageSecurityUpdatesInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('package security updates runner respects min threshold', function () {
@@ -598,7 +598,7 @@ test('package security updates runner respects min threshold', function () {
     stubRemoteBashOutput("total=10\nsecurity=2\n");
 
     $runner = app(PackageSecurityUpdatesInsightRunner::class);
-    expect(run($server->fresh(), null, ['min_security_updates' => 5]))->toBe([]);
+    expect($runner->run($server->fresh(), null, ['min_security_updates' => 5]))->toBe([]);
 });
 
 test('system clock sync runner emits warning when ntp inactive', function () {
@@ -607,7 +607,7 @@ test('system clock sync runner emits warning when ntp inactive', function () {
     stubRemoteBashOutput("ntp_service=inactive\nsynchronized=yes\ntimezone=UTC\n");
 
     $runner = app(SystemClockSyncInsightRunner::class);
-    $candidates = run($server->fresh(), null, []);
+    $candidates = $runner->run($server->fresh(), null, []);
 
     expect($candidates)->toHaveCount(1);
     $c = $candidates[0];
@@ -624,7 +624,7 @@ test('system clock sync runner emits when synchronized is no', function () {
     stubRemoteBashOutput("ntp_service=active\nsynchronized=no\ntimezone=UTC\n");
 
     $runner = app(SystemClockSyncInsightRunner::class);
-    $candidates = run($server->fresh(), null, []);
+    $candidates = $runner->run($server->fresh(), null, []);
 
     expect($candidates)->toHaveCount(1);
     $this->assertStringContainsString('not reported as synchronized', $candidates[0]->body);
@@ -636,7 +636,7 @@ test('system clock sync runner skips when clock is synchronized', function () {
     stubRemoteBashOutput("ntp_service=active\nsynchronized=yes\ntimezone=UTC\n");
 
     $runner = app(SystemClockSyncInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('system clock sync runner skips when timedatectl not present', function () {
@@ -645,7 +645,7 @@ test('system clock sync runner skips when timedatectl not present', function () 
     stubRemoteBashOutput("no-timedatectl\n");
 
     $runner = app(SystemClockSyncInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('enable ntp fix action runs timedatectl set ntp true', function () {
@@ -672,8 +672,8 @@ test('enable ntp fix action runs timedatectl set ntp true', function () {
     ]);
 
     $action = app(EnableNtpFixAction::class);
-    expect(preflight($server->fresh(), null, $finding, []))->toBeNull();
-    $result = apply($server->fresh(), null, $finding, []);
+    expect($action->preflight($server->fresh(), null, $finding, []))->toBeNull();
+    $result = $action->apply($server->fresh(), null, $finding, []);
 
     expect($result->ok)->toBeTrue();
     expect($captured['name'])->toBe('insight-fix-enable-ntp');
@@ -697,7 +697,7 @@ function stubRemoteBashOutput(string $buffer): void
             return new ProcessOutput($this->buffer, 0, false);
         }
     };
-    $this->app->instance(ExecuteRemoteTaskOnServer::class, $stub);
+    app()->instance(ExecuteRemoteTaskOnServer::class, $stub);
 }
 
 /**
@@ -721,7 +721,7 @@ function stubRemoteBashCapturing(array &$captured, string $buffer): void
             return new ProcessOutput($this->buffer, 0, false);
         }
     };
-    $this->app->instance(ExecuteRemoteTaskOnServer::class, $stub);
+    app()->instance(ExecuteRemoteTaskOnServer::class, $stub);
 }
 test('php fpm workers undersized runner emits when active over threshold', function () {
     [, $server] = userWithServer();
@@ -730,7 +730,7 @@ test('php fpm workers undersized runner emits when active over threshold', funct
     stubFpmProbe(['max_children' => 30, 'active_workers' => 28, 'php_version' => '8.3']);
 
     $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
-    $candidates = run($server->fresh(), null, []);
+    $candidates = $runner->run($server->fresh(), null, []);
 
     expect($candidates)->toHaveCount(1);
     $c = $candidates[0];
@@ -748,7 +748,7 @@ test('php fpm workers undersized runner skips below threshold', function () {
     stubFpmProbe(['max_children' => 30, 'active_workers' => 5, 'php_version' => '8.3']);
 
     $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('php fpm workers undersized runner skips when probe fails', function () {
@@ -758,7 +758,7 @@ test('php fpm workers undersized runner skips when probe fails', function () {
     stubFpmProbe(null);
 
     $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('bump fpm workers fix action backs up substitutes and writes via editor', function () {
@@ -851,8 +851,8 @@ test('bump fpm workers fix action backs up substitutes and writes via editor', f
     // 4GB * 0.6 / 30 = ~81 → proposed should be 81 (or capped). Current 30 → 81 increase passes preflight.
     $action = app(BumpFpmWorkersFixAction::class);
     $params = (array) (config('insights.insights.php_fpm_workers_undersized.fix.params') ?? []);
-    expect(preflight($server->fresh(), null, $finding, $params))->toBeNull();
-    $result = apply($server->fresh(), null, $finding, $params);
+    expect($action->preflight($server->fresh(), null, $finding, $params))->toBeNull();
+    $result = $action->apply($server->fresh(), null, $finding, $params);
 
     expect($result->ok)->toBeTrue('Apply should succeed: '.$result->errorMessage);
 
@@ -898,7 +898,7 @@ test('bump fpm workers fix action preflight refuses without total ram', function
     ]);
 
     $action = app(BumpFpmWorkersFixAction::class);
-    $reason = preflight($server->fresh(), null, $finding, []);
+    $reason = $action->preflight($server->fresh(), null, $finding, []);
     expect($reason)->not->toBeNull();
     $this->assertStringContainsString('RAM', $reason);
 });
@@ -1288,7 +1288,7 @@ test('bump fpm workers fix action aborts when pattern not found', function () {
     $this->app->instance(ServerPhpConfigEditor::class, $stubEditor);
 
     $action = app(BumpFpmWorkersFixAction::class);
-    $result = apply($server->fresh(), null, $finding, []);
+    $result = $action->apply($server->fresh(), null, $finding, []);
 
     expect($result->ok)->toBeFalse();
     expect($result->errorMessage)->not->toBeNull();
@@ -1300,7 +1300,7 @@ test('php fpm workers undersized runner skips when no php version', function () 
 
     // No stack-summary seeded → phpVersionFor() returns null → runner returns [].
     $runner = app(PhpFpmWorkersUndersizedInsightRunner::class);
-    expect(run($server->fresh(), null, []))->toBe([]);
+    expect($runner->run($server->fresh(), null, []))->toBe([]);
 });
 
 /**
@@ -1322,7 +1322,7 @@ function stubFpmProbe(?array $snapshot): void
             return $this->snapshot;
         }
     };
-    $this->app->instance(ServerPhpFpmProbe::class, $stub);
+    app()->instance(ServerPhpFpmProbe::class, $stub);
 }
 
 test('horizon recommended runner emits for laravel site with queue worker and no horizon', function () {
@@ -1361,7 +1361,7 @@ test('horizon recommended runner emits for laravel site with queue worker and no
     ]);
 
     $runner = app(HorizonRecommendedInsightRunner::class);
-    $candidates = run($server, $site, []);
+    $candidates = $runner->run($server, $site, []);
 
     expect($candidates)->toHaveCount(1);
     $c = $candidates[0];
@@ -1407,7 +1407,7 @@ test('horizon recommended runner skips when already on horizon', function () {
     ]);
 
     $runner = app(HorizonRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('horizon recommended runner skips when no queue worker present', function () {
@@ -1428,7 +1428,7 @@ test('horizon recommended runner skips when no queue worker present', function (
 
     // No SupervisorProgram seeded → no signal → suggestion does not fire.
     $runner = app(HorizonRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('horizon recommended runner skips inactive queue worker', function () {
@@ -1467,7 +1467,7 @@ test('horizon recommended runner skips inactive queue worker', function () {
     ]);
 
     $runner = app(HorizonRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('octane recommended runner emits suggestion for busy laravel site without octane', function () {
@@ -1496,7 +1496,7 @@ test('octane recommended runner emits suggestion for busy laravel site without o
     }
 
     $runner = app(OctaneRecommendedInsightRunner::class);
-    $candidates = run($server, $site, []);
+    $candidates = $runner->run($server, $site, []);
 
     expect($candidates)->toHaveCount(1);
     $c = $candidates[0];
@@ -1534,7 +1534,7 @@ test('octane recommended runner skips when site already uses octane', function (
     }
 
     $runner = app(OctaneRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('octane recommended runner skips non laravel sites', function () {
@@ -1562,7 +1562,7 @@ test('octane recommended runner skips non laravel sites', function () {
     }
 
     $runner = app(OctaneRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('octane recommended runner skips when load below threshold', function () {
@@ -1591,7 +1591,7 @@ test('octane recommended runner skips when load below threshold', function () {
     }
 
     $runner = app(OctaneRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('octane recommended writes finding with kind suggestion via coordinator', function () {
@@ -1661,7 +1661,7 @@ test('octane recommended runner skips when too few samples', function () {
     }
 
     $runner = app(OctaneRecommendedInsightRunner::class);
-    expect(run($server, $site, []))->toBe([]);
+    expect($runner->run($server, $site, []))->toBe([]);
 });
 
 test('ignore finding marks suggestion as ignored and records user', function () {
@@ -1983,7 +1983,7 @@ test('ignored suggestion does not reopen within cooldown', function () {
     config()->set('insights.insights.stub_suggestion_cooldown.cooldown_days', 30);
 
     // Initial run creates the suggestion.
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
     $finding = InsightFinding::query()
         ->where('insight_key', 'stub_suggestion_cooldown')
         ->first();
@@ -1998,7 +1998,7 @@ test('ignored suggestion does not reopen within cooldown', function () {
 
     // Next scheduled run within cooldown — runner still emits but the recorder must
     // skip the upsert and leave the finding ignored.
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding->refresh();
     expect($finding->status)->toBe(InsightFinding::STATUS_IGNORED);
@@ -2011,7 +2011,7 @@ test('ignored suggestion reopens after cooldown expires', function () {
     registerStubInsight('stub_suggestion_cooldown_expired', requires: [], kind: InsightFinding::KIND_SUGGESTION);
     config()->set('insights.insights.stub_suggestion_cooldown_expired.cooldown_days', 7);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
     $finding = InsightFinding::query()
         ->where('insight_key', 'stub_suggestion_cooldown_expired')
         ->first();
@@ -2024,7 +2024,7 @@ test('ignored suggestion reopens after cooldown expires', function () {
         'ignored_by_user_id' => $server->user_id,
     ])->save();
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding->refresh();
     expect($finding->status)->toBe(InsightFinding::STATUS_OPEN);
@@ -2120,7 +2120,7 @@ test('apply fix job dispatches through handler and resolves problem when recheck
     setStubRunnerEmits('stub_problem_with_fix', true);
 
     // Initial run: emit candidate → finding open.
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
     $finding = InsightFinding::query()
         ->where('server_id', $server->id)
         ->where('insight_key', 'stub_problem_with_fix')
@@ -2162,7 +2162,7 @@ test('apply fix job records failure when recheck still fails', function () {
     registerStubInsightWithHandler('stub_problem_recheck_fails', $handlerClass);
     setStubRunnerEmits('stub_problem_recheck_fails', true);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
     $finding = InsightFinding::query()
         ->where('server_id', $server->id)
         ->where('insight_key', 'stub_problem_recheck_fails')
@@ -2201,7 +2201,7 @@ test('apply fix job records refusal from preflight without running apply', funct
     registerStubInsightWithHandler('stub_problem_refusal', $handlerClass);
     setStubRunnerEmits('stub_problem_refusal', true);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
     $finding = InsightFinding::query()
         ->where('insight_key', 'stub_problem_refusal')
         ->first();
@@ -2235,7 +2235,7 @@ test('apply fix job resolves suggestion without recheck', function () {
     registerStubInsightWithHandler('stub_suggestion_with_fix', $handlerClass, kind: InsightFinding::KIND_SUGGESTION);
     setStubRunnerEmits('stub_suggestion_with_fix', true);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
     $finding = InsightFinding::query()
         ->where('insight_key', 'stub_suggestion_with_fix')
         ->first();
@@ -2255,9 +2255,9 @@ test('apply fix job resolves suggestion without recheck', function () {
  */
 function registerStubInsightWithHandler(string $key, string $handlerClass, string $kind = InsightFinding::KIND_PROBLEM): void
 {
-    $runner = new class($key, $kind, $this) implements InsightRunnerInterface
+    $runner = new class($key, $kind) implements InsightRunnerInterface
     {
-        function __construct(private string $key, private string $kind, private \PHPUnit\Framework\TestCase $test)
+        function __construct(private string $key, private string $kind)
         {
         }
 
@@ -2278,7 +2278,7 @@ function registerStubInsightWithHandler(string $key, string $handlerClass, strin
     };
 
     $runnerClass = get_class($runner);
-    $this->app->instance($runnerClass, $runner);
+    app()->instance($runnerClass, $runner);
 
     config()->set('insights.insights.'.$key, [
         'label' => 'Stub: '.$key,
@@ -2316,7 +2316,7 @@ test('suggestions do not dispatch notification events', function () {
 
     registerStubInsight('stub_suggestion_no_notify', requires: [], kind: InsightFinding::KIND_SUGGESTION);
 
-    runForServer($server->fresh());
+    app(InsightRunCoordinator::class)->runForServer($server->fresh());
 
     $finding = InsightFinding::query()
         ->where('server_id', $server->id)
@@ -2360,7 +2360,7 @@ function registerStubInsight(string $key, array $requires, string $kind = Insigh
     };
 
     $runnerClass = get_class($runner);
-    $this->app->instance($runnerClass, $runner);
+    app()->instance($runnerClass, $runner);
 
     config()->set('insights.insights.'.$key, [
         'label' => 'Stub: '.$key,

@@ -18,7 +18,7 @@ test('install runs apt steps then registers postgres', function () {
     $shell = new InstallDbRecordingShell;
 
     $action = $this->app->make(InstallDatabaseEngineOnServer::class);
-    $result = execute($server, 'postgres17', '17', isDefault: true, shellFactory: fn () => $shell);
+    $result = $action->execute($server, 'postgres17', '17', isDefault: true, shellFactory: fn () => $shell);
 
     expect($result['ok'])->toBeTrue();
     expect($result['engine'])->toBe('postgres17');
@@ -45,7 +45,7 @@ test('install runs apt steps for mysql 84', function () {
     $shell = new InstallDbRecordingShell;
 
     $action = $this->app->make(InstallDatabaseEngineOnServer::class);
-    $result = execute($server, 'mysql84', '8.4', shellFactory: fn () => $shell);
+    $result = $action->execute($server, 'mysql84', '8.4', shellFactory: fn () => $shell);
 
     expect($result['ok'])->toBeTrue();
     $combined = implode("\n", $shell->execCalls);
@@ -59,7 +59,7 @@ test('install returns unrecognized engine with ok false', function () {
     $shell = new InstallDbRecordingShell;
 
     $action = $this->app->make(InstallDatabaseEngineOnServer::class);
-    $result = execute($server, 'duckdb', null, shellFactory: fn () => $shell);
+    $result = $action->execute($server, 'duckdb', null, shellFactory: fn () => $shell);
 
     expect($result['ok'])->toBeFalse();
     expect($shell->execCalls)->toBe([]);
@@ -74,7 +74,8 @@ test('install throws when server not ready', function () {
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessage('Server must be ready');
 
-    execute($server, 'postgres17', '17', shellFactory: fn () => new InstallDbRecordingShell);
+    $this->app->make(InstallDatabaseEngineOnServer::class)
+        ->execute($server, 'postgres17', '17', shellFactory: fn () => new InstallDbRecordingShell);
 });
 test('install rejects blank engine', function () {
     $server = Server::factory()->ready()->create([
@@ -83,7 +84,8 @@ test('install rejects blank engine', function () {
 
     $this->expectException(\InvalidArgumentException::class);
 
-    execute($server, '   ', null, shellFactory: fn () => new InstallDbRecordingShell);
+    $this->app->make(InstallDatabaseEngineOnServer::class)
+        ->execute($server, '   ', null, shellFactory: fn () => new InstallDbRecordingShell);
 });
 test('add engine command with install flag falls back when engine unknown', function () {
     $server = Server::factory()->ready()->create([

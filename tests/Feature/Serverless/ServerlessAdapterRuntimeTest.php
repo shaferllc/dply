@@ -20,7 +20,7 @@ function tempDir(): string
 function skipUnless(string $binary): void
 {
     if ((new ExecutableFinder)->find($binary) === null) {
-        $this->markTestSkipped($binary.' is not available in this environment.');
+        \PHPUnit\Framework\Assert::markTestSkipped($binary.' is not available in this environment.');
     }
 }
 /**
@@ -40,7 +40,7 @@ function process(array $command, string $dir, array $env = [], int $timeout = 30
 function installOrSkip(array $command, string $dir, array $env = []): void
 {
     if (! process($command, $dir, $env)->isSuccessful()) {
-        $this->markTestSkipped('Dependency install failed (offline?): '.implode(' ', $command));
+        \PHPUnit\Framework\Assert::markTestSkipped('Dependency install failed (offline?): '.implode(' ', $command));
     }
 }
 /**

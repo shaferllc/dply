@@ -99,14 +99,16 @@ function bindFakeSyncer(): object
 {
     $fake = new class extends StripeSubscriptionSyncer
     {
-        function reconcile(Organization $organization, DesiredBillingState $desired): array
+        public array $calls = [];
+
+        public function reconcile(Organization $organization, DesiredBillingState $desired): array
         {
             $this->calls[] = ['organization' => $organization, 'desired' => $desired];
 
             return [];
         }
     };
-    $this->app->instance(StripeSubscriptionSyncer::class, $fake);
+    app()->instance(StripeSubscriptionSyncer::class, $fake);
 
     return $fake;
 }

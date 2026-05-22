@@ -96,14 +96,14 @@ test('reader failure marks run failed', function () {
 });
 function bindFakeReader(string $payload): void
 {
-    $this->app->bind(SiteEnvReader::class, fn () => new class($payload) extends SiteEnvReader
+    app()->bind(SiteEnvReader::class, fn () => new class($payload) extends SiteEnvReader
     {
-        function __construct(private readonly string $payload)
+        public function __construct(private readonly string $payload)
         {
             // Bypass parent constructor — no SSH wrapper needed for the fake.
         }
 
-        function read(Site $site): string
+        public function read(Site $site): string
         {
             return $this->payload;
         }

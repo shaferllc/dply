@@ -107,14 +107,14 @@ function makeUserSite(array $siteAttrs = []): array
 }
 function bindFakeReader(string $serverEnv): void
 {
-    $this->app->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
+    app()->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
     {
-        function __construct(private readonly string $payload)
+        public function __construct(private readonly string $payload)
         {
             // Bypass parent constructor; the wrapper is unused for the fake.
         }
 
-        function read(Site $site): string
+        public function read(Site $site): string
         {
             return $this->payload;
         }

@@ -59,7 +59,7 @@ test('task model uses persisted remote output path when present', function () {
         }
     };
 
-    self::assertSame('/root/.dply-task-runner/custom-remote.log', $taskModel->outputLogPath());
+    $this->assertSame('/root/.dply-task-runner/custom-remote.log', $taskModel->outputLogPath());
 });
 test('run on connection persists remote script and output paths on task model', function () {
     $task = new TestTask;
@@ -115,8 +115,8 @@ test('run on connection persists remote script and output paths on task model', 
 
     $taskModel->refresh();
 
-    self::assertSame('/root/.dply-task-runner/abc123.sh', $taskModel->options['remote_script_path'] ?? null);
-    self::assertSame('/root/.dply-task-runner/abc123.log', $taskModel->options['remote_output_path'] ?? null);
+    $this->assertSame('/root/.dply-task-runner/abc123.sh', $taskModel->options['remote_script_path'] ?? null);
+    $this->assertSame('/root/.dply-task-runner/abc123.log', $taskModel->options['remote_output_path'] ?? null);
 });
 test('run on connection uploads tracking wrapper for remote tracked tasks', function () {
     $trackedTask = new TrackTaskInBackground(
@@ -183,9 +183,9 @@ test('run on connection uploads tracking wrapper for remote tracked tasks', func
     };
     runOnConnection($pendingTask);
 
-    self::assertSame('tracked123.sh', $dispatcher->uploadedFilename);
-    self::assertStringContainsString('Task completed successfully, calling finished webhook...', (string) $dispatcher->uploadedContents);
-    self::assertStringContainsString('httpPost', (string) $dispatcher->uploadedContents);
+    $this->assertSame('tracked123.sh', $dispatcher->uploadedFilename);
+    $this->assertStringContainsString('Task completed successfully, calling finished webhook...', (string) $dispatcher->uploadedContents);
+    $this->assertStringContainsString('httpPost', (string) $dispatcher->uploadedContents);
 });
 test('remote process runner background command does not require local remote file', function () {
     $connection = new Connection(
@@ -208,7 +208,7 @@ test('remote process runner background command does not require local remote fil
     };
     runUploadedScriptInBackground('task-abc123.sh', 'task-abc123.log', 300);
 
-    self::assertSame(
+    $this->assertSame(
         'timeout 300s bash /root/.dply-task-runner/task-abc123.sh > /root/.dply-task-runner/task-abc123.log 2>&1 &',
         $runner->capturedScript,
     );
@@ -255,8 +255,8 @@ test('run in background with model persists remote paths for tracked remote task
 
     $taskModel->refresh();
 
-    self::assertSame('/root/.dply-task-runner/task-'.$taskModel->id.'-original.sh', $taskModel->options['remote_script_path'] ?? null);
-    self::assertSame('/root/.dply-task-runner/task-'.$taskModel->id.'-original.sh.log', $taskModel->options['remote_output_path'] ?? null);
+    $this->assertSame('/root/.dply-task-runner/task-'.$taskModel->id.'-original.sh', $taskModel->options['remote_script_path'] ?? null);
+    $this->assertSame('/root/.dply-task-runner/task-'.$taskModel->id.'-original.sh.log', $taskModel->options['remote_output_path'] ?? null);
 });
 test('run in background with model does not start output polling for tracked remote tasks', function () {
     Queue::fake();
@@ -346,6 +346,6 @@ test('run in background with model uses remote dispatch path for tracked remote 
     };
     $dispatcher->runInBackgroundWithModel($trackedTask, $taskModel);
 
-    self::assertTrue($dispatcher->usedRemoteDispatch);
-    self::assertFalse($dispatcher->usedLocalBackground);
+    $this->assertTrue($dispatcher->usedRemoteDispatch);
+    $this->assertFalse($dispatcher->usedLocalBackground);
 });

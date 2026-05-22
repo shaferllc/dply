@@ -563,7 +563,7 @@ function stubAllPreflightChecksPass(): void
     $stub->shouldReceive('run')->andReturn($allPass);
     $stub->shouldReceive('structuralFailures')->andReturn([]);
     $stub->shouldReceive('advisoryWarnings')->andReturn([]);
-    $this->app->instance(\App\Services\Servers\PreflightSchedulerOnSite::class, $stub);
+    app()->instance(\App\Services\Servers\PreflightSchedulerOnSite::class, $stub);
 }
 test('enable scheduler for site creates laravel wrapper cron entry', function () {
     stubAllPreflightChecksPass();

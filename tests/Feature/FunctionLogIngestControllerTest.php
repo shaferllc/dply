@@ -25,7 +25,7 @@ function postRecord(Site $site, array $payload, ?string $secret = SECRET): \Illu
         $headers['HTTP_X_DPLY_SIGNATURE'] = hash_hmac('sha256', $body, $secret);
     }
 
-    return $this->call('POST', route('hooks.functions.log', $site), [], [], [], $headers, $body);
+    return test()->call('POST', route('hooks.functions.log', $site), [], [], [], $headers, $body);
 }
 test('a correctly signed payload records a web invocation', function () {
     $site = functionSite();

@@ -72,7 +72,7 @@ function runDeployWithSpy(string $storedYaml, ?string $legacyKubeconfigPath = nu
             return ['output' => 'fake kubectl output', 'revision' => '1', 'context' => null];
         }
     };
-    $this->app->instance(KubernetesKubectlExecutor::class, $spy);
+    app()->instance(KubernetesKubectlExecutor::class, $spy);
 
     $kubernetesMeta = [
         'provider' => 'digitalocean',

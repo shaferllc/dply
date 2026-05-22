@@ -187,14 +187,20 @@ test('teardown disables and removes each unit', function () {
  */
 class RecordingShell implements RemoteShell
 {
-    function exec(string $command, int $timeoutSeconds = 120): string
+    /** @var list<array{path: string, contents: string}> */
+    public array $putFiles = [];
+
+    /** @var list<array{command: string, timeout: int}> */
+    public array $execCalls = [];
+
+    public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = ['command' => $command, 'timeout' => $timeoutSeconds];
 
         return '';
     }
 
-    function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
     {
         $this->putFiles[] = ['path' => $remotePath, 'contents' => $contents];
     }

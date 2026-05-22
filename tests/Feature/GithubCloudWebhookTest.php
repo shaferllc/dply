@@ -137,7 +137,7 @@ function postWebhook(Site $site, string $event, string $body)
 {
     $signature = 'sha256='.hash_hmac('sha256', $body, (string) $site->webhook_secret);
 
-    return $this->call(
+    return test()->call(
         'POST',
         route('hooks.cloud.github', $site),
         [], [], [],
