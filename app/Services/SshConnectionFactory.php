@@ -19,4 +19,13 @@ class SshConnectionFactory
     {
         return new SshConnection($server);
     }
+
+    /**
+     * Build an SSH connection that logs in as root with the recovery
+     * credential — used by provisioners that need privileged writes.
+     */
+    public function recoveryForServer(Server $server): SshConnection
+    {
+        return new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
+    }
 }

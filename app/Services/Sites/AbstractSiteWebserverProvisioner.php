@@ -9,6 +9,7 @@ use App\Models\SiteBasicAuthUser;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 use Illuminate\Support\Str;
 
 abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -30,15 +31,16 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
     protected function systemSsh(Site $site): SshConnection
     {
         $server = $site->server;
+        $factory = app(SshConnectionFactory::class);
 
         if ($server->recoverySshPrivateKey()) {
-            $root = new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
+            $root = $factory->recoveryForServer($server);
             if ($root->connect()) {
                 return $root;
             }
         }
 
-        return new SshConnection($server);
+        return $factory->forServer($server);
     }
 
     protected function writeSystemFile(SshConnection $ssh, string $remotePath, string $contents): void
