@@ -431,6 +431,154 @@
         @endif
     @endif
 
+    {{-- Observability — CPU/memory/restart metrics + runtime logs --}}
+    @php
+        // Convert a list of {t, v} points into the {at, min, avg, max}
+        // shape the shared x-metrics-line-chart component expects.
+        $toChartSeries = function (mixed $points): array {
+            if (! is_array($points)) {
+                return [];
+            }
+            $out = [];
+            foreach ($points as $p) {
+                if (! is_array($p) || ! isset($p['t'], $p['v'])) {
+                    continue;
+                }
+                $v = (float) $p['v'];
+                $out[] = ['at' => (int) $p['t'], 'min' => $v, 'avg' => $v, 'max' => $v];
+            }
+
+            return $out;
+        };
+        $metricsWindows = \App\Services\Cloud\ResolvesMetricWindows::metricWindows();
+        $metricsResult = is_array($container_metrics_result) ? $container_metrics_result : null;
+        $metricsSeries = is_array($metricsResult['series'] ?? null) ? $metricsResult['series'] : [];
+        $metricsAvailable = (bool) ($metricsResult['available'] ?? false);
+    @endphp
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-4" wire:key="observability-section">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Observability') }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ __('CPU, memory and restart metrics plus runtime logs, pulled live from the backend (cached ~60s).') }}</p>
+            </div>
+            <div class="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                @foreach ($metricsWindows as $window)
+                    <button type="button"
+                            wire:click="setContainerMetricsWindow('{{ $window }}')"
+                            class="rounded-md px-2.5 py-1 text-[11px] font-semibold {{ $container_metrics_window === $window ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                        {{ $window }}
+                    </button>
+                @endforeach
+            </div>
+        </div>
+
+        @if ($metricsResult === null)
+            <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center">
+                <p class="text-xs text-slate-500">{{ __('Metrics have not been loaded yet.') }}</p>
+                <button type="button" wire:click="refreshContainerMetrics" wire:loading.attr="disabled" wire:target="refreshContainerMetrics" class="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="refreshContainerMetrics">{{ __('Load metrics') }}</span>
+                    <span wire:loading wire:target="refreshContainerMetrics">{{ __('Loading…') }}</span>
+                </button>
+            </div>
+        @elseif (! $metricsAvailable)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+                <p class="font-semibold">{{ __('Metrics unavailable for this backend.') }}</p>
+                @if (! empty($metricsResult['note']))
+                    <p class="mt-1">{{ $metricsResult['note'] }}</p>
+                @endif
+                @if (! empty($metricsResult['url']))
+                    <a href="{{ $metricsResult['url'] }}" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 font-semibold text-amber-900 underline">
+                        {{ __('View in CloudWatch') }} →
+                    </a>
+                @endif
+            </div>
+        @else
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="rounded-xl border border-slate-200 bg-white p-3">
+                    <p class="text-xs font-semibold text-slate-700">{{ __('CPU') }} <span class="text-slate-400">%</span></p>
+                    <div class="mt-2">
+                        <x-metrics-line-chart
+                            :series="$toChartSeries($metricsSeries['cpu'] ?? [])"
+                            :y-min="0"
+                            :y-max="100"
+                            color-class="text-sky-600"
+                            format="percent"
+                            height-class="h-28"
+                        />
+                    </div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-3">
+                    <p class="text-xs font-semibold text-slate-700">{{ __('Memory') }} <span class="text-slate-400">%</span></p>
+                    <div class="mt-2">
+                        <x-metrics-line-chart
+                            :series="$toChartSeries($metricsSeries['memory'] ?? [])"
+                            :y-min="0"
+                            :y-max="100"
+                            color-class="text-amber-600"
+                            format="percent"
+                            height-class="h-28"
+                        />
+                    </div>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-3 {{ isset($metricsSeries['requests']) ? '' : 'sm:col-span-2' }}">
+                    <p class="text-xs font-semibold text-slate-700">{{ isset($metricsSeries['requests']) ? __('Requests') : __('Restarts') }}</p>
+                    <div class="mt-2">
+                        <x-metrics-line-chart
+                            :series="$toChartSeries($metricsSeries['requests'] ?? ($metricsSeries['restarts'] ?? []))"
+                            :y-min="0"
+                            color-class="text-rose-600"
+                            format="load"
+                            height-class="h-28"
+                        />
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end">
+                <button type="button" wire:click="refreshContainerMetrics" wire:loading.attr="disabled" wire:target="refreshContainerMetrics" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="refreshContainerMetrics">{{ __('Refresh metrics') }}</span>
+                    <span wire:loading wire:target="refreshContainerMetrics">{{ __('Refreshing…') }}</span>
+                </button>
+            </div>
+        @endif
+
+        {{-- Runtime (RUN) logs viewer --}}
+        <div class="rounded-xl border border-slate-200 bg-white p-3">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold text-slate-700">{{ __('Runtime logs') }}</p>
+                    <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Live application (RUN) output — last 200 lines.') }}</p>
+                </div>
+                <button type="button" wire:click="fetchContainerRuntimeLogs" wire:loading.attr="disabled" wire:target="fetchContainerRuntimeLogs" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="fetchContainerRuntimeLogs">{{ is_array($container_runtime_logs_result) ? __('Refresh logs') : __('Fetch runtime logs') }}</span>
+                    <span wire:loading wire:target="fetchContainerRuntimeLogs">{{ __('Fetching…') }}</span>
+                </button>
+            </div>
+            @if (is_array($container_runtime_logs_result))
+                @php
+                    $runtimeLines = is_array($container_runtime_logs_result['lines'] ?? null) ? $container_runtime_logs_result['lines'] : [];
+                    $runtimeAvailable = (bool) ($container_runtime_logs_result['available'] ?? false);
+                @endphp
+                <div class="mt-3">
+                    @if ($runtimeLines !== [])
+                        <pre class="max-h-72 overflow-auto rounded-lg border border-slate-200 bg-slate-900 p-3 font-mono text-[11px] leading-5 text-slate-100">{{ implode("\n", array_map('strval', $runtimeLines)) }}</pre>
+                    @endif
+                    @if (! $runtimeAvailable && ! empty($container_runtime_logs_result['note']))
+                        <p class="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{{ $container_runtime_logs_result['note'] }}</p>
+                    @elseif ($runtimeLines === [] && ! empty($container_runtime_logs_result['note']))
+                        <p class="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">{{ $container_runtime_logs_result['note'] }}</p>
+                    @elseif ($runtimeLines === [] && $runtimeAvailable)
+                        <p class="mt-2 text-xs text-slate-500">{{ __('No runtime log lines returned.') }}</p>
+                    @endif
+                    @if (! empty($container_runtime_logs_result['url']))
+                        <a href="{{ $container_runtime_logs_result['url'] }}" target="_blank" rel="noopener" class="mt-2 inline-flex items-center gap-1 break-all text-xs font-medium text-sky-700 hover:underline">
+                            {{ __('Open log archive / console') }} →
+                        </a>
+                    @endif
+                </div>
+            @endif
+        </div>
+    </div>
+
     <div class="rounded-xl border border-slate-200 bg-white p-4">
         <div class="flex items-center justify-between gap-4">
             <div>

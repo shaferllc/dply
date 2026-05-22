@@ -131,6 +131,46 @@ interface CloudBackend
     public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array;
 
     /**
+     * Fetch CPU / memory / restart (or request) metric series for the
+     * site over the requested window. The window is a short code —
+     * '1h', '6h', or '24h' — and the backend maps it to a concrete
+     * start/end timestamp pair.
+     *
+     * Returns a normalized, backend-agnostic structure:
+     *   - 'window': the echoed window code
+     *   - 'series': map of metric name → list of {t: unix-int, v: float}
+     *       points. DigitalOcean / Fake return cpu, memory, restarts.
+     *   - 'available': false when the backend cannot return metrics
+     *       (App Runner — see the CloudWatch fallback).
+     *   - 'note': optional human-readable note (e.g. CloudWatch hint).
+     *   - 'url': optional deep link the operator can open instead.
+     *
+     * Implementations MUST degrade to available:false rather than
+     * throw when the provider API is unreachable or returns an
+     * unexpected shape — the dashboard renders the unavailable state.
+     *
+     * @return array{window: string, series: array<string, list<array{t: int, v: float}>>, available: bool, note?: string, url?: string}
+     */
+    public function metrics(Site $site, ProviderCredential $credential, string $window): array;
+
+    /**
+     * Fetch RUN (runtime) logs for the site — the live application
+     * stdout/stderr, not BUILD or DEPLOY logs. Returns:
+     *   - 'lines': list of log line strings (most-recent-last), capped
+     *       at roughly $lines entries.
+     *   - 'available': false when the backend cannot return runtime
+     *       logs synchronously (App Runner streams to CloudWatch).
+     *   - 'url': optional link — DO returns a presigned archive URL;
+     *       App Runner returns a CloudWatch console deep link.
+     *   - 'note': optional human-readable note.
+     *
+     * Implementations MUST degrade gracefully rather than throw.
+     *
+     * @return array{lines: list<string>, available: bool, url?: string, note?: string}
+     */
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array;
+
+    /**
      * Whether the backend can run background processes (queue workers,
      * the Laravel scheduler) alongside the web service.
      *

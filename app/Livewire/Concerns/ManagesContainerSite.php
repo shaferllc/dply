@@ -15,6 +15,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Site;
 use App\Services\Cloud\CloudRouter;
+use App\Services\Cloud\ResolvesMetricWindows;
 
 /**
  * Methods bolted onto Sites\Settings (and any future container
@@ -59,6 +60,25 @@ trait ManagesContainerSite
      * @var list<array<string, ?string>>|null
      */
     public ?array $container_deployments_result = null;
+
+    /** Selected metrics window for the Observability section: 1h | 6h | 24h. */
+    public string $container_metrics_window = '1h';
+
+    /**
+     * Populated by refreshContainerMetrics(); shape matches
+     * CloudBackend::metrics return: { window, series, available, note?, url? }.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $container_metrics_result = null;
+
+    /**
+     * Populated by fetchContainerRuntimeLogs(); shape matches
+     * CloudBackend::runtimeLogs return: { lines, available, url?, note? }.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $container_runtime_logs_result = null;
 
     public function bootManagesContainerSite(): void
     {
@@ -271,6 +291,97 @@ trait ManagesContainerSite
             if (method_exists($this, 'toastError')) {
                 $this->toastError(__('Failed to fetch deployments: :err', ['err' => $e->getMessage()]));
             }
+        }
+    }
+
+    /* ========================================================================
+     * Observability — metrics & runtime logs
+     * ======================================================================== */
+
+    /**
+     * Switch the metrics window (1h / 6h / 24h) and re-fetch. Invalid
+     * codes are ignored — the picker only ever sends valid values.
+     */
+    public function setContainerMetricsWindow(string $window): void
+    {
+        if (! in_array($window, ResolvesMetricWindows::metricWindows(), true)) {
+            return;
+        }
+        $this->container_metrics_window = $window;
+        $this->refreshContainerMetrics();
+    }
+
+    /**
+     * Fetch CPU / memory / restart metrics for the current window
+     * via the site's cloud backend. Backend results are 60s-cached;
+     * this just surfaces them. Never throws — degrades to an
+     * available:false result on error.
+     */
+    public function refreshContainerMetrics(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('view', $this->site);
+
+        $window = $this->container_metrics_window;
+
+        $backend = CloudRouter::backendFor($this->site);
+        $credential = CloudRouter::credentialFor($this->site);
+        if ($backend === null || $credential === null) {
+            $this->container_metrics_result = [
+                'window' => $window,
+                'series' => [],
+                'available' => false,
+                'note' => __('No backend or credential resolvable for this site.'),
+            ];
+
+            return;
+        }
+
+        try {
+            $this->container_metrics_result = $backend->metrics($this->site, $credential, $window);
+        } catch (\Throwable $e) {
+            $this->container_metrics_result = [
+                'window' => $window,
+                'series' => [],
+                'available' => false,
+                'note' => __('Failed to fetch metrics: :err', ['err' => $e->getMessage()]),
+            ];
+        }
+    }
+
+    /**
+     * Fetch the last N runtime (RUN) log lines via the site's cloud
+     * backend. Backend results are 60s-cached. Never throws.
+     */
+    public function fetchContainerRuntimeLogs(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('view', $this->site);
+
+        $backend = CloudRouter::backendFor($this->site);
+        $credential = CloudRouter::credentialFor($this->site);
+        if ($backend === null || $credential === null) {
+            $this->container_runtime_logs_result = [
+                'lines' => [],
+                'available' => false,
+                'note' => __('No backend or credential resolvable for this site.'),
+            ];
+
+            return;
+        }
+
+        try {
+            $this->container_runtime_logs_result = $backend->runtimeLogs($this->site, $credential, 200);
+        } catch (\Throwable $e) {
+            $this->container_runtime_logs_result = [
+                'lines' => [],
+                'available' => false,
+                'note' => __('Failed to fetch runtime logs: :err', ['err' => $e->getMessage()]),
+            ];
         }
     }
 

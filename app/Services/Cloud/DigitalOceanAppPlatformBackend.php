@@ -8,9 +8,13 @@ use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Services\DigitalOceanAppPlatformService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class DigitalOceanAppPlatformBackend implements CloudBackend
 {
+    use ResolvesMetricWindows;
+
     public function providerKey(): string
     {
         return 'digitalocean_app_platform';
@@ -418,6 +422,140 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
         }
 
         return ['content' => null, 'url' => $result['url'], 'message' => null];
+    }
+
+    /**
+     * Live-fetch CPU / memory / restart metrics from DO's App Platform
+     * monitoring API, normalized to the CloudBackend metrics shape.
+     *
+     * Wrapped in a 60s cache keyed by site + window so repeated
+     * dashboard renders don't hammer the monitoring API. Any failure
+     * (unprovisioned site, API error, unexpected shape) degrades to
+     * available:false rather than throwing.
+     */
+    public function metrics(Site $site, ProviderCredential $credential, string $window): array
+    {
+        $window = $this->normalizeWindow($window);
+
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [
+                'window' => $window,
+                'series' => ['cpu' => [], 'memory' => [], 'restarts' => []],
+                'available' => false,
+                'note' => 'Site has not been provisioned on the backend yet.',
+            ];
+        }
+
+        return Cache::remember(
+            self::metricsCacheKey($site, $window),
+            self::CACHE_TTL_SECONDS,
+            function () use ($site, $credential, $window): array {
+                [$start, $end] = $this->windowBounds($window);
+                $appId = (string) $site->container_backend_id;
+
+                try {
+                    $service = new DigitalOceanAppPlatformService($credential);
+
+                    return [
+                        'window' => $window,
+                        'series' => [
+                            'cpu' => $service->getAppMetric($appId, 'cpu_percentage', $start, $end),
+                            'memory' => $service->getAppMetric($appId, 'memory_percentage', $start, $end),
+                            'restarts' => $service->getAppMetric($appId, 'restart_count', $start, $end),
+                        ],
+                        'available' => true,
+                    ];
+                } catch (\Throwable $e) {
+                    return [
+                        'window' => $window,
+                        'series' => ['cpu' => [], 'memory' => [], 'restarts' => []],
+                        'available' => false,
+                        'note' => 'Could not fetch metrics from DigitalOcean: '.$e->getMessage(),
+                    ];
+                }
+            },
+        );
+    }
+
+    /**
+     * Live-fetch RUN (runtime) logs for the app's web component.
+     *
+     * DO returns a presigned archive URL; we download it and split it
+     * into lines, capped at $lines. Both the URL resolution and the
+     * archive download are cached for 60s. Failures degrade to
+     * available:false.
+     */
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array
+    {
+        $lines = max(1, min(2000, $lines));
+
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return [
+                'lines' => [],
+                'available' => false,
+                'note' => 'Site has not been provisioned on the backend yet.',
+            ];
+        }
+
+        return Cache::remember(
+            self::runtimeLogsCacheKey($site, $lines),
+            self::CACHE_TTL_SECONDS,
+            function () use ($site, $credential, $lines): array {
+                $appId = (string) $site->container_backend_id;
+
+                try {
+                    $service = new DigitalOceanAppPlatformService($credential);
+                    $result = $service->getRuntimeLogs($appId, 'web');
+                } catch (\Throwable $e) {
+                    return [
+                        'lines' => [],
+                        'available' => false,
+                        'note' => 'Could not fetch runtime logs from DigitalOcean: '.$e->getMessage(),
+                    ];
+                }
+
+                $archiveUrl = $result['url'];
+                if (! is_string($archiveUrl) || $archiveUrl === '') {
+                    return [
+                        'lines' => [],
+                        'available' => true,
+                        'url' => is_string($result['live_url'] ?? null) ? $result['live_url'] : null,
+                        'note' => 'No archived runtime logs yet — the app may not have produced output, or DO has not flushed an archive.',
+                    ];
+                }
+
+                // The historic_urls archive is a presigned URL with no
+                // auth — fetch it directly and tail to $lines.
+                try {
+                    $response = Http::timeout(8)->get($archiveUrl);
+                    if (! $response->successful()) {
+                        return [
+                            'lines' => [],
+                            'available' => true,
+                            'url' => $archiveUrl,
+                            'note' => 'Runtime log archive is available but could not be downloaded inline.',
+                        ];
+                    }
+                    $body = trim($response->body());
+                } catch (\Throwable) {
+                    return [
+                        'lines' => [],
+                        'available' => true,
+                        'url' => $archiveUrl,
+                        'note' => 'Runtime log archive is available but could not be downloaded inline.',
+                    ];
+                }
+
+                $allLines = $body === '' ? [] : explode("\n", $body);
+                $tail = array_slice($allLines, -$lines);
+
+                return [
+                    'lines' => array_values($tail),
+                    'available' => true,
+                    'url' => $archiveUrl,
+                ];
+            },
+        );
     }
 
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array

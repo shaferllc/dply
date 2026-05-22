@@ -10,6 +10,8 @@ use App\Services\AwsAppRunnerService;
 
 class AwsAppRunnerBackend implements CloudBackend
 {
+    use ResolvesMetricWindows;
+
     public function providerKey(): string
     {
         return 'aws_app_runner';
@@ -255,6 +257,84 @@ class AwsAppRunnerBackend implements CloudBackend
                 $serviceName,
             ),
         ];
+    }
+
+    /**
+     * App Runner publishes CPU / memory / request metrics to
+     * CloudWatch under the AWS/AppRunner namespace, not over the App
+     * Runner API. v1 does not fetch them through the CloudWatch SDK —
+     * deep CloudWatch integration is deferred — so this returns the
+     * structured unavailable state with a CloudWatch console deep
+     * link the operator can open instead.
+     */
+    public function metrics(Site $site, ProviderCredential $credential, string $window): array
+    {
+        $window = $this->normalizeWindow($window);
+
+        return [
+            'window' => $window,
+            'series' => ['cpu' => [], 'memory' => [], 'requests' => []],
+            'available' => false,
+            'note' => 'AWS App Runner publishes CPU, memory, and request metrics to CloudWatch '
+                .'under the AWS/AppRunner namespace. Open the CloudWatch console for live charts.',
+            'url' => $this->cloudWatchMetricsUrl($site),
+        ];
+    }
+
+    /**
+     * App Runner streams runtime (application) logs to CloudWatch
+     * Logs under /aws/apprunner/{service}/{revision}/application.
+     * v1 does not tail them through the CloudWatch Logs SDK — the
+     * operator opens the CloudWatch console via the returned link.
+     */
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array
+    {
+        $serviceName = $this->backendServiceName($site);
+
+        return [
+            'lines' => [],
+            'available' => false,
+            'url' => $this->cloudWatchLogsUrl($site),
+            'note' => sprintf(
+                'AWS App Runner streams runtime logs to CloudWatch under '
+                .'/aws/apprunner/%s/<revision>/application. Open the CloudWatch console for live tailing.',
+                $serviceName,
+            ),
+        ];
+    }
+
+    /**
+     * Deep link to the CloudWatch Logs console for the service's
+     * App Runner application log group. Region is best-effort —
+     * container_region is the App Runner region.
+     */
+    private function cloudWatchLogsUrl(Site $site): string
+    {
+        $region = $site->container_region ?: 'us-east-1';
+        $serviceName = $this->backendServiceName($site);
+        $logGroup = '/aws/apprunner/'.$serviceName.'/application';
+
+        return sprintf(
+            'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#logsV2:log-groups/log-group/%s',
+            rawurlencode($region),
+            rawurlencode($region),
+            rawurlencode($logGroup),
+        );
+    }
+
+    /**
+     * Deep link to the CloudWatch metrics console scoped to the
+     * AWS/AppRunner namespace for this service.
+     */
+    private function cloudWatchMetricsUrl(Site $site): string
+    {
+        $region = $site->container_region ?: 'us-east-1';
+
+        return sprintf(
+            'https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#metricsV2:graph=~();namespace=~AWS*2fAppRunner',
+            rawurlencode($region),
+            rawurlencode($region),
+        );
     }
 
     public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array

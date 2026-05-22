@@ -24,6 +24,8 @@ use Illuminate\Support\Str;
  */
 class FakeCloudBackend implements CloudBackend
 {
+    use ResolvesMetricWindows;
+
     public function __construct(public string $providerKey = 'fake_edge') {}
 
     public function providerKey(): string
@@ -144,6 +146,76 @@ class FakeCloudBackend implements CloudBackend
         }
 
         return $entries;
+    }
+
+    /**
+     * Deterministic synthetic metric series. CPU / memory follow a
+     * gentle sine wave seeded off the site id so the same site always
+     * renders the same shape (stable test oracle); restarts are a
+     * mostly-flat low integer series. ~60 points regardless of window.
+     */
+    public function metrics(Site $site, ProviderCredential $credential, string $window): array
+    {
+        $window = $this->normalizeWindow($window);
+        [$start, $end] = $this->windowBounds($window);
+        $points = 60;
+        $step = max(1, (int) (($end - $start) / $points));
+        $seed = crc32((string) $site->id);
+
+        $cpu = [];
+        $memory = [];
+        $restarts = [];
+        for ($i = 0; $i < $points; $i++) {
+            $t = $start + ($i * $step);
+            $phase = ($seed % 100) / 100;
+            $cpuVal = 30.0 + 25.0 * sin(($i / 9.0) + $phase) + (($seed >> ($i % 7)) % 7);
+            $memVal = 45.0 + 18.0 * sin(($i / 13.0) + $phase + 1.5) + (($seed >> ($i % 5)) % 5);
+            $cpu[] = ['t' => $t, 'v' => round(max(0.0, min(100.0, $cpuVal)), 2)];
+            $memory[] = ['t' => $t, 'v' => round(max(0.0, min(100.0, $memVal)), 2)];
+            // A restart roughly every ~20 points.
+            $restarts[] = ['t' => $t, 'v' => ($i > 0 && $i % 23 === (int) ($seed % 23)) ? 1.0 : 0.0];
+        }
+
+        return [
+            'window' => $window,
+            'series' => [
+                'cpu' => $cpu,
+                'memory' => $memory,
+                'restarts' => $restarts,
+            ],
+            'available' => true,
+        ];
+    }
+
+    /**
+     * Deterministic synthetic runtime log lines — a small repeating
+     * set of Laravel-shaped request lines so dev installs and tests
+     * see a populated RUN log viewer.
+     */
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array
+    {
+        $lines = max(1, min(2000, $lines));
+        $samples = [
+            '[info] Application started — listening on 0.0.0.0:8080',
+            'production.INFO: Queue worker booted',
+            '200 GET / — 14ms',
+            '200 GET /health — 2ms',
+            '302 POST /login — 41ms',
+            '200 GET /dashboard — 88ms',
+            'production.INFO: Scheduled task ran: cleanup:expired',
+            '404 GET /favicon.ico — 1ms',
+        ];
+
+        $out = [];
+        $count = min($lines, 40);
+        for ($i = 0; $i < $count; $i++) {
+            $out[] = '[fake-edge] '.$samples[$i % count($samples)];
+        }
+
+        return [
+            'lines' => $out,
+            'available' => true,
+        ];
     }
 
     private function syntheticLiveUrl(Site $site): string

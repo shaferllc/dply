@@ -47,8 +47,8 @@ class DigitalOceanAppPlatformService
      *
      * @param  array<string, string>  $envVars
      * @param  list<array<string, mixed>>  $workers  Optional `workers`
-     *   components (background processes — queue workers / scheduler)
-     *   to add to the spec alongside the web service.
+     *                                               components (background processes — queue workers / scheduler)
+     *                                               to add to the spec alongside the web service.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createApp(
@@ -113,8 +113,8 @@ class DigitalOceanAppPlatformService
      *
      * @param  array<string, string>  $envVars
      * @param  list<array<string, mixed>>  $workers  Optional `workers`
-     *   components (background processes — queue workers / scheduler)
-     *   to add to the spec alongside the web service.
+     *                                               components (background processes — queue workers / scheduler)
+     *                                               to add to the spec alongside the web service.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createAppFromSource(
@@ -220,6 +220,97 @@ class DigitalOceanAppPlatformService
             : (is_string($payload['live_url'] ?? null) ? (string) $payload['live_url'] : null);
 
         return ['deployment_id' => $deploymentId, 'url' => $url];
+    }
+
+    /**
+     * Fetch RUN (runtime) logs for the active deployment of an app.
+     *
+     * DO's active-deployment logs endpoint
+     * (/v2/apps/{app_id}/components/{component_name}/logs) returns
+     * `historic_urls` (archived log files) and/or a `live_url`
+     * (real-time stream). We surface whichever archive URL is set —
+     * the operator / dashboard fetches the actual text from it.
+     *
+     * type=RUN selects live runtime logs; type=RUN_RESTARTED would
+     * return crash logs. The component defaults to "web" — the name
+     * the dply provision flow always gives the web service.
+     *
+     * @return array{url: ?string, live_url: ?string}
+     */
+    public function getRuntimeLogs(string $appId, string $component = 'web'): array
+    {
+        $path = '/apps/'.$appId.'/components/'.rawurlencode($component).'/logs?type=RUN';
+        $response = $this->request('get', $path);
+        $this->assertSuccess($response, 'get runtime logs');
+        $payload = $response->json() ?? [];
+
+        $url = is_array($payload['historic_urls'] ?? null) && isset($payload['historic_urls'][0])
+            ? (string) $payload['historic_urls'][0]
+            : null;
+        $liveUrl = is_string($payload['live_url'] ?? null) ? (string) $payload['live_url'] : null;
+
+        return ['url' => $url, 'live_url' => $liveUrl];
+    }
+
+    /**
+     * Fetch an App Platform monitoring metric for an app over a
+     * UNIX-timestamp window. $metric is the DO metric path segment —
+     * one of: 'cpu_percentage', 'memory_percentage', 'restart_count'.
+     *
+     * The response is Prometheus-style: a `matrix` result where each
+     * series carries a `values` array of [unix-ts, "string-value"]
+     * pairs. We flatten the first series into {t, v} points; an empty
+     * or unexpected response degrades to an empty list.
+     *
+     * Docs: GET /v2/monitoring/metrics/apps/{metric}
+     *
+     * @return list<array{t: int, v: float}>
+     */
+    public function getAppMetric(string $appId, string $metric, int $start, int $end, string $component = 'web'): array
+    {
+        $query = http_build_query([
+            'app_id' => $appId,
+            'app_component' => $component,
+            'start' => (string) $start,
+            'end' => (string) $end,
+        ]);
+        $response = $this->request('get', '/monitoring/metrics/apps/'.$metric.'?'.$query);
+        $this->assertSuccess($response, 'get app metric '.$metric);
+
+        $payload = $response->json() ?? [];
+        $result = $payload['data']['result'] ?? null;
+        if (! is_array($result) || $result === []) {
+            return [];
+        }
+
+        // Prefer the series matching our component; fall back to the
+        // first series when no label match (single-component apps).
+        $series = null;
+        foreach ($result as $entry) {
+            if (is_array($entry) && (string) ($entry['metric']['app_component'] ?? '') === $component) {
+                $series = $entry;
+                break;
+            }
+        }
+        if ($series === null) {
+            $series = is_array($result[0] ?? null) ? $result[0] : null;
+        }
+        if (! is_array($series) || ! is_array($series['values'] ?? null)) {
+            return [];
+        }
+
+        $points = [];
+        foreach ($series['values'] as $pair) {
+            if (! is_array($pair) || count($pair) < 2) {
+                continue;
+            }
+            $points[] = [
+                't' => (int) $pair[0],
+                'v' => (float) $pair[1],
+            ];
+        }
+
+        return $points;
     }
 
     /**

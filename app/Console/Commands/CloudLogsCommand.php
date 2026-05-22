@@ -4,29 +4,36 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\ProviderCredential;
 use App\Models\Site;
+use App\Services\Cloud\CloudBackend;
 use App\Services\Cloud\CloudRouter;
 use Illuminate\Console\Command;
 
 /**
- * Fetch the latest deployment log link / content for an cloud site.
+ * Fetch logs for an cloud site — the latest deployment (BUILD/DEPLOY)
+ * logs by default, or runtime (RUN) logs with --run.
  *
- *   dply:cloud:logs <site>
+ *   dply:cloud:logs <site> [--run] [--lines=200]
  *
  * Backend behavior varies:
  *   - DigitalOcean App Platform returns a presigned URL the
- *     operator can curl / open in a browser.
+ *     operator can curl / open in a browser; --run fetches the RUN
+ *     log archive and prints the tail inline.
  *   - AWS App Runner streams logs to CloudWatch — we surface the
- *     LogGroup name so the operator can open the AWS console.
+ *     LogGroup name / console link so the operator can open the AWS
+ *     console.
  *   - FakeCloudBackend returns synthetic inline content for tests
  *     and dev installs.
  */
 class CloudLogsCommand extends Command
 {
     protected $signature = 'dply:cloud:logs
-        {site : Site ID, slug, or name}';
+        {site : Site ID, slug, or name}
+        {--run : Fetch runtime (RUN) logs instead of the latest deployment logs}
+        {--lines=200 : With --run, how many trailing log lines to print (1-2000)}';
 
-    protected $description = 'Fetch the latest deployment logs for an cloud site.';
+    protected $description = 'Fetch deployment or runtime logs for an cloud site.';
 
     public function handle(): int
     {
@@ -50,6 +57,10 @@ class CloudLogsCommand extends Command
             $this->error('No backend or credential resolvable for this site.');
 
             return self::FAILURE;
+        }
+
+        if ($this->option('run')) {
+            return $this->handleRuntimeLogs($site, $backend, $credential);
         }
 
         try {
@@ -80,6 +91,51 @@ class CloudLogsCommand extends Command
         }
 
         $this->line('<fg=gray>No logs returned by backend.</>');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Fetch and print RUN (runtime) logs — the --run path.
+     */
+    private function handleRuntimeLogs(Site $site, CloudBackend $backend, ProviderCredential $credential): int
+    {
+        $linesRaw = $this->option('lines');
+        $lines = is_string($linesRaw) && ctype_digit($linesRaw) ? (int) $linesRaw : 200;
+        $lines = max(1, min(2000, $lines));
+
+        try {
+            $result = $backend->runtimeLogs($site, $credential, $lines);
+        } catch (\Throwable $e) {
+            $this->error('Failed to fetch runtime logs: '.$e->getMessage());
+
+            return self::FAILURE;
+        }
+
+        $logLines = is_array($result['lines'] ?? null) ? $result['lines'] : [];
+        if ($logLines !== []) {
+            foreach ($logLines as $line) {
+                $this->line((string) $line);
+            }
+        }
+
+        if (! ($result['available'] ?? false)) {
+            if (is_string($result['note'] ?? null) && $result['note'] !== '') {
+                $this->line($result['note']);
+            }
+        } elseif ($logLines === []) {
+            if (is_string($result['note'] ?? null) && $result['note'] !== '') {
+                $this->line('<fg=gray>'.$result['note'].'</>');
+            } else {
+                $this->line('<fg=gray>No runtime log lines returned by backend.</>');
+            }
+        }
+
+        if (is_string($result['url'] ?? null) && $result['url'] !== '') {
+            $this->newLine();
+            $this->line('Runtime logs / console:');
+            $this->line($result['url']);
+        }
 
         return self::SUCCESS;
     }
