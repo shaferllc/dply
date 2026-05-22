@@ -357,6 +357,118 @@
         @endif
     </div>
 
+    {{-- Scaling & health — autoscaling rules + HTTP health checks --}}
+    @php
+        $supportsAutoscaling = $this->containerSupportsAutoscaling();
+        $isAppRunner = $site->container_backend === 'aws_app_runner';
+        $autoscalingNote = $containerMeta['autoscaling']['backend_note'] ?? null;
+    @endphp
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-4" wire:key="scaling-section">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Scaling & health') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('CPU-target autoscaling and an HTTP health check, pushed into the backend deployment spec.') }}</p>
+        </div>
+
+        @if (! $supportsAutoscaling)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p class="font-semibold">{{ __('Not available on this backend') }}</p>
+                <p class="mt-1">{{ __('This site\'s backend does not support autoscaling or health-check configuration.') }}</p>
+            </div>
+        @else
+            {{-- Autoscaling --}}
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" wire:model.live="container_autoscaling_enabled" class="rounded border-slate-300 text-sky-700 shadow-sm" />
+                    <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{{ __('Autoscaling') }}</span>
+                </label>
+                <p class="text-[11px] text-slate-500">{{ __('When on, the backend scales the web service between the min and max instance counts to hold the target CPU. The fixed instance count is superseded.') }}</p>
+
+                @if ($container_autoscaling_enabled)
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <div>
+                            <label for="container_autoscaling_min" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Min instances') }}</label>
+                            <input id="container_autoscaling_min" type="number" min="1" wire:model="container_autoscaling_min" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                        <div>
+                            <label for="container_autoscaling_max" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Max instances') }}</label>
+                            <input id="container_autoscaling_max" type="number" min="1" wire:model="container_autoscaling_max" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                        <div>
+                            <label for="container_autoscaling_cpu" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Target CPU %') }}</label>
+                            <input id="container_autoscaling_cpu" type="number" min="1" max="100" wire:model="container_autoscaling_cpu" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                    </div>
+                    <div class="rounded-md bg-sky-50 p-2 text-[11px] text-sky-900">
+                        {{ __('The manual instance count (currently :n) is superseded while autoscaling is on.', ['n' => (int) ($containerMeta['instance_count'] ?? 1)]) }}
+                    </div>
+                @else
+                    <p class="text-[11px] text-slate-500">{{ __('Autoscaling is off — the site runs a fixed :n instance(s).', ['n' => (int) ($containerMeta['instance_count'] ?? 1)]) }}</p>
+                @endif
+
+                @if ($isAppRunner)
+                    <p class="rounded-md bg-amber-50 p-2 text-[11px] text-amber-900">{{ __('On AWS App Runner, autoscaling uses a concurrency-driven AutoScalingConfiguration (min/max size). The CPU target is recorded as intent only.') }}</p>
+                    @if ($autoscalingNote)
+                        <p class="rounded-md bg-slate-100 p-2 text-[11px] text-slate-700 break-words">{{ $autoscalingNote }}</p>
+                    @endif
+                @endif
+
+                <button type="button" wire:click="saveContainerAutoscaling" wire:loading.attr="disabled" wire:target="saveContainerAutoscaling" class="inline-flex items-center justify-center rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-sky-800 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="saveContainerAutoscaling">{{ __('Save autoscaling') }}</span>
+                    <span wire:loading wire:target="saveContainerAutoscaling">{{ __('Saving…') }}</span>
+                </button>
+            </div>
+
+            {{-- Health check --}}
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" wire:model.live="container_health_check_enabled" class="rounded border-slate-300 text-sky-700 shadow-sm" />
+                    <span class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{{ __('HTTP health check') }}</span>
+                </label>
+                <p class="text-[11px] text-slate-500">{{ __('The backend probes this path and only routes traffic to instances that respond healthy.') }}</p>
+
+                @if ($container_health_check_enabled)
+                    <div>
+                        <label for="container_health_check_path" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('HTTP path') }}</label>
+                        <input id="container_health_check_path" type="text" wire:model="container_health_check_path" class="mt-1 block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="/health" />
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        <div>
+                            <label for="container_health_check_initial_delay" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Initial delay (s)') }}</label>
+                            <input id="container_health_check_initial_delay" type="number" min="0" wire:model="container_health_check_initial_delay" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                        <div>
+                            <label for="container_health_check_period" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Period (s)') }}</label>
+                            <input id="container_health_check_period" type="number" min="1" wire:model="container_health_check_period" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                        <div>
+                            <label for="container_health_check_timeout" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Timeout (s)') }}</label>
+                            <input id="container_health_check_timeout" type="number" min="1" wire:model="container_health_check_timeout" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                        <div>
+                            <label for="container_health_check_success" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Success threshold') }}</label>
+                            <input id="container_health_check_success" type="number" min="1" wire:model="container_health_check_success" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                        <div>
+                            <label for="container_health_check_failure" class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Failure threshold') }}</label>
+                            <input id="container_health_check_failure" type="number" min="1" wire:model="container_health_check_failure" class="mt-1 block w-full rounded-md border-slate-300 text-xs shadow-sm" />
+                        </div>
+                    </div>
+                @else
+                    <p class="text-[11px] text-slate-500">{{ __('Health check is off — the backend uses its default readiness behaviour.') }}</p>
+                @endif
+
+                @if ($isAppRunner)
+                    <p class="rounded-md bg-amber-50 p-2 text-[11px] text-amber-900">{{ __('On AWS App Runner the health check maps to the service HealthCheckConfiguration. App Runner has no "initial delay" — that field is ignored.') }}</p>
+                @endif
+
+                <button type="button" wire:click="saveContainerHealthCheck" wire:loading.attr="disabled" wire:target="saveContainerHealthCheck" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="saveContainerHealthCheck">{{ __('Save health check') }}</span>
+                    <span wire:loading wire:target="saveContainerHealthCheck">{{ __('Saving…') }}</span>
+                </button>
+            </div>
+        @endif
+    </div>
+
     @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))
         <div class="rounded-xl border border-slate-200 bg-white p-4">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('GitHub webhook') }}</p>

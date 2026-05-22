@@ -27,6 +27,13 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
         return true;
     }
 
+    public function supportsAutoscaling(): bool
+    {
+        // App Platform supports both an `autoscaling` block and a
+        // service `health_check` block first-class in the app spec.
+        return true;
+    }
+
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new DigitalOceanAppPlatformService($credential);
@@ -43,6 +50,8 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             instanceCount: $this->siteInstanceCount($site),
             instanceSizeSlug: $this->siteSizeSlugForDo($site),
             workers: $this->workerComponentsFor($site, $env, $buildEnv),
+            autoscaling: CloudScalingConfig::doAutoscalingBlock($site),
+            healthCheck: CloudScalingConfig::doHealthCheckBlock($site),
         );
 
         return [
@@ -71,6 +80,8 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             instanceCount: $this->siteInstanceCount($site),
             instanceSizeSlug: $this->siteSizeSlugForDo($site),
             workers: $this->workerComponentsFor($site, $env, $buildEnv, $source),
+            autoscaling: CloudScalingConfig::doAutoscalingBlock($site),
+            healthCheck: CloudScalingConfig::doHealthCheckBlock($site),
         );
 
         return [
@@ -130,8 +141,9 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
         [, $repository, $tag] = $service->parseImageRef($image);
         $spec['services'][0]['image']['repository'] = $repository;
         $spec['services'][0]['image']['tag'] = $tag;
-        // Re-emit the workers array so background components track the
-        // new image tag alongside the web service.
+        // Re-emit the autoscaling / health-check blocks and the workers
+        // array so an image bump never silently drops them.
+        $spec = $this->applyScalingToSpec($spec, $site);
         $spec = $this->applyWorkersToSpec($spec, $site);
         $service->updateApp($site->container_backend_id, $spec);
     }
@@ -160,14 +172,14 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
         $spec['services'][0]['envs'] = $envSpec;
-        // Re-push instance_count and size too — operators may have
-        // called dply:cloud:scale or dply:cloud:resize; pushing only
-        // envs would leave the spec out of sync with the Site.
-        $spec['services'][0]['instance_count'] = $this->siteInstanceCount($site);
+        // Re-push size too — operators may have called dply:cloud:resize;
+        // pushing only envs would leave the spec out of sync.
         $spec['services'][0]['instance_size_slug'] = $this->siteSizeSlugForDo($site);
-        // Re-emit the workers array from the site's current CloudWorker
-        // rows so an env-vars push never silently drops or staleness
-        // the background components.
+        // Re-emit the autoscaling / health-check blocks (this also
+        // restores the fixed instance_count when autoscaling is off)
+        // and the workers array so an env-vars push never silently
+        // drops or stales any of them.
+        $spec = $this->applyScalingToSpec($spec, $site);
         $spec = $this->applyWorkersToSpec($spec, $site);
         $service->updateApp($site->container_backend_id, $spec);
     }
@@ -199,9 +211,81 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             return;
         }
 
+        // Re-emit the autoscaling / health-check blocks alongside the
+        // workers so a worker sync never drops the scaling config.
+        $spec = $this->applyScalingToSpec($spec, $site);
         $spec = $this->applyWorkersToSpec($spec, $site);
         $service->updateApp($site->container_backend_id, $spec);
         $service->deployApp($site->container_backend_id, force: false);
+    }
+
+    /**
+     * Roll a deployment that re-pushes the site's autoscaling +
+     * health-check config (and, as a side effect, the worker spec)
+     * into the live app spec. Used by ConfigureCloudAutoscaling /
+     * ConfigureCloudHealthCheck via SyncCloudScalingJob.
+     *
+     * No-op when the site has not been provisioned on the backend yet.
+     */
+    public function syncScaling(Site $site, ProviderCredential $credential): void
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return;
+        }
+
+        $service = new DigitalOceanAppPlatformService($credential);
+        $current = $service->getApp($site->container_backend_id);
+        $spec = $current['spec'] ?? [];
+        if (! is_array($spec) || empty($spec['services'][0])) {
+            // Spec shape unexpected — fall back to a plain redeploy.
+            $service->deployApp($site->container_backend_id, force: false);
+
+            return;
+        }
+
+        $spec = $this->applyScalingToSpec($spec, $site);
+        $spec = $this->applyWorkersToSpec($spec, $site);
+        $service->updateApp($site->container_backend_id, $spec);
+        $service->deployApp($site->container_backend_id, force: false);
+    }
+
+    /**
+     * Weave the site's autoscaling + health-check config into the web
+     * service of an existing app spec.
+     *
+     * Autoscaling and a fixed `instance_count` are mutually exclusive
+     * on App Platform: when autoscaling is enabled this sets the
+     * `autoscaling` block and unsets `instance_count`; when disabled
+     * it removes any `autoscaling` block and restores the fixed
+     * `instance_count` from the site's meta. Health-check is set or
+     * removed independently.
+     *
+     * @param  array<string, mixed>  $spec
+     * @return array<string, mixed>
+     */
+    private function applyScalingToSpec(array $spec, Site $site): array
+    {
+        if (! is_array($spec['services'][0] ?? null)) {
+            return $spec;
+        }
+
+        $autoscaling = CloudScalingConfig::doAutoscalingBlock($site);
+        if ($autoscaling !== null) {
+            $spec['services'][0]['autoscaling'] = $autoscaling;
+            unset($spec['services'][0]['instance_count']);
+        } else {
+            unset($spec['services'][0]['autoscaling']);
+            $spec['services'][0]['instance_count'] = $this->siteInstanceCount($site);
+        }
+
+        $healthCheck = CloudScalingConfig::doHealthCheckBlock($site);
+        if ($healthCheck !== null) {
+            $spec['services'][0]['health_check'] = $healthCheck;
+        } else {
+            unset($spec['services'][0]['health_check']);
+        }
+
+        return $spec;
     }
 
     /**

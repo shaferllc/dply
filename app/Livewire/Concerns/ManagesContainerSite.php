@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Actions\Cloud\ConfigureCloudAutoscaling;
+use App\Actions\Cloud\ConfigureCloudHealthCheck;
 use App\Actions\Cloud\CreateCloudWorker;
 use App\Jobs\AttachCloudDatabaseJob;
 use App\Jobs\AttachCloudDomainJob;
@@ -15,6 +17,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Site;
 use App\Services\Cloud\CloudRouter;
+use App\Services\Cloud\CloudScalingConfig;
 use App\Services\Cloud\ResolvesMetricWindows;
 
 /**
@@ -44,6 +47,38 @@ trait ManagesContainerSite
     public string $container_worker_size_input = 'small';
 
     public int $container_worker_count_input = 1;
+
+    /* Scaling & health — autoscaling form inputs. */
+    public bool $container_autoscaling_enabled = false;
+
+    public int $container_autoscaling_min = CloudScalingConfig::DEFAULT_MIN_INSTANCES;
+
+    public int $container_autoscaling_max = CloudScalingConfig::DEFAULT_MAX_INSTANCES;
+
+    public int $container_autoscaling_cpu = CloudScalingConfig::DEFAULT_CPU_PERCENT;
+
+    /* Scaling & health — health-check form inputs. */
+    public bool $container_health_check_enabled = false;
+
+    public string $container_health_check_path = CloudScalingConfig::DEFAULT_HEALTH_PATH;
+
+    public int $container_health_check_initial_delay = CloudScalingConfig::DEFAULT_INITIAL_DELAY_SECONDS;
+
+    public int $container_health_check_period = CloudScalingConfig::DEFAULT_PERIOD_SECONDS;
+
+    public int $container_health_check_timeout = CloudScalingConfig::DEFAULT_TIMEOUT_SECONDS;
+
+    public int $container_health_check_success = CloudScalingConfig::DEFAULT_SUCCESS_THRESHOLD;
+
+    public int $container_health_check_failure = CloudScalingConfig::DEFAULT_FAILURE_THRESHOLD;
+
+    /**
+     * Guards the one-time hydration of the scaling & health-check
+     * form inputs. boot() runs on every Livewire request — without
+     * this flag the inputs would be reset from meta on every round
+     * trip, discarding the operator's unsaved edits.
+     */
+    public bool $container_scaling_inputs_hydrated = false;
 
     /**
      * Populated by fetchContainerLogs(); shape matches
@@ -91,6 +126,28 @@ trait ManagesContainerSite
         if ($this->container_build_env_file_input === '' && isset($this->site)) {
             $meta = is_array($this->site->meta) ? $this->site->meta : [];
             $this->container_build_env_file_input = (string) ($meta['container']['build_env_file_content'] ?? '');
+        }
+
+        // Hydrate the scaling & health-check form inputs from the
+        // site's current meta config so the dashboard reflects state.
+        // One-time only — boot() runs on every request, so re-running
+        // this would discard the operator's unsaved edits.
+        if (isset($this->site) && ! $this->container_scaling_inputs_hydrated) {
+            $this->container_scaling_inputs_hydrated = true;
+            $autoscaling = CloudScalingConfig::autoscaling($this->site);
+            $this->container_autoscaling_enabled = $autoscaling['enabled'];
+            $this->container_autoscaling_min = $autoscaling['min_instances'];
+            $this->container_autoscaling_max = $autoscaling['max_instances'];
+            $this->container_autoscaling_cpu = $autoscaling['cpu_percent'];
+
+            $healthCheck = CloudScalingConfig::healthCheck($this->site);
+            $this->container_health_check_enabled = $healthCheck['enabled'];
+            $this->container_health_check_path = $healthCheck['http_path'];
+            $this->container_health_check_initial_delay = $healthCheck['initial_delay_seconds'];
+            $this->container_health_check_period = $healthCheck['period_seconds'];
+            $this->container_health_check_timeout = $healthCheck['timeout_seconds'];
+            $this->container_health_check_success = $healthCheck['success_threshold'];
+            $this->container_health_check_failure = $healthCheck['failure_threshold'];
         }
     }
 
@@ -628,6 +685,91 @@ trait ManagesContainerSite
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Worker removed. The backend will drop the component on the next roll.'));
+        }
+    }
+
+    /* ========================================================================
+     * Scaling & health — autoscaling rules + HTTP health checks
+     * ======================================================================== */
+
+    /**
+     * Whether the site's container backend can apply autoscaling +
+     * health-check config. DigitalOcean App Platform and App Runner
+     * both can; the dashboard shows a degradation note for App Runner.
+     */
+    public function containerSupportsAutoscaling(): bool
+    {
+        $backend = CloudRouter::backendFor($this->site);
+
+        return $backend !== null && $backend->supportsAutoscaling();
+    }
+
+    /**
+     * Persist the autoscaling form inputs via ConfigureCloudAutoscaling
+     * and queue the backend spec sync.
+     */
+    public function saveContainerAutoscaling(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        try {
+            (new ConfigureCloudAutoscaling)->handle($this->site, [
+                'enabled' => $this->container_autoscaling_enabled,
+                'min_instances' => $this->container_autoscaling_min,
+                'max_instances' => $this->container_autoscaling_max,
+                'cpu_percent' => $this->container_autoscaling_cpu,
+            ]);
+        } catch (\Throwable $e) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError($e->getMessage());
+            }
+
+            return;
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess($this->container_autoscaling_enabled
+                ? __('Autoscaling saved. It supersedes the fixed instance count — a fresh roll is queued.')
+                : __('Autoscaling disabled. The site reverts to its fixed instance count — a fresh roll is queued.'));
+        }
+    }
+
+    /**
+     * Persist the health-check form inputs via ConfigureCloudHealthCheck
+     * and queue the backend spec sync.
+     */
+    public function saveContainerHealthCheck(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        try {
+            (new ConfigureCloudHealthCheck)->handle($this->site, [
+                'enabled' => $this->container_health_check_enabled,
+                'http_path' => $this->container_health_check_path,
+                'initial_delay_seconds' => $this->container_health_check_initial_delay,
+                'period_seconds' => $this->container_health_check_period,
+                'timeout_seconds' => $this->container_health_check_timeout,
+                'success_threshold' => $this->container_health_check_success,
+                'failure_threshold' => $this->container_health_check_failure,
+            ]);
+        } catch (\Throwable $e) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError($e->getMessage());
+            }
+
+            return;
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess($this->container_health_check_enabled
+                ? __('Health check saved. The backend spec is being updated and a fresh roll queued.')
+                : __('Health check disabled. The backend will drop it on the next roll.'));
         }
     }
 }

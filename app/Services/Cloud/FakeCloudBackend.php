@@ -47,6 +47,20 @@ class FakeCloudBackend implements CloudBackend
         // no real backend spec to push in fake mode.
     }
 
+    public function supportsAutoscaling(): bool
+    {
+        // Mirrors DigitalOcean App Platform — the autoscaling +
+        // health-check capable v1 backend — so dev installs / the
+        // test suite can click through the flow end to end.
+        return true;
+    }
+
+    public function syncScaling(Site $site, ProviderCredential $credential): void
+    {
+        // No-op — autoscaling / health-check config lives on the Site
+        // model's meta in fake mode; there's no real spec to push.
+    }
+
     public function provision(Site $site, ProviderCredential $credential): array
     {
         return [

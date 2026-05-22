@@ -239,6 +239,64 @@ class AwsAppRunnerService
     }
 
     /**
+     * Update the App Runner service's HealthCheckConfiguration. App
+     * Runner supports an HTTP or TCP health check first-class on the
+     * service — Protocol HTTP needs a Path; TCP omits it.
+     *
+     * App Runner field names differ from DO: Interval / Timeout /
+     * HealthyThreshold / UnhealthyThreshold (seconds + counts). There
+     * is no "initial delay" equivalent — App Runner waits for the
+     * first healthy response before routing traffic.
+     *
+     * @param  array{http_path: string, period_seconds: int, timeout_seconds: int, success_threshold: int, failure_threshold: int}  $config
+     */
+    public function updateHealthCheck(string $serviceArn, array $config): void
+    {
+        $this->client->updateService([
+            'ServiceArn' => $serviceArn,
+            'HealthCheckConfiguration' => [
+                'Protocol' => 'HTTP',
+                'Path' => $config['http_path'],
+                'Interval' => max(1, $config['period_seconds']),
+                'Timeout' => max(1, $config['timeout_seconds']),
+                'HealthyThreshold' => max(1, $config['success_threshold']),
+                'UnhealthyThreshold' => max(1, $config['failure_threshold']),
+            ],
+        ]);
+    }
+
+    /**
+     * Create an App Runner AutoScalingConfiguration (min/max service
+     * instances) and associate it with the service via updateService.
+     *
+     * App Runner autoscaling is concurrency-driven (MaxConcurrency),
+     * not CPU-target like DigitalOcean — dply's cpu_percent intent is
+     * recorded in meta but not mapped to App Runner. What App Runner
+     * does take is MinSize / MaxSize, which we set from the dply
+     * min/max instance config.
+     *
+     * Returns the created AutoScalingConfigurationArn.
+     */
+    public function applyAutoScaling(string $serviceArn, string $configName, int $minSize, int $maxSize): string
+    {
+        $result = $this->client->createAutoScalingConfiguration([
+            'AutoScalingConfigurationName' => $configName,
+            'MinSize' => max(1, $minSize),
+            'MaxSize' => max(max(1, $minSize), $maxSize),
+        ]);
+        $arn = (string) ($result['AutoScalingConfiguration']['AutoScalingConfigurationArn'] ?? '');
+
+        if ($arn !== '') {
+            $this->client->updateService([
+                'ServiceArn' => $serviceArn,
+                'AutoScalingConfigurationArn' => $arn,
+            ]);
+        }
+
+        return $arn;
+    }
+
+    /**
      * Push new env vars to a CODE_REPOSITORY-mode service without
      * changing the source repo / branch / Dockerfile path. Used by
      * the source-mode env editor.

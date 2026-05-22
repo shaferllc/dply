@@ -183,6 +183,35 @@ interface CloudBackend
     public function supportsWorkers(): bool;
 
     /**
+     * Whether the backend can apply dply's autoscaling rules (CPU-target
+     * based min/max instance counts) and HTTP health-check configuration.
+     *
+     * DigitalOcean App Platform supports both first-class in its app
+     * spec (`autoscaling` + `health_check` blocks), so it returns true.
+     * AWS App Runner has native AutoScalingConfiguration + a
+     * HealthCheckConfiguration on the service, so it returns true too —
+     * see syncScaling() for the degradation note. The Fake backend
+     * mirrors DO and returns true so dev installs / tests can exercise
+     * the flow end to end.
+     */
+    public function supportsAutoscaling(): bool;
+
+    /**
+     * Push the site's autoscaling + health-check configuration
+     * (meta.container.autoscaling / meta.container.health_check) into
+     * the backend's deployment spec and roll a new deployment so the
+     * change takes effect.
+     *
+     * Rebuilt from the site's current config each call — idempotent.
+     * No-op when the site has no backend deployment yet (the config
+     * lands via the next provision instead).
+     *
+     * Backends that cannot apply autoscaling MUST throw a clear
+     * exception — see supportsAutoscaling().
+     */
+    public function syncScaling(Site $site, ProviderCredential $credential): void;
+
+    /**
      * Push the site's CloudWorker rows into the backend's deployment
      * spec — one background component per worker, built from the same
      * source/image as the web service — and roll a new deployment so

@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Jobs\RedeployCloudSiteJob;
 use App\Models\Site;
 use App\Services\Cloud\CloudRouter;
+use App\Services\Cloud\CloudScalingConfig;
 use Illuminate\Console\Command;
 
 /**
@@ -67,6 +68,16 @@ class CloudScaleCommand extends Command
             'instance_count' => $instances,
         ]);
         $site->update(['meta' => $meta]);
+
+        // A fixed instance count and autoscaling are mutually
+        // exclusive — warn that autoscaling will keep winning.
+        if (CloudScalingConfig::autoscalingEnabled($site->fresh())) {
+            $this->warn(
+                'Autoscaling is enabled for this site — it supersedes a fixed instance count. '
+                .'The value is recorded but will not take effect until autoscaling is disabled '
+                .'(dply:cloud:autoscale --site='.$site->name.' --off).',
+            );
+        }
 
         $backend = CloudRouter::backendFor($site->fresh());
         $credential = CloudRouter::credentialFor($site->fresh());

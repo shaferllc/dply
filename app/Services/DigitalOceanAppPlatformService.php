@@ -45,10 +45,17 @@ class DigitalOceanAppPlatformService
      * spec (autoscaling, multiple components, env-from-secret) can
      * patch the app after creation via updateApp().
      *
+     * When $autoscaling is non-null the web service emits an
+     * `autoscaling` block and OMITS the fixed `instance_count` — the
+     * two are mutually exclusive on App Platform. $healthCheck, when
+     * non-null, adds a `health_check` block to the web service.
+     *
      * @param  array<string, string>  $envVars
      * @param  list<array<string, mixed>>  $workers  Optional `workers`
      *                                               components (background processes — queue workers / scheduler)
      *                                               to add to the spec alongside the web service.
+     * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block.
+     * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createApp(
@@ -61,6 +68,8 @@ class DigitalOceanAppPlatformService
         int $instanceCount = 1,
         string $instanceSizeSlug = 'basic-xxs',
         array $workers = [],
+        ?array $autoscaling = null,
+        ?array $healthCheck = null,
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -72,21 +81,32 @@ class DigitalOceanAppPlatformService
 
         [, $repository, $tag] = $this->parseImageRef($image);
 
+        $service = [
+            'name' => 'web',
+            'image' => [
+                'registry_type' => 'DOCKER_HUB',
+                'repository' => $repository,
+                'tag' => $tag,
+            ],
+            'http_port' => $port,
+            'instance_size_slug' => $instanceSizeSlug,
+            'envs' => $envSpec,
+        ];
+        // Autoscaling and a fixed instance_count are mutually
+        // exclusive on App Platform — emit exactly one.
+        if ($autoscaling !== null) {
+            $service['autoscaling'] = $autoscaling;
+        } else {
+            $service['instance_count'] = max(1, $instanceCount);
+        }
+        if ($healthCheck !== null) {
+            $service['health_check'] = $healthCheck;
+        }
+
         $spec = [
             'name' => $appName,
             'region' => $region,
-            'services' => [[
-                'name' => 'web',
-                'image' => [
-                    'registry_type' => 'DOCKER_HUB',
-                    'repository' => $repository,
-                    'tag' => $tag,
-                ],
-                'http_port' => $port,
-                'instance_count' => max(1, $instanceCount),
-                'instance_size_slug' => $instanceSizeSlug,
-                'envs' => $envSpec,
-            ]],
+            'services' => [$service],
         ];
         if ($workers !== []) {
             $spec['workers'] = array_values($workers);
@@ -115,6 +135,8 @@ class DigitalOceanAppPlatformService
      * @param  list<array<string, mixed>>  $workers  Optional `workers`
      *                                               components (background processes — queue workers / scheduler)
      *                                               to add to the spec alongside the web service.
+     * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block (omits fixed instance_count).
+     * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createAppFromSource(
@@ -130,6 +152,8 @@ class DigitalOceanAppPlatformService
         int $instanceCount = 1,
         string $instanceSizeSlug = 'basic-xxs',
         array $workers = [],
+        ?array $autoscaling = null,
+        ?array $healthCheck = null,
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -147,10 +171,19 @@ class DigitalOceanAppPlatformService
                 'deploy_on_push' => $deployOnPush,
             ],
             'http_port' => $port,
-            'instance_count' => max(1, $instanceCount),
             'instance_size_slug' => $instanceSizeSlug,
             'envs' => $envSpec,
         ];
+        // Autoscaling and a fixed instance_count are mutually
+        // exclusive on App Platform — emit exactly one.
+        if ($autoscaling !== null) {
+            $service['autoscaling'] = $autoscaling;
+        } else {
+            $service['instance_count'] = max(1, $instanceCount);
+        }
+        if ($healthCheck !== null) {
+            $service['health_check'] = $healthCheck;
+        }
 
         if (is_string($dockerfilePath) && $dockerfilePath !== '') {
             $service['dockerfile_path'] = $dockerfilePath;

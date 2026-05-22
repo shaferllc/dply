@@ -35,6 +35,109 @@ class AwsAppRunnerBackend implements CloudBackend
         );
     }
 
+    public function supportsAutoscaling(): bool
+    {
+        // App Runner has a native HealthCheckConfiguration on the
+        // service, and an AutoScalingConfiguration resource for
+        // min/max instances. We apply both — see syncScaling() for
+        // the graceful-degradation note on autoscaling.
+        return true;
+    }
+
+    /**
+     * Push the site's autoscaling + health-check config to App Runner.
+     *
+     * Health check: applied directly via the service's native
+     * HealthCheckConfiguration (HTTP path + interval / timeout /
+     * thresholds).
+     *
+     * Autoscaling: App Runner uses an AutoScalingConfiguration
+     * resource (MinSize / MaxSize) associated with the service. We
+     * create one and associate it best-effort. App Runner autoscaling
+     * is concurrency-driven, not CPU-target, so dply's cpu_percent is
+     * recorded as intent but not mapped. If the AutoScalingConfiguration
+     * lifecycle fails (quota, permissions, an in-progress operation),
+     * we degrade gracefully: the config stays on the site's meta and a
+     * note is recorded in meta.container.autoscaling.backend_note
+     * rather than leaving the service half-configured.
+     *
+     * No-op when the site has no backend service yet — the config
+     * lands via the next provision instead.
+     */
+    public function syncScaling(Site $site, ProviderCredential $credential): void
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return;
+        }
+
+        $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
+
+        // Health check — straightforward, applied directly.
+        $hc = CloudScalingConfig::healthCheck($site);
+        if ($hc['enabled']) {
+            $service->updateHealthCheck($site->container_backend_id, [
+                'http_path' => $hc['http_path'],
+                'period_seconds' => $hc['period_seconds'],
+                'timeout_seconds' => $hc['timeout_seconds'],
+                'success_threshold' => $hc['success_threshold'],
+                'failure_threshold' => $hc['failure_threshold'],
+            ]);
+        }
+
+        // Autoscaling — best-effort. Degrade gracefully on any failure.
+        $autoscaling = CloudScalingConfig::autoscaling($site);
+        $note = null;
+        if ($autoscaling['enabled']) {
+            try {
+                $configName = $this->autoScalingConfigName($site);
+                $arn = $service->applyAutoScaling(
+                    $site->container_backend_id,
+                    $configName,
+                    $autoscaling['min_instances'],
+                    $autoscaling['max_instances'],
+                );
+                $note = $arn !== ''
+                    ? sprintf(
+                        'Applied App Runner AutoScalingConfiguration %s (MinSize %d, MaxSize %d). '
+                        .'Note: App Runner autoscaling is concurrency-driven — the %d%% CPU target is recorded as intent only.',
+                        $arn,
+                        $autoscaling['min_instances'],
+                        $autoscaling['max_instances'],
+                        $autoscaling['cpu_percent'],
+                    )
+                    : 'App Runner did not return an AutoScalingConfiguration ARN — config recorded as intent only.';
+            } catch (\Throwable $e) {
+                $note = 'Could not apply App Runner AutoScalingConfiguration: '.$e->getMessage()
+                    .' — config recorded on the site as intent; apply it in the App Runner console.';
+            }
+        }
+
+        // Record the outcome note on the site's meta so the dashboard
+        // / CLI can surface what actually happened on App Runner.
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
+        $as = is_array($container['autoscaling'] ?? null) ? $container['autoscaling'] : [];
+        if ($note === null) {
+            unset($as['backend_note']);
+        } else {
+            $as['backend_note'] = $note;
+        }
+        $container['autoscaling'] = $as;
+        $meta['container'] = $container;
+        $site->update(['meta' => $meta]);
+    }
+
+    /**
+     * A short, AWS-safe AutoScalingConfiguration name for the site.
+     * App Runner names are alnum + hyphen + underscore, ≤ 32 chars.
+     */
+    private function autoScalingConfigName(Site $site): string
+    {
+        $base = $this->backendServiceName($site);
+
+        return substr('dply-'.$base, 0, 32);
+    }
+
     public function provision(Site $site, ProviderCredential $credential): array
     {
         $service = new AwsAppRunnerService($credential, $site->container_region ?: null);
