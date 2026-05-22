@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CliSearchCommandTest;
+
 use Illuminate\Support\Facades\Artisan;
+
 test('finds commands by name keyword', function () {
     Artisan::call('dply:cli-search', [
         'keyword' => 'env',

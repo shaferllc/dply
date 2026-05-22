@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Serverless\ServerlessFunctionDnsProvisionerTest;
+
 use App\Models\Site;
 use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config([

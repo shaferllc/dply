@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Billing\StandardSubscribeTest;
+
 use App\Livewire\Billing\Show as BillingShow;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->admin = User::factory()->create();
@@ -86,7 +87,7 @@ test('switch interval rejects when no subscription', function () {
 });
 
 test('switch interval rejects when target prices unconfigured', function () {
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_test_base_monthly')
         ->active()
         ->create(['organization_id' => $this->org->id]);
@@ -112,7 +113,7 @@ test('cancel rejects when no active subscription', function () {
 });
 
 test('cancel rejects when already canceled', function () {
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_test_base_monthly')
         ->create([
             'organization_id' => $this->org->id,
@@ -130,7 +131,7 @@ test('cancel rejects when already canceled', function () {
 });
 
 test('resume rejects when not in grace period', function () {
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_test_base_monthly')
         ->active()
         ->create(['organization_id' => $this->org->id]);

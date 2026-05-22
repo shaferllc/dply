@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\FunctionInvokerTest;
+
 use App\Models\FunctionInvocation;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Serverless\FunctionInvoker;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function functionSite(bool $provisioned = true): Site
 {

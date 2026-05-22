@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteRoutingAliasesTest;
+
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomainAlias;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('add alias with comment', function () {
     Bus::fake();

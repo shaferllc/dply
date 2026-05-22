@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StandardSubscriptionCreator;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Laravel\Cashier\Invoice;
@@ -284,7 +285,7 @@ class Show extends Component
         return $this->subscription?->onGracePeriod() ?? false;
     }
 
-    public function getSubscriptionEndsAtProperty(): ?\Carbon\CarbonInterface
+    public function getSubscriptionEndsAtProperty(): ?CarbonInterface
     {
         return $this->subscription?->ends_at;
     }
@@ -357,8 +358,7 @@ class Show extends Component
             ->map(function (Server $server) use ($cutoff, $minAge): array {
                 $reason = match (true) {
                     $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
-                    $server->created_at !== null && $server->created_at->gt($cutoff)
-                        => __('Under the :days-day billable threshold', ['days' => $minAge]),
+                    $server->created_at !== null && $server->created_at->gt($cutoff) => __('Under the :days-day billable threshold', ['days' => $minAge]),
                     default => __('Excluded'),
                 };
 
@@ -428,7 +428,7 @@ class Show extends Component
         return 'month';
     }
 
-    public function getNextInvoiceAtProperty(): ?\Carbon\CarbonInterface
+    public function getNextInvoiceAtProperty(): ?CarbonInterface
     {
         $sub = $this->subscription;
         if (! $sub) {

@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDoctorCommandTest;
+
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('json report contains runtime database processes envcounts', function () {
     $server = Server::factory()->create();

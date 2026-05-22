@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\PruneServerCreateDraftsCommandTest;
+
 use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('prunes only expired drafts', function () {
     $expired = makeDraft(now()->subDay(), 'old draft');

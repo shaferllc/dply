@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiMigrationKickoffTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
+use App\Livewire\Servers\Create\StepReview;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\PloiServer;
@@ -12,8 +14,10 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('store creates import migration when draft carries ploi source', function () {
     Bus::fake();
@@ -91,7 +95,7 @@ test('store creates import migration when draft carries ploi source', function (
     // a custom assertion harness. We bypass the full Livewire store() pipeline
     // (preflight validation, real provisioning) because that's not what's under
     // test here — only the migration-planning side effect of a successful create.
-    $stepReview = $this->app->make(\App\Livewire\Servers\Create\StepReview::class);
+    $stepReview = $this->app->make(StepReview::class);
 
     // The kickoff helper is protected; invoke via Reflection. (StepReview's
     // public store() requires a full preflight + actual server provisioning;
@@ -155,7 +159,7 @@ test('store skips migration when no eligible sites remain', function () {
         'source_snapshot' => null,
     ]);
 
-    $stepReview = $this->app->make(\App\Livewire\Servers\Create\StepReview::class);
+    $stepReview = $this->app->make(StepReview::class);
     $target = Server::factory()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,

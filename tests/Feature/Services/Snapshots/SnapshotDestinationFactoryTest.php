@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Snapshots\SnapshotDestinationFactoryTest;
-use Mockery;
 
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\S3Destination;
 use App\Services\Snapshots\SnapshotDestinationFactory;
+use Mockery;
+
 afterEach(function () {
     Mockery::close();
 });

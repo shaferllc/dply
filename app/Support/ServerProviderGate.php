@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use Laravel\Pennant\Feature;
+
 /**
  * Whether a provider is exposed in UI and accepted for new credentials / server create.
  */
@@ -77,7 +79,7 @@ final class ServerProviderGate
             return true;
         }
 
-        return \Laravel\Pennant\Feature::active($flag);
+        return Feature::active($flag);
     }
 
     /**

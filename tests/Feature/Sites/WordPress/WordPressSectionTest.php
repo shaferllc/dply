@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\WordPress\WordPressSectionTest;
-use Mockery;
 
 use App\Enums\SiteType;
 use App\Livewire\Sites\WordPress\WordPressSection;
@@ -18,8 +17,11 @@ use App\Services\RemoteCli\Kind;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

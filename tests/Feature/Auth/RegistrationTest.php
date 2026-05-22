@@ -1,15 +1,17 @@
 <?php
 
-
 namespace Tests\Feature\Auth\RegistrationTest;
+
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Auth\Register;
 use App\Models\Organization;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 test('registration screen can be rendered', function () {
     // Bypass RedirectGuestsToComingSoon — non-local environments

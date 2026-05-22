@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\WorkspaceMonitorTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
@@ -9,9 +9,10 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Services\Servers\ServerMetricsGuestScript;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

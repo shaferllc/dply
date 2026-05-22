@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\WorkspaceInsightsDetailModalTest;
+
 use App\Jobs\ApplyInsightFixJob;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Models\InsightFinding;
@@ -12,11 +13,14 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Insights\Contracts\InsightFixActionInterface;
 use App\Services\Insights\FixResult;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 /**
  * @return array{0: User, 1: Server, 2: Organization}
@@ -207,12 +211,12 @@ test('correlation pivot loads a sibling finding', function () {
  */
 class StubFixHandler implements InsightFixActionInterface
 {
-    function preflight(Server $server, ?Site $site, InsightFinding $finding, array $params): ?string
+    public function preflight(Server $server, ?Site $site, InsightFinding $finding, array $params): ?string
     {
         return null;
     }
 
-    function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
+    public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult
     {
         return FixResult::success('stub-applied');
     }

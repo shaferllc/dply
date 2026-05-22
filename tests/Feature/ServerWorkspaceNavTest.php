@@ -1,17 +1,19 @@
 <?php
 
-
 namespace Tests\Feature\ServerWorkspaceNavTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 test('nav shows all items when stack summary is missing', function () {
     $server = serverWithoutProvisionArtifact();

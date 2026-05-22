@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\ProvisionStepDurationsTest;
+
 use App\Support\Servers\ProvisionStepDurations;
 use App\Support\Servers\ProvisionStepSnapshots;
+
 test('returns empty when no end markers present', function () {
     $output = "Some unrelated output\n[dply-step] Installing MySQL\nrandom log\n";
 

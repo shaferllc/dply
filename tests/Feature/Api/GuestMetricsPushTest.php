@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\Api\GuestMetricsPushTest;
+
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('guest push stores snapshot with valid token', function () {
     config([

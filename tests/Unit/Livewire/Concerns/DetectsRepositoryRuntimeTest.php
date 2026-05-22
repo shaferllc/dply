@@ -3,21 +3,22 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Livewire\Concerns\DetectsRepositoryRuntimeTest;
+
+use App\Livewire\Concerns\DetectsRepositoryRuntime;
+
 function subject(): object
 {
     return new class
     {
-        use \App\Livewire\Concerns\DetectsRepositoryRuntime;
+        use DetectsRepositoryRuntime;
 
-        function applyDetectedRuntimePrefills(): void
-        {
-        }
+        public function applyDetectedRuntimePrefills(): void {}
 
         /**
          * @param  array<string, mixed>  $detection
          * @return array<string, mixed>
          */
-        function exposeServerlessDetectionToArray(array $detection, string $url, string $branch): array
+        public function exposeServerlessDetectionToArray(array $detection, string $url, string $branch): array
         {
             return $this->serverlessDetectionToArray($detection, $url, $branch);
         }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Events\Servers\ServerSystemdActionCompletedBroadcast;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\NotificationSubscription;
@@ -127,8 +128,7 @@ trait ManagesServerSystemdServices
             $kind === 'bulk-restart' => $this->bulkSystemdRestart(),
             $kind === 'bulk-stop' => $this->bulkSystemdStop(),
             $kind === 'remove-custom' && $unit !== '' => $this->removeCustomSystemdUnit($unit),
-            in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable'], true) && $unit !== ''
-                => $this->runSystemdServiceAction($unit, $kind),
+            in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable'], true) && $unit !== '' => $this->runSystemdServiceAction($unit, $kind),
             default => null,
         };
     }
@@ -806,8 +806,8 @@ trait ManagesServerSystemdServices
      * Queue SSH inventory; workers persist to the database.
      *
      * @param  bool  $silent  When true (auto-refresh on load), skip the toast and the banner; the
-     *                       page already shows the cached inventory and we don't want to surprise
-     *                       the operator with a banner they didn't trigger.
+     *                        page already shows the cached inventory and we don't want to surprise
+     *                        the operator with a banner they didn't trigger.
      */
     protected function queueSystemdInventorySync(bool $silent): void
     {
@@ -881,7 +881,7 @@ trait ManagesServerSystemdServices
         SyncServerSystemdServicesJob::dispatch(
             $this->server->id,
             $id,
-            \App\Events\Servers\ServerSystemdActionCompletedBroadcast::class,
+            ServerSystemdActionCompletedBroadcast::class,
         );
 
         $this->js('window.__dplySystemdActionActiveId = '.json_encode($id).';');
@@ -1597,7 +1597,7 @@ trait ManagesServerSystemdServices
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
             null,
-            \App\Events\Servers\ServerSystemdActionCompletedBroadcast::class,
+            ServerSystemdActionCompletedBroadcast::class,
         );
 
         $this->systemdRemoteTaskId = $id;

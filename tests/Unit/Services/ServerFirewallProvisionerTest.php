@@ -1,12 +1,10 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerFirewallProvisionerTest;
+
 use App\Models\Server;
 use App\Models\ServerFirewallRule;
 use App\Services\Servers\ServerFirewallProvisioner;
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Test;
 
 test('ufw rule fragment allow any tcp', function () {
     $p = new ServerFirewallProvisioner;

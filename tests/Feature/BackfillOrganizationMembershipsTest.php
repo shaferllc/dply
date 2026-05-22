@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\BackfillOrganizationMembershipsTest;
+
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('command creates a workspace for users without an organization', function () {
     $user = User::factory()->create([

@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\DeployPhaseRunnerTest;
+
 use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Deploy\DeployPhaseRunner;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('run build walks build steps in order and executes in release dir', function () {
     [$site] = makeSite(['runtime' => 'php']);
@@ -264,7 +267,7 @@ function makeSite(array $overrides = []): array
 }
 class DeployRecordingShell implements RemoteShell
 {
-    function exec(string $command, int $timeoutSeconds = 120): string
+    public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;
         if ($this->failOn !== null && str_contains($command, $this->failOn)) {
@@ -274,7 +277,5 @@ class DeployRecordingShell implements RemoteShell
         return '';
     }
 
-    function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-    }
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
 }

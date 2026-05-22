@@ -14,7 +14,7 @@ class ServerAuthorizedKeysDiffPreview
      * to stream raw bash since the read result is already rendered as the diff itself; what's
      * useful here is the high-level "what user did we just read" trail.
      *
-     * @var (callable(string $type, string $line): void)|null
+     * @var (callable(string, string): void)|null
      */
     protected $outputCallback = null;
 

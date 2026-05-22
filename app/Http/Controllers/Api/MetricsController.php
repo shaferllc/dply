@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\InsightFinding;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricIngestEvent;
 use App\Services\Servers\ScheduleHeartbeatIngest;
@@ -51,7 +52,7 @@ class MetricsController extends Controller
             'metrics' => ['required', 'array'],
         ]);
 
-        $organization = \App\Models\Organization::query()->whereKey($data['organization_id'])->first();
+        $organization = Organization::query()->whereKey($data['organization_id'])->first();
         if ($organization !== null && ! $organization->acceptsMetrics()) {
             return response()->json([
                 'message' => 'Organization is paused. Add a payment method to resume metrics ingest.',

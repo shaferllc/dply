@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiMigrationWizardTest;
+
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Models\Organization;
 use App\Models\PloiServer;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

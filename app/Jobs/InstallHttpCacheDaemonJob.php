@@ -8,6 +8,7 @@ use App\Models\ServerCacheService;
 use App\Models\ServerCacheServiceAuditEvent;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Servers\CacheServiceInstallScripts;
 use App\Support\Servers\HttpCacheDaemonInstallScripts;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -88,7 +89,7 @@ class InstallHttpCacheDaemonJob implements ShouldQueue
                 );
             }
 
-            $version = \App\Support\Servers\CacheServiceInstallScripts::parseVersionFromBuffer($output->buffer);
+            $version = CacheServiceInstallScripts::parseVersionFromBuffer($output->buffer);
 
             $row->update([
                 'status' => ServerCacheService::STATUS_RUNNING,

@@ -1,11 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\Components\TrialPauseBannerTest;
-use App\Models\Organization;
-use Illuminate\Support\Facades\Blade;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Models\Organization;
+use App\Models\Subscription;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+
+uses(RefreshDatabase::class);
 
 function render(Organization $org): string
 {
@@ -60,7 +62,7 @@ test('expired soft still renders pause banner', function () {
 
 test('expired soft after cancellation says subscription ended', function () {
     $org = Organization::factory()->create(['trial_ends_at' => null]);
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_x')
         ->create([
             'organization_id' => $org->id,
@@ -76,9 +78,9 @@ test('expired soft after cancellation says subscription ended', function () {
 });
 
 test('subscribed org shows no banner', function () {
-    \Illuminate\Support\Facades\Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
+    Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
     $org = Organization::factory()->create(['trial_ends_at' => null]);
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_sub_base')
         ->active()
         ->create(['organization_id' => $org->id]);
@@ -91,9 +93,9 @@ test('subscribed org shows no banner', function () {
 });
 
 test('grace period shows resume banner with end date', function () {
-    \Illuminate\Support\Facades\Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
+    Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
     $org = Organization::factory()->create(['trial_ends_at' => null]);
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_sub_base')
         ->create([
             'organization_id' => $org->id,

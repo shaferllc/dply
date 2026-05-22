@@ -77,7 +77,7 @@ class CloneRepoHandler extends SshDependentHandler
         $verify = $shell->exec('sudo -u '.escapeshellarg($sshUser).' git -C '.escapeshellarg($siteRoot).' rev-parse HEAD 2>&1');
         $head = trim($verify);
         if (! preg_match('/^[0-9a-f]{40}$/', $head)) {
-            throw new RuntimeException("git clone failed: ".mb_substr($output, 0, 1000));
+            throw new RuntimeException('git clone failed: '.mb_substr($output, 0, 1000));
         }
 
         $step->result_data = [

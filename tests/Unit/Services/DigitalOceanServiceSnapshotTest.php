@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceSnapshotTest;
+
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
+
 test('power off droplet returns action payload', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/droplets/42/actions' => Http::response([

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\CutoverHandlersTest;
-use \App\Services\Imports\Handlers\CutoverSmokeTestHandler;
+
 use App\Jobs\IssueSiteSslJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
@@ -16,14 +16,17 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Imports\Handlers\CutoverDbDeltaHandler;
 use App\Services\Imports\Handlers\CutoverMaintenanceOnHandler;
+use App\Services\Imports\Handlers\CutoverSmokeTestHandler;
 use App\Services\Imports\Handlers\CutoverWebhookSwapHandler;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\Imports\FakeSourceSshConnectionFactory;
 use Tests\Support\Imports\FakeSshConnectionFactory;
 use Tests\Support\Imports\RecordingShell;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: ImportSiteMigration, 2: ImportServerMigration, 3: Site, 4: Server}
  */
@@ -100,7 +103,7 @@ test('maintenance on enables via api and transitions status', function () {
     ]);
     [$step, $child, $migration] = seedFixture(ImportMigrationStep::KEY_CUTOVER_MAINTENANCE_ON);
 
-    (new CutoverMaintenanceOnHandler())->execute($step);
+    (new CutoverMaintenanceOnHandler)->execute($step);
 
     expect($child->fresh()->status)->toBe(ImportSiteMigration::STATUS_CUTOVER_IN_PROGRESS);
     expect($child->fresh()->cutover_started_at)->not->toBeNull();
@@ -115,7 +118,7 @@ test('db delta redumps and restores via both shells', function () {
             'data' => [['id' => 7, 'name' => 'acme_prod', 'user' => 'acme']],
         ], 200),
     ]);
-    $ploi = new RecordingShell();
+    $ploi = new RecordingShell;
     $ploi->responses[] = '';
     // mysqldump
     $ploi->responses[] = base64_encode($dumpBytes);
@@ -123,7 +126,7 @@ test('db delta redumps and restores via both shells', function () {
     $ploi->responses[] = '';
 
     // rm cleanup
-    $dply = new RecordingShell();
+    $dply = new RecordingShell;
     $dply->responses[] = 'restored';
 
     [$step, , , $site] = seedFixture(ImportMigrationStep::KEY_CUTOVER_DB_DELTA);
@@ -152,8 +155,8 @@ test('db delta skips when no database', function () {
 
     [$step] = seedFixture(ImportMigrationStep::KEY_CUTOVER_DB_DELTA);
     (new CutoverDbDeltaHandler(
-        new FakeSshConnectionFactory(new RecordingShell()),
-        new FakeSourceSshConnectionFactory(new RecordingShell()),
+        new FakeSshConnectionFactory(new RecordingShell),
+        new FakeSourceSshConnectionFactory(new RecordingShell),
     ))->execute($step);
 
     expect($step->fresh()->status)->toBe(ImportMigrationStep::STATUS_SKIPPED);
@@ -171,7 +174,7 @@ test('webhook swap deletes each ploi webhook', function () {
     ]);
 
     [$step] = seedFixture(ImportMigrationStep::KEY_CUTOVER_WEBHOOK_SWAP);
-    (new CutoverWebhookSwapHandler())->execute($step);
+    (new CutoverWebhookSwapHandler)->execute($step);
 
     $step->refresh();
     expect($step->result_data['webhooks_attempted'])->toBe(2);
@@ -192,7 +195,7 @@ test('webhook swap tolerates individual failures', function () {
     ]);
 
     [$step] = seedFixture(ImportMigrationStep::KEY_CUTOVER_WEBHOOK_SWAP);
-    (new CutoverWebhookSwapHandler())->execute($step);
+    (new CutoverWebhookSwapHandler)->execute($step);
 
     $step->refresh();
     expect($step->result_data['webhooks_attempted'])->toBe(1);
@@ -208,7 +211,7 @@ test('smoke test completes when dply header observed', function () {
     ]);
 
     [$step, $child, $migration] = seedFixture(ImportMigrationStep::KEY_CUTOVER_SMOKE_TEST, sslStrategy: ImportSiteMigration::SSL_CLEAN);
-    (new CutoverSmokeTestHandler())->execute($step);
+    (new CutoverSmokeTestHandler)->execute($step);
 
     expect($child->fresh()->status)->toBe(ImportSiteMigration::STATUS_COMPLETED);
     expect($child->fresh()->cutover_completed_at)->not->toBeNull();
@@ -226,7 +229,7 @@ test('smoke test dispatches ssl issuance for gap strategy', function () {
     ]);
 
     [$step, , , $site] = seedFixture(ImportMigrationStep::KEY_CUTOVER_SMOKE_TEST, sslStrategy: ImportSiteMigration::SSL_GAP);
-    (new CutoverSmokeTestHandler())->execute($step);
+    (new CutoverSmokeTestHandler)->execute($step);
 
     Bus::assertDispatched(IssueSiteSslJob::class, function (IssueSiteSslJob $job) use ($site): bool {
         return $job->siteId === $site->id;
@@ -241,7 +244,8 @@ test('smoke test keeps polling then fails when header never appears', function (
     // POLL_ATTEMPTS / POLL_INTERVAL_SECONDS are referenced via static:: in the handler
     // so an anonymous subclass overriding the constants shrinks the budget. Avoids
     // a real 5-minute sleep inside the test.
-    $handler = new class extends CutoverSmokeTestHandler {
+    $handler = new class extends CutoverSmokeTestHandler
+    {
         public const POLL_ATTEMPTS = 2;
 
         public const POLL_INTERVAL_SECONDS = 0;

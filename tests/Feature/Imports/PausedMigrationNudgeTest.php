@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PausedMigrationNudgeTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\NotificationEvent;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function seedMigration(Carbon $latestActivity): ImportServerMigration
 {

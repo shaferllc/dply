@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ForgeInventoryPageTest;
+
 use App\Jobs\Imports\SyncForgeInventoryJob;
 use App\Models\ForgeServer;
 use App\Models\ForgeSite;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

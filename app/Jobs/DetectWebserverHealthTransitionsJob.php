@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Models\User;
 use App\Notifications\WebserverHealthAlertNotification;
 use App\Services\Servers\WebserverHealthThresholdResolver;
 use Illuminate\Bus\Queueable;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Notification;
 
 /**
@@ -123,6 +125,7 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
         if (array_key_exists('active_connections', $block) && is_numeric($block['active_connections'])) {
             $out['active_connections'] = (float) $block['active_connections'];
         }
+
         // The agent only emits requests_per_sec for some engines (apache,
         // openlitespeed). For others we'd need to derive it server-side
         // from snapshot deltas. Skip the 5xx metric for now — the rate
@@ -136,9 +139,9 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
      * Org admins (owner / admin roles) receive the alert. Mirrors the
      * recipient resolution used by BackupFailureNotification.
      *
-     * @return \Illuminate\Support\Collection<int, \App\Models\User>
+     * @return Collection<int, User>
      */
-    private function recipientsFor(Server $server): \Illuminate\Support\Collection
+    private function recipientsFor(Server $server): Collection
     {
         $org = $server->organization;
         if ($org === null) {

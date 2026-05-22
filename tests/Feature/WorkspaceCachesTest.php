@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\WorkspaceCachesTest;
+
 use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Servers\WorkspaceCaches;
@@ -19,11 +20,14 @@ use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServicePort;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 /**
  * Test scaffolding shared across every case in this class:
@@ -1032,7 +1036,7 @@ test('show cache instance status runs systemctl for default instance', function 
                     && str_contains($cmd, 'systemctl status')
                     && str_contains($cmd, "'redis-server'");
             })
-            ->andReturn(new \App\Modules\TaskRunner\ProcessOutput("● redis-server.service — active (running)\n", 0, false));
+            ->andReturn(new ProcessOutput("● redis-server.service — active (running)\n", 0, false));
     });
 
     Livewire::actingAs($user)
@@ -1077,7 +1081,7 @@ test('show cache instance logs runs journalctl for default instance', function (
                     && str_contains($cmd, "'redis-server'")
                     && str_contains($cmd, '-n 200');
             })
-            ->andReturn(new \App\Modules\TaskRunner\ProcessOutput("2026-05-11T10:00:00+0000 redis-server: Ready to accept connections\n", 0, false));
+            ->andReturn(new ProcessOutput("2026-05-11T10:00:00+0000 redis-server: Ready to accept connections\n", 0, false));
     });
 
     Livewire::actingAs($user)
@@ -1112,12 +1116,12 @@ test('set cache status modal view reprobes with logs script', function () {
         $mock->shouldReceive('runInlineBash')
             ->once()
             ->withArgs(fn ($server, $name, $cmd): bool => str_contains($cmd, 'systemctl status'))
-            ->andReturn(new \App\Modules\TaskRunner\ProcessOutput('initial status output', 0, false));
+            ->andReturn(new ProcessOutput('initial status output', 0, false));
 
         $mock->shouldReceive('runInlineBash')
             ->once()
             ->withArgs(fn ($server, $name, $cmd): bool => str_contains($cmd, 'journalctl --no-pager --output=short-iso'))
-            ->andReturn(new \App\Modules\TaskRunner\ProcessOutput('switched logs output', 0, false));
+            ->andReturn(new ProcessOutput('switched logs output', 0, false));
     });
 
     Livewire::actingAs($user)

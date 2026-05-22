@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceFunctionsTest;
+
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
+
 test('create functions namespace recombines uuid and key into an access key', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/functions/namespaces' => Http::response([

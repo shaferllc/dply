@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\KubernetesManifestBuilderTest;
+
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Services\Deploy\KubernetesManifestBuilder;

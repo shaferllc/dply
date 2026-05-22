@@ -25,7 +25,7 @@ class ServerlessEnvironmentPreparer
 {
     /**
      * @param  bool  $isLaravel  whether the artifact builder detected Laravel
-     * @return string  a short log line describing what happened
+     * @return string a short log line describing what happened
      */
     public function prepare(Site $site, string $workingDirectory, bool $isLaravel): string
     {

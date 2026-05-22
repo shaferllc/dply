@@ -1,21 +1,23 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Sites\ServerlessDashboardTest;
+
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Settings as SiteSettings;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function functionSite(array $serverlessMeta): array
 {
     $user = User::factory()->create();
-    $org = \App\Models\Organization::factory()->create();
+    $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
 
     $server = Server::factory()->create([

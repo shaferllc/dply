@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ContainerProviderCredentialsTest;
+
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('panels visible only when provider is enabled', function () {
     config([

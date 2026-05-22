@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\WorkspaceSystemUsersTest;
+
 use App\Jobs\CreateServerSystemUserJob;
 use App\Jobs\DeleteOrphanSystemUsersJob;
 use App\Jobs\DeleteServerSystemUserJob;
@@ -14,11 +15,14 @@ use App\Models\Server;
 use App\Models\ServerSystemUser;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 /**
  * @return array{0: User, 1: Server}

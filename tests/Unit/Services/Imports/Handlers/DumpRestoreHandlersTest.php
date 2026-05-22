@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\DumpRestoreHandlersTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -14,11 +15,13 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Imports\Handlers\DumpDatabaseHandler;
 use App\Services\Imports\Handlers\RestoreDatabaseHandler;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\Imports\FakeSourceSshConnectionFactory;
 use Tests\Support\Imports\FakeSshConnectionFactory;
 use Tests\Support\Imports\RecordingShell;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: ImportSiteMigration, 2: ImportServerMigration, 3: Site, 4: Server}
  */
@@ -106,7 +109,7 @@ test('dump runs mysqldump via ploi ssh and records metadata', function () {
         ], 200),
     ]);
 
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
 
     // mysqldump command — output captured, no exit code from phpseclib's exec
     $shell->responses[] = '';
@@ -131,7 +134,7 @@ test('dump skips when site has no database', function () {
     Http::fake([
         'https://ploi.io/api/servers/42/sites/100/databases*' => Http::response(['data' => []], 200),
     ]);
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     [$step] = seedFixture(ImportMigrationStep::KEY_DUMP_DB);
 
     $handler = new DumpDatabaseHandler(new FakeSourceSshConnectionFactory($shell));
@@ -151,7 +154,7 @@ test('dump flags warning when site has multiple databases', function () {
             ],
         ], 200),
     ]);
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     $shell->responses[] = '';
     $shell->responses[] = "1024\n";
 
@@ -168,7 +171,7 @@ test('dump throws when dump file is empty', function () {
             'data' => [['id' => 7, 'name' => 'primary', 'user' => 'acme']],
         ], 200),
     ]);
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     $shell->responses[] = 'mysqldump: Got error 1045 — access denied';
     $shell->responses[] = "0\n";
 
@@ -180,13 +183,13 @@ test('dump throws when dump file is empty', function () {
 });
 test('restore pulls dump from ploi and restores on dply', function () {
     $dumpBytes = "-- MySQL dump\nINSERT INTO users …\n";
-    $shellPloi = new RecordingShell();
+    $shellPloi = new RecordingShell;
     $shellPloi->responses[] = base64_encode($dumpBytes);
 
     // Cleanup rm at the end:
     $shellPloi->responses[] = '';
 
-    $shellDply = new RecordingShell();
+    $shellDply = new RecordingShell;
     $shellDply->responses[] = 'mysql restore OK';
 
     [$step, , , $site] = seedFixture(ImportMigrationStep::KEY_RESTORE_DB, dumpPath: '/tmp/dply-migrate-xyz-100.sql');
@@ -214,8 +217,8 @@ test('restore pulls dump from ploi and restores on dply', function () {
     expect($step->result_data['bytes'])->toBe(strlen($dumpBytes));
 });
 test('restore skips when dump was skipped', function () {
-    $shellPloi = new RecordingShell();
-    $shellDply = new RecordingShell();
+    $shellPloi = new RecordingShell;
+    $shellDply = new RecordingShell;
 
     [$step, $child] = seedFixture(ImportMigrationStep::KEY_RESTORE_DB);
 
@@ -247,7 +250,7 @@ test('restore throws when dump step missing', function () {
     $this->expectExceptionMessageMatches('/dump_database to have run/');
 
     (new RestoreDatabaseHandler(
-        new FakeSshConnectionFactory(new RecordingShell()),
-        new FakeSourceSshConnectionFactory(new RecordingShell()),
+        new FakeSshConnectionFactory(new RecordingShell),
+        new FakeSourceSshConnectionFactory(new RecordingShell),
     ))->execute($step);
 });

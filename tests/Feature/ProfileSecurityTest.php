@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\ProfileSecurityTest;
+
 use App\Livewire\Settings\Security;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passkeys\Passkey;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('cannot unlink only oauth without password or passkey', function () {
     $user = User::factory()->create(['password' => null]);

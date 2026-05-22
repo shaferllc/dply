@@ -8,14 +8,17 @@ use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\TailCacheServiceMonitorJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerCacheServiceAuditEvent;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\CacheServiceAuth;
@@ -37,7 +40,6 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -46,6 +48,7 @@ class WorkspaceCaches extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.caches';
+
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
@@ -334,13 +337,13 @@ class WorkspaceCaches extends Component
      * groups cache-engine output together. Throws on non-zero exit so the
      * {@see runConsoleAction()} wrapper marks the row failed and re-throws.
      */
-    protected function emitExecutorBuffer(\App\Services\ConsoleActions\ConsoleEmitter $emit, string $buffer, int $exitCode, string $verb): void
+    protected function emitExecutorBuffer(ConsoleEmitter $emit, string $buffer, int $exitCode, string $verb): void
     {
         foreach (preg_split("/\r?\n/", $buffer) ?: [] as $line) {
             if ($line === '') {
                 continue;
             }
-            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'cache');
+            $emit($line, ConsoleAction::LEVEL_INFO, 'cache');
         }
 
         if ($exitCode !== 0) {
@@ -455,7 +458,7 @@ BASH,
                 __('Debug :engine instance :name on :host', [
                     'engine' => $engine, 'name' => $row->name, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $engine, $row, $script): void {
+                function (ConsoleEmitter $emit) use ($executor, $engine, $row, $script): void {
                     $output = $executor->runInlineBash(
                         $this->server,
                         'cache-service:debug:'.$engine.':'.$row->name,
@@ -869,12 +872,12 @@ BASH,
             ->where('server_id', $this->server->id)
             ->where('engine', $engine)
             ->orderByRaw(
-                "CASE status "
+                'CASE status '
                 ."WHEN 'installing' THEN 0 "
                 ."WHEN 'uninstalling' THEN 1 "
                 ."WHEN 'pending' THEN 2 "
                 ."WHEN 'failed' THEN 3 "
-                ."ELSE 9 END"
+                .'ELSE 9 END'
             )
             ->first();
         if ($row === null) {
@@ -1179,7 +1182,7 @@ BASH,
                 $row,
                 'cache_save_config',
                 __('Save :engine config on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($writer, $row, $draft, $audit): void {
+                function (ConsoleEmitter $emit) use ($writer, $row, $draft, $audit): void {
                     $emit->step('cache', sprintf('Writing %d bytes to %s config', strlen($draft), $row->engine));
                     $writer->write($row->server, $row, $draft);
                     $emit->success('cache', 'Config written and engine restarted.');
@@ -1329,7 +1332,7 @@ BASH,
                 $row,
                 'cache_save_memory',
                 __('Apply memory settings to :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($memory, $row, $maxNorm, $policyNorm, $audit, $maxmemory, $policy): void {
+                function (ConsoleEmitter $emit) use ($memory, $row, $maxNorm, $policyNorm, $audit, $maxmemory, $policy): void {
                     $emit->step('cache', sprintf('maxmemory=%s policy=%s', $maxNorm ?? 'unset', $policyNorm ?? 'unset'));
                     $memory->write($row->server, $row, $maxNorm, $policyNorm);
                     $emit->success('cache', 'Memory directives applied.');
@@ -1398,7 +1401,7 @@ BASH,
                 $row,
                 'cache_set_auth',
                 __('Set AUTH password on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($auth, $row, $newAuth, $audits): void {
+                function (ConsoleEmitter $emit) use ($auth, $row, $newAuth, $audits): void {
                     $emit->step('cache', sprintf('Setting requirepass on %s', $row->engine));
                     $auth->setRequirePass($row->server, $row, $newAuth);
                     $emit->success('cache', 'AUTH password active.');
@@ -1453,7 +1456,7 @@ BASH,
                 $row,
                 'cache_clear_auth',
                 __('Clear AUTH password on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($auth, $row, $audits): void {
+                function (ConsoleEmitter $emit) use ($auth, $row, $audits): void {
                     $emit->step('cache', sprintf('Clearing requirepass on %s', $row->engine));
                     $auth->clearRequirePass($row->server, $row);
                     $emit->success('cache', 'AUTH password cleared.');
@@ -1541,7 +1544,7 @@ BASH,
                 __('Change :engine port :old → :new on :host', [
                     'engine' => $row->engine, 'old' => $oldPort, 'new' => $newPort, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($portChanger, $row, $newPort, $oldPort, $audits): void {
+                function (ConsoleEmitter $emit) use ($portChanger, $row, $newPort, $oldPort, $audits): void {
                     $emit->step('cache', sprintf('Rewriting %s config to listen on :%d', $row->engine, $newPort));
                     $portChanger->changePort($row->server, $row, $newPort);
                     $emit->success('cache', sprintf('%s now listening on :%d', $row->engine, $newPort));
@@ -1618,7 +1621,7 @@ BASH,
                 __('Expose :engine on :host to :cidr', [
                     'engine' => $row->engine, 'host' => $this->server->name, 'cidr' => $cidr,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($exposure, $row, $cidr, $audits): void {
+                function (ConsoleEmitter $emit) use ($exposure, $row, $cidr, $audits): void {
                     $emit->step('cache', sprintf('Rewriting bind to 0.0.0.0; firewall rule for %s', $cidr));
                     $exposure->expose($row->server, $row, $cidr, auth()->id());
                     $emit->success('cache', 'Exposed; firewall apply queued.');
@@ -1670,7 +1673,7 @@ BASH,
                 $row,
                 'cache_lockdown',
                 __('Lock :engine on :host to loopback', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($exposure, $row, $audits): void {
+                function (ConsoleEmitter $emit) use ($exposure, $row, $audits): void {
                     $emit->step('cache', 'Rewriting bind to 127.0.0.1; removing firewall rule');
                     $exposure->lockdown($row->server, $row, auth()->id());
                     $emit->success('cache', 'Locked down; firewall apply queued.');
@@ -2280,7 +2283,7 @@ BASH,
                 $row,
                 'cache_flush',
                 __('Flush all keys on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $row, $cmd, $audit): void {
+                function (ConsoleEmitter $emit) use ($executor, $row, $cmd, $audit): void {
                     $output = $executor->runInlineBash(
                         $row->server,
                         'cache-service:flush:'.$row->engine,
@@ -2365,7 +2368,7 @@ BASH;
                 __(':label :engine on :host', [
                     'label' => $label, 'engine' => $row->engine, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $row, $verb, $script, $audit, $event, $newStatus): void {
+                function (ConsoleEmitter $emit) use ($executor, $row, $verb, $script, $audit, $event, $newStatus): void {
                     $output = $executor->runInlineBash(
                         $row->server,
                         'cache-service:'.$verb.':'.$row->engine.':'.$row->name,
@@ -2464,7 +2467,7 @@ BASH;
 
         // Latest non-dismissed manage_action run for this server — drives the
         // Show Redis INFO output banner on the redis Stats subtab.
-        $manageActionRun = \App\Models\ConsoleAction::query()
+        $manageActionRun = ConsoleAction::query()
             ->where('subject_type', $this->server->getMorphClass())
             ->where('subject_id', $this->server->id)
             ->where('kind', 'manage_action')

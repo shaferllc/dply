@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseCommandsTest;
+
 use App\Enums\SiteType;
 use App\Jobs\AttachCloudDatabaseJob;
 use App\Jobs\ProvisionCloudDatabaseJob;
@@ -13,9 +14,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function orgWithDoCredential(): Organization
 {

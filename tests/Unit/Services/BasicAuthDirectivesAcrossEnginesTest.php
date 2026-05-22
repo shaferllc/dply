@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\BasicAuthDirectivesAcrossEnginesTest;
+
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
@@ -10,9 +10,10 @@ use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function siteWithBasicAuth(string $username = 'preview', string $path = '/', ?string $hash = null): Site
 {

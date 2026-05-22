@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
+use App\Models\UserSshKey;
 
 /**
  * Builds a bash script (list of lines) from servers.meta stack fields set at create time.
@@ -271,7 +273,7 @@ final class ServerProvisionCommandBuilder
      * operator's laptop (etc.) lands on first boot instead of having to wait
      * for the post-provision authorized_keys sync. The matching panel rows
      * (ServerAuthorizedKey) are pre-created by
-     * {@see \App\Jobs\RunSetupScriptJob::applyProvisionOutcomeToServer()} so
+     * {@see RunSetupScriptJob::applyProvisionOutcomeToServer()} so
      * the workspace SSH Keys page reflects what's on the box from day zero —
      * a later Sync would otherwise rewrite authorized_keys to whatever the
      * panel currently knows and silently remove the bootstrap-installed keys.
@@ -350,7 +352,7 @@ final class ServerProvisionCommandBuilder
         $lines = [];
         foreach ($rows as $row) {
             $pk = trim((string) $row->public_key);
-            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+            if ($pk === '' || ! UserSshKey::publicKeyLooksValid($pk)) {
                 continue;
             }
             $lines[] = $pk;

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudWorkerDashboardTest;
+
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Sites\Settings as SiteSettings;
@@ -12,9 +13,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Server, 2: Site}

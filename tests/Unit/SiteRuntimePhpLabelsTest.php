@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\SiteRuntimePhpLabelsTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('runtime php process section title matches detected framework', function () {
     $user = User::factory()->create();

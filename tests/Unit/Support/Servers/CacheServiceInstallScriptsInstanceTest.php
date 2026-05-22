@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\CacheServiceInstallScriptsInstanceTest;
+
 use App\Models\ServerCacheService;
 use App\Support\Servers\CacheServiceInstallScripts;
-use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * @return iterable<string, array{string, string}>
  */

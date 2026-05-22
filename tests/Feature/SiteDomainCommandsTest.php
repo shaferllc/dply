@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDomainCommandsTest;
+
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('add creates a domain row', function () {
     $site = makeSite();

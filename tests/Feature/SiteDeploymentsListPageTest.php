@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeploymentsListPageTest;
+
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\DeploymentsList;
 use App\Models\Organization;
@@ -10,9 +11,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('renders deployments newest first', function () {
     [$user, $server, $site] = makeUserSite();

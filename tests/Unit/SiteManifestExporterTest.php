@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\SiteManifestExporterTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Services\Sites\SiteManifestExporter;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('exports runtime version build release', function () {
     $server = Server::factory()->create();

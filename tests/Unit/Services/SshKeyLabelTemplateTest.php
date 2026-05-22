@@ -1,13 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\Services\SshKeyLabelTemplateTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Services\Servers\SshKeyLabelTemplate;
-use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('server meta overrides organization preference', function () {
     $org = Organization::factory()->create([

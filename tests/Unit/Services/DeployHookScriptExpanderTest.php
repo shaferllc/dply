@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\Services\DeployHookScriptExpanderTest;
+
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Services\Sites\DeployHookScriptExpander;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('expands tokens from site', function () {
     $site = Site::factory()->create([

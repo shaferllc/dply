@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudListCommandTest;
+
 use App\Enums\SiteType;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('lists all cloud sites', function () {
     makeContainerSite('Site A', 'digitalocean_app_platform');

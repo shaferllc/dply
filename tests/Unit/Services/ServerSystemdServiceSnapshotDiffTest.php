@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSystemdServiceSnapshotDiffTest;
+
 use App\Services\Servers\ServerSystemdServiceSnapshotDiff;
-use PHPUnit\Framework\Attributes\Test;
 
 it('emits no events without prior snapshot', function () {
     $diff = new ServerSystemdServiceSnapshotDiff;

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Modules\TaskRunner\ProcessOutput;
+use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 
 /**
  * Read / write / backup / restore for webserver config files on a server.
@@ -101,7 +103,7 @@ class RemoteWebserverConfigService
      *
      * @return array{contents: string, truncated: bool, size: int}
      */
-    public function read(Server $server, string $engine, string $path, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function read(Server $server, string $engine, string $path, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -143,7 +145,7 @@ class RemoteWebserverConfigService
      *
      * @return array{backup: ?string, validate_output: string, validate_ok: bool}
      */
-    public function write(Server $server, string $engine, string $path, string $contents, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function write(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -243,7 +245,7 @@ BASH;
      *
      * @return array{output: string, ok: bool}
      */
-    public function validateContent(Server $server, string $engine, string $path, string $contents, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function validateContent(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -316,7 +318,7 @@ BASH;
      * Regenerate the dply-canonical content for a managed config file. For
      * httpd_config.conf we invoke the {@see OpenLiteSpeedHttpdConfigBuilder}
      * against the server's current sites + active port; for per-site
-     * vhconf.conf we use {@see \App\Services\Sites\OpenLiteSpeedSiteConfigBuilder}.
+     * vhconf.conf we use {@see OpenLiteSpeedSiteConfigBuilder}.
      * Files outside the dply-managed set raise a RuntimeException — there's
      * no canonical "default" to fall back to.
      *
@@ -330,28 +332,28 @@ BASH;
 
         if ($engine === 'openlitespeed') {
             if ($path === '/usr/local/lsws/conf/httpd_config.conf') {
-                $sites = \App\Models\Site::query()
+                $sites = Site::query()
                     ->where('server_id', $server->id)
                     ->with(['domains', 'domainAliases', 'tenantDomains'])
                     ->get();
                 $port = 80;
 
-                return app(\App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $port);
+                return app(OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $port);
             }
 
             // Per-site vhconf at /usr/local/lsws/conf/vhosts/<basename>/vhconf.conf.
             if (preg_match('#^/usr/local/lsws/conf/vhosts/([^/]+)/vhconf\.conf$#', $path, $m) === 1) {
                 $basename = $m[1];
-                $site = \App\Models\Site::query()
+                $site = Site::query()
                     ->where('server_id', $server->id)
                     ->get(['id', 'slug'])
                     ->first(fn ($s) => 'dply-'.$s->id.'-'.$s->slug === $basename);
                 if ($site === null) {
                     throw new \RuntimeException('No Site found for vhost basename `'.$basename.'`. The provisioner can\'t regenerate a default.');
                 }
-                $full = \App\Models\Site::query()->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'server'])->find($site->id);
+                $full = Site::query()->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'server'])->find($site->id);
 
-                return app(\App\Services\Sites\OpenLiteSpeedSiteConfigBuilder::class)->build($full);
+                return app(OpenLiteSpeedSiteConfigBuilder::class)->build($full);
             }
         }
 
@@ -422,7 +424,7 @@ BASH;
      *
      * @return array{validate_output: string, validate_ok: bool}
      */
-    public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($targetPath);
@@ -535,7 +537,7 @@ BASH;
         return $this->bashLiteral($s);
     }
 
-    private function runScript(Server $server, string $task, string $script, int $timeout, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): string
+    private function runScript(Server $server, string $task, string $script, int $timeout, ?ConsoleEmitter $emitter = null): string
     {
         // When an emitter is passed (Livewire's manage_action banner path),
         // stream every newline-terminated chunk from the SSH pipe straight
@@ -543,14 +545,14 @@ BASH;
         // the callback is a no-op and the buffer is captured at the end.
         $onOutput = $emitter === null
             ? function (string $type, string $buffer): void {}
-            : function (string $type, string $buffer) use ($emitter): void {
-                foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
-                    $line = trim($line);
-                    if ($line !== '') {
-                        $emitter($line);
-                    }
+        : function (string $type, string $buffer) use ($emitter): void {
+            foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $emitter($line);
                 }
-            };
+            }
+        };
 
         $out = $this->executor->runInlineBash($server, $task, $script, $timeout, $onOutput);
 

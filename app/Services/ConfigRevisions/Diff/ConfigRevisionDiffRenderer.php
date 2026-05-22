@@ -12,7 +12,7 @@ interface ConfigRevisionDiffRenderer
 {
     /**
      * @param  array<string, mixed>  $left  earlier/from snapshot
-     * @param  array<string, mixed>  $right later/to snapshot
+     * @param  array<string, mixed>  $right  later/to snapshot
      * @return string a unified-diff-style block suitable for rendering in a `<pre>`
      */
     public function render(array $left, array $right): string;

@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDatabaseEngineTest;
+
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('site database engine returns explicit column when set', function () {
     $server = Server::factory()->create();

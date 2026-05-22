@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Deploy\ServerlessEnvironmentPreparerTest;
+
 use App\Models\Site;
 use App\Services\Deploy\ServerlessEnvironmentPreparer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/serverless-env-'.uniqid();

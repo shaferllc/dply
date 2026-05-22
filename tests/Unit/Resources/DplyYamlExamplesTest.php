@@ -3,8 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Resources\DplyYamlExamplesTest;
+
 use App\Services\Deploy\Manifest\DplyManifestParser;
-use PHPUnit\Framework\Attributes\DataProvider;
+
 /**
  * @return array<string, array{0: string, 1: string}>
  */

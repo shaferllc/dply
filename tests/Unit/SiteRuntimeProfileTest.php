@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\SiteRuntimeProfileTest;
+
 use App\Models\Server;
 use App\Models\Site;
 

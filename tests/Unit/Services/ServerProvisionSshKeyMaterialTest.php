@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerProvisionSshKeyMaterialTest;
+
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 
 test('generate returns distinct recovery and operational keys', function () {

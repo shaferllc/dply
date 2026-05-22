@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Feature\ProviderOAuthTest;
+
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function ownerWithOrg(): User
 {

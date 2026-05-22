@@ -1,17 +1,19 @@
 <?php
 
-
 namespace Tests\Feature\ScriptsTest;
+
 use App\Livewire\Scripts\Create;
 use App\Livewire\Scripts\Marketplace;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function ownerWithOrg(): User
 {

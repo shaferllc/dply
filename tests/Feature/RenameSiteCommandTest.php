@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\RenameSiteCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('command updates name and slug', function () {
     $site = makeSite(['name' => 'Jobs', 'slug' => 'jobs']);

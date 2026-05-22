@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FakeCloudBackendTest;
+
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
 use App\Models\Organization;
@@ -10,10 +11,12 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\CloudRouter;
+use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\FakeCloudBackend;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['server_provision_fake.env_flag' => true]);

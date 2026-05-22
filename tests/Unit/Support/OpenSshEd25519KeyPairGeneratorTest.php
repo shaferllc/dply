@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Support\OpenSshEd25519KeyPairGeneratorTest;
+
 use App\Support\OpenSshEd25519KeyPairGenerator;
 
 test('generate returns openssh ed25519 pair', function () {

@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\MarketplaceItemSeederRuntimeTagsTest;
+
 use App\Models\MarketplaceItem;
 use Database\Seeders\MarketplaceItemSeeder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->seed(MarketplaceItemSeeder::class);

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\Kubernetes\KubernetesDeployEngineIntegrationTest;
-use \App\Services\Deploy\KubernetesKubectlExecutor;
+
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProviderCredential;
@@ -12,7 +12,10 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\KubernetesDeployEngine;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Services\Deploy\KubernetesKubectlExecutor;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('engine materialises stored kubeconfig to temp file and cleans up', function () {
     $storedYaml = "apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    server: https://EXAMPLE.k8s.ondigitalocean.com\n  name: prod\n";
@@ -57,11 +60,9 @@ function runDeployWithSpy(string $storedYaml, ?string $legacyKubeconfigPath = nu
 
     $spy = new class($capturedPath, $capturedContent, $passedPath) extends KubernetesKubectlExecutor
     {
-        function __construct(public ?string &$pathOut, public ?string &$contentOut, public ?string &$passedOut)
-        {
-        }
+        public function __construct(public ?string &$pathOut, public ?string &$contentOut, public ?string &$passedOut) {}
 
-        function deploy(string $manifest, string $namespace, string $deploymentName, ?string $kubeconfigPath = null, ?string $context = null): array
+        public function deploy(string $manifest, string $namespace, string $deploymentName, ?string $kubeconfigPath = null, ?string $context = null): array
         {
             $this->passedOut = $kubeconfigPath;
             if ($kubeconfigPath !== null && is_file($kubeconfigPath)) {

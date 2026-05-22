@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerProvisionCommandBuilderTest;
+
 use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionCommandBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use phpseclib3\Crypt\RSA;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('build returns empty without server role meta', function () {
     $server = Server::factory()->create([

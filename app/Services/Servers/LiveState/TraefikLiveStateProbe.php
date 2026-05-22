@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers\LiveState;
 
+use App\Jobs\AddEdgeProxyJob;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Services\SshConnection;
@@ -12,7 +13,7 @@ use Carbon\CarbonImmutable;
 /**
  * Probes Traefik's live state via the localhost-only API at :9094
  * (api.insecure on the `traefik` entry-point — set up by
- * {@see \App\Jobs\AddEdgeProxyJob::writeTraefikStaticConfig()}).
+ * {@see AddEdgeProxyJob::writeTraefikStaticConfig()}).
  *
  * dply runs `curl` on the box to hit /api/http/{routers,services,middlewares}
  * and /api/{overview,version}. JSON parsed in PHP and normalized into the

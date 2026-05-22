@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDefaultMonitorTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('site creation auto creates default uptime monitor', function () {
     $user = User::factory()->create();

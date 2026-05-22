@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\NginxSiteConfigBuilderTest;
+
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
@@ -10,9 +10,10 @@ use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Services\Sites\NginxSiteConfigBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('node block routes to internal port when set', function () {
     $site = Site::factory()->create([

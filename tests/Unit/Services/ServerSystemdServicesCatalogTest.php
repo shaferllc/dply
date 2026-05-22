@@ -1,14 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSystemdServicesCatalogTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\ServerSystemdServicesCatalog;
-use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeServerWithMeta(array $meta = []): Server
 {

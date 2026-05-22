@@ -20,7 +20,10 @@
  */
 
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
+use Monolog\Handler\StreamHandler;
+use Symfony\Component\HttpFoundation\Response;
 
 if (! function_exists('main')) {
     /**
@@ -103,7 +106,7 @@ if (! function_exists('main')) {
         try {
             require $root.'/vendor/autoload.php';
 
-            /** @var \Illuminate\Foundation\Application $app */
+            /** @var Application $app */
             $app = require $root.'/bootstrap/app.php';
             $app->useStoragePath($storage);
 
@@ -112,7 +115,7 @@ if (! function_exists('main')) {
             // scheduler invokes this every minute for enabled functions.
             $task = dply_do_functions_command($args, $envFile);
             if ($task !== null) {
-                $consoleKernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+                $consoleKernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
                 $exitCode = $consoleKernel->call($task[0], $task[1]);
 
                 return [
@@ -154,7 +157,7 @@ if (! function_exists('main')) {
                 'headers' => $headers,
                 'body' => is_string($body) ? $body : '',
             ];
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // OpenWhisk would otherwise swallow this behind a generic
             // "error processing your request" — surface the real cause.
             fwrite(STDERR, 'dply adapter error: '.$e.PHP_EOL);
@@ -275,7 +278,7 @@ if (! function_exists('dply_do_functions_attach_log_capture')) {
             }
 
             // Level 100 = DEBUG — an int so this works under Monolog 2 and 3.
-            $handler = new \Monolog\Handler\StreamHandler($stream, 100);
+            $handler = new StreamHandler($stream, 100);
             $app->make('log')->channel()->getLogger()->pushHandler($handler);
 
             return static function () use ($handler, $stream): array {
@@ -286,11 +289,11 @@ if (! function_exists('dply_do_functions_attach_log_capture')) {
                     fclose($stream);
 
                     return $raw === '' ? [] : explode("\n", $raw);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     return [];
                 }
             };
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return static fn (): array => [];
         }
     }
@@ -317,8 +320,8 @@ if (! function_exists('dply_do_functions_report_visit')) {
     function dply_do_functions_report_visit(
         array $args,
         array $envFile,
-        \Illuminate\Http\Request $request,
-        \Symfony\Component\HttpFoundation\Response $response,
+        Request $request,
+        Response $response,
         int $durationMs,
         callable $drainLogs,
     ): void {
@@ -396,7 +399,7 @@ if (! function_exists('dply_do_functions_report_visit')) {
             ]);
             curl_exec($ch);
             curl_close($ch);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Fire-and-forget — swallow everything.
         }
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\AuditLog;
 use App\Models\OrganizationInvitation;
@@ -11,6 +12,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\Team;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -19,7 +21,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -29,6 +30,7 @@ class WorkspaceActivity extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.activity';
+
     use InteractsWithServerWorkspace;
     use WithPagination;
 
@@ -328,11 +330,11 @@ class WorkspaceActivity extends Component
             return collect();
         }
 
-        return \App\Models\User::query()
+        return User::query()
             ->whereIn('id', $userIds)
             ->orderBy('name')
             ->get(['id', 'name'])
-            ->map(fn (\App\Models\User $u): array => ['id' => (string) $u->id, 'name' => (string) $u->name]);
+            ->map(fn (User $u): array => ['id' => (string) $u->id, 'name' => (string) $u->name]);
     }
 
     public function render(): View

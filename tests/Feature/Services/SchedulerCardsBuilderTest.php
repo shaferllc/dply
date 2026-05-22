@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\SchedulerCardsBuilderTest;
+
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
@@ -10,7 +11,9 @@ use App\Models\Site;
 use App\Services\Servers\SchedulerCardsBuilder;
 use App\Services\Servers\SchedulerHealthEvaluator;
 use Carbon\Carbon;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function server(): Server
 {

@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\Observers\ServerObserverBillingSyncTest;
+
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('dispatches sync when server transitions into ready', function () {
     Bus::fake();

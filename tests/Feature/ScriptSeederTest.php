@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\ScriptSeederTest;
+
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\User;
 use Database\Seeders\ScriptSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('seeds default scripts for seed users organization', function () {
     $user = User::factory()->create();

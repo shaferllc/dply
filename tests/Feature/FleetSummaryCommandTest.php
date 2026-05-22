@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FleetSummaryCommandTest;
+
 use App\Enums\SiteType;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('command aggregates runtime counts across sites', function () {
     $server = Server::factory()->create(['status' => Server::STATUS_READY]);

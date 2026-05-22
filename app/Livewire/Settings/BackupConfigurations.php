@@ -6,8 +6,10 @@ use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\BackupConfiguration;
+use App\Models\Organization;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -141,12 +143,12 @@ class BackupConfigurations extends Component
      * login-flush could land here without one). Throwing the validation error
      * surfaces the right message in the UI rather than 500ing on a null call.
      */
-    private function requireCurrentOrganization(): \App\Models\Organization
+    private function requireCurrentOrganization(): Organization
     {
         $org = Auth::user()?->currentOrganization();
         if ($org === null) {
             $this->toastError(__('Pick an organization before adding a backup destination.'));
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'createForm.name' => __('No active organization.'),
             ]);
         }

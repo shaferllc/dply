@@ -1,7 +1,8 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Serverless\JourneyTest;
+
+use App\Exceptions\ServerlessDeployCancelledException;
 use App\Jobs\ProvisionServerlessHostJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Serverless\Journey as ServerlessJourney;
@@ -10,10 +11,12 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use App\Services\Deploy\ServerlessDeployProgress;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -102,8 +105,8 @@ test('cancel deploy requests cancellation of the running deploy', function () {
         ->call('cancelDeploy');
 
     // The deploy pipeline's next checkpoint should now abort.
-    $this->expectException(\App\Exceptions\ServerlessDeployCancelledException::class);
-    app(\App\Services\Deploy\ServerlessDeployProgress::class)->checkpoint($site->fresh());
+    $this->expectException(ServerlessDeployCancelledException::class);
+    app(ServerlessDeployProgress::class)->checkpoint($site->fresh());
 });
 
 test('retry provision redispatches the host job when errored', function () {

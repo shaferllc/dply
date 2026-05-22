@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\ServerCreatePresetCatalogTest;
+
 use App\Services\Servers\ServerCreatePresetCatalog;
+
 test('catalog lists the v1 presets in order', function () {
     $ids = array_column((new ServerCreatePresetCatalog)->all(), 'id');
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\CollectManualReviewHandlerTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -10,7 +11,9 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\Imports\Handlers\CollectManualReviewHandler;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 function seedMigration(): ImportServerMigration
 {
     $user = User::factory()->create();
@@ -51,7 +54,7 @@ test('emits custom nginx advisory when snapshot has nginx config', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    (new CollectManualReviewHandler())->execute($step);
+    (new CollectManualReviewHandler)->execute($step);
 
     $items = $migration->fresh()->manual_review_items;
     $kinds = array_map(fn ($i) => $i['kind'], $items);
@@ -86,7 +89,7 @@ test('emits php fpm and opcache advisories when present', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    (new CollectManualReviewHandler())->execute($step);
+    (new CollectManualReviewHandler)->execute($step);
 
     $items = collect($migration->fresh()->manual_review_items);
     expect($items->firstWhere('kind', 'php_fpm_tuning'))->not->toBeNull();
@@ -110,7 +113,7 @@ test('baked in advisories appear even when no per site items', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    (new CollectManualReviewHandler())->execute($step);
+    (new CollectManualReviewHandler)->execute($step);
 
     $items = $migration->fresh()->manual_review_items;
     expect($items)->toHaveCount(3);

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DockerDeployEngineTest;
-use \App\Services\Deploy\LocalDockerRuntimeManager;
+
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Server;
@@ -11,9 +11,12 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DockerDeployEngine;
+use App\Services\Deploy\LocalDockerRuntimeManager;
 use App\Services\SshConnectionFactory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\FakeRemoteShell;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('it deploys a site to a docker host over ssh', function () {
     $user = User::factory()->create();
@@ -125,11 +128,9 @@ test('it persists discovered local docker publication and runtime details', func
 
     app()->instance(LocalDockerRuntimeManager::class, new class extends LocalDockerRuntimeManager
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function deploy(Site $site): array
+        public function deploy(Site $site): array
         {
             return [
                 'output' => 'Local Docker deploy completed.',

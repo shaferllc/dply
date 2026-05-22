@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteShowRuntimeSummaryTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('install summary shows runtime and internal port for node site', function () {
     [$user, $server] = makeUserServer();

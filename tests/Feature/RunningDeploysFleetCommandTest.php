@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\RunningDeploysFleetCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('lists currently running deploys', function () {
     $server = Server::factory()->create();

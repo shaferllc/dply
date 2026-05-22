@@ -68,7 +68,7 @@ final class ServerlessFunctionDnsProvisioner
                     'provisioned_at' => now()->toIso8601String(),
                 ]);
 
-                return 'DNS: covered by *.' .$zone.' '.($wildcard['type'] ?? '').' '.($wildcard['data'] ?? '');
+                return 'DNS: covered by *.'.$zone.' '.($wildcard['type'] ?? '').' '.($wildcard['data'] ?? '');
             }
 
             // DNS allows at most one record-shape per name when CNAME is
@@ -92,6 +92,7 @@ final class ServerlessFunctionDnsProvisioner
                 if ($sameTargetMatch) {
                     return false; // exact match — upsert will no-op on this row
                 }
+
                 // Anything else at the name blocks a CNAME create.
                 return strtoupper($type) === 'CNAME' || $rt === 'CNAME';
             }));

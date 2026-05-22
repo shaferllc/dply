@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerSshCommandPrinterTest;
+
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('prints ssh command with default user', function () {
     $server = Server::factory()->create([

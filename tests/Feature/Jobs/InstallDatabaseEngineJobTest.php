@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Jobs\InstallDatabaseEngineJobTest;
+
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Models\Organization;
 use App\Models\Server;
@@ -14,8 +15,10 @@ use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Servers\ServerResourcePreflight;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Queue::fake();

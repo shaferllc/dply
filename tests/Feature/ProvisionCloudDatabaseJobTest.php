@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ProvisionCloudDatabaseJobTest;
+
 use App\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function database(array $overrides = []): CloudDatabase
 {

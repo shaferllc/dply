@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ForgeMigrationWizardTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Livewire\Servers\Create\StepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
@@ -14,9 +15,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

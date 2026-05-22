@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -138,6 +139,7 @@ class TraefikStaticConfigOptions
 
     /**
      * @param  array<string, string>  $values
+     *
      * @throws \RuntimeException
      */
     public function save(Server $server, array $values, ?ConsoleEmitter $emitter = null): void
@@ -354,7 +356,7 @@ class TraefikStaticConfigOptions
             foreach (preg_split('/\R/', trim($journal)) ?: [] as $line) {
                 $line = trim($line);
                 if ($line !== '') {
-                    $emit($line, \App\Models\ConsoleAction::LEVEL_WARN);
+                    $emit($line, ConsoleAction::LEVEL_WARN);
                 }
             }
             throw new \RuntimeException('Traefik failed to come back active; previous traefik.yml restored.'."\n".trim($restartOut));

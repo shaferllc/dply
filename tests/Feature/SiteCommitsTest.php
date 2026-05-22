@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Feature\SiteCommitsTest;
+
 use App\Livewire\Sites\Commits as SitesCommits;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function actingOrgOwner(): User
 {

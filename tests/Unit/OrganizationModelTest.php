@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\OrganizationModelTest;
-use App\Models\User;
-use \App\Models\Organization;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Models\Organization;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('has member returns true for attached user', function () {
     $user = User::factory()->create();
@@ -77,7 +78,7 @@ test('plan tier label defaults to trial without a pro subscription', function ()
 test('plan tier label returns standard when org is on standard', function () {
     $org = new class extends Organization
     {
-        function onStandardSubscription(): bool
+        public function onStandardSubscription(): bool
         {
             return true;
         }
@@ -89,7 +90,7 @@ test('plan tier label returns standard when org is on standard', function () {
 test('plan tier label returns enterprise when org is on enterprise', function () {
     $org = new class extends Organization
     {
-        function onEnterpriseSubscription(): bool
+        public function onEnterpriseSubscription(): bool
         {
             return true;
         }
@@ -101,12 +102,12 @@ test('plan tier label returns enterprise when org is on enterprise', function ()
 test('enterprise takes precedence over standard', function () {
     $org = new class extends Organization
     {
-        function onEnterpriseSubscription(): bool
+        public function onEnterpriseSubscription(): bool
         {
             return true;
         }
 
-        function onStandardSubscription(): bool
+        public function onStandardSubscription(): bool
         {
             return true;
         }
@@ -121,7 +122,7 @@ test('on any paid plan is true for each paid plan', function () {
 
     $standardOrg = new class extends Organization
     {
-        function onStandardSubscription(): bool
+        public function onStandardSubscription(): bool
         {
             return true;
         }
@@ -130,7 +131,7 @@ test('on any paid plan is true for each paid plan', function () {
 
     $enterpriseOrg = new class extends Organization
     {
-        function onEnterpriseSubscription(): bool
+        public function onEnterpriseSubscription(): bool
         {
             return true;
         }
@@ -141,7 +142,7 @@ test('on any paid plan is true for each paid plan', function () {
 test('max servers is unlimited on any paid plan', function () {
     $standardOrg = new class extends Organization
     {
-        function onStandardSubscription(): bool
+        public function onStandardSubscription(): bool
         {
             return true;
         }

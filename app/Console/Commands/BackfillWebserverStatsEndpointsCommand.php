@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Jobs\SwitchServerWebserverJob;
 use App\Models\Server;
 use App\Services\Servers\WebserverStatsEndpointTemplates;
 use App\Services\SshConnection;
@@ -15,7 +16,7 @@ use Illuminate\Support\Str;
  * Drop the dply metrics-agent stats endpoint configs on already-running
  * webservers that predate the observability feature.
  *
- * New installs (via {@see \App\Jobs\SwitchServerWebserverJob}) auto-write
+ * New installs (via {@see SwitchServerWebserverJob}) auto-write
  * these — but a server provisioned before the feature has nginx/apache
  * running without the matching stub_status / mod_status endpoint, so the
  * metrics agent's collectors return None and the engine Overview charts

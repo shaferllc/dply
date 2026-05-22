@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudAutoscalingTest;
-use InvalidArgumentException;
-use Mockery;
 
 use App\Actions\Cloud\ConfigureCloudAutoscaling;
 use App\Actions\Cloud\ConfigureCloudHealthCheck;
@@ -23,11 +21,15 @@ use App\Services\Cloud\CloudScalingConfig;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use Aws\AppRunner\AppRunnerClient;
 use Aws\Result;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use InvalidArgumentException;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('autoscaling validation rejects min below one', function () {
     $this->expectException(InvalidArgumentException::class);

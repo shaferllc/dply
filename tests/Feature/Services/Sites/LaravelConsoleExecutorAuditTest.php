@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Sites\LaravelConsoleExecutorAuditTest;
-use ReflectionMethod;
 
 use App\Models\Organization;
 use App\Models\RemoteCliRun;
@@ -14,8 +13,11 @@ use App\Models\User;
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\Sites\LaravelConsoleExecutor;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use ReflectionMethod;
+
+uses(RefreshDatabase::class);
 
 function makeLaravelSite(): Site
 {

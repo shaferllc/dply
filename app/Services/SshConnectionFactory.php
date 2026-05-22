@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\RemoteShell;
 use App\Models\Server;
 
 class SshConnectionFactory
@@ -9,7 +10,7 @@ class SshConnectionFactory
     /**
      * Build an SSH connection for a server.
      *
-     * Returns the concrete {@see SshConnection} (a {@see \App\Contracts\RemoteShell})
+     * Returns the concrete {@see SshConnection} (a {@see RemoteShell})
      * so callers needing connection-specific methods like
      * execWithCallbackAndExit() get them; routing construction through this
      * factory keeps the connection swappable in tests via the container.

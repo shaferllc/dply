@@ -1,20 +1,20 @@
 <?php
 
-
 namespace Tests\Unit\Services\ZeroSslHttpCertificateEngineTest;
-use Mockery;
 
 use App\Models\Organization;
-use \App\Services\Certificates\ZeroSslHttpCertificateEngine;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\User;
 use App\Services\Certificates\ImportedCertificateInstaller;
+use App\Services\Certificates\ZeroSslHttpCertificateEngine;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('it issues and installs a zerossl http certificate', function () {
     Config::set('services.zerossl.access_key', 'zerossl-test-key');
@@ -108,26 +108,24 @@ test('it issues and installs a zerossl http certificate', function () {
 
     $engine = new class($installer, $publishedFiles, $commands) extends ZeroSslHttpCertificateEngine
     {
-        function __construct(ImportedCertificateInstaller $installer, private array &$publishedFiles, private array &$commands)
+        public function __construct(ImportedCertificateInstaller $installer, private array &$publishedFiles, private array &$commands)
         {
             parent::__construct($installer);
         }
 
-        function runRemoteCommand(Server $server, string $command, int $timeout): string
+        public function runRemoteCommand(Server $server, string $command, int $timeout): string
         {
             $this->commands[] = compact('command', 'timeout');
 
             return '';
         }
 
-        function writeRemoteFile(Server $server, string $path, string $contents): void
+        public function writeRemoteFile(Server $server, string $path, string $contents): void
         {
             $this->publishedFiles[] = compact('path', 'contents');
         }
 
-        function sleepMilliseconds(int $milliseconds): void
-        {
-        }
+        public function sleepMilliseconds(int $milliseconds): void {}
     };
 
     $result = $engine->execute($certificate->fresh());

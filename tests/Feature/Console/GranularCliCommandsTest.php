@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Console\GranularCliCommandsTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\RemoteCliRun;
@@ -13,9 +12,12 @@ use App\Models\Snapshot;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

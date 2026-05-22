@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\ApiKeysSettingsTest;
+
 use App\Livewire\Settings\ApiKeys;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function ownerWithOrg(): User
 {

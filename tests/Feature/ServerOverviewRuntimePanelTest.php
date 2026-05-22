@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerOverviewRuntimePanelTest;
+
 use App\Models\Organization;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('overview shows polyglot runtime inventory panel', function () {
     $this->markTestSkipped('Installed runtimes panel was moved off /overview; /services page should host it. See dashboard refactor disposition Q4.');

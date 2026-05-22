@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Livewire-side machinery for the console-actions banner.
  *
- * Differs from {@see \App\Jobs\Concerns\WritesConsoleAction} (the job-side
+ * Differs from {@see WritesConsoleAction} (the job-side
  * trait) in two ways:
  *
  *   - Subjects vary per call. A workspace Livewire component handles many

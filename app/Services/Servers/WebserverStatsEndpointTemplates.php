@@ -4,21 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Console\Commands\BackfillWebserverStatsEndpointsCommand;
+use App\Jobs\AddEdgeProxyJob;
+use App\Jobs\SwitchServerWebserverJob;
+
 /**
  * Single source of truth for the localhost-only stats endpoint configs
  * dply writes onto each webserver so the metrics agent can scrape it.
  *
  * Used by:
- *   - {@see \App\Jobs\SwitchServerWebserverJob} — drops these during a
+ *   - {@see SwitchServerWebserverJob} — drops these during a
  *     fresh install / switch-to flow.
- *   - {@see \App\Console\Commands\BackfillWebserverStatsEndpointsCommand}
+ *   - {@see BackfillWebserverStatsEndpointsCommand}
  *     — drops them on existing servers that predate the observability
  *     feature.
  *
  * All endpoints bind to 127.0.0.1 so they never reach the public network.
  * Ports are dply-conventional: nginx :9091, apache :9092, traefik :9093
  * (traefik is configured via /etc/traefik/traefik.yml; see
- * {@see \App\Jobs\AddEdgeProxyJob::writeTraefikStaticConfig()}).
+ * {@see AddEdgeProxyJob::writeTraefikStaticConfig()}).
  */
 final class WebserverStatsEndpointTemplates
 {

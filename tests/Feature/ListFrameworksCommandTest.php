@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ListFrameworksCommandTest;
+
 use Illuminate\Support\Facades\Artisan;
+
 test('lists all runtimes and frameworks', function () {
     Artisan::call('dply:list-frameworks', ['--json' => true]);
     $decoded = json_decode(Artisan::output(), true);

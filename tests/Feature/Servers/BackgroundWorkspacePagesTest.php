@@ -3,30 +3,41 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\BackgroundWorkspacePagesTest;
+
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
+use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;
+use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceSchedule;
+use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
+use App\Models\ServerDatabaseBackup;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
-use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
-use App\Support\Servers\ServerInstalledServices;
 use App\Models\User;
+use App\Notifications\BackupFailureNotification;
+use App\Services\Servers\PreflightSchedulerOnSite;
+use App\Services\Servers\SupervisorProvisioner;
+use App\Support\Servers\ServerInstalledServices;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 function actingOrgUser(): User
 {
@@ -559,11 +570,11 @@ function stubAllPreflightChecksPass(): void
         ['key' => 'cron_user_access', 'status' => 'pass', 'message' => 'ok'],
         ['key' => 'no_duplicate_scheduler', 'status' => 'pass', 'message' => 'ok'],
     ];
-    $stub = \Mockery::mock(\App\Services\Servers\PreflightSchedulerOnSite::class);
+    $stub = \Mockery::mock(PreflightSchedulerOnSite::class);
     $stub->shouldReceive('run')->andReturn($allPass);
     $stub->shouldReceive('structuralFailures')->andReturn([]);
     $stub->shouldReceive('advisoryWarnings')->andReturn([]);
-    app()->instance(\App\Services\Servers\PreflightSchedulerOnSite::class, $stub);
+    app()->instance(PreflightSchedulerOnSite::class, $stub);
 }
 test('enable scheduler for site creates laravel wrapper cron entry', function () {
     stubAllPreflightChecksPass();
@@ -723,7 +734,7 @@ test('schedule mutations emit audit log rows', function () {
         ->test(WorkspaceBackups::class, ['server' => $server])
         ->call('runScheduleNow', $schedule->id);
 
-    $actions = \App\Models\AuditLog::query()
+    $actions = AuditLog::query()
         ->where('organization_id', $server->organization_id)
         ->orderBy('created_at')
         ->pluck('action')
@@ -783,9 +794,9 @@ test('queue workers stop action calls stop program group', function () {
         'is_active' => true,
     ]);
 
-    $provisioner = \Mockery::mock(\App\Services\Servers\SupervisorProvisioner::class);
+    $provisioner = \Mockery::mock(SupervisorProvisioner::class);
     $provisioner->shouldReceive('stopProgramGroup')->once()->andReturn('ok');
-    app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
+    app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
         ->test(WorkspaceQueueWorkers::class, ['server' => $server])
@@ -795,7 +806,7 @@ test('queue workers stop action calls stop program group', function () {
     // a `server.daemons.program_created` row at the same second as the
     // worker action below — so filter by action rather than ordering by
     // created_at (which ties at second-precision timestamps).
-    $audit = \App\Models\AuditLog::query()
+    $audit = AuditLog::query()
         ->where('organization_id', $server->organization_id)
         ->where('action', 'queue_worker.stop')
         ->first();
@@ -817,15 +828,15 @@ test('queue workers start action calls start program group', function () {
         'is_active' => false,
     ]);
 
-    $provisioner = \Mockery::mock(\App\Services\Servers\SupervisorProvisioner::class);
+    $provisioner = \Mockery::mock(SupervisorProvisioner::class);
     $provisioner->shouldReceive('startProgramGroup')->once()->andReturn('ok');
-    app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
+    app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
         ->test(WorkspaceQueueWorkers::class, ['server' => $server])
         ->call('startWorker', $program->id);
 
-    $audit = \App\Models\AuditLog::query()
+    $audit = AuditLog::query()
         ->where('organization_id', $server->organization_id)
         ->where('action', 'queue_worker.start')
         ->first();
@@ -860,7 +871,7 @@ test('queue workers stats count active inactive and total processes', function (
     expect($stats['total_processes'])->toBe(4);
 });
 test('send test alert sends notification with test marker and audits', function () {
-    \Illuminate\Support\Facades\Notification::fake();
+    Notification::fake();
 
     $user = actingOrgUser();
     $server = readyServer($user);
@@ -883,18 +894,18 @@ test('send test alert sends notification with test marker and audits', function 
         ->test(WorkspaceBackups::class, ['server' => $server])
         ->call('sendTestAlert', $schedule->id);
 
-    \Illuminate\Support\Facades\Notification::assertSentTo($user, \App\Notifications\BackupFailureNotification::class, function ($notification) {
+    Notification::assertSentTo($user, BackupFailureNotification::class, function ($notification) {
         return $notification->isTest === true;
     });
 
-    $audit = \App\Models\AuditLog::query()
+    $audit = AuditLog::query()
         ->where('organization_id', $server->organization_id)
         ->latest('created_at')
         ->first();
     expect($audit?->action)->toBe('backup.schedule.test_alert');
 });
 test('failed backup sends notification when schedule opted in', function () {
-    \Illuminate\Support\Facades\Notification::fake();
+    Notification::fake();
 
     $user = actingOrgUser();
     $server = readyServer($user);
@@ -919,10 +930,10 @@ test('failed backup sends notification when schedule opted in', function () {
     ]);
     $backup->update(['status' => 'failed', 'error_message' => 'connection refused']);
 
-    \Illuminate\Support\Facades\Notification::assertSentTo($user, \App\Notifications\BackupFailureNotification::class);
+    Notification::assertSentTo($user, BackupFailureNotification::class);
 });
 test('failed backup does not notify when schedule opted out', function () {
-    \Illuminate\Support\Facades\Notification::fake();
+    Notification::fake();
 
     $user = actingOrgUser();
     $server = readyServer($user);
@@ -947,7 +958,7 @@ test('failed backup does not notify when schedule opted out', function () {
     ]);
     $backup->update(['status' => 'failed']);
 
-    \Illuminate\Support\Facades\Notification::assertNothingSent();
+    Notification::assertNothingSent();
 });
 test('toggle notify on failure flips flag and audits', function () {
     $user = actingOrgUser();
@@ -973,7 +984,7 @@ test('toggle notify on failure flips flag and audits', function () {
 
     expect(ServerBackupSchedule::find($schedule->id)->notify_on_failure)->toBeFalse();
 
-    $latestAudit = \App\Models\AuditLog::query()
+    $latestAudit = AuditLog::query()
         ->where('organization_id', $server->organization_id)
         ->orderByDesc('created_at')
         ->first();
@@ -1253,7 +1264,7 @@ test('activity mount honors category query param', function () {
 
     $component = Livewire::actingAs($user)
         ->withQueryParams(['category' => 'background'])
-        ->test(\App\Livewire\Servers\WorkspaceActivity::class, ['server' => $server]);
+        ->test(WorkspaceActivity::class, ['server' => $server]);
 
     expect($component->get('category'))->toBe('background');
 });
@@ -1263,22 +1274,22 @@ test('activity mount ignores unknown category query param', function () {
 
     $component = Livewire::actingAs($user)
         ->withQueryParams(['category' => 'made-up-bucket'])
-        ->test(\App\Livewire\Servers\WorkspaceActivity::class, ['server' => $server]);
+        ->test(WorkspaceActivity::class, ['server' => $server]);
 
     expect($component->get('category'))->toBe('');
 });
 test('activity categorize routes backup and worker actions to background', function () {
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('backup.schedule.created'))->toBe('background');
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('backup.schedule.paused'))->toBe('background');
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('queue_worker.restart'))->toBe('background');
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('queue_worker.stop'))->toBe('background');
+    expect(WorkspaceActivity::categorize('backup.schedule.created'))->toBe('background');
+    expect(WorkspaceActivity::categorize('backup.schedule.paused'))->toBe('background');
+    expect(WorkspaceActivity::categorize('queue_worker.restart'))->toBe('background');
+    expect(WorkspaceActivity::categorize('queue_worker.stop'))->toBe('background');
 
     // Sibling categories still route correctly.
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('insight.opened'))->toBe('insights');
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('site.settings.updated'))->toBe('site');
+    expect(WorkspaceActivity::categorize('insight.opened'))->toBe('insights');
+    expect(WorkspaceActivity::categorize('site.settings.updated'))->toBe('site');
 
     // 'other' bucket excludes my new prefixes.
-    expect(\App\Livewire\Servers\WorkspaceActivity::categorize('unknown.thing.happened'))->toBe('other');
+    expect(WorkspaceActivity::categorize('unknown.thing.happened'))->toBe('other');
 });
 test('overview background tile summarizes workers and schedules', function () {
     $user = actingOrgUser();
@@ -1325,7 +1336,7 @@ test('overview background tile summarizes workers and schedules', function () {
     $old->save();
 
     $component = Livewire::actingAs($user)
-        ->test(\App\Livewire\Servers\WorkspaceOverview::class, ['server' => $server]);
+        ->test(WorkspaceOverview::class, ['server' => $server]);
 
     $summary = $component->viewData('backgroundSummary');
     expect($summary['active_workers'])->toBe(2);
@@ -1353,16 +1364,16 @@ test('site queue workers stop dispatches and audits with site id', function () {
         'is_active' => true,
     ]);
 
-    $provisioner = \Mockery::mock(\App\Services\Servers\SupervisorProvisioner::class);
+    $provisioner = \Mockery::mock(SupervisorProvisioner::class);
     $provisioner->shouldReceive('stopProgramGroup')->once()->andReturn('ok');
-    app()->instance(\App\Services\Servers\SupervisorProvisioner::class, $provisioner);
+    app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
         ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $site])
         ->call('stopWorker', $program->id);
 
     // Filter by action to avoid tying with the observer's `program_created` row.
-    $audit = \App\Models\AuditLog::query()
+    $audit = AuditLog::query()
         ->where('organization_id', $server->organization_id)
         ->where('action', 'queue_worker.stop')
         ->first();

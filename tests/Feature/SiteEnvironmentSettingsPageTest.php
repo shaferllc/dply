@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteEnvironmentSettingsPageTest;
+
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Sites\Settings as SitesSettings;
@@ -11,9 +12,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Sites\DotEnvFileParser;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('add env var writes cache and dispatches push job', function () {
     Queue::fake();

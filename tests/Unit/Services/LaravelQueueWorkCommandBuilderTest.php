@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Unit\Services\LaravelQueueWorkCommandBuilderTest;
+
 use App\Services\Servers\LaravelQueueWorkCommandBuilder;
-use PHPUnit\Framework\Attributes\DataProvider;
 
 test('builds minimal command', function () {
     $cmd = (new LaravelQueueWorkCommandBuilder)->build();

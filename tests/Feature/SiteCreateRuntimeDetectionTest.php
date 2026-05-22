@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteCreateRuntimeDetectionTest;
+
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Models\Organization;
 use App\Models\Server;
@@ -13,9 +14,11 @@ use App\Models\User;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {
@@ -67,7 +70,7 @@ test('install missing runtime button hidden for php detection', function () {
 
     $this->app->instance(GitCloner::class, new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             mkdir($destination, 0o755, true);
             file_put_contents(
@@ -139,7 +142,7 @@ test('detect from repository records clone errors', function () {
     [$user, $server] = makeServerWithUser();
     $this->app->instance(GitCloner::class, new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             throw new GitCloneException('Repository not found.');
         }

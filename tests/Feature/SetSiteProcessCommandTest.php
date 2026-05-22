@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SetSiteProcessCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('creates a new process with defaults', function () {
     $site = makeSite();

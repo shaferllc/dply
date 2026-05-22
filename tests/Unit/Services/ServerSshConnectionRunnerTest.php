@@ -1,10 +1,10 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSshConnectionRunnerTest;
+
 use App\Models\Server;
-use \App\Services\SshConnection;
-use \App\Services\Servers\ServerSshConnectionRunner;
+use App\Services\Servers\ServerSshConnectionRunner;
+use App\Services\SshConnection;
 
 test('root first fallback uses recovery then operational roles', function () {
     $server = new Server([
@@ -13,15 +13,13 @@ test('root first fallback uses recovery then operational roles', function () {
 
     $runner = new class extends ServerSshConnectionRunner
     {
-        function makeConnection(Server $server, string $loginUser, string $credentialRole): SshConnection
+        public function makeConnection(Server $server, string $loginUser, string $credentialRole): SshConnection
         {
             $this->created[] = [$loginUser, $credentialRole];
 
             return new class($server, $loginUser, $credentialRole) extends SshConnection
             {
-                function disconnect(): void
-                {
-                }
+                public function disconnect(): void {}
             };
         }
     };

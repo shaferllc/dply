@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\Jobs\RunSiteDeploymentJobTrialGatingTest;
+
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Project;
@@ -9,8 +9,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('skipped deployment recorded when org trial expired', function () {
     $user = User::factory()->create();

@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\TaskRunner\ServerTaskRunnerConnectionTest;
+
 use App\Models\Server;
 use App\Modules\TaskRunner\Connection;
 use App\Support\Servers\FakeCloudProvision;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function validPrivateKey(): string
 {

@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerCreateStepReviewSshKeyModalTest;
+
 use App\Livewire\Servers\Create\StepReview;
 use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use App\Models\UserSshKey;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('step review renders personal ssh key modal listener', function () {
     $user = seedUserWithDraftAtReview();

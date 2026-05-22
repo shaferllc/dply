@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Services\AwsEksService;
 use Aws\CommandInterface;
 use Aws\Exception\AwsException;
 use Aws\MockHandler;
 use Aws\Result;
+use GuzzleHttp\Psr7\Response;
 
 /**
  * Use this trait on a test class that needs to stub AWS SDK calls without
@@ -16,7 +18,7 @@ use Aws\Result;
  * pipeline that ignores Http::fake.
  *
  * Wires a {@see MockHandler} into the container under `aws.eks.handler`;
- * {@see \App\Services\AwsEksService} checks that binding and attaches the
+ * {@see AwsEksService} checks that binding and attaches the
  * handler when present (test-only hook, no production effect).
  *
  * Usage:
@@ -35,7 +37,7 @@ trait StubsAwsSdk
 
     protected function fakeAws(): MockHandler
     {
-        $this->awsMockHandler = new MockHandler();
+        $this->awsMockHandler = new MockHandler;
         app()->bind('aws.eks.handler', fn () => $this->awsMockHandler);
 
         return $this->awsMockHandler;
@@ -65,7 +67,7 @@ trait StubsAwsSdk
         $this->awsMockHandler->append(function (CommandInterface $command) use ($awsErrorCode, $message, $httpStatus) {
             return new AwsException($message, $command, [
                 'code' => $awsErrorCode,
-                'response' => new \GuzzleHttp\Psr7\Response($httpStatus),
+                'response' => new Response($httpStatus),
             ]);
         });
     }

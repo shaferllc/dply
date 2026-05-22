@@ -3,14 +3,19 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Jobs\ProvisionServerlessDatabaseJobTest;
+
 use App\Jobs\ProvisionServerlessDatabaseJob;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\Deploy\ServerlessEnvironmentPreparer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @param  array<string, mixed>  $database
@@ -18,8 +23,8 @@ uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 function functionSite(array $database): Site
 {
     $credential = ProviderCredential::query()->create([
-        'organization_id' => ($org = \App\Models\Organization::factory()->create())->id,
-        'user_id' => ($user = \App\Models\User::factory()->create())->id,
+        'organization_id' => ($org = Organization::factory()->create())->id,
+        'user_id' => ($user = User::factory()->create())->id,
         'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['token' => 'tok'],

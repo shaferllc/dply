@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ShowSiteDeployCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('renders phase tree with step status', function () {
     // phase_results[$phase] is a flat list of steps (matches what

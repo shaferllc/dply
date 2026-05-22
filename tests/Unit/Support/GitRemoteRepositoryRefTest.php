@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Support\GitRemoteRepositoryRefTest;
+
 use App\Support\GitRemoteRepositoryRef;
 
 test('parses github ssh', function () {

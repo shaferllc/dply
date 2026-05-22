@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Feature\SettingsAndNotificationsTest;
+
 use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Settings\Hub as SettingsHub;
 use App\Models\NotificationWebhookDestination;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('settings hub is reachable for authenticated user', function () {
     $user = User::factory()->create();

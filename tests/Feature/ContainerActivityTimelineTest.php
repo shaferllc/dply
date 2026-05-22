@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ContainerActivityTimelineTest;
+
 use App\Enums\SiteType;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Cloud\ContainerActivityTimeline;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('empty meta returns empty timeline', function () {
     $site = makeSite([]);

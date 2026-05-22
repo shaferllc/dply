@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Snapshots\S3DestinationTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
@@ -16,7 +15,10 @@ use App\Services\Snapshots\S3Destination;
 use Aws\Command;
 use Aws\S3\S3Client;
 use GuzzleHttp\Psr7\Request;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

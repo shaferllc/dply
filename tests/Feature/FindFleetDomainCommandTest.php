@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FindFleetDomainCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('finds exact match with site and server context', function () {
     $server = Server::factory()->create(['name' => 'web-1', 'ip_address' => '203.0.113.10']);

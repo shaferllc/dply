@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\PruneBackupsCommand;
+
 return [
 
     /**
@@ -69,7 +71,7 @@ return [
     'backup_retention_per_database' => (int) env('SERVER_DATABASE_BACKUP_RETENTION_PER_DATABASE', 10),
 
     /**
-     * Time-based retention for {@see App\Console\Commands\PruneBackupsCommand} (days).
+     * Time-based retention for {@see PruneBackupsCommand} (days).
      * Complements the per-database count limit above — anything older than this is pruned
      * regardless of how many newer backups exist. Floor of 7 days enforced in code.
      */

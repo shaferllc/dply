@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunnerVerifyWebhooksCommandTest;
+
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('missing task id returns failure', function () {
     $exit = Artisan::call('dply:task-runner-verify-webhooks');

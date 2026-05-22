@@ -3,16 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ExpirePausedMigrationsCommandTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
-use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function seedMigration(Carbon $latestActivity, int $sourceKeyId = 9001, string $status = ImportServerMigration::STATUS_STAGING): ImportServerMigration
 {

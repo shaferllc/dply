@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\DeploymentValueRedactorTest;
+
 use App\Services\Deploy\DeploymentValueRedactor;
 
 test('it redacts sensitive context values', function () {

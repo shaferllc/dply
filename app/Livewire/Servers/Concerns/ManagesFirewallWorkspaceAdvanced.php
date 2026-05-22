@@ -3,7 +3,9 @@
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\FirewallRuleTemplate;
+use App\Models\ServerFirewallRule;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
+use Illuminate\Support\Collection;
 
 trait ManagesFirewallWorkspaceAdvanced
 {
@@ -36,8 +38,8 @@ trait ManagesFirewallWorkspaceAdvanced
      * both the view (which paints filtered rows) and any future bulk-on-filtered action share
      * one matcher. Case-insensitive, treats blank filter as "match anything".
      *
-     * @param  \Illuminate\Support\Collection<int, \App\Models\ServerFirewallRule>  $rules
-     * @return \Illuminate\Support\Collection<int, \App\Models\ServerFirewallRule>
+     * @param  Collection<int, ServerFirewallRule>  $rules
+     * @return Collection<int, ServerFirewallRule>
      */
     public function filteredFirewallRules($rules)
     {

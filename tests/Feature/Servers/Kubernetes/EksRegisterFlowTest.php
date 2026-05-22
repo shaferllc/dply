@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\Kubernetes\EksRegisterFlowTest;
+
 use App\Jobs\PollEksClusterStatusJob;
 use App\Livewire\Servers\Create\StepReview;
 use App\Livewire\Servers\Create\StepWhat;
@@ -13,11 +14,14 @@ use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use App\Services\AwsEksService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('step what lists aws supported regions in the picker', function () {
     Queue::fake();

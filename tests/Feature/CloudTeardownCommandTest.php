@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudTeardownCommandTest;
+
 use App\Actions\Cloud\CreateCloudPreviewSite;
 use App\Enums\SiteType;
 use App\Jobs\TeardownCloudSiteJob;
@@ -10,9 +11,11 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('dispatches teardown for a simple site', function () {
     Queue::fake();

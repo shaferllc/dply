@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessActionDiscoveryTest;
+
 use App\Services\Deploy\ServerlessActionDiscovery;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use Illuminate\Support\Facades\File;
+
 function capabilities(): array
 {
     return [

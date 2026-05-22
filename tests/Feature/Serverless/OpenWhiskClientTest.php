@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\OpenWhiskClientTest;
+
 use App\Models\Server;
 use App\Services\Serverless\OpenWhiskClient;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function functionServer(bool $provisioned = true): Server
 {

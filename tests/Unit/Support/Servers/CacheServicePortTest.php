@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\CacheServicePortTest;
-use Mockery;
 
+use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\CacheServicePort;
+use Mockery;
+
 beforeEach(function () {
     $this->port = new CacheServicePort(Mockery::mock(ExecuteRemoteTaskOnServer::class));
 });
@@ -85,7 +87,7 @@ function row(string $engine, string $name, int $port): ServerCacheService
 
     return $row;
 }
-function fakeServer(): \App\Models\Server
+function fakeServer(): Server
 {
-    return new \App\Models\Server;
+    return new Server;
 }

@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ImportSiteEnvCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('merge mode creates and updates without removing', function () {
     $site = makeSite(['env_file_content' => "KEEP_ME=k\nOVERRIDE_ME=old"]);

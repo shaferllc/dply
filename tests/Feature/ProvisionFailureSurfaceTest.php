@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ProvisionFailureSurfaceTest;
+
 use App\Jobs\RunSetupScriptJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationEvent;
@@ -11,12 +12,13 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Notifications\ServerProvisionFailedNotification;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
-use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('index card renders setup failed chip', function () {
     $user = userWithOrganization();

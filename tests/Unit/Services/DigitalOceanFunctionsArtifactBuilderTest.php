@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanFunctionsArtifactBuilderTest;
-use ZipArchive;
 
 use App\Models\Site;
 use App\Services\Deploy\DigitalOceanFunctionsArtifactBuilder;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
+use ZipArchive;
+
 test('it clones builds and packages a functions repo', function () {
     $root = storage_path('framework/testing/functions-builder-'.uniqid());
     $origin = $root.'/origin';

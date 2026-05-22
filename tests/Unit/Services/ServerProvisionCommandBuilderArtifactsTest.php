@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerProvisionCommandBuilderArtifactsTest;
+
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionCommandBuilder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('it builds rendered config and verification artifacts', function () {
     $server = new Server([

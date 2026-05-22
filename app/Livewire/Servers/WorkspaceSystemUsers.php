@@ -8,8 +8,10 @@ use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\SyncServerSystemUsersJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\Servers\ServerSystemUserService;
@@ -17,7 +19,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -26,6 +27,7 @@ class WorkspaceSystemUsers extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.system_users';
+
     use ConfirmsActionWithModal;
     use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
@@ -95,7 +97,7 @@ class WorkspaceSystemUsers extends Component
 
     /**
      * Seeds a queued console_actions row for the server-scoped system_user
-     * banner. Mirrors the helper on {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()}
+     * banner. Mirrors the helper on {@see Show::seedQueuedConsoleAction()}
      * but scoped to a Server subject; auto-dismisses any prior terminal rows so
      * the banner always shows the current run, not a stale completion.
      */

@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\KubernetesDeployEngineKubeconfigTest;
-use ReflectionMethod;
 
 use App\Services\Deploy\KubernetesDeployEngine;
+use ReflectionMethod;
+
 test('materialise kubeconfig writes yaml to a secure temp file', function () {
     $engine = app(KubernetesDeployEngine::class);
     $reflection = new ReflectionMethod($engine, 'materialiseKubeconfig');

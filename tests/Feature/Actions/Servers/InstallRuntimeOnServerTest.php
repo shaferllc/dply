@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Actions\Servers\InstallRuntimeOnServerTest;
+
 use App\Actions\Servers\InstallRuntimeOnServer;
 use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Services\Servers\MiseInstallScriptBuilder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('installs node via mise use global and records default', function () {
     $server = Server::factory()->ready()->create([
@@ -91,14 +94,12 @@ test('merges runtime default with existing entries', function () {
 });
 class InstallRuntimeRecordingShell implements RemoteShell
 {
-    function exec(string $command, int $timeoutSeconds = 120): string
+    public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;
 
         return '';
     }
 
-    function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-    }
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
 }

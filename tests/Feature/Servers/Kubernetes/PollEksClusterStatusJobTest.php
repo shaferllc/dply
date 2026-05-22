@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\Kubernetes\PollEksClusterStatusJobTest;
+
 use App\Jobs\PollEksClusterStatusJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\StubsAwsSdk;
 
-uses(\Tests\Support\StubsAwsSdk::class);
+uses(RefreshDatabase::class);
+
+uses(StubsAwsSdk::class);
 
 test('active cluster flips server to ready and persists kubeconfig', function () {
     $this->fakeAws();

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\ApiTokenPermissionsConfigTest;
+
 use App\Models\ApiToken;
 
 test('presets only reference defined or star abilities', function () {

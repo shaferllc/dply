@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Servers\WorkspaceManage;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
  * config('server_manage.service_actions') or config('server_manage.dangerous_actions'))
  * against the current server, banner-only flow.
  *
- * Equivalent to the queued path of {@see \App\Livewire\Servers\WorkspaceManage::runAllowlistedAction()},
+ * Equivalent to the queued path of {@see WorkspaceManage::runAllowlistedAction()},
  * trimmed of the legacy "Command output" panel and SSH-stream overlay. The seeded
  * `manage_action` ConsoleAction row drives the page-top console-action banner partial
  * on whichever workspace owns the button (Databases for `mysql_*`, Caches for `redis_info`).

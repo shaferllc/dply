@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\TrialState;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -74,7 +77,7 @@ class Organization extends Model
      */
     public function onDplyTrial(): bool
     {
-        return $this->trialState() === \App\Enums\TrialState::ActiveTrial;
+        return $this->trialState() === TrialState::ActiveTrial;
     }
 
     /**
@@ -82,12 +85,12 @@ class Organization extends Model
      * source of truth for "what can this org do right now?" — see
      * App\Enums\TrialState for the full state machine.
      */
-    public function trialState(): \App\Enums\TrialState
+    public function trialState(): TrialState
     {
         // Includes the cancel grace period — Cashier's valid() stays true
         // until ends_at, so a just-canceled org keeps full access.
         if ($this->onAnyPaidPlan()) {
-            return \App\Enums\TrialState::Subscribed;
+            return TrialState::Subscribed;
         }
 
         $reference = $this->pauseLadderReference();
@@ -95,15 +98,15 @@ class Organization extends Model
             $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
 
             return $reference->copy()->addDays($softPauseDays)->isPast()
-                ? \App\Enums\TrialState::ExpiredHard
-                : \App\Enums\TrialState::ExpiredSoft;
+                ? TrialState::ExpiredHard
+                : TrialState::ExpiredSoft;
         }
 
         if ($this->trial_ends_at === null) {
-            return \App\Enums\TrialState::NoTrial;
+            return TrialState::NoTrial;
         }
 
-        return \App\Enums\TrialState::ActiveTrial;
+        return TrialState::ActiveTrial;
     }
 
     /**
@@ -117,7 +120,7 @@ class Organization extends Model
      *
      * A future-dated trial returns null (still an active trial, not paused).
      */
-    private function pauseLadderReference(): ?\Carbon\CarbonInterface
+    private function pauseLadderReference(): ?CarbonInterface
     {
         $subscription = $this->subscription('default');
         if ($subscription && $subscription->ended() && $subscription->ends_at !== null) {
@@ -157,7 +160,7 @@ class Organization extends Model
     /**
      * The date a canceled subscription's access ends. Null when not canceled.
      */
-    public function subscriptionEndsAt(): ?\Carbon\CarbonInterface
+    public function subscriptionEndsAt(): ?CarbonInterface
     {
         return $this->subscription('default')?->ends_at;
     }
@@ -167,7 +170,7 @@ class Organization extends Model
      * track (subscribed, active trial, no trial recorded). Useful for "agent
      * disconnects on {date}" UI copy.
      */
-    public function hardPauseStartsAt(): ?\Carbon\CarbonImmutable
+    public function hardPauseStartsAt(): ?CarbonImmutable
     {
         if ($this->onAnyPaidPlan()) {
             return null;
@@ -211,7 +214,7 @@ class Organization extends Model
      */
     public function acceptsMetrics(): bool
     {
-        return $this->trialState() !== \App\Enums\TrialState::ExpiredHard;
+        return $this->trialState() !== TrialState::ExpiredHard;
     }
 
     /**

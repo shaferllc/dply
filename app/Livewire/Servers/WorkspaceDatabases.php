@@ -11,6 +11,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAdminCredential;
@@ -19,6 +20,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseExtraUser;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
@@ -1105,14 +1107,14 @@ class WorkspaceDatabases extends Component
                 __('Create :engine database :name on :host', [
                     'engine' => $db->engine, 'name' => $db->name, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($provisioner, $db, $existingMysqlUser, $auditLogger): string {
+                function (ConsoleEmitter $emit) use ($provisioner, $db, $existingMysqlUser, $auditLogger): string {
                     $emit->step('db', sprintf('CREATE %s DATABASE %s', strtoupper($db->engine), $db->name));
                     $out = $existingMysqlUser
                         ? $provisioner->createMysqlDatabaseForExistingUser($db, $existingMysqlUser['grant_host'])
                         : $provisioner->createOnServer($db);
                     foreach (preg_split("/\r?\n/", (string) $out) ?: [] as $line) {
                         if ($line !== '') {
-                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'db');
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'db');
                         }
                     }
                     $emit->success('db', sprintf('Database %s ready.', $db->name));
@@ -1197,12 +1199,12 @@ class WorkspaceDatabases extends Component
                 __('Drop :engine database :name on :host', [
                     'engine' => $db->engine, 'name' => $db->name, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($provisioner, $db, $auditLogger): string {
+                function (ConsoleEmitter $emit) use ($provisioner, $db, $auditLogger): string {
                     $emit->step('db', sprintf('DROP %s DATABASE %s', strtoupper($db->engine), $db->name));
                     $out = $provisioner->dropFromServer($db);
                     foreach (preg_split("/\r?\n/", (string) $out) ?: [] as $line) {
                         if ($line !== '') {
-                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'db');
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'db');
                         }
                     }
                     $emit->success('db', sprintf('Database %s dropped on server.', $db->name));
@@ -1333,7 +1335,7 @@ class WorkspaceDatabases extends Component
         // Show processlist output banner on the MySQL → Info subtab. Picks up
         // any `manage_*` allowlisted action (also fires from the Caches workspace
         // for `redis_info`), but the banner is rendered only inside the MySQL tab.
-        $manageActionRun = \App\Models\ConsoleAction::query()
+        $manageActionRun = ConsoleAction::query()
             ->where('subject_type', $this->server->getMorphClass())
             ->where('subject_id', $this->server->id)
             ->where('kind', 'manage_action')

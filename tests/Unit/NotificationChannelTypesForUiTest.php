@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\NotificationChannelTypesForUiTest;
+
 use App\Models\NotificationChannel;
 
 test('types for ui intersects with config', function () {

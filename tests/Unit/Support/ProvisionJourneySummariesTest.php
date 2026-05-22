@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\ProvisionJourneySummariesTest;
+
 use App\Models\ServerProvisionArtifact;
 use App\Support\Servers\ClassifyProvisionFailure;
 use App\Support\Servers\ProvisionVerificationSummary;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('verification summary uses metadata checks', function () {
     $artifact = new ServerProvisionArtifact([

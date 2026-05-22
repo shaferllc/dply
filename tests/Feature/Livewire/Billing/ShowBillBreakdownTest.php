@@ -1,16 +1,17 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Billing\ShowBillBreakdownTest;
+
 use App\Livewire\Billing\Show as BillingShow;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->admin = User::factory()->create();

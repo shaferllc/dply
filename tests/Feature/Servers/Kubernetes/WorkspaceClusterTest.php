@@ -3,19 +3,23 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\Kubernetes\WorkspaceClusterTest;
+
 use App\Jobs\PollDoksClusterStatusJob;
 use App\Livewire\Servers\WorkspaceCluster;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('poller keeps polling while state is provisioning', function () {
     Cache::flush();

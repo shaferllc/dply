@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Models\SiteFunctionActionsTest;
+
 use App\Models\FunctionAction;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('a site exposes its function actions with code actions first', function () {
     $site = Site::factory()->create();

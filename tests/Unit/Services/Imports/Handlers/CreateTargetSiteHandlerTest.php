@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\CreateTargetSiteHandlerTest;
+
+use App\Jobs\ProvisionSiteJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -12,11 +14,12 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\User;
-use App\Jobs\ProvisionSiteJob;
 use App\Services\Imports\Handlers\CreateTargetSiteHandler;
 use App\Services\Imports\WaitForTargetServerException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: ImportSiteMigration, 2: Server}
  */

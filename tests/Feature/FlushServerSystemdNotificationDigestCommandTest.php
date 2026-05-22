@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FlushServerSystemdNotificationDigestCommandTest;
+
 use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerSystemdNotificationDigestLine;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('no op when no lines buffered for previous hour', function () {
     $exit = Artisan::call('systemd:flush-notification-digest');

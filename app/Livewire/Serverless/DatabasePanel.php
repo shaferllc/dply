@@ -7,6 +7,7 @@ namespace App\Livewire\Serverless;
 use App\Jobs\ProvisionServerlessDatabaseJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Services\Serverless\ServerlessCostEstimator;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -88,7 +89,7 @@ class DatabasePanel extends Component
         return view('livewire.serverless.database-panel', [
             'database' => $database,
             'state' => (string) ($database['status'] ?? ''),
-            'estimate' => app(\App\Services\Serverless\ServerlessCostEstimator::class)->databaseMonthly($this->size),
+            'estimate' => app(ServerlessCostEstimator::class)->databaseMonthly($this->size),
         ]);
     }
 }

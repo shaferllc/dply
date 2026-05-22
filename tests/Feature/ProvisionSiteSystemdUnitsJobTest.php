@@ -3,16 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ProvisionSiteSystemdUnitsJobTest;
-use Mockery;
 
-use \App\Services\Sites\SiteSystemdProvisioner;
 use App\Contracts\RemoteShell;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
+use App\Services\Sites\SiteSystemdProvisioner;
 use App\Services\Sites\SiteSystemdUnitBuilder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('job provisions units for node site', function () {
     $server = Server::factory()->ready()->create([
@@ -28,12 +30,12 @@ test('job provisions units for node site', function () {
     $shell = new ProvisionRecordingShell;
     $provisioner = new class($shell) extends SiteSystemdProvisioner
     {
-        function __construct(private RemoteShell $shell)
+        public function __construct(private RemoteShell $shell)
         {
             parent::__construct(new SiteSystemdUnitBuilder);
         }
 
-        function provision(Site $site, ?\Closure $shellFactory = null): array
+        public function provision(Site $site, ?\Closure $shellFactory = null): array
         {
             return parent::provision($site, fn () => $this->shell);
         }
@@ -106,12 +108,12 @@ test('job provisions units for each non web process', function () {
     $shell = new ProvisionRecordingShell;
     $provisioner = new class($shell) extends SiteSystemdProvisioner
     {
-        function __construct(private RemoteShell $shell)
+        public function __construct(private RemoteShell $shell)
         {
             parent::__construct(new SiteSystemdUnitBuilder);
         }
 
-        function provision(Site $site, ?\Closure $shellFactory = null): array
+        public function provision(Site $site, ?\Closure $shellFactory = null): array
         {
             return parent::provision($site, fn () => $this->shell);
         }
@@ -127,14 +129,14 @@ test('job provisions units for each non web process', function () {
 });
 class ProvisionRecordingShell implements RemoteShell
 {
-    function exec(string $command, int $timeoutSeconds = 120): string
+    public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;
 
         return '';
     }
 
-    function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
     {
         $this->putFiles[] = ['path' => $remotePath, 'contents' => $contents];
     }

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\FakeCloudProvisionTest;
+
 use App\Jobs\PollDropletIpJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\WaitForServerSshReadyJob;
@@ -10,9 +10,10 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\Servers\FakeCloudProvision;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config([

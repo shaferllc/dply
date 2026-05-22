@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\FreezeSnapshotHandlerTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -12,7 +13,9 @@ use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\Imports\Handlers\FreezeSnapshotHandler;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 test('copies current ploi site snapshot onto child', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -74,7 +77,7 @@ test('copies current ploi site snapshot onto child', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    (new FreezeSnapshotHandler())->execute($step);
+    (new FreezeSnapshotHandler)->execute($step);
 
     $child->refresh();
     expect($child->source_snapshot)->toBe(['env' => ['APP_ENV' => 'production']]);
@@ -103,5 +106,5 @@ test('throws when site scoped step lacks site id', function () {
     ]);
 
     $this->expectException(\RuntimeException::class);
-    (new FreezeSnapshotHandler())->execute($step);
+    (new FreezeSnapshotHandler)->execute($step);
 });

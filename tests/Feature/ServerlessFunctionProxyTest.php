@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Feature\ServerlessFunctionProxyTest;
+
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('it proxies a friendly url to the function', function () {
     Http::fake([

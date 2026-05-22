@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\RestartSiteProcessCommandTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Services\Sites\SiteSystemdProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('command restarts named process', function () {
     [$site] = makeNodeSiteWithProcess('sidekiq');

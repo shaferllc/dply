@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteResourceBindingResolverTest;
+
 use App\Models\Site;
 use App\Services\Deploy\SiteResourceBindingResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('redis is configured when redis host is set', function () {
     $site = Site::factory()->create([

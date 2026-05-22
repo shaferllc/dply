@@ -1,18 +1,19 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Serverless\RollbackPanelTest;
+
 use App\Jobs\RollbackServerlessFunctionJob;
 use App\Livewire\Serverless\RollbackPanel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * @param  list<array<string, mixed>>  $history

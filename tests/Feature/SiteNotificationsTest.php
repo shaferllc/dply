@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\SiteNotificationsTest;
+
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\NotificationChannel;
@@ -15,11 +15,12 @@ use App\Models\SiteUptimeMonitor;
 use App\Models\User;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(string $role = 'owner'): User
 {

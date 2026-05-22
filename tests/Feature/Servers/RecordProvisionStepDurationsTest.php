@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\RecordProvisionStepDurationsTest;
+
 use App\Actions\Servers\RecordProvisionStepDurations;
 use App\Models\Organization;
 use App\Models\Server;
@@ -11,7 +12,9 @@ use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Support\Servers\ProvisionStepSnapshots;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function makeProvisionTask(Server $server, string $output): Task
 {

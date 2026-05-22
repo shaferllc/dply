@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Debug\RecordLivewireDispatchedJobTest;
+
 use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\UpdateDispatchedJobLifecycle;
 use App\Models\Organization;
@@ -10,11 +11,13 @@ use App\Models\Server;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\JobQueued;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Organization, 2: Server}
@@ -42,7 +45,7 @@ test('job dispatched during a livewire request creates a task row', function () 
 
     $job = new class($server->id)
     {
-        function __construct(string $serverId)
+        public function __construct(string $serverId)
         {
             $this->serverId = $serverId;
         }
@@ -157,11 +160,9 @@ function makeQueueJob(string $uuid): object
 {
     return new class($uuid)
     {
-        function __construct(private string $uuid)
-        {
-        }
+        public function __construct(private string $uuid) {}
 
-        function uuid(): string
+        public function uuid(): string
         {
             return $this->uuid;
         }

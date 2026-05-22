@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\UptimeProbeRegionResolverTest;
+
 use App\Services\Sites\UptimeProbeRegionResolver;
+
 test('it maps digitalocean regions to the nearest probe', function () {
     $resolver = new UptimeProbeRegionResolver;
 

@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Notifications\ResourceSummaryHidesInsightsTest;
+
 use App\Livewire\Notifications\ResourceSummary;
 use App\Models\NotificationEvent;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Insights\InsightsNotificationDispatcher;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Organization, 2: Server}

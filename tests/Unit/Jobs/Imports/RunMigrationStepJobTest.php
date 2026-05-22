@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Jobs\Imports\RunMigrationStepJobTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
@@ -10,9 +11,12 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\Imports\Handlers\HandlerManifest;
+use App\Services\Imports\StepOrchestrator;
 use App\Services\Imports\StepRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('job runs step and dispatches next pending when succeeded', function () {
     // Use the manifest-bound registry — exercises the real registration path.
@@ -27,7 +31,7 @@ test('job runs step and dispatches next pending when succeeded', function () {
 
     // eligibility_scan handler resolves cleanly (does nothing if no children); execute
     // marks first succeeded and dispatches a job for the second pending step.
-    (new RunMigrationStepJob($first->id))->handle($this->app->make(\App\Services\Imports\StepOrchestrator::class));
+    (new RunMigrationStepJob($first->id))->handle($this->app->make(StepOrchestrator::class));
 
     $first->refresh();
     expect($first->status)->toBe(ImportMigrationStep::STATUS_SUCCEEDED);
@@ -39,7 +43,7 @@ test('job runs step and dispatches next pending when succeeded', function () {
 });
 test('job is noop when step id missing', function () {
     (new RunMigrationStepJob('does-not-exist'))->handle(
-        $this->app->make(\App\Services\Imports\StepOrchestrator::class)
+        $this->app->make(StepOrchestrator::class)
     );
     expect(true)->toBeTrue();
     // didn't throw

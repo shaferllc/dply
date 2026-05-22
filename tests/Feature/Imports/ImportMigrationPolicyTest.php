@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ImportMigrationPolicyTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Livewire\Imports\Ploi\MigrationProgress;
+use App\Livewire\Servers\Create\StepReview;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -13,11 +15,12 @@ use App\Models\PloiServer;
 use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Models\ServerCreateDraft;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Organization, 2: ImportServerMigration}
@@ -140,7 +143,7 @@ test('kickoff helper returns null when user lacks admin role', function () {
         'source_snapshot' => ['repository' => 'acme/app'],
     ]);
 
-    $stepReview = $this->app->make(\App\Livewire\Servers\Create\StepReview::class);
+    $stepReview = $this->app->make(StepReview::class);
     $target = Server::factory()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,

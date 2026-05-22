@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\SetupSslHandlerTest;
+
 use App\Jobs\IssueSiteSslJob;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
@@ -14,12 +15,14 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Imports\Handlers\SetupSslHandler;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\Imports\FakeSourceSshConnectionFactory;
 use Tests\Support\Imports\FakeSshConnectionFactory;
 use Tests\Support\Imports\RecordingShell;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: ImportSiteMigration, 2: ImportServerMigration, 3: Site, 4: Server, 5: User, 6: Organization}
  */
@@ -103,8 +106,8 @@ test('clean strategy when dns credential present dispatches issuance', function 
     ]);
 
     $handler = new SetupSslHandler(
-        new FakeSshConnectionFactory(new RecordingShell()),
-        new FakeSourceSshConnectionFactory(new RecordingShell()),
+        new FakeSshConnectionFactory(new RecordingShell),
+        new FakeSourceSshConnectionFactory(new RecordingShell),
     );
     $handler->execute($step);
 
@@ -133,11 +136,11 @@ test('bridged strategy when no dns but valid letsencrypt cert on ploi', function
         ], 200),
     ]);
 
-    $ploi = new RecordingShell();
+    $ploi = new RecordingShell;
     $ploi->responses[] = base64_encode("-----BEGIN CERTIFICATE-----\nFAKECERT\n-----END CERTIFICATE-----\n");
     $ploi->responses[] = base64_encode("-----BEGIN PRIVATE KEY-----\nFAKEKEY\n-----END PRIVATE KEY-----\n");
 
-    $dply = new RecordingShell();
+    $dply = new RecordingShell;
     $dply->responses[] = '';
     // mkdir
     $dply->responses[] = '';
@@ -174,8 +177,8 @@ test('gap strategy when no dns and no usable cert', function () {
     [$step, $child, , $site] = seedFixture();
 
     $handler = new SetupSslHandler(
-        new FakeSshConnectionFactory(new RecordingShell()),
-        new FakeSourceSshConnectionFactory(new RecordingShell()),
+        new FakeSshConnectionFactory(new RecordingShell),
+        new FakeSourceSshConnectionFactory(new RecordingShell),
     );
     $handler->execute($step);
 
@@ -204,8 +207,8 @@ test('gap strategy when cert expiring within seven days', function () {
 
     [$step, $child] = seedFixture();
     $handler = new SetupSslHandler(
-        new FakeSshConnectionFactory(new RecordingShell()),
-        new FakeSourceSshConnectionFactory(new RecordingShell()),
+        new FakeSshConnectionFactory(new RecordingShell),
+        new FakeSourceSshConnectionFactory(new RecordingShell),
     );
     $handler->execute($step);
 

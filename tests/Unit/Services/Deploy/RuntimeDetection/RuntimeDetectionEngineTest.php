@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\RuntimeDetectionEngineTest;
+
 use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
@@ -12,6 +13,7 @@ use App\Services\Deploy\RuntimeDetection\RuntimeDetection;
 use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\RuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
+
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-detection-engine-'.uniqid();
     mkdir($this->tempDir);
@@ -123,12 +125,12 @@ test('returns all detections in order they fired', function () {
 test('skips detectors that return null', function () {
     $alwaysNull = new class implements RuntimeDetector
     {
-        function runtime(): string
+        public function runtime(): string
         {
             return 'never';
         }
 
-        function detect(string $workingDirectory): ?RuntimeDetection
+        public function detect(string $workingDirectory): ?RuntimeDetection
         {
             return null;
         }
@@ -136,12 +138,12 @@ test('skips detectors that return null', function () {
 
     $alwaysHits = new class implements RuntimeDetector
     {
-        function runtime(): string
+        public function runtime(): string
         {
             return 'fake';
         }
 
-        function detect(string $workingDirectory): RuntimeDetection
+        public function detect(string $workingDirectory): RuntimeDetection
         {
             return new RuntimeDetection(
                 runtime: 'fake',

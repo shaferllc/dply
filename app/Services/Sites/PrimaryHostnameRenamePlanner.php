@@ -111,6 +111,7 @@ final class PrimaryHostnameRenamePlanner
         if (! empty($plan['optIn'])) {
             return false;
         }
+
         // 2 = the two unconditional auto rows (nginx + audit). Anything beyond
         // that (dns_zone re-suggest) is a state change worth surfacing.
         return count($plan['auto']) <= 2;

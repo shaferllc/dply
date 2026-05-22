@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessCommandSecretTest;
+
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('it mints and persists a command secret', function () {
     $site = Site::factory()->create();

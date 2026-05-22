@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Jobs\SwitchCacheServiceJob;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,7 +48,7 @@ class ServerCacheService extends Model
     /**
      * Engines that speak the Redis wire protocol on port 6379. dply allows at most one of these
      * to be installed on a given server — operators who want Valkey instead of Redis use the
-     * engine-switch flow ({@see \App\Jobs\SwitchCacheServiceJob}), not parallel installs.
+     * engine-switch flow ({@see SwitchCacheServiceJob}), not parallel installs.
      *
      * @var list<string>
      */

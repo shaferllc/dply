@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\CachePatternCatalogTest;
+
 use App\Support\Servers\CachePatternCatalog;
+
 test('catalog entries have the documented shape', function () {
     foreach (CachePatternCatalog::all() as $entry) {
         expect(array_keys($entry))->toBe(['pattern', 'description', 'group'], 'Pattern catalog entries must keep the documented keys.');

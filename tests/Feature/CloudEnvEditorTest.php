@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudEnvEditorTest;
+
 use App\Enums\SiteType;
 use App\Jobs\RedeployCloudSiteJob;
 use App\Livewire\Sites\Settings as SitesSettings;
@@ -10,9 +11,11 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('save persists env and dispatches redeploy', function () {
     Queue::fake();

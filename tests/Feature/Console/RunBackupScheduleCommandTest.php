@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Console\RunBackupScheduleCommandTest;
+
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Models\Organization;
@@ -12,8 +13,10 @@ use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function makeServer(): Server
 {

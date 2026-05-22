@@ -3,8 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunner\RemoteTaskOutputPathTest;
-use \App\Modules\TaskRunner\RemoteProcessRunner;
-use \App\Modules\TaskRunner\TaskDispatcher;
+
 use App\Models\Server;
 use App\Modules\TaskRunner\Connection;
 use App\Modules\TaskRunner\Enums\TaskStatus;
@@ -13,11 +12,15 @@ use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\PendingTask;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\TaskRunner\ProcessRunner;
+use App\Modules\TaskRunner\RemoteProcessRunner;
 use App\Modules\TaskRunner\Task;
+use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use App\Modules\TaskRunner\TrackTaskInBackground;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('task model uses persisted remote output path when present', function () {
     $taskModel = TaskModel::query()->create([
@@ -34,7 +37,7 @@ test('task model uses persisted remote output path when present', function () {
 
     $taskModel->server = new class
     {
-        function connectionAsRoot(): Connection
+        public function connectionAsRoot(): Connection
         {
             return new Connection(
                 host: '127.0.0.1',
@@ -46,7 +49,7 @@ test('task model uses persisted remote output path when present', function () {
             );
         }
 
-        function connectionAsUser(): Connection
+        public function connectionAsUser(): Connection
         {
             return new Connection(
                 host: '127.0.0.1',
@@ -89,21 +92,21 @@ test('run on connection persists remote script and output paths on task model', 
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
-        function createRemoteRunner(PendingTask $pendingTask): RemoteProcessRunner
+        public function createRemoteRunner(PendingTask $pendingTask): RemoteProcessRunner
         {
             return new class($pendingTask->getConnection(), app(ProcessRunner::class)) extends RemoteProcessRunner
             {
-                function verifyScriptDirectoryExists(): self
+                public function verifyScriptDirectoryExists(): self
                 {
                     return $this;
                 }
 
-                function upload($filename, $contents): self
+                public function upload($filename, $contents): self
                 {
                     return $this;
                 }
 
-                function runUploadedScriptInBackground(string $script, string $output, int $timeout = 0): ProcessOutput
+                public function runUploadedScriptInBackground(string $script, string $output, int $timeout = 0): ProcessOutput
                 {
                     return ProcessOutput::make('ok')->setExitCode(0);
                 }
@@ -152,21 +155,21 @@ test('run on connection uploads tracking wrapper for remote tracked tasks', func
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
-        function createRemoteRunner(PendingTask $pendingTask): RemoteProcessRunner
+        public function createRemoteRunner(PendingTask $pendingTask): RemoteProcessRunner
         {
             return new class($pendingTask->getConnection(), app(ProcessRunner::class), $this) extends RemoteProcessRunner
             {
-                function __construct(Connection $connection, ProcessRunner $processRunner, private readonly object $testHarness)
+                public function __construct(Connection $connection, ProcessRunner $processRunner, private readonly object $testHarness)
                 {
                     __construct($connection, $processRunner);
                 }
 
-                function verifyScriptDirectoryExists(): self
+                public function verifyScriptDirectoryExists(): self
                 {
                     return $this;
                 }
 
-                function upload($filename, $contents): self
+                public function upload($filename, $contents): self
                 {
                     $this->testHarness->uploadedFilename = $filename;
                     $this->testHarness->uploadedContents = $contents;
@@ -174,7 +177,7 @@ test('run on connection uploads tracking wrapper for remote tracked tasks', func
                     return $this;
                 }
 
-                function runUploadedScriptInBackground(string $script, string $output, int $timeout = 0): ProcessOutput
+                public function runUploadedScriptInBackground(string $script, string $output, int $timeout = 0): ProcessOutput
                 {
                     return ProcessOutput::make('ok')->setExitCode(0);
                 }
@@ -199,7 +202,7 @@ test('remote process runner background command does not require local remote fil
 
     $runner = new class($connection, app(ProcessRunner::class)) extends RemoteProcessRunner
     {
-        function run(string $script, int $timeout = 0): ProcessOutput
+        public function run(string $script, int $timeout = 0): ProcessOutput
         {
             $this->capturedScript = $script;
 
@@ -241,14 +244,12 @@ test('run in background with model persists remote paths for tracked remote task
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
-        function runOnConnection(PendingTask $pendingTask): ProcessOutput
+        public function runOnConnection(PendingTask $pendingTask): ProcessOutput
         {
             return ProcessOutput::make('remote started')->setExitCode(0);
         }
 
-        function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void
-        {
-        }
+        public function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void {}
     };
 
     $dispatcher->runInBackgroundWithModel($trackedTask, $taskModel);
@@ -288,7 +289,7 @@ test('run in background with model does not start output polling for tracked rem
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
-        function runOnConnection(PendingTask $pendingTask): ProcessOutput
+        public function runOnConnection(PendingTask $pendingTask): ProcessOutput
         {
             return ProcessOutput::make('remote started')->setExitCode(0);
         }
@@ -326,23 +327,21 @@ test('run in background with model uses remote dispatch path for tracked remote 
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
-        function runOnConnection(PendingTask $pendingTask): ProcessOutput
+        public function runOnConnection(PendingTask $pendingTask): ProcessOutput
         {
             $this->usedRemoteDispatch = true;
 
             return ProcessOutput::make('remote started')->setExitCode(0);
         }
 
-        function runInBackground(PendingTask $pendingTask): ProcessOutput
+        public function runInBackground(PendingTask $pendingTask): ProcessOutput
         {
             $this->usedLocalBackground = true;
 
             return ProcessOutput::make('local background started')->setExitCode(0);
         }
 
-        function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void
-        {
-        }
+        public function startBackgroundMonitoring(Task $task, TaskModel $taskModel): void {}
     };
     $dispatcher->runInBackgroundWithModel($trackedTask, $taskModel);
 

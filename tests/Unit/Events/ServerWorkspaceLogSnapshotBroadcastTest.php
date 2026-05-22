@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Unit\Events\ServerWorkspaceLogSnapshotBroadcastTest;
+
 use App\Events\Servers\ServerWorkspaceLogSnapshotBroadcast;
-use PHPUnit\Framework\Attributes\Test;
 
 it('broadcasts on private server channel', function () {
     $event = new ServerWorkspaceLogSnapshotBroadcast(

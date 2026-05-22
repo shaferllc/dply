@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\ServerProviderFeatureFlagsTest;
+
 use App\Actions\Servers\ListServerProviderCards;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('list server provider cards only includes enabled providers', function () {
     // Disable everything in the catalog, then explicitly enable the

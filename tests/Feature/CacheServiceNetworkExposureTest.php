@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\CacheServiceNetworkExposureTest;
+
 use App\Jobs\ApplyFirewallJob;
 use App\Models\Organization;
 use App\Models\Server;
@@ -11,9 +11,10 @@ use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\CacheServiceNetworkExposure;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /** @return array{User, Server, ServerCacheService} */
 function ownerWithRedisInstance(): array

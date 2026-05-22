@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudRouterTest;
+
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Cloud\AwsAppRunnerBackend;
-use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\CloudRouter;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Services\Cloud\DigitalOceanAppPlatformBackend;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('backend for returns correct implementation', function () {
     config(['server_provision_fake.env_flag' => false]);

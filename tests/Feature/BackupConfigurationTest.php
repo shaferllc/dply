@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\BackupConfigurationTest;
+
 use App\Livewire\Settings\BackupConfigurations;
 use App\Models\BackupConfiguration;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * Create a user with a single organization membership. Single org means

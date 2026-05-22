@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FailedDeploysFleetCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('lists sites with failed latest deploy', function () {
     $server = Server::factory()->create();

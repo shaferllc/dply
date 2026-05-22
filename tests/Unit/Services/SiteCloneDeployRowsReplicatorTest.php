@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteCloneDeployRowsReplicatorTest;
+
 use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteRedirect;
 use App\Services\Sites\Clone\SiteCloneDeployRowsReplicator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('replicates redirects to destination site', function () {
     $source = Site::factory()->create(['type' => SiteType::Static]);

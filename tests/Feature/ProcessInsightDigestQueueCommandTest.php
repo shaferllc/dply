@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ProcessInsightDigestQueueCommandTest;
+
 use App\Models\InsightDigestQueue;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('drains daily queue and skips weekly orgs', function () {
     Mail::fake();

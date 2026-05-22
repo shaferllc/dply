@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessRepositoryCheckoutTest;
+
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
+
 test('it falls back to the remote default branch when requested branch is missing', function () {
     $origin = storage_path('framework/testing/repository-checkout-origin-'.uniqid());
     $remote = storage_path('framework/testing/repository-checkout-remote-'.uniqid().'.git');

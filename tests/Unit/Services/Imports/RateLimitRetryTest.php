@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\RateLimitRetryTest;
+
 use App\Models\ProviderCredential;
 use App\Services\Imports\Forge\ForgeClient;
 use App\Services\Imports\Ploi\PloiClient;
+use Carbon\CarbonInterval;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Sleep::fake();
@@ -108,7 +112,7 @@ test('ploi client honors retry after header when present', function () {
     // Retry-After was 3s; the request layer should have slept at least that long.
     // Sleep::fake() lets us assert on the slept duration without actually waiting.
     Sleep::assertSleptTimes(1);
-    Sleep::assertSlept(function (\Carbon\CarbonInterval $interval): bool {
+    Sleep::assertSlept(function (CarbonInterval $interval): bool {
         return $interval->totalMilliseconds >= 3000;
     });
 });

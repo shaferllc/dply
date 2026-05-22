@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ClearSiteEnvCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('clears all vars with force', function () {
     $site = makeSite(['env_file_content' => "A=a\nB=b"]);

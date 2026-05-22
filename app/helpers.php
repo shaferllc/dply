@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Pennant\Feature;
 
 if (! function_exists('reverb_health_check_url')) {
     /**
@@ -83,7 +84,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
             }
 
             $feature = $item['feature'] ?? null;
-            if (is_string($feature) && $feature !== '' && ! \Laravel\Pennant\Feature::active($feature)) {
+            if (is_string($feature) && $feature !== '' && ! Feature::active($feature)) {
                 return false;
             }
 

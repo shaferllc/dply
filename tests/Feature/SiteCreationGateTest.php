@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\SiteCreationGateTest;
-use Mockery;
 
 use App\Livewire\Sites\Show as SitesShow;
 use App\Models\Organization;
@@ -10,10 +8,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\ServerPhpManager;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function actingInOrg(User $user, Organization $org): void
 {

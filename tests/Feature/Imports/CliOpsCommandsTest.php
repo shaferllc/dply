@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\CliOpsCommandsTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -10,7 +11,10 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+
+uses(RefreshDatabase::class);
 
 function seedMigration(string $source = 'ploi', string $status = 'staging'): ImportServerMigration
 {
@@ -75,8 +79,8 @@ test('list command renders each migration with step counts', function () {
     seedMigration(source: 'ploi');
     seedMigration(source: 'forge');
 
-    \Illuminate\Support\Facades\Artisan::call('dply:imports:list');
-    $output = \Illuminate\Support\Facades\Artisan::output();
+    Artisan::call('dply:imports:list');
+    $output = Artisan::output();
 
     $this->assertStringContainsString('ploi', $output);
     $this->assertStringContainsString('forge', $output);
@@ -89,8 +93,8 @@ test('list command filters by source', function () {
     seedMigration(source: 'ploi');
     seedMigration(source: 'forge');
 
-    \Illuminate\Support\Facades\Artisan::call('dply:imports:list', ['--source' => 'forge']);
-    $output = \Illuminate\Support\Facades\Artisan::output();
+    Artisan::call('dply:imports:list', ['--source' => 'forge']);
+    $output = Artisan::output();
 
     $this->assertStringContainsString('forge', $output);
 
@@ -102,15 +106,15 @@ test('list command filters to active when flag set', function () {
     seedMigration(status: 'completed');
     seedMigration(status: 'staging');
 
-    \Illuminate\Support\Facades\Artisan::call('dply:imports:list', ['--active' => true]);
-    $output = \Illuminate\Support\Facades\Artisan::output();
+    Artisan::call('dply:imports:list', ['--active' => true]);
+    $output = Artisan::output();
 
     $this->assertStringContainsString('staging', $output);
     $this->assertStringNotContainsString('completed', $output);
 });
 test('list command handles empty result', function () {
-    \Illuminate\Support\Facades\Artisan::call('dply:imports:list');
-    $this->assertStringContainsString('No matching migrations.', \Illuminate\Support\Facades\Artisan::output());
+    Artisan::call('dply:imports:list');
+    $this->assertStringContainsString('No matching migrations.', Artisan::output());
 });
 test('show command renders full step plan with failure message', function () {
     $migration = seedMigration();
@@ -118,8 +122,8 @@ test('show command renders full step plan with failure message', function () {
     // Capture the full output buffer once via Artisan::call and grep the result;
     // expectsOutputToContain is order-sensitive (each call advances a cursor)
     // which doesn't fit a multi-line table-like rendering.
-    \Illuminate\Support\Facades\Artisan::call('dply:imports:show', ['migration' => $migration->id]);
-    $output = \Illuminate\Support\Facades\Artisan::output();
+    Artisan::call('dply:imports:show', ['migration' => $migration->id]);
+    $output = Artisan::output();
 
     $this->assertStringContainsString('Migration '.$migration->id, $output);
     $this->assertStringContainsString('Source:', $output);
@@ -131,7 +135,7 @@ test('show command renders full step plan with failure message', function () {
     $this->assertStringContainsString('git clone failed: repository not found', $output);
 });
 test('show command returns failure when migration not found', function () {
-    $exitCode = \Illuminate\Support\Facades\Artisan::call('dply:imports:show', ['migration' => '01jfakeulid000000000000000']);
+    $exitCode = Artisan::call('dply:imports:show', ['migration' => '01jfakeulid000000000000000']);
     expect($exitCode)->toBe(1);
-    $this->assertStringContainsString('Migration not found.', \Illuminate\Support\Facades\Artisan::output());
+    $this->assertStringContainsString('Migration not found.', Artisan::output());
 });

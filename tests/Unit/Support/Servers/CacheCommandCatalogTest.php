@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\CacheCommandCatalogTest;
+
 use App\Support\Servers\CacheCommandCatalog;
+
 test('catalog entries have the documented shape', function () {
     foreach (CacheCommandCatalog::respFamily() as $entry) {
         expect(array_keys($entry))->toBe(['name', 'syntax', 'summary', 'group', 'mutating'], 'Catalog entries must keep their documented keys (name, syntax, summary, group, mutating).');

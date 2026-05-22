@@ -6,6 +6,7 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\WebserverHealthThreshold;
+use Illuminate\Support\Collection;
 
 /**
  * Resolves the effective alert threshold for a (server, engine, metric)
@@ -94,7 +95,7 @@ class WebserverHealthThresholdResolver
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, WebserverHealthThreshold>  $rows
+     * @param  Collection<int, WebserverHealthThreshold>  $rows
      */
     private function pickEngineSpecificFirst($rows, string $engine): ?WebserverHealthThreshold
     {

@@ -1,10 +1,8 @@
 <?php
 
-
 namespace Tests\Feature\SiteTest;
+
 use App\Contracts\DeployEngine;
-use \App\Services\Deploy\SiteRuntimeActionExecutor;
-use \App\Services\Deploy\KubernetesKubectlExecutor;
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
@@ -30,8 +28,11 @@ use App\Models\Workspace;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DockerDeployEngine;
+use App\Services\Deploy\KubernetesKubectlExecutor;
+use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteWebserverConfigApplier;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -39,7 +40,7 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Symfony\Component\Process\Process;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(string $role = 'owner'): User
 {
@@ -920,7 +921,7 @@ test('docker host site provisioning prepares runtime until first deploy', functi
 test('docker host deploy uses docker engine', function () {
     app()->instance(DockerDeployEngine::class, new class implements DeployEngine
     {
-        function run(DeployContext $context): array
+        public function run(DeployContext $context): array
         {
             $site = $context->site();
             $meta = is_array($site->meta) ? $site->meta : [];
@@ -972,7 +973,7 @@ test('docker host deploy uses docker engine', function () {
 test('kubernetes host deploy uses kubernetes engine', function () {
     app()->instance(KubernetesKubectlExecutor::class, new class extends KubernetesKubectlExecutor
     {
-        function deploy(string $manifest, string $namespace, string $deploymentName, ?string $kubeconfigPath = null, ?string $context = null): array
+        public function deploy(string $manifest, string $namespace, string $deploymentName, ?string $kubeconfigPath = null, ?string $context = null): array
         {
             return [
                 'output' => "namespace/{$namespace} unchanged\ndeployment.apps/{$deploymentName} configured\ndeployment \"{$deploymentName}\" successfully rolled out",
@@ -1738,11 +1739,9 @@ test('runtime target model maps local and cloud container families', function ()
 test('site show exposes orbstack runtime controls and records runtime actions', function () {
     app()->instance(SiteRuntimeActionExecutor::class, new class extends SiteRuntimeActionExecutor
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function run(Site $site, string $action): array
+        public function run(Site $site, string $action): array
         {
             return [
                 'status' => 'running',
@@ -1968,11 +1967,9 @@ test('site settings general section renders container dashboard for cloud app', 
 test('refresh docker details persists discovered runtime metadata', function () {
     app()->instance(SiteRuntimeActionExecutor::class, new class extends SiteRuntimeActionExecutor
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function run(Site $site, string $action): array
+        public function run(Site $site, string $action): array
         {
             return [
                 'status' => 'running',
@@ -2041,11 +2038,9 @@ test('refresh docker details persists discovered runtime metadata', function () 
 test('site show records failed orbstack runtime actions with debug output', function () {
     app()->instance(SiteRuntimeActionExecutor::class, new class extends SiteRuntimeActionExecutor
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function run(Site $site, string $action): array
+        public function run(Site $site, string $action): array
         {
             throw new \RuntimeException("docker compose failed\n\nWorking directory: /tmp/demo\nCommand: docker compose up -d");
         }

@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\ReMigrationHistoryTest;
+
+use App\Livewire\Imports\Ploi\Inventory;
 use App\Models\ForgeServer;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\PloiServer;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {
@@ -113,10 +117,10 @@ test('inventory uses most recent terminal migration when multiple exist', functi
     // Verify the helper picks the most-recent terminal migration directly,
     // since HTML-level assertDontSee is too coarse (the rendered page may
     // contain unrelated substrings).
-    $inventory = $this->app->make(\App\Livewire\Imports\Ploi\Inventory::class);
+    $inventory = $this->app->make(Inventory::class);
     $ref = new \ReflectionMethod($inventory, 'mostRecentTerminalMigrationsForServers');
     $ref->setAccessible(true);
-    $servers = \App\Models\PloiServer::query()->get();
+    $servers = PloiServer::query()->get();
     $map = $ref->invoke($inventory, $servers);
     expect($map[42]->id)->toBe($newer->id, 'Newer aborted migration wins despite older completed one');
 

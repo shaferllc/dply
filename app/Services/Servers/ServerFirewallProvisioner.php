@@ -2,6 +2,7 @@
 
 namespace App\Services\Servers;
 
+use App\Jobs\ApplyFirewallJob;
 use App\Models\Server;
 use App\Models\ServerFirewallRule;
 
@@ -10,11 +11,11 @@ class ServerFirewallProvisioner
     /**
      * Optional output callback set by callers that want per-command streaming during apply.
      * The callback receives one line at a time — usually a `> ufw …` header before the
-     * exec and the captured output indented after. Used by {@see \App\Jobs\ApplyFirewallJob}
+     * exec and the captured output indented after. Used by {@see ApplyFirewallJob}
      * to surface live progress in the workspace banner; in-request callers leave it null
      * and get the same buffered string return value as before.
      *
-     * @var (callable(string $type, string $line): void)|null
+     * @var (callable(string, string): void)|null
      */
     protected $outputCallback = null;
 

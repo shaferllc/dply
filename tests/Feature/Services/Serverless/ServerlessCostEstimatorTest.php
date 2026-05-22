@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Serverless\ServerlessCostEstimatorTest;
+
 use App\Models\Site;
 use App\Services\Serverless\ServerlessCostEstimator;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('function fee comes from subscription config', function () {
     config(['subscription.standard.serverless_cents' => 200]);

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\AttachCloudDatabaseJobTest;
+
 use App\Enums\SiteType;
 use App\Jobs\AttachCloudDatabaseJob;
 use App\Jobs\RedeployCloudSiteJob;
@@ -11,8 +12,10 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: CloudDatabase, 1: Site}
@@ -97,7 +100,7 @@ test('detach removes db env and queues redeploy', function () {
 });
 test('detach preserves unrelated env keys', function () {
     Bus::fake([RedeployCloudSiteJob::class]);
-    [$db, $site] = databaseAndSite("APP_ENV=production");
+    [$db, $site] = databaseAndSite('APP_ENV=production');
 
     (new AttachCloudDatabaseJob($db->id, $site->id))->handle();
     (new AttachCloudDatabaseJob($db->id, $site->id, detach: true))->handle();

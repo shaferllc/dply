@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\ServerOpcacheConfigEditorTest;
+
 use App\Models\ServerPhpOpcacheProfile;
 use App\Services\Servers\ServerOpcacheConfigEditor;
+
 test('renders disabled profile emits enable zero', function () {
     $profile = profile([
         'enabled' => false,

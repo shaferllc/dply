@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ShowServerCommandTest;
+
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('renders full server profile in json', function () {
     $server = Server::factory()->create([

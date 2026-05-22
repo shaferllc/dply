@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Imports\Forge;
 
 use App\Models\ProviderCredential;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -86,7 +87,7 @@ class ForgeClient
             // Same retry posture as PloiClient — exponential backoff + Retry-After.
             ->retry(3, function (int $attempt, \Throwable $exception): int {
                 $delay = (int) (1000 * (2 ** ($attempt - 1)));
-                if ($exception instanceof \Illuminate\Http\Client\RequestException) {
+                if ($exception instanceof RequestException) {
                     $retryAfter = $exception->response?->header('Retry-After');
                     if (is_string($retryAfter) && ctype_digit($retryAfter)) {
                         $delay = max($delay, (int) $retryAfter * 1000);
@@ -95,7 +96,7 @@ class ForgeClient
 
                 return $delay;
             }, function (\Throwable $exception): bool {
-                if (! $exception instanceof \Illuminate\Http\Client\RequestException) {
+                if (! $exception instanceof RequestException) {
                     return false;
                 }
                 $status = $exception->response?->status();

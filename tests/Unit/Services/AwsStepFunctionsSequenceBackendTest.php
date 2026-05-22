@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\AwsStepFunctionsSequenceBackendTest;
+
 use App\Models\FunctionAction;
 use App\Services\Serverless\Aws\AwsStepFunctionsSequenceBackend;
 use Aws\MockHandler;
 use Aws\Result;
 use Aws\Sfn\SfnClient;
+
 function sfn(MockHandler $handler): SfnClient
 {
     return new SfnClient([

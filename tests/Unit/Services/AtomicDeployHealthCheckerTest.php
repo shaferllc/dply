@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\AtomicDeployHealthCheckerTest;
+
 use App\Services\Sites\AtomicDeployHealthChecker;
 
 test('normalize path', function () {

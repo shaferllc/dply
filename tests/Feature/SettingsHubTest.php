@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\SettingsHubTest;
+
 use App\Livewire\Settings\Hub;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('guest cannot view settings hub', function () {
     $this->get(route('settings.index'))->assertRedirect();

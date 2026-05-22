@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Jobs\Imports\SyncPloiInventoryJobTest;
-use Mockery;
 
 use App\Jobs\Imports\SyncPloiInventoryJob;
 use App\Models\ProviderCredential;
 use App\Services\Imports\Ploi\PloiInventorySync;
 use App\Services\Imports\SyncResult;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('job calls sync all when no server filter', function () {
     $credential = ProviderCredential::factory()->create([

@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\InstalledStackReconciliationTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Support\Servers\InstalledStack;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('observer reconciles installed stack from tagged output line', function () {
     [$user, $server] = makeServer(['database' => 'mysql84', 'php_version' => '8.4']);

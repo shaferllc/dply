@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Scaffold\ScaffoldPrerequisitesTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Models\User;
@@ -11,7 +10,10 @@ use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Scaffold\PrerequisiteResult;
 use App\Services\Scaffold\ScaffoldPrerequisites;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

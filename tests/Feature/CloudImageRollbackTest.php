@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudImageRollbackTest;
+
 use App\Enums\SiteType;
 use App\Jobs\RedeployCloudSiteJob;
 use App\Livewire\Sites\Settings as SiteSettings;
@@ -11,10 +12,12 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('redeploy appends to image history', function () {
     Http::fake([

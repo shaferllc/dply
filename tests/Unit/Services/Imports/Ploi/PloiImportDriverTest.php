@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Ploi\PloiImportDriverTest;
+
 use App\Models\ProviderCredential;
 use App\Services\Imports\Ploi\PloiImportDriver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function driver(): PloiImportDriver
 {

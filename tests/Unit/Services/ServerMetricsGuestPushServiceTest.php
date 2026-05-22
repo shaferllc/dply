@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerMetricsGuestPushServiceTest;
+
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Models\Server;
 use App\Services\Servers\ServerMetricsGuestPushService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('guest push url prefers ingest url then public origin then app url', function () {
     config([

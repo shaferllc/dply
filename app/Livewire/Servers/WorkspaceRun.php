@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -14,7 +15,6 @@ use App\Services\SshConnection;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -37,6 +37,7 @@ class WorkspaceRun extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.run';
+
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;

@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Feature\Jobs\SyncOrganizationBillingJobTest;
+
 use App\Jobs\SyncOrganizationBillingJob;
-use \App\Services\Billing\StripeSubscriptionSyncer;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Services\Billing\StripeSubscriptionSyncer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Config::set('subscription.standard.stripe.base_monthly', $this->basePriceId);

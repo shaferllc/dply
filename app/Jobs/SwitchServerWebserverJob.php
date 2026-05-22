@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
@@ -19,10 +20,11 @@ use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\SshConnection;
-use Illuminate\Support\Str;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -163,7 +165,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
             // webserver workspace shows stale state from the OLD engine for
             // up to the next scheduled probe — see the engine-Overview filter
             // that hides Start when daemon is active, etc.
-            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+            SyncServerSystemdServicesJob::dispatch($server->id);
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
@@ -197,18 +199,18 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         // the lock would otherwise sit for the full uniqueFor() window
         // blocking every retry. failed() does run after a SIGKILL via
         // Horizon's lost-job detection, so this is the right hook.
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
 
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $action = \App\Models\ConsoleAction::query()
+        $action = ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
             ->where('subject_id', $server->getKey())
             ->where('kind', 'webserver_switch')
-            ->whereIn('status', [\App\Models\ConsoleAction::STATUS_QUEUED, \App\Models\ConsoleAction::STATUS_RUNNING])
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
             ->whereNull('dismissed_at')
             ->orderByDesc('created_at')
             ->first();
@@ -216,7 +218,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         $message = sprintf('Job failed before completing: %s', $e->getMessage());
         if ($action !== null) {
             $action->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($message, 0, 2000),
             ]);
@@ -977,12 +979,12 @@ BASH;
      * stock config with WebAdmin + Example vhosts that we don't want to keep,
      * but we preserve it for forensic recovery.
      *
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     private function writeOlsHttpdConfig(
         Server $server,
         SshConnection $ssh,
-        \Illuminate\Database\Eloquent\Collection $sites,
+        Collection $sites,
         int $listenPort
     ): void {
         $path = '/usr/local/lsws/conf/httpd_config.conf';

@@ -1,11 +1,10 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteDeployPipelineRunnerTest;
+
 use App\Models\SiteDeployStep;
-use \App\Services\Sites\SiteDeployPipelineRunner;
 use App\Services\Sites\SiteDeployPipelineCommands;
-use PHPUnit\Framework\Attributes\DataProvider;
+use App\Services\Sites\SiteDeployPipelineRunner;
 
 /**
  * @return iterable<string, array{string, string}>
@@ -28,7 +27,7 @@ test('resolves artisan install steps', function (string $type, string $expected)
     ]);
     $runner = new class extends SiteDeployPipelineRunner
     {
-        function publicResolve(SiteDeployStep $step): ?string
+        public function publicResolve(SiteDeployStep $step): ?string
         {
             return $this->resolveShellCommand($step);
         }

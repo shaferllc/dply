@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\SiteEnvPusherTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\SiteEnvPusher;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('throws when runtime does not support env push', function () {
     $server = Server::factory()->ready()->create([

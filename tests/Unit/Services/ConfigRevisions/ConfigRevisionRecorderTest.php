@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\ConfigRevisions\ConfigRevisionRecorderTest;
+
 use App\Models\ConfigRevision;
 use App\Models\Organization;
 use App\Models\Server;
@@ -9,9 +9,9 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\ConfigRevisions\ConfigRevisionContext;
 use App\Services\ConfigRevisions\ConfigRevisionRecorder;
-use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 it('creates a revision with denormalized owner pointers', function () {
     $org = Organization::factory()->create();

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Services\Notifications\NotificationPublisher;
@@ -106,7 +107,7 @@ class FinalizeContainerCloudLaunchJob implements ShouldQueue
         $this->publishCompletedNotification($server, $site, $user);
     }
 
-    private function publishCompletedNotification(Server $server, \App\Models\Site $site, User $user): void
+    private function publishCompletedNotification(Server $server, Site $site, User $user): void
     {
         try {
             app(NotificationPublisher::class)->publish(

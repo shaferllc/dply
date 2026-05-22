@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\ApiTokenDeployerTest;
+
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('deployer cannot use commands run even with star token', function () {
     $user = User::factory()->create();

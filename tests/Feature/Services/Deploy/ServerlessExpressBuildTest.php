@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Deploy\ServerlessExpressBuildTest;
-use ZipArchive;
 
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Deploy\DigitalOceanFunctionsArtifactBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use ZipArchive;
+
+uses(RefreshDatabase::class);
 
 test('it injects the express adapter when building an express app', function () {
     $root = storage_path('framework/testing/express-build-'.uniqid());

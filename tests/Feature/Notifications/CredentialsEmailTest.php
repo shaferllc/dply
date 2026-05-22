@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Notifications\CredentialsEmailTest;
+
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\InstallMetricsAgentJob;
@@ -15,9 +16,11 @@ use App\Models\Site;
 use App\Models\User;
 use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Notifications\SiteDatabaseCredentialsNotification;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('server credentials email does not fire when toggle off', function () {
     Notification::fake();

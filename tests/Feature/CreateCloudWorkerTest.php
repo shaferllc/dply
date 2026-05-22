@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudWorkerTest;
+
 use App\Actions\Cloud\CreateCloudWorker;
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudWorkersJob;
@@ -15,8 +16,10 @@ use App\Models\User;
 use App\Services\Cloud\AwsAppRunnerBackend;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\FakeCloudBackend;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function containerSite(string $backend = 'digitalocean_app_platform'): Site
 {

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Servers;
 
+use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseEngine;
+use App\Services\Servers\ServerProvisionCommandBuilder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,10 +17,10 @@ use Illuminate\Support\Facades\DB;
  * `server_database_engines`) so the Caches and Databases workspace pages
  * have a row to render after provisioning finishes.
  *
- * Why this exists: {@see \App\Services\Servers\ServerProvisionCommandBuilder}
+ * Why this exists: {@see ServerProvisionCommandBuilder}
  * installs the chosen apt packages on the host (redis-server, postgresql-18,
  * etc.) and writes their configs, but the post-provision hook
- * ({@see \App\Jobs\RunSetupScriptJob::applyProvisionOutcomeToServer()})
+ * ({@see RunSetupScriptJob::applyProvisionOutcomeToServer()})
  * historically only seeded firewall / systemd / system-user state — never
  * the engine rows. Operators landed on an empty workspace even though the
  * engine was running on the host. This action plugs that gap; it's invoked

@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\TestingHostnameProvisionerTest;
+
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SitePreviewDomain;
 use App\Services\Sites\TestingHostnameProvisioner;
 use Illuminate\Support\Collection;
+
 test('it chooses a domain from the owned pool deterministically', function () {
     config([
         'services.digitalocean.testing_domains' => ['dply.cc', 'dply.host', 'dply.io'],

@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\WordPress\Advisories\WordfenceIntelligenceProviderTest;
+
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+
 beforeEach(function () {
     Cache::flush();
 });

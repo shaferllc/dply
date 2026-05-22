@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\ExampleTest;
+
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 

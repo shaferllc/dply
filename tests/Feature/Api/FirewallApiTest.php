@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\Api\FirewallApiTest;
-use Mockery;
 
 use App\Models\ApiToken;
 use App\Models\FirewallRuleTemplate;
@@ -11,8 +9,10 @@ use App\Models\Server;
 use App\Models\ServerFirewallRule;
 use App\Models\User;
 use App\Services\Servers\ServerFirewallProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: Organization, 1: Server, 2: string}

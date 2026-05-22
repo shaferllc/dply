@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\SiteType;
+use App\Jobs\CleanupCustomSiteJob;
 use App\Livewire\Sites\Settings;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\LaravelComposerPackageDetector;
@@ -262,7 +263,7 @@ class Site extends Model
                 try {
                     $server = $site->server;
                     if ($server) {
-                        \App\Jobs\CleanupCustomSiteJob::dispatch(
+                        CleanupCustomSiteJob::dispatch(
                             (string) $server->id,
                             (string) ($site->repository_path ?? ''),
                             $site->effectiveSystemUser($server),
@@ -1687,13 +1688,13 @@ class Site extends Model
             return $existing;
         }
 
-        $base = \Illuminate\Support\Str::slug((string) $this->name) ?: 'fn';
+        $base = Str::slug((string) $this->name) ?: 'fn';
         $slug = $base;
         while (static::query()
             ->where('meta->serverless->proxy_slug', $slug)
             ->whereKeyNot($this->getKey())
             ->exists()) {
-            $slug = $base.'-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(4));
+            $slug = $base.'-'.Str::lower(Str::random(4));
         }
 
         $meta = is_array($this->meta) ? $this->meta : [];
@@ -1721,7 +1722,7 @@ class Site extends Model
             return $existing;
         }
 
-        $secret = \Illuminate\Support\Str::random(48);
+        $secret = Str::random(48);
 
         $meta = is_array($this->meta) ? $this->meta : [];
         $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
@@ -2126,7 +2127,7 @@ class Site extends Model
             case 'openlitespeed':
                 $methods[] = 'lscache';
                 break;
-            // apache mod_cache + caddy souin land in v2.
+                // apache mod_cache + caddy souin land in v2.
         }
 
         return array_values(array_unique($methods));

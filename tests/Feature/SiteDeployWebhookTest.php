@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\SiteDeployWebhookTest;
+
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\Server;
@@ -10,10 +10,11 @@ use App\Models\SiteDeployment;
 use App\Models\SiteDeploySyncGroup;
 use App\Models\WebhookDeliveryLog;
 use App\Support\WebhookSignature;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeSiteWithSecret(string $secret = 'whsec_test_value'): Site
 {

@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Unit\ReverbClientConfigTest;
+
 use App\Support\ReverbClientConfig;
-use PHPUnit\Framework\Attributes\DataProvider;
 
 test('browser port', function (?string $explicitPort, string $scheme, ?string $serverPort, string $appEnvironment, int $expected) {
     expect(ReverbClientConfig::browserPort($explicitPort, $scheme, $serverPort, $appEnvironment))->toBe($expected);

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\CutoverRollbackTest;
+
 use App\Livewire\Imports\Ploi\MigrationProgress;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
@@ -10,10 +11,14 @@ use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Services\Imports\StepOrchestrator;
+use App\Services\Imports\StepRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Organization, 2: ImportServerMigration, 3: ImportSiteMigration}
@@ -179,8 +184,8 @@ test('step orchestrator marks site cutover failed when cutover step fails', func
     ]);
 
     // Trigger the orchestrator with an unregistered key so it marks failed.
-    $registry = new \App\Services\Imports\StepRegistry();
-    $orchestrator = new \App\Services\Imports\StepOrchestrator($registry);
+    $registry = new StepRegistry;
+    $orchestrator = new StepOrchestrator($registry);
     $step->step_key = 'cutover_smoke_test';
     // valid key, but no handler registered → fails.
     $step->save();

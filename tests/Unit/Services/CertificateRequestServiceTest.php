@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\CertificateRequestServiceTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
@@ -15,8 +15,9 @@ use App\Services\Certificates\CertificateSigningRequestGenerator;
 use App\Services\Certificates\ImportedCertificateInstaller;
 use App\Services\Certificates\LetsEncryptDnsCertificateEngine;
 use App\Services\Certificates\LetsEncryptHttpCertificateEngine;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('issue for customer domains includes domain aliases in domains json', function () {
     $site = Site::factory()->create();
@@ -33,13 +34,13 @@ test('issue for customer domains includes domain aliases in domains json', funct
 
     $noopEngine = new class implements CertificateEngine
     {
-        function supports(SiteCertificate $certificate): bool
+        public function supports(SiteCertificate $certificate): bool
         {
             return $certificate->provider_type === SiteCertificate::PROVIDER_LETSENCRYPT
                 && $certificate->challenge_type === SiteCertificate::CHALLENGE_HTTP;
         }
 
-        function execute(SiteCertificate $certificate): SiteCertificate
+        public function execute(SiteCertificate $certificate): SiteCertificate
         {
             $certificate->forceFill([
                 'status' => SiteCertificate::STATUS_ACTIVE,

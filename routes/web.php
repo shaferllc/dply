@@ -1,35 +1,35 @@
 <?php
 
 use App\Http\Controllers\CancelServerProvisionController;
-use App\Http\Controllers\ServerlessFunctionProxyController;
+use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
-use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\LogViewerShareController;
+use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
 use App\Livewire\Billing\Invoices as BillingInvoices;
 use App\Livewire\Billing\Show as BillingShow;
-use App\Livewire\Credentials\Index as CredentialsIndex;
-use App\Livewire\Dashboard;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Cloud\Index as CloudIndex;
-use App\Livewire\Serverless\Create as ServerlessCreate;
-use App\Livewire\Serverless\Index as ServerlessIndex;
-use App\Livewire\Serverless\Journey as ServerlessJourney;
-use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
+use App\Livewire\Credentials\Index as CredentialsIndex;
+use App\Livewire\Dashboard;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
+use App\Livewire\Imports\Forge\Inventory;
+use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
+use App\Livewire\Imports\Ploi\MigrationProgress;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Launches\Create as LaunchesCreate;
 use App\Livewire\Launches\Path as LaunchesPath;
@@ -53,6 +53,9 @@ use App\Livewire\Scripts\Create as ScriptsCreate;
 use App\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Livewire\Scripts\Index as ScriptsIndex;
 use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
+use App\Livewire\Serverless\Create as ServerlessCreate;
+use App\Livewire\Serverless\Index as ServerlessIndex;
+use App\Livewire\Serverless\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
@@ -62,11 +65,14 @@ use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
+use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCluster;
+use App\Livewire\Servers\WorkspaceConsole;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
+use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFirewall;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
@@ -74,12 +80,15 @@ use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePhp;
+use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceRun;
+use App\Livewire\Servers\WorkspaceSchedule;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
+use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
 use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
@@ -89,18 +98,24 @@ use App\Livewire\Settings\Security as SettingsSecurity;
 use App\Livewire\Settings\SourceControl as SettingsSourceControl;
 use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
+use App\Livewire\Sites\Caching;
 use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
+use App\Livewire\Sites\Files;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Monitor as SitesMonitor;
+use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\ScaffoldJourney;
+use App\Livewire\Sites\Schedule;
+use App\Livewire\Sites\ServerlessRouting;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
+use App\Livewire\Sites\Workers;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
@@ -110,6 +125,7 @@ use App\Livewire\TwoFactor\Page as TwoFactorPage;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -155,8 +171,8 @@ foreach ((array) config('services.digitalocean.testing_domains', []) as $functio
         ->any('/{path?}', ServerlessFunctionProxyController::class)
         ->where('path', '.*')
         ->withoutMiddleware([
-            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
-            \App\Http\Middleware\RedirectGuestsToComingSoon::class,
+            ValidateCsrfToken::class,
+            RedirectGuestsToComingSoon::class,
         ]);
 }
 
@@ -262,8 +278,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
     Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
-    Route::livewire('imports/ploi/migrations/{migration}', \App\Livewire\Imports\Ploi\MigrationProgress::class)->name('imports.ploi.migration.progress');
-    Route::livewire('imports/forge', \App\Livewire\Imports\Forge\Inventory::class)->name('imports.forge.inventory');
+    Route::livewire('imports/ploi/migrations/{migration}', MigrationProgress::class)->name('imports.ploi.migration.progress');
+    Route::livewire('imports/forge', Inventory::class)->name('imports.forge.inventory');
     Route::middleware('feature:surface.projects')->group(function (): void {
         Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
         Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
@@ -369,24 +385,24 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
-    Route::livewire('servers/{server}/sites/{site}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->name('sites.queue-workers');
+    Route::livewire('servers/{server}/sites/{site}/queue-workers', WorkspaceQueueWorkers::class)->name('sites.queue-workers');
     // BACKGROUND group for container/serverless workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
-    Route::livewire('servers/{server}/sites/{site}/schedule', \App\Livewire\Sites\Schedule::class)->name('sites.schedule');
-    Route::livewire('servers/{server}/sites/{site}/workers', \App\Livewire\Sites\Workers::class)->name('sites.workers');
+    Route::livewire('servers/{server}/sites/{site}/schedule', Schedule::class)->name('sites.schedule');
+    Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
     // NETWORKING group for serverless workspaces — manages the dply edge
     // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). Distinct from VM `routing` which edits nginx.
-    Route::livewire('servers/{server}/sites/{site}/routing', \App\Livewire\Sites\ServerlessRouting::class)->name('sites.routing');
+    Route::livewire('servers/{server}/sites/{site}/routing', ServerlessRouting::class)->name('sites.routing');
     // DEPLOY group for serverless workspaces — Repository page that
     // browses the connected repo: overview (commits + README), file
     // tree, branches, and the connection config (account / repo /
     // deploy key / webhook). VM sites keep the legacy section partial
     // at `?section=repository`.
-    Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
-    Route::livewire('servers/{server}/sites/{site}/caching', \App\Livewire\Sites\Caching::class)->name('sites.caching');
-    Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
+    Route::livewire('servers/{server}/sites/{site}/repository', Repository::class)->name('sites.repository');
+    Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
+    Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to
@@ -429,18 +445,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     });
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
-    Route::livewire('servers/{server}/webserver', \App\Livewire\Servers\WorkspaceWebserver::class)->name('servers.webserver');
+    Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
     });
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
-    Route::livewire('servers/{server}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->middleware('server.service.installed')->name('servers.queue-workers');
+    Route::livewire('servers/{server}/queue-workers', WorkspaceQueueWorkers::class)->middleware('server.service.installed')->name('servers.queue-workers');
     Route::middleware('feature:workspace.schedule')->group(function (): void {
-        Route::livewire('servers/{server}/schedule', \App\Livewire\Servers\WorkspaceSchedule::class)->name('servers.schedule');
+        Route::livewire('servers/{server}/schedule', WorkspaceSchedule::class)->name('servers.schedule');
     });
-    Route::livewire('servers/{server}/backups', \App\Livewire\Servers\WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
+    Route::livewire('servers/{server}/backups', WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::middleware('feature:workspace.system_users')->group(function (): void {
@@ -454,11 +470,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
     });
     Route::middleware('feature:workspace.console')->group(function (): void {
-        Route::livewire('servers/{server}/console', \App\Livewire\Servers\WorkspaceConsole::class)->name('servers.console');
+        Route::livewire('servers/{server}/console', WorkspaceConsole::class)->name('servers.console');
     });
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::middleware('feature:workspace.files')->group(function (): void {
-        Route::livewire('servers/{server}/files', \App\Livewire\Servers\WorkspaceFiles::class)->name('servers.files');
+        Route::livewire('servers/{server}/files', WorkspaceFiles::class)->name('servers.files');
     });
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');

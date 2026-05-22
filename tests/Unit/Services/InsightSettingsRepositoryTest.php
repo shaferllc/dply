@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\Services\InsightSettingsRepositoryTest;
+
 use App\Models\Organization;
 use App\Services\Insights\InsightSettingsRepository;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('default enabled map turns off pro insights without subscription', function () {
     // Heartbeat default_enabled is env-driven (INSIGHTS_HEARTBEAT_DEFAULT_ENABLED).

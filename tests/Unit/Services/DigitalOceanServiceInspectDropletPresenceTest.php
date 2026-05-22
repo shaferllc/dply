@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceInspectDropletPresenceTest;
+
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
+
 test('inspect reports gone on 404', function () {
     Http::fake([
         'api.digitalocean.com/v2/droplets/555' => Http::response(['message' => 'Not found'], 404),

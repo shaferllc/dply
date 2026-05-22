@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Models\Site;
 use App\Services\Serverless\ServerlessRoutingResolver;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +25,7 @@ use Throwable;
  * Before forwarding, the resolved routing rules are applied in order:
  * redirects → CORS preflight short-circuit → forward upstream → response
  * decoration (static headers + CORS). Custom-domain hosts are dispatched
- * here by the {@see \App\Http\Middleware\ResolveServerlessCustomDomain}
+ * here by the {@see ResolveServerlessCustomDomain}
  * middleware via {@see self::proxyForSite()}.
  */
 class ServerlessFunctionProxyController extends Controller

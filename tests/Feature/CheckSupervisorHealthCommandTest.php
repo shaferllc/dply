@@ -3,18 +3,20 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CheckSupervisorHealthCommandTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\SupervisorProgram;
 use App\Models\User;
 use App\Services\Servers\SupervisorProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('no op when disabled', function () {
     Config::set('dply.supervisor_health_check_enabled', false);

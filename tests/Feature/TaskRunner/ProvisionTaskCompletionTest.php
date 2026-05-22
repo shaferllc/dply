@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunner\ProvisionTaskCompletionTest;
+
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\InstallMetricsAgentJob;
@@ -14,8 +15,10 @@ use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // applyProvisionOutcomeToServer dispatches three follow-up jobs

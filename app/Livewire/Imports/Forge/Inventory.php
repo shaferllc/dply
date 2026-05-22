@@ -9,6 +9,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ForgeServer;
 use App\Models\ImportServerMigration;
 use App\Models\ProviderCredential;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -182,7 +183,7 @@ class Inventory extends Component
             return $value;
         }
         if (is_string($value) && $value !== '') {
-            return \Carbon\Carbon::parse($value);
+            return Carbon::parse($value);
         }
 
         return null;

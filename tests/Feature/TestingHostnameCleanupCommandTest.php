@@ -1,10 +1,9 @@
 <?php
 
-
 namespace Tests\Feature\TestingHostnameCleanupCommandTest;
-use Mockery;
 
 use App\Services\Sites\TestingHostnameRecordPruner;
+use Mockery;
 
 test('it reports stale records in dry run mode', function () {
     $pruner = Mockery::mock(TestingHostnameRecordPruner::class);

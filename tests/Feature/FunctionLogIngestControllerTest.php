@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FunctionLogIngestControllerTest;
+
 use App\Models\FunctionInvocation;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+
+uses(RefreshDatabase::class);
 
 const SECRET = 'ingest-secret-abc';
 function functionSite(): Site
@@ -17,7 +21,7 @@ function functionSite(): Site
 /**
  * @param  array<string, mixed>  $payload
  */
-function postRecord(Site $site, array $payload, ?string $secret = SECRET): \Illuminate\Testing\TestResponse
+function postRecord(Site $site, array $payload, ?string $secret = SECRET): TestResponse
 {
     $body = (string) json_encode($payload);
     $headers = ['CONTENT_TYPE' => 'application/json'];

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\ServerWorkspaceSshKeysTest;
+
 use App\Jobs\PreviewDriftJob;
 use App\Jobs\SyncAuthorizedKeysJob;
 use App\Livewire\Servers\WorkspaceSshKeys;
@@ -11,11 +11,14 @@ use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\User;
 use App\Models\UserSshKey;
+use App\Services\Servers\OrganizationTeamSshKeyServerDeployer;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function actingOwnerWithServer(): array
 {
@@ -390,7 +393,7 @@ test('poll sync status hydrates diff result from drift cache', function () {
     ])]);
 
     $cacheKey = (string) config('server_ssh_keys.drift_output_cache_key_prefix', 'ssh_key_drift_output:').$runId;
-    \Illuminate\Support\Facades\Cache::put($cacheKey, [
+    Cache::put($cacheKey, [
         'lines' => ['> Connecting…', '> Done. Diff computed.'],
         'diff_result' => [
             'root' => ['remote' => [], 'desired' => [], 'added' => [], 'removed' => []],
@@ -513,7 +516,7 @@ test('deploy org key is blocked while sync is in flight', function () {
         config('server_ssh_keys.meta_sync_run_id_key') => '01ABC',
     ])]);
 
-    $this->mock(\App\Services\Servers\OrganizationTeamSshKeyServerDeployer::class, function ($mock): void {
+    $this->mock(OrganizationTeamSshKeyServerDeployer::class, function ($mock): void {
         $mock->shouldNotReceive('deployOrganizationKey');
     });
 

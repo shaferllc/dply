@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\RenameServerCommandTest;
+
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('renames server', function () {
     $server = Server::factory()->create(['name' => 'web-1']);

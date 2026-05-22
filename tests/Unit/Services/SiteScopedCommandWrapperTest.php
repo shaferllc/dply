@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteScopedCommandWrapperTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\SiteScopedCommandWrapper;

@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\DashboardFleetAlertBannerTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('banner hidden when fleet is clean', function () {
     [$user, $org] = makeUserOrg();

@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\Create\KubernetesWizardTest;
-use App\Livewire\Forms\ServerCreateForm;
+
+use App\Jobs\PollDoksClusterStatusJob;
 use App\Livewire\Servers\Create\StepReview;
 use App\Livewire\Servers\Create\StepWhat;
 use App\Livewire\Servers\Create\StepWhere;
@@ -12,14 +13,16 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
-use App\Jobs\PollDoksClusterStatusJob;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('choosing kubernetes host kind clears type for provider pick', function () {
     // Choosing the K8s host-kind tile sets provider_host_kind=kubernetes

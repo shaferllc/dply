@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\ProjectsTest;
+
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
@@ -15,12 +15,14 @@ use App\Models\Site;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function userWithOrganization(string $role = 'owner'): User
 {

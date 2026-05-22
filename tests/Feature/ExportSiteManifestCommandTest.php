@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ExportSiteManifestCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('writes manifest to stdout', function () {
     $site = makeSite(['runtime' => 'node', 'runtime_version' => '20']);

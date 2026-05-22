@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\Jobs\ProvisionServerlessHostJobTest;
+
 use App\Jobs\ProvisionServerlessHostJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
@@ -9,10 +9,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeHost(array $serverMeta = []): Server
 {

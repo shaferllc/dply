@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Feature\WorkspaceSettingsRepairAccessTest;
+
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\ServerSshAccessRepairer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function actingOwnerWithServer(): array
 {

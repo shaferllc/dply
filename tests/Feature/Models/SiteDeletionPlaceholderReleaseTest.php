@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Models\SiteDeletionPlaceholderReleaseTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Scaffold\PlaceholderDnsManager;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

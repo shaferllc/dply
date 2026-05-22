@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Config\WebserverServiceActionsConfigTest;
+
 test('lifecycle actions are registered for each engine', function () {
     $actions = (array) config('server_manage.service_actions', []);
     foreach (['nginx', 'caddy', 'apache'] as $engine) {

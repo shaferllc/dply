@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\RemoteCli\WpCliClassificationTest;
-use Mockery;
 
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RemoteCliPermissions;
@@ -11,7 +10,8 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\RemoteCli\WpCli;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use PHPUnit\Framework\Attributes\DataProvider;
+use Mockery;
+
 afterEach(function () {
     Mockery::close();
 });

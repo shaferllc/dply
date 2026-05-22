@@ -9,6 +9,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ImportServerMigration;
 use App\Models\PloiServer;
 use App\Models\ProviderCredential;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -98,10 +99,10 @@ class Inventory extends Component
      * "View last migration" link on the inventory page so the user has
      * a way back into history after a completed/aborted run.
      *
-     * @param  \Illuminate\Support\Collection<int, PloiServer>  $servers
-     * @return \Illuminate\Support\Collection<int, ImportServerMigration>
+     * @param  Collection<int, PloiServer>  $servers
+     * @return Collection<int, ImportServerMigration>
      */
-    protected function mostRecentTerminalMigrationsForServers($servers): \Illuminate\Support\Collection
+    protected function mostRecentTerminalMigrationsForServers($servers): Collection
     {
         if ($servers->isEmpty()) {
             return collect();
@@ -130,10 +131,10 @@ class Inventory extends Component
      * Used by the Blade to show a "View migration" badge in place of the
      * "Migrate" CTA — enforces the per-PloiServer lock from Q18 visibly.
      *
-     * @param  \Illuminate\Support\Collection<int, PloiServer>  $servers
-     * @return \Illuminate\Support\Collection<int, ImportServerMigration>
+     * @param  Collection<int, PloiServer>  $servers
+     * @return Collection<int, ImportServerMigration>
      */
-    protected function activeMigrationsForServers($servers): \Illuminate\Support\Collection
+    protected function activeMigrationsForServers($servers): Collection
     {
         if ($servers->isEmpty()) {
             return collect();
@@ -199,7 +200,7 @@ class Inventory extends Component
             return $value;
         }
         if (is_string($value) && $value !== '') {
-            return \Carbon\Carbon::parse($value);
+            return Carbon::parse($value);
         }
 
         return null;

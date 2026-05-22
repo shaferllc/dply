@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeleteSystemdTeardownTest;
+
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('node site deletion passes unit names to cleanup job', function () {
     Queue::fake();

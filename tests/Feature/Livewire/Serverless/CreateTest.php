@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Serverless\CreateTest;
+
 use App\Livewire\Serverless\Create as ServerlessCreate;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -9,10 +9,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -214,14 +215,12 @@ function fakeServerlessCheckout(callable $populate): string
 
     $this->app->instance(ServerlessRepositoryCheckout::class, new class($dir)
     {
-        function __construct(private string $dir)
-        {
-        }
+        public function __construct(private string $dir) {}
 
         /**
          * @return array<string, string>
          */
-        function checkout(): array
+        public function checkout(): array
         {
             return [
                 'workspace_path' => $this->dir,
@@ -232,9 +231,7 @@ function fakeServerlessCheckout(callable $populate): string
             ];
         }
 
-        function cleanup(string $workspacePath): void
-        {
-        }
+        public function cleanup(string $workspacePath): void {}
     });
 
     return $dir;

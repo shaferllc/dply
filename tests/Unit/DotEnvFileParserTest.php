@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\DotEnvFileParserTest;
+
 use App\Services\Sites\DotEnvFileParser;
+
 test('parses simple assignments', function () {
     $parser = new DotEnvFileParser;
     $r = $parser->parse("FOO=bar\nBAZ=qux\n");

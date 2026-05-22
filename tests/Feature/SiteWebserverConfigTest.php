@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\SiteWebserverConfigTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -9,8 +9,9 @@ use App\Models\SiteDomain;
 use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
 use App\Services\Sites\NginxSiteConfigBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('webserver config page loads', function () {
     $user = User::factory()->create();

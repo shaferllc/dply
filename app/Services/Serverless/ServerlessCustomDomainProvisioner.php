@@ -7,6 +7,7 @@ namespace App\Services\Serverless;
 use App\Models\Site;
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -74,7 +75,7 @@ final class ServerlessCustomDomainProvisioner
         }
 
         // Auto path: we own the zone, write the CNAME.
-        $recordName = (string) \Illuminate\Support\Str::beforeLast($hostname, '.'.$zone);
+        $recordName = (string) Str::beforeLast($hostname, '.'.$zone);
         if ($recordName === '') {
             $recordName = '@';
         }
@@ -164,7 +165,7 @@ final class ServerlessCustomDomainProvisioner
             'verified_at' => now()->toIso8601String(),
             'error' => $matches
                 ? null
-                : "Hostname resolves to ".implode(', ', $resolved).", expected {$expected}.",
+                : 'Hostname resolves to '.implode(', ', $resolved).", expected {$expected}.",
         ]);
     }
 
@@ -186,6 +187,7 @@ final class ServerlessCustomDomainProvisioner
         foreach ($domains as $entry) {
             if (is_array($entry) && strtolower((string) ($entry['hostname'] ?? '')) === $hostname) {
                 $removed = $entry;
+
                 continue;
             }
             $remaining[] = $entry;

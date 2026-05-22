@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\InstallDatabaseEngineOnServerTest;
-use \App\Actions\Servers\InstallDatabaseEngineOnServer;
+
+use App\Actions\Servers\InstallDatabaseEngineOnServer;
 use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('install runs apt steps then registers postgres', function () {
     $server = Server::factory()->ready()->create([
@@ -99,11 +102,9 @@ test('add engine command with install flag falls back when engine unknown', func
     $this->app->bind(InstallDatabaseEngineOnServer::class, function () {
         return new class extends InstallDatabaseEngineOnServer
         {
-            function __construct()
-            {
-            }
+            public function __construct() {}
 
-            function execute(Server $server, string $engine, ?string $version = null, bool $isDefault = false, ?\Closure $shellFactory = null): array
+            public function execute(Server $server, string $engine, ?string $version = null, bool $isDefault = false, ?\Closure $shellFactory = null): array
             {
                 return ['ok' => false, 'engine' => $engine, 'output' => ''];
             }
@@ -123,14 +124,12 @@ test('add engine command with install flag falls back when engine unknown', func
 });
 class InstallDbRecordingShell implements RemoteShell
 {
-    function exec(string $command, int $timeoutSeconds = 120): string
+    public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;
 
         return '';
     }
 
-    function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-    }
+    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\WorkspaceCachesKeyBrowserTest;
+
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Models\Organization;
 use App\Models\Server;
@@ -14,11 +15,14 @@ use App\Support\Servers\CacheServiceCli;
 use App\Support\Servers\CacheServiceKeyExplorer;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 beforeEach(function () {
     Queue::fake();

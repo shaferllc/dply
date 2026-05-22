@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\WorkspaceDatabasesTest;
+
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Servers\WorkspaceDatabases;
@@ -13,10 +13,11 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\User;
 use App\Services\Servers\ServerDatabaseHostCapabilities;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function actingOwnerWithServer(): array
 {

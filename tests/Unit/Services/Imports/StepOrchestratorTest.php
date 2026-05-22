@@ -3,23 +3,24 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\StepOrchestratorTest;
-use RuntimeException;
 
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
-use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\StepOrchestrator;
 use App\Services\Imports\StepRegistry;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
+
+uses(RefreshDatabase::class);
 
 test('execute marks succeeded when handler returns cleanly', function () {
     [$migration, $step] = seedSingleStep('freeze_snapshot');
 
-    $registry = new StepRegistry();
+    $registry = new StepRegistry;
     $registry->register('freeze_snapshot', InlineSucceedingHandler::class);
 
     (new StepOrchestrator($registry))->executeStep($step);
@@ -37,7 +38,7 @@ test('execute marks succeeded when handler returns cleanly', function () {
 test('execute marks failed and records message when handler throws', function () {
     [, $step] = seedSingleStep('freeze_snapshot');
 
-    $registry = new StepRegistry();
+    $registry = new StepRegistry;
     $registry->register('freeze_snapshot', InlineThrowingHandler::class);
 
     (new StepOrchestrator($registry))->executeStep($step);
@@ -51,7 +52,7 @@ test('execute is a noop for terminal steps', function () {
     $step->status = ImportMigrationStep::STATUS_SUCCEEDED;
     $step->save();
 
-    $registry = new StepRegistry();
+    $registry = new StepRegistry;
     $registry->register('freeze_snapshot', InlineThrowingHandler::class);
 
     (new StepOrchestrator($registry))->executeStep($step);
@@ -63,7 +64,7 @@ test('execute is a noop for terminal steps', function () {
 test('unknown step key marks failed with clear message', function () {
     [, $step] = seedSingleStep('totally_unknown');
 
-    (new StepOrchestrator(new StepRegistry()))->executeStep($step);
+    (new StepOrchestrator(new StepRegistry))->executeStep($step);
 
     $step->refresh();
     expect($step->status)->toBe(ImportMigrationStep::STATUS_FAILED);
@@ -96,7 +97,7 @@ test('next step skips cutover steps', function () {
         'status' => ImportMigrationStep::STATUS_PENDING,
     ]);
 
-    $next = (new StepOrchestrator(new StepRegistry()))->nextStep($migration);
+    $next = (new StepOrchestrator(new StepRegistry))->nextStep($migration);
 
     expect($next)->not->toBeNull();
     expect($next->id)->toBe($revoke->id);
@@ -138,23 +139,21 @@ function seedMigration(): ImportServerMigration
 }
 final class InlineSucceedingHandler implements StepHandler
 {
-    static function key(): string
+    public static function key(): string
     {
         return 'freeze_snapshot';
     }
 
-    function execute(ImportMigrationStep $step): void
-    {
-    }
+    public function execute(ImportMigrationStep $step): void {}
 }
 final class InlineThrowingHandler implements StepHandler
 {
-    static function key(): string
+    public static function key(): string
     {
         return 'freeze_snapshot';
     }
 
-    function execute(ImportMigrationStep $step): void
+    public function execute(ImportMigrationStep $step): void
     {
         throw new RuntimeException('boom');
     }

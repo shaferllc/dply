@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudNavLinkTest;
+
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('authenticated dashboard includes cloud link when surface cloud active', function () {
     Feature::define('surface.cloud', fn () => true);

@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessAdapterRuntimeTest;
+
 use App\Services\Deploy\ServerlessDjangoAdapter;
 use App\Services\Deploy\ServerlessExpressAdapter;
 use App\Services\Deploy\ServerlessFlaskAdapter;
 use App\Services\Deploy\ServerlessGinAdapter;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Assert;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
+
 function tempDir(): string
 {
     $dir = storage_path('framework/testing/adapter-runtime-'.uniqid());
@@ -20,7 +23,7 @@ function tempDir(): string
 function skipUnless(string $binary): void
 {
     if ((new ExecutableFinder)->find($binary) === null) {
-        \PHPUnit\Framework\Assert::markTestSkipped($binary.' is not available in this environment.');
+        Assert::markTestSkipped($binary.' is not available in this environment.');
     }
 }
 /**
@@ -40,7 +43,7 @@ function process(array $command, string $dir, array $env = [], int $timeout = 30
 function installOrSkip(array $command, string $dir, array $env = []): void
 {
     if (! process($command, $dir, $env)->isSuccessful()) {
-        \PHPUnit\Framework\Assert::markTestSkipped('Dependency install failed (offline?): '.implode(' ', $command));
+        Assert::markTestSkipped('Dependency install failed (offline?): '.implode(' ', $command));
     }
 }
 /**

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\RoutingConfigBuilderParityTest;
+
 use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
@@ -14,8 +14,9 @@ use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('apache builder uses all webserver hostnames and redirects', function () {
     $site = routingSite();

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\RepositoryWebhookProvisionerTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -10,11 +10,12 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteDeploySyncCoordinator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('enable creates github hook and persists meta', function () {
     Http::fake(function () {

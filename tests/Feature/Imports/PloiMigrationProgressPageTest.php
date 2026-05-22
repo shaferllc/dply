@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiMigrationProgressPageTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Livewire\Imports\Ploi\MigrationProgress;
 use App\Models\ImportMigrationStep;
@@ -11,9 +12,11 @@ use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function seedMigration(?User $user = null): ImportServerMigration
 {
@@ -153,7 +156,7 @@ test('begin cutover dispatches first cutover step when site ready', function () 
         'status' => ImportMigrationStep::STATUS_PENDING,
     ]);
 
-    \Livewire\Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test(MigrationProgress::class, ['migration' => $migration])
         ->call('beginCutover', $site->id)
         ->assertHasNoErrors();
@@ -170,7 +173,7 @@ test('begin cutover rejects site not ready', function () {
     expect($site)->not->toBeNull();
     $this->assertNotSame(ImportSiteMigration::STATUS_READY_FOR_CUTOVER, $site->status);
 
-    \Livewire\Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test(MigrationProgress::class, ['migration' => $migration])
         ->call('beginCutover', $site->id);
 

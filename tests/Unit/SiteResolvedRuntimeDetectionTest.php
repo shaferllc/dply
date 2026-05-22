@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\SiteResolvedRuntimeDetectionTest;
+
 use App\Models\Site;
 
 test('resolved detection prefers docker meta over kubernetes and serverless', function () {

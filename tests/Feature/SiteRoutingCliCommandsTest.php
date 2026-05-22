@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteRoutingCliCommandsTest;
+
 use App\Enums\SiteRedirectKind;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Models\Server;
@@ -11,9 +12,11 @@ use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteRedirect;
 use App\Models\SiteTenantDomain;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('alias add creates row and dispatches apply', function () {
     Bus::fake();

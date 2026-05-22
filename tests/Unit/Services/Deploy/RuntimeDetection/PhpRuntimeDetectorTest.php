@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\PhpRuntimeDetectorTest;
+
 use App\Models\SiteProcess;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
+
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-php-detector-'.uniqid();
     mkdir($this->tempDir);

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\SiteCloneTest;
+
 use App\Jobs\CloneSiteJob;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Models\Organization;
@@ -9,10 +9,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 

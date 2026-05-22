@@ -255,4 +255,3 @@ class ApplyInsightFixJob implements ShouldQueue
         ], $extra));
     }
 }
-

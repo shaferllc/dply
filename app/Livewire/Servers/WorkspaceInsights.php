@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Jobs\ApplyInsightFixJob;
 use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
 use App\Models\Organization;
@@ -20,7 +21,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -29,6 +29,7 @@ class WorkspaceInsights extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.insights';
+
     use InteractsWithServerWorkspace;
 
     public string $tab = 'overview';

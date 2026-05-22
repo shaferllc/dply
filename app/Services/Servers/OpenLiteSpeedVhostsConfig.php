@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -199,6 +200,7 @@ class OpenLiteSpeedVhostsConfig
      * once; on failure restores every snapshot.
      *
      * @param  array<string, array{conf_path: string, values: array<string, string>}>  $updates  Keyed by vhost name
+     *
      * @throws \RuntimeException
      */
     public function save(Server $server, array $updates, ?ConsoleEmitter $emitter = null): void
@@ -274,7 +276,7 @@ class OpenLiteSpeedVhostsConfig
             foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
                 $line = trim($line);
                 if ($line !== '') {
-                    $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                    $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
                 }
             }
             if ($exit !== 0) {

@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
+use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
@@ -380,7 +381,7 @@ class Index extends Component
         if ($org) {
             $importSources = ProviderCredential::query()
                 ->where('organization_id', $org->id)
-                ->whereIn('provider', \App\Enums\ServerProvider::importProviderKeys())
+                ->whereIn('provider', ServerProvider::importProviderKeys())
                 ->pluck('provider')
                 ->unique()
                 ->values();

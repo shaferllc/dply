@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
@@ -176,8 +177,8 @@ class Caching extends Component
         $this->site->save();
 
         // Re-emit the vhost so the new directives land on disk.
-        if (class_exists(\App\Jobs\ApplySiteWebserverConfigJob::class)) {
-            \App\Jobs\ApplySiteWebserverConfigJob::dispatch($this->site->id);
+        if (class_exists(ApplySiteWebserverConfigJob::class)) {
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
         }
 
         $this->toastSuccess(__('Caching settings saved and applied.'));

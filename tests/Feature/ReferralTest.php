@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Feature\ReferralTest;
+
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Auth\Register;
 use App\Models\Organization;
 use App\Models\ReferralReward;
 use App\Models\User;
 use App\Services\Referrals\ReferralConversionService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Cashier\Events\WebhookReceived;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('valid referrer query sets session', function () {
     $referrer = User::factory()->create();

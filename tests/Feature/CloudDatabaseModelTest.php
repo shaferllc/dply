@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseModelTest;
+
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('factory creates a provisioning postgres database', function () {
     $db = CloudDatabase::factory()->create();

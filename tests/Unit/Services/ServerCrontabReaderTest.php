@@ -1,11 +1,10 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerCrontabReaderTest;
+
 use App\Models\Server;
-use \App\Services\SshConnection;
-use \App\Services\Servers\ServerCrontabReader;
-use PHPUnit\Framework\Attributes\Test;
+use App\Services\Servers\ServerCrontabReader;
+use App\Services\SshConnection;
 
 it('rejects invalid linux usernames', function () {
     $server = new Server([
@@ -32,7 +31,7 @@ it('uses root before the server ssh user when fallback is enabled', function () 
         /**
          * @return list<string>
          */
-        function exposedSshLoginCandidates(Server $server): array
+        public function exposedSshLoginCandidates(Server $server): array
         {
             return $this->sshLoginCandidates($server);
         }
@@ -53,21 +52,19 @@ it('uses recovery role for root attempts and operational role for deploy attempt
 
     $reader = new class extends ServerCrontabReader
     {
-        function makeConnection(Server $server, string $loginUser): SshConnection
+        public function makeConnection(Server $server, string $loginUser): SshConnection
         {
             $role = $loginUser === 'root' ? SshConnection::ROLE_RECOVERY : SshConnection::ROLE_OPERATIONAL;
             $this->createdConnections[] = [$loginUser, $role];
 
             return new class($server, $loginUser, $role) extends SshConnection
             {
-                function exec(string $command, int $timeoutSeconds = 120): string
+                public function exec(string $command, int $timeoutSeconds = 120): string
                 {
                     throw new \RuntimeException('stop after role capture');
                 }
 
-                function disconnect(): void
-                {
-                }
+                public function disconnect(): void {}
             };
         }
     };

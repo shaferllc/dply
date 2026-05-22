@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FlushDeployDigestCommandTest;
+
 use App\Models\Organization;
 use App\Models\User;
 use App\Services\Notifications\DeployDigestBuffer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Mail;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('does nothing when digest disabled', function () {
     Config::set('dply.deploy_digest_hours', 0);

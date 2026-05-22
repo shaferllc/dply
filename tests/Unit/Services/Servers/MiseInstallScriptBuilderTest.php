@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\MiseInstallScriptBuilderTest;
+
 use App\Services\Servers\MiseInstallScriptBuilder;
+
 test('install lines are idempotent with command v guard', function () {
     $lines = (new MiseInstallScriptBuilder)->installLines();
     $script = implode("\n", $lines);

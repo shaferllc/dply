@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Sites\MonitorServerlessTest;
+
 use App\Livewire\Sites\Monitor;
 use App\Models\FunctionInvocation;
 use App\Models\Organization;
@@ -11,9 +12,11 @@ use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Models\User;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /** @return array{0: User, 1: Server, 2: Site} */
 function makeFunctionsSite(): array

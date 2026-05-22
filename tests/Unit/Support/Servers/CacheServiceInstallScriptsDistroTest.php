@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\CacheServiceInstallScriptsDistroTest;
+
 use App\Support\Servers\CacheServiceInstallScripts;
+
 test('supported distro codenames keydb', function () {
     expect(CacheServiceInstallScripts::supportedDistroCodenames('keydb'))->toBe(['focal', 'jammy', 'bullseye', 'bookworm']);
 });

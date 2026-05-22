@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeploymentDetailPageTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('renders phase tree for a deployment', function () {
     [$user, $server, $site] = makeUserSite();

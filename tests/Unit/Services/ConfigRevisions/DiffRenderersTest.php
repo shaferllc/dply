@@ -1,11 +1,10 @@
 <?php
 
-
 namespace Tests\Unit\Services\ConfigRevisions\DiffRenderersTest;
+
 use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
 use App\Services\ConfigRevisions\Diff\PhpFileDiffRenderer;
 use App\Services\ConfigRevisions\Diff\WebserverConfigDiffRenderer;
-use PHPUnit\Framework\Attributes\Test;
 
 test('php file renderer produces unified diff lines for changed content', function () {
     $renderer = new PhpFileDiffRenderer;
@@ -15,8 +14,8 @@ test('php file renderer produces unified diff lines for changed content', functi
         ['path' => '/etc/php/8.4/cli/php.ini', 'content' => "a\nBB\nc\n"],
     );
 
-    $this->assertStringContainsString("-b", $out);
-    $this->assertStringContainsString("+BB", $out);
+    $this->assertStringContainsString('-b', $out);
+    $this->assertStringContainsString('+BB', $out);
 });
 
 test('php file renderer returns empty string when content unchanged', function () {

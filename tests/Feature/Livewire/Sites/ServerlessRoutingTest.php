@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Sites\ServerlessRoutingTest;
+
 use App\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Livewire\Sites\ServerlessRouting;
 use App\Models\Organization;
@@ -9,11 +9,12 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Serverless\ServerlessRoutingResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * @param  array<string, mixed>  $serverlessMeta

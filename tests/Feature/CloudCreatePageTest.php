@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudCreatePageTest;
-use \App\Services\SourceControl\SourceControlRepositoryBrowser;
+
 use App\Jobs\ProvisionCloudSiteJob;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Models\Organization;
@@ -14,11 +14,15 @@ use App\Models\User;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('page renders with no backends connected warning', function () {
     config(['server_provision_fake.env_flag' => false]);
@@ -182,16 +186,14 @@ test('source tab renders picker when accounts linked', function () {
 
     $browser = new class extends SourceControlRepositoryBrowser
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function accountsForUser($user): array
+        public function accountsForUser($user): array
         {
             return [['id' => 'acct-1', 'label' => 'github:acme', 'name' => 'acme']];
         }
 
-        function repositoriesForAccount($account): array
+        public function repositoriesForAccount($account): array
         {
             return [
                 ['url' => 'https://github.com/acme/api', 'name' => 'acme/api', 'branch' => 'main'],
@@ -225,16 +227,14 @@ test('picker selection populates repo and branch', function () {
 
     $browser = new class($account->id) extends SourceControlRepositoryBrowser
     {
-        function __construct(public string $accountId)
-        {
-        }
+        public function __construct(public string $accountId) {}
 
-        function accountsForUser($user): array
+        public function accountsForUser($user): array
         {
             return [['id' => $this->accountId, 'label' => 'github:acme', 'name' => 'acme']];
         }
 
-        function repositoriesForAccount($account): array
+        public function repositoriesForAccount($account): array
         {
             return [
                 ['url' => 'https://github.com/acme/api.git', 'name' => 'acme/api', 'branch' => 'develop'],
@@ -329,7 +329,7 @@ test('source mode detection failure does not block deploy', function () {
     ]);
     $this->app->instance(GitCloner::class, new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             throw new GitCloneException('Repository not found.');
         }
@@ -356,11 +356,9 @@ function fakeClonerProducingNodeRepo(string $startScript): void
 {
     $this->app->instance(GitCloner::class, new class($startScript) implements GitCloner
     {
-        function __construct(private string $startScript)
-        {
-        }
+        public function __construct(private string $startScript) {}
 
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             mkdir($destination, 0o755, true);
             file_put_contents(

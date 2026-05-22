@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\Services\DeploymentContractBuilderTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\Workspace;
 use App\Services\Deploy\DeploymentContractBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('it builds a typed contract with environment and bindings', function () {
     $workspace = Workspace::factory()->create();

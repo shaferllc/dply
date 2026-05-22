@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -79,7 +80,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
         // Livewire component can pick it up on its next poll-driven
         // render and drop it into the editor buffer.
         if ($this->op === 'read') {
-            \Illuminate\Support\Facades\Cache::put(
+            Cache::put(
                 self::readResultCacheKey($this->consoleActionId),
                 $result,
                 now()->addMinutes(5),

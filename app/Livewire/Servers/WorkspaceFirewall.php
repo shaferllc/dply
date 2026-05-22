@@ -12,6 +12,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
 use App\Models\FirewallRuleTemplate;
 use App\Models\Server;
+use App\Models\ServerFirewallApplyLog;
 use App\Models\ServerFirewallAuditEvent;
 use App\Models\ServerFirewallRule;
 use App\Models\User;
@@ -28,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('layouts.app')]
 class WorkspaceFirewall extends Component
@@ -206,7 +208,7 @@ class WorkspaceFirewall extends Component
                 array_values(array_filter([
                     sprintf('> Updated "%s" in the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
                     sprintf('  %s %s/%s from %s', strtoupper($rule->action), $rule->port ?? '*', strtoupper($rule->protocol), $rule->source),
-                    $this->lastUfwHostSyncError ? '> Host sync failed: '.\Illuminate\Support\Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
+                    $this->lastUfwHostSyncError ? '> Host sync failed: '.Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
                 ])),
             );
             $this->editing_rule_id = null;
@@ -258,7 +260,7 @@ class WorkspaceFirewall extends Component
                         ? '> Rule is enabled. Click "Apply rules" to reconcile the host firewall.'
                         : '> Rule is disabled — Apply will skip it until you toggle it on.',
                     isset($this->lastUfwHostSyncError) && $this->lastUfwHostSyncError !== null
-                        ? '> Inline host apply failed: '.\Illuminate\Support\Str::limit($this->lastUfwHostSyncError, 200)
+                        ? '> Inline host apply failed: '.Str::limit($this->lastUfwHostSyncError, 200)
                         : null,
                 ])),
             );
@@ -389,7 +391,7 @@ class WorkspaceFirewall extends Component
             __('Rule removed — apply to push to the server'),
             array_values(array_filter([
                 sprintf('> Removed "%s" from the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
-                $remote !== null && $remote !== '' ? '  ufw output: '.\Illuminate\Support\Str::limit(trim($remote), 200) : null,
+                $remote !== null && $remote !== '' ? '  ufw output: '.Str::limit(trim($remote), 200) : null,
                 '> Click "Apply rules" to reconcile the host firewall.',
             ])),
         );
@@ -1263,7 +1265,7 @@ class WorkspaceFirewall extends Component
      * server" — drop the file into a new server's template upload (or feed it to the template
      * applicator directly) and you get the same rules without retyping.
      */
-    public function exportFirewallRulesJson(): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportFirewallRulesJson(): StreamedResponse
     {
         $this->authorize('update', $this->server);
         $this->server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')]);
@@ -1289,7 +1291,7 @@ class WorkspaceFirewall extends Component
             ])->values()->all(),
         ];
 
-        $filename = sprintf('firewall-rules-%s-%s.json', \Illuminate\Support\Str::slug($this->server->name), now()->format('Ymd-His'));
+        $filename = sprintf('firewall-rules-%s-%s.json', Str::slug($this->server->name), now()->format('Ymd-His'));
 
         return response()->streamDownload(function () use ($payload): void {
             echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -1300,13 +1302,13 @@ class WorkspaceFirewall extends Component
      * CSV export — operator-friendly columns, no app_profile/iface_direction (which CSV-flatten
      * poorly). Use the JSON export for round-trip imports; CSV is for spreadsheet audits.
      */
-    public function exportFirewallRulesCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportFirewallRulesCsv(): StreamedResponse
     {
         $this->authorize('update', $this->server);
         $this->server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')]);
 
         $rules = $this->server->firewallRules;
-        $filename = sprintf('firewall-rules-%s-%s.csv', \Illuminate\Support\Str::slug($this->server->name), now()->format('Ymd-His'));
+        $filename = sprintf('firewall-rules-%s-%s.csv', Str::slug($this->server->name), now()->format('Ymd-His'));
 
         return response()->streamDownload(function () use ($rules): void {
             $fh = fopen('php://output', 'w');
@@ -1369,6 +1371,7 @@ class WorkspaceFirewall extends Component
             $rules = $bundle['rules'] ?? [];
             if ($rules === []) {
                 $bundledAppliedMap[$key] = false;
+
                 continue;
             }
             $bundledAppliedMap[$key] = collect($rules)->every(fn ($r) => isset($appliedKeys[
@@ -1398,7 +1401,7 @@ class WorkspaceFirewall extends Component
      * shape the view can branch on: `kind=apply` (expandable, with output) vs `kind=audit`
      * (compact one-liner).
      *
-     * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: \App\Models\ServerFirewallApplyLog, event?: \App\Models\ServerFirewallAuditEvent}>
+     * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: ServerFirewallApplyLog, event?: ServerFirewallAuditEvent}>
      */
     /**
      * Activity timeline window size. Grows by {@see ACTIVITY_PAGE_SIZE} each time the operator

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
+use App\Models\ServerCacheService;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
+use App\Services\Sites\PrimaryHostnameRenamePlanner;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Read-only previewer for the cascade triggered when an operator switches a
@@ -16,7 +19,7 @@ use App\Models\SiteWebserverConfigProfile;
  * modal. No side effects, no remote SSH.
  *
  * Drives the "Switch webserver" UX on `/servers/{srv}/manage/web`. Mirrors
- * the rename-cascade planner pattern from {@see \App\Services\Sites\PrimaryHostnameRenamePlanner}.
+ * the rename-cascade planner pattern from {@see PrimaryHostnameRenamePlanner}.
  */
 final class WebserverSwitchPreflight
 {
@@ -56,7 +59,7 @@ final class WebserverSwitchPreflight
      * eager-loaded) keyed by server_id. Shared across all target evaluations
      * for the same server since the underlying rows don't depend on target.
      *
-     * @var array<string, \Illuminate\Database\Eloquent\Collection<int, Site>>
+     * @var array<string, Collection<int, Site>>
      */
     private array $sitesCache = [];
 
@@ -66,7 +69,7 @@ final class WebserverSwitchPreflight
      * the picker shows — without this every non-active engine pays for its
      * own varnish select even though the answer is identical across targets.
      *
-     * @var array<string, \App\Models\ServerCacheService|null>
+     * @var array<string, ServerCacheService|null>
      */
     private array $varnishCache = [];
 
@@ -170,7 +173,7 @@ final class WebserverSwitchPreflight
      * location blocks, apache .htaccess, etc.) and won't auto-port to the
      * TARGET webserver — operator has to re-port manually after the switch.
      *
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      * @return list<array{id: string, name: string, reason: string}>
      */
     private function detectCustomConfigDrift($sites): array
@@ -205,7 +208,7 @@ final class WebserverSwitchPreflight
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      * @return array{key: string, label: string, detail?: array<string, mixed>}|null
      */
     private function detectBlocker(string $from, string $to, $sites, Server $server): ?array
@@ -252,9 +255,9 @@ final class WebserverSwitchPreflight
      * path here ultimately reads (config profile for drift, certificates for
      * the caddy TLS opt-in). Shared across all target evaluations.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Site>
+     * @return Collection<int, Site>
      */
-    private function sitesFor(Server $server): \Illuminate\Database\Eloquent\Collection
+    private function sitesFor(Server $server): Collection
     {
         if (isset($this->sitesCache[$server->id])) {
             return $this->sitesCache[$server->id];
@@ -270,24 +273,24 @@ final class WebserverSwitchPreflight
      * Most-recent running/installing varnish row for this server, memoized so
      * the picker loop doesn't pay for a select per target.
      */
-    private function varnishRowFor(Server $server): ?\App\Models\ServerCacheService
+    private function varnishRowFor(Server $server): ?ServerCacheService
     {
         if (array_key_exists($server->id, $this->varnishCache)) {
             return $this->varnishCache[$server->id];
         }
 
-        return $this->varnishCache[$server->id] = \App\Models\ServerCacheService::query()
+        return $this->varnishCache[$server->id] = ServerCacheService::query()
             ->where('server_id', $server->id)
             ->where('engine', 'varnish')
             ->whereIn('status', [
-                \App\Models\ServerCacheService::STATUS_RUNNING,
-                \App\Models\ServerCacheService::STATUS_INSTALLING,
+                ServerCacheService::STATUS_RUNNING,
+                ServerCacheService::STATUS_INSTALLING,
             ])
             ->first();
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     private function hasAnyTlsSites($sites): bool
     {

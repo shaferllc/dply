@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\Manifest\DplyManifestParserTest;
+
 use App\Services\Deploy\Manifest\DplyManifest;
 use App\Services\Deploy\Manifest\DplyManifestException;
 use App\Services\Deploy\Manifest\DplyManifestParser;
+
 function parser(): DplyManifestParser
 {
     return new DplyManifestParser;

@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\SourceControlRepositoryBrowserTest;
+
 use App\Models\SocialAccount;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\Http;
+
 test('it lists github repositories for a linked account', function () {
     Http::fake([
         'https://api.github.com/user/repos*' => Http::response([

@@ -1,13 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerBootstrapStrategyResolverTest;
+
 use App\Models\Server;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\Bootstrap\VmServerBootstrapStrategy;
-use PHPUnit\Framework\MockObject\MockObject;
 
 test('resolver returns vm strategy for vm hosts', function () {
     $resolver = makeResolver();

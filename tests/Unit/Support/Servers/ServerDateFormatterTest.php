@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\ServerDateFormatterTest;
+
 use App\Models\Server;
 use App\Support\Servers\ServerDateFormatter;
 use Illuminate\Support\Carbon;
+
 function serverWithMeta(array $meta): Server
 {
     $server = new Server;

@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SetServerMetaCommandTest;
+
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('sets a top level key', function () {
     $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);

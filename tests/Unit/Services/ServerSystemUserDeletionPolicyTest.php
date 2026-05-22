@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSystemUserDeletionPolicyTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\ServerSystemUserDeletionPolicy;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('blocks root dply and deploy users', function () {
     $policy = new ServerSystemUserDeletionPolicy;

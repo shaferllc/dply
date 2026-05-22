@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\SiteSettingsSidebarTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Support\SiteSettingsSidebar;
+
 function makeVmServer(): Server
 {
     $server = new Server;
@@ -140,9 +142,9 @@ test('rails stack item appears when rails detected', function () {
     // Inject the runtime detection blob the helper reads from. resolvedRuntimeAppDetection()
     // looks at the site's `meta` for a cached detection — simplest path is to override the
     // method via an anonymous-class subclass that returns a Rails framework signal.
-    $site = new class extends \App\Models\Site
+    $site = new class extends Site
     {
-        function isRailsFrameworkDetected(): bool
+        public function isRailsFrameworkDetected(): bool
         {
             return true;
         }

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ListPresetsCommandTest;
+
 use Illuminate\Support\Facades\Artisan;
+
 test('command lists all presets with featured marker', function () {
     $exit = Artisan::call('dply:list-presets');
     $output = Artisan::output();

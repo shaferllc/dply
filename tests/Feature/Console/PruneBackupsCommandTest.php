@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Console\PruneBackupsCommandTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function makeServer(): Server
 {

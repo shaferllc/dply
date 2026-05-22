@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSystemUserServiceListUsersTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
@@ -13,8 +11,10 @@ use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerSshConnectionRunner;
 use App\Services\Servers\ServerSystemUserDeletionPolicy;
 use App\Services\Servers\ServerSystemUserService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

@@ -74,7 +74,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 $this->flashSuccessMessage,
                 $output,
             ));
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Swallow broadcast failures: the cache write already happened, so the wire:poll
             // fallback will resolve the banner. We never want a Reverb hiccup to fail the job.
         }

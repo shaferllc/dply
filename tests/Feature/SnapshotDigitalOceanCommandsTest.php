@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SnapshotDigitalOceanCommandsTest;
+
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+
 test('list command renders snapshots as json', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/snapshots*' => Http::response([

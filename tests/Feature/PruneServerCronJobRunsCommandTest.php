@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\PruneServerCronJobRunsCommandTest;
+
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerCronJobRun;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('prunes runs older than retention', function () {
     Config::set('cron_workspace.run_retention_days', 30);

@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerDatabaseDumpOutputValidatorTest;
+
 use App\Services\Servers\ServerDatabaseDumpOutputValidator;
-use PHPUnit\Framework\Attributes\Test;
 
 test('mysql success dump is not failed', function () {
     $sql = "-- MySQL dump\nCREATE TABLE t (id int);\n";

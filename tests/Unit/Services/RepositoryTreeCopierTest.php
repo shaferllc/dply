@@ -1,13 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\Services\RepositoryTreeCopierTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Services\Servers\ServerSshConnectionRunner;
 use App\Services\Sites\Clone\RepositoryTreeCopier;
 use App\Services\SshConnection;
+use Mockery;
 
 afterEach(function () {
     Mockery::close();

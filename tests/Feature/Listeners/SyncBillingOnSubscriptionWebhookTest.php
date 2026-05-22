@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\Listeners\SyncBillingOnSubscriptionWebhookTest;
+
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Listeners\SyncBillingOnSubscriptionWebhook;
 use App\Models\Organization;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Cashier\Events\WebhookReceived;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('dispatches sync on subscription created event', function () {
     Bus::fake();

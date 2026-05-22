@@ -8,8 +8,11 @@ use App\Actions\Serverless\CreateServerlessFunction;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
+use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Services\Serverless\ServerlessCostEstimator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Throwable;
@@ -61,7 +64,7 @@ class Create extends Component
 
     /**
      * Runtime selection. Defaults to `auto` — the deploy-time
-     * {@see \App\Services\Deploy\ServerlessRuntimeDetector} picks the runtime
+     * {@see ServerlessRuntimeDetector} picks the runtime
      * from the repository. An explicit value overrides detection.
      */
     public string $runtime = 'auto';
@@ -165,12 +168,12 @@ class Create extends Component
             'name' => ['required', 'string', 'max:255'],
             'repo' => ['required', 'string', 'max:255'],
             'branch' => ['required', 'string', 'max:255'],
-            'runtime' => ['required', 'string', \Illuminate\Validation\Rule::in(array_keys($this->runtimeOptions()))],
+            'runtime' => ['required', 'string', Rule::in(array_keys($this->runtimeOptions()))],
             'region' => ['required', 'string', 'max:32'],
             'provider_credential_id' => [
                 'required',
                 'string',
-                \Illuminate\Validation\Rule::exists('provider_credentials', 'id')->where(fn ($q) => $q
+                Rule::exists('provider_credentials', 'id')->where(fn ($q) => $q
                     ->where('organization_id', $org->id)
                     ->where('provider', 'digitalocean')),
             ],
@@ -230,7 +233,7 @@ class Create extends Component
 
         return view('livewire.serverless.create', [
             'credentials' => $credentials,
-            'functionFee' => app(\App\Services\Serverless\ServerlessCostEstimator::class)->functionFee(),
+            'functionFee' => app(ServerlessCostEstimator::class)->functionFee(),
             'runtimes' => $this->runtimeOptions(),
             'regions' => [
                 'nyc1' => 'New York',

@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\Models\ServerDatabaseConnectionUrlTest;
+
 use App\Models\Server;
 use App\Models\ServerDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('mysql connection url encodes special characters', function () {
     $server = Server::factory()->create();

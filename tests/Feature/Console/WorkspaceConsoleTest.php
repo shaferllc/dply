@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\Console\WorkspaceConsoleTest;
-use Mockery;
 
 use App\Livewire\Servers\WorkspaceConsole;
 use App\Models\Organization;
@@ -10,11 +8,14 @@ use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\DplyCliInstaller;
 use App\Services\SshConnection;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function userWithOrganization(?string $role = 'owner'): User
 {

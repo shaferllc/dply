@@ -1,8 +1,10 @@
 <?php
 
-
 namespace Tests\Feature\Marketing\PricingPageTest;
-uses(\Tests\Concerns\WithFeatures::class);
+
+use Tests\Concerns\WithFeatures;
+
+uses(WithFeatures::class);
 
 test('pricing page renders new standard and enterprise cards', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));

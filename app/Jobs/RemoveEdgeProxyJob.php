@@ -13,8 +13,10 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -118,7 +120,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
             // Re-probe systemd inventory so meta.manage_units reflects the
             // post-remove state (caddy back on :80, edge proxy stopped+disabled).
-            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+            SyncServerSystemdServicesJob::dispatch($server->id);
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
@@ -138,11 +140,11 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(\Throwable $e): void
     {
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     protected function executeStageRestoreCaddy(Server $server, $sites): void
     {

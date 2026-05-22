@@ -6,12 +6,15 @@ use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\ConfigRevision;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;
 use App\Services\Servers\ServerPhpManager;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -94,12 +97,12 @@ class WorkspacePhp extends Component
                 __(':verb PHP :version on :host', [
                     'verb' => ucfirst($actionVerb), 'version' => $version, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($action, $version, $actionVerb): array {
+                function (ConsoleEmitter $emit) use ($action, $version, $actionVerb): array {
                     $emit->step('php', sprintf('apt %s php%s', $actionVerb, $version));
                     $result = app(ServerPhpManager::class)->applyPackageAction($this->server, $action, $version);
                     foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
                         if ($line !== '') {
-                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'php');
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
                     // The manager surfaces a `stale` status when inventory readback diverges
@@ -145,12 +148,12 @@ class WorkspacePhp extends Component
                 $this->server,
                 'php_refresh_inventory',
                 __('Refresh PHP inventory on :host', ['host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit): array {
+                function (ConsoleEmitter $emit): array {
                     $emit->step('php', 'Probing installed PHP versions');
                     $result = app(ServerPhpManager::class)->refreshInventory($this->server);
                     foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
                         if ($line !== '') {
-                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'php');
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
                     if (($result['status'] ?? null) === 'stale') {
@@ -555,8 +558,8 @@ class WorkspacePhp extends Component
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, ConfigRevision>  $revisions
-     * @return array{0: ?string, 1: ?string}  [diff text, header label]
+     * @param  Collection<int, ConfigRevision>  $revisions
+     * @return array{0: ?string, 1: ?string} [diff text, header label]
      */
     protected function buildDiffForView(ServerPhpConfigEditor $editor, $revisions): array
     {

@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\OrganizationPolicyTest;
+
 use App\Models\Organization;
 use App\Models\User;
 use App\Policies\OrganizationPolicy;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->policy = new OrganizationPolicy;

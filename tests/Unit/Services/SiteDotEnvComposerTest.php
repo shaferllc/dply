@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteDotEnvComposerTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\Workspace;
 use App\Services\Sites\SiteDotEnvComposer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('it merges project variables with site env file content', function () {
     $workspace = Workspace::factory()->create();

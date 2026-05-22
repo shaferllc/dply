@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -322,7 +323,7 @@ trait ManagesNotificationChannels
      * route to that org; user-owned (personal) channels route to the user's
      * current org so the action surfaces alongside their other audit events.
      */
-    protected function recordChannelAudit(string $action, ?\Illuminate\Database\Eloquent\Model $subject, ?array $oldValues, ?array $newValues): void
+    protected function recordChannelAudit(string $action, ?Model $subject, ?array $oldValues, ?array $newValues): void
     {
         $owner = $this->owner();
         $org = match (true) {

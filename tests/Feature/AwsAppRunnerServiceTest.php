@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\AwsAppRunnerServiceTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -11,7 +10,10 @@ use App\Models\User;
 use App\Services\AwsAppRunnerService;
 use Aws\AppRunner\AppRunnerClient;
 use Aws\Result;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('constructor throws when credentials missing', function () {
     $cred = credentialWithoutKey();

@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\DiffSiteEnvCommandTest;
-use \App\Services\Sites\SiteEnvReader;
+
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Sites\SiteEnvReader;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('categorizes keys with a mocked server read', function () {
     $site = makeSiteWithEnvSupport(env: "CACHE_ONLY=c\nSHARED=cache-value\nIDENTICAL=same");
@@ -102,12 +105,12 @@ function bindFakeReader(string $serverEnv): void
 {
     $this->app->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
     {
-        function __construct(private readonly string $payload)
+        public function __construct(private readonly string $payload)
         {
             // Bypass parent constructor — we don't need the wrapper for the fake.
         }
 
-        function read(Site $site): string
+        public function read(Site $site): string
         {
             return $this->payload;
         }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\RepositoryRuntimePreviewTest;
+
 use App\Services\Deploy\Manifest\DplyManifestParser;
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
@@ -15,6 +16,7 @@ use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
+
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-runtime-preview-'.uniqid();
     mkdir($this->tempDir);
@@ -41,7 +43,7 @@ test('from url clones then composes then cleans up', function () {
     // Fake cloner materializes a Node repo at the destination — no network.
     $fakeCloner = new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             mkdir($destination, 0o755, true);
             file_put_contents(
@@ -70,11 +72,9 @@ test('from url normalizes blank branch to main', function () {
     $observed = ['branch' => null];
     $fakeCloner = new class($observed) implements GitCloner
     {
-        function __construct(private array &$observed)
-        {
-        }
+        public function __construct(private array &$observed) {}
 
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             $this->observed['branch'] = $branch;
             mkdir($destination, 0o755, true);
@@ -89,11 +89,9 @@ test('from url cleans up even on clone failure', function () {
     $observed = ['cleanup_dirs' => []];
     $fakeCloner = new class($observed) implements GitCloner
     {
-        function __construct(private array &$observed)
-        {
-        }
+        public function __construct(private array &$observed) {}
 
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             // Record the parent temp dir so the test can verify cleanup
             // happened (we can't observe the deletion directly without
@@ -117,7 +115,7 @@ test('from url cleans up even on clone failure', function () {
 test('from url returns null when cloned repo has no signals', function () {
     $fakeCloner = new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             mkdir($destination, 0o755, true);
             // Empty repo — no manifest, no language signals.
@@ -132,7 +130,7 @@ function makePreview(?GitCloner $cloner = null): RepositoryRuntimePreview
 {
     $cloner ??= new class implements GitCloner
     {
-        function shallowClone(string $url, string $branch, string $destination): void
+        public function shallowClone(string $url, string $branch, string $destination): void
         {
             throw new \LogicException('cloner not configured for this test');
         }

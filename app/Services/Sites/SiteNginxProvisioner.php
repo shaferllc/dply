@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Enums\SiteType;
 use App\Models\ConsoleAction;
+use App\Models\ServerWebserverCacheFeature;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
 use App\Services\ConsoleActions\ConsoleEmitter;
@@ -357,9 +358,9 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         // can tune them per-server from the workspace. The row is created
         // lazily here with the legacy defaults (100m/100m/2g/60m) so existing
         // servers get the same on-disk output until someone touches it.
-        $feature = \App\Models\ServerWebserverCacheFeature::findOrCreateFor(
+        $feature = ServerWebserverCacheFeature::findOrCreateFor(
             $server->id,
-            \App\Models\ServerWebserverCacheFeature::WEBSERVER_NGINX,
+            ServerWebserverCacheFeature::WEBSERVER_NGINX,
         );
         $fcgiSize = (int) $feature->nginx_fcgi_zone_size_mb;
         $proxySize = (int) $feature->nginx_proxy_zone_size_mb;

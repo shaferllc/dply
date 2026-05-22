@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\MarketplaceTest;
+
 use App\Livewire\Marketplace\Index;
 use App\Models\MarketplaceItem;
 use App\Models\Organization;
@@ -10,11 +10,13 @@ use App\Models\ServerRecipe;
 use App\Models\User;
 use App\Models\WebserverTemplate;
 use Database\Seeders\MarketplaceItemSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 beforeEach(function () {
     $this->seed(MarketplaceItemSeeder::class);

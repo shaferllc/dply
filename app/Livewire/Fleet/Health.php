@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Fleet;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -31,6 +31,7 @@ class Health extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.fleet';
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();

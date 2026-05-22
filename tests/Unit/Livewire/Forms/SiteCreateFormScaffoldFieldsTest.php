@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Livewire\Forms\SiteCreateFormScaffoldFieldsTest;
-use ReflectionClass;
 
 use App\Livewire\Forms\SiteCreateForm;
+use ReflectionClass;
+
 function defaultFor(string $property): mixed
 {
     $reflection = new ReflectionClass(SiteCreateForm::class);

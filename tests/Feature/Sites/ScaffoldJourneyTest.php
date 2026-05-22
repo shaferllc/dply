@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\ScaffoldJourneyTest;
-use Mockery;
 
 use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
@@ -14,9 +13,12 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Services\Scaffold\ScaffoldStep;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 /**
  * Bind a stub PlaceholderDnsManager into the container so Livewire's

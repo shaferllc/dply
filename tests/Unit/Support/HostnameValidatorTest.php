@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\HostnameValidatorTest;
+
 use App\Support\HostnameValidator;
+
 test('it accepts a valid domain name', function () {
     expect(HostnameValidator::isValid('app.example.com'))->toBeTrue();
 });

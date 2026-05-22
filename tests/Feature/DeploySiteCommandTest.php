@@ -3,14 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\DeploySiteCommandTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Deploy\DeploymentRunner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('command creates deployment and runs pipeline', function () {
     $server = Server::factory()->ready()->create([

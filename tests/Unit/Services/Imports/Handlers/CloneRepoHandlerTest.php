@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\CloneRepoHandlerTest;
-use \App\Services\SshConnectionFactory;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -16,8 +16,11 @@ use App\Services\Imports\Handlers\CloneRepoHandler;
 use App\Services\Imports\WaitForTargetServerException;
 use App\Services\Imports\WaitForTargetSiteException;
 use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\Imports\RecordingShell;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: Site, 2: Server}
  */
@@ -76,12 +79,11 @@ function seedFixture(string $serverStatus = Server::STATUS_READY, string $siteSt
 }
 function handlerWithShell(RecordingShell $shell): CloneRepoHandler
 {
-    $factory = new class($shell) extends SshConnectionFactory {
-        function __construct(private RecordingShell $shell)
-        {
-        }
+    $factory = new class($shell) extends SshConnectionFactory
+    {
+        public function __construct(private RecordingShell $shell) {}
 
-        function forServer(Server $server): SshConnection
+        public function forServer(Server $server): SshConnection
         {
             return $this->shell;
         }
@@ -90,7 +92,7 @@ function handlerWithShell(RecordingShell $shell): CloneRepoHandler
     return new CloneRepoHandler($factory);
 }
 test('clones repo when directory absent', function () {
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
 
     // First call: probe rev-parse → returns empty/false (no work tree).
     $shell->responses[] = "false\n";
@@ -113,7 +115,7 @@ test('clones repo when directory absent', function () {
     $this->assertStringContainsString('git@github.com:acme/app.git', $shell->commands[1]);
 });
 test('is a noop when repo already cloned', function () {
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     $shell->responses[] = "true\n";
     // probe says already a work tree
     [$step] = seedFixture();
@@ -125,7 +127,7 @@ test('is a noop when repo already cloned', function () {
     expect($shell->commands)->toHaveCount(1);
 });
 test('throws wait when target server not ready', function () {
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     [$step] = seedFixture(serverStatus: Server::STATUS_PROVISIONING);
 
     $this->expectException(WaitForTargetServerException::class);
@@ -133,7 +135,7 @@ test('throws wait when target server not ready', function () {
     expect($shell->commands)->toHaveCount(0);
 });
 test('throws wait when target site not provisioned', function () {
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     [$step] = seedFixture(siteStatus: Site::STATUS_PENDING);
 
     $this->expectException(WaitForTargetSiteException::class);
@@ -141,7 +143,7 @@ test('throws wait when target site not provisioned', function () {
     expect($shell->commands)->toHaveCount(0);
 });
 test('fails when post clone head probe returns garbage', function () {
-    $shell = new RecordingShell();
+    $shell = new RecordingShell;
     $shell->responses[] = "false\n";
     // not a work tree
     $shell->responses[] = "error: cannot clone — repo not found\n";
@@ -152,4 +154,3 @@ test('fails when post clone head probe returns garbage', function () {
     $this->expectExceptionMessageMatches('/git clone failed/');
     handlerWithShell($shell)->execute($step);
 });
-

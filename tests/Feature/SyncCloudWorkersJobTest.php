@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SyncCloudWorkersJobTest;
+
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;
@@ -12,8 +13,10 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: Site, 1: ProviderCredential}

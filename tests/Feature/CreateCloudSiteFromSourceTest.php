@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudSiteFromSourceTest;
+
 use App\Actions\Cloud\CreateCloudSiteFromSource;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
@@ -10,8 +11,10 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('creates site with source meta and dispatches provision', function () {
     Queue::fake();

@@ -3,13 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SourceControlOAuthReturnTest;
-use Mockery;
 
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
-use PHPUnit\Framework\Attributes\DataProvider;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('redirect stores a same app return path', function () {
     $driver = Mockery::mock();

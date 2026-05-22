@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDashboardFlyCloudUpsellTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('node site shows dply cloud upsell', function () {
     [$user, $server, $site] = makeUserSite('node');

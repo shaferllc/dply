@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\DetectRuntimeCommandTest;
+
 use Illuminate\Support\Facades\Artisan;
+
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/dply-detect-runtime-cli-'.uniqid();
     mkdir($this->tempDir);

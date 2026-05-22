@@ -461,7 +461,7 @@ class DigitalOceanService
      * (evaluated in UTC). `body` must be a JSON object, so an empty payload is
      * sent as `{}` (a PHP `[]` would serialize to `[]` and DO rejects it).
      *
-     * @return array<string, mixed>  the created trigger
+     * @return array<string, mixed> the created trigger
      */
     public function createScheduledFunctionTrigger(string $namespace, string $name, string $function, string $cron): array
     {

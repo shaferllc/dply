@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerInventoryOsDetectorTest;
+
 use App\Services\Servers\ServerInventoryOsDetector;
 
 test('maps ubuntu 22 04', function () {

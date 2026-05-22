@@ -5,6 +5,7 @@ namespace App\Livewire\Projects;
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\AuditLog;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
@@ -22,7 +23,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -31,6 +31,7 @@ class Show extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.projects';
+
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 

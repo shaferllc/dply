@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Servers\WorkspaceScheduleEnableTest;
-use Mockery;
 
 use App\Livewire\Servers\WorkspaceSchedule;
 use App\Models\Organization;
@@ -13,10 +12,14 @@ use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\PreflightSchedulerOnSite;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 /** @return array{User, Server, Site} */
 function setupServerWithSite(): array

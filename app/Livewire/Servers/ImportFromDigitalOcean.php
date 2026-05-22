@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -225,7 +226,7 @@ class ImportFromDigitalOcean extends Component
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, ProviderCredential>
+     * @return Collection<int, ProviderCredential>
      */
     private function availableCredentials()
     {

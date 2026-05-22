@@ -1,10 +1,9 @@
 <?php
 
-
 namespace Tests\Unit\Services\SshPublicKeyFingerprintTest;
+
 use App\Services\Servers\SshPublicKeyFingerprint;
 use phpseclib3\Crypt\PublicKeyLoader;
-use PHPUnit\Framework\Attributes\Test;
 
 it('returns sha256 and md5 for derived openssh line', function () {
     $pem = file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem'));

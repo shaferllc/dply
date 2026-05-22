@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\UniversalNotificationsTest;
+
 use App\Models\NotificationChannel;
 use App\Models\NotificationEvent;
 use App\Models\NotificationSubscription;
@@ -21,10 +21,11 @@ use App\Notifications\SupervisorProgramsUnhealthyNotification;
 use App\Notifications\UniversalEventNotification;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('publisher creates event and in app items for resource stakeholders', function () {
     $owner = User::factory()->create();

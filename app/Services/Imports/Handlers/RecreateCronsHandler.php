@@ -10,6 +10,7 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\ServerCronJob;
 use App\Models\Site;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\StepHandler;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -51,7 +52,7 @@ class RecreateCronsHandler implements StepHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
+        $driver = app(SourceDriverFactory::class)->for($credential);
         $crons = $driver->listSiteCrons($migration->source_server_id, $child->source_site_id);
 
         $created = DB::transaction(function () use ($crons, $site, $child): int {

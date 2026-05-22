@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\CreateCustomTest;
+
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCustomSiteJob;
 use App\Livewire\Sites\Create as SiteCreate;
@@ -12,9 +13,12 @@ use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('vm host shows custom entry point on create page', function () {
     $user = userWithOrganization();
@@ -83,7 +87,7 @@ test('non vm host rejects custom create', function () {
     $user = userWithOrganization();
     $server = dockerServer($user);
 
-    $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+    $this->expectException(AuthorizationException::class);
 
     Livewire::actingAs($user)
         ->test(CreateCustom::class, ['server' => $server]);

@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Feature\Console\ProvisionStripeBillingCommandTest;
+
 use App\Services\Billing\StripeBillingProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('dry run lists objects without calling stripe', function () {
     Config::set('cashier.secret', 'sk_test_dummy');

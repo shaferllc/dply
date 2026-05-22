@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteUptimeCheckUrlResolverTest;
+
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteUptimeMonitor;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('resolves full url from primary domain and path', function () {
     $site = Site::factory()->create(['status' => Site::STATUS_NGINX_ACTIVE]);

@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\SiteCacheDirectivesBuilderTest;
+
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Services\Sites\SiteCacheDirectivesBuilder;
+
 test('nginx fastcgi emits nothing when method not enabled', function () {
     $site = siteWithCaching([
         'enabled' => false,

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\Billing\ServerTierClassifierTest;
+
 use App\Enums\ServerTier;
 use App\Services\Billing\ServerTierClassifier;
 

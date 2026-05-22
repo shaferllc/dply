@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\DigitalOceanFunctionsLaravelAdapterTest;
+
 use App\Services\Deploy\DigitalOceanFunctionsLaravelAdapter;
+
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/do-fn-laravel-'.uniqid();
     mkdir($this->dir);

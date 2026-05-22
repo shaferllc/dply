@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteSuspendedPageBuilderTest;
+
 use App\Models\Site;
 use App\Services\Sites\SiteSuspendedPageBuilder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('render escapes site name and includes optional message from meta', function () {
     $site = Site::factory()->create([

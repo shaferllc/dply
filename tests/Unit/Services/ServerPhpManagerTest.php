@@ -1,19 +1,18 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerPhpManagerTest;
-use Mockery;
 
 use App\Models\Organization;
-use \App\Services\Servers\ServerPhpManager;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Servers\ServerPhpManager;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use PHPUnit\Framework\Attributes\Test;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeServerWithMeta(array $meta = []): Server
 {
@@ -449,7 +448,7 @@ test('the remote inventory script counts fpm packages as installed versions', fu
 
     $manager = new class extends ServerPhpManager
     {
-        function inventoryScript(Server $server, string $quotedVersions): string
+        public function inventoryScript(Server $server, string $quotedVersions): string
         {
             return $this->privilegedShellScript($server, $quotedVersions);
         }

@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\PruneBackupsCommand;
+
 return [
 
     /**
@@ -18,7 +20,7 @@ return [
     'timeout_seconds' => (int) env('SITE_FILE_BACKUP_TIMEOUT_SECONDS', 7200),
 
     /**
-     * Time-based retention for {@see App\Console\Commands\PruneBackupsCommand} (days).
+     * Time-based retention for {@see PruneBackupsCommand} (days).
      * Floor of 7 days enforced in code.
      */
     'run_retention_days' => (int) env('SITE_FILE_BACKUP_RETENTION_DAYS', 90),

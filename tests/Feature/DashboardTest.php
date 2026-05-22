@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Feature\DashboardTest;
+
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\NotificationChannelsTest;
+
 use App\Livewire\Organizations\NotificationChannels as OrgNotificationChannels;
 use App\Livewire\Settings\BulkNotificationAssignments;
 use App\Livewire\Settings\NotificationChannels as ProfileNotificationChannels;
@@ -12,11 +12,12 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('user can view profile notification channels', function () {
     $user = User::factory()->create();

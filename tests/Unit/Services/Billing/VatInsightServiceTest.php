@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\Services\Billing\VatInsightServiceTest;
+
 use App\Services\Billing\VatInsightService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Config::set('vat.vies_enabled', true);

@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\TrackTaskInBackgroundScriptTest;
+
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use App\Modules\TaskRunner\TrackTaskInBackground;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('wrapper script renders even with shell expansion syntax', function () {
     $actualTask = new TestTask;

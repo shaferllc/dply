@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessTriggerProvisionerTest;
+
 use App\Models\FunctionAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Serverless\ServerlessTriggerProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function action(array $trigger): FunctionAction
 {

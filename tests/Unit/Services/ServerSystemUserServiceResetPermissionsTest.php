@@ -1,16 +1,16 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSystemUserServiceResetPermissionsTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\ServerSshConnectionRunner;
 use App\Services\Servers\ServerSystemUserDeletionPolicy;
 use App\Services\Servers\ServerSystemUserService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

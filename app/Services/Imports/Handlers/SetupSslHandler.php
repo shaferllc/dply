@@ -11,6 +11,7 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\SourceSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use Illuminate\Support\Carbon;
@@ -97,7 +98,7 @@ class SetupSslHandler extends SshDependentHandler
         }
 
         // Look at Ploi cert state for the site.
-        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
+        $driver = app(SourceDriverFactory::class)->for($credential);
         $cert = $driver->fetchSiteCertificate($migration->source_server_id, $child->source_site_id);
         if ($cert !== null
             && $cert['status'] === 'active'

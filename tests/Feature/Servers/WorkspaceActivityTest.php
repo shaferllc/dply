@@ -3,17 +3,21 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\WorkspaceActivityTest;
+
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 /**
  * @return array{0: User, 1: Server, 2: Organization}

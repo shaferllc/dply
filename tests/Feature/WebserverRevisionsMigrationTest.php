@@ -1,19 +1,20 @@
 <?php
 
-
 namespace Tests\Feature\WebserverRevisionsMigrationTest;
+
 use App\Models\ConfigRevision;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('legacy revision rows copy into config revisions with preserved metadata', function () {
     // The data migration has already run as part of RefreshDatabase. To

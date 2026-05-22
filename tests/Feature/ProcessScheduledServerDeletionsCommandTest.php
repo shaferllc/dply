@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ProcessScheduledServerDeletionsCommandTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Notification;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('deletes servers whose scheduled deletion is due', function () {
     Notification::fake();

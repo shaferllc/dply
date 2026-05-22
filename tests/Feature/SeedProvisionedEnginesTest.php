@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SeedProvisionedEnginesTest;
+
 use App\Actions\Servers\SeedProvisionedEnginesForServer;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseEngine;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('seeds cache and database rows from meta', function () {
     $server = makeServer([

@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\DotEnvFileWriterTest;
+
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+
 test('renders simple pairs', function () {
     $w = new DotEnvFileWriter;
     $out = $w->render(['B' => 'two', 'A' => 'one']);

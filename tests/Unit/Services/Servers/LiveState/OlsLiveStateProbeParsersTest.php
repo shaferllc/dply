@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\LiveState\OlsLiveStateProbeParsersTest;
-use ReflectionClass;
 
 use App\Services\Servers\LiveState\OlsLiveStateProbe;
+use ReflectionClass;
+
 function invoke(string $method, array $args): mixed
 {
     $reflection = new ReflectionClass(OlsLiveStateProbe::class);
@@ -29,7 +30,7 @@ test('split sections demuxes combined output', function () {
     $this->assertStringContainsString('/lsphp83/bin/lsphp', $sections['lsphp']);
 });
 test('parses listeners with maps', function () {
-    $httpd = <<<CONF
+    $httpd = <<<'CONF'
 serverName foo
 listener Default {
   address                 *:80
@@ -54,8 +55,8 @@ CONF;
     expect($listeners[1]['secure'])->toBeTrue();
 });
 test('parses vhost conf with extprocessor', function () {
-    $blob = "###dply-file:/usr/local/lsws/conf/vhosts/site1/vhconf.conf###\n".<<<CONF
-docRoot                   \$VH_ROOT/public/
+    $blob = "###dply-file:/usr/local/lsws/conf/vhosts/site1/vhconf.conf###\n".<<<'CONF'
+docRoot                   $VH_ROOT/public/
 vhDomain                  site1.example.com,www.site1.example.com
 extprocessor lsapi-php83 {
   type                    lsapi
@@ -74,7 +75,7 @@ CONF;
     expect($vhconfs['site1']['extprocessors'][0]['type'])->toBe('lsapi');
 });
 test('parses rtreport aggregates numeric keys', function () {
-    $blob = "###dply-file:/tmp/lshttpd/.rtreport###\n".<<<RT
+    $blob = "###dply-file:/tmp/lshttpd/.rtreport###\n".<<<'RT'
 VERSION: LiteSpeed Web Server/Open/1.7.18
 UPTIME: 12s
 BPS_IN: 0, BPS_OUT: 0

@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\SourceControlTest;
+
 use App\Livewire\Settings\SourceControl;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('source control page is reachable for authenticated user', function () {
     $user = User::factory()->create();

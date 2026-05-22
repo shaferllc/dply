@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Feature\Services\Billing\StandardSubscriptionCreatorTest;
-use RuntimeException;
 
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StandardSubscriptionCreator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use RuntimeException;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Tests create servers via factory with `created_at = now()`, which the
@@ -137,7 +138,7 @@ test('tier price ids for interval returns correct set', function () {
 });
 
 test('serverless functions add an interval aware line item', function () {
-    $desired = \App\Services\Billing\DesiredBillingState::fromCounts(
+    $desired = DesiredBillingState::fromCounts(
         tierQuantities: [],
         baseCents: 1500,
         creditCents: 0,

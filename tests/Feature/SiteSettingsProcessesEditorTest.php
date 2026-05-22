@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteSettingsProcessesEditorTest;
+
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Sites\Settings as SitesSettings;
@@ -12,9 +13,11 @@ use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
 use App\Services\Sites\SiteSystemdProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('add site process creates worker row and dispatches systemd job', function () {
     Queue::fake();

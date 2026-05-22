@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\ServerModelTest;
+
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('is ready returns true when status ready', function () {
     $server = Server::factory()->ready()->create();

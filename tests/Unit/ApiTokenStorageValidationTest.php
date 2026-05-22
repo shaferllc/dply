@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\ApiTokenStorageValidationTest;
+
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('create token rejects unknown ability', function () {
     $user = User::factory()->create();

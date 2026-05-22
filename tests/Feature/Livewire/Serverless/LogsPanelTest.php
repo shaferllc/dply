@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Serverless\LogsPanelTest;
+
 use App\Livewire\Serverless\LogsPanel;
 use App\Models\FunctionInvocation;
 use App\Models\Organization;
@@ -10,9 +11,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function functionSite(): Site
 {

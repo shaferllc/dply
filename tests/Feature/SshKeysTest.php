@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\SshKeysTest;
+
 use App\Livewire\Profile\PersonalSshKeyModal;
 use App\Livewire\Settings\SshKeys;
 use App\Models\Organization;
@@ -9,9 +9,10 @@ use App\Models\Server;
 use App\Models\User;
 use App\Models\UserSshKey;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiWizardChecklistTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Livewire\Servers\Create\StepReview;
 use App\Models\ImportServerMigration;
-use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\PloiServer;
 use App\Models\PloiSite;
@@ -14,8 +14,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Organization, 2: PloiServer, 3: array<int, PloiSite>}
@@ -86,7 +89,7 @@ test('mount defaults eligible sites checked and unsupported unchecked', function
         'expires_at' => now()->addDays(14),
     ]);
 
-    \Livewire\Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test(StepReview::class)
         ->assertSet('migrationSourcePloiServerId', $ploiServer->id)
         ->assertSet('migrationSiteSelection.'.$sites[0]->id, true)
@@ -108,7 +111,7 @@ test('toggling selection persists into draft payload', function () {
         'expires_at' => now()->addDays(14),
     ]);
 
-    \Livewire\Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test(StepReview::class)
         ->set('migrationSiteSelection.'.$sites[1]->id, false);
 

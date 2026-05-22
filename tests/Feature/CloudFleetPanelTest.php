@@ -3,14 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudFleetPanelTest;
+
 use App\Enums\SiteType;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('panel hidden when no cloud sites', function () {
     $user = ownerWithOrg();

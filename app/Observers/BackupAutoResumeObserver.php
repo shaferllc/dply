@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Console\Commands\RunBackupScheduleCommand;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Re-enable a paused {@see ServerBackupSchedule} when a backup against the same
  * target completes successfully. Pairs with the auto-pause logic in
- * {@see \App\Console\Commands\RunBackupScheduleCommand} — operator fixes whatever
+ * {@see RunBackupScheduleCommand} — operator fixes whatever
  * was broken (creds, disk space), runs a backup manually, and the schedule
  * resumes itself instead of requiring a separate Resume click.
  *

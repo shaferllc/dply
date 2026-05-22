@@ -16,8 +16,10 @@ use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -135,7 +137,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             // new edge-proxy unit (traefik / haproxy) + the freshly-restarted
             // caddy backend's state. See SwitchServerWebserverJob's matching
             // dispatch for the rationale.
-            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+            SyncServerSystemdServicesJob::dispatch($server->id);
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
@@ -156,7 +158,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(\Throwable $e): void
     {
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
     }
 
     protected function executeStageInstall(Server $server, ConsoleEmitter $emitter): void
@@ -211,7 +213,7 @@ BASH;
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     protected function executeStageProvision(Server $server, $sites): void
     {
@@ -269,7 +271,7 @@ BASH;
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     protected function executeStageCutover(Server $server, $sites, string $previousWebserver): void
     {
@@ -504,7 +506,7 @@ YAML;
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     private function writeHAProxyEdgeConfig(Server $server, SshConnection $ssh, $sites, int $listenPort): void
     {

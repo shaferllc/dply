@@ -50,7 +50,6 @@ class ServerPhpConfigEditor
         return $this->recorder->checksumFor(['path' => $path, 'content' => $content]);
     }
 
-
     /**
      * @return array{
      *     version: string,

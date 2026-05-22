@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteEnvDiffPageTest;
-use \App\Services\Sites\SiteEnvReader;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Services\Sites\SiteEnvReader;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('renders in sync when cache matches server', function () {
     [$user, $server, $site] = makeUserSite(['env_file_content' => 'A=one']);

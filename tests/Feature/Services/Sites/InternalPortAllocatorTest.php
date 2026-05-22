@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Sites\InternalPortAllocatorTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\InternalPortAllocator;
 use Illuminate\Database\UniqueConstraintViolationException;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('allocates range start when no sites exist on server', function () {
     $server = Server::factory()->create();

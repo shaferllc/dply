@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -192,6 +193,7 @@ class ApacheGlobalOptionsConfig
 
     /**
      * @param  array<string, string>  $values
+     *
      * @throws \RuntimeException
      */
     public function save(Server $server, array $values, ?ConsoleEmitter $emitter = null): void
@@ -362,7 +364,7 @@ class ApacheGlobalOptionsConfig
     }
 
     /**
-     * @return array{0: int, 1: int}|null  [body start offset, body end offset]
+     * @return array{0: int, 1: int}|null [body start offset, body end offset]
      */
     private function findIfModuleBlock(string $contents, string $module): ?array
     {
@@ -426,7 +428,7 @@ class ApacheGlobalOptionsConfig
         foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         // apachectl configtest exits 0 even when output has "Syntax OK" so

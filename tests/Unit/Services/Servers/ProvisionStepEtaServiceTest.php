@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\ProvisionStepEtaServiceTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerProvisionStepRun;
 use App\Models\User;
 use App\Services\Servers\ProvisionStepEtaService;
 use App\Support\Servers\ProvisionStepSnapshots;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function freshOrgWithServer(): array
 {

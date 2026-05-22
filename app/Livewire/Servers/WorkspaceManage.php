@@ -14,17 +14,23 @@ use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
+use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\MiseInstallScriptBuilder;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\WebserverSwitchPreflight;
+use App\Services\SshConnection;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -330,9 +336,9 @@ BASH;
             // in real time, then stream output lines into it as they arrive
             // alongside the existing remote_output buffer.
             $consoleId = $this->seedManageConsoleAction($server, $label);
-            $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            $emitter = new ConsoleEmitter($consoleId);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_RUNNING,
                 'started_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -366,16 +372,16 @@ BASH;
                 if (trim((string) $this->remote_output) === '') {
                     $emitter->success(__('Command finished with no terminal output.'), 'dply');
                 }
-                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                    'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_COMPLETED,
                     'finished_at' => now(),
                     'error' => null,
                     'updated_at' => now(),
                 ]);
                 $this->toastSuccess($flash);
             } catch (\Throwable $inner) {
-                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                    'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_FAILED,
                     'finished_at' => now(),
                     'error' => mb_substr($inner->getMessage(), 0, 2000),
                     'updated_at' => now(),
@@ -576,7 +582,7 @@ BASH;
             $userArg = escapeshellarg($deployUser);
             $toolArg = escapeshellarg($runtime);
             $script = "sudo -u {$userArg} -i mise ls-remote {$toolArg} 2>/dev/null || true";
-            $ssh = new \App\Services\SshConnection($this->server, 'root');
+            $ssh = new SshConnection($this->server, 'root');
             $output = $ssh->exec('/bin/sh -c '.escapeshellarg($script), 30);
             $ssh->disconnect();
 
@@ -620,6 +626,7 @@ BASH;
         }
         $versions = array_values(array_unique($versions));
         usort($versions, fn (string $a, string $b) => version_compare($b, $a));
+
         // Cap at a reasonable size — operators rarely need anything older.
         return array_slice($versions, 0, 60);
     }
@@ -718,7 +725,7 @@ BASH;
                 source: $this->server,
                 overrides: ['name' => $this->clone_name],
             );
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $messages = collect($e->errors())->flatten()->all();
             $this->toastError($messages[0] ?? __('Clone failed.'));
 
@@ -822,7 +829,7 @@ BASH;
      * so the banner-static partial picks it up on the next render — without
      * waiting for the worker to claim the job. Auto-dismisses prior terminal +
      * stale-running rows so the operator sees only the run they just started.
-     * Mirrors {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()} but
+     * Mirrors {@see Show::seedQueuedConsoleAction()} but
      * scoped to a Server subject instead of a Site.
      *
      * `from`/`to` are persisted in `output['meta']` so {@see stopAndRevertWebserverSwitch()}
@@ -965,7 +972,7 @@ BASH;
      * banner is scoped to. WorkspaceManage's banner shows server-level runs
      * (webserver_switch, etc.), so the subject is the server.
      */
-    protected function consoleActionSubject(): \Illuminate\Database\Eloquent\Model
+    protected function consoleActionSubject(): Model
     {
         return $this->server;
     }
@@ -1307,22 +1314,22 @@ BASH;
      */
     protected function seedManageConsoleAction(Server $server, string $label): string
     {
-        \App\Models\ConsoleAction::query()
+        ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
             ->where('subject_id', $server->id)
             ->where('kind', 'manage_action')
             ->whereNull('dismissed_at')
             ->whereIn('status', [
-                \App\Models\ConsoleAction::STATUS_COMPLETED,
-                \App\Models\ConsoleAction::STATUS_FAILED,
+                ConsoleAction::STATUS_COMPLETED,
+                ConsoleAction::STATUS_FAILED,
             ])
             ->update(['dismissed_at' => now()]);
 
-        $row = \App\Models\ConsoleAction::query()->create([
+        $row = ConsoleAction::query()->create([
             'subject_type' => $server->getMorphClass(),
             'subject_id' => $server->id,
             'kind' => 'manage_action',
-            'status' => \App\Models\ConsoleAction::STATUS_QUEUED,
+            'status' => ConsoleAction::STATUS_QUEUED,
             'user_id' => auth()->id(),
             'label' => $label.' …',
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],

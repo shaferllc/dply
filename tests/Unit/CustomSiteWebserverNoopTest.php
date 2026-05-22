@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\CustomSiteWebserverNoopTest;
-use App\Enums\SiteType;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Deploy\DockerRuntimeDockerfileBuilder;
@@ -11,7 +11,9 @@ use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('nginx builder returns empty for custom', function () {
     $site = customSite();

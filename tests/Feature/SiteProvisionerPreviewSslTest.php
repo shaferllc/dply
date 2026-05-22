@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteProvisionerPreviewSslTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -11,9 +12,11 @@ use App\Models\SiteDomain;
 use App\Models\SitePreviewDomain;
 use App\Models\User;
 use App\Services\Sites\SiteProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('check readiness queues preview ssl even when customer domain matches first', function () {
     Queue::fake();

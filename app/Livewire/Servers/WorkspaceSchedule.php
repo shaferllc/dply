@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\RunSchedulerNowJob;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
@@ -15,7 +17,6 @@ use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -37,6 +38,7 @@ class WorkspaceSchedule extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.schedule';
+
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -410,7 +412,7 @@ class WorkspaceSchedule extends Component
             ],
         );
 
-        \App\Jobs\RunSchedulerNowJob::dispatch(
+        RunSchedulerNowJob::dispatch(
             $this->server->id,
             $heartbeat->id,
             (string) auth()->id(),

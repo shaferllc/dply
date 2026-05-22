@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteNginxProvisionerLayeredSnippetTest;
+
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteWebserverConfigProfile;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\SiteNginxProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('parse layered main snippet round trips for php site', function () {
     $site = Site::factory()->create([

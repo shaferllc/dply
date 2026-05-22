@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\StepFunctionsDefinitionTest;
-use InvalidArgumentException;
 
 use App\Services\Serverless\Aws\StepFunctionsDefinition;
+use InvalidArgumentException;
+
 test('it chains functions into a state machine', function () {
     $definition = json_decode(
         StepFunctionsDefinition::forSequence(['fetch', 'transform', 'store']),

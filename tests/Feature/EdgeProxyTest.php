@@ -1,21 +1,22 @@
 <?php
 
-
 namespace Tests\Feature\EdgeProxyTest;
+
 use App\Jobs\AddEdgeProxyJob;
 use App\Jobs\RemoveEdgeProxyJob;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function makeUser(): User
 {

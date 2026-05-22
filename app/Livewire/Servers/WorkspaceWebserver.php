@@ -4,10 +4,41 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\RunWebserverConfigOpJob;
+use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Servers\ApacheGlobalOptionsConfig;
+use App\Services\Servers\ApacheModulesConfig;
+use App\Services\Servers\CaddyGlobalOptionsConfig;
+use App\Services\Servers\CaddySnippetsConfig;
+use App\Services\Servers\HaproxyBackendsConfig;
+use App\Services\Servers\HaproxyFrontendsConfig;
+use App\Services\Servers\HaproxyGlobalOptionsConfig;
+use App\Services\Servers\LiveState\ApacheLiveStateProbe;
+use App\Services\Servers\LiveState\CaddyLiveStateProbe;
+use App\Services\Servers\LiveState\EngineLiveStateProbe;
+use App\Services\Servers\LiveState\HaproxyLiveStateProbe;
+use App\Services\Servers\LiveState\NginxLiveStateProbe;
+use App\Services\Servers\LiveState\OlsLiveStateProbe;
+use App\Services\Servers\LiveState\TraefikLiveStateProbe;
+use App\Services\Servers\NginxGlobalOptionsConfig;
+use App\Services\Servers\NginxUpstreamsConfig;
+use App\Services\Servers\OpenLiteSpeedCacheModuleConfig;
+use App\Services\Servers\OpenLiteSpeedExtAppsConfig;
+use App\Services\Servers\OpenLiteSpeedListenersConfig;
+use App\Services\Servers\OpenLiteSpeedVhostsConfig;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerMetricsRangeQuery;
+use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\TraefikStaticConfigOptions;
+use App\Services\Servers\WebserverCertsAggregator;
+use App\Services\Servers\WebserverConfigDriftDetector;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 
@@ -528,7 +559,7 @@ class WorkspaceWebserver extends WorkspaceManage
      */
     public function setEngineMetricsRange(string $range): void
     {
-        $allowed = array_keys(\App\Services\Servers\ServerMetricsRangeQuery::RANGES);
+        $allowed = array_keys(ServerMetricsRangeQuery::RANGES);
         $this->engine_metrics_range = in_array($range, $allowed, true) ? $range : '1h';
     }
 
@@ -727,7 +758,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedCacheModuleConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedCacheModuleConfig::class)->read($this->server);
             $this->ols_cache_form = $result['values'];
             $this->ols_cache_loaded = true;
             $this->ols_cache_error = null;
@@ -776,18 +807,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed cache config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedCacheModuleConfig::class)
+            app(OpenLiteSpeedCacheModuleConfig::class)
                 ->save($this->server, $this->ols_cache_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -797,8 +828,8 @@ class WorkspaceWebserver extends WorkspaceManage
             // round-tripped from on/off) so the form reflects what's on disk.
             $this->loadOlsCacheConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -821,7 +852,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedExtAppsConfig::class)->read($this->server);
             $form = [];
             $identity = [];
             foreach ($result['apps'] as $app) {
@@ -872,18 +903,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed ExtApp config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+            app(OpenLiteSpeedExtAppsConfig::class)
                 ->save($this->server, $this->ols_extapps_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -891,8 +922,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_extapps_flash = __('ExtApp config saved and OpenLiteSpeed reloaded.');
             $this->loadOlsExtAppsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -938,18 +969,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add OpenLiteSpeed ExtApp: :name', ['name' => trim($this->ols_extapps_new_app['name'] ?? '')]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+            app(OpenLiteSpeedExtAppsConfig::class)
                 ->addApp($this->server, $this->ols_extapps_new_app, [], $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -959,8 +990,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_extapps_new_app = ['name' => '', 'type' => 'lsapi', 'address' => '', 'path' => ''];
             $this->loadOlsExtAppsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -980,7 +1011,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\CaddyGlobalOptionsConfig::class)->read($this->server);
+            $result = app(CaddyGlobalOptionsConfig::class)->read($this->server);
             $this->caddy_globals_form = $result['values'];
             $this->caddy_globals_loaded = true;
             $this->caddy_globals_flash = null;
@@ -1019,18 +1050,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Caddy global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddyGlobalOptionsConfig::class)
+            app(CaddyGlobalOptionsConfig::class)
                 ->save($this->server, $this->caddy_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1038,8 +1069,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_globals_flash = __('Caddy global options saved and Caddy reloaded.');
             $this->loadCaddyGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1071,12 +1102,12 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Site smoke test'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
             $result = app(\App\Services\Servers\WebserverSmokeTestRunner::class)->run($this->server, $emitter);
@@ -1090,15 +1121,15 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->smoke_truncated = (bool) $result['truncated'];
             $this->smoke_loaded = true;
 
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1118,7 +1149,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\WebserverConfigDriftDetector::class)->detect($this->server, $forceFresh);
+            $result = app(WebserverConfigDriftDetector::class)->detect($this->server, $forceFresh);
             $this->drift_results = $result['results'];
             $this->drift_engine = $result['engine'];
             $this->drift_scanned_at_iso = $result['scanned_at']->toIso8601String();
@@ -1150,15 +1181,15 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
+            $result = app(WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
             $this->tls_certs = array_map(function (array $row): array {
-                $row['expires_at'] = $row['expires_at'] instanceof \Carbon\CarbonImmutable
+                $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
                     ? $row['expires_at']->toIso8601String()
                     : null;
 
                 return $row;
             }, $result['certs']);
-            $this->tls_certs_scanned_at_iso = $result['scanned_at'] instanceof \Carbon\CarbonImmutable
+            $this->tls_certs_scanned_at_iso = $result['scanned_at'] instanceof CarbonImmutable
                 ? $result['scanned_at']->toIso8601String()
                 : null;
             $this->tls_certs_unreadable = $result['unreadable'];
@@ -1181,7 +1212,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\HaproxyBackendsConfig::class)->read($this->server);
+            $result = app(HaproxyBackendsConfig::class)->read($this->server);
             $form = [];
             $serversText = [];
             foreach ($result['backends'] as $b) {
@@ -1235,18 +1266,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save HAProxy backends'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+            app(HaproxyBackendsConfig::class)
                 ->save($this->server, $this->haproxy_backends_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1254,8 +1285,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_backends_flash = __('Backends saved and HAProxy reloaded.');
             $this->loadHaproxyBackendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1308,19 +1339,19 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add HAProxy backend: :name', ['name' => trim($name)]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
             $values = ['balance' => $balance];
-            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+            app(HaproxyBackendsConfig::class)
                 ->addBackend($this->server, $name, $servers, $values, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1330,8 +1361,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
             $this->loadHaproxyBackendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1363,18 +1394,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove HAProxy backend: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+            app(HaproxyBackendsConfig::class)
                 ->removeBackend($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1382,8 +1413,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_backends_flash = __('Backend :name removed and HAProxy reloaded.', ['name' => $name]);
             $this->loadHaproxyBackendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1403,7 +1434,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\HaproxyFrontendsConfig::class)->read($this->server);
+            $result = app(HaproxyFrontendsConfig::class)->read($this->server);
             $form = [];
             $bindsText = [];
             foreach ($result['frontends'] as $f) {
@@ -1458,18 +1489,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save HAProxy frontends'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+            app(HaproxyFrontendsConfig::class)
                 ->save($this->server, $this->haproxy_frontends_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1477,8 +1508,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_frontends_flash = __('Frontends saved and HAProxy reloaded.');
             $this->loadHaproxyFrontendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1531,22 +1562,22 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add HAProxy frontend: :name', ['name' => trim($name)]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
             $values = [];
             if ($defaultBackend !== '') {
                 $values['default_backend'] = $defaultBackend;
             }
-            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+            app(HaproxyFrontendsConfig::class)
                 ->addFrontend($this->server, $name, $binds, $values, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1556,8 +1587,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_frontends_new = ['name' => '', 'binds' => '', 'default_backend' => ''];
             $this->loadHaproxyFrontendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1589,18 +1620,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove HAProxy frontend: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+            app(HaproxyFrontendsConfig::class)
                 ->removeFrontend($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1608,8 +1639,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_frontends_flash = __('Frontend :name removed and HAProxy reloaded.', ['name' => $name]);
             $this->loadHaproxyFrontendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1629,7 +1660,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\TraefikStaticConfigOptions::class)->read($this->server);
+            $result = app(TraefikStaticConfigOptions::class)->read($this->server);
             $this->traefik_static_form = $result['values'];
             $this->traefik_static_loaded = true;
             $this->traefik_static_flash = null;
@@ -1666,18 +1697,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Traefik static config (restart required)'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\TraefikStaticConfigOptions::class)
+            app(TraefikStaticConfigOptions::class)
                 ->save($this->server, $this->traefik_static_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1685,8 +1716,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->traefik_static_flash = __('Traefik static config saved and Traefik restarted.');
             $this->loadTraefikStaticConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1706,7 +1737,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\HaproxyGlobalOptionsConfig::class)->read($this->server);
+            $result = app(HaproxyGlobalOptionsConfig::class)->read($this->server);
             $this->haproxy_globals_form = $result['values'];
             $this->haproxy_globals_loaded = true;
             $this->haproxy_globals_flash = null;
@@ -1743,18 +1774,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save HAProxy global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyGlobalOptionsConfig::class)
+            app(HaproxyGlobalOptionsConfig::class)
                 ->save($this->server, $this->haproxy_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1762,8 +1793,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_globals_flash = __('HAProxy global options saved and HAProxy reloaded.');
             $this->loadHaproxyGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1783,7 +1814,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\ApacheModulesConfig::class)->read($this->server);
+            $result = app(ApacheModulesConfig::class)->read($this->server);
             $this->apache_modules_list = $result['modules'];
             $this->apache_modules_loaded = true;
             $this->apache_modules_flash = null;
@@ -1820,18 +1851,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __(':verb Apache module: :name', ['verb' => $enable ? 'Enable' : 'Disable', 'name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\ApacheModulesConfig::class)
+            app(ApacheModulesConfig::class)
                 ->toggle($this->server, $name, $enable, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1839,8 +1870,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->apache_modules_flash = __('Module :name :state and Apache reloaded.', ['name' => $name, 'state' => $enable ? 'enabled' : 'disabled']);
             $this->loadApacheModulesConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1865,7 +1896,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\NginxUpstreamsConfig::class)->read($this->server);
+            $result = app(NginxUpstreamsConfig::class)->read($this->server);
             $form = [];
             $serversText = [];
             foreach ($result['upstreams'] as $u) {
@@ -1920,18 +1951,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save nginx upstreams'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+            app(NginxUpstreamsConfig::class)
                 ->save($this->server, $this->nginx_upstreams_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1939,8 +1970,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_upstreams_flash = __('Upstreams saved and nginx reloaded.');
             $this->loadNginxUpstreamsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1992,18 +2023,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add nginx upstream: :name', ['name' => trim($name)]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+            app(NginxUpstreamsConfig::class)
                 ->addUpstream($this->server, $name, $servers, [], $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2013,8 +2044,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_upstreams_new = ['name' => '', 'servers' => ''];
             $this->loadNginxUpstreamsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2046,18 +2077,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove nginx upstream: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+            app(NginxUpstreamsConfig::class)
                 ->removeUpstream($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2065,8 +2096,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_upstreams_flash = __('Upstream :name removed and nginx reloaded.', ['name' => $name]);
             $this->loadNginxUpstreamsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2086,7 +2117,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\ApacheGlobalOptionsConfig::class)->read($this->server);
+            $result = app(ApacheGlobalOptionsConfig::class)->read($this->server);
             $this->apache_globals_form = $result['values'];
             $this->apache_globals_mpm = $result['mpm'];
             $this->apache_globals_loaded = true;
@@ -2124,18 +2155,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Apache global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\ApacheGlobalOptionsConfig::class)
+            app(ApacheGlobalOptionsConfig::class)
                 ->save($this->server, $this->apache_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2143,8 +2174,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->apache_globals_flash = __('Apache global options saved and apache2 reloaded.');
             $this->loadApacheGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2164,7 +2195,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\NginxGlobalOptionsConfig::class)->read($this->server);
+            $result = app(NginxGlobalOptionsConfig::class)->read($this->server);
             $this->nginx_globals_form = $result['values'];
             $this->nginx_globals_loaded = true;
             $this->nginx_globals_flash = null;
@@ -2201,18 +2232,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save nginx global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxGlobalOptionsConfig::class)
+            app(NginxGlobalOptionsConfig::class)
                 ->save($this->server, $this->nginx_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2220,8 +2251,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_globals_flash = __('nginx global options saved and nginx reloaded.');
             $this->loadNginxGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2241,7 +2272,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\CaddySnippetsConfig::class)->read($this->server);
+            $result = app(CaddySnippetsConfig::class)->read($this->server);
             $form = [];
             foreach ($result['snippets'] as $snippet) {
                 $form[$snippet['name']] = $snippet['body'];
@@ -2284,18 +2315,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Caddy snippets'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddySnippetsConfig::class)
+            app(CaddySnippetsConfig::class)
                 ->save($this->server, $this->caddy_snippets_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2303,8 +2334,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_flash = __('Snippets saved and Caddy reloaded.');
             $this->loadCaddySnippetsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2350,23 +2381,23 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add Caddy snippet: :name', ['name' => trim($this->caddy_snippets_new['name'] ?? '')]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddySnippetsConfig::class)
+            app(CaddySnippetsConfig::class)
                 ->addSnippet(
                     $this->server,
                     (string) ($this->caddy_snippets_new['name'] ?? ''),
                     (string) ($this->caddy_snippets_new['body'] ?? ''),
                     $emitter,
                 );
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2376,8 +2407,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_new = ['name' => '', 'body' => ''];
             $this->loadCaddySnippetsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2409,18 +2440,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove Caddy snippet: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddySnippetsConfig::class)
+            app(CaddySnippetsConfig::class)
                 ->removeSnippet($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2428,8 +2459,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_flash = __('Snippet (:name) removed and Caddy reloaded.', ['name' => $name]);
             $this->loadCaddySnippetsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2449,7 +2480,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedVhostsConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedVhostsConfig::class)->read($this->server);
             $form = [];
             $identity = [];
             foreach ($result['vhosts'] as $vh) {
@@ -2511,18 +2542,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed vhost config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedVhostsConfig::class)
+            app(OpenLiteSpeedVhostsConfig::class)
                 ->save($this->server, $updates, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2530,8 +2561,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_vhosts_flash = __('Vhost config saved and OpenLiteSpeed reloaded.');
             $this->loadOlsVhostsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2551,7 +2582,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedListenersConfig::class)->read($this->server);
             $form = [];
             $identity = [];
             $maps = [];
@@ -2600,18 +2631,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed listener config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+            app(OpenLiteSpeedListenersConfig::class)
                 ->save($this->server, $this->ols_listeners_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2619,8 +2650,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_listeners_flash = __('Listener config saved and OpenLiteSpeed reloaded.');
             $this->loadOlsListenersConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2666,18 +2697,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add OpenLiteSpeed listener: :name', ['name' => trim($this->ols_listeners_new['name'] ?? '')]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+            app(OpenLiteSpeedListenersConfig::class)
                 ->addListener($this->server, $this->ols_listeners_new, [], $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2687,8 +2718,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_listeners_new = ['name' => '', 'address' => '', 'secure' => '0', 'keyFile' => '', 'certFile' => ''];
             $this->loadOlsListenersConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2720,18 +2751,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove OpenLiteSpeed listener: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+            app(OpenLiteSpeedListenersConfig::class)
                 ->removeListener($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2739,8 +2770,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_listeners_flash = __('Listener :name removed and OpenLiteSpeed reloaded.', ['name' => $name]);
             $this->loadOlsListenersConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2777,18 +2808,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove OpenLiteSpeed ExtApp: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+            app(OpenLiteSpeedExtAppsConfig::class)
                 ->removeApp($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2796,8 +2827,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_extapps_flash = __('ExtApp :name removed and OpenLiteSpeed reloaded.', ['name' => $name]);
             $this->loadOlsExtAppsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2836,15 +2867,15 @@ class WorkspaceWebserver extends WorkspaceManage
      * probe isn't built yet (anything other than OLS in v1). Each
      * subsequent engine wires in here as its probe lands.
      */
-    private function resolveLiveStateProbe(string $engine): ?\App\Services\Servers\LiveState\EngineLiveStateProbe
+    private function resolveLiveStateProbe(string $engine): ?EngineLiveStateProbe
     {
         return match ($engine) {
-            'openlitespeed' => app(\App\Services\Servers\LiveState\OlsLiveStateProbe::class),
-            'caddy' => app(\App\Services\Servers\LiveState\CaddyLiveStateProbe::class),
-            'nginx' => app(\App\Services\Servers\LiveState\NginxLiveStateProbe::class),
-            'apache' => app(\App\Services\Servers\LiveState\ApacheLiveStateProbe::class),
-            'traefik' => app(\App\Services\Servers\LiveState\TraefikLiveStateProbe::class),
-            'haproxy' => app(\App\Services\Servers\LiveState\HaproxyLiveStateProbe::class),
+            'openlitespeed' => app(OlsLiveStateProbe::class),
+            'caddy' => app(CaddyLiveStateProbe::class),
+            'nginx' => app(NginxLiveStateProbe::class),
+            'apache' => app(ApacheLiveStateProbe::class),
+            'traefik' => app(TraefikLiveStateProbe::class),
+            'haproxy' => app(HaproxyLiveStateProbe::class),
             default => null,
         };
     }
@@ -2886,7 +2917,7 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->config_last_backup = null;
         $this->config_backups = [];
 
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'read',
@@ -2905,20 +2936,20 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->pending_load_console_id === null) {
             return;
         }
-        $row = \App\Models\ConsoleAction::query()->find($this->pending_load_console_id);
+        $row = ConsoleAction::query()->find($this->pending_load_console_id);
         if ($row === null) {
             $this->pending_load_console_id = null;
             $this->pending_load_path = null;
 
             return;
         }
-        if (! in_array($row->status, [\App\Models\ConsoleAction::STATUS_COMPLETED, \App\Models\ConsoleAction::STATUS_FAILED], true)) {
+        if (! in_array($row->status, [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], true)) {
             return; // still queued / running
         }
 
-        if ($row->status === \App\Models\ConsoleAction::STATUS_COMPLETED) {
-            $cached = \Illuminate\Support\Facades\Cache::pull(
-                \App\Jobs\RunWebserverConfigOpJob::readResultCacheKey($this->pending_load_console_id),
+        if ($row->status === ConsoleAction::STATUS_COMPLETED) {
+            $cached = Cache::pull(
+                RunWebserverConfigOpJob::readResultCacheKey($this->pending_load_console_id),
             );
             if (is_array($cached)) {
                 $this->config_selected_path = $this->pending_load_path;
@@ -2926,7 +2957,7 @@ class WorkspaceWebserver extends WorkspaceManage
                 $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
                 // Bust the cached picker listing so the next render reflects
                 // the freshly-read file size + mtime accurately.
-                \Illuminate\Support\Facades\Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
+                Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
                 $this->refreshConfigBackups();
             }
         }
@@ -2996,7 +3027,7 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save webserver config: :path', ['path' => basename((string) $this->config_selected_path)]),
         );
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'write',
@@ -3033,7 +3064,7 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Validate webserver config buffer: :path', ['path' => basename((string) $this->config_selected_path)]),
         );
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'validate',
@@ -3099,7 +3130,7 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Restore revision: :path', ['path' => basename($backup_path)]),
         );
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'restore',
@@ -3190,7 +3221,7 @@ class WorkspaceWebserver extends WorkspaceManage
             && $this->serverOpsReady()) {
             $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
             try {
-                $configFiles = \Illuminate\Support\Facades\Cache::remember(
+                $configFiles = Cache::remember(
                     $cacheKey,
                     10,
                     fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
@@ -3208,7 +3239,7 @@ class WorkspaceWebserver extends WorkspaceManage
             'webserverConfigLayout' => config('server_manage.webserver_config_layout', []),
             'webserverConfigFiles' => $configFiles,
             'deletionSummary' => $this->showRemoveServerModal
-                ? \App\Services\Servers\ServerRemovalAdvisor::summary($this->server)
+                ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
     }

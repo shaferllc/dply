@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\BillingInvoicesTest;
+
 use App\Livewire\Billing\Invoices;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('guest cannot view invoices', function () {
     $org = Organization::factory()->create();

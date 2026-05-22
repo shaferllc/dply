@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerCreateStepWhatPresetsTest;
+
 use App\Livewire\Servers\Create\StepWhat;
 use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('apply preset for laravel pins php 84 mysql redis', function () {
     $user = seedUserWithDraft();

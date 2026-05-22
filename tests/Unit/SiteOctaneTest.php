@@ -1,10 +1,11 @@
 <?php
 
-
 namespace Tests\Unit\SiteOctaneTest;
-use App\Models\Site;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('octane server defaults to swoole', function () {
     $site = Site::factory()->create(['meta' => null]);

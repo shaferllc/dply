@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Serverless\DatabasePanelTest;
+
 use App\Jobs\ProvisionServerlessDatabaseJob;
 use App\Livewire\Serverless\DatabasePanel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();

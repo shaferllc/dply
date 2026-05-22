@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Unit\Jobs\PushServerMetricSnapshotToIngestJobTest;
+
 use App\Jobs\PushServerMetricSnapshotToIngestJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\User;
 use App\Services\Servers\ServerMetricsIngestClient;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('job posts snapshot payload to configured url', function () {
     Config::set('server_metrics.ingest.enabled', true);

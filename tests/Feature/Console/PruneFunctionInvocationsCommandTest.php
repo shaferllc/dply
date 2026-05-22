@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Console\PruneFunctionInvocationsCommandTest;
+
 use App\Models\FunctionInvocation;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function row(Site $site, string $source, \DateTimeInterface $at): void
 {

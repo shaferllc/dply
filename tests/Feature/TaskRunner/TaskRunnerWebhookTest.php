@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunner\TaskRunnerWebhookTest;
+
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use App\Modules\TaskRunner\TrackTaskInBackground;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Webhook routes are guest-accessible — RedirectGuestsToComingSoon

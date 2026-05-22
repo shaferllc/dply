@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Unit\Support\ServerSystemdServiceNotificationKeysTest;
+
 use App\Support\ServerSystemdServiceNotificationKeys;
-use PHPUnit\Framework\Attributes\Test;
 
 it('builds keys under eighty chars for typical units', function () {
     $key = ServerSystemdServiceNotificationKeys::eventKey('nginx.service', 'stopped');

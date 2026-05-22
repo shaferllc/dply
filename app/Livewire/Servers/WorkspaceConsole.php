@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerConsoleCommands;
@@ -13,7 +14,6 @@ use App\Support\Console\ConsoleArgspecs;
 use App\Support\Console\ConsoleCatalog;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -31,6 +31,7 @@ class WorkspaceConsole extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.console';
+
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RunsServerConsoleCommands;

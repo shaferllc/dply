@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerAuthorizedKeysDiffPreviewTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
@@ -11,9 +9,11 @@ use App\Models\User;
 use App\Services\Servers\ServerAuthorizedKeysDiffPreview;
 use App\Services\Servers\ServerAuthorizedKeysRemoteReader;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function validPrivateKey(): string
 {

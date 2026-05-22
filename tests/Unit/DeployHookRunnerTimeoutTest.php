@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\DeployHookRunnerTimeoutTest;
+
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Services\Sites\DeployHookRunner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\FakeRemoteShell;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('passes hook timeout to remote shell', function () {
     config(['dply.default_deploy_hook_timeout_seconds' => 111]);

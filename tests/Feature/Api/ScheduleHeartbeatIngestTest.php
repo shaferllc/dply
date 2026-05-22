@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Api\ScheduleHeartbeatIngestTest;
+
 use App\Models\Server;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 /** @return array{Server, Site, string} */
 function serverWithSite(): array

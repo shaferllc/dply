@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\RelocateSiteEnvCommandTest;
+
 use App\Jobs\PushSiteEnvJob;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('default path uses etc dply convention', function () {
     Queue::fake();

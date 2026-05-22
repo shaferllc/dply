@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteLatestDeploymentTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('latest deployment returns most recent by started at', function () {
     $site = makeSite();

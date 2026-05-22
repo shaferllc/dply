@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Jobs\RunSetupScriptJobTest;
+
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 

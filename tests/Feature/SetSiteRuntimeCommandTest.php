@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SetSiteRuntimeCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('command updates runtime and version', function () {
     $site = makeSite(['runtime' => 'php', 'runtime_version' => '8.2']);

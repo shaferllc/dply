@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Serverless\BackgroundPanelTest;
+
 use App\Livewire\Serverless\BackgroundPanel;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();

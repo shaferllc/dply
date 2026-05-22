@@ -1,9 +1,8 @@
 <?php
 
-
 namespace Tests\Feature\Insights\WorkspaceInsightsBannerTest;
+
 use App\Jobs\ApplyInsightFixJob;
-use \App\Services\Insights\InsightRunCoordinator;
 use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteInsightsJob;
@@ -16,13 +15,17 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Insights\Contracts\InsightFixActionInterface;
 use App\Services\Insights\FixResult;
+use App\Services\Insights\InsightHealthScoreService;
+use App\Services\Insights\InsightRunCoordinator;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 /**
  * @return array{0: User, 1: Server, 2: Organization}
@@ -95,7 +98,7 @@ test('busy gate treats stale runs as unblocked', function () {
 
     $server->update(['meta' => [
         config('insights_workspace.meta_run_run_id_key') => 'stale-run',
-        config('insights_workspace.meta_run_status_key' ) => 'running',
+        config('insights_workspace.meta_run_status_key') => 'running',
         // Past the configured stale threshold → stale, should not block re-dispatch.
         config('insights_workspace.meta_run_started_at_key') => now()
             ->subSeconds((int) config('insights_workspace.stale_threshold_seconds') + 60)
@@ -208,11 +211,9 @@ test('run server insights job streams lifecycle lines to the cache buffer', func
     // Stub the coordinator so the job doesn't actually try to SSH out.
     $stub = new class extends InsightRunCoordinator
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function runForServer($server, $onlyKey = null, $onProgress = null): void
+        public function runForServer($server, $onlyKey = null, $onProgress = null): void
         {
             if ($onProgress !== null) {
                 $onProgress('check.start', 'cpu_ram_usage', []);
@@ -228,7 +229,7 @@ test('run server insights job streams lifecycle lines to the cache buffer', func
 
     (new RunServerInsightsJob($server->id, null, $runId))->handle(
         $stub,
-        $this->app->make(\App\Services\Insights\InsightHealthScoreService::class),
+        $this->app->make(InsightHealthScoreService::class),
     );
 
     $server->refresh();
@@ -254,12 +255,12 @@ test('apply insight fix job emits lifecycle lines and marks completed on success
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             return FixResult::success("line-one\nline-two");
         }
@@ -310,12 +311,12 @@ test('apply insight fix job marks failed when preflight refuses', function () {
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return 'Server not ready (test refusal).';
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             return FixResult::success();
         }
@@ -361,12 +362,12 @@ test('site scoped apply fix writes banner state to site meta not server meta', f
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             return FixResult::success('done');
         }
@@ -534,24 +535,18 @@ test('scheduled dispatch without run id skips banner writes', function () {
     // Stub coordinator so the job doesn't reach for SSH.
     $stub = new class extends InsightRunCoordinator
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function runForServer($server, $onlyKey = null, $onProgress = null): void
-        {
-        }
+        public function runForServer($server, $onlyKey = null, $onProgress = null): void {}
 
-        function runForSite($site, $onlyKey = null, $onProgress = null): void
-        {
-        }
+        public function runForSite($site, $onlyKey = null, $onProgress = null): void {}
     };
     $this->app->instance(InsightRunCoordinator::class, $stub);
 
     // No runId — scheduler / setup-script / post-deploy callers stay silent.
     (new RunServerInsightsJob($server->id))->handle(
         $stub,
-        $this->app->make(\App\Services\Insights\InsightHealthScoreService::class),
+        $this->app->make(InsightHealthScoreService::class),
     );
 
     $server->refresh();

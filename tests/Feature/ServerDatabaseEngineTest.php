@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerDatabaseEngineTest;
+
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use Illuminate\Database\UniqueConstraintViolationException;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('server can have multiple engines', function () {
     $server = Server::factory()->create();

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\SiteServerlessLimitsTest;
+
 use App\Models\Site;
+
 function siteWithLimits(mixed $limits): Site
 {
     $site = new Site;

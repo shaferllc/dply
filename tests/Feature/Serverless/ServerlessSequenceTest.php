@@ -3,15 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessSequenceTest;
-use InvalidArgumentException;
 
 use App\Models\FunctionAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Serverless\ServerlessSequenceBuilder;
 use App\Services\Serverless\ServerlessSequenceDeployer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use InvalidArgumentException;
+
+uses(RefreshDatabase::class);
 
 function functionsServer(): Server
 {

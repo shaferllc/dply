@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\Jobs\ExportServerDatabaseBackupJobSqliteTest;
+
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Models\Organization;
 use App\Models\Server;
@@ -10,9 +10,10 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\User;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseRemoteExec;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Server, 2: ServerDatabase}

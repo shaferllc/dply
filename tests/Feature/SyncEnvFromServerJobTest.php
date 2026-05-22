@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SyncEnvFromServerJobTest;
-use \App\Services\Sites\SiteEnvReader;
+
 use App\Jobs\SyncEnvFromServerJob;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Services\Sites\SiteEnvReader;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('happy path writes cache and marks origin server', function () {
     $server = Server::factory()->ready()->create(['ssh_private_key' => 'fake']);
@@ -68,11 +71,9 @@ test('reader failure marks run failed', function () {
 
     $this->app->bind(SiteEnvReader::class, fn () => new class extends SiteEnvReader
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function read(Site $site): string
+        public function read(Site $site): string
         {
             throw new \RuntimeException('connection refused');
         }

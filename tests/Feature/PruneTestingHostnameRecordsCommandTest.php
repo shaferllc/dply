@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\PruneTestingHostnameRecordsCommandTest;
-use Mockery;
 
 use App\Services\Sites\TestingHostnameRecordPruner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('no stale records emits clean message', function () {
     $mock = Mockery::mock(TestingHostnameRecordPruner::class);

@@ -1,17 +1,19 @@
 <?php
 
-
 namespace Tests\Feature\CredentialTest;
+
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function userWithOrganization(): User
 {

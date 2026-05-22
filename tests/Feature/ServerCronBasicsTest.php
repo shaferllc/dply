@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\ServerCronBasicsTest;
-use Mockery;
 
 use App\Livewire\Servers\WorkspaceCron;
 use App\Models\Organization;
@@ -12,9 +10,11 @@ use App\Models\ServerCronJob;
 use App\Models\User;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerCrontabReader;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

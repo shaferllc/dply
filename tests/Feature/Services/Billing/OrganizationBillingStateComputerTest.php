@@ -1,16 +1,17 @@
 <?php
 
-
 namespace Tests\Feature\Services\Billing\OrganizationBillingStateComputerTest;
+
 use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Services\Billing\OrganizationBillingStateComputer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Keep the existing assertions sharp by setting the age cutoff to zero

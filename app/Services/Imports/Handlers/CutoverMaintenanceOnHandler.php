@@ -8,6 +8,7 @@ use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\StepHandler;
 use Illuminate\Support\Carbon;
 use RuntimeException;
@@ -45,7 +46,7 @@ class CutoverMaintenanceOnHandler implements StepHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
+        $driver = app(SourceDriverFactory::class)->for($credential);
         $driver->enableSiteMaintenance($migration->source_server_id, $child->source_site_id);
 
         $child->status = ImportSiteMigration::STATUS_CUTOVER_IN_PROGRESS;

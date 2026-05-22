@@ -2,6 +2,8 @@
 
 namespace App\Services\Billing;
 
+use Stripe\Price;
+use Stripe\Product;
 use Stripe\StripeClient;
 
 /**
@@ -221,7 +223,7 @@ class StripeBillingProvisioner
      * stored name/description when they drift from what the code declares.
      * Marketing copy can change without spinning up a new Stripe product.
      */
-    private function upsertProduct(string $name, string $description, string $role): \Stripe\Product
+    private function upsertProduct(string $name, string $description, string $role): Product
     {
         $existing = $this->stripe->products->search([
             'query' => sprintf('metadata[\'dply_role\']:\'%s\'', $role),
@@ -266,7 +268,7 @@ class StripeBillingProvisioner
         string $interval,
         string $nickname,
         string $role,
-    ): \Stripe\Price {
+    ): Price {
         $existing = $this->stripe->prices->search([
             'query' => sprintf('metadata[\'dply_role\']:\'%s\' AND active:\'true\'', $role),
             'limit' => 1,

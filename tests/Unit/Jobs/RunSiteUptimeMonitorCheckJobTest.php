@@ -1,16 +1,17 @@
 <?php
 
-
 namespace Tests\Unit\Jobs\RunSiteUptimeMonitorCheckJobTest;
+
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteUptimeMonitor;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('job records successful check', function () {
     Http::fake(fn () => Http::response('ok', 200));

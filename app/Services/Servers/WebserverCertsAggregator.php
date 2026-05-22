@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Services\SshConnection;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Cross-engine TLS certificates aggregator. Sweeps the canonical cert
@@ -58,27 +59,27 @@ class WebserverCertsAggregator
     ];
 
     /**
-     * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?\Carbon\CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?\Carbon\CarbonImmutable, unreadable: bool}
+     * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     public function aggregate(Server $server, bool $forceFresh = false): array
     {
         $cacheKey = 'dply.webserver-certs:'.$server->id;
 
         if (! $forceFresh) {
-            $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            $cached = Cache::get($cacheKey);
             if (is_array($cached)) {
                 return $this->rehydrate($cached);
             }
         }
 
         $payload = $this->runScan($server);
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
+        Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
 
         return $payload;
     }
 
     /**
-     * @return array{certs: list<array<string, mixed>>, scanned_at: ?\Carbon\CarbonImmutable, unreadable: bool}
+     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     private function runScan(Server $server): array
     {
@@ -253,7 +254,7 @@ BASH;
      * objects from `not_after` on the way back out.
      *
      * @param  array<string, mixed>  $cached
-     * @return array{certs: list<array<string, mixed>>, scanned_at: ?\Carbon\CarbonImmutable, unreadable: bool}
+     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     private function rehydrate(array $cached): array
     {

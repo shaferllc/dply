@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceDatabaseTest;
+
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
+
 test('create database cluster posts and normalizes the response', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/databases' => Http::response([

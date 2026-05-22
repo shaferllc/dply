@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\ApplyFirewallJobTest;
+
 use App\Jobs\ApplyFirewallJob;
 use App\Models\Organization;
 use App\Models\Server;
@@ -9,9 +9,10 @@ use App\Models\User;
 use App\Services\Servers\ServerFirewallApplyRecorder;
 use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /** @return array{User, Server} */
 function ownerWithServer(): array

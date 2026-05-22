@@ -3,17 +3,22 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseCreatePageTest;
+
 use App\Jobs\ProvisionCloudDatabaseJob;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('page renders', function () {
     $user = ownerWithOrg();
@@ -29,8 +34,8 @@ test('page is gated by auth', function () {
     $this->get(route('cloud.databases.create'))->assertRedirect(route('login'));
 });
 test('page is gated by surface cloud feature', function () {
-    \Laravel\Pennant\Feature::define('surface.cloud', fn () => false);
-    \Laravel\Pennant\Feature::flushCache();
+    Feature::define('surface.cloud', fn () => false);
+    Feature::flushCache();
     $user = ownerWithOrg();
 
     // The feature:surface.cloud route middleware aborts before the

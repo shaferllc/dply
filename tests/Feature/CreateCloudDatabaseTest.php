@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CreateCloudDatabaseTest;
+
 use App\Actions\Cloud\CreateCloudDatabase;
 use App\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function orgWithDoCredential(string $provider = 'digitalocean'): Organization
 {

@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\Servers\ServerlessHostRedirectTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('serverless host overview redirects to the function workspace', function () {
     $user = User::factory()->create();

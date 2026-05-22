@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerOverviewEnginesPanelTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('overview shows engines panel with default marker', function () {
     $this->markTestSkipped('Database engines panel was moved off /overview; /databases page should host it. See dashboard refactor disposition Q4.');

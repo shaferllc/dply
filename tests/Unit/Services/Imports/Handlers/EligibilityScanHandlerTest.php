@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\EligibilityScanHandlerTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -12,7 +13,9 @@ use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\Imports\Handlers\EligibilityScanHandler;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 test('aborts children whose source site was removed', function () {
     [$migration, $eligible, $removedFromSource] = seedFixture();
 
@@ -23,7 +26,7 @@ test('aborts children whose source site was removed', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    (new EligibilityScanHandler())->execute($step);
+    (new EligibilityScanHandler)->execute($step);
 
     expect($eligible->refresh()->status)->toBe(ImportSiteMigration::STATUS_PENDING, 'eligible site stays pending');
     expect($removedFromSource->refresh()->status)->toBe(ImportSiteMigration::STATUS_ABORTED, 'removed-from-source child gets aborted');
@@ -49,7 +52,7 @@ test('pending steps for aborted child are skipped', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    (new EligibilityScanHandler())->execute($scanStep);
+    (new EligibilityScanHandler)->execute($scanStep);
 
     expect($childStep->refresh()->status)->toBe(ImportMigrationStep::STATUS_SKIPPED);
 });

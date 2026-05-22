@@ -7,6 +7,7 @@ use App\Models\ConsoleAction;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerInventoryProbeScript;
 use App\Services\SshConnection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Refresh the server's inventory + manage probe over SSH. Streams output to two
@@ -68,7 +69,7 @@ trait RunsServerInventoryProbe
         $consoleRow = $this->seedInventoryProbeConsoleAction();
         $emitter = $consoleRow !== null ? new ConsoleEmitter((string) $consoleRow->id) : null;
         if ($consoleRow !== null) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleRow->id)->update([
+            DB::table('console_actions')->where('id', $consoleRow->id)->update([
                 'status' => ConsoleAction::STATUS_RUNNING,
                 'started_at' => now(),
                 'updated_at' => now(),
@@ -213,7 +214,7 @@ trait RunsServerInventoryProbe
     protected function finalizeInventoryProbeConsoleAction(ConsoleAction $row, bool $success, ?string $errorMessage = null): void
     {
         try {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $row->id)->update([
+            DB::table('console_actions')->where('id', $row->id)->update([
                 'status' => $success ? ConsoleAction::STATUS_COMPLETED : ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => $errorMessage !== null ? mb_substr($errorMessage, 0, 2000) : null,

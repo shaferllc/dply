@@ -1,10 +1,11 @@
 <?php
 
-
 namespace Tests\Feature\Api\MetricsIngestTest;
-use App\Models\ServerMetricIngestEvent;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use App\Models\ServerMetricIngestEvent;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('rejects when token not configured', function () {
     config(['server_metrics.ingest.token' => '']);

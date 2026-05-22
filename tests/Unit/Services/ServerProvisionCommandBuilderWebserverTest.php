@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerProvisionCommandBuilderWebserverTest;
+
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionCommandBuilder;
+
 test('build application stack supports apache openlitespeed and traefik', function () {
     $builder = app(ServerProvisionCommandBuilder::class);
 

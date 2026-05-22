@@ -1,12 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\TrialStateGatingTest;
+
 use App\Enums\TrialState;
-use \App\Models\Organization;
+use App\Models\Organization;
+use App\Models\Subscription;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Config::set('subscription.standard.trial_days', 14);
@@ -40,7 +42,7 @@ test('expired hard state past soft window', function () {
 test('subscribed state overrides trial window', function () {
     $org = new class extends Organization
     {
-        function onStandardSubscription(): bool
+        public function onStandardSubscription(): bool
         {
             return true;
         }
@@ -70,7 +72,7 @@ test('no trial state when field is null', function () {
 test('hard pause starts at returns null for subscribed orgs', function () {
     $org = new class extends Organization
     {
-        function onStandardSubscription(): bool
+        public function onStandardSubscription(): bool
         {
             return true;
         }
@@ -115,7 +117,7 @@ test('canceled subscription within grace keeps org subscribed', function () {
     $org = Organization::factory()->create(['trial_ends_at' => null]);
 
     // Canceled but ends_at in the future = Cashier grace period; valid() true.
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_grace_base')
         ->create([
             'organization_id' => $org->id,
@@ -129,7 +131,7 @@ test('canceled subscription within grace keeps org subscribed', function () {
 test('ended subscription within soft window is expired soft', function () {
     Config::set('subscription.standard.soft_pause_days', 30);
     $org = Organization::factory()->create(['trial_ends_at' => null]);
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_x')
         ->create([
             'organization_id' => $org->id,
@@ -144,7 +146,7 @@ test('ended subscription within soft window is expired soft', function () {
 test('ended subscription past soft window is expired hard', function () {
     Config::set('subscription.standard.soft_pause_days', 30);
     $org = Organization::factory()->create(['trial_ends_at' => null]);
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_x')
         ->create([
             'organization_id' => $org->id,
@@ -160,7 +162,7 @@ test('ended subscription reference beats trial dates', function () {
     // The recent subscription end is what should drive the pause ladder.
     Config::set('subscription.standard.soft_pause_days', 30);
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(400)]);
-    \App\Models\Subscription::factory()
+    Subscription::factory()
         ->withPrice('price_x')
         ->create([
             'organization_id' => $org->id,

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudBuildEnvTest;
+
 use App\Enums\SiteType;
 use App\Jobs\RedeployCloudSiteJob;
 use App\Livewire\Sites\Settings as SitesSettings;
@@ -11,16 +12,19 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\DigitalOceanAppPlatformService;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
+use App\Services\DigitalOceanAppPlatformService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 test('do service create app includes build time envs', function () {
     Http::fake([

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Api\ImportMigrationsApiTest;
+
 use App\Models\ApiToken;
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
@@ -11,7 +12,9 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: Organization, 1: User, 2: string}

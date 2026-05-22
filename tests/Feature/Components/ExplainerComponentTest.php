@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Components\ExplainerComponentTest;
+
 use Illuminate\Support\Facades\Blade;
+
 test('it renders default what is this label', function () {
     $html = Blade::render('<x-explainer><p>Hello.</p></x-explainer>');
 

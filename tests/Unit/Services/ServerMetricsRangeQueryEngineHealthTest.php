@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerMetricsRangeQueryEngineHealthTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\User;
 use App\Services\Servers\ServerMetricsRangeQuery;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function makeServer(): Server
 {

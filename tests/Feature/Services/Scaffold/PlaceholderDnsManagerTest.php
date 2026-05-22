@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Scaffold\PlaceholderDnsManagerTest;
+
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Scaffold\PlaceholderDnsManager;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function makeSite(string $serverIp = '203.0.113.42', string $slug = 'my-blog'): Site
 {

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseAttachmentTest;
+
 use App\Enums\SiteType;
 use App\Jobs\AttachCloudDatabaseJob;
 use App\Livewire\Sites\Settings as SiteSettings;
@@ -12,9 +13,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('dashboard shows available databases to attach', function () {
     [$user, $server, $site, $org] = makeContainerSite();

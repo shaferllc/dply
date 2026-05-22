@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ListEnginesCommandTest;
+
 use Illuminate\Support\Facades\Artisan;
+
 test('command lists engines with packages', function () {
     $exit = Artisan::call('dply:list-engines');
     $output = Artisan::output();

@@ -1,10 +1,9 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerPasswdUserListerTest;
+
 use App\Models\Server;
 use App\Services\Servers\ServerPasswdUserLister;
-use PHPUnit\Framework\Attributes\Test;
 
 it('requires a ready server with ssh key', function () {
     $server = new Server([

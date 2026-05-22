@@ -1,22 +1,27 @@
 <?php
 
-
 namespace Tests\Feature\WebserverSwitchTest;
+
 use App\Jobs\RevertServerWebserverSwitchJob;
-use \App\Jobs\SwitchServerWebserverJob;
-use App\Livewire\Servers\WorkspaceManage;
+use App\Jobs\SwitchServerWebserverJob;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerCacheService;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
+use App\Models\SiteCertificate;
+use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
+use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\RemoteCli\RiskLevel;
 use App\Services\Servers\WebserverSwitchPreflight;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeUser(): User
 {
@@ -150,10 +155,10 @@ test('planner surfaces custom config drift', function () {
         'name' => 'edited-site',
         'runtime' => 'static',
     ]);
-    \App\Models\SiteWebserverConfigProfile::query()->create([
+    SiteWebserverConfigProfile::query()->create([
         'site_id' => $site->id,
         'webserver' => 'nginx',
-        'mode' => \App\Models\SiteWebserverConfigProfile::MODE_LAYERED,
+        'mode' => SiteWebserverConfigProfile::MODE_LAYERED,
         'main_snippet_body' => "    add_header X-Custom \"yes\";\n",
     ]);
 
@@ -177,11 +182,11 @@ test('planner surfaces full override drift', function () {
         'name' => 'fully-overridden',
         'runtime' => 'static',
     ]);
-    \App\Models\SiteWebserverConfigProfile::query()->create([
+    SiteWebserverConfigProfile::query()->create([
         'site_id' => $site->id,
         'webserver' => 'nginx',
-        'mode' => \App\Models\SiteWebserverConfigProfile::MODE_FULL_OVERRIDE,
-        'full_override_body' => "server { listen 80; server_name foo; }",
+        'mode' => SiteWebserverConfigProfile::MODE_FULL_OVERRIDE,
+        'full_override_body' => 'server { listen 80; server_name foo; }',
     ]);
 
     $plan = app(WebserverSwitchPreflight::class)->plan($server, 'caddy');
@@ -199,10 +204,10 @@ test('planner omits drift when no customizations', function () {
         'organization_id' => $user->currentOrganization()->id,
         'runtime' => 'static',
     ]);
-    \App\Models\SiteWebserverConfigProfile::query()->create([
+    SiteWebserverConfigProfile::query()->create([
         'site_id' => $site->id,
         'webserver' => 'nginx',
-        'mode' => \App\Models\SiteWebserverConfigProfile::MODE_LAYERED,
+        'mode' => SiteWebserverConfigProfile::MODE_LAYERED,
     ]);
 
     $plan = app(WebserverSwitchPreflight::class)->plan($server, 'caddy');
@@ -219,7 +224,7 @@ test('planner offers tls optin for caddy with tls sites', function () {
         'organization_id' => $user->currentOrganization()->id,
         'runtime' => 'static',
     ]);
-    \App\Models\SiteCertificate::query()->create([
+    SiteCertificate::query()->create([
         'site_id' => $site->id,
         'scope_type' => 'customer',
         'provider_type' => 'letsencrypt',
@@ -254,11 +259,11 @@ test('workspace manage rejects blocked target', function () {
     // stages on :8080 too, so {@see WebserverSwitchPreflight::detectBlocker}
     // hard-rejects any target while it's running. Operator must uninstall
     // Varnish before switching the webserver.
-    \App\Models\ServerCacheService::query()->create([
+    ServerCacheService::query()->create([
         'server_id' => $server->id,
         'engine' => 'varnish',
         'name' => 'default',
-        'status' => \App\Models\ServerCacheService::STATUS_RUNNING,
+        'status' => ServerCacheService::STATUS_RUNNING,
         'port' => 80,
     ]);
 
@@ -380,7 +385,7 @@ test('recent switches audit renders on web tab', function () {
         'server_id' => $server->id,
         'user_id' => $user->id,
         'action' => ServerWebserverAuditEvent::ACTION_SWITCHED,
-        'risk' => \App\Services\RemoteCli\RiskLevel::MutatingRecoverable->value,
+        'risk' => RiskLevel::MutatingRecoverable->value,
         'transport' => ServerWebserverAuditEvent::TRANSPORT_WEB,
         'summary' => 'Switched nginx → caddy',
         'payload' => [
@@ -419,25 +424,20 @@ test('job records audit event on success', function () {
     // orchestration shape (preflight → audit → meta update) is what we're
     // exercising here; the actual SSH stages have their own tests once the
     // executor service lands.
-    $job = new class(serverId: $server->id, target: 'caddy', tlsToCaddy: false, userId: $user->id) extends SwitchServerWebserverJob {
+    $job = new class(serverId: $server->id, target: 'caddy', tlsToCaddy: false, userId: $user->id) extends SwitchServerWebserverJob
+    {
         // Production `executeStageInstall` takes an additional ConsoleEmitter for streaming
         // apt output into the banner; the no-op test override matches that signature so the
         // anonymous-class declaration stays binary-compatible with the parent.
-        protected function executeStageInstall(\App\Models\Server $server, \App\Services\ConsoleActions\ConsoleEmitter $emitter): void
-        {
-        }
-        protected function executeStageProvision(\App\Models\Server $server, array $preflight): void
-        {
-        }
-        protected function executeStageValidate(\App\Models\Server $server): void
-        {
-        }
-        protected function executeStageCutover(\App\Models\Server $server, string $from): void
-        {
-        }
-        protected function executeStageDisableOld(\App\Models\Server $server, string $from): void
-        {
-        }
+        protected function executeStageInstall(Server $server, ConsoleEmitter $emitter): void {}
+
+        protected function executeStageProvision(Server $server, array $preflight): void {}
+
+        protected function executeStageValidate(Server $server): void {}
+
+        protected function executeStageCutover(Server $server, string $from): void {}
+
+        protected function executeStageDisableOld(Server $server, string $from): void {}
     };
     $job->handle();
 

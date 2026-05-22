@@ -3,15 +3,19 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteBackgroundPagesTest;
+
 use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\Workers;
+use App\Models\FunctionInvocation;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\SiteSettingsSidebar;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function actingOrgOwner(): User
 {
@@ -230,9 +234,9 @@ test('clicking a history row opens the tick detail modal with the full body', fu
     [$server, $site] = makeFunctionsSite($user);
 
     $olderBody = str_repeat('A', 200).'OLD-TAIL-MARKER';
-    $older = \App\Models\FunctionInvocation::query()->create([
+    $older = FunctionInvocation::query()->create([
         'site_id' => $site->id,
-        'source' => \App\Models\FunctionInvocation::SOURCE_TICK,
+        'source' => FunctionInvocation::SOURCE_TICK,
         'task' => 'schedule',
         'method' => 'GET',
         'path' => '/',
@@ -245,9 +249,9 @@ test('clicking a history row opens the tick detail modal with the full body', fu
         'result_excerpt' => $olderBody,
         'created_at' => now()->subMinute(),
     ]);
-    \App\Models\FunctionInvocation::query()->create([
+    FunctionInvocation::query()->create([
         'site_id' => $site->id,
-        'source' => \App\Models\FunctionInvocation::SOURCE_TICK,
+        'source' => FunctionInvocation::SOURCE_TICK,
         'task' => 'schedule',
         'method' => 'GET',
         'path' => '/',

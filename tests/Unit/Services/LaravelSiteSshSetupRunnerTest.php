@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\LaravelSiteSshSetupRunnerTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -9,8 +9,9 @@ use App\Models\SiteDeployStep;
 use App\Models\User;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteDeployPipelineCommands;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function laravelVmSite(array $siteMeta = [], array $serverAttrs = []): Site
 {

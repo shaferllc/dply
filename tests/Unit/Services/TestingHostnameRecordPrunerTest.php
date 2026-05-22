@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\TestingHostnameRecordPrunerTest;
-use Mockery;
 
-use \App\Services\Sites\TestingHostnameRecordPruner;
 use App\Services\DigitalOceanService;
 use App\Services\Sites\TestingHostnameProvisioner;
+use App\Services\Sites\TestingHostnameRecordPruner;
+use Mockery;
+
 test('it finds stale a records that are not attached to any site', function () {
     $provisioner = Mockery::mock(TestingHostnameProvisioner::class);
     $provisioner->shouldReceive('configuredDomains')->once()->andReturn(['dply.cc']);
@@ -24,7 +25,7 @@ test('it finds stale a records that are not attached to any site', function () {
 
     $pruner = new class($provisioner, $digitalOcean) extends TestingHostnameRecordPruner
     {
-        function managedHostnames(): array
+        public function managedHostnames(): array
         {
             return ['active-preview.dply.cc'];
         }

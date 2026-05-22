@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudDeployCommandTest;
+
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
 use App\Jobs\RedeployCloudSiteJob;
@@ -11,9 +12,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('creates edge site for new name', function () {
     Queue::fake();

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\SiteFilesTest;
+
 use App\Livewire\Sites\Files;
 use App\Models\Organization;
 use App\Models\Server;
@@ -14,8 +15,10 @@ use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Support\Servers\FileBrowserEntry;
 use App\Support\Servers\FileBrowserFileRead;
 use App\Support\Servers\FileBrowserListing;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function actingOrgUser(string $role = 'owner'): User
 {
@@ -82,7 +85,7 @@ test('edit inside releases warns before saving', function () {
         sha256: str_repeat('a', 64),
         mime: 'text/plain',
         isBinary: false,
-        content: "APP_ENV=prod",
+        content: 'APP_ENV=prod',
     ));
     $this->app->instance(ServerFileBrowserRemoteReader::class, $reader);
 
@@ -115,7 +118,7 @@ test('save conflict when remote sha drifted', function () {
         sha256: str_repeat('a', 64),
         mime: 'text/plain',
         isBinary: false,
-        content: "APP_ENV=prod",
+        content: 'APP_ENV=prod',
     ));
     $this->app->instance(ServerFileBrowserRemoteReader::class, $reader);
 

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\ServerProviderGateTest;
+
 use App\Support\ServerProviderGate;
 
 test('defaults enable digitalocean and custom', function () {

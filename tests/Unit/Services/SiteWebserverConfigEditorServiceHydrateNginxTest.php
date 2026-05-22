@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Unit\Services\SiteWebserverConfigEditorServiceHydrateNginxTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
@@ -12,8 +10,10 @@ use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('layered profile pulls before and after even when main vhost has no include paths', function () {
     $user = User::factory()->create();

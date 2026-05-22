@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\WorkspacePhpRevisionsTest;
-use Mockery;
 
 use App\Livewire\Servers\WorkspacePhp;
 use App\Models\ConfigRevision;
@@ -12,9 +10,11 @@ use App\Models\User;
 use App\Services\ConfigRevisions\ConfigRevisionRecorder;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpManager;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

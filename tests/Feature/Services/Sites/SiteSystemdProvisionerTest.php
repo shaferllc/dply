@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Sites\SiteSystemdProvisionerTest;
+
 use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Services\Sites\SiteSystemdProvisioner;
 use App\Services\Sites\SiteSystemdUnitBuilder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('provision uploads web unit and activates via systemctl', function () {
     $server = Server::factory()->ready()->create([

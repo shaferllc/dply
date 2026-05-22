@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SupervisorHealthNotificationsTest;
+
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Models\Organization;
 use App\Models\Server;
@@ -10,8 +11,10 @@ use App\Models\SupervisorProgram;
 use App\Models\User;
 use App\Notifications\UniversalEventNotification;
 use App\Services\Servers\SupervisorProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('supervisor health command publishes universal notification for org admins', function () {
     Mail::fake();

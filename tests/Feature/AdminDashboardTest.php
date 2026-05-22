@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Feature\AdminDashboardTest;
+
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('guest cannot access platform admin', function () {
     $this->get(route('admin.dashboard'))->assertRedirect(route('login', absolute: false));

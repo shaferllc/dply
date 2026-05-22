@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Sites\ServerlessRuntimeTest;
+
 use App\Livewire\Sites\Settings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @param  array<string, mixed>  $serverlessMeta

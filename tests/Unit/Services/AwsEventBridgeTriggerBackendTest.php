@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\AwsEventBridgeTriggerBackendTest;
+
 use App\Models\FunctionAction;
 use App\Services\Serverless\Aws\AwsEventBridgeTriggerBackend;
 use Aws\EventBridge\EventBridgeClient;
 use Aws\Lambda\LambdaClient;
 use Aws\MockHandler;
 use Aws\Result;
+
 function client(string $service, MockHandler $handler): EventBridgeClient|LambdaClient
 {
     $config = [

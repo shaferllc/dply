@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\PrimaryHostnameRenameTest;
+
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AttachCloudDomainJob;
 use App\Jobs\DetachCloudDomainJob;
@@ -15,10 +15,11 @@ use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\User;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeUser(): User
 {

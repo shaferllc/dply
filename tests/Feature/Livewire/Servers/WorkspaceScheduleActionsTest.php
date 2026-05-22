@@ -3,27 +3,31 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Servers\WorkspaceScheduleActionsTest;
-use Mockery;
 
 use App\Jobs\RunSchedulerNowJob;
 use App\Livewire\Servers\WorkspaceSchedule;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\ServerCronSynchronizer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+use Tests\Concerns\WithFeatures;
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
 
 /** @return array{User, Server, Site, ServerCronJob, ServerSchedulerHeartbeat} */
 function setupWithScheduler(bool $enabled = true): array
 {
     $user = User::factory()->create();
-    $org = \App\Models\Organization::factory()->create();
+    $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
 
     $server = Server::factory()->ready()->create([

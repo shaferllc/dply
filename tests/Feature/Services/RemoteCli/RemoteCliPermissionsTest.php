@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\RemoteCli\RemoteCliPermissionsTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -10,7 +11,9 @@ use App\Models\User;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
 use App\Services\RemoteCli\RemoteCliPermissions;
 use App\Services\RemoteCli\RiskLevel;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function makeUserWithRole(?string $role): array
 {

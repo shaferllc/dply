@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerMetricsGuestPushVerifierTest;
+
 use App\Models\Server;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
 use App\Services\Servers\ServerMetricsGuestScript;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('summary reports current guest push setup', function () {
     $server = Server::factory()->create([

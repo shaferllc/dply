@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\Console\SyncAllOrganizationBillingCommandTest;
+
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('no op when no orgs have subscriptions', function () {
     Bus::fake();

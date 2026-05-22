@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\NotificationPublishingTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -13,14 +14,16 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Imports\Handlers\CutoverSmokeTestHandler;
-use App\Services\Imports\Handlers\EligibilityScanHandler;
-use App\Services\Imports\Handlers\PushSshKeyHandler;
+use App\Services\Imports\MigrationPlanner;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\StepOrchestrator;
 use App\Services\Imports\StepRegistry;
+use App\Services\Notifications\NotificationEventRegistry;
 use App\Services\Notifications\NotificationPublisher;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Organization, 2: ImportServerMigration, 3: ImportSiteMigration, 4: Site}
@@ -79,7 +82,7 @@ test('step failed publishes notification event', function () {
     ]);
 
     $orchestrator = new StepOrchestrator(
-        new StepRegistry(),
+        new StepRegistry,
         $this->app->make(NotificationPublisher::class),
     );
     $orchestrator->executeStep($step);
@@ -103,7 +106,7 @@ test('cutover ready publishes when site finishes staging', function () {
     // All staging steps already succeeded — the orchestrator only needs to evaluate after
     // one more succeeds. We synthesize that final-success path by inserting a freeze_snapshot
     // step succeeded, then running it through markSucceeded → maybeMarkSiteReady manually.
-    foreach (\App\Services\Imports\MigrationPlanner::STAGING_STEPS as $key) {
+    foreach (MigrationPlanner::STAGING_STEPS as $key) {
         ImportMigrationStep::create([
             'import_server_migration_id' => $migration->id,
             'import_site_migration_id' => $child->id,
@@ -117,14 +120,14 @@ test('cutover ready publishes when site finishes staging', function () {
     // purposes; what matters is that maybeAdvanceMigration → maybeMarkSiteReady fires.
     $tailStep = ImportMigrationStep::query()
         ->where('import_site_migration_id', $child->id)
-        ->where('step_key', \App\Services\Imports\MigrationPlanner::STAGING_STEPS[0])
+        ->where('step_key', MigrationPlanner::STAGING_STEPS[0])
         ->first();
 
     // Reset to PENDING so orchestrator runs it.
     $tailStep->status = ImportMigrationStep::STATUS_PENDING;
     $tailStep->save();
 
-    $registry = new StepRegistry();
+    $registry = new StepRegistry;
     $registry->register($tailStep->step_key, NoOpHandler::class);
 
     (new StepOrchestrator($registry, $this->app->make(NotificationPublisher::class)))
@@ -165,7 +168,7 @@ test('smoke test success publishes cutover complete', function () {
     ]);
 });
 test('notification event supports email for import keys', function () {
-    $registry = $this->app->make(\App\Services\Notifications\NotificationEventRegistry::class);
+    $registry = $this->app->make(NotificationEventRegistry::class);
 
     $definition = $registry->definition('import.migration.cutover_ready');
     expect($definition['supports_email'])->toBeTrue();
@@ -180,12 +183,10 @@ test('notification event supports email for import keys', function () {
 });
 final class NoOpHandler implements StepHandler
 {
-    static function key(): string
+    public static function key(): string
     {
         return 'freeze_snapshot';
     }
 
-    function execute(ImportMigrationStep $step): void
-    {
-    }
+    public function execute(ImportMigrationStep $step): void {}
 }

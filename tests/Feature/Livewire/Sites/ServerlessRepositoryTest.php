@@ -1,17 +1,18 @@
 <?php
 
-
 namespace Tests\Feature\Livewire\Sites\ServerlessRepositoryTest;
+
 use App\Livewire\Sites\Repository;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: Server, 2: Site}

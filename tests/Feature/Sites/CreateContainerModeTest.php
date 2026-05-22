@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\CreateContainerModeTest;
-use Mockery;
 
 use App\Enums\SiteType;
 use App\Jobs\FinalizeContainerCloudLaunchJob;
@@ -12,9 +11,12 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Deploy\LocalRepositoryInspector;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('docker host renders container mode form', function () {
     $user = userWithOrganization();

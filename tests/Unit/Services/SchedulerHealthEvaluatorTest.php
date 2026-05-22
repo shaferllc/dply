@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\SchedulerHealthEvaluatorTest;
+
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Services\Servers\SchedulerHealthEvaluator;
 use Carbon\Carbon;
+
 function heartbeat(array $attrs = []): ServerSchedulerHeartbeat
 {
     $hb = new ServerSchedulerHeartbeat;

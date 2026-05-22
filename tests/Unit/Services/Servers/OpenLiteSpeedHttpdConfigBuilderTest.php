@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\OpenLiteSpeedHttpdConfigBuilderTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -10,7 +11,9 @@ use App\Models\SiteDomain;
 use App\Models\User;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
 use Illuminate\Database\Eloquent\Collection;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function makeUserWithOrg(): User
 {

@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\SiteRuntimeSettingsVisibilityTest;
+
 use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('should show php octane when site type is php', function () {
     $server = Server::factory()->ready()->create();

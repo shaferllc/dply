@@ -1,18 +1,18 @@
 <?php
 
-
 namespace Tests\Unit\Services\DplyCliInstallerTest;
-use Mockery;
 
 use App\Models\Server;
-use \Mockery\MockInterface;
 use App\Services\Servers\DplyCliInstaller;
 use App\Services\Servers\DplyCliStateWriter;
 use App\Services\SshConnection;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+use Mockery\MockInterface;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-function createMockSsh(): Mockery\MockInterface
+function createMockSsh(): MockInterface
 {
     return Mockery::mock(SshConnection::class);
 }
@@ -20,6 +20,7 @@ function createMockSsh(): Mockery\MockInterface
 function createInstaller(?DplyCliStateWriter $stateWriter = null): DplyCliInstaller
 {
     $stateWriter ??= Mockery::mock(DplyCliStateWriter::class);
+
     return new DplyCliInstaller($stateWriter);
 }
 
@@ -140,12 +141,12 @@ test('install creates state directory', function () {
         ->andReturnNull();
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/sudo install/'), 15)
+        ->with(Mockery::pattern('/sudo install/'), 15)
         ->andReturn('');
 
     // jq installation check
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/command -v jq/'), 120)
+        ->with(Mockery::pattern('/command -v jq/'), 120)
         ->andReturn('');
 
     // State file push
@@ -163,23 +164,23 @@ test('install uploads binary', function () {
     $mockStateWriter = Mockery::mock(DplyCliStateWriter::class);
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/mkdir -p/'), 15)
+        ->with(Mockery::pattern('/mkdir -p/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('putFile')
         ->once()
-        ->with(\Mockery::pattern('/\/tmp\/dply\.install\.[a-f0-9]+/'), \Mockery::type('string'));
+        ->with(Mockery::pattern('/\/tmp\/dply\.install\.[a-f0-9]+/'), Mockery::type('string'));
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/sudo install.*\/usr\/local\/bin\/dply/'), 15)
+        ->with(Mockery::pattern('/sudo install.*\/usr\/local\/bin\/dply/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/command -v jq/'), 120)
+        ->with(Mockery::pattern('/command -v jq/'), 120)
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/rm -f/'), 15)
+        ->with(Mockery::pattern('/rm -f/'), 15)
         ->andReturn('');
 
     $mockStateWriter->shouldReceive('push')
@@ -195,14 +196,14 @@ test('install installs jq when missing', function () {
     $mockStateWriter = Mockery::mock(DplyCliStateWriter::class);
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/mkdir -p/'), 15)
+        ->with(Mockery::pattern('/mkdir -p/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('putFile')
         ->once();
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/sudo install/'), 15)
+        ->with(Mockery::pattern('/sudo install/'), 15)
         ->andReturn('');
 
     // jq not found, triggers apt install
@@ -212,7 +213,7 @@ test('install installs jq when missing', function () {
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/rm -f/'), 15)
+        ->with(Mockery::pattern('/rm -f/'), 15)
         ->andReturn('');
 
     $mockStateWriter->shouldReceive('push')
@@ -228,26 +229,26 @@ test('install skips jq install when present', function () {
     $mockStateWriter = Mockery::mock(DplyCliStateWriter::class);
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/mkdir -p/'), 15)
+        ->with(Mockery::pattern('/mkdir -p/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('putFile')
         ->once();
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/sudo install/'), 15)
+        ->with(Mockery::pattern('/sudo install/'), 15)
         ->andReturn('');
 
     // jq already present
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/command -v jq/'), 120)
+        ->with(Mockery::pattern('/command -v jq/'), 120)
         ->andReturnUsing(function ($cmd) {
             // The command succeeds silently when jq is present
             return '';
         });
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/rm -f/'), 15)
+        ->with(Mockery::pattern('/rm -f/'), 15)
         ->andReturn('');
 
     $mockStateWriter->shouldReceive('push')
@@ -263,22 +264,22 @@ test('install pushes state file', function () {
     $mockStateWriter = Mockery::mock(DplyCliStateWriter::class);
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/mkdir -p/'), 15)
+        ->with(Mockery::pattern('/mkdir -p/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('putFile')
         ->once();
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/sudo install/'), 15)
+        ->with(Mockery::pattern('/sudo install/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/command -v jq/'), 120)
+        ->with(Mockery::pattern('/command -v jq/'), 120)
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/rm -f/'), 15)
+        ->with(Mockery::pattern('/rm -f/'), 15)
         ->andReturn('');
 
     // State push should be called with the server and SSH connection
@@ -296,22 +297,22 @@ test('install returns parsed version', function () {
     $mockStateWriter = Mockery::mock(DplyCliStateWriter::class);
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/mkdir -p/'), 15)
+        ->with(Mockery::pattern('/mkdir -p/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('putFile')
         ->once();
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/sudo install/'), 15)
+        ->with(Mockery::pattern('/sudo install/'), 15)
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/command -v jq/'), 120)
+        ->with(Mockery::pattern('/command -v jq/'), 120)
         ->andReturn('');
 
     $mockSsh->shouldReceive('exec')
-        ->with(\Mockery::pattern('/rm -f/'), 15)
+        ->with(Mockery::pattern('/rm -f/'), 15)
         ->andReturn('');
 
     $mockStateWriter->shouldReceive('push')
@@ -331,7 +332,7 @@ test('install throws when script file missing', function () {
 
     // Temporarily rename the script to simulate missing file
     $scriptPath = resource_path('bin/dply');
-    $backupPath = $scriptPath . '.backup';
+    $backupPath = $scriptPath.'.backup';
 
     if (file_exists($scriptPath)) {
         rename($scriptPath, $backupPath);
@@ -373,7 +374,7 @@ test('refresh state does not install binary', function () {
 
     // Should NOT call any exec methods for binary installation
     $mockSsh->shouldNotReceive('exec')
-        ->with(\Mockery::pattern('/mkdir -p/'));
+        ->with(Mockery::pattern('/mkdir -p/'));
     $mockSsh->shouldNotReceive('putFile');
 
     $mockStateWriter->shouldReceive('push')

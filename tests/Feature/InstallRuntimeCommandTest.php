@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\InstallRuntimeCommandTest;
-use Mockery;
 
 use App\Actions\Servers\InstallRuntimeOnServer;
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('command installs node via action', function () {
     $server = Server::factory()->ready()->create([

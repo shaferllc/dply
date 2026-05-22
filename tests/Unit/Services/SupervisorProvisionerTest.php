@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\SupervisorProvisionerTest;
+
 use App\Models\Server;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\SupervisorProvisioner;
-use PHPUnit\Framework\Attributes\Test;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('build ini includes expert fields when set', function () {
     $p = new SupervisorProgram([

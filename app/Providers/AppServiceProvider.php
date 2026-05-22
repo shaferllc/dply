@@ -9,20 +9,24 @@ use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
 use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
+use App\Listeners\SyncBillingOnSubscriptionWebhook;
 use App\Listeners\UpdateDispatchedJobLifecycle;
 use App\Models\BackupConfiguration;
-use App\Models\ServerDatabaseBackup;
-use App\Models\SiteFileBackup;
+use App\Models\ImportServerMigration;
 use App\Models\Incident;
 use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Script;
 use App\Models\Server;
+use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
+use App\Models\SiteFileBackup;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
+use App\Models\Subscription;
+use App\Models\SubscriptionItem;
 use App\Models\SupervisorProgram;
 use App\Models\Team;
 use App\Models\User;
@@ -37,6 +41,7 @@ use App\Observers\ServerObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Policies\BackupConfigurationPolicy;
+use App\Policies\ImportServerMigrationPolicy;
 use App\Policies\IncidentPolicy;
 use App\Policies\NotificationChannelPolicy;
 use App\Policies\OrganizationPolicy;
@@ -64,7 +69,6 @@ use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesDeployEngine;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
-use App\Services\Deploy\SiteResourceBindingResolver;
 use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
@@ -73,11 +77,16 @@ use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
 use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
+use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Services\Imports\Handlers\HandlerManifest;
+use App\Services\Imports\StepRegistry;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\Bootstrap\VmServerBootstrapStrategy;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Servers\ServerMetricsRangeQuery;
+use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
@@ -89,6 +98,7 @@ use App\Services\Sites\SiteRuntimeProvisionerRegistry;
 use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
+use App\Services\Sites\UptimeProbeRegionResolver;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\CaddyWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
@@ -132,21 +142,21 @@ class AppServiceProvider extends ServiceProvider
         // engine (e.g. caddy backend + traefik edge), and the range fetch +
         // latest-snapshot select would otherwise run once per engine instance.
         // The class memoizes snapshots per (server, range) on the instance.
-        $this->app->scoped(\App\Services\Servers\ServerMetricsRangeQuery::class);
+        $this->app->scoped(ServerMetricsRangeQuery::class);
 
         // Scoped: the webserver picker calls plan()/isBlocked() once per known
         // target during a single render, and each non-cached target triggers
         // its own varnish-running select. The instance already memoizes plan()
         // results — we add an explicit binding to make sure every call site
         // hits the same instance.
-        $this->app->scoped(\App\Services\Servers\WebserverSwitchPreflight::class);
+        $this->app->scoped(WebserverSwitchPreflight::class);
 
         // Migration step handler registry — bind handler classes to their step keys.
         // Bind eagerly so the orchestrator always has a fully populated registry; the
         // resolved handler instances are still container-managed (per-resolve).
-        $this->app->singleton(\App\Services\Imports\StepRegistry::class, function (): \App\Services\Imports\StepRegistry {
-            $registry = new \App\Services\Imports\StepRegistry();
-            foreach (\App\Services\Imports\Handlers\HandlerManifest::all() as $handlerClass) {
+        $this->app->singleton(StepRegistry::class, function (): StepRegistry {
+            $registry = new StepRegistry;
+            foreach (HandlerManifest::all() as $handlerClass) {
                 $registry->register($handlerClass::key(), $handlerClass);
             }
 
@@ -247,11 +257,11 @@ class AppServiceProvider extends ServiceProvider
         $this->mergeServerMonitoringInstallScript();
 
         Cashier::useCustomerModel(Organization::class);
-        Cashier::useSubscriptionModel(\App\Models\Subscription::class);
-        Cashier::useSubscriptionItemModel(\App\Models\SubscriptionItem::class);
+        Cashier::useSubscriptionModel(Subscription::class);
+        Cashier::useSubscriptionItemModel(SubscriptionItem::class);
 
         Event::listen(WebhookReceived::class, ProcessReferralInvoicePayment::class);
-        Event::listen(WebhookReceived::class, \App\Listeners\SyncBillingOnSubscriptionWebhook::class);
+        Event::listen(WebhookReceived::class, SyncBillingOnSubscriptionWebhook::class);
         Event::listen(ServerAuthorizedKeysSynced::class, DispatchServerAuthorizedKeysSyncedWebhook::class);
 
         // Mirror Livewire-dispatched queue jobs into task_runner_tasks so the
@@ -273,7 +283,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Workspace::class, WorkspacePolicy::class);
         Gate::policy(StatusPage::class, StatusPagePolicy::class);
         Gate::policy(Incident::class, IncidentPolicy::class);
-        Gate::policy(\App\Models\ImportServerMigration::class, \App\Policies\ImportServerMigrationPolicy::class);
+        Gate::policy(ImportServerMigration::class, ImportServerMigrationPolicy::class);
 
         Gate::define('manageNotificationChannels', function (User $user, User|Organization|Team $owner): bool {
             return match (true) {
@@ -364,7 +374,7 @@ class AppServiceProvider extends ServiceProvider
                             'label' => __('Homepage check'),
                             'path' => null,
                             // Probe from the region nearest the host, not a fixed default.
-                            'probe_region' => app(\App\Services\Sites\UptimeProbeRegionResolver::class)->forSite($site),
+                            'probe_region' => app(UptimeProbeRegionResolver::class)->forSite($site),
                         ],
                     );
                 },

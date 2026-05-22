@@ -16,14 +16,13 @@ use App\Models\TeamSshKey;
 use App\Models\UserSshKey;
 use App\Services\Servers\OrganizationTeamSshKeyServerDeployer;
 use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
-use App\Services\Servers\ServerAuthorizedKeysDiffPreview;
-use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SshKeyLabelTemplate;
 use App\Services\Servers\SshPublicKeyFingerprint;
 use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Request;
@@ -286,7 +285,7 @@ class WorkspaceSshKeys extends Component
             return;
         }
 
-        $runId = (string) \Illuminate\Support\Str::ulid();
+        $runId = (string) Str::ulid();
         $meta = $this->server->fresh()->meta ?? [];
         $meta[config('server_ssh_keys.meta_drift_run_id_key')] = $runId;
         $meta[$statusKey] = 'queued';
@@ -398,7 +397,6 @@ class WorkspaceSshKeys extends Component
 
         $this->toastSuccess(__('Key saved. Click “Sync authorized_keys” to apply on the server.'));
     }
-
 
     public function updateKeyReviewFromInput(string $id, ServerAuthorizedKeysAuditLogger $audit): void
     {
@@ -543,7 +541,7 @@ class WorkspaceSshKeys extends Component
             return true;
         }
         try {
-            return ! \Illuminate\Support\Carbon::parse($startedAt)
+            return ! Carbon::parse($startedAt)
                 ->lt(now()->subSeconds(self::SYNC_STALE_THRESHOLD_SECONDS));
         } catch (\Throwable) {
             // Unparseable started_at → fail open and let the operator retry.

@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FleetAgeCommandTest;
+
 use App\Models\Server;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('lists all servers oldest first', function () {
     $old = Server::factory()->create(['name' => 'old-server', 'created_at' => now()->subDays(400)]);

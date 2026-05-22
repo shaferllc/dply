@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PloiInventoryPageTest;
+
 use App\Jobs\Imports\SyncPloiInventoryJob;
 use App\Models\ImportServerMigration;
 use App\Models\Organization;
@@ -10,8 +11,10 @@ use App\Models\PloiServer;
 use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

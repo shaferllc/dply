@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Models\SiteEffectiveSystemUserTest;
+
 use App\Models\Server;
 use App\Models\Site;
 

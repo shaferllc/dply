@@ -61,14 +61,14 @@ class NoNotificationChannelsInsightRunner implements InsightRunnerInterface
                     $q->where('owner_type', $org->getMorphClass())
                         ->where('owner_id', $org->id);
                 })
-                  ->orWhere(function ($q) use ($teamIds): void {
-                      $q->where('owner_type', Team::class)
-                          ->whereIn('owner_id', $teamIds);
-                  })
-                  ->orWhere(function ($q) use ($userMemberIds): void {
-                      $q->where('owner_type', User::class)
-                          ->whereIn('owner_id', $userMemberIds);
-                  });
+                    ->orWhere(function ($q) use ($teamIds): void {
+                        $q->where('owner_type', Team::class)
+                            ->whereIn('owner_id', $teamIds);
+                    })
+                    ->orWhere(function ($q) use ($userMemberIds): void {
+                        $q->where('owner_type', User::class)
+                            ->whereIn('owner_id', $userMemberIds);
+                    });
             })
             ->count();
 

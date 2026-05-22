@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\RemoteCli\RemoteCliSyncExecutionTest;
-use Mockery;
 
 use App\Jobs\RunRemoteCliInBackgroundJob;
 use App\Models\Organization;
@@ -20,8 +19,11 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\RemoteCli\WpCli;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

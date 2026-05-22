@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\NginxConfigSyntaxTesterTest;
-use ReflectionMethod;
 
 use App\Services\Webserver\NginxConfigSyntaxTester;
-use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
+
 test('strip log directives removes access and error log lines', function () {
     $tester = new NginxConfigSyntaxTester;
     $method = new ReflectionMethod(NginxConfigSyntaxTester::class, 'stripLogDirectivesForLocalValidation');

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Scaffold\DatabaseConnectionEnvTest;
+
 use App\Support\Scaffold\DatabaseConnectionEnv;
+
 test('sqlite emits minimal block with default path', function () {
     $env = DatabaseConnectionEnv::forEngine('sqlite3', []);
 

@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\Console\ConsoleDrawerTest;
-use Mockery;
 
 use App\Livewire\Servers\ConsoleDrawer;
 use App\Models\Organization;
@@ -10,10 +8,12 @@ use App\Models\Server;
 use App\Models\User;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     // Each ready server created here fires a Server::created listener

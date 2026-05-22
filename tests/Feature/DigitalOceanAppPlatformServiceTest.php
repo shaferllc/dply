@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\DigitalOceanAppPlatformServiceTest;
+
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
 use App\Services\DigitalOceanAppPlatformService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('create app posts spec and returns id', function () {
     Http::fake([

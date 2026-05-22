@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ServerScheduledDeletionTest;
+
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\WorkspaceOverview;
@@ -10,9 +11,11 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Notifications\UniversalEventNotification;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

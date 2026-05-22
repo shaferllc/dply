@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Actions\Servers\CreateServerProvisionRun;
+use App\Actions\Servers\SeedProvisionedEnginesForServer;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
 use App\Models\ServerProvisionRun;
+use App\Models\UserSshKey;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
@@ -16,14 +19,19 @@ use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
 use App\Notifications\ServerProvisionedCredentialsNotification;
+use App\Notifications\ServerProvisionFailedNotification;
 use App\Observers\TaskRunnerTaskObserver;
+use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
 use App\Services\Servers\ServerMetricsGuestPushService;
+use App\Services\Servers\ServerProvisionCommandBuilder;
 use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 /**
  * Runs stack provisioning from servers.meta (wizard choices), then optional setup_scripts recipes.
@@ -204,7 +212,7 @@ class RunSetupScriptJob implements ShouldQueue
             // packages and started the services; this is the missing data
             // bridge. Idempotent — only inserts when the row is absent.
             try {
-                app(\App\Actions\Servers\SeedProvisionedEnginesForServer::class)
+                app(SeedProvisionedEnginesForServer::class)
                     ->execute($server->fresh() ?? $server);
             } catch (\Throwable $e) {
                 ProvisionPipelineLog::warning('server.provision.engine_seed_failed', $server, [
@@ -225,7 +233,7 @@ class RunSetupScriptJob implements ShouldQueue
                 channelSubject: sprintf('[dply] Server is ready: %s', $server->name ?: $server->id),
                 inboxTitle: sprintf('Server "%s" is ready', $server->name ?: $server->id),
                 inboxBody: 'Provisioning finished. Open the server overview to start adding sites or connect via SSH.',
-                actionUrl: \Illuminate\Support\Facades\URL::route('servers.overview', $server),
+                actionUrl: URL::route('servers.overview', $server),
                 actionLabel: 'Open server',
                 bodyLines: static::successBodyLines($server),
             );
@@ -252,7 +260,7 @@ class RunSetupScriptJob implements ShouldQueue
         $excerpt = static::extractLastProvisionError($server);
         if ($creator && filled($creator->email)) {
             try {
-                $creator->notify(new \App\Notifications\ServerProvisionFailedNotification($server->fresh() ?? $server, $excerpt));
+                $creator->notify(new ServerProvisionFailedNotification($server->fresh() ?? $server, $excerpt));
             } catch (\Throwable $e) {
                 ProvisionPipelineLog::warning('server.provision.failure_email_send_failed', $server, [
                     'error' => $e->getMessage(),
@@ -265,7 +273,7 @@ class RunSetupScriptJob implements ShouldQueue
             sprintf('Address: %s', $server->ip_address ?: '—'),
         ];
         if (is_string($excerpt) && trim($excerpt) !== '') {
-            $failureBodyLines[] = 'Last error: '.\Illuminate\Support\Str::limit(trim($excerpt), 400);
+            $failureBodyLines[] = 'Last error: '.Str::limit(trim($excerpt), 400);
         }
 
         static::dispatchProvisionEvent(
@@ -274,7 +282,7 @@ class RunSetupScriptJob implements ShouldQueue
             channelSubject: sprintf('[dply] Server provisioning failed: %s', $server->name ?: $server->id),
             inboxTitle: sprintf('Server "%s" failed to provision', $server->name ?: $server->id),
             inboxBody: 'Provisioning stopped before finishing. Open the journey to see the failing step and retry.',
-            actionUrl: \Illuminate\Support\Facades\URL::route('servers.journey', $server),
+            actionUrl: URL::route('servers.journey', $server),
             actionLabel: 'Open journey',
             bodyLines: $failureBodyLines,
         );
@@ -322,7 +330,7 @@ class RunSetupScriptJob implements ShouldQueue
         }
 
         try {
-            app(\App\Services\Notifications\NotificationPublisher::class)->publish(
+            app(NotificationPublisher::class)->publish(
                 eventKey: $eventKey,
                 subject: $server,
                 title: $inboxTitle,
@@ -448,7 +456,7 @@ class RunSetupScriptJob implements ShouldQueue
      * Pre-populate ServerAuthorizedKey panel rows for the creator's profile
      * keys that opted into new-server provisioning. These keys are written
      * directly into the deploy user's authorized_keys by the bootstrap script
-     * (see {@see \App\Services\Servers\ServerProvisionCommandBuilder::dplyDeployUserBootstrap()});
+     * (see {@see ServerProvisionCommandBuilder::dplyDeployUserBootstrap()});
      * mirroring them as panel rows here keeps the workspace SSH Keys page
      * truthful and prevents the next user-initiated Sync from treating the
      * bootstrap-installed keys as drift and removing them.
@@ -474,7 +482,7 @@ class RunSetupScriptJob implements ShouldQueue
 
         foreach ($rows as $userKey) {
             $pk = trim((string) $userKey->public_key);
-            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+            if ($pk === '' || ! UserSshKey::publicKeyLooksValid($pk)) {
                 continue;
             }
 
@@ -482,10 +490,10 @@ class RunSetupScriptJob implements ShouldQueue
             // synchronizer's convention (see ServerAuthorizedKeysSynchronizer).
             // The deploy user is ssh_user at this point because
             // applyProvisionOutcomeToServer already flipped it.
-            \App\Models\ServerAuthorizedKey::query()->updateOrCreate(
+            ServerAuthorizedKey::query()->updateOrCreate(
                 [
                     'server_id' => $server->id,
-                    'managed_key_type' => \App\Models\UserSshKey::class,
+                    'managed_key_type' => UserSshKey::class,
                     'managed_key_id' => $userKey->id,
                     'target_linux_user' => '',
                 ],

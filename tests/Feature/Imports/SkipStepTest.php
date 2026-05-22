@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\SkipStepTest;
+
 use App\Jobs\Imports\RunMigrationStepJob;
 use App\Livewire\Imports\Ploi\MigrationProgress;
 use App\Models\ImportMigrationStep;
@@ -11,9 +12,11 @@ use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: User, 1: ImportServerMigration, 2: ImportSiteMigration}

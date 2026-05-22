@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\ServerlessLaravelHandlerCommandTest;
+
 use RuntimeException;
 
 beforeEach(function () {

@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Ploi\PloiInventorySyncTest;
+
 use App\Models\PloiServer;
-use App\Models\PloiSite;
 use App\Models\ProviderCredential;
 use App\Services\Imports\ImportDriver;
 use App\Services\Imports\Ploi\PloiInventorySync;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function credential(): ProviderCredential
 {
@@ -123,7 +125,7 @@ test('sync rejects non ploi credential', function () {
     ]);
 
     $this->expectException(\RuntimeException::class);
-    (new PloiInventorySync(new FakeImportDriver()))->syncAll($credential);
+    (new PloiInventorySync(new FakeImportDriver))->syncAll($credential);
 });
 /**
  * @return array{
@@ -178,88 +180,76 @@ final class FakeImportDriver implements ImportDriver
      * @param  array<int, list<array<string, mixed>>>  $sitesByServer
      * @param  array<int, array<string, mixed>>  $serverDetail
      */
-    function __construct(protected array $servers = [], protected array $sitesByServer = [], protected array $serverDetail = [])
-    {
-    }
+    public function __construct(protected array $servers = [], protected array $sitesByServer = [], protected array $serverDetail = []) {}
 
-    function source(): string
+    public function source(): string
     {
         return 'ploi';
     }
 
-    function validateConnection(): void
-    {
-    }
+    public function validateConnection(): void {}
 
-    function listServers(): array
+    public function listServers(): array
     {
         return $this->servers;
     }
 
-    function fetchServerDetail(int $sourceServerId): array
+    public function fetchServerDetail(int $sourceServerId): array
     {
         return $this->serverDetail[$sourceServerId]
             ?? throw new \RuntimeException("No fake detail for server {$sourceServerId}");
     }
 
-    function listSites(int $sourceServerId): array
+    public function listSites(int $sourceServerId): array
     {
         return $this->sitesByServer[$sourceServerId] ?? [];
     }
 
-    function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
+    public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {
         throw new \RuntimeException('not used in these tests');
     }
 
-    function pushSshKey(int $sourceServerId, string $label, string $publicKey): int
+    public function pushSshKey(int $sourceServerId, string $label, string $publicKey): int
     {
         return 0;
     }
 
-    function revokeSshKey(int $sourceServerId, int $sourceKeyId): void
-    {
-    }
+    public function revokeSshKey(int $sourceServerId, int $sourceKeyId): void {}
 
-    function fetchEnv(int $sourceServerId, int $sourceSiteId): string
+    public function fetchEnv(int $sourceServerId, int $sourceSiteId): string
     {
         return '';
     }
 
-    function listSiteCrons(int $sourceServerId, int $sourceSiteId): array
+    public function listSiteCrons(int $sourceServerId, int $sourceSiteId): array
     {
         return [];
     }
 
-    function listDaemons(int $sourceServerId, int $sourceSiteId): array
+    public function listDaemons(int $sourceServerId, int $sourceSiteId): array
     {
         return [];
     }
 
-    function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array
+    public function listSiteDatabases(int $sourceServerId, int $sourceSiteId): array
     {
         return [];
     }
 
-    function fetchSiteCertificate(int $sourceServerId, int $sourceSiteId): ?array
+    public function fetchSiteCertificate(int $sourceServerId, int $sourceSiteId): ?array
     {
         return null;
     }
 
-    function enableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void
-    {
-    }
+    public function enableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void {}
 
-    function disableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void
-    {
-    }
+    public function disableSiteMaintenance(int $sourceServerId, int $sourceSiteId): void {}
 
-    function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array
+    public function listSiteWebhooks(int $sourceServerId, int $sourceSiteId): array
     {
         return [];
     }
 
-    function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void
-    {
-    }
+    public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void {}
 }

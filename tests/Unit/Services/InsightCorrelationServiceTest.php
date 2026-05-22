@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\InsightCorrelationServiceTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerFirewallAuditEvent;
@@ -9,8 +9,9 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Services\Insights\InsightCorrelationService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeServerWithSite(): array
 {

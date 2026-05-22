@@ -5,6 +5,7 @@ namespace App\Livewire\Scripts;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;
@@ -14,7 +15,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -23,6 +23,7 @@ class Edit extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.scripts';
+
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use InteractsWithUnsavedChangesBar;

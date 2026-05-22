@@ -6,8 +6,10 @@ namespace App\Livewire\Serverless;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Services\DigitalOceanService;
 use App\Services\Serverless\ServerlessFunctionDnsProvisioner;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -69,7 +71,7 @@ class DnsPanel extends Component
      * was created via DO's web UI or another tool, and our matcher doesn't
      * recognize it as something we should clear automatically.
      */
-    public function forcePurgeAndProvision(\App\Services\DigitalOceanService $do, ServerlessFunctionDnsProvisioner $provisioner): void
+    public function forcePurgeAndProvision(DigitalOceanService $do, ServerlessFunctionDnsProvisioner $provisioner): void
     {
         $site = $this->site();
         $this->authorize('update', $site);
@@ -88,12 +90,12 @@ class DnsPanel extends Component
 
             return;
         }
-        $recordName = (string) \Illuminate\Support\Str::beforeLast($host, '.'.$zone);
+        $recordName = (string) Str::beforeLast($host, '.'.$zone);
 
         // Delete every record at this name. The instance the constructor
         // hands us is the app-scoped service; switch to a token-specific
         // instance for the actual API calls.
-        $tokenScoped = new \App\Services\DigitalOceanService($token);
+        $tokenScoped = new DigitalOceanService($token);
         $records = $tokenScoped->getDomainRecords($zone);
         $targets = [strtolower(trim($recordName)), strtolower(rtrim($recordName.'.'.$zone, '.'))];
         $deleted = 0;

@@ -1,22 +1,23 @@
 <?php
 
-
 namespace Tests\Feature\WorkspacePhpTest;
-use Mockery;
 
 use App\Livewire\Servers\WorkspacePhp;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConfigRevisions\ConfigRevisionRecorder;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;
 use App\Services\Servers\ServerPhpManager;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {
@@ -358,7 +359,7 @@ test('php workspace can open a version config editor from livewire', function ()
         ]);
     $this->app->instance(ServerPhpManager::class, $manager);
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial();
     $editor->shouldReceive('openTarget')
         ->once()
         ->withArgs(fn (Server $refreshedServer, string $version, string $target) => $refreshedServer->is($server) && $version === '8.3' && $target === 'cli_ini')
@@ -421,7 +422,7 @@ test('php workspace can save a version config edit from livewire', function () {
         ]);
     $this->app->instance(ServerPhpManager::class, $manager);
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial();
     $editor->shouldReceive('openTarget')
         ->once()
         ->andReturn([
@@ -494,7 +495,7 @@ test('php workspace surfaces config validation failures without replacing the li
         ]);
     $this->app->instance(ServerPhpManager::class, $manager);
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial();
     $editor->shouldReceive('openTarget')
         ->once()
         ->andReturn([
@@ -673,7 +674,7 @@ test('php workspace rejects config saves while another server mutation is runnin
         ]);
     $this->app->instance(ServerPhpManager::class, $manager);
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial();
     $editor->shouldReceive('openTarget')
         ->once()
         ->andReturn([

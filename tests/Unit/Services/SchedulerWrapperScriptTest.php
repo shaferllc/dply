@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\SchedulerWrapperScriptTest;
+
 use App\Services\Servers\SchedulerWrapperScript;
+
 test('bundled sha256 is 64 hex chars', function () {
     $svc = app(SchedulerWrapperScript::class);
 
@@ -23,7 +25,7 @@ test('install fragment decodes and pins wrapper to system path', function () {
 
     // Wrapper installs system-wide as root.
     $this->assertStringContainsString('/usr/local/bin/dply-scheduler-tick', $fragment);
-    $this->assertStringContainsString("install -m 0755 -o root -g root", $fragment);
+    $this->assertStringContainsString('install -m 0755 -o root -g root', $fragment);
 
     // SHA-256 pinning prevents partial / corrupt deploys.
     $this->assertStringContainsString($svc->bundledSha256(), $fragment);

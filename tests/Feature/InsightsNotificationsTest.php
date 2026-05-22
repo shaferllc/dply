@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\InsightsNotificationsTest;
+
 use App\Models\InsightFinding;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -9,9 +9,10 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Insights\InsightsNotificationDispatcher;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('insights dispatcher publishes universal event and sends subscribed channels', function () {
     Http::fake([

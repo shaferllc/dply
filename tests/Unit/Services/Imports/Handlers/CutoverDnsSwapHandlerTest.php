@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\CutoverDnsSwapHandlerTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -12,9 +13,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Imports\Handlers\CutoverDnsSwapHandler;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: ImportSiteMigration, 2: ImportServerMigration, 3: User, 4: Organization}
  */
@@ -70,7 +73,7 @@ test('falls back to instructions when no dns automation in org', function () {
     Http::fake();
     [$step] = seedFixture();
 
-    (new CutoverDnsSwapHandler())->execute($step);
+    (new CutoverDnsSwapHandler)->execute($step);
 
     $step->refresh();
     expect($step->status)->toBe(ImportMigrationStep::STATUS_SKIPPED);
@@ -94,7 +97,7 @@ test('uses digitalocean adapter when zone hosted there', function () {
         'credentials' => ['api_token' => 'dop_v1_test'],
     ]);
 
-    (new CutoverDnsSwapHandler())->execute($step);
+    (new CutoverDnsSwapHandler)->execute($step);
 
     $step->refresh();
     expect($step->result_data['strategy'])->toBe('automated');
@@ -121,7 +124,7 @@ test('skips dns credential when zone not in account', function () {
         'credentials' => ['api_token' => 'dop_v1_test'],
     ]);
 
-    (new CutoverDnsSwapHandler())->execute($step);
+    (new CutoverDnsSwapHandler)->execute($step);
 
     $step->refresh();
     expect($step->status)->toBe(ImportMigrationStep::STATUS_SKIPPED, 'No matching zone → instructions fallback');
@@ -143,7 +146,7 @@ test('extracts apex from multi label subdomain', function () {
         'credentials' => ['api_token' => 'dop_v1_test'],
     ]);
 
-    (new CutoverDnsSwapHandler())->execute($step);
+    (new CutoverDnsSwapHandler)->execute($step);
 
     $step->refresh();
     expect($step->result_data['zone'])->toBe('example.co.uk');

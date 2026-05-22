@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\PollDoksClusterStatusJob;
+use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
@@ -11,9 +13,13 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
 use App\Models\Server;
+use App\Models\ServerBackupSchedule;
+use App\Models\ServerDatabaseBackup;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\SiteFileBackup;
+use App\Models\SupervisorProgram;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
@@ -73,9 +79,9 @@ class WorkspaceOverview extends Component
 
         $provider = (string) ($this->server->meta['kubernetes']['provider'] ?? 'digitalocean');
         if ($provider === 'aws') {
-            \App\Jobs\PollEksClusterStatusJob::dispatch($this->server);
+            PollEksClusterStatusJob::dispatch($this->server);
         } else {
-            \App\Jobs\PollDoksClusterStatusJob::dispatch($this->server);
+            PollDoksClusterStatusJob::dispatch($this->server);
         }
         $this->toastSuccess(__('Re-checking cluster status…'));
     }
@@ -166,25 +172,25 @@ class WorkspaceOverview extends Component
         // without having to drill into the Background subpages individually.
         $weekAgo = now()->subDays(7);
         $backgroundSummary = [
-            'active_workers' => \App\Models\SupervisorProgram::query()
+            'active_workers' => SupervisorProgram::query()
                 ->where('server_id', $this->server->id)
-                ->whereIn('program_type', \App\Livewire\Servers\WorkspaceQueueWorkers::QUEUE_TYPES)
+                ->whereIn('program_type', WorkspaceQueueWorkers::QUEUE_TYPES)
                 ->where('is_active', true)
                 ->count(),
-            'active_schedules' => \App\Models\ServerBackupSchedule::query()
+            'active_schedules' => ServerBackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', true)
                 ->count(),
-            'paused_schedules' => \App\Models\ServerBackupSchedule::query()
+            'paused_schedules' => ServerBackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', false)
                 ->count(),
-            'failed_backups_7d' => (int) \App\Models\ServerDatabaseBackup::query()
+            'failed_backups_7d' => (int) ServerDatabaseBackup::query()
                 ->whereIn('server_database_id', $this->server->serverDatabases()->pluck('id'))
                 ->where('status', 'failed')
                 ->where('created_at', '>=', $weekAgo)
                 ->count()
-                + (int) \App\Models\SiteFileBackup::query()
+                + (int) SiteFileBackup::query()
                     ->whereIn('site_id', $this->server->sites()->pluck('id'))
                     ->where('status', 'failed')
                     ->where('created_at', '>=', $weekAgo)
@@ -348,5 +354,4 @@ class WorkspaceOverview extends Component
                 : null,
         ]);
     }
-
 }

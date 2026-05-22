@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceDnsTest;
+
 use App\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Http;
+
 test('it fetches domain when present in account', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/domains/example.com' => Http::response([

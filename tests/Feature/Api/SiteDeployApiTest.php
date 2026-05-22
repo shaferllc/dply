@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\Api\SiteDeployApiTest;
-use Mockery;
 
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\ApiToken;
@@ -11,9 +9,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Sites\SiteGitDeployer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeSiteInOrg(Organization $org): Site
 {

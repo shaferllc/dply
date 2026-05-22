@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\OnboardingEmptyStateTest;
+
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

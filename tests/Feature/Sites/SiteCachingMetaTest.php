@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Sites\SiteCachingMetaTest;
+
 use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('pre migration site with legacy boolean reports nginx http enabled', function () {
     $site = siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);

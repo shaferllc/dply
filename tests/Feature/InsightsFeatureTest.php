@@ -1,12 +1,8 @@
 <?php
 
-
 namespace Tests\Feature\InsightsFeatureTest;
+
 use App\Jobs\ApplyInsightFixJob;
-use \App\Services\Insights\InsightRunCoordinator;
-use \App\Services\Servers\ServerPhpFpmProbe;
-use \App\Services\Servers\ServerPhpConfigEditor;
-use \App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Livewire\Servers\WorkspaceInsights;
@@ -31,6 +27,7 @@ use App\Services\Insights\FixActions\BumpFpmWorkersFixAction;
 use App\Services\Insights\FixActions\EnableNtpFixAction;
 use App\Services\Insights\FixResult;
 use App\Services\Insights\InsightCandidate;
+use App\Services\Insights\InsightRunCoordinator;
 use App\Services\Insights\InsightSettingsRepository;
 use App\Services\Insights\InsightsNotificationDispatcher;
 use App\Services\Insights\Runners\HorizonRecommendedInsightRunner;
@@ -38,13 +35,18 @@ use App\Services\Insights\Runners\OctaneRecommendedInsightRunner;
 use App\Services\Insights\Runners\PackageSecurityUpdatesInsightRunner;
 use App\Services\Insights\Runners\PhpFpmWorkersUndersizedInsightRunner;
 use App\Services\Insights\Runners\SystemClockSyncInsightRunner;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\ServerPhpConfigEditor;
+use App\Services\Servers\ServerPhpFpmProbe;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 /**
  * @return array{0: User, 1: Server}
@@ -688,11 +690,9 @@ function stubRemoteBashOutput(string $buffer): void
 {
     $stub = new class($buffer) extends ExecuteRemoteTaskOnServer
     {
-        function __construct(private string $buffer)
-        {
-        }
+        public function __construct(private string $buffer) {}
 
-        function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
+        public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
         {
             return new ProcessOutput($this->buffer, 0, false);
         }
@@ -707,12 +707,12 @@ function stubRemoteBashCapturing(array &$captured, string $buffer): void
 {
     $stub = new class($captured, $buffer) extends ExecuteRemoteTaskOnServer
     {
-        function __construct(array &$captured, private string $buffer)
+        public function __construct(array &$captured, private string $buffer)
         {
             $this->captured = &$captured;
         }
 
-        function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
+        public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
         {
             $this->captured['name'] = $name;
             $this->captured['script'] = $inlineBash;
@@ -802,12 +802,12 @@ test('bump fpm workers fix action backs up substitutes and writes via editor', f
     $remoteCalls = [];
     $stubRemote = new class($remoteCalls) extends ExecuteRemoteTaskOnServer
     {
-        function __construct(array &$calls)
+        public function __construct(array &$calls)
         {
             $this->calls = &$calls;
         }
 
-        function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
+        public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
         {
             $this->calls[] = ['name' => $name, 'script' => $inlineBash];
 
@@ -820,12 +820,12 @@ test('bump fpm workers fix action backs up substitutes and writes via editor', f
     $editorState = ['saved_content' => null, 'saved_target' => null, 'saved_version' => null];
     $stubEditor = new class($editorState) extends ServerPhpConfigEditor
     {
-        function __construct(array &$state)
+        public function __construct(array &$state)
         {
             $this->state = &$state;
         }
 
-        function openTarget(Server $server, string $version, string $target): array
+        public function openTarget(Server $server, string $version, string $target): array
         {
             return [
                 'version' => $version,
@@ -837,7 +837,7 @@ test('bump fpm workers fix action backs up substitutes and writes via editor', f
             ];
         }
 
-        function saveTarget(Server $server, string $version, string $target, string $content, ?\App\Models\User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
         {
             $this->state['saved_content'] = $content;
             $this->state['saved_target'] = $target;
@@ -931,11 +931,9 @@ test('bump fpm workers revert restores backup via editor and clears backup path'
 
     $stubRemote = new class extends ExecuteRemoteTaskOnServer
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
+        public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
         {
             // Pretend we read the backup successfully — return prior config content.
             return new ProcessOutput("[www]\npm = dynamic\npm.max_children = 30\n", 0, false);
@@ -946,12 +944,12 @@ test('bump fpm workers revert restores backup via editor and clears backup path'
     $editorState = ['saved_content' => null];
     $stubEditor = new class($editorState) extends ServerPhpConfigEditor
     {
-        function __construct(array &$state)
+        public function __construct(array &$state)
         {
             $this->state = &$state;
         }
 
-        function saveTarget(Server $server, string $version, string $target, string $content, ?\App\Models\User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
         {
             $this->state['saved_content'] = $content;
 
@@ -976,12 +974,12 @@ test('revert insight fix job refuses when handler is not revertable', function (
     // Synthetic insight whose handler implements only the apply interface (no Revertable).
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             return FixResult::success();
         }
@@ -1101,12 +1099,12 @@ test('apply fix job refuses config mutating fix when org disables it', function 
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             $this->applyCalled = true;
 
@@ -1173,12 +1171,12 @@ test('apply fix job runs config mutating fix when org allows it', function () {
     // Default behavior: no `allow_config_mutation` key set → gate is open.
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             $this->applyCalled = true;
 
@@ -1250,11 +1248,9 @@ test('bump fpm workers fix action aborts when pattern not found', function () {
 
     $stubRemote = new class extends ExecuteRemoteTaskOnServer
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
+        public function runInlineBash(Server $server, string $name, string $inlineBash, ?int $timeoutSeconds = null, bool $asRoot = false): ProcessOutput
         {
             return new ProcessOutput('backed-up', 0, false);
         }
@@ -1264,11 +1260,9 @@ test('bump fpm workers fix action aborts when pattern not found', function () {
     // Editor returns content with no pm.max_children line — substitution is a no-op.
     $stubEditor = new class extends ServerPhpConfigEditor
     {
-        function __construct()
-        {
-        }
+        public function __construct() {}
 
-        function openTarget(Server $server, string $version, string $target): array
+        public function openTarget(Server $server, string $version, string $target): array
         {
             return [
                 'version' => $version,
@@ -1280,7 +1274,7 @@ test('bump fpm workers fix action aborts when pattern not found', function () {
             ];
         }
 
-        function saveTarget(Server $server, string $version, string $target, string $content, ?\App\Models\User $user = null, ?string $summary = null): array
+        public function saveTarget(Server $server, string $version, string $target, string $content, ?User $user = null, ?string $summary = null): array
         {
             throw new \RuntimeException('saveTarget should not be called when substitution is a no-op');
         }
@@ -1312,12 +1306,12 @@ function stubFpmProbe(?array $snapshot): void
 {
     $stub = new class($snapshot) extends ServerPhpFpmProbe
     {
-        function __construct(private ?array $snapshot)
+        public function __construct(private ?array $snapshot)
         {
             // Skip parent constructor — we don't need the SSH executor in tests.
         }
 
-        function probe(Server $server, string $phpVersion): ?array
+        public function probe(Server $server, string $phpVersion): ?array
         {
             return $this->snapshot;
         }
@@ -1819,12 +1813,12 @@ test('run server insights job with only key skips health score recompute', funct
     $coordinatorState = ['only_key_seen' => null];
     $stubCoord = new class($coordinatorState) extends InsightRunCoordinator
     {
-        function __construct(array &$state)
+        public function __construct(array &$state)
         {
             $this->state = &$state;
         }
 
-        function runForServer(Server $server, ?string $onlyKey = null, ?callable $onProgress = null): void
+        public function runForServer(Server $server, ?string $onlyKey = null, ?callable $onProgress = null): void
         {
             $this->state['only_key_seen'] = $onlyKey;
         }
@@ -2093,14 +2087,14 @@ test('apply fix job dispatches through handler and resolves problem when recheck
     // Stub handler that captures invocations.
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             $this->preflightCalled = true;
 
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             $this->applyCalled = true;
 
@@ -2146,12 +2140,12 @@ test('apply fix job records failure when recheck still fails', function () {
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             return FixResult::success('shell ran but condition persists');
         }
@@ -2183,12 +2177,12 @@ test('apply fix job records refusal from preflight without running apply', funct
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return 'not enough RAM headroom';
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             $this->applyCalled = true;
 
@@ -2219,12 +2213,12 @@ test('apply fix job resolves suggestion without recheck', function () {
 
     $handler = new class implements InsightFixActionInterface
     {
-        function preflight($server, $site, $finding, array $params): ?string
+        public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
         }
 
-        function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
+        public function apply($server, $site, $finding, array $params, ?callable $onOutput = null): FixResult
         {
             return FixResult::success();
         }
@@ -2257,11 +2251,9 @@ function registerStubInsightWithHandler(string $key, string $handlerClass, strin
 {
     $runner = new class($key, $kind) implements InsightRunnerInterface
     {
-        function __construct(private string $key, private string $kind)
-        {
-        }
+        public function __construct(private string $key, private string $kind) {}
 
-        function run(Server $server, ?Site $site, array $parameters): array
+        public function run(Server $server, ?Site $site, array $parameters): array
         {
             if (! config('insights.test.stub_runner_emits.'.$this->key, true)) {
                 return [];
@@ -2343,11 +2335,9 @@ function registerStubInsight(string $key, array $requires, string $kind = Insigh
 {
     $runner = new class($key, $kind) implements InsightRunnerInterface
     {
-        function __construct(private string $key, private string $kind)
-        {
-        }
+        public function __construct(private string $key, private string $kind) {}
 
-        function run(Server $server, ?Site $site, array $parameters): array
+        public function run(Server $server, ?Site $site, array $parameters): array
         {
             return [new InsightCandidate(
                 insightKey: $this->key,

@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeployStepPhaseTest;
+
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('default phase for artisan migrate is release', function () {
     expect(SiteDeployStep::defaultPhaseFor(SiteDeployStep::TYPE_ARTISAN_MIGRATE))->toBe(SiteDeployStep::PHASE_RELEASE);

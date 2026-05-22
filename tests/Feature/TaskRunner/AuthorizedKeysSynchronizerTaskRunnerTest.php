@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\TaskRunner\AuthorizedKeysSynchronizerTaskRunnerTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
@@ -13,10 +11,12 @@ use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
 use App\Services\Servers\ServerAuthorizedKeysHealthCheck;
 use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Mockery;
 use phpseclib3\Crypt\RSA;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function validPrivateKey(): string
 {

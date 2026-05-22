@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\RecommendServerCreateSizesTest;
+
 use App\Actions\Servers\RecommendServerCreateSizes;
+
 test('marks tiny database node as too small', function () {
     $result = RecommendServerCreateSizes::run('database', [
         ['value' => 'tiny', 'memory_mb' => 1024, 'vcpus' => 1, 'disk_gb' => 25],

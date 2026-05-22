@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\HostCapabilitiesTest;
+
 use App\Models\Server;
 
 test('vm hosts keep ssh capabilities by default', function () {

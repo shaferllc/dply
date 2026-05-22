@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\Marketing\ComingSoonSignupTest;
+
 use App\Livewire\Marketing\ComingSoonSignup;
 use App\Models\ComingSoonSignup as ComingSoonSignupRecord;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('coming soon page can be rendered', function () {
     $this->get(route('coming-soon'))

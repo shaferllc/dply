@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudDomainAttachmentTest;
+
 use App\Enums\SiteType;
 use App\Jobs\AttachCloudDomainJob;
 use App\Jobs\DetachCloudDomainJob;
@@ -12,10 +13,12 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('attach dispatches job with normalized hostname', function () {
     Queue::fake();

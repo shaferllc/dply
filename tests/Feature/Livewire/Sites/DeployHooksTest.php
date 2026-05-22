@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Sites\DeployHooksTest;
+
 use App\Livewire\Sites\DeployHooks;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /** @return array{0: User, 1: Site} */
 function ownerAndSite(): array

@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerSystemLogReaderTest;
+
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
@@ -9,8 +9,9 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Services\Servers\ServerSystemLogReader;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('fetch returns unknown for invalid dynamic site key', function () {
     $server = Server::factory()->ready()->create();

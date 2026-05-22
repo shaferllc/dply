@@ -9,6 +9,7 @@ use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
+use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use Throwable;
 
 /**
@@ -112,7 +113,7 @@ trait DetectsRepositoryRuntime
      * detector array into the same {@see $detectedPlan} shape.
      *
      * @param  array<string, mixed>  $capabilities  target capability map from
-     *                                              {@see \App\Services\Deploy\ServerlessTargetCapabilityResolver}
+     *                                              {@see ServerlessTargetCapabilityResolver}
      */
     public function runServerlessDetection(string $url, string $branch, string $subdirectory, array $capabilities): void
     {

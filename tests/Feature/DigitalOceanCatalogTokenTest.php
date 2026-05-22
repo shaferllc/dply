@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Feature\DigitalOceanCatalogTokenTest;
+
 use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('resolve catalog uses digitalocean token when no credential selected', function () {
     config(['services.digitalocean.token' => 'dop_v1_test_catalog_token']);

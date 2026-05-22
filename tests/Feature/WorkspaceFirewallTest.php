@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Tests\Feature\WorkspaceFirewallTest;
-use Mockery;
 
 use App\Jobs\ApplyFirewallJob;
 use App\Livewire\Servers\WorkspaceFirewall;
@@ -15,11 +13,13 @@ use App\Models\ServerFirewallRule;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Servers\ServerFirewallProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {

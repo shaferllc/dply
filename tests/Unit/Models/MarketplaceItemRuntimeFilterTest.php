@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Models\MarketplaceItemRuntimeFilterTest;
+
 use App\Models\MarketplaceItem;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('universal item appears for any runtime', function () {
     $universal = MarketplaceItem::factory()->create([

@@ -3,10 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessLoggingShimInjectorTest;
-use RuntimeException;
 
 use App\Services\Deploy\ServerlessLoggingShimInjector;
 use Illuminate\Support\Facades\File;
+use RuntimeException;
+
 function repo(array $files): string
 {
     $dir = storage_path('framework/testing/shim-injector-'.uniqid());

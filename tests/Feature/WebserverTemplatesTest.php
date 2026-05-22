@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\WebserverTemplatesTest;
+
 use App\Livewire\Settings\WebserverTemplates;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\WebserverTemplate;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('guest cannot view webserver templates', function () {
     $org = Organization::factory()->create();

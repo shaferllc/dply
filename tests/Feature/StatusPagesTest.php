@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\StatusPagesTest;
+
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Status\PublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
@@ -11,11 +11,13 @@ use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function userWithOrg(string $role = 'owner'): User
 {

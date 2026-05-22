@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Unit\Services\ConsoleArgspecsTest;
+
 use App\Models\Server;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Support\Console\ConsoleArgspecs;
 use App\Support\Servers\ServerInstalledServices;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * Create a Server and seed a stack_summary artifact so ServerInstalledServices

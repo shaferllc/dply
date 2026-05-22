@@ -12,11 +12,14 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\Team;
+use App\Models\User;
 use App\Services\Insights\InsightCorrelationService;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
@@ -30,7 +33,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -161,7 +163,7 @@ class WorkspaceMonitor extends Component
     /**
      * Override from CreatesNotificationChannelInline to scope channels to org.
      */
-    protected function creatableChannelOwner(): \App\Models\User|\App\Models\Organization|\App\Models\Team
+    protected function creatableChannelOwner(): User|Organization|Team
     {
         $user = Auth::user();
         if ($user === null) {

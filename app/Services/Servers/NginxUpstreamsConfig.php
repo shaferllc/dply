@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -126,6 +127,7 @@ class NginxUpstreamsConfig
      * Upstreams not in $updates pass through untouched.
      *
      * @param  array<string, array{servers: list<string>, values: array<string, string>}>  $updates
+     *
      * @throws \RuntimeException
      */
     public function save(Server $server, array $updates, ?ConsoleEmitter $emitter = null): void
@@ -180,6 +182,7 @@ class NginxUpstreamsConfig
      *
      * @param  list<string>  $servers
      * @param  array<string, string>  $values
+     *
      * @throws \RuntimeException
      */
     public function addUpstream(Server $server, string $name, array $servers, array $values, ?ConsoleEmitter $emitter = null): void
@@ -403,7 +406,7 @@ class NginxUpstreamsConfig
         foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         if ($exit !== 0) {

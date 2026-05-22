@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Serverless\FunctionStatsRangeQueryTest;
+
 use App\Models\FunctionInvocation;
 use App\Models\Site;
 use App\Services\Serverless\FunctionStatsRangeQuery;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 /**
  * @param  array<string, mixed>  $attrs

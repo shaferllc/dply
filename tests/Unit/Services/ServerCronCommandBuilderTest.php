@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerCronCommandBuilderTest;
+
 use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Services\Servers\ServerCronCommandBuilder;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('wraps with flock when overlap skip', function () {
     $server = Server::factory()->create([

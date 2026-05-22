@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\CloudWorkerCommandsTest;
+
 use App\Enums\SiteType;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Models\CloudWorker;
@@ -11,9 +12,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function containerSite(string $backend = 'digitalocean_app_platform'): Site
 {

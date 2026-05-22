@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Support\Servers\InstalledStackTest;
+
 use App\Models\Server;
 use App\Support\Servers\InstalledStack;
+
 test('round trip via array', function () {
     $stack = new InstalledStack(
         database: 'mysql84',

@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\Api\MetricsIngestTrialPauseTest;
+
 use App\Models\Organization;
 use App\Models\ServerMetricIngestEvent;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Config::set('server_metrics.ingest.token', 'test-token');

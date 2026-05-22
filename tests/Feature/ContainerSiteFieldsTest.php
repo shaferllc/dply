@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ContainerSiteFieldsTest;
+
 use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('container columns persist', function () {
     $user = User::factory()->create();

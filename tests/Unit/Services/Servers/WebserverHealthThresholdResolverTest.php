@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\WebserverHealthThresholdResolverTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Models\WebserverHealthThreshold;
 use App\Services\Servers\WebserverHealthThresholdResolver;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function makeServer(): Server
 {

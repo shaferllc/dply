@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Livewire\Servers\WorkspaceBackupsDestinationModalTest;
+
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Models\BackupConfiguration;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 /** @return array{User, Organization, Server} */
 function ownerWithServer(): array

@@ -71,7 +71,7 @@ if (! function_exists('dply_raw_report')) {
             ]);
             curl_exec($ch);
             curl_close($ch);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // fire-and-forget — never let reporting affect the response
         }
     }
@@ -92,7 +92,7 @@ if (! function_exists('dplyMain')) {
                 $result = ['body' => $result];
             }
             $status = (int) ($result['statusCode'] ?? 200);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $thrown = $e;
             $status = 500;
             $result = ['statusCode' => 500, 'body' => $e->getMessage()];

@@ -571,6 +571,7 @@ class WorkspaceCron extends Component
                 $expr = trim((string) ($entry['cron_expression'] ?? ''));
                 if ($cmd === '' || $expr === '') {
                     $allApplied = false;
+
                     continue;
                 }
                 $user = trim((string) ($entry['user'] ?? '')) ?: $defaultSshUser;

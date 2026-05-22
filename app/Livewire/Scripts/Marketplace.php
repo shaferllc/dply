@@ -3,11 +3,11 @@
 namespace App\Livewire\Scripts;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -16,6 +16,7 @@ class Marketplace extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.scripts';
+
     use DispatchesToastNotifications;
 
     public function mount(): void

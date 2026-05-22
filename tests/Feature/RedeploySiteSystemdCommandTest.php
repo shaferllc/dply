@@ -3,13 +3,15 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\RedeploySiteSystemdCommandTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\SiteSystemdProvisioner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 test('command provisions units for node site', function () {
     $server = Server::factory()->ready()->create([

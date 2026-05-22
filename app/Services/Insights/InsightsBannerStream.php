@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Insights;
 
+use App\Jobs\ApplyFirewallJob;
+use App\Jobs\SyncAuthorizedKeysJob;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Support\Facades\Cache;
@@ -12,7 +14,7 @@ use Illuminate\Support\Str;
 /**
  * Owns the banner cache buffer + per-entity meta-state writes for an apply-fix
  * or revert-fix job. Mirrors the inline buffer/flush pattern in
- * {@see \App\Jobs\SyncAuthorizedKeysJob} and {@see \App\Jobs\ApplyFirewallJob},
+ * {@see SyncAuthorizedKeysJob} and {@see ApplyFirewallJob},
  * with two adjustments: (a) state is written to either {@see Server}.meta or
  * {@see Site}.meta depending on the finding's scope; (b) the helper exposes
  * succeed/fail/refuse sinks so callers stay linear.

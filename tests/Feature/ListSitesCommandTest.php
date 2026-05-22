@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ListSitesCommandTest;
+
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('command lists all sites with runtime info', function () {
     $server = Server::factory()->create(['name' => 'edge-1']);

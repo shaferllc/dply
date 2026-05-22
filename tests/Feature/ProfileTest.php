@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\ProfileTest;
+
 use App\Livewire\Profile\DeleteAccount;
 use App\Livewire\Profile\Edit;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();

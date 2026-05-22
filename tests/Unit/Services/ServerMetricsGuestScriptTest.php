@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerMetricsGuestScriptTest;
+
 use App\Services\Servers\ServerMetricsGuestScript;
 
 test('install script deploys via base64 file and keeps apt block', function () {

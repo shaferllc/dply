@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Deploy\ServerlessDeployProgressTest;
+
 use App\Exceptions\ServerlessDeployCancelledException;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Deploy\ServerlessDeployProgress;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function runningDeployment(Site $site): SiteDeployment
 {

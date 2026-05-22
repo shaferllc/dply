@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Actions\Servers\BuildKubernetesCostPreviewTest;
+
 use App\Actions\Servers\BuildServerCreatePreflight;
 use App\Livewire\Forms\ServerCreateForm;
+use Livewire\Component;
+
 test('doks zero clusters with no sizes falls back to unavailable placeholder', function () {
     $form = new ServerCreateForm(makeComponent(), 'form');
     $form->type = 'digitalocean_kubernetes';
@@ -332,11 +335,11 @@ function runPreflight(ServerCreateForm $form, array $catalog): array
  * Livewire forms need a Component reference to instantiate; for these
  * pure-data tests we just need *something* that satisfies the constructor.
  */
-function makeComponent(): \Livewire\Component
+function makeComponent(): Component
 {
-    return new class extends \Livewire\Component
+    return new class extends Component
     {
-        function render(): string
+        public function render(): string
         {
             return '';
         }

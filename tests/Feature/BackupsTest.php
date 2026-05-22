@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Feature\BackupsTest;
+
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Backups\Databases;
 use App\Livewire\Backups\Files;
@@ -14,10 +14,11 @@ use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 

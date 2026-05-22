@@ -1,18 +1,18 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerPhpConfigEditorTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Services\ConfigRevisions\ConfigRevisionRecorder;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use PHPUnit\Framework\Attributes\Test;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeServerWithMeta(array $meta = []): Server
 {
@@ -57,7 +57,7 @@ it('resolves the expected paths and labels for each supported target', function 
 it('reads the current content for a resolved target', function () {
     $server = makeServerWithMeta();
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
     $editor->shouldReceive('readRemoteTarget')
         ->once()
         ->withArgs(fn (Server $refreshedServer, array $target) => $refreshedServer->is($server) && $target['path'] === '/etc/php/8.3/cli/php.ini')
@@ -73,7 +73,7 @@ it('reads the current content for a resolved target', function () {
 it('rejects validation failures before the live file is replaced', function () {
     $server = makeServerWithMeta();
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
     $editor->shouldReceive('verifyProposedContent')
         ->once()
         ->andThrow(new ServerPhpConfigValidationException(
@@ -101,7 +101,7 @@ it('fails clearly for unsupported target types', function () {
 it('fails clearly when the expected target is missing on the server', function () {
     $server = makeServerWithMeta();
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
     $editor->shouldReceive('readRemoteTarget')
         ->once()
         ->andThrow(new \RuntimeException('Pool config is not available for PHP 8.3 on this server.'));
@@ -115,7 +115,7 @@ it('fails clearly when the expected target is missing on the server', function (
 it('returns reload guidance after a verified write succeeds', function () {
     $server = makeServerWithMeta();
 
-    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
+    $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
     $editor->shouldReceive('verifyProposedContent')
         ->once()
         ->andReturn([

@@ -1,18 +1,20 @@
 <?php
 
-
 namespace Tests\Feature\ServerRecipesTest;
+
 use App\Livewire\Servers\WorkspaceRun;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\ServerRecipe;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
-uses(\Tests\Concerns\WithFeatures::class);
+uses(WithFeatures::class);
 
 function userWithOrganization(): User
 {

@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Imports\PreCutoverChecklistTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 /**
  * @param  array<string, array<string, mixed>>  $stepResultData  step_key → result_data overrides

@@ -1,13 +1,14 @@
 <?php
 
-
 namespace Tests\Unit\ServerPolicyTest;
+
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Policies\ServerPolicy;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->policy = new ServerPolicy;

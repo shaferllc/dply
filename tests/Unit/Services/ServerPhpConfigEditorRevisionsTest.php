@@ -1,19 +1,18 @@
 <?php
 
-
 namespace Tests\Unit\Services\ServerPhpConfigEditorRevisionsTest;
-use Mockery;
 
 use App\Models\ConfigRevision;
-use \Mockery\MockInterface;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\ConfigRevisions\ConfigRevisionRecorder;
 use App\Services\Servers\ServerPhpConfigEditor;
-use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+use Mockery\MockInterface;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function makeServerWithMeta(array $meta = []): Server
 {
@@ -39,7 +38,7 @@ function makeServerWithMeta(array $meta = []): Server
     ]);
 }
 
-function editorWithMockedRemoteOps(Server $server, ?string $preContent = null): ServerPhpConfigEditor&Mockery\MockInterface
+function editorWithMockedRemoteOps(Server $server, ?string $preContent = null): ServerPhpConfigEditor&MockInterface
 {
     $editor = Mockery::mock(
         ServerPhpConfigEditor::class,

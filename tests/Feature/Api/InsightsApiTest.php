@@ -1,15 +1,16 @@
 <?php
 
-
 namespace Tests\Feature\Api\InsightsApiTest;
+
 use App\Models\ApiToken;
 use App\Models\InsightFinding;
 use App\Models\InsightHealthSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: Organization, 1: Server, 2: string}

@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Deploy\ServerlessDeployHookRunnerTest;
-use RuntimeException;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Services\Deploy\ServerlessDeployHookRunner;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use RuntimeException;
+
+uses(RefreshDatabase::class);
 
 function hook(Site $site, string $phase, int $order, string $script): void
 {

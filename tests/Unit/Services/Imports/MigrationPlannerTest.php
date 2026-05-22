@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\MigrationPlannerTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -13,7 +14,9 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Imports\MigrationPlanner;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 /**
  * @return array{0: ProviderCredential, 1: PloiServer, 2: list<PloiSite>, 3: User, 4: Organization}
@@ -96,7 +99,7 @@ test('plan creates parent children and steps for eligible sites', function () {
     [$credential, $server, $sites, $user, $org] = fixture();
     $targetId = targetServerId($org, $user);
 
-    $parent = (new MigrationPlanner())->plan(
+    $parent = (new MigrationPlanner)->plan(
         source: $server,
         selectedSiteIds: [$sites[0]->id, $sites[1]->id],
         targetServerId: $targetId,
@@ -124,7 +127,7 @@ test('plan emits server steps first and revoke last', function () {
     [$credential, $server, $sites, $user, $org] = fixture();
     $targetId = targetServerId($org, $user);
 
-    $parent = (new MigrationPlanner())->plan(
+    $parent = (new MigrationPlanner)->plan(
         source: $server,
         selectedSiteIds: [$sites[0]->id],
         targetServerId: $targetId,
@@ -149,7 +152,7 @@ test('plan rejects ineligible sites', function () {
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessageMatches('/wordpress/i');
 
-    (new MigrationPlanner())->plan(
+    (new MigrationPlanner)->plan(
         source: $server,
         selectedSiteIds: [$sites[2]->id], // wordpress
         targetServerId: $targetId,
@@ -162,7 +165,7 @@ test('plan rejects empty selection', function () {
     $targetId = targetServerId($org, $user);
 
     $this->expectException(\RuntimeException::class);
-    (new MigrationPlanner())->plan(
+    (new MigrationPlanner)->plan(
         source: $server,
         selectedSiteIds: [],
         targetServerId: $targetId,

@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\SiteRuntimeKeyTest;
+
 use App\Enums\SiteType;
 use App\Models\Site;
+
 test('returns runtime column when set', function () {
     $site = new Site(['runtime' => 'python']);
 

@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Feature\Models\ServerBillingTierTest;
+
 use App\Enums\ServerTier;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('returns xs when no metrics have been collected', function () {
     $server = Server::factory()->create();

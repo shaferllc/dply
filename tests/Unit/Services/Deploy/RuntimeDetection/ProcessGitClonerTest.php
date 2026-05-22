@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Deploy\RuntimeDetection\ProcessGitClonerTest;
+
 use App\Services\Deploy\RuntimeDetection\GitCloneException;
 use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
 use Symfony\Component\Process\Process;
+
 beforeEach(function () {
     $this->workDir = sys_get_temp_dir().'/dply-process-git-cloner-'.uniqid();
     mkdir($this->workDir);

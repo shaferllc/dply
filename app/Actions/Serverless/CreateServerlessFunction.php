@@ -8,6 +8,7 @@ use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionServerlessHostJob;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
@@ -64,7 +65,7 @@ class CreateServerlessFunction
         if ($credentialId === '') {
             throw new InvalidArgumentException('A DigitalOcean credential is required to provision a serverless function. Add one at /credentials, then try again.');
         }
-        $credential = \App\Models\ProviderCredential::query()
+        $credential = ProviderCredential::query()
             ->where('id', $credentialId)
             ->where('organization_id', $organization->id)
             ->where('provider', 'digitalocean')

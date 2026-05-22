@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\ProcessSshKeyRotationRemindersCommandTest;
+
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\User;
 use App\Notifications\SshKeyRotationDueNotification;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('notifies owner when review after has passed', function () {
     Notification::fake();

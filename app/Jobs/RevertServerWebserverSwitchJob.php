@@ -11,6 +11,7 @@ use App\Models\ServerWebserverAuditEvent;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -133,7 +134,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         // blocked for the full uniqueFor() window when the worker was
         // SIGKILL'd. See SwitchServerWebserverJob::failed() for the full
         // rationale.
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
 
         $server = Server::query()->find($this->serverId);
         if ($server === null) {

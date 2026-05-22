@@ -1,11 +1,12 @@
 <?php
 
-
 namespace Tests\Unit\Services\LaravelConsoleExecutorTest;
+
 use App\Models\Site;
 use App\Services\Sites\LaravelConsoleExecutor;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('assert safe artisan argv rejects shell metacharacters', function () {
     $executor = app(LaravelConsoleExecutor::class);

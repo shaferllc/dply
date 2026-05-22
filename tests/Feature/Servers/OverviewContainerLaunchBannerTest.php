@@ -3,14 +3,17 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\OverviewContainerLaunchBannerTest;
+
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('docker host with no sites shows add first container cta', function () {
     $user = userWithOrganization();

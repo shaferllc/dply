@@ -1,13 +1,10 @@
 <?php
 
-
 namespace Tests\Feature\ServerTest;
-use Mockery;
 
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Enums\SiteType;
 use App\Jobs\FinalizeContainerCloudLaunchJob;
-use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;
@@ -41,15 +38,15 @@ use App\Modules\TaskRunner\Services\TaskRunnerService;
 use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function userWithOrganization(): User
 {
@@ -571,12 +568,12 @@ test('site provisioner records docker runtime activity details', function () {
     app()->instance(SiteRuntimeProvisionerRegistry::class, new SiteRuntimeProvisionerRegistry([
         new class implements SiteRuntimeProvisioner
         {
-            function runtimeProfile(): string
+            public function runtimeProfile(): string
             {
                 return 'docker_web';
             }
 
-            function provision(Site $site): void
+            public function provision(Site $site): void
             {
                 $meta = is_array($site->meta) ? $site->meta : [];
                 $meta['docker_runtime'] = array_merge(
@@ -598,7 +595,7 @@ test('site provisioner records docker runtime activity details', function () {
                 $site->forceFill(['meta' => $meta])->save();
             }
 
-            function readyResult(Site $site): array
+            public function readyResult(Site $site): array
             {
                 return [
                     'ok' => false,

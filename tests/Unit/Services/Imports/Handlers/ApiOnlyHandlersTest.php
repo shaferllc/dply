@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Imports\Handlers\ApiOnlyHandlersTest;
+
 use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
@@ -17,8 +18,10 @@ use App\Services\Imports\Handlers\CopyEnvHandler;
 use App\Services\Imports\Handlers\RecreateCronsHandler;
 use App\Services\Imports\Handlers\RecreateDaemonsHandler;
 use App\Services\Imports\Handlers\RecreateSchedulerHandler;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 /**
  * @return array{0: ImportMigrationStep, 1: ImportSiteMigration, 2: Site, 3: ImportServerMigration}
  */
@@ -81,7 +84,7 @@ test('copy env stores env content on site', function () {
 
     [$step, , $site] = seedFixture(ImportMigrationStep::KEY_COPY_ENV);
 
-    (new CopyEnvHandler())->execute($step);
+    (new CopyEnvHandler)->execute($step);
 
     $site->refresh();
     expect($site->env_file_content)->toBe("APP_ENV=production\nAPP_KEY=abc123\n");
@@ -99,7 +102,7 @@ test('recreate crons creates server cron jobs', function () {
 
     [$step, , $site] = seedFixture(ImportMigrationStep::KEY_RECREATE_CRONS);
 
-    (new RecreateCronsHandler())->execute($step);
+    (new RecreateCronsHandler)->execute($step);
 
     expect(ServerCronJob::query()->where('site_id', $site->id)->count())->toBe(2);
     $this->assertDatabaseHas('server_cron_jobs', [
@@ -117,8 +120,8 @@ test('recreate crons is idempotent across reruns', function () {
 
     [$step, , $site] = seedFixture(ImportMigrationStep::KEY_RECREATE_CRONS);
 
-    (new RecreateCronsHandler())->execute($step);
-    (new RecreateCronsHandler())->execute($step);
+    (new RecreateCronsHandler)->execute($step);
+    (new RecreateCronsHandler)->execute($step);
 
     expect(ServerCronJob::query()->where('site_id', $site->id)->count())->toBe(1);
 });
@@ -133,7 +136,7 @@ test('recreate daemons creates site processes', function () {
 
     [$step, , $site] = seedFixture(ImportMigrationStep::KEY_RECREATE_DAEMONS);
 
-    (new RecreateDaemonsHandler())->execute($step);
+    (new RecreateDaemonsHandler)->execute($step);
 
     $worker = SiteProcess::query()
         ->where('site_id', $site->id)
@@ -156,7 +159,7 @@ test('recreate scheduler creates scheduler when laravel with schedule run', func
 
     [$step, , $site] = seedFixture(ImportMigrationStep::KEY_RECREATE_SCHEDULER);
 
-    (new RecreateSchedulerHandler())->execute($step);
+    (new RecreateSchedulerHandler)->execute($step);
 
     $scheduler = SiteProcess::query()
         ->where('site_id', $site->id)
@@ -171,7 +174,7 @@ test('recreate scheduler creates scheduler when laravel with schedule run', func
 test('recreate scheduler is a noop for non laravel sites', function () {
     [$step] = seedFixture(ImportMigrationStep::KEY_RECREATE_SCHEDULER, siteType: 'php');
 
-    (new RecreateSchedulerHandler())->execute($step);
+    (new RecreateSchedulerHandler)->execute($step);
 
     $step->refresh();
     expect($step->result_data['scheduler_created'])->toBeFalse();
@@ -186,7 +189,7 @@ test('recreate scheduler skips when no schedule run cron on source', function ()
 
     [$step] = seedFixture(ImportMigrationStep::KEY_RECREATE_SCHEDULER);
 
-    (new RecreateSchedulerHandler())->execute($step);
+    (new RecreateSchedulerHandler)->execute($step);
 
     $step->refresh();
     expect($step->result_data['scheduler_created'])->toBeFalse();

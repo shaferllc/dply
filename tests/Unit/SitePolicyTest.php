@@ -1,12 +1,13 @@
 <?php
 
-
 namespace Tests\Unit\SitePolicyTest;
+
 use App\Models\Organization;
 use App\Models\User;
 use App\Policies\SitePolicy;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->policy = new SitePolicy;

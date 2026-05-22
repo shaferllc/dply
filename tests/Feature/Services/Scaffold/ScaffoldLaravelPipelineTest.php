@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Services\Scaffold\ScaffoldLaravelPipelineTest;
-use Mockery;
 
 use App\Models\Organization;
 use App\Models\Server;
@@ -20,7 +19,10 @@ use App\Services\Scaffold\ScaffoldPrerequisites;
 use App\Services\Scaffold\ScaffoldStep;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+
+uses(RefreshDatabase::class);
 
 afterEach(function () {
     Mockery::close();

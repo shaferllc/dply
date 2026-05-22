@@ -1,16 +1,16 @@
 <?php
 
-
 namespace Tests\Unit\Services\ConsoleCatalogTest;
-use Mockery;
 
 use App\Models\Server;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Support\Console\ConsoleCatalog;
 use App\Support\Servers\ServerInstalledServices;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 function mockServerWithTags(array $tags, ?string $phpVersion = null): Server
 {

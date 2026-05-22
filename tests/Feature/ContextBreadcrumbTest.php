@@ -1,14 +1,15 @@
 <?php
 
-
 namespace Tests\Feature\ContextBreadcrumbTest;
+
 use App\Livewire\Layout\ContextBreadcrumb;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 test('switch organization updates session and clears team', function () {
     $user = User::factory()->create();

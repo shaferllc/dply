@@ -1,12 +1,11 @@
 <?php
 
-
 namespace Tests\Unit\Events\ServerCronRunBroadcastTest;
+
 use App\Events\Servers\ServerCronRunCompletedBroadcast;
 use App\Events\Servers\ServerCronRunMetaBroadcast;
 use App\Events\Servers\ServerCronRunOutputChunkBroadcast;
 use Illuminate\Broadcasting\PrivateChannel;
-use PHPUnit\Framework\Attributes\Test;
 
 test('meta broadcasts on private server channel', function () {
     $e = new ServerCronRunMetaBroadcast('srv1', 'run1', '<p>x</p>');

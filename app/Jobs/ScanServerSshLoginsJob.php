@@ -13,6 +13,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\LazyCollection;
 
 /**
  * Per-server SSH login scan. SSHes in as root, parses `last -F -i -n 50`, fires
@@ -192,7 +194,7 @@ class ScanServerSshLoginsJob implements ShouldQueue
      */
     protected function publishLoginEvent(NotificationPublisher $publisher, Server $server, array $entry): void
     {
-        $when = \Illuminate\Support\Carbon::createFromTimestamp($entry['ts']);
+        $when = Carbon::createFromTimestamp($entry['ts']);
 
         try {
             $publisher->publish(
@@ -245,9 +247,9 @@ class ScanServerSshLoginsJob implements ShouldQueue
      * one active `server.ssh_login` subscription. Called from the scheduler;
      * exposed as a static for unit testing.
      *
-     * @return \Illuminate\Support\LazyCollection<int, Server>
+     * @return LazyCollection<int, Server>
      */
-    public static function eligibleServers(): \Illuminate\Support\LazyCollection
+    public static function eligibleServers(): LazyCollection
     {
         $subscribedIds = NotificationSubscription::query()
             ->where('subscribable_type', Server::class)
@@ -258,7 +260,7 @@ class ScanServerSshLoginsJob implements ShouldQueue
             ->all();
 
         if ($subscribedIds === []) {
-            return \Illuminate\Support\LazyCollection::empty();
+            return LazyCollection::empty();
         }
 
         return Server::query()

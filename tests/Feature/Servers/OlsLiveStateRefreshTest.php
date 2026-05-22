@@ -3,15 +3,18 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\Servers\OlsLiveStateRefreshTest;
-use \App\Services\Servers\LiveState\OlsLiveStateProbe;
+
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\LiveState\EngineLiveState;
+use App\Services\Servers\LiveState\OlsLiveStateProbe;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 function makeUser(): User
 {
@@ -35,7 +38,7 @@ test('refresh engine live state invokes probe and caches result', function () {
     // Server.meta so the assertion below can verify the cache hand-off.
     $stub = new class extends OlsLiveStateProbe
     {
-        function runFreshProbe(Server $server): EngineLiveState
+        public function runFreshProbe(Server $server): EngineLiveState
         {
             $this->calls++;
 

@@ -15,11 +15,13 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
+use App\Notifications\BackupFailureNotification;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -427,7 +429,7 @@ class WorkspaceBackups extends Component
      * destination credentials.
      */
     /**
-     * Fire a one-shot {@see \App\Notifications\BackupFailureNotification} with the
+     * Fire a one-shot {@see BackupFailureNotification} with the
      * test marker so operators can validate their email/recipient setup without
      * inducing an actual backup failure.
      */
@@ -457,7 +459,7 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\BackupFailureNotification(
+        Notification::send($admins, new BackupFailureNotification(
             schedule: $schedule,
             errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()?->email ?? 'operator']),
             serverName: (string) ($this->server->name ?? ''),

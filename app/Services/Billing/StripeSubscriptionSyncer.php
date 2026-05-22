@@ -23,7 +23,7 @@ class StripeSubscriptionSyncer
 {
     /**
      * @return array<int, array{tier: string, action: string, from: ?int, to: int}>
-     *         Audit log of changes applied; empty when nothing changed.
+     *                                                                              Audit log of changes applied; empty when nothing changed.
      */
     public function reconcile(Organization $organization, DesiredBillingState $desired): array
     {

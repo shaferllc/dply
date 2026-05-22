@@ -1,7 +1,7 @@
 <?php
 
-
 namespace Tests\Unit\Services\Billing\DesiredBillingStateTest;
+
 use App\Enums\ServerTier;
 use App\Services\Billing\DesiredBillingState;
 

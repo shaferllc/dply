@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 namespace Tests\Feature\FlyEligibilityCommandTest;
+
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+uses(RefreshDatabase::class);
 
 test('lists node and static sites excluding php', function () {
     [$user, $orgA, $orgB] = makeTwoOrgs();
