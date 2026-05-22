@@ -110,7 +110,7 @@ if (! function_exists('main')) {
             // dply background tick — run the Laravel scheduler or a queue
             // worker instead of handling an HTTP request. dply's own
             // scheduler invokes this every minute for enabled functions.
-            $task = dply_do_functions_command($args);
+            $task = dply_do_functions_command($args, $envFile);
             if ($task !== null) {
                 $consoleKernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
                 $exitCode = $consoleKernel->call($task[0], $task[1]);
@@ -181,9 +181,10 @@ if (! function_exists('dply_do_functions_command')) {
      * throws — a tick must never silently fall through to serving the app.
      *
      * @param  array<string, mixed>  $args
+     * @param  array<string, string>  $envFile  parsed bundled .env
      * @return array{0: string, 1: array<string, mixed>}|null
      */
-    function dply_do_functions_command(array $args): ?array
+    function dply_do_functions_command(array $args, array $envFile = []): ?array
     {
         $headers = is_array($args['__ow_headers'] ?? null) ? $args['__ow_headers'] : [];
         $task = strtolower(trim((string) ($headers['x-dply-run'] ?? '')));
@@ -191,8 +192,12 @@ if (! function_exists('dply_do_functions_command')) {
             return null;
         }
 
-        $secret = (string) getenv('DPLY_COMMAND_SECRET');
-        $given = (string) ($headers['x-dply-secret'] ?? '');
+        // The command secret is delivered in the bundled .env — DigitalOcean
+        // Functions does not promote .env keys to real environment variables,
+        // so resolve it .env-first (mirroring dply_do_functions_report_visit)
+        // and fall back to a real env var only if one is set.
+        $secret = trim((string) ($envFile['DPLY_COMMAND_SECRET'] ?? (getenv('DPLY_COMMAND_SECRET') ?: '')));
+        $given = trim((string) ($headers['x-dply-secret'] ?? ''));
         if ($secret === '' || ! hash_equals($secret, $given)) {
             throw new RuntimeException('dply command rejected: invalid command secret.');
         }

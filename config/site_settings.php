@@ -25,6 +25,7 @@ return [
         'wordpress' => ['label' => 'WordPress'],
         'environment' => ['label' => 'Environment'],
         'logs' => ['label' => 'Logs'],
+        'platform' => ['label' => 'Platform'],
         'notifications' => ['label' => 'Notifications'],
         'basic-auth' => ['label' => 'Authentication'],
         'danger' => ['label' => 'Danger zone'],

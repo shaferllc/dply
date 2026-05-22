@@ -30,7 +30,10 @@
 
             <div class="grid gap-6 md:grid-cols-2">
                 <div>
-                    <x-input-label for="container_repo_source" :value="__('Repo source')" />
+                    <div class="flex items-center justify-between gap-2">
+                        <x-input-label for="container_repo_source" :value="__('Repo source')" />
+                        <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                    </div>
                     <select id="container_repo_source" wire:model.live="container_repo_source" class="mt-2 block w-full rounded-xl border-slate-300 text-sm">
                         <option value="manual">{{ __('Manual Git URL') }}</option>
                         <option value="provider" @disabled($containerLinkedSourceControlAccounts === [])>{{ __('Linked source control') }}</option>

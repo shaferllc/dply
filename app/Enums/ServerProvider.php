@@ -95,6 +95,20 @@ enum ServerProvider: string
     }
 
     /**
+     * Whether this provider offers a CDN / edge network Dply can put in front of a
+     * site. A subset of the DNS providers — Cloudflare's CDN and Vercel's Edge
+     * Network qualify; pure registrars / authoritative-DNS hosts do not.
+     */
+    public function supportsCdn(): bool
+    {
+        return match ($this) {
+            self::Cloudflare,
+            self::VercelDns => true,
+            default => false,
+        };
+    }
+
+    /**
      * Whether this provider is a source for inventory imports (existing fleets that
      * dply can read sites/servers from and migrate). Distinct from compute/DNS —
      * import providers don't host anything; dply only talks to their APIs to read
@@ -122,6 +136,9 @@ enum ServerProvider: string
         if ($this->supportsDns()) {
             $caps[] = 'dns';
         }
+        if ($this->supportsCdn()) {
+            $caps[] = 'cdn';
+        }
         if ($this->supportsImport()) {
             $caps[] = 'import';
         }
@@ -140,6 +157,19 @@ enum ServerProvider: string
         return array_values(array_map(
             fn (self $p) => $p->value,
             array_filter(self::cases(), fn (self $p) => $p->supportsDns())
+        ));
+    }
+
+    /**
+     * Provider keys that offer a CDN / edge network.
+     *
+     * @return list<string>
+     */
+    public static function cdnProviderKeys(): array
+    {
+        return array_values(array_map(
+            fn (self $p) => $p->value,
+            array_filter(self::cases(), fn (self $p) => $p->supportsCdn())
         ));
     }
 

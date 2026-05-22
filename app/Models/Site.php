@@ -559,6 +559,11 @@ class Site extends Model
             && $server->hasAnySshPrivateKey();
     }
 
+    /** Memoized result of the lazy-load path in primaryDomain(). */
+    private ?SiteDomain $primaryDomainCache = null;
+
+    private bool $primaryDomainResolved = false;
+
     public function primaryDomain(): ?SiteDomain
     {
         // Avoid re-querying when callers have already eager-loaded `domains`
@@ -568,8 +573,31 @@ class Site extends Model
             return $this->domains->firstWhere('is_primary', true) ?? $this->domains->first();
         }
 
-        return $this->domains()->where('is_primary', true)->first()
-            ?? $this->domains()->first();
+        // primaryDomain() is hit repeatedly per request (blade views, Site::url(),
+        // service classes). Memoize so the lazy path queries at most once.
+        if ($this->primaryDomainResolved) {
+            return $this->primaryDomainCache;
+        }
+
+        $this->primaryDomainResolved = true;
+
+        // Order is_primary descending so the primary domain wins, falling back
+        // to any domain — one query instead of a where + a separate fallback.
+        return $this->primaryDomainCache = $this->domains()
+            ->orderByDesc('is_primary')
+            ->first();
+    }
+
+    /**
+     * Drop the memoized primaryDomain() result. Call this after creating or
+     * re-prioritising a SiteDomain on an in-memory Site instance that may have
+     * already resolved primaryDomain() — e.g. the scaffold pipelines, which
+     * read primaryDomain() in a later step than the one that creates it.
+     */
+    public function flushPrimaryDomainCache(): void
+    {
+        $this->primaryDomainCache = null;
+        $this->primaryDomainResolved = false;
     }
 
     public function testingHostname(): string
@@ -1675,6 +1703,33 @@ class Site extends Model
         $this->forceFill(['meta' => $meta])->save();
 
         return $slug;
+    }
+
+    /**
+     * The stable secret dply signs background ticks (scheduler / queue) with.
+     *
+     * Deliberately separate from {@see webhook_secret}: that one is operator-
+     * rotatable, and rotating it must never silently break the function's
+     * scheduler. This secret is minted once, persisted in `meta.serverless`,
+     * and reused — the deploy bakes it into the function's env and every tick
+     * signs with the same value, so the two can never drift apart.
+     */
+    public function ensureServerlessCommandSecret(): string
+    {
+        $existing = trim((string) ($this->serverlessConfig()['command_secret'] ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $secret = \Illuminate\Support\Str::random(48);
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $serverless['command_secret'] = $secret;
+        $meta['serverless'] = $serverless;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $secret;
     }
 
     /**

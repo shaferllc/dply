@@ -60,6 +60,71 @@
                 'kindLabels' => (array) config('console_actions.kinds', []),
             ])
 
+            {{-- Function activity — serverless only. Auto-populated from
+                 function_invocations; no setup, no manual wiring. --}}
+            @if (($runtimeMode ?? '') === 'serverless' && $functionStats)
+                @php $fnSummary = $functionStats['summary']; @endphp
+                <section class="{{ $card }}">
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+                        <div>
+                            <h2 class="text-sm font-semibold text-brand-ink">{{ __('Function activity') }}</h2>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Invocations, errors, latency and cold starts — every recorded call to this function.') }}</p>
+                        </div>
+                        <div class="flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-1">
+                            @foreach (['1h' => __('1h'), '24h' => __('24h'), '7d' => __('7d')] as $rangeKey => $rangeLabel)
+                                <button type="button" wire:click="setStatsRange('{{ $rangeKey }}')" @class([
+                                    'rounded-md px-2.5 py-1 text-xs font-semibold transition',
+                                    'bg-white text-brand-ink shadow-sm' => $statsRange === $rangeKey,
+                                    'text-brand-moss hover:text-brand-ink' => $statsRange !== $rangeKey,
+                                ])>{{ $rangeLabel }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="space-y-5 px-6 py-5 sm:px-8">
+                        @if ($fnSummary['invocations'] === 0)
+                            <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-4 py-6 text-center text-sm text-brand-moss">
+                                {{ __('No invocations in this window yet. Background ticks, test requests, and live traffic all land here.') }}
+                            </div>
+                        @else
+                            <dl class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                                @foreach ([
+                                    ['label' => __('Invocations'), 'value' => number_format($fnSummary['invocations'])],
+                                    ['label' => __('Error rate'), 'value' => $fnSummary['error_rate'].'%'],
+                                    ['label' => __('Avg duration'), 'value' => $fnSummary['avg_duration'].'ms'],
+                                    ['label' => __('p95 duration'), 'value' => $fnSummary['p95_duration'].'ms'],
+                                    ['label' => __('Cold starts'), 'value' => $fnSummary['cold_rate'].'%'],
+                                ] as $stat)
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
+                                        <dt class="text-[10px] font-medium uppercase tracking-wide text-brand-moss/70">{{ $stat['label'] }}</dt>
+                                        <dd class="mt-0.5 text-lg font-bold text-brand-ink">{{ $stat['value'] }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+
+                            <div class="grid gap-5 sm:grid-cols-2">
+                                @foreach ([
+                                    ['title' => __('Invocations'), 'series' => $functionStats['series']['invocations'], 'color' => 'text-brand-forest', 'fmt' => 'load', 'ymax' => null],
+                                    ['title' => __('Error rate %'), 'series' => $functionStats['series']['error_rate'], 'color' => 'text-rose-500', 'fmt' => 'percent', 'ymax' => 100],
+                                    ['title' => __('Duration (ms)'), 'series' => $functionStats['series']['duration'], 'color' => 'text-sky-600', 'fmt' => 'load', 'ymax' => null],
+                                    ['title' => __('Cold-start rate %'), 'series' => $functionStats['series']['cold_rate'], 'color' => 'text-brand-gold', 'fmt' => 'percent', 'ymax' => 100],
+                                ] as $chart)
+                                    <div>
+                                        <p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ $chart['title'] }}</p>
+                                        <x-metrics-line-chart :series="$chart['series']" :yMax="$chart['ymax']" :colorClass="$chart['color']" :format="$chart['fmt']" heightClass="h-24" />
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <p class="text-[11px] text-brand-moss/60">
+                                {{ __(':tick ticks · :test test · :web web in this window.', ['tick' => $fnSummary['by_source']['tick'], 'test' => $fnSummary['by_source']['test'], 'web' => $fnSummary['by_source']['web']]) }}
+                                <button type="button" wire:click="refreshStats" class="ml-1 font-semibold text-brand-sage hover:underline">{{ __('Refresh') }}</button>
+                            </p>
+                        @endif
+                    </div>
+                </section>
+            @endif
+
             {{-- Slim trigger card. The "Add a monitor" button opens a modal containing the
                  actual form — keeps the page focused on the monitors list when the operator
                  is just here to check status. --}}

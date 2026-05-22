@@ -32,21 +32,18 @@ final class InvokeFunctionTick
      * signed `x-dply-run` header to put the adapter into scheduler / queue
      * mode. `keep-warm` is a plain request that just holds a warm container.
      *
-     * Returns null only when the task can't run at all — a command-mode
-     * tick with no webhook secret, or a host that isn't provisioned.
+     * The command header is signed with the site's stable serverless command
+     * secret — minted once and baked into the deployed function's env by the
+     * environment preparer — never the operator-rotatable webhook_secret.
      */
     public function tickSite(Site $site, string $task): ?FunctionInvocation
     {
         $headers = [];
 
         if ($task === 'schedule' || $task === 'queue') {
-            $secret = trim((string) $site->webhook_secret);
-            if ($secret === '') {
-                return null;
-            }
             $headers = [
                 'x-dply-run' => $task,
-                'x-dply-secret' => $secret,
+                'x-dply-secret' => $site->ensureServerlessCommandSecret(),
             ];
         }
 

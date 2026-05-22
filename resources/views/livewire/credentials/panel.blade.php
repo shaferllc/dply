@@ -6,6 +6,7 @@
         return match ($cap) {
             'compute' => ['label' => __('compute'), 'class' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10'],
             'dns' => ['label' => __('DNS'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
+            'cdn' => ['label' => __('CDN'), 'class' => 'bg-sky-100 text-sky-900 ring-sky-200'],
             'import' => ['label' => __('import'), 'class' => 'bg-amber-100 text-amber-900 ring-amber-200'],
             default => ['label' => $cap, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
         };
@@ -674,29 +675,126 @@
         @break
 
     @case('gandi')
-    @case('namecheap')
-    @case('vercel_dns')
-        @php
-            $comingSoonCopy = match ($active_provider) {
-                'gandi' => __('Gandi DNS support is on the roadmap. The DNS tab surfaces it so you can plan a switch — credentials are not stored yet.'),
-                'namecheap' => __('Namecheap DNS support is on the roadmap. The DNS tab surfaces it so you can plan a switch — credentials are not stored yet.'),
-                'vercel_dns' => __('Vercel DNS support is on the roadmap. The DNS tab surfaces it so you can plan a switch — credentials are not stored yet.'),
-                default => __('This provider is on the roadmap. Credentials are not stored yet.'),
-            };
-        @endphp
         <div class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 p-6 sm:p-8">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-mist ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-clock class="h-5 w-5" />
-                </span>
-                <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ $activeProviderLabel }}</h3>
-                        <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('coming soon') }}</span>
-                        <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/30">{{ __('DNS') }}</span>
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect Gandi LiveDNS so Dply can manage records for the zones you host at Gandi. This is independent of where your servers run.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="gandi_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="gandi_name" wire:model="gandi_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production DNS') }}" />
                     </div>
-                    <p class="{{ $hint }}">{{ $comingSoonCopy }}</p>
-                    <p class="mt-3 text-xs text-brand-mist">{{ __('Connect a supported DNS provider (DigitalOcean, Cloudflare, AWS Route53) in the meantime — site DNS settings already accept any of them.') }}</p>
+                    <div>
+                        <x-input-label for="gandi_api_token" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Personal Access Token') }}
+                        </x-input-label>
+                        <x-text-input id="gandi_api_token" wire:model="gandi_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in the :link with the "Manage domain name technical configurations" permission.', ['link' => '<a href="https://account.gandi.net/" target="_blank" rel="noopener" class="'.$link.'">Gandi account → Security</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('gandi_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeGandi" wire:loading.attr="disabled" wire:target="storeGandi">
+                        <span wire:loading.remove wire:target="storeGandi" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Gandi') }}
+                        </span>
+                        <span wire:loading wire:target="storeGandi" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('namecheap')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect the Namecheap API so Dply can manage host records for your domains. Enable API access and allowlist this server\'s IP in your Namecheap profile first.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="namecheap_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="namecheap_name" wire:model="namecheap_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production DNS') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="namecheap_api_user" :value="__('API user')" />
+                        <x-text-input id="namecheap_api_user" wire:model="namecheap_api_user" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{{ __('Usually your Namecheap account username.') }}</p>
+                        <x-input-error :messages="$errors->get('namecheap_api_user')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="namecheap_api_key" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('API key') }}
+                        </x-input-label>
+                        <x-text-input id="namecheap_api_key" wire:model="namecheap_api_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Enable API access and copy the key from :link.', ['link' => '<a href="https://ap.www.namecheap.com/settings/tools/apiaccess/" target="_blank" rel="noopener" class="'.$link.'">Namecheap → Profile → Tools → API Access</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('namecheap_api_key')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeNamecheap" wire:loading.attr="disabled" wire:target="storeNamecheap">
+                        <span wire:loading.remove wire:target="storeNamecheap" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Namecheap') }}
+                        </span>
+                        <span wire:loading wire:target="storeNamecheap" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('vercel_dns')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect a Vercel API token so Dply can manage DNS records and put the Vercel Edge Network in front of your sites.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="vercel_dns_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="vercel_dns_name" wire:model="vercel_dns_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production CDN') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="vercel_dns_api_token" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('API token') }}
+                        </x-input-label>
+                        <x-text-input id="vercel_dns_api_token" wire:model="vercel_dns_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://vercel.com/account/tokens" target="_blank" rel="noopener" class="'.$link.'">Vercel → Account Settings → Tokens</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('vercel_dns_api_token')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="vercel_dns_team_id" :value="__('Team ID (optional)')" />
+                        <x-text-input id="vercel_dns_team_id" wire:model="vercel_dns_team_id" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="team_…" />
+                        <p class="{{ $hint }}">{{ __('Leave blank for a personal account. Required when the domains live under a Vercel team.') }}</p>
+                        <x-input-error :messages="$errors->get('vercel_dns_team_id')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeVercelDns" wire:loading.attr="disabled" wire:target="storeVercelDns">
+                        <span wire:loading.remove wire:target="storeVercelDns" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Vercel DNS') }}
+                        </span>
+                        <span wire:loading wire:target="storeVercelDns" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>

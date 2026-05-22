@@ -35,6 +35,7 @@
                 ['id' => 'all', 'label' => __('All')],
                 ['id' => 'server', 'label' => __('Server')],
                 ['id' => 'dns', 'label' => __('DNS')],
+                ['id' => 'cdn', 'label' => __('CDN')],
             ] as $tabItem)
                 <button
                     type="button"
@@ -74,6 +75,7 @@
                             ['id' => 'all', 'label' => __('All')],
                             ['id' => 'server', 'label' => __('Server')],
                             ['id' => 'dns', 'label' => __('DNS')],
+                            ['id' => 'cdn', 'label' => __('CDN')],
                         ] as $tabItem)
                             <button
                                 type="button"

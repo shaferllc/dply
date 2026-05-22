@@ -28,9 +28,21 @@ class OAuthController extends Controller
             } else {
                 Session::forget('oauth_return_route');
             }
+
+            // `return_to` lets a "Connect a provider" modal send the operator
+            // back to the exact page they launched from (a create flow, the
+            // Repository tab). Sanitized to a same-app path — never an
+            // absolute or protocol-relative URL — so it can't open-redirect.
+            $returnTo = $this->sanitizeReturnTo($request->query('return_to'));
+            if ($returnTo !== null) {
+                Session::put('oauth_return_url', $returnTo);
+            } else {
+                Session::forget('oauth_return_url');
+            }
         } else {
             Session::forget('oauth_intent');
             Session::forget('oauth_return_route');
+            Session::forget('oauth_return_url');
         }
 
         $driver = Socialite::driver($provider);
@@ -94,18 +106,51 @@ class OAuthController extends Controller
     private function oauthFailureRedirect(?string $intent, string $message): RedirectResponse
     {
         if ($intent === 'link') {
-            return redirect()->route(Session::pull('oauth_return_route', 'profile.source-control'))
-                ->with('error', $message);
+            return $this->linkReturnRedirect()->with('error', $message);
         }
 
         return redirect()->route('login')
             ->with('error', $message);
     }
 
+    /**
+     * Where to land after a link attempt: the `return_to` page the operator
+     * launched from when one was supplied, otherwise the `return` route
+     * (Security / Source control). Pulls both keys so neither lingers.
+     */
+    private function linkReturnRedirect(): RedirectResponse
+    {
+        $url = Session::pull('oauth_return_url');
+        $route = Session::pull('oauth_return_route', 'profile.source-control');
+
+        if (is_string($url) && $url !== '') {
+            return redirect()->to($url);
+        }
+
+        return redirect()->route($route);
+    }
+
+    /**
+     * Accept a `return_to` only when it's a same-app path — leading single
+     * slash, no scheme, no host. Returns the path (+ query) or null.
+     */
+    private function sanitizeReturnTo(mixed $raw): ?string
+    {
+        $raw = is_string($raw) ? trim($raw) : '';
+        if ($raw === '' || ! str_starts_with($raw, '/') || str_starts_with($raw, '//') || str_contains($raw, '\\')) {
+            return null;
+        }
+
+        $parts = parse_url($raw);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host'])) {
+            return null;
+        }
+
+        return ($parts['path'] ?? '/').(isset($parts['query']) ? '?'.$parts['query'] : '');
+    }
+
     private function linkAccountToCurrentUser(string $provider, SocialiteUser $oauthUser): RedirectResponse
     {
-        $returnRoute = Session::pull('oauth_return_route', 'profile.source-control');
-
         /** @var User $user */
         $user = Auth::user();
         $providerId = (string) $oauthUser->getId();
@@ -116,7 +161,7 @@ class OAuthController extends Controller
             ->first();
 
         if ($existing && (string) $existing->user_id !== (string) $user->id) {
-            return redirect()->route($returnRoute)
+            return $this->linkReturnRedirect()
                 ->with('error', __('This :provider account is already linked to another user.', ['provider' => ucfirst($provider)]));
         }
 
@@ -138,7 +183,7 @@ class OAuthController extends Controller
             ], $payload));
         }
 
-        return redirect()->route($returnRoute)
+        return $this->linkReturnRedirect()
             ->with('success', __('Account linked.'));
     }
 

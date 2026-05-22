@@ -4,6 +4,19 @@
 ])
 
 @php
+    // Resolve every nav surface flag in one query. Without this each
+    // @feature directive below issues its own SELECT against `features`.
+    if (auth()->check() && auth()->user()->currentOrganization()) {
+        \Laravel\Pennant\Feature::loadMissing([
+            'surface.edge',
+            'surface.fleet',
+            'surface.projects',
+            'surface.status_pages',
+            'surface.marketplace',
+            'surface.scripts',
+        ]);
+    }
+
     $notificationTablesReady = \App\Support\NotificationTablesReady::all();
     $featuresActive = $active === 'features' || request()->routeIs('features');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
@@ -56,7 +69,10 @@
                     />
                 </a>
                 @auth
-                    @if (auth()->user()->organizations()->exists())
+                    {{-- currentOrganization() is memoised (resolved in middleware) and
+                         returns an org whenever the user belongs to any — so this
+                         reuses that result instead of a fresh organization_user join. --}}
+                    @if (auth()->user()->currentOrganization())
                         <div class="flex min-w-0 flex-1 basis-0 max-w-[min(68vw,13.5rem)] sm:max-w-[min(44vw,18rem)] lg:max-w-[22rem] lg:flex-none">
                             @livewire('layout.context-breadcrumb', ['variant' => 'inline'], key('site-header-workspace'))
                         </div>

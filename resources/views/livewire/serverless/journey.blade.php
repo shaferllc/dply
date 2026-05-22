@@ -84,32 +84,42 @@
                 };
             @endphp
             @if ($banner)
-                <div class="m-6 mb-0 sm:m-8 sm:mb-0">
-                    <div class="flex max-w-xl items-center gap-3 rounded-xl border {{ $banner['ring'] }} {{ $banner['wash'] }} px-4 py-3.5">
-                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $banner['badge'] }}">
-                            <x-dynamic-component :component="$banner['icon']" class="h-5 w-5" />
+                <div class="px-6 pt-6 sm:px-8 sm:pt-7">
+                    <div class="flex items-center gap-4 rounded-2xl border {{ $banner['ring'] }} {{ $banner['wash'] }} px-5 py-4">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ $banner['badge'] }}">
+                            <x-dynamic-component :component="$banner['icon']" class="h-6 w-6" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-sm font-semibold text-brand-ink">{{ $banner['title'] }}</p>
-                            <p class="text-xs text-brand-moss">{{ $banner['detail'] }}</p>
+                            <p class="text-[15px] font-bold text-brand-ink">{{ $banner['title'] }}</p>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ $banner['detail'] }}</p>
                         </div>
                     </div>
                 </div>
             @endif
 
             {{-- Stage timeline --}}
-            <ol class="divide-y divide-brand-ink/10">
+            <ol class="px-6 py-6 sm:px-8">
                 @foreach ($stages as $stage)
-                    <li class="flex items-start gap-3 px-6 py-4 sm:px-8">
+                    <li class="relative flex items-start gap-4 pb-6 last:pb-0">
+                        {{-- Connecting spine — runs from this stage's icon to the
+                             next; tinted green once the stage is complete. --}}
+                        @unless ($loop->last)
+                            <span aria-hidden="true" @class([
+                                'absolute left-[13px] top-7 bottom-0 w-0.5',
+                                'bg-brand-forest/35' => $stage['state'] === 'done',
+                                'bg-brand-ink/10' => $stage['state'] !== 'done',
+                            ])></span>
+                        @endunless
+
                         <span @class([
-                            'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                            'bg-brand-forest/15 text-brand-forest' => $stage['state'] === 'done',
-                            'bg-brand-gold/20 text-brand-ink' => $stage['state'] === 'active',
-                            'bg-rose-100 text-rose-700' => $stage['state'] === 'failed',
+                            'relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white',
+                            'bg-brand-forest text-white' => $stage['state'] === 'done',
+                            'bg-brand-gold text-brand-ink' => $stage['state'] === 'active',
+                            'bg-rose-500 text-white' => $stage['state'] === 'failed',
                             'bg-brand-ink/5 text-brand-moss/50' => $stage['state'] === 'pending',
                         ])>
                             @if ($stage['state'] === 'done')
-                                &checkmark;
+                                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                             @elseif ($stage['state'] === 'active')
                                 <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -121,7 +131,7 @@
                                 &bull;
                             @endif
                         </span>
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0 flex-1 pt-0.5">
                             <p @class([
                                 'text-sm font-semibold',
                                 'text-brand-ink' => $stage['state'] !== 'pending',
@@ -130,18 +140,18 @@
                             <p class="mt-0.5 text-xs text-brand-moss">{{ $stage['detail'] }}</p>
 
                             @if ($stage['key'] === 'deploy' && count($deploySteps) > 0)
-                                <ul class="mt-2 space-y-1.5 border-l border-brand-ink/10 pl-3">
+                                <ul class="mt-3 space-y-2 rounded-xl bg-brand-ink/[0.03] px-3 py-2.5">
                                     @foreach ($deploySteps as $sub)
-                                        <li class="flex items-center gap-2 text-xs">
+                                        <li class="flex items-center gap-2.5 text-xs">
                                             <span @class([
                                                 'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
-                                                'bg-brand-forest/15 text-brand-forest' => $sub['state'] === 'done',
-                                                'bg-brand-gold/20 text-brand-ink' => $sub['state'] === 'active',
-                                                'bg-rose-100 text-rose-700' => $sub['state'] === 'failed',
-                                                'bg-brand-ink/5 text-brand-moss/50' => $sub['state'] === 'pending',
+                                                'bg-brand-forest text-white' => $sub['state'] === 'done',
+                                                'bg-brand-gold text-brand-ink' => $sub['state'] === 'active',
+                                                'bg-rose-500 text-white' => $sub['state'] === 'failed',
+                                                'bg-brand-ink/10 text-brand-moss/50' => $sub['state'] === 'pending',
                                             ])>
                                                 @if ($sub['state'] === 'done')
-                                                    &checkmark;
+                                                    <svg class="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                                                 @elseif ($sub['state'] === 'active')
                                                     <svg class="h-2.5 w-2.5 animate-spin" viewBox="0 0 24 24" fill="none">
                                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>

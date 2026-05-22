@@ -8,6 +8,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Deploy\ServerlessRepositoryCheckout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -158,5 +159,102 @@ class CreateTest extends TestCase
             ->set('runtime', 'cobol:74')
             ->call('create')
             ->assertHasErrors(['runtime']);
+    }
+
+    public function test_detect_from_repository_renders_panel(): void
+    {
+        $this->withCredential();
+        $this->fakeServerlessCheckout(function (string $dir): void {
+            file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
+        });
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSee('php:8.3')
+            ->assertSee('raw');
+    }
+
+    public function test_detect_from_repository_prefills_runtime_dropdown(): void
+    {
+        $this->withCredential();
+        $this->fakeServerlessCheckout(function (string $dir): void {
+            file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
+        });
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSet('runtime', 'php:8.3');
+    }
+
+    public function test_detect_from_repository_does_not_overwrite_picked_runtime(): void
+    {
+        $this->withCredential();
+        $this->fakeServerlessCheckout(function (string $dir): void {
+            file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
+        });
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            // Picking a runtime first marks it touched — detect must not stomp it.
+            ->set('runtime', 'go:1.22')
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSet('runtime', 'go:1.22');
+    }
+
+    public function test_detect_from_repository_leaves_dropdown_on_auto_when_nothing_detected(): void
+    {
+        $this->withCredential();
+        // An empty checkout — no framework markers, no raw main() entry file.
+        $this->fakeServerlessCheckout(fn (string $dir) => null);
+
+        Livewire::actingAs($this->user)
+            ->test(ServerlessCreate::class)
+            ->set('repo', 'acme/empty')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSet('runtime', 'auto')
+            ->assertSee('No runtime detected');
+    }
+
+    /**
+     * Bind a fake {@see ServerlessRepositoryCheckout} that resolves to a local
+     * fixture directory instead of cloning over the network.
+     */
+    private function fakeServerlessCheckout(callable $populate): string
+    {
+        $dir = sys_get_temp_dir().'/dply-sls-detect-'.bin2hex(random_bytes(6));
+        mkdir($dir, 0o755, true);
+        $populate($dir);
+
+        $this->app->instance(ServerlessRepositoryCheckout::class, new class($dir)
+        {
+            public function __construct(private string $dir) {}
+
+            /**
+             * @return array<string, string>
+             */
+            public function checkout(): array
+            {
+                return [
+                    'workspace_path' => $this->dir,
+                    'repository_path' => $this->dir,
+                    'working_directory' => $this->dir,
+                    'output' => '',
+                    'branch' => 'main',
+                ];
+            }
+
+            public function cleanup(string $workspacePath): void {}
+        });
+
+        return $dir;
     }
 }

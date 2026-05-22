@@ -263,6 +263,31 @@ class ServerlessRuntimeDetectorTest extends TestCase
         $this->assertSame('framework', $result['deploy_kind']);
     }
 
+    public function test_detects_an_express_app_as_a_framework(): void
+    {
+        $result = $this->detectRepo([
+            'package.json' => json_encode(['dependencies' => ['express' => '^4.19.0']]),
+            'index.js' => "const express = require('express');\nmodule.exports = express();\n",
+        ]);
+
+        $this->assertSame('express', $result['framework']);
+        $this->assertSame('framework', $result['deploy_kind']);
+        $this->assertSame('node', $result['language']);
+    }
+
+    public function test_detects_a_gin_app_as_a_framework(): void
+    {
+        $result = $this->detectRepo([
+            'go.mod' => "module example.com/api\n\ngo 1.22\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
+            'main.go' => "package main\nfunc main() {}\n",
+        ]);
+
+        $this->assertSame('gin', $result['framework']);
+        $this->assertSame('framework', $result['deploy_kind']);
+        $this->assertSame('go', $result['language']);
+        $this->assertSame('go:1.22', $result['runtime']);
+    }
+
     public function test_a_raw_action_is_unsupported_when_the_target_lacks_that_runtime(): void
     {
         $result = $this->detectRepo(

@@ -363,7 +363,8 @@ class AppServiceProvider extends ServiceProvider
                         [
                             'label' => __('Homepage check'),
                             'path' => null,
-                            'probe_region' => $regions[0],
+                            // Probe from the region nearest the host, not a fixed default.
+                            'probe_region' => app(\App\Services\Sites\UptimeProbeRegionResolver::class)->forSite($site),
                         ],
                     );
                 },

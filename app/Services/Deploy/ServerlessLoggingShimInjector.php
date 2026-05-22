@@ -39,13 +39,14 @@ class ServerlessLoggingShimInjector
     /**
      * The filename the shim is written as. For node/python/php this is the
      * OpenWhisk runtime's entry file, so the shim is what the runtime loads.
-     * Go compiles the whole package, so its shim is just an extra file.
+     * Go compiles the whole package, so its shim is just an extra file —
+     * named without a leading `_`, which the Go build tool would ignore.
      */
     private const SHIM_FILENAME = [
         'node' => 'index.js',
         'python' => '__main__.py',
         'php' => 'index.php',
-        'go' => '__dply_shim.go',
+        'go' => 'dply_shim.go',
     ];
 
     /** Where the user's entry file is moved if it collides with the shim. */
@@ -149,7 +150,7 @@ class ServerlessLoggingShimInjector
         // Node resolves a zip action's entry from package.json `main`; make
         // sure that points at the shim and not the user's original file.
         if ($language === 'node') {
-            $this->pointNodePackageMainAtShim($workingDirectory, $shimFile);
+            $this->prepareNodePackageJson($workingDirectory, $shimFile);
         }
 
         return [
@@ -161,22 +162,26 @@ class ServerlessLoggingShimInjector
     }
 
     /**
-     * Force package.json's `main` to the shim so the OpenWhisk Node runtime
-     * loads the shim rather than the user's original entry file.
+     * Prepare package.json so the OpenWhisk Node runtime loads the shim:
+     * point `main` at it, and force `type` to `commonjs`.
+     *
+     * The shim is CommonJS (it uses `require`). A repo-level `"type":
+     * "module"` would make node treat the `.js` shim as an ES module and the
+     * `require` call would throw at cold start — so the type is normalised
+     * here regardless of what the user's repo declared.
      */
-    private function pointNodePackageMainAtShim(string $workingDirectory, string $shimFile): void
+    private function prepareNodePackageJson(string $workingDirectory, string $shimFile): void
     {
         $packageJsonPath = $workingDirectory.'/package.json';
-        if (! is_file($packageJsonPath)) {
-            return;
-        }
 
-        $decoded = json_decode((string) file_get_contents($packageJsonPath), true);
-        if (! is_array($decoded)) {
-            return;
-        }
+        $decoded = is_file($packageJsonPath)
+            ? json_decode((string) file_get_contents($packageJsonPath), true)
+            : [];
+        $decoded = is_array($decoded) ? $decoded : [];
 
         $decoded['main'] = $shimFile;
+        $decoded['type'] = 'commonjs';
+
         file_put_contents(
             $packageJsonPath,
             (string) json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),

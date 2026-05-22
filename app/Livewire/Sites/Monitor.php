@@ -9,13 +9,16 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
+use App\Services\Serverless\FunctionStatsRangeQuery;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use App\Services\Sites\UptimeProbeRegionResolver;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -40,6 +43,10 @@ class Monitor extends Component
 
     public string $newProbeRegion = 'eu-amsterdam';
 
+    /** Function-activity chart window: 1h | 24h | 7d (serverless only). */
+    #[Url]
+    public string $statsRange = '24h';
+
     public function mount(Server $server, Site $site): void
     {
         abort_unless($site->server_id === $server->id, 404);
@@ -50,11 +57,57 @@ class Monitor extends Component
         $this->server = $server;
         $this->site = $site->load('uptimeMonitors');
 
-        $regions = array_keys(config('site_uptime.probe_regions', []));
-        if ($regions !== [] && ! in_array($this->newProbeRegion, $regions, true)) {
-            $this->newProbeRegion = $regions[0];
+        // Default the probe region to the one nearest the host, not EU.
+        $this->newProbeRegion = app(UptimeProbeRegionResolver::class)->forSite($this->site);
+
+        if (! FunctionStatsRangeQuery::isValidRange($this->statsRange)) {
+            $this->statsRange = FunctionStatsRangeQuery::defaultRange();
+        }
+
+        $this->ensureFunctionUptimeMonitor();
+    }
+
+    /**
+     * Backfill the default "Homepage check" monitor for a function that has
+     * none — functions created before AppServiceProvider's Site::created
+     * hook never got one. New sites still get theirs at creation; this just
+     * catches the older ones so their Monitor page isn't empty. Idempotent.
+     */
+    private function ensureFunctionUptimeMonitor(): void
+    {
+        if (! $this->site->usesFunctionsRuntime() || $this->site->uptimeMonitors->isNotEmpty()) {
+            return;
+        }
+
+        if (array_keys(config('site_uptime.probe_regions', [])) === []) {
+            return;
+        }
+
+        $monitor = SiteUptimeMonitor::query()->firstOrCreate(
+            ['site_id' => $this->site->id, 'sort_order' => 0],
+            [
+                'label' => __('Homepage check'),
+                'path' => null,
+                'probe_region' => app(UptimeProbeRegionResolver::class)->forSite($this->site),
+            ],
+        );
+
+        $this->site->load('uptimeMonitors');
+
+        if ($monitor->wasRecentlyCreated) {
+            RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $monitor, auth()->id());
         }
     }
+
+    public function setStatsRange(string $range): void
+    {
+        $this->statsRange = FunctionStatsRangeQuery::isValidRange($range)
+            ? $range
+            : FunctionStatsRangeQuery::defaultRange();
+    }
+
+    /** Re-renders, which re-queries the function-activity series. */
+    public function refreshStats(): void {}
 
     public function addMonitor(SiteUptimeCheckUrlResolver $resolver): void
     {
@@ -153,6 +206,11 @@ class Monitor extends Component
         $runtimeTarget = $this->site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 
+        // Function-activity dashboard — serverless functions only.
+        $functionStats = $this->site->usesFunctionsRuntime()
+            ? app(FunctionStatsRangeQuery::class)->forSite($this->site, $this->statsRange)
+            : null;
+
         return view('livewire.sites.monitor', [
             'probeRegions' => is_array($probeRegions) ? $probeRegions : [],
             'resolvedBaseUrl' => $baseUrl,
@@ -164,6 +222,8 @@ class Monitor extends Component
             'laravel_tab' => $laravel_tab,
             'section' => $section,
             'runtimePublication' => $runtimePublication,
+            'runtimeMode' => $runtimeMode,
+            'functionStats' => $functionStats,
         ]);
     }
 

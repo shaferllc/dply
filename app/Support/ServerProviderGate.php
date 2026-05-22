@@ -54,15 +54,12 @@ final class ServerProviderGate
     /**
      * Providers that are surfaced as "coming soon" in the credentials UI — visible in the
      * sidebar but disabled (no form submission). Set as a constant rather than via env so
-     * the placeholder rollout is deterministic in tests.
+     * the placeholder rollout is deterministic in tests. Empty now that the DNS & CDN
+     * providers (Gandi, Namecheap, Vercel) ship real credential forms.
      *
      * @var list<string>
      */
-    private const COMING_SOON = [
-        'gandi',
-        'namecheap',
-        'vercel_dns',
-    ];
+    private const COMING_SOON = [];
 
     public static function enabled(string $provider): bool
     {

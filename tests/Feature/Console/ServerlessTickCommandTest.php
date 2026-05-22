@@ -70,7 +70,7 @@ class ServerlessTickCommandTest extends TestCase
 
         Http::assertSent(fn ($request): bool => str_contains($request->url(), '/actions/laravel-demo')
             && data_get($request->data(), '__ow_headers.x-dply-run') === 'schedule'
-            && data_get($request->data(), '__ow_headers.x-dply-secret') === (string) $site->webhook_secret);
+            && data_get($request->data(), '__ow_headers.x-dply-secret') === $site->fresh()->ensureServerlessCommandSecret());
     }
 
     public function test_it_skips_functions_without_background_enabled(): void

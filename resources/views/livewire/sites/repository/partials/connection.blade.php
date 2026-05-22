@@ -7,7 +7,10 @@
 
         <form wire:submit.prevent="saveConnection" class="mt-5 space-y-4">
             <label class="block text-sm">
-                <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Linked source-control account') }}</span>
+                <span class="flex items-center justify-between gap-2">
+                    <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Linked source-control account') }}</span>
+                    <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                </span>
                 <select
                     wire:model.live="connectionAccountId"
                     class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
@@ -140,4 +143,6 @@
             </div>
         </div>
     </div>
+
+    <x-connect-provider-modal />
 </section>

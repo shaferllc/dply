@@ -51,22 +51,25 @@
                             <p class="mt-1">{{ __('App Runner can only build from a GitHub repo when an authorized connection ARN is attached to the credential. Set up the connection in the AWS console, then store the ARN as github_connection_arn on this credential.') }}</p>
                         </div>
                     @endif
-                    @if ($linkedSourceControlAccounts !== [])
-                        <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
-                            <button type="button" role="radio" aria-checked="{{ $repo_source === 'connected' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'connected')"
-                                @class([
-                                    'rounded-md px-2.5 py-1 font-medium transition',
-                                    'bg-white text-slate-900 shadow-sm' => $repo_source === 'connected',
-                                    'text-slate-600 hover:text-slate-900' => $repo_source !== 'connected',
-                                ])>{{ __('Pick from connected account') }}</button>
-                            <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
-                                @class([
-                                    'rounded-md px-2.5 py-1 font-medium transition',
-                                    'bg-white text-slate-900 shadow-sm' => $repo_source === 'manual',
-                                    'text-slate-600 hover:text-slate-900' => $repo_source !== 'manual',
-                                ])>{{ __('Enter manually') }}</button>
-                        </div>
-                    @endif
+                    <div class="flex flex-wrap items-center gap-3">
+                        @if ($linkedSourceControlAccounts !== [])
+                            <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
+                                <button type="button" role="radio" aria-checked="{{ $repo_source === 'connected' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'connected')"
+                                    @class([
+                                        'rounded-md px-2.5 py-1 font-medium transition',
+                                        'bg-white text-slate-900 shadow-sm' => $repo_source === 'connected',
+                                        'text-slate-600 hover:text-slate-900' => $repo_source !== 'connected',
+                                    ])>{{ __('Pick from connected account') }}</button>
+                                <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
+                                    @class([
+                                        'rounded-md px-2.5 py-1 font-medium transition',
+                                        'bg-white text-slate-900 shadow-sm' => $repo_source === 'manual',
+                                        'text-slate-600 hover:text-slate-900' => $repo_source !== 'manual',
+                                    ])>{{ __('Enter manually') }}</button>
+                            </div>
+                        @endif
+                        <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                    </div>
 
                     @if ($repo_source === 'connected' && $linkedSourceControlAccounts !== [])
                         <div class="grid gap-4 sm:grid-cols-2">
@@ -116,6 +119,17 @@
                         <input type="checkbox" wire:model="deploy_on_push" class="rounded border-slate-300">
                         {{ __('Auto-deploy on push to this branch') }}
                     </label>
+
+                    <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <p class="text-sm text-slate-600">{{ __('Preview what dply detects in this repo before you deploy. The backend builds it with a buildpack when no Dockerfile path is given.') }}</p>
+                            <button type="button" wire:click="detectFromRepository" wire:loading.attr="disabled" wire:target="detectFromRepository" class="inline-flex shrink-0 items-center justify-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-ink/90 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="detectFromRepository">{{ __('Detect runtime') }}</span>
+                                <span wire:loading wire:target="detectFromRepository">{{ __('Detecting…') }}</span>
+                            </button>
+                        </div>
+                        @include('livewire.partials._runtime-detection-panel')
+                    </div>
                 @else
                     <div>
                         <x-input-label for="image" :value="__('Container image')" />
@@ -183,4 +197,6 @@
             </x-primary-button>
         </div>
     </form>
+
+    <x-connect-provider-modal />
 </div>

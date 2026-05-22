@@ -50,15 +50,31 @@ class ServerlessEnvironmentPreparerTest extends TestCase
 
         (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
 
+        // The baked secret is the site's stable command secret — not the
+        // operator-rotatable webhook_secret.
+        $commandSecret = $site->fresh()->ensureServerlessCommandSecret();
+        $this->assertNotSame('', $commandSecret);
+        $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$commandSecret, (string) $site->fresh()->env_file_content);
+    }
+
+    public function test_the_command_secret_survives_a_webhook_secret_rotation(): void
+    {
+        $site = Site::factory()->create(['env_file_content' => null]);
+        $commandSecret = $site->ensureServerlessCommandSecret();
+
+        // Operator regenerates the webhook secret, then redeploys.
+        $site->update(['webhook_secret' => 'a-freshly-rotated-webhook-secret']);
+        (new ServerlessEnvironmentPreparer)->prepare($site->fresh(), $this->dir, true);
+
         $managed = (string) $site->fresh()->env_file_content;
-        $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->webhook_secret, $managed);
+        $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$commandSecret, $managed);
+        $this->assertStringNotContainsString('a-freshly-rotated-webhook-secret', $managed);
     }
 
     public function test_it_overwrites_a_stale_command_secret(): void
     {
-        // A stale DPLY_COMMAND_SECRET — rotated, or committed in the repo
-        // .env — must be forced to the site's current webhook_secret, not
-        // kept; otherwise every background tick fails the handler's check.
+        // A stale DPLY_COMMAND_SECRET committed in the repo .env must be
+        // forced to the site's managed command secret, not kept.
         $site = Site::factory()->create([
             'env_file_content' => "APP_ENV=production\nDPLY_COMMAND_SECRET=stale-old-value\n",
         ]);
@@ -66,7 +82,7 @@ class ServerlessEnvironmentPreparerTest extends TestCase
         (new ServerlessEnvironmentPreparer)->prepare($site, $this->dir, true);
 
         $managed = (string) $site->fresh()->env_file_content;
-        $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->webhook_secret, $managed);
+        $this->assertStringContainsString('DPLY_COMMAND_SECRET='.$site->fresh()->ensureServerlessCommandSecret(), $managed);
         $this->assertStringNotContainsString('stale-old-value', $managed);
     }
 

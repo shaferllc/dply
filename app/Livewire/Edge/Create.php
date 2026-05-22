@@ -6,6 +6,7 @@ namespace App\Livewire\Edge;
 
 use App\Actions\Edge\CreateEdgeSite;
 use App\Actions\Edge\CreateEdgeSiteFromSource;
+use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
 use App\Services\Edge\AwsAppRunnerBackend;
@@ -24,6 +25,7 @@ use Livewire\Component;
  */
 class Create extends Component
 {
+    use DetectsRepositoryRuntime;
     use DispatchesToastNotifications;
 
     #[Url]
@@ -70,6 +72,12 @@ class Create extends Component
     public array $availableRepositories = [];
 
     public int $port = 8080;
+
+    /**
+     * Suppress detection-driven port pre-fill once the user has typed their
+     * own HTTP port, so a re-detect doesn't stomp it.
+     */
+    public bool $portOverridesTouched = false;
 
     public int $instances = 1;
 
@@ -162,6 +170,47 @@ class Create extends Component
         $this->branch = is_string($match['branch'] ?? null) && $match['branch'] !== ''
             ? (string) $match['branch']
             : 'main';
+
+        // Picking a repo from a connected account is a deliberate choice —
+        // detect immediately so the user sees the runtime preview without a
+        // separate click. Manual entry uses the explicit Detect button.
+        $this->detectFromRepository();
+    }
+
+    /**
+     * URL-first detection for source mode — clone the repo and surface the
+     * detected runtime / framework / port in the shared panel. No-op in
+     * image mode (there's no repo to inspect). Non-blocking: a clone failure
+     * lands in `$detectedPlan['error']` and never blocks {@see deploy()}.
+     */
+    public function detectFromRepository(): void
+    {
+        if ($this->mode !== 'source') {
+            return;
+        }
+
+        $this->runDetection($this->normalizeToCloneUrl($this->repo), $this->branch);
+    }
+
+    public function updatedPort(): void
+    {
+        $this->portOverridesTouched = true;
+    }
+
+    /**
+     * Pre-fill the container HTTP port from the detected app port, unless the
+     * user has already typed their own.
+     */
+    protected function applyDetectedRuntimePrefills(): void
+    {
+        if ($this->portOverridesTouched) {
+            return;
+        }
+
+        $port = $this->detectedPlan['app_port'] ?? null;
+        if (is_int($port) && $port >= 1 && $port <= 65535) {
+            $this->port = $port;
+        }
     }
 
     private function loadRepositoriesForSelectedAccount(): void

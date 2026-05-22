@@ -67,6 +67,7 @@ final class SiteSettingsSidebar
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
                 ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
+                ['id' => 'platform', 'label' => __('Platform'), 'icon' => 'heroicon-o-cube', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
@@ -92,6 +93,12 @@ final class SiteSettingsSidebar
                 ['id' => 'basic-auth', 'label' => __('Authentication'), 'icon' => 'heroicon-o-lock-closed', 'group' => 'access'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];
+
+        // The Platform tab is the OpenWhisk inspector — it only applies to
+        // DigitalOcean Functions hosts, not docker / kubernetes containers.
+        if (! $site->usesFunctionsRuntime()) {
+            $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'platform'));
+        }
 
         // Runtime sub-tabs (runtime-php / runtime-ruby / runtime-static) are
         // VM-only — they expose engine knobs that, for container/serverless
