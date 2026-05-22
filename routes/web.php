@@ -5,9 +5,9 @@ use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
-use App\Http\Controllers\EdgeDeployWebhookController;
+use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\FunctionLogIngestController;
-use App\Http\Controllers\GithubEdgeWebhookController;
+use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Jobs\RunSetupScriptJob;
@@ -18,8 +18,10 @@ use App\Livewire\Billing\Invoices as BillingInvoices;
 use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
-use App\Livewire\Edge\Create as EdgeCreate;
-use App\Livewire\Edge\Index as EdgeIndex;
+use App\Livewire\Cloud\Create as CloudCreate;
+use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
+use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
+use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Serverless\Create as ServerlessCreate;
 use App\Livewire\Serverless\Index as ServerlessIndex;
 use App\Livewire\Serverless\Journey as ServerlessJourney;
@@ -118,13 +120,13 @@ Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhoo
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
 
-Route::match(['post', 'options'], '/hooks/edge/{site}/redeploy', EdgeDeployWebhookController::class)
+Route::match(['post', 'options'], '/hooks/cloud/{site}/redeploy', CloudDeployWebhookController::class)
     ->middleware(['throttle:site-webhook'])
-    ->name('hooks.edge.redeploy');
+    ->name('hooks.cloud.redeploy');
 
-Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
+Route::match(['post', 'options'], '/hooks/cloud/{site}/github', GithubCloudWebhookController::class)
     ->middleware(['throttle:site-webhook'])
-    ->name('hooks.edge.github');
+    ->name('hooks.cloud.github');
 
 // Per-request log records POSTed by a deployed serverless function's handler
 // — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
@@ -250,9 +252,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
-    Route::middleware('feature:surface.edge')->group(function (): void {
-        Route::livewire('edge', EdgeIndex::class)->name('edge.index');
-        Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+    Route::middleware('feature:surface.cloud')->group(function (): void {
+        Route::livewire('cloud', CloudIndex::class)->name('cloud.index');
+        Route::livewire('cloud/create', CloudCreate::class)->name('cloud.create');
+        Route::livewire('cloud/databases', CloudDatabaseIndex::class)->name('cloud.databases.index');
+        Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
     });
     Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
@@ -282,12 +286,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
-    // Cloud Routes
-    Route::livewire('cloud/clusters', \App\Livewire\Cloud\ClusterIndex::class)->name('cloud.clusters.index');
-    Route::livewire('cloud/clusters/create', \App\Livewire\Cloud\ClusterCreate::class)->name('cloud.clusters.create');
-    Route::livewire('cloud/clusters/{cluster}', \App\Livewire\Cloud\ClusterShow::class)->name('cloud.clusters.show');
-    Route::livewire('cloud/clusters/{cluster}/apps/create', \App\Livewire\Cloud\AppCreate::class)->name('cloud.apps.create');
-    Route::livewire('cloud/clusters/{cluster}/apps/{app}', \App\Livewire\Cloud\AppShow::class)->name('cloud.apps.show');
 
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
     Route::livewire('servers/import/digitalocean', ServersImportFromDigitalOcean::class)->name('servers.import.digitalocean');

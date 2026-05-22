@@ -4,8 +4,8 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteRedirectKind;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Jobs\AttachEdgeDomainJob;
-use App\Jobs\DetachEdgeDomainJob;
+use App\Jobs\AttachCloudDomainJob;
+use App\Jobs\DetachCloudDomainJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
@@ -2402,8 +2402,8 @@ class Show extends Component
         }
         if ($cycleBackend) {
             $cascadeKeys[] = 'cycle_backend';
-            DetachEdgeDomainJob::dispatch($this->site->id, $old);
-            AttachEdgeDomainJob::dispatch($this->site->id, $new);
+            DetachCloudDomainJob::dispatch($this->site->id, $old);
+            AttachCloudDomainJob::dispatch($this->site->id, $new);
         }
 
         $this->recordRenameAudit($old, $new, $cascadeKeys, $rewriteDnsZone);

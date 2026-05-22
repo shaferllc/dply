@@ -51,7 +51,7 @@ class Health extends Component
         $successRate = $this->computeSuccessRate($sites->pluck('id'));
         $mostActive = $this->computeMostActive($sites);
         $flyUpsell = $this->computeFlyUpsell($org->id, $sites);
-        $edgeFleet = $this->computeEdgeFleet($org->id);
+        $cloudFleet = $this->computeCloudFleet($org->id);
 
         return view('livewire.fleet.health', [
             'org' => $org,
@@ -62,13 +62,13 @@ class Health extends Component
             'deploys' => $deploys,
             'mostActive' => $mostActive,
             'flyUpsell' => $flyUpsell,
-            'edgeFleet' => $edgeFleet,
+            'cloudFleet' => $cloudFleet,
         ])->layout('layouts.app');
     }
 
     /**
-     * Aggregate stats for edge container sites in the org. Returns
-     * null when the org has no edge sites — the view falls through
+     * Aggregate stats for cloud container sites in the org. Returns
+     * null when the org has no cloud sites — the view falls through
      * to the generic Fly upsell in that case.
      *
      * @return array{
@@ -80,7 +80,7 @@ class Health extends Component
      *     failed_sites: list<array{name: string, server_id: ?string, container_image: ?string}>
      * }|null
      */
-    private function computeEdgeFleet(string $organizationId): ?array
+    private function computeCloudFleet(string $organizationId): ?array
     {
         $sites = Site::query()
             ->where('organization_id', $organizationId)

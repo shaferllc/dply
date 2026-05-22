@@ -558,6 +558,22 @@ class DigitalOceanService
     }
 
     /**
+     * Delete a DigitalOcean Managed Database cluster. Returns true on a
+     * successful delete (204), false on a 404 (already gone) so teardown
+     * is idempotent — mirrors {@see deleteKubernetesCluster()}.
+     */
+    public function deleteDatabaseCluster(string $clusterId): bool
+    {
+        $response = $this->request('delete', '/databases/'.$clusterId);
+        if ($response->status() === 404) {
+            return false;
+        }
+        $this->assertSuccess($response, 'delete database cluster');
+
+        return true;
+    }
+
+    /**
      * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
      */
     private function normalizeDatabaseCluster(mixed $database): array
@@ -967,164 +983,6 @@ class DigitalOceanService
         }
 
         throw new \InvalidArgumentException("Unsupported method: {$method}");
-    }
-
-    /**
-     * Create a DigitalOcean Kubernetes (DOKS) cluster.
-     *
-     * @param  array{
-     *     name: string,
-     *     region: string,
-     *     version: string,
-     *     node_pool: array{
-     *         size: string,
-     *         count: int,
-     *         name?: string,
-     *         tags?: list<string>,
-     *         labels?: array<string,string>,
-     *         auto_scale?: bool,
-     *         min_nodes?: int,
-     *         max_nodes?: int,
-     *     },
-     *     ha?: bool,
-     *     vpc_uuid?: string|null,
-     *     tags?: list<string>,
-     * }  $config
-     * @return array<string, mixed> The created kubernetes cluster
-     */
-    public function createKubernetesCluster(array $config): array
-    {
-        $body = [
-            'name' => $config['name'],
-            'region' => $config['region'],
-            'version' => $config['version'],
-            'node_pools' => [
-                [
-                    'name' => $config['node_pool']['name'] ?? 'default-pool',
-                    'size' => $config['node_pool']['size'],
-                    'count' => $config['node_pool']['count'],
-                    'tags' => $config['node_pool']['tags'] ?? [],
-                    'labels' => $config['node_pool']['labels'] ?? new \stdClass,
-                ],
-            ],
-        ];
-
-        // Add autoscaling if enabled
-        if (! empty($config['node_pool']['auto_scale'])) {
-            $body['node_pools'][0]['auto_scale'] = true;
-            $body['node_pools'][0]['min_nodes'] = $config['node_pool']['min_nodes'] ?? 1;
-            $body['node_pools'][0]['max_nodes'] = $config['node_pool']['max_nodes'] ?? 10;
-        }
-
-        if (isset($config['ha'])) {
-            $body['ha'] = (bool) $config['ha'];
-        }
-
-        if (! empty($config['vpc_uuid'])) {
-            $body['vpc_uuid'] = $config['vpc_uuid'];
-        }
-
-        if (! empty($config['tags'])) {
-            $body['tags'] = $config['tags'];
-        }
-
-        $response = $this->request('post', '/kubernetes/clusters', $body);
-        $this->assertSuccess($response, 'create kubernetes cluster');
-
-        $cluster = $response->json('kubernetes_cluster');
-
-        return is_array($cluster) ? $cluster : [];
-    }
-
-    /**
-     * Get a Kubernetes cluster by ID.
-     *
-     * @return array<string, mixed>|null Null if cluster has been deleted
-     */
-    public function getKubernetesCluster(string $clusterId): ?array
-    {
-        $response = $this->request('get', '/kubernetes/clusters/'.$clusterId);
-
-        if ($response->status() === 404) {
-            return null;
-        }
-
-        $this->assertSuccess($response, 'get kubernetes cluster');
-
-        $cluster = $response->json('kubernetes_cluster');
-
-        return is_array($cluster) ? $cluster : null;
-    }
-
-    /**
-     * Get the kubeconfig for a cluster.
-     * This returns a YAML string that can be used with kubectl.
-     */
-    public function getKubernetesKubeconfig(string $clusterId, ?string $expirySeconds = null): string
-    {
-        $url = '/kubernetes/clusters/'.$clusterId.'/kubeconfig';
-        if ($expirySeconds !== null) {
-            $url .= '?expiry_seconds='.$expirySeconds;
-        }
-
-        $response = $this->request('get', $url);
-        $this->assertSuccess($response, 'get kubernetes kubeconfig');
-
-        return $response->body();
-    }
-
-    /**
-     * Delete a Kubernetes cluster.
-     */
-    public function deleteKubernetesCluster(string $clusterId): void
-    {
-        $response = $this->request('delete', '/kubernetes/clusters/'.$clusterId);
-        $this->assertSuccess($response, 'delete kubernetes cluster');
-    }
-
-    /**
-     * Get available Kubernetes versions.
-     *
-     * @return list<string>
-     */
-    public function getKubernetesVersions(): array
-    {
-        $options = $this->getKubernetesOptions();
-        $versions = $options['versions'] ?? [];
-        $slugs = [];
-        foreach ($versions as $version) {
-            if (is_array($version) && ! empty($version['slug'])) {
-                $slugs[] = (string) $version['slug'];
-            }
-        }
-
-        return $slugs;
-    }
-
-    /**
-     * Get the latest (default) Kubernetes version slug.
-     */
-    public function getLatestKubernetesVersion(): string
-    {
-        $versions = $this->getKubernetesVersions();
-        if (empty($versions)) {
-            throw new \RuntimeException('No Kubernetes versions available from DigitalOcean');
-        }
-
-        return $versions[0];
-    }
-
-    /**
-     * Get available node sizes for Kubernetes.
-     *
-     * @return list<array<string, mixed>>
-     */
-    public function getKubernetesNodeSizes(): array
-    {
-        $options = $this->getKubernetesOptions();
-        $sizes = $options['sizes'] ?? [];
-
-        return is_array($sizes) ? array_values($sizes) : [];
     }
 
     /**

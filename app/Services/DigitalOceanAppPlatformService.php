@@ -14,12 +14,12 @@ use RuntimeException;
  *
  * Docs: https://docs.digitalocean.com/reference/api/api-reference/#tag/Apps
  *
- * Used by the dply edge layer to provision/redeploy container apps
+ * Used by the dply cloud layer to provision/redeploy container apps
  * on DO. The api_token credential here is the same shape as the
  * regular DigitalOcean credential — App Platform shares the
  * read+write token scope with droplets/dns/etc.
  *
- * Methods are intentionally minimal — just what the dply edge
+ * Methods are intentionally minimal — just what the dply cloud
  * deploy/redeploy/teardown flow needs. We're not trying to expose
  * the full DO Apps surface.
  */
@@ -46,6 +46,9 @@ class DigitalOceanAppPlatformService
      * patch the app after creation via updateApp().
      *
      * @param  array<string, string>  $envVars
+     * @param  list<array<string, mixed>>  $workers  Optional `workers`
+     *   components (background processes — queue workers / scheduler)
+     *   to add to the spec alongside the web service.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createApp(
@@ -57,6 +60,7 @@ class DigitalOceanAppPlatformService
         array $buildEnvVars = [],
         int $instanceCount = 1,
         string $instanceSizeSlug = 'basic-xxs',
+        array $workers = [],
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -68,26 +72,27 @@ class DigitalOceanAppPlatformService
 
         [, $repository, $tag] = $this->parseImageRef($image);
 
-        $body = [
-            'spec' => [
-                'name' => $appName,
-                'region' => $region,
-                'services' => [[
-                    'name' => 'web',
-                    'image' => [
-                        'registry_type' => 'DOCKER_HUB',
-                        'repository' => $repository,
-                        'tag' => $tag,
-                    ],
-                    'http_port' => $port,
-                    'instance_count' => max(1, $instanceCount),
-                    'instance_size_slug' => $instanceSizeSlug,
-                    'envs' => $envSpec,
-                ]],
-            ],
+        $spec = [
+            'name' => $appName,
+            'region' => $region,
+            'services' => [[
+                'name' => 'web',
+                'image' => [
+                    'registry_type' => 'DOCKER_HUB',
+                    'repository' => $repository,
+                    'tag' => $tag,
+                ],
+                'http_port' => $port,
+                'instance_count' => max(1, $instanceCount),
+                'instance_size_slug' => $instanceSizeSlug,
+                'envs' => $envSpec,
+            ]],
         ];
+        if ($workers !== []) {
+            $spec['workers'] = array_values($workers);
+        }
 
-        $response = $this->request('post', '/apps', $body);
+        $response = $this->request('post', '/apps', ['spec' => $spec]);
         $this->assertSuccess($response, 'create app');
         $data = $response->json('app') ?? [];
 
@@ -107,6 +112,9 @@ class DigitalOceanAppPlatformService
      * `repo` is `owner/name` exactly as DO expects.
      *
      * @param  array<string, string>  $envVars
+     * @param  list<array<string, mixed>>  $workers  Optional `workers`
+     *   components (background processes — queue workers / scheduler)
+     *   to add to the spec alongside the web service.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createAppFromSource(
@@ -121,6 +129,7 @@ class DigitalOceanAppPlatformService
         array $buildEnvVars = [],
         int $instanceCount = 1,
         string $instanceSizeSlug = 'basic-xxs',
+        array $workers = [],
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -147,15 +156,16 @@ class DigitalOceanAppPlatformService
             $service['dockerfile_path'] = $dockerfilePath;
         }
 
-        $body = [
-            'spec' => [
-                'name' => $appName,
-                'region' => $region,
-                'services' => [$service],
-            ],
+        $spec = [
+            'name' => $appName,
+            'region' => $region,
+            'services' => [$service],
         ];
+        if ($workers !== []) {
+            $spec['workers'] = array_values($workers);
+        }
 
-        $response = $this->request('post', '/apps', $body);
+        $response = $this->request('post', '/apps', ['spec' => $spec]);
         $this->assertSuccess($response, 'create app from source');
         $data = $response->json('app') ?? [];
 

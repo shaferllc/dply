@@ -48,7 +48,7 @@ return [
         'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', false),
         // exit: bare-metal flow is materially different; keep gated until a paying customer asks
         'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', false),
-        // exit: ship once container-on-AppRunner architecture lands per dply edge memo
+        // exit: ship once container-on-AppRunner architecture lands per dply cloud memo
         'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', false),
         // exit: keep gated indefinitely; EKS is enterprise-only positioning
         'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', false),
@@ -85,8 +85,8 @@ return [
     | Whole non-workspace product surfaces. Each is a top-level route group.
     */
     'surface' => [
-        // exit: ship once container/edge flow inversion (project memo) is complete
-        'edge' => env('FEATURE_SURFACE_EDGE', false),
+        // exit: ship once container/cloud flow inversion (project memo) is complete
+        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
         // exit: ship once cross-server views have a saved-view persistence model
         'fleet' => env('FEATURE_SURFACE_FLEET', false),
         // exit: ship after a curated v1 marketplace catalog is approved

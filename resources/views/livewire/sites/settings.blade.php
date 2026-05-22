@@ -27,8 +27,8 @@
     $runtimeMode = $site->runtimeTargetMode();
     $runtimePlatform = $site->runtimeTargetPlatform();
     $runtimeFamily = $site->runtimeTargetFamily();
-    // A SiteType::Container edge app has runtimeTargetMode() === 'vm' (there is
-    // no "edge container" runtime family), so the mode check alone misses it.
+    // A SiteType::Container cloud app has runtimeTargetMode() === 'vm' (there is
+    // no "cloud container" runtime family), so the mode check alone misses it.
     // usesContainerRuntime() catches container-type sites and backend-bound
     // sites so the container dashboard renders and the VM overview is hidden.
     $isContainerWorkspace = in_array($runtimeMode, ['docker', 'kubernetes', 'serverless'], true)
@@ -103,7 +103,7 @@
     $resourceNounLower = strtolower($resourceNoun);
     $resourcePlural = $runtimeMode === 'vm' ? __('sites') : __('apps');
     $workspacePrefix = match (true) {
-        str_contains($runtimeFamily, 'edge') || str_contains($runtimePlatform, 'edge') => __('Edge'),
+        str_contains($runtimeFamily, 'cloud') || str_contains($runtimePlatform, 'cloud') => __('Cloud'),
         in_array($runtimePlatform, ['aws', 'digitalocean'], true) => __('Cloud'),
         $runtimeMode === 'docker' => __('Container'),
         $runtimeMode === 'kubernetes' => __('Kubernetes'),
@@ -213,7 +213,7 @@
         <div class="min-w-0 lg:col-span-9">
             <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
 
-            {{-- Page-level workspace eyebrow. Pairs the runtime family (Edge / Cloud /
+            {{-- Page-level workspace eyebrow. Pairs the runtime family (Cloud /
                  Container / etc.) with the resource noun and lives ABOVE the per-section
                  page header so operators reading top-to-bottom see "Site workspace · General"
                  rather than landing on a bare "General" with no orientation. --}}
@@ -466,9 +466,9 @@
 
                                 @if (in_array($site->runtime, ['node', 'static'], true))
                                     <div class="mt-5 rounded-xl border border-brand-sage/30 bg-brand-sage/10 p-3 text-xs text-brand-ink">
-                                        <span class="font-semibold text-brand-forest">{{ __('Edge-eligible') }}</span> —
-                                        <span class="text-brand-moss">{{ __('this :runtime site can deploy globally on dply edge — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}</span>
-                                        <a href="{{ route('edge.create') }}" wire:navigate class="ml-1 font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('Deploy to dply edge') }} →</a>
+                                        <span class="font-semibold text-brand-forest">{{ __('Cloud-eligible') }}</span> —
+                                        <span class="text-brand-moss">{{ __('this :runtime site can deploy globally on dply cloud — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}</span>
+                                        <a href="{{ route('cloud.create') }}" wire:navigate class="ml-1 font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('Deploy to dply cloud') }} →</a>
                                     </div>
                                 @endif
                             </div>

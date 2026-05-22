@@ -114,12 +114,12 @@ class FleetSummaryCommandTest extends TestCase
         $this->assertTrue($decoded['fly_io']['connected']);
     }
 
-    public function test_edge_fleet_section_aggregates_by_backend_and_status(): void
+    public function test_cloud_fleet_section_aggregates_by_backend_and_status(): void
     {
         $user = User::factory()->create();
         $server = Server::factory()->create([
             'user_id' => $user->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         Site::factory()->create([
             'server_id' => $server->id,
@@ -149,28 +149,28 @@ class FleetSummaryCommandTest extends TestCase
         Artisan::call('dply:fleet:summary', ['--json' => true]);
         $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertSame(2, $decoded['edge_fleet']['total']);
-        $this->assertSame(1, $decoded['edge_fleet']['by_backend']['digitalocean_app_platform']);
-        $this->assertSame(1, $decoded['edge_fleet']['by_backend']['aws_app_runner']);
-        $this->assertSame(1, $decoded['edge_fleet']['by_status'][Site::STATUS_CONTAINER_ACTIVE]);
-        $this->assertSame(1, $decoded['edge_fleet']['by_status'][Site::STATUS_CONTAINER_FAILED]);
+        $this->assertSame(2, $decoded['cloud_fleet']['total']);
+        $this->assertSame(1, $decoded['cloud_fleet']['by_backend']['digitalocean_app_platform']);
+        $this->assertSame(1, $decoded['cloud_fleet']['by_backend']['aws_app_runner']);
+        $this->assertSame(1, $decoded['cloud_fleet']['by_status'][Site::STATUS_CONTAINER_ACTIVE]);
+        $this->assertSame(1, $decoded['cloud_fleet']['by_status'][Site::STATUS_CONTAINER_FAILED]);
     }
 
-    public function test_edge_fleet_section_empty_when_no_container_sites(): void
+    public function test_cloud_fleet_section_empty_when_no_container_sites(): void
     {
         Artisan::call('dply:fleet:summary', ['--json' => true]);
         $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertSame(0, $decoded['edge_fleet']['total']);
-        $this->assertSame([], $decoded['edge_fleet']['by_backend']);
+        $this->assertSame(0, $decoded['cloud_fleet']['total']);
+        $this->assertSame([], $decoded['cloud_fleet']['by_backend']);
     }
 
-    public function test_edge_fleet_section_breaks_down_by_mode_and_counts_previews(): void
+    public function test_cloud_fleet_section_breaks_down_by_mode_and_counts_previews(): void
     {
         $user = User::factory()->create();
         $server = Server::factory()->create([
             'user_id' => $user->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         // 1 image-mode parent
         Site::factory()->create([
@@ -223,18 +223,18 @@ class FleetSummaryCommandTest extends TestCase
         Artisan::call('dply:fleet:summary', ['--json' => true]);
         $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertSame(3, $decoded['edge_fleet']['total']);
-        $this->assertSame(1, $decoded['edge_fleet']['by_mode']['image']);
-        $this->assertSame(2, $decoded['edge_fleet']['by_mode']['source']);
-        $this->assertSame(1, $decoded['edge_fleet']['previews']);
+        $this->assertSame(3, $decoded['cloud_fleet']['total']);
+        $this->assertSame(1, $decoded['cloud_fleet']['by_mode']['image']);
+        $this->assertSame(2, $decoded['cloud_fleet']['by_mode']['source']);
+        $this->assertSame(1, $decoded['cloud_fleet']['previews']);
     }
 
-    public function test_edge_fleet_human_output_renders_section(): void
+    public function test_cloud_fleet_human_output_renders_section(): void
     {
         $user = User::factory()->create();
         $server = Server::factory()->create([
             'user_id' => $user->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         Site::factory()->create([
             'server_id' => $server->id,
@@ -252,8 +252,8 @@ class FleetSummaryCommandTest extends TestCase
         Artisan::call('dply:fleet:summary');
         $output = Artisan::output();
 
-        $this->assertStringContainsString('Dply edge', $output);
-        $this->assertStringContainsString('1 edge container site', $output);
+        $this->assertStringContainsString('Dply cloud', $output);
+        $this->assertStringContainsString('1 cloud container site', $output);
         $this->assertStringContainsString('digitalocean_app_platform', $output);
     }
 }

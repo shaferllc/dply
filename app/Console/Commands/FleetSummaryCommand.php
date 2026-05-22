@@ -50,18 +50,18 @@ class FleetSummaryCommand extends Command
             ->whereIn('runtime', ['node', 'static'])
             ->count();
 
-        $edgeSites = Site::query()
+        $cloudSites = Site::query()
             ->whereNotNull('container_backend')
             ->get(['container_backend', 'status', 'meta']);
-        $edgeByBackend = $edgeSites->groupBy('container_backend')->map->count()->sortKeys()->all();
-        $edgeByStatus = $edgeSites->groupBy('status')->map->count()->sortKeys()->all();
-        $edgeByMode = $edgeSites
+        $cloudByBackend = $cloudSites->groupBy('container_backend')->map->count()->sortKeys()->all();
+        $cloudByStatus = $cloudSites->groupBy('status')->map->count()->sortKeys()->all();
+        $cloudByMode = $cloudSites
             ->groupBy(fn (Site $s) => is_array($s->meta['container']['source'] ?? null) ? 'source' : 'image')
             ->map->count()
             ->sortKeys()
             ->all();
-        $edgePreviewCount = $edgeSites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
-        $edgeBackendCredentials = ProviderCredential::query()
+        $cloudPreviewCount = $cloudSites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
+        $cloudBackendCredentials = ProviderCredential::query()
             ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
             ->get(['provider'])
             ->groupBy('provider')
@@ -80,13 +80,13 @@ class FleetSummaryCommand extends Command
                 'connected' => $flyConnected,
                 'edge_eligible_sites' => $edgeEligibleSites,
             ],
-            'edge_fleet' => [
-                'total' => $edgeSites->count(),
-                'by_backend' => $edgeByBackend,
-                'by_status' => $edgeByStatus,
-                'by_mode' => $edgeByMode,
-                'previews' => $edgePreviewCount,
-                'backend_credentials' => $edgeBackendCredentials,
+            'cloud_fleet' => [
+                'total' => $cloudSites->count(),
+                'by_backend' => $cloudByBackend,
+                'by_status' => $cloudByStatus,
+                'by_mode' => $cloudByMode,
+                'previews' => $cloudPreviewCount,
+                'backend_credentials' => $cloudBackendCredentials,
             ],
         ];
 
@@ -140,24 +140,24 @@ class FleetSummaryCommand extends Command
             $this->line('<fg=gray>  Connect: dply:list-engines | docs: https://fly.io/docs/about/pricing</>');
         }
 
-        if ($edgeSites->isNotEmpty()) {
+        if ($cloudSites->isNotEmpty()) {
             $this->newLine();
-            $this->line('<fg=cyan>Dply edge</>');
+            $this->line('<fg=cyan>Dply cloud</>');
             $this->line(sprintf(
-                '  %d edge container site(s)%s',
-                $edgeSites->count(),
-                $edgePreviewCount > 0 ? sprintf(' (%d preview deploy(s))', $edgePreviewCount) : '',
+                '  %d cloud container site(s)%s',
+                $cloudSites->count(),
+                $cloudPreviewCount > 0 ? sprintf(' (%d preview deploy(s))', $cloudPreviewCount) : '',
             ));
-            if ($edgeByMode !== []) {
+            if ($cloudByMode !== []) {
                 $this->table(['mode', 'count'], array_map(
-                    fn ($mode) => [$mode, (string) $edgeByMode[$mode]],
-                    array_keys($edgeByMode),
+                    fn ($mode) => [$mode, (string) $cloudByMode[$mode]],
+                    array_keys($cloudByMode),
                 ));
             }
-            if ($edgeByBackend !== []) {
+            if ($cloudByBackend !== []) {
                 $this->table(['backend', 'count'], array_map(
-                    fn ($backend) => [$backend, (string) $edgeByBackend[$backend]],
-                    array_keys($edgeByBackend),
+                    fn ($backend) => [$backend, (string) $cloudByBackend[$backend]],
+                    array_keys($cloudByBackend),
                 ));
             }
             $statusOrder = [
@@ -167,8 +167,8 @@ class FleetSummaryCommand extends Command
             ];
             $statusRows = [];
             foreach ($statusOrder as $status) {
-                if (isset($edgeByStatus[$status])) {
-                    $statusRows[] = [$status, (string) $edgeByStatus[$status]];
+                if (isset($cloudByStatus[$status])) {
+                    $statusRows[] = [$status, (string) $cloudByStatus[$status]];
                 }
             }
             if ($statusRows !== []) {

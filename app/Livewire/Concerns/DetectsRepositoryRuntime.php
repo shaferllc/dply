@@ -14,7 +14,7 @@ use Throwable;
 /**
  * Shared URL-first runtime detection for the create flows.
  *
- * The VM site, Edge container, and serverless function create forms all want
+ * The VM site, Cloud container, and serverless function create forms all want
  * the same "paste a repo, see what dply detected" affordance. This concern
  * carries the detection state + the two detector entry points + the panel's
  * input shape so each flow renders an identical detection panel instead of
@@ -23,7 +23,7 @@ use Throwable;
  * Two detector backends feed one panel:
  *
  *   - {@see runDetection} — the general {@see RepositoryRuntimePreview}
- *     (dply.yaml manifest + runtime-detection engine). Used by VM + Edge.
+ *     (dply.yaml manifest + runtime-detection engine). Used by VM + Cloud.
  *   - {@see runServerlessDetection} — the serverless {@see ServerlessRuntimeDetector}
  *     (framework vs. raw-action). Used by serverless create + the VM
  *     functions-host path.
@@ -162,7 +162,7 @@ trait DetectsRepositoryRuntime
 
     /**
      * Reconstruct a clone URL from either `owner/name` shorthand (what the
-     * Edge + serverless forms store) or a full URL. Empty input passes
+     * Cloud + serverless forms store) or a full URL. Empty input passes
      * through so callers can short-circuit.
      */
     public function normalizeToCloneUrl(string $repo): string

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\SiteType;
-use App\Jobs\RedeployEdgeSiteJob;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Jobs\RedeployCloudSiteJob;
+use App\Jobs\TeardownCloudSiteJob;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Models\Organization;
 use App\Models\Server;
@@ -28,7 +28,7 @@ class ContainerSiteDashboardTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));
 
         $response->assertOk()
-            ->assertSee('Dply edge')
+            ->assertSee('Dply cloud')
             ->assertSee('Container deployment')
             ->assertSee('DigitalOcean App Platform')
             ->assertSee('ghcr.io/acme/api:v1');
@@ -79,7 +79,7 @@ class ContainerSiteDashboardTest extends TestCase
             ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
             ->call('redeployContainer');
 
-        Queue::assertPushed(RedeployEdgeSiteJob::class, function (RedeployEdgeSiteJob $job) use ($site): bool {
+        Queue::assertPushed(RedeployCloudSiteJob::class, function (RedeployCloudSiteJob $job) use ($site): bool {
             return $job->siteId === $site->id && $job->newImage === null;
         });
     }
@@ -94,7 +94,7 @@ class ContainerSiteDashboardTest extends TestCase
             ->set('container_image_input', 'ghcr.io/acme/api:v2')
             ->call('redeployContainer');
 
-        Queue::assertPushed(RedeployEdgeSiteJob::class, function (RedeployEdgeSiteJob $job) use ($site): bool {
+        Queue::assertPushed(RedeployCloudSiteJob::class, function (RedeployCloudSiteJob $job) use ($site): bool {
             return $job->siteId === $site->id && $job->newImage === 'ghcr.io/acme/api:v2';
         });
     }
@@ -108,7 +108,7 @@ class ContainerSiteDashboardTest extends TestCase
             ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
             ->call('tearDownContainer');
 
-        Queue::assertPushed(TeardownEdgeSiteJob::class);
+        Queue::assertPushed(TeardownCloudSiteJob::class);
     }
 
     public function test_panel_does_not_render_for_non_container_site(): void
@@ -188,7 +188,7 @@ class ContainerSiteDashboardTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         $site = Site::factory()->create([
             'server_id' => $server->id,

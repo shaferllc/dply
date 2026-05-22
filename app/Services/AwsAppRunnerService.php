@@ -8,7 +8,7 @@ use App\Models\ProviderCredential;
 use Aws\AppRunner\AppRunnerClient;
 
 /**
- * Thin wrapper around AWS App Runner. Used by the dply edge layer
+ * Thin wrapper around AWS App Runner. Used by the dply cloud layer
  * to provision/redeploy/teardown container apps on AWS.
  *
  * Why App Runner over ECS Fargate or Lightsail Containers:

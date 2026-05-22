@@ -32,19 +32,19 @@ class Create extends Component
                 'icon' => 'cube',
             ],
             [
-                'id' => 'edge',
-                'title' => __('Edge'),
-                'description' => __('Deploy a container image straight onto the dply edge platform — DO App Platform or AWS App Runner.'),
-                'enabled' => true,
-                'href' => route('edge.create'),
-                'icon' => 'globe-alt',
-            ],
-            [
                 'id' => 'cloud',
                 'title' => __('Cloud'),
+                'description' => __('Deploy a container image straight onto the dply Cloud platform — DO App Platform or AWS App Runner.'),
+                'enabled' => true,
+                'href' => route('cloud.create'),
+                'icon' => 'cloud',
+            ],
+            [
+                'id' => 'cloud-network',
+                'title' => __('Cloud Network'),
                 'description' => __('Start managed cloud network deploys from a network-aware setup flow.'),
                 'enabled' => false,
-                'icon' => 'cloud',
+                'icon' => 'globe-alt',
             ],
             [
                 'id' => 'serverless',

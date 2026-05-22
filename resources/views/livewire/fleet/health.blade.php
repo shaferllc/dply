@@ -125,22 +125,22 @@
         </section>
     @endif
 
-    @if ($edgeFleet)
+    @if ($cloudFleet)
         <section class="mt-8 rounded-2xl border border-sky-200 bg-sky-50/40 p-5 shadow-sm">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Dply edge') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Dply cloud') }}</p>
                     <h2 class="mt-1 text-lg font-semibold text-slate-900">
-                        {{ trans_choice('{1} 1 edge container site|[2,*] :count edge container sites', $edgeFleet['total'], ['count' => $edgeFleet['total']]) }}
+                        {{ trans_choice('{1} 1 cloud container site|[2,*] :count cloud container sites', $cloudFleet['total'], ['count' => $cloudFleet['total']]) }}
                     </h2>
                 </div>
-                <a href="{{ route('edge.index') }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
-                    {{ __('Open /edge') }} →
+                <a href="{{ route('cloud.index') }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
+                    {{ __('Open /cloud') }} →
                 </a>
             </div>
 
             <dl class="mt-4 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                @foreach ($edgeFleet['by_backend'] as $backend => $count)
+                @foreach ($cloudFleet['by_backend'] as $backend => $count)
                     <div class="rounded-xl border border-slate-200 bg-white p-3">
                         <dt class="font-semibold uppercase tracking-[0.14em] text-slate-500">
                             {{ $backend === 'digitalocean_app_platform' ? 'DO App Platform' : ($backend === 'aws_app_runner' ? 'AWS App Runner' : $backend) }}
@@ -149,7 +149,7 @@
                     </div>
                 @endforeach
                 @php
-                    $byStatus = $edgeFleet['by_status'];
+                    $byStatus = $cloudFleet['by_status'];
                     $activeCount = $byStatus[\App\Models\Site::STATUS_CONTAINER_ACTIVE] ?? 0;
                     $provisioningCount = $byStatus[\App\Models\Site::STATUS_CONTAINER_PROVISIONING] ?? 0;
                     $failedCount = $byStatus[\App\Models\Site::STATUS_CONTAINER_FAILED] ?? 0;
@@ -165,9 +165,9 @@
             </dl>
 
             @php
-                $sourceCount = $edgeFleet['by_mode']['source'] ?? 0;
-                $imageCount = $edgeFleet['by_mode']['image'] ?? 0;
-                $previewCount = $edgeFleet['previews'] ?? 0;
+                $sourceCount = $cloudFleet['by_mode']['source'] ?? 0;
+                $imageCount = $cloudFleet['by_mode']['image'] ?? 0;
+                $previewCount = $cloudFleet['previews'] ?? 0;
             @endphp
             @if ($sourceCount > 0 || $previewCount > 0)
                 <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
@@ -192,13 +192,13 @@
                 </div>
             @endif
 
-            @if ($edgeFleet['failed_sites'] !== [])
+            @if ($cloudFleet['failed_sites'] !== [])
                 <div class="mt-4 rounded-xl border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-900">
                     <p class="font-semibold">
-                        {{ trans_choice('{1} 1 edge site failed|[2,*] :count edge sites failed', $failedCount, ['count' => $failedCount]) }}
+                        {{ trans_choice('{1} 1 cloud site failed|[2,*] :count cloud sites failed', $failedCount, ['count' => $failedCount]) }}
                     </p>
                     <ul class="mt-1 space-y-0.5">
-                        @foreach ($edgeFleet['failed_sites'] as $row)
+                        @foreach ($cloudFleet['failed_sites'] as $row)
                             <li>
                                 <span class="font-medium">{{ $row['name'] }}</span>
                                 @if ($row['container_image'])
@@ -214,13 +214,13 @@
         <section class="mt-8 rounded-2xl border border-sky-200 bg-sky-50/60 p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <p class="text-sm font-semibold text-sky-900">{{ __('Deploy a container app on dply edge') }}</p>
+                    <p class="text-sm font-semibold text-sky-900">{{ __('Deploy a container app on dply cloud') }}</p>
                     <p class="mt-1 text-xs text-sky-800">
-                        {{ __('Run any container image globally on dply edge — managed HTTPS, auto-scaling, and one-click rollback. Backed by DigitalOcean App Platform or AWS App Runner.') }}
+                        {{ __('Run any container image globally on dply cloud — managed HTTPS, auto-scaling, and one-click rollback. Backed by DigitalOcean App Platform or AWS App Runner.') }}
                     </p>
                 </div>
-                <a href="{{ route('edge.create') }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
-                    {{ __('Deploy to dply edge') }} →
+                <a href="{{ route('cloud.create') }}" wire:navigate class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">
+                    {{ __('Deploy to dply cloud') }} →
                 </a>
             </div>
         </section>

@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Jobs\AttachEdgeDomainJob;
-use App\Jobs\DetachEdgeDomainJob;
-use App\Jobs\RedeployEdgeSiteJob;
-use App\Jobs\TeardownEdgeSiteJob;
+use App\Actions\Cloud\CreateCloudWorker;
+use App\Jobs\AttachCloudDatabaseJob;
+use App\Jobs\AttachCloudDomainJob;
+use App\Jobs\DetachCloudDomainJob;
+use App\Jobs\RedeployCloudSiteJob;
+use App\Jobs\SyncCloudWorkersJob;
+use App\Jobs\TeardownCloudSiteJob;
+use App\Models\CloudDatabase;
+use App\Models\CloudWorker;
 use App\Models\Site;
-use App\Services\Edge\EdgeRouter;
+use App\Services\Cloud\CloudRouter;
 
 /**
  * Methods bolted onto Sites\Settings (and any future container
- * dashboard surfaces) for triggering edge actions on a container
+ * dashboard surfaces) for triggering cloud actions on a container
  * site. Lives in its own trait so the giant Settings.php class
  * stays focused on its existing PHP/Laravel/Node responsibilities.
  *
@@ -29,9 +34,19 @@ trait ManagesContainerSite
 
     public string $container_build_env_file_input = '';
 
+    /** Selected managed database id in the "attach a database" picker. */
+    public string $container_database_attach_id = '';
+
+    /** Add-worker form inputs (the dashboard Workers section). */
+    public string $container_worker_command_input = '';
+
+    public string $container_worker_size_input = 'small';
+
+    public int $container_worker_count_input = 1;
+
     /**
      * Populated by fetchContainerLogs(); shape matches
-     * EdgeBackend::latestDeploymentLogs return: { content?, url?, message? }.
+     * CloudBackend::latestDeploymentLogs return: { content?, url?, message? }.
      *
      * @var array<string, ?string>|null
      */
@@ -79,8 +94,8 @@ trait ManagesContainerSite
             'meta' => $meta,
         ]);
 
-        $backend = EdgeRouter::backendFor($this->site->fresh());
-        $credential = EdgeRouter::credentialFor($this->site->fresh());
+        $backend = CloudRouter::backendFor($this->site->fresh());
+        $credential = CloudRouter::credentialFor($this->site->fresh());
         if ($backend !== null && $credential !== null) {
             try {
                 $backend->updateEnvVars($this->site->fresh(), $credential);
@@ -93,7 +108,7 @@ trait ManagesContainerSite
             }
         }
 
-        RedeployEdgeSiteJob::dispatch($this->site->id);
+        RedeployCloudSiteJob::dispatch($this->site->id);
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Env vars saved and redeploy queued. The backend will pick up the new values on the next roll.'));
@@ -110,7 +125,7 @@ trait ManagesContainerSite
         $newImage = trim($this->container_image_input);
         $changed = $newImage !== '' && $newImage !== (string) $this->site->container_image;
 
-        RedeployEdgeSiteJob::dispatch($this->site->id, $changed ? $newImage : null);
+        RedeployCloudSiteJob::dispatch($this->site->id, $changed ? $newImage : null);
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess($changed
@@ -126,7 +141,7 @@ trait ManagesContainerSite
         }
         $this->authorize('delete', $this->site);
 
-        TeardownEdgeSiteJob::dispatch($this->site->id);
+        TeardownCloudSiteJob::dispatch($this->site->id);
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Tear-down queued. The container will be deleted on the backend shortly.'));
@@ -156,7 +171,7 @@ trait ManagesContainerSite
             return;
         }
 
-        TeardownEdgeSiteJob::dispatch($preview->id);
+        TeardownCloudSiteJob::dispatch($preview->id);
 
         if (method_exists($this, 'toastSuccess')) {
             $branch = (string) ($preview->meta['container']['preview_branch'] ?? '');
@@ -182,7 +197,7 @@ trait ManagesContainerSite
             return;
         }
 
-        AttachEdgeDomainJob::dispatch($this->site->id, $hostname);
+        AttachCloudDomainJob::dispatch($this->site->id, $hostname);
         $this->container_domain_input = '';
 
         if (method_exists($this, 'toastSuccess')) {
@@ -197,7 +212,7 @@ trait ManagesContainerSite
         }
         $this->authorize('update', $this->site);
 
-        DetachEdgeDomainJob::dispatch($this->site->id, $hostname);
+        DetachCloudDomainJob::dispatch($this->site->id, $hostname);
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Domain detach queued.'));
@@ -211,8 +226,8 @@ trait ManagesContainerSite
         }
         $this->authorize('view', $this->site);
 
-        $backend = EdgeRouter::backendFor($this->site);
-        $credential = EdgeRouter::credentialFor($this->site);
+        $backend = CloudRouter::backendFor($this->site);
+        $credential = CloudRouter::credentialFor($this->site);
         if ($backend === null || $credential === null) {
             $this->container_logs_result = [
                 'content' => null,
@@ -241,8 +256,8 @@ trait ManagesContainerSite
         }
         $this->authorize('view', $this->site);
 
-        $backend = EdgeRouter::backendFor($this->site);
-        $credential = EdgeRouter::credentialFor($this->site);
+        $backend = CloudRouter::backendFor($this->site);
+        $credential = CloudRouter::credentialFor($this->site);
         if ($backend === null || $credential === null) {
             $this->container_deployments_result = [];
 
@@ -275,11 +290,233 @@ trait ManagesContainerSite
             return;
         }
 
-        RedeployEdgeSiteJob::dispatch($this->site->id, $image);
+        RedeployCloudSiteJob::dispatch($this->site->id, $image);
         $this->container_image_input = $image;
 
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Rollback to :image queued.', ['image' => $image]));
+        }
+    }
+
+    /**
+     * Attach the managed database currently picked in
+     * $container_database_attach_id to this site. The job merges the
+     * connection env vars into the site's env file and redeploys.
+     */
+    public function attachContainerDatabase(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $databaseId = trim($this->container_database_attach_id);
+        if ($databaseId === '') {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Pick a database to attach.'));
+            }
+
+            return;
+        }
+
+        $database = CloudDatabase::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('status', CloudDatabase::STATUS_ACTIVE)
+            ->find($databaseId);
+        if ($database === null) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Database not found, not active, or not in this organization.'));
+            }
+
+            return;
+        }
+
+        AttachCloudDatabaseJob::dispatch($database->id, $this->site->id);
+        $this->container_database_attach_id = '';
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Database attach queued. The connection env vars will be injected and the app redeployed.'));
+        }
+    }
+
+    /**
+     * Detach a managed database from this site. The job strips the
+     * connection env keys it added and redeploys.
+     */
+    public function detachContainerDatabase(string $databaseId): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $database = CloudDatabase::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->find($databaseId);
+        if ($database === null) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Database not found or not in this organization.'));
+            }
+
+            return;
+        }
+
+        AttachCloudDatabaseJob::dispatch($database->id, $this->site->id, detach: true);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Database detach queued. The connection env vars will be removed and the app redeployed.'));
+        }
+    }
+
+    /**
+     * Whether the site's container backend can run background workers.
+     * App Runner cannot — the dashboard renders a disabled state for it.
+     */
+    public function containerSupportsWorkers(): bool
+    {
+        $backend = CloudRouter::backendFor($this->site);
+
+        return $backend !== null && $backend->supportsWorkers();
+    }
+
+    /**
+     * Add a queue worker to this site using the add-worker form inputs.
+     * Creates a CloudWorker row and queues SyncCloudWorkersJob.
+     */
+    public function addContainerWorker(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        try {
+            (new CreateCloudWorker)->handle($this->site, [
+                'type' => CloudWorker::TYPE_WORKER,
+                'command' => trim($this->container_worker_command_input),
+                'size' => $this->container_worker_size_input,
+                'instance_count' => $this->container_worker_count_input,
+            ]);
+        } catch (\Throwable $e) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError($e->getMessage());
+            }
+
+            return;
+        }
+
+        $this->container_worker_command_input = '';
+        $this->container_worker_size_input = 'small';
+        $this->container_worker_count_input = 1;
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Worker added. The backend spec is being updated and a fresh roll queued.'));
+        }
+    }
+
+    /**
+     * Enable the Laravel scheduler — creates a scheduler-type
+     * CloudWorker (one instance running `php artisan schedule:work`).
+     */
+    public function enableContainerScheduler(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        try {
+            (new CreateCloudWorker)->handle($this->site, [
+                'type' => CloudWorker::TYPE_SCHEDULER,
+            ]);
+        } catch (\Throwable $e) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError($e->getMessage());
+            }
+
+            return;
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Scheduler enabled. The backend spec is being updated and a fresh roll queued.'));
+        }
+    }
+
+    /** Disable the scheduler — removes the scheduler-type CloudWorker. */
+    public function disableContainerScheduler(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $scheduler = CloudWorker::query()
+            ->where('site_id', $this->site->id)
+            ->where('type', CloudWorker::TYPE_SCHEDULER)
+            ->first();
+        if ($scheduler === null) {
+            return;
+        }
+
+        $scheduler->delete();
+        SyncCloudWorkersJob::dispatch($this->site->id);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Scheduler disabled. The backend will drop it on the next roll.'));
+        }
+    }
+
+    /** Scale a worker's instance count, then re-sync the backend spec. */
+    public function scaleContainerWorker(string $workerId, int $count): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $worker = CloudWorker::query()
+            ->where('site_id', $this->site->id)
+            ->find($workerId);
+        if ($worker === null) {
+            return;
+        }
+
+        if ($worker->isScheduler()) {
+            if (method_exists($this, 'toastWarning')) {
+                $this->toastWarning(__('The scheduler always runs a single instance.'));
+            }
+
+            return;
+        }
+
+        $worker->update(['instance_count' => max(1, $count)]);
+        SyncCloudWorkersJob::dispatch($this->site->id);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Worker scaled to :n instance(s). Re-sync queued.', ['n' => $worker->effectiveInstanceCount()]));
+        }
+    }
+
+    /** Remove a worker, then re-sync the backend spec without it. */
+    public function removeContainerWorker(string $workerId): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $worker = CloudWorker::query()
+            ->where('site_id', $this->site->id)
+            ->find($workerId);
+        if ($worker === null) {
+            return;
+        }
+
+        $worker->delete();
+        SyncCloudWorkersJob::dispatch($this->site->id);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Worker removed. The backend will drop the component on the next roll.'));
         }
     }
 }

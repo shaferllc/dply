@@ -9,7 +9,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Support\Edge\ContainerActivityTimeline;
+use App\Support\Cloud\ContainerActivityTimeline;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -108,7 +108,7 @@ class ContainerActivityTimelineTest extends TestCase
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         $site = Site::factory()->create([
             'server_id' => $server->id,

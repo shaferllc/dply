@@ -8,7 +8,7 @@
     // @feature directive below issues its own SELECT against `features`.
     if (auth()->check() && auth()->user()->currentOrganization()) {
         \Laravel\Pennant\Feature::loadMissing([
-            'surface.edge',
+            'surface.cloud',
             'surface.fleet',
             'surface.projects',
             'surface.status_pages',
@@ -168,12 +168,18 @@
                                         </x-slot>
                                         {{ __('Sites') }}
                                     </x-dropdown-link>
-                                    @feature('surface.edge')
-                                        <x-dropdown-link :href="route('edge.index')">
+                                    @feature('surface.cloud')
+                                        <x-dropdown-link :href="route('cloud.index')">
                                             <x-slot name="icon">
                                                 <x-heroicon-o-cube class="{{ $hi }}" />
                                             </x-slot>
-                                            {{ __('Edge sites') }}
+                                            {{ __('Cloud sites') }}
+                                        </x-dropdown-link>
+                                        <x-dropdown-link :href="route('cloud.databases.index')">
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-circle-stack class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Databases') }}
                                         </x-dropdown-link>
                                     @endfeature
                                     <x-dropdown-link :href="route('serverless.index')">

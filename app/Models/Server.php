@@ -47,7 +47,7 @@ class Server extends Model
 
     public const HOST_KIND_AWS_APP_RUNNER = 'aws_app_runner';
 
-    public const HOST_KIND_DPLY_EDGE = 'dply_edge';
+    public const HOST_KIND_DPLY_CLOUD = 'dply_cloud';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -353,7 +353,7 @@ class Server extends Model
             self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
             self::HOST_KIND_AWS_LAMBDA,
             self::HOST_KIND_AWS_APP_RUNNER,
-            self::HOST_KIND_DPLY_EDGE,
+            self::HOST_KIND_DPLY_CLOUD,
         ], true) ? $hostKind : self::HOST_KIND_VM;
     }
 
@@ -397,9 +397,9 @@ class Server extends Model
         return $this->hostKind() === self::HOST_KIND_AWS_APP_RUNNER;
     }
 
-    public function isDplyEdgeHost(): bool
+    public function isDplyCloudHost(): bool
     {
-        return $this->hostKind() === self::HOST_KIND_DPLY_EDGE;
+        return $this->hostKind() === self::HOST_KIND_DPLY_CLOUD;
     }
 
     public function isContainerHost(): bool
@@ -407,7 +407,7 @@ class Server extends Model
         return in_array($this->hostKind(), [
             self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
             self::HOST_KIND_AWS_APP_RUNNER,
-            self::HOST_KIND_DPLY_EDGE,
+            self::HOST_KIND_DPLY_CLOUD,
         ], true);
     }
 

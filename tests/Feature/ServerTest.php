@@ -219,13 +219,13 @@ class ServerTest extends TestCase
         // and the href now jumps straight to /servers/create with the docker
         // host_target preset instead of the retired launcher page.
         $response->assertSee('Run a container app');
-        $response->assertSee('Edge');
         $response->assertSee('Cloud');
+        $response->assertSee('Cloud Network');
         $response->assertSee('Serverless');
         $response->assertSee('Coming soon');
         $response->assertSee(route('servers.create'), false);
         $response->assertSee(route('servers.create', ['host_target' => 'docker']), false);
-        $response->assertSee(route('edge.create'), false);
+        $response->assertSee(route('cloud.create'), false);
         $response->assertDontSee(route('launches.serverless'), false);
         $response->assertDontSee(route('launches.cloud-network'), false);
     }

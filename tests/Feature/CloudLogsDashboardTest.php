@@ -1,0 +1,99 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature;
+
+use App\Enums\SiteType;
+use App\Livewire\Sites\Settings as SitesSettings;
+use App\Models\Organization;
+use App\Models\Server;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+/**
+ * Coverage for the dashboard "Fetch logs" button. The button calls
+ * fetchContainerLogs() on the ManagesContainerSite trait, which
+ * delegates to backend->latestDeploymentLogs and stores the result
+ * on container_logs_result. The view branches on which key is
+ * non-empty (url > content > message > placeholder).
+ */
+class CloudLogsDashboardTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Stay in fake-cloud so the backend is FakeCloudBackend (no
+        // HTTP fakes needed); test asserts on the inline content path.
+        config(['server_provision_fake.env_flag' => true]);
+    }
+
+    public function test_fetch_logs_populates_inline_content_via_fake_backend(): void
+    {
+        [$user, $server, $site] = $this->scaffoldSite();
+
+        Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->assertSet('container_logs_result', null)
+            ->call('fetchContainerLogs')
+            ->assertHasNoErrors();
+        // After the call, the property holds an array with a content key.
+        $component = Livewire::actingAs($user)
+            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+            ->call('fetchContainerLogs');
+        $set = $component->get('container_logs_result');
+        $this->assertIsArray($set);
+        $this->assertStringContainsString('fake-edge backend', (string) $set['content']);
+    }
+
+    public function test_button_is_present_on_dashboard(): void
+    {
+        [$user, $server, $site] = $this->scaffoldSite();
+
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site]));
+
+        $response->assertOk()
+            ->assertSee('Fetch logs')
+            ->assertSee('Latest deployment logs');
+    }
+
+    /**
+     * @return array{0: User, 1: Server, 2: Site}
+     */
+    private function scaffoldSite(): array
+    {
+        $user = User::factory()->create();
+        $org = Organization::factory()->create();
+        $org->users()->attach($user->id, ['role' => 'owner']);
+        session(['current_organization_id' => $org->id]);
+        $server = Server::factory()->ready()->create([
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
+        ]);
+        $site = Site::factory()->create([
+            'server_id' => $server->id,
+            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'name' => 'API service',
+            'slug' => 'api-service',
+            'type' => SiteType::Container,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'container_image' => 'nginx:1',
+            'container_port' => 80,
+            'container_backend' => 'digitalocean_app_platform',
+            'container_region' => 'nyc',
+            'container_backend_id' => null,
+            'status' => Site::STATUS_CONTAINER_ACTIVE,
+        ]);
+
+        return [$user, $server, $site];
+    }
+}

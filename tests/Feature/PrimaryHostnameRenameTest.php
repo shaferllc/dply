@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Jobs\AttachEdgeDomainJob;
-use App\Jobs\DetachEdgeDomainJob;
+use App\Jobs\AttachCloudDomainJob;
+use App\Jobs\DetachCloudDomainJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Livewire\Sites\Show as SitesShow;
 use App\Models\Organization;
@@ -147,8 +147,8 @@ class PrimaryHostnameRenameTest extends TestCase
         $this->assertSame('new.example.com', $site->fresh()->primaryDomain()->hostname);
         Queue::assertPushed(ApplySiteWebserverConfigJob::class);
         Queue::assertNotPushed(ExecuteSiteCertificateJob::class);
-        Queue::assertNotPushed(AttachEdgeDomainJob::class);
-        Queue::assertNotPushed(DetachEdgeDomainJob::class);
+        Queue::assertNotPushed(AttachCloudDomainJob::class);
+        Queue::assertNotPushed(DetachCloudDomainJob::class);
     }
 
     public function test_save_edited_primary_domain_opens_modal_when_cert_makes_rename_non_trivial(): void
@@ -176,8 +176,8 @@ class PrimaryHostnameRenameTest extends TestCase
         $this->assertSame('old.example.com', $site->fresh()->primaryDomain()->hostname);
         Queue::assertNotPushed(ApplySiteWebserverConfigJob::class);
         Queue::assertNotPushed(ExecuteSiteCertificateJob::class);
-        Queue::assertNotPushed(AttachEdgeDomainJob::class);
-        Queue::assertNotPushed(DetachEdgeDomainJob::class);
+        Queue::assertNotPushed(AttachCloudDomainJob::class);
+        Queue::assertNotPushed(DetachCloudDomainJob::class);
     }
 
     public function test_confirm_rename_with_cert_optin_queues_reissue_and_writes_audit(): void
@@ -242,8 +242,8 @@ class PrimaryHostnameRenameTest extends TestCase
             ->call('confirmPrimaryHostnameRename')
             ->assertSet('rename_plan', null);
 
-        Queue::assertPushed(DetachEdgeDomainJob::class, fn ($job) => $job->hostname === 'old.example.com');
-        Queue::assertPushed(AttachEdgeDomainJob::class, fn ($job) => $job->hostname === 'new.example.com');
+        Queue::assertPushed(DetachCloudDomainJob::class, fn ($job) => $job->hostname === 'old.example.com');
+        Queue::assertPushed(AttachCloudDomainJob::class, fn ($job) => $job->hostname === 'new.example.com');
     }
 
     public function test_cancel_rename_leaves_state_unchanged_and_clears_modal(): void
@@ -266,8 +266,8 @@ class PrimaryHostnameRenameTest extends TestCase
         $this->assertSame('old.example.com', $site->fresh()->primaryDomain()->hostname);
         Queue::assertNotPushed(ApplySiteWebserverConfigJob::class);
         Queue::assertNotPushed(ExecuteSiteCertificateJob::class);
-        Queue::assertNotPushed(AttachEdgeDomainJob::class);
-        Queue::assertNotPushed(DetachEdgeDomainJob::class);
+        Queue::assertNotPushed(AttachCloudDomainJob::class);
+        Queue::assertNotPushed(DetachCloudDomainJob::class);
     }
 
     public function test_editing_non_primary_domain_skips_rename_flow(): void

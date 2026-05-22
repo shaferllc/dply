@@ -57,7 +57,7 @@ class DplyAboutCommandTest extends TestCase
     public function test_fleet_counts_include_edge_breakdown(): void
     {
         $server = Server::factory()->create([
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         // 1 image-mode + 1 source-mode + 1 source-mode preview
         Site::factory()->create([

@@ -16,7 +16,7 @@ use InvalidArgumentException;
 
 /**
  * One-shot "Create a serverless app" — the FaaS counterpart to
- * {@see App\Actions\Edge\CreateEdgeSiteFromSource}.
+ * {@see App\Actions\Cloud\CreateCloudSiteFromSource}.
  *
  * Creates the host `Server` row (a DO Functions namespace — not a machine;
  * `host_kind = digitalocean_functions`) and the first function `Site` on it,

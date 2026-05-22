@@ -82,7 +82,7 @@ class ContainerSiteFieldsTest extends TestCase
         ]);
         $edge = Server::factory()->create([
             'user_id' => $user->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
         ]);
         $vm = Server::factory()->create(['user_id' => $user->id]);
 
@@ -90,7 +90,7 @@ class ContainerSiteFieldsTest extends TestCase
         $this->assertTrue($appPlatform->isContainerHost());
         $this->assertTrue($appRunner->isAwsAppRunnerHost());
         $this->assertTrue($appRunner->isContainerHost());
-        $this->assertTrue($edge->isDplyEdgeHost());
+        $this->assertTrue($edge->isDplyCloudHost());
         $this->assertTrue($edge->isContainerHost());
         $this->assertFalse($vm->isContainerHost());
     }

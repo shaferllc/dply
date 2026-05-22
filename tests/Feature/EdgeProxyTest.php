@@ -27,7 +27,7 @@ class EdgeProxyTest extends TestCase
     use RefreshDatabase;
     use WithFeatures;
 
-    protected array $features = ['surface.edge'];
+    protected array $features = ['surface.cloud'];
 
     private function makeUser(): User
     {

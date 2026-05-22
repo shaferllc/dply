@@ -16,7 +16,7 @@ use Throwable;
 
 /**
  * One-shot "Create a serverless app" flow — the FaaS counterpart to
- * Edge\Create. Collects a DO credential + region + repo + runtime, hands
+ * Cloud\Create. Collects a DO credential + region + repo + runtime, hands
  * off to {@see CreateServerlessFunction}, which stands up the host
  * namespace + first function and kicks a deploy.
  */

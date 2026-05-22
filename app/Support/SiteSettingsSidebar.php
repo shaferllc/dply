@@ -38,10 +38,10 @@ final class SiteSettingsSidebar
         // entirely for them so the heading doesn't render empty.
         $showBackgroundGroup = $supportsSsh && ! $isContainerWorkspace;
 
-        // Container / serverless workspaces run behind the dply edge — host
+        // Container / serverless workspaces run behind the dply cloud — host
         // webserver, system user, basic auth, certificates, and framework-
         // specific stack tabs (Laravel/Rails/WordPress) all belong either
-        // to the edge or to the operator's artifact, not this workspace.
+        // to the cloud or to the operator's artifact, not this workspace.
         // BACKGROUND (Schedule / Workers) sits between RUNTIME and OBSERVABILITY
         // so the page reads: configure → run → observe → destroy.
         //

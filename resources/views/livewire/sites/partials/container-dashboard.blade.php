@@ -25,7 +25,7 @@
 <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Dply edge') }}</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Dply cloud') }}</p>
             <h2 class="mt-1 text-lg font-semibold text-slate-900">{{ __('Container deployment') }}</h2>
             <p class="mt-1 text-sm text-slate-600">
                 @if ($isSourceMode)
@@ -193,13 +193,177 @@
         </div>
     </div>
 
+    @php
+        $attachedDatabases = \App\Models\CloudDatabase::query()
+            ->whereHas('sites', fn ($q) => $q->where('sites.id', $site->id))
+            ->orderBy('name')
+            ->get();
+        $attachedDatabaseIds = $attachedDatabases->pluck('id')->all();
+        $availableDatabases = \App\Models\CloudDatabase::query()
+            ->where('organization_id', $site->organization_id)
+            ->where('status', \App\Models\CloudDatabase::STATUS_ACTIVE)
+            ->whereNotIn('id', $attachedDatabaseIds)
+            ->orderBy('name')
+            ->get();
+        $dbEngineLabel = fn (string $engine): string => match ($engine) {
+            \App\Models\CloudDatabase::ENGINE_POSTGRES => 'Postgres',
+            \App\Models\CloudDatabase::ENGINE_MYSQL => 'MySQL',
+            \App\Models\CloudDatabase::ENGINE_REDIS => 'Redis',
+            default => ucfirst($engine),
+        };
+    @endphp
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Managed databases') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Attach a managed database and dply injects its connection env vars (DB_* / REDIS_*) and redeploys. Detaching strips exactly those keys.') }}</p>
+        </div>
+
+        @if ($attachedDatabases->isNotEmpty())
+            <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                @foreach ($attachedDatabases as $database)
+                    <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                        <div class="min-w-0">
+                            <span class="font-medium text-slate-900 break-all">{{ $database->name }}</span>
+                            <span class="ml-2 text-xs text-slate-500">{{ $dbEngineLabel($database->engine) }} {{ $database->version }} · {{ ucfirst((string) $database->size) }} · {{ $database->region }}</span>
+                        </div>
+                        <button type="button"
+                            wire:click="detachContainerDatabase('{{ $database->id }}')"
+                            wire:confirm="{{ __('Detach :name from this app? Its connection env vars will be removed and the app redeployed.', ['name' => $database->name]) }}"
+                            class="text-xs font-medium text-rose-700 hover:text-rose-900">
+                            {{ __('Detach') }}
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
+        @else
+            <p class="text-xs text-slate-500">{{ __('No managed databases attached yet.') }}</p>
+        @endif
+
+        @if ($availableDatabases->isNotEmpty())
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <select wire:model="container_database_attach_id" class="block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                    <option value="">{{ __('Select a database…') }}</option>
+                    @foreach ($availableDatabases as $database)
+                        <option value="{{ $database->id }}">{{ $database->name }} — {{ $dbEngineLabel($database->engine) }} {{ $database->version }}</option>
+                    @endforeach
+                </select>
+                <button type="button" wire:click="attachContainerDatabase" wire:loading.attr="disabled" wire:target="attachContainerDatabase" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
+                    <span wire:loading.remove wire:target="attachContainerDatabase">{{ __('Attach database') }}</span>
+                    <span wire:loading wire:target="attachContainerDatabase">{{ __('Queueing…') }}</span>
+                </button>
+            </div>
+        @else
+            <p class="text-xs text-slate-400">{{ __('No more active databases available to attach.') }}
+                <a href="{{ route('cloud.databases.create') }}" wire:navigate class="font-medium text-sky-700 hover:underline">{{ __('Create one') }} →</a>
+            </p>
+        @endif
+    </div>
+
+    @php
+        $supportsWorkers = $this->containerSupportsWorkers();
+        $siteWorkers = \App\Models\CloudWorker::query()
+            ->where('site_id', $site->id)
+            ->orderBy('type')
+            ->orderBy('created_at')
+            ->get();
+        $scheduler = $siteWorkers->firstWhere('type', \App\Models\CloudWorker::TYPE_SCHEDULER);
+        $queueWorkers = $siteWorkers->where('type', \App\Models\CloudWorker::TYPE_WORKER);
+        $workerStatusClass = fn (string $status): string => match ($status) {
+            \App\Models\CloudWorker::STATUS_ACTIVE => 'bg-emerald-100 text-emerald-800',
+            \App\Models\CloudWorker::STATUS_PROVISIONING => 'bg-sky-100 text-sky-800',
+            \App\Models\CloudWorker::STATUS_FAILED => 'bg-rose-100 text-rose-800',
+            default => 'bg-slate-100 text-slate-700',
+        };
+    @endphp
+    <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-3" wire:key="workers-section">
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Workers & scheduler') }}</p>
+            <p class="mt-1 text-xs text-slate-500">{{ __('Background processes that run alongside the web service — queue workers and the Laravel scheduler. They run the same code as the web process.') }}</p>
+        </div>
+
+        @if (! $supportsWorkers)
+            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <p class="font-semibold">{{ __('Not available on AWS App Runner') }}</p>
+                <p class="mt-1">{{ __('App Runner services are HTTP-request-driven only — they cannot run background processes. Use a DigitalOcean App Platform site for queue workers and the scheduler.') }}</p>
+            </div>
+        @else
+            @if ($siteWorkers->isNotEmpty())
+                <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                    @foreach ($siteWorkers as $worker)
+                        <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm" wire:key="worker-{{ $worker->id }}">
+                            <div class="min-w-0">
+                                <span class="font-medium text-slate-900 break-all">{{ $worker->name }}</span>
+                                <span class="ml-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">{{ $worker->type }}</span>
+                                <span class="ml-1 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $workerStatusClass($worker->status) }}">{{ $worker->status }}</span>
+                                <p class="mt-0.5 font-mono text-[11px] text-slate-500 break-all">{{ $worker->effectiveCommand() }} · ×{{ $worker->effectiveInstanceCount() }} · {{ ucfirst((string) $worker->size) }}</p>
+                            </div>
+                            <div class="flex shrink-0 items-center gap-2">
+                                @unless ($worker->isScheduler())
+                                    <button type="button" wire:click="scaleContainerWorker('{{ $worker->id }}', {{ $worker->effectiveInstanceCount() + 1 }})" class="rounded-md border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50">+</button>
+                                    <button type="button" wire:click="scaleContainerWorker('{{ $worker->id }}', {{ max(1, $worker->effectiveInstanceCount() - 1) }})" class="rounded-md border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-50">−</button>
+                                @endunless
+                                <button type="button"
+                                    wire:click="removeContainerWorker('{{ $worker->id }}')"
+                                    wire:confirm="{{ __('Remove :name? The backend will drop the component and redeploy.', ['name' => $worker->name]) }}"
+                                    class="text-xs font-medium text-rose-700 hover:text-rose-900">
+                                    {{ __('Remove') }}
+                                </button>
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            @else
+                <p class="text-xs text-slate-500">{{ __('No workers configured yet.') }}</p>
+            @endif
+
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Add a queue worker') }}</p>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                    <input type="text" wire:model="container_worker_command_input" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" placeholder="php artisan queue:work" />
+                    <select wire:model="container_worker_size_input" class="rounded-md border-slate-300 text-xs shadow-sm">
+                        <option value="small">{{ __('Small') }}</option>
+                        <option value="medium">{{ __('Medium') }}</option>
+                        <option value="large">{{ __('Large') }}</option>
+                        <option value="xlarge">{{ __('XLarge') }}</option>
+                    </select>
+                    <input type="number" min="1" wire:model="container_worker_count_input" class="w-20 rounded-md border-slate-300 text-xs shadow-sm" />
+                    <button type="button" wire:click="addContainerWorker" wire:loading.attr="disabled" wire:target="addContainerWorker" class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50">
+                        <span wire:loading.remove wire:target="addContainerWorker">{{ __('Add worker') }}</span>
+                        <span wire:loading wire:target="addContainerWorker">{{ __('Queueing…') }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Laravel scheduler') }}</p>
+                    <p class="mt-0.5 text-xs text-slate-500">
+                        @if ($scheduler)
+                            {{ __('Enabled — running `php artisan schedule:work` on one instance.') }}
+                        @else
+                            {{ __('Disabled. Enable to run scheduled tasks (App Platform has no native cron).') }}
+                        @endif
+                    </p>
+                </div>
+                @if ($scheduler)
+                    <button type="button" wire:click="disableContainerScheduler" wire:confirm="{{ __('Disable the scheduler? Scheduled tasks will stop running.') }}" class="text-xs font-medium text-rose-700 hover:text-rose-900">{{ __('Disable scheduler') }}</button>
+                @else
+                    <button type="button" wire:click="enableContainerScheduler" wire:loading.attr="disabled" wire:target="enableContainerScheduler" class="inline-flex items-center justify-center rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-sky-800 disabled:opacity-50">
+                        <span wire:loading.remove wire:target="enableContainerScheduler">{{ __('Enable scheduler') }}</span>
+                        <span wire:loading wire:target="enableContainerScheduler">{{ __('Queueing…') }}</span>
+                    </button>
+                @endif
+            </div>
+        @endif
+    </div>
+
     @if ($isSourceMode && empty($containerMeta['preview_parent_site_id']))
         <div class="rounded-xl border border-slate-200 bg-white p-4">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('GitHub webhook') }}</p>
             <p class="mt-1 text-xs text-slate-500">{{ __('Paste this URL + the site\'s webhook secret into your repository\'s GitHub webhook settings. dply will spawn previews on PR open / sync, tear them down on PR close, and redeploy on push to the source branch.') }}</p>
             <div class="mt-3 grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center">
                 <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Payload URL') }}</span>
-                <input type="text" readonly value="{{ $site->edgeGithubHookUrl() }}" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" onclick="this.select()" />
+                <input type="text" readonly value="{{ $site->cloudGithubHookUrl() }}" class="block w-full rounded-md border-slate-300 font-mono text-xs shadow-sm" onclick="this.select()" />
                 <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Content type') }}</span>
                 <code class="rounded bg-slate-100 px-2 py-1 text-xs">application/json</code>
                 <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Secret') }}</span>
@@ -210,7 +374,7 @@
         </div>
 
         @php
-            $previews = \App\Actions\Edge\CreateEdgePreviewSite::listForParent($site);
+            $previews = \App\Actions\Cloud\CreateCloudPreviewSite::listForParent($site);
         @endphp
         @if ($previews->isNotEmpty())
             <div class="rounded-xl border border-slate-200 bg-white p-4">
@@ -340,7 +504,7 @@
     </div>
 
     @php
-        $activity = \App\Support\Edge\ContainerActivityTimeline::for($site);
+        $activity = \App\Support\Cloud\ContainerActivityTimeline::for($site);
     @endphp
     @if ($activity !== [])
         <div class="rounded-xl border border-slate-200 bg-white p-4">
@@ -415,7 +579,7 @@
     <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Deploy webhook') }}</p>
         <p class="text-xs text-slate-500">{{ __('POST to this URL from your CI to redeploy. Optional JSON body { "image": "ghcr.io/me/api:v2" } bumps the tag.') }}</p>
-        <input type="text" readonly value="{{ $site->edgeRedeployHookUrl() }}" class="block w-full select-all rounded-md border-slate-300 bg-slate-50 font-mono text-xs text-slate-800 shadow-sm" onclick="this.select()" />
+        <input type="text" readonly value="{{ $site->cloudRedeployHookUrl() }}" class="block w-full select-all rounded-md border-slate-300 bg-slate-50 font-mono text-xs text-slate-800 shadow-sm" onclick="this.select()" />
     </div>
 
     <div class="flex justify-end border-t border-slate-200 pt-4">

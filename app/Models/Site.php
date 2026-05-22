@@ -1157,7 +1157,7 @@ class Site extends Model
             || in_array($this->container_backend, [
                 'digitalocean_app_platform',
                 'aws_app_runner',
-                'dply_edge',
+                'dply_cloud',
             ], true);
     }
 
@@ -2183,17 +2183,17 @@ class Site extends Model
     }
 
     /**
-     * Signed URL CI can POST to for redeploying an edge container
+     * Signed URL CI can POST to for redeploying a cloud container
      * site. The signature uses Laravel's signed-route mechanism
      * keyed on APP_KEY — no expiry (CI scripts shouldn't have to
      * refresh the URL on a schedule). Operators can rotate by
      * regenerating webhook_secret on the site, which invalidates
      * the URL via that field's inclusion in the signature.
      */
-    public function edgeRedeployHookUrl(): string
+    public function cloudRedeployHookUrl(): string
     {
         return URL::signedRoute(
-            'hooks.edge.redeploy',
+            'hooks.cloud.redeploy',
             ['site' => $this->id, 's' => substr((string) $this->webhook_secret, 0, 8)],
         );
     }
@@ -2204,9 +2204,9 @@ class Site extends Model
      * shared HMAC-SHA256 signing secret operators paste alongside.
      * No URL signing here: GitHub signs the body, not the URL.
      */
-    public function edgeGithubHookUrl(): string
+    public function cloudGithubHookUrl(): string
     {
-        return route('hooks.edge.github', ['site' => $this->id]);
+        return route('hooks.cloud.github', ['site' => $this->id]);
     }
 
     /**

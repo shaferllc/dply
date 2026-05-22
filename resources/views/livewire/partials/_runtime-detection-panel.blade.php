@@ -3,7 +3,7 @@
 
     Keyed entirely off the $detectedPlan array populated by the
     DetectsRepositoryRuntime concern. Rendered identically by the VM site,
-    Edge container, and serverless function create flows.
+    Cloud container, and serverless function create flows.
 
     Optional include data:
       - $detectionInstallable (bool) — render the VM-only "install runtime on
