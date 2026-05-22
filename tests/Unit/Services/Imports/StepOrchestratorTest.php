@@ -136,7 +136,7 @@ function seedMigration(): ImportServerMigration
 }
 final class InlineSucceedingHandler implements StepHandler
 {
-    function key(): string
+    static function key(): string
     {
         return 'freeze_snapshot';
     }
@@ -147,7 +147,7 @@ final class InlineSucceedingHandler implements StepHandler
 }
 final class InlineThrowingHandler implements StepHandler
 {
-    function key(): string
+    static function key(): string
     {
         return 'freeze_snapshot';
     }

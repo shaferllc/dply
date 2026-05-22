@@ -180,7 +180,7 @@ test('notification event supports email for import keys', function () {
 });
 final class NoOpHandler implements StepHandler
 {
-    function key(): string
+    static function key(): string
     {
         return 'freeze_snapshot';
     }
