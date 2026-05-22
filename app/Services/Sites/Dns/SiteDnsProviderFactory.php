@@ -5,6 +5,7 @@ namespace App\Services\Sites\Dns;
 use App\Models\ProviderCredential;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\DigitalOceanService;
+use App\Services\Route53Service;
 
 final class SiteDnsProviderFactory
 {
@@ -13,8 +14,9 @@ final class SiteDnsProviderFactory
         return match ($credential->provider) {
             'digitalocean' => new DigitalOceanDnsProvider(new DigitalOceanService($credential)),
             'cloudflare' => new CloudflareDnsProvider(new CloudflareDnsService($credential)),
+            'aws' => new Route53DnsProvider(new Route53Service($credential)),
             default => throw new \RuntimeException(
-                __('DNS automation is not available for this provider yet. Choose DigitalOcean or Cloudflare.')
+                __('DNS automation is not available for this provider yet. Choose DigitalOcean, Cloudflare, or AWS (Route53).')
             ),
         };
     }

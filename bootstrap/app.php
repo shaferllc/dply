@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckSupervisorHealthCommand;
+use App\Console\Commands\EdgePollStatusCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
@@ -11,9 +12,11 @@ use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
+use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
+use App\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
@@ -22,14 +25,18 @@ use App\Jobs\CheckSiteUrlHealthJob;
 use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteInsightsJob;
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
+use App\Jobs\ScanServerSshLoginsJob;
 use App\Jobs\SyncServerSystemdServicesJob;
+use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
+use App\Services\Servers\ServerMetricsGuestScript;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -73,15 +80,43 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
         })->everyFiveMinutes();
 
+        // SSH login notifications. Dispatches a per-server scan job only for
+        // servers that actually have a `server.ssh_login` subscriber — there's
+        // no point paying the SSH cost when nothing is listening. The job
+        // diffs `last -F` against meta.ssh_login_last_seen_at and publishes
+        // a NotificationEvent per new entry.
+        $schedule->call(function (): void {
+            ScanServerSshLoginsJob::eligibleServers()
+                ->each(fn (Server $server) => ScanServerSshLoginsJob::dispatch((string) $server->id));
+        })->everyFiveMinutes();
+
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
 
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
 
+        // Sweep edge sites for backend status updates. Runs every
+        // minute so an active deploy reaches "active" within ~60s
+        // of the backend reporting ready.
+        $schedule->command(EdgePollStatusCommand::class)->everyMinute();
+
+        // Drive the Laravel scheduler + queue worker on serverless functions
+        // — DigitalOcean Functions has no long-running process of its own.
+        $schedule->command(\App\Console\Commands\ServerlessTickCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        $schedule->command(\App\Console\Commands\SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
+
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        $schedule->command(\App\Console\Commands\PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
+        // Q17 trust-window enforcement: revoke ephemeral SSH keys for migrations
+        // paused beyond 168h. Hourly cadence so the trust window doesn't quietly
+        // extend during scheduler downtime.
+        $schedule->command(\App\Console\Commands\ExpirePausedImportMigrationsCommand::class)->hourly();
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()
@@ -131,6 +166,35 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(FlushServerSystemdNotificationDigestCommand::class)
             ->hourlyAt(12)
             ->when(fn (): bool => (bool) config('server_services.systemd_digest_flush_enabled', true));
+
+        // Sweep ready servers and push the bundled metrics script when
+        // its SHA differs from what's recorded as deployed. Job is
+        // ShouldBeUnique on serverId, so a slow droplet won't pile up
+        // duplicate upgrade attempts. The job itself re-checks the
+        // bundled SHA at runtime so a queue backlog can't push a stale
+        // script. Hourly cadence is the cheapest "new release reaches
+        // every droplet within an hour" without making this the
+        // queue's primary tenant.
+        $schedule->call(function (): void {
+            if (! (bool) config('server_metrics.guest_script.scheduled_upgrades_enabled', true)) {
+                return;
+            }
+            $bundledSha = app(ServerMetricsGuestScript::class)->bundledSha256();
+            if ($bundledSha === '') {
+                return;
+            }
+            Server::query()
+                ->where('status', Server::STATUS_READY)
+                ->whereNotNull('ip_address')
+                ->whereNotNull('ssh_private_key')
+                ->each(function (Server $server) use ($bundledSha): void {
+                    $deployedSha = (string) ($server->meta['monitoring_guest_script_sha'] ?? $server->meta['monitoring_guest_script_sha256'] ?? '');
+                    if ($deployedSha === $bundledSha) {
+                        return;
+                    }
+                    UpgradeGuestMetricsScriptJob::dispatch($server->id, $bundledSha);
+                });
+        })->hourly();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));
@@ -148,14 +212,24 @@ return Application::configure(basePath: dirname(__DIR__))
             'fleet.operator' => ValidateFleetOperatorToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
+            'feature' => EnsureFeaturesAreActive::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',
             'webhook/*',
             'webauthn/*',
+            'fn/*',
+        ]);
+
+        // Custom-domain short-circuit MUST run before the normal web stack
+        // so a request to `api.acme.com/` doesn't fall through to the
+        // marketing welcome view (which has no host constraint on /).
+        $middleware->prependToGroup('web', [
+            ResolveServerlessCustomDomain::class,
         ]);
 
         $middleware->appendToGroup('web', [
+            EnforceMaintenanceMode::class,
             CaptureReferralCode::class,
             RedirectGuestsToComingSoon::class,
         ]);

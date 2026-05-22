@@ -50,6 +50,13 @@ return [
             explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
         ))),
         'testing_domain_strategy' => env('DPLY_TESTING_DOMAIN_STRATEGY', 'deterministic'),
+        /*
+         * DNS target for a deployed serverless function's friendly hostname
+         * ({slug}.{testing-domain}). An IP becomes an A record; a hostname
+         * becomes a CNAME. When unset, the function host CNAMEs onto the
+         * testing-domain apex (which must already resolve to the dply app).
+         */
+        'serverless_function_dns_target' => env('DPLY_SERVERLESS_FUNCTION_DNS_TARGET'),
     ],
 
     /*

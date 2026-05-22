@@ -12,8 +12,123 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4" tone="warn">
+        <p>{{ __('Manages the authorized_keys file for the dply system user on this server. Dply tracks what should be there; "Sync" reconciles the file on the box to match. Anything in authorized_keys that\'s NOT tracked here gets removed when you sync.') }}</p>
+        <p>{{ __('Drift preview shows what would change before you sync — the diff between the file currently on the server and what dply expects. The audit log records every sync with a hash of the key set so you can trace which key was added/removed when.') }}</p>
+        <p>{{ __('Locking out the dply system user is a real risk if its key gets dropped from this list. Always keep at least one key for the dply user; the workspace warns if you\'re about to sync with no keys.') }}</p>
+    </x-explainer>
+
     @if ($opsReady)
         <div class="space-y-6">
+
+        @php
+            $syncStatus = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_status_key'));
+            $syncRunId = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_run_id_key'));
+            $syncError = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_error_key'));
+            $syncStartedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_started_at_key'));
+            $syncFinishedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_finished_at_key'));
+            $syncBusy = in_array($syncStatus, ['queued', 'running'], true);
+            $syncShowBanner = $syncRunId !== '' && in_array($syncStatus, ['queued', 'running', 'completed', 'failed'], true);
+
+            $driftStatus = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_status_key'));
+            $driftRunId = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_run_id_key'));
+            $driftError = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_error_key'));
+            $driftStartedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_started_at_key'));
+            $driftFinishedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_drift_finished_at_key'));
+            $driftBusy = in_array($driftStatus, ['queued', 'running'], true);
+            $driftShowBanner = $driftRunId !== '' && in_array($driftStatus, ['queued', 'running', 'completed', 'failed'], true);
+
+            $panelShowBanner = ! empty($panel_event_lines);
+
+            // Banner precedence: an in-flight run always wins over a settled banner so a fresh
+            // drift click doesn't get hidden behind a lingering completed sync. Among settled
+            // banners, the most-recently-started one wins (that's the run the operator was
+            // last looking at). Panel events (add/delete) come last — they're inline feedback
+            // that yields to anything more important. If only one exists, take it.
+            if ($syncBusy) {
+                $bannerKind = 'sync';
+            } elseif ($driftBusy) {
+                $bannerKind = 'drift';
+            } elseif ($syncShowBanner && $driftShowBanner) {
+                $bannerKind = (string) ($syncStartedAt ?? '') >= (string) ($driftStartedAt ?? '') ? 'sync' : 'drift';
+            } elseif ($syncShowBanner) {
+                $bannerKind = 'sync';
+            } elseif ($driftShowBanner) {
+                $bannerKind = 'drift';
+            } elseif ($panelShowBanner) {
+                $bannerKind = 'panel';
+            } else {
+                $bannerKind = null;
+            }
+            $bannerBusy = ($bannerKind === 'sync' && $syncBusy) || ($bannerKind === 'drift' && $driftBusy);
+            $bannerOutput = match ($bannerKind) {
+                'sync' => $syncShowBanner ? $this->syncOutputLines : [],
+                'drift' => $diff_output,
+                'panel' => $panel_event_lines,
+                default => [],
+            };
+            $bannerStatus = match ($bannerKind) {
+                'sync' => $syncStatus,
+                'drift' => $driftStatus,
+                'panel' => $panel_event_status, // 'completed' / 'failed', set by emitPanelEvent
+                default => '',
+            };
+            $bannerMessage = match ($bannerKind) {
+                'sync' => match ($syncStatus) {
+                    'queued' => __('Sync queued — waiting for a worker to pick it up…'),
+                    'running' => __('Syncing authorized_keys to :host …', ['host' => $server->getSshConnectionString()]),
+                    'completed' => __('Sync complete — authorized_keys updated.'),
+                    'failed' => __('Sync failed — authorized_keys was not fully updated.'),
+                    default => '',
+                },
+                'drift' => match ($driftStatus) {
+                    'queued' => __('Drift preview queued — waiting for a worker to pick it up…'),
+                    'running' => __('Comparing authorized_keys against :host …', ['host' => $server->getSshConnectionString()]),
+                    'completed' => __('Drift preview ready.'),
+                    'failed' => __('Drift preview failed.'),
+                    default => '',
+                },
+                'panel' => $panel_event_message,
+                default => '',
+            };
+            $bannerDismissAction = match ($bannerKind) {
+                'drift' => 'dismissDriftBanner',
+                'panel' => 'dismissPanelBanner',
+                default => 'dismissSyncBanner',
+            };
+            // Subtitle is computed in the workspace because it depends on per-kind state
+            // (sync error string, finished_at, drift error, etc.) — the component itself stays
+            // generic.
+            $bannerSubtitle = $bannerBusy
+                ? __('Refreshing every 4s · safe to leave this page — the job runs on the queue.')
+                : match (true) {
+                    $bannerKind === 'sync' && $syncStatus === 'failed' && $syncError !== '' => $syncError,
+                    $bannerKind === 'sync' && $syncStatus === 'completed' && $syncFinishedAt
+                        => __('Finished :time', ['time' => \Illuminate\Support\Carbon::parse($syncFinishedAt)->diffForHumans()]),
+                    $bannerKind === 'drift' && $driftStatus === 'failed' && $driftError !== '' => $driftError,
+                    $bannerKind === 'drift' && $driftStatus === 'completed'
+                        => __('Compared the panel’s desired keys against the server. See the Drift tab for the structured diff.'),
+                    $bannerKind === 'panel'
+                        => __('The panel was updated. The server\'s authorized_keys file is unchanged until you Sync.'),
+                    default => null,
+                };
+            $bannerDefaultExpanded = $bannerKind === 'drift' || $bannerKind === 'panel';
+        @endphp
+
+        @if ($bannerKind !== null)
+            <x-workspace-console-banner
+                :status="$bannerStatus"
+                :message="$bannerMessage"
+                :subtitle="$bannerSubtitle"
+                :output="$bannerOutput"
+                :busy="$bannerBusy"
+                :dismiss-action="$bannerDismissAction"
+                :poll-action="$bannerBusy ? 'pollSyncStatus' : null"
+                poll-interval="4s"
+                :default-expanded="$bannerDefaultExpanded"
+            />
+        @endif
+
         <x-server-workspace-tablist :aria-label="__('SSH keys workspace')">
             <x-server-workspace-tab id="ssh-tab-keys" :active="$ssh_workspace_tab === 'keys'" wire:click="$set('ssh_workspace_tab', 'keys')">
                 <span class="inline-flex items-center gap-1.5">
@@ -33,6 +148,12 @@
                     {{ __('Advanced') }}
                 </span>
             </x-server-workspace-tab>
+            <x-server-workspace-tab id="ssh-tab-activity" :active="$ssh_workspace_tab === 'activity'" wire:click="$set('ssh_workspace_tab', 'activity')">
+                <span class="inline-flex items-center gap-1.5">
+                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Activity') }}
+                </span>
+            </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
         <x-server-workspace-tab-panel
@@ -45,22 +166,77 @@
                 // Source mode is implicit: if a profile key is selected, we're in "profile" mode;
                 // otherwise default to "paste" (the form fields). "Generate" is a one-shot button.
                 $sourceMode = $profile_key_id ? 'profile' : 'paste';
+                $hasProfile = $profileKeys->isNotEmpty();
+            @endphp
+
+            {{-- Slim trigger card. The "Add a key" button opens a modal containing the actual
+                 Profile/Paste/Generate form — keeps the page from being dominated by a 165-line
+                 form when the operator is just here to sync or review drift. --}}
+            @php
+                $trackedKeyCount = $server->authorizedKeys->count();
+                $lastSyncFinishedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_finished_at_key'));
+                $lastSyncStatus = (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_status_key'));
             @endphp
             <div class="{{ $card }} overflow-hidden">
-                {{-- Header row: title + inline sync/review buttons (no big sidebar callout) --}}
-                <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Add an SSH key') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __('Pick a source, then sync to write the key to the server\'s authorized_keys.') }}
-                            <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
-                        </p>
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                            <x-heroicon-o-key class="h-5 w-5" />
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Add an SSH key') }}</h2>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                {{ __('Authorize a key, then click Sync to push it to the server\'s authorized_keys.') }}
+                                <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
+                            </p>
+                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                    {{ trans_choice('{0} no keys tracked|{1} :count key tracked|[2,*] :count keys tracked', $trackedKeyCount, ['count' => $trackedKeyCount]) }}
+                                </span>
+                                @if ($lastSyncFinishedAt && in_array($lastSyncStatus, ['completed', 'failed'], true))
+                                    <span class="text-brand-mist/60">·</span>
+                                    <span class="inline-flex items-center gap-1">
+                                        @if ($lastSyncStatus === 'completed')
+                                            <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
+                                            {{ __('synced :time', ['time' => \Illuminate\Support\Carbon::parse($lastSyncFinishedAt)->diffForHumans()]) }}
+                                        @else
+                                            <x-heroicon-o-exclamation-triangle class="h-3 w-3 text-rose-600" />
+                                            {{ __('last sync failed :time', ['time' => \Illuminate\Support\Carbon::parse($lastSyncFinishedAt)->diffForHumans()]) }}
+                                        @endif
+                                    </span>
+                                @else
+                                    <span class="text-brand-mist/60">·</span>
+                                    <span>{{ __('not yet synced') }}</span>
+                                @endif
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex shrink-0 flex-wrap gap-2">
-                        <button type="button" wire:click="syncAuthorizedKeys" wire:loading.attr="disabled" wire:target="syncAuthorizedKeys" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                            <span wire:loading.remove wire:target="syncAuthorizedKeys">{{ __('Sync now') }}</span>
-                            <span wire:loading wire:target="syncAuthorizedKeys">{{ __('Syncing…') }}</span>
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('open-modal', 'add-ssh-key-modal')"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                        >
+                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            {{ __('Add a key') }}
+                        </button>
+                        <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
+                        <button
+                            type="button"
+                            wire:click="requestSyncAuthorizedKeys"
+                            wire:loading.attr="disabled"
+                            wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
+                            @disabled($syncBusy)
+                            title="{{ $syncBusy ? __('A sync is already running. Wait for it to finish.') : '' }}"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" />
+                            <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-spinner variant="forest" size="sm" />
+                            </span>
+                            <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
+                            <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
                         </button>
                         <button type="button" wire:click="$set('ssh_workspace_tab', 'preview')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                             <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
@@ -70,10 +246,10 @@
                 </div>
 
                 @if (! $serverHasPersonalProfileKey)
-                    <div class="mx-6 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 sm:mx-8">
+                    <div class="mx-6 my-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 sm:mx-8">
                         <p class="min-w-0 leading-6">
                             <span class="font-semibold">{{ __('No personal key on this server yet.') }}</span>
-                            {{ __('Attach one below, then sync.') }}
+                            {{ __('Add one to authorized_keys, then sync.') }}
                         </p>
                         @if ($profileKeys->isEmpty())
                             <button type="button" x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')" class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
@@ -83,12 +259,22 @@
                         @endif
                     </div>
                 @endif
+            </div>
 
-                <div class="px-6 py-6 sm:px-8 sm:py-7">
+            {{-- Add SSH key modal — Profile / Paste / Generate sources, name + key + target user
+                 + advanced rotation date. Closes on successful add (Livewire dispatches close-modal
+                 from addAuthorizedKey). Generate-new opens the keypair-reveal modal on top. --}}
+            <x-modal name="add-ssh-key-modal" maxWidth="3xl" overlayClass="bg-brand-ink/40">
+                <div class="border-b border-brand-ink/10 px-6 py-5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Authorized key') }}</p>
+                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add an SSH key') }}</h2>
+                    <p class="mt-2 text-sm leading-6 text-brand-moss">
+                        {{ __('Pick a source, then save. Run "Sync now" afterwards to write the new authorized_keys to the server.') }}
+                    </p>
+                </div>
+
+                <div class="px-6 py-6">
                     {{-- Source picker: Profile / Paste / Generate --}}
-                    @php
-                        $hasProfile = $profileKeys->isNotEmpty();
-                    @endphp
                     <fieldset class="space-y-2">
                         <legend class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Source') }}</legend>
                         <div class="grid gap-2 sm:grid-cols-3">
@@ -150,12 +336,12 @@
                         </div>
                     @endif
 
-                    <form wire:submit="addAuthorizedKey" class="mt-5 space-y-4">
-                        {{-- Name + key (always present, sometimes disabled when source=profile) --}}
+                    <form wire:submit="addAuthorizedKey" id="add-ssh-key-form" class="mt-5 space-y-4">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="new_auth_name" :value="__('Name')" />
                                 <x-text-input id="new_auth_name" wire:model="new_auth_name" class="mt-1 block w-full" placeholder="{{ __('e.g. Work laptop') }}" :disabled="(bool) $profile_key_id" />
+                                <x-input-error :messages="$errors->get('new_auth_name')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="new_target_linux_user" :value="__('Target user on server')" />
@@ -169,6 +355,7 @@
                                         <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
                                     </button>
                                 </div>
+                                <x-input-error :messages="$errors->get('new_target_linux_user')" class="mt-1" />
                             </div>
                         </div>
 
@@ -182,10 +369,11 @@
                                 class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage/30 disabled:bg-brand-sand/50"
                                 placeholder="ssh-ed25519 AAAA…"
                             ></textarea>
+                            <x-input-error :messages="$errors->get('new_auth_key')" class="mt-1" />
                         </div>
 
                         <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                            <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <span class="inline-flex items-center gap-1.5">
                                     <x-heroicon-o-chevron-down class="h-3.5 w-3.5" />
                                     {{ __('Advanced — rotation reminder') }}
@@ -197,22 +385,18 @@
                                 <p class="mt-1 text-xs text-brand-moss">{{ __('Triggers a rotation reminder email to the server owner on this date.') }}</p>
                             </div>
                         </details>
-
-                        <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/5 pt-4">
-                            <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
-                                <span wire:loading.remove wire:target="addAuthorizedKey">{{ __('Add SSH key') }}</span>
-                                <span wire:loading wire:target="addAuthorizedKey">{{ __('Adding…') }}</span>
-                            </x-primary-button>
-                            <button type="button" wire:click="syncAuthorizedKeys" wire:loading.attr="disabled" wire:target="syncAuthorizedKeys" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                <span wire:loading.remove wire:target="syncAuthorizedKeys">{{ __('Add & sync now') }}</span>
-                                <span wire:loading wire:target="syncAuthorizedKeys">{{ __('Syncing…') }}</span>
-                            </button>
-                            <p class="text-xs text-brand-moss">{{ __('Saved here · written to the server only on sync.') }}</p>
-                        </div>
                     </form>
                 </div>
-            </div>
+
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                    <p class="mr-auto text-xs text-brand-moss">{{ __('Saved here · written to the server only on sync.') }}</p>
+                    <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                    <x-primary-button type="submit" form="add-ssh-key-form" wire:loading.attr="disabled" wire:target="addAuthorizedKey">
+                        <span wire:loading.remove wire:target="addAuthorizedKey">{{ __('Add SSH key') }}</span>
+                        <span wire:loading wire:target="addAuthorizedKey">{{ __('Adding…') }}</span>
+                    </x-primary-button>
+                </div>
+            </x-modal>
 
             @if ($orgKeys->isNotEmpty() || $teamKeys->isNotEmpty())
                 <div class="{{ $card }} mt-6 p-6 sm:p-8">
@@ -234,7 +418,13 @@
                                         <option value="{{ $u }}">{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
+                                <x-primary-button
+                                    type="submit"
+                                    class="!py-2"
+                                    wire:loading.attr="disabled"
+                                    :disabled="$syncBusy"
+                                    :title="$syncBusy ? __('A sync is in flight — wait for it to finish before deploying another key.') : ''"
+                                >
                                     <span wire:loading.remove wire:target="deployOrganizationKey">{{ __('Deploy org key') }}</span>
                                     <span wire:loading wire:target="deployOrganizationKey">{{ __('Deploying…') }}</span>
                                 </x-primary-button>
@@ -255,7 +445,13 @@
                                         <option value="{{ $u }}">{{ $u }}</option>
                                     @endforeach
                                 </select>
-                                <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
+                                <x-primary-button
+                                    type="submit"
+                                    class="!py-2"
+                                    wire:loading.attr="disabled"
+                                    :disabled="$syncBusy"
+                                    :title="$syncBusy ? __('A sync is in flight — wait for it to finish before deploying another key.') : ''"
+                                >
                                     <span wire:loading.remove wire:target="deployTeamKey">{{ __('Deploy team key') }}</span>
                                     <span wire:loading wire:target="deployTeamKey">{{ __('Deploying…') }}</span>
                                 </x-primary-button>
@@ -359,13 +555,17 @@
                                                 <span wire:loading wire:target="updateKeyReviewFromInput('{{ $ak->id }}')"><x-spinner variant="forest" size="sm" /></span>
                                             </button>
                                         </div>
+                                        @php
+                                            $isLastLoginKey = $this->isLastLoginUserKey($ak);
+                                        @endphp
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('deleteAuthorizedKey', ['{{ $ak->id }}'], @js(__('Delete authorized key')), @js(__('Remove this key from the panel? Sync to apply on the server.')), @js(__('Delete key')), true)"
                                             wire:loading.attr="disabled"
                                             wire:target="deleteAuthorizedKey('{{ $ak->id }}')"
-                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
-                                            title="{{ __('Remove key') }}"
+                                            @disabled($isLastLoginKey)
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-brand-mist"
+                                            title="{{ $isLastLoginKey ? __('This is the only key for the login user — Dply needs it to reach this server. Add another key targeting :user first.', ['user' => $server->ssh_user ?: 'login']) : __('Remove key') }}"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="deleteAuthorizedKey('{{ $ak->id }}')" />
                                             <span wire:loading wire:target="deleteAuthorizedKey('{{ $ak->id }}')"><x-spinner variant="forest" size="sm" /></span>
@@ -378,44 +578,6 @@
                 @endif
             </div>
 
-            <details class="{{ $card }} mt-6 group">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 text-left sm:px-8">
-                    <div>
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent audit history') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('See who changed server SSH keys without giving audit its own full tab.') }}</p>
-                    </div>
-                    <span class="text-sm font-medium text-brand-sage group-open:hidden">{{ __('Show') }}</span>
-                    <span class="hidden text-sm font-medium text-brand-sage group-open:inline">{{ __('Hide') }}</span>
-                </summary>
-                <div class="border-t border-brand-ink/10 px-6 py-6 sm:px-8">
-                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
-                        <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                            <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase text-brand-moss">
-                                <tr>
-                                    <th class="px-3 py-2">{{ __('When') }}</th>
-                                    <th class="px-3 py-2">{{ __('Event') }}</th>
-                                    <th class="px-3 py-2">{{ __('Actor') }}</th>
-                                    <th class="px-3 py-2">{{ __('IP') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-brand-ink/10">
-                                @forelse ($auditEvents as $ev)
-                                    <tr>
-                                        <td class="whitespace-nowrap px-3 py-2 text-xs text-brand-moss">{{ $ev->created_at?->format('Y-m-d H:i:s') }}</td>
-                                        <td class="px-3 py-2 font-mono text-xs">{{ $ev->event }}</td>
-                                        <td class="px-3 py-2 text-xs">{{ $ev->user?->email ?? '—' }}</td>
-                                        <td class="px-3 py-2 font-mono text-xs">{{ $ev->ip_address ?? '—' }}</td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="px-3 py-6 text-center text-sm text-brand-moss">{{ __('No events yet.') }}</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </details>
         </x-server-workspace-tab-panel>
 
         <x-server-workspace-tab-panel
@@ -426,45 +588,248 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-lg font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
-                    <button type="button" wire:click="previewDiff" wire:loading.attr="disabled" wire:target="previewDiff" class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm disabled:opacity-50">
-                        <span wire:loading.remove wire:target="previewDiff">{{ __('Refresh preview') }}</span>
-                        <span wire:loading wire:target="previewDiff" class="inline-flex items-center gap-2">
-                            <x-spinner variant="forest" size="sm" />
-                            {{ __('Refreshing…') }}
-                        </span>
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            wire:click="requestSyncAuthorizedKeys"
+                            wire:loading.attr="disabled"
+                            wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
+                            @disabled($syncBusy || $driftBusy)
+                            title="{{ $syncBusy ? __('A sync is already running.') : ($driftBusy ? __('A drift preview is running — wait for it to finish.') : __('Apply the pending changes by writing authorized_keys on the server.')) }}"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" />
+                            <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
+                            <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="previewDiff"
+                            wire:loading.attr="disabled"
+                            wire:target="previewDiff"
+                            @disabled($syncBusy || $driftBusy)
+                            title="{{ $syncBusy ? __('A sync is in flight — wait for it to finish before refreshing the drift preview.') : ($driftBusy ? __('A drift preview is already running. Wait for it to finish.') : '') }}"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="previewDiff" />
+                            <span wire:loading wire:target="previewDiff" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-spinner variant="forest" size="sm" />
+                            </span>
+                            <span wire:loading.remove wire:target="previewDiff">{{ __('Refresh preview') }}</span>
+                            <span wire:loading wire:target="previewDiff">{{ __('Refreshing…') }}</span>
+                        </button>
+                    </div>
                 </div>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Compares the panel’s desired keys with what is on the server now (read-only).') }}</p>
+                <p class="mt-1 text-xs text-brand-mist">
+                    {{ __('“Will add” / “Will remove” means: when you click Sync, the server\'s authorized_keys file will gain or lose that key. Adding a key in the panel doesn\'t touch the server — only Sync does.') }}
+                </p>
                 @if ($diff_result === null)
-                    <p class="mt-6 text-sm text-brand-moss">{{ __('Use “Review drift” from Keys or “Refresh preview” here to load the latest comparison.') }}</p>
+                    @php
+                        $lastSyncFinishedAt = data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_finished_at_key'));
+                        $recentlySynced = $lastSyncFinishedAt
+                            && (string) data_get($server->meta ?? [], config('server_ssh_keys.meta_sync_status_key')) === 'completed';
+                    @endphp
+                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-arrows-right-left class="h-5 w-5" />
+                        </span>
+                        @if ($recentlySynced)
+                            <p class="text-sm font-medium text-brand-ink">{{ __('Sync finished — drift preview cleared.') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Click “Refresh preview” to confirm the server now matches the panel.') }}</p>
+                        @else
+                            <p class="text-sm font-medium text-brand-ink">{{ __('No comparison loaded yet.') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Click “Refresh preview” to compare the panel against authorized_keys on the server.') }}</p>
+                        @endif
+                    </div>
                 @else
-                    <div class="mt-6 space-y-6">
+                    <div class="mt-6 space-y-4">
+                        @php
+                            // One-time helpers for the rendering loop. Pull a stable "type" out of an
+                            // OpenSSH public key line so we can render it as a chip; the comment (last
+                            // whitespace-separated token) becomes the human-readable label, and the
+                            // middle base64 blob is what gets monospace-displayed.
+                            $sshTypeOf = static function (string $line): string {
+                                $tok = strtok(trim($line), ' ');
+
+                                return is_string($tok) ? $tok : 'ssh-?';
+                            };
+                            $sshCommentOf = static function (string $line): string {
+                                $parts = preg_split('/\s+/', trim($line)) ?: [];
+
+                                return count($parts) >= 3 ? implode(' ', array_slice($parts, 2)) : '';
+                            };
+                            $sshBodyOf = static function (string $line): string {
+                                $parts = preg_split('/\s+/', trim($line)) ?: [];
+
+                                return $parts[1] ?? trim($line);
+                            };
+                            // Recognize Dply's auto-managed keys so we can flag them clearly in the
+                            // "kept" list — they aren't in the panel, but they're always on the
+                            // server because the synchronizer re-injects them on every sync.
+                            $operationalKeyLine = trim((string) ($server->openSshPublicKeyFromOperationalPrivate() ?? ''));
+                            $recoveryKeyLine = trim((string) ($server->openSshPublicKeyFromRecoveryPrivate() ?? ''));
+                            $isManagedKey = static function (string $line) use ($operationalKeyLine, $recoveryKeyLine): ?string {
+                                if ($operationalKeyLine !== '' && trim($line) === $operationalKeyLine) {
+                                    return 'operational';
+                                }
+                                if ($recoveryKeyLine !== '' && trim($line) === $recoveryKeyLine) {
+                                    return 'recovery';
+                                }
+
+                                return null;
+                            };
+                        @endphp
                         @foreach ($diff_result as $user => $block)
-                            <div class="rounded-xl border border-brand-ink/10 p-4">
-                                <h3 class="font-semibold text-brand-ink">{{ $user }}</h3>
-                                @if ($block['added'] !== [])
-                                    <p class="mt-2 text-xs font-semibold uppercase text-emerald-800">{{ __('Would add') }}</p>
-                                    <ul class="mt-1 list-inside list-disc font-mono text-xs text-brand-ink">
-                                        @foreach ($block['added'] as $line)
-                                            <li class="break-all">{{ \Illuminate\Support\Str::limit($line, 120) }}</li>
-                                        @endforeach
-                                    </ul>
-                                @endif
-                                @if ($block['removed'] !== [])
-                                    <p class="mt-3 text-xs font-semibold uppercase text-red-800">{{ __('Would remove') }}</p>
-                                    <ul class="mt-1 list-inside list-disc font-mono text-xs text-brand-ink">
-                                        @foreach ($block['removed'] as $line)
-                                            <li class="break-all">{{ \Illuminate\Support\Str::limit($line, 120) }}</li>
-                                        @endforeach
-                                    </ul>
-                                @endif
-                                @if ($block['added'] === [] && $block['removed'] === [])
-                                    <p class="mt-2 text-sm text-brand-moss">{{ __('No drift for this user.') }}</p>
-                                @endif
+                            @php
+                                // Hide the root user from the workspace diff. Dply auto-manages a
+                                // recovery key under root and we don't want to advertise that
+                                // surface in the UI — the operator can still observe drift via
+                                // audit events / direct server access if they need to.
+                                if ($user === 'root') {
+                                    continue;
+                                }
+                                $addedCount = count($block['added']);
+                                $removedCount = count($block['removed']);
+                                $keptLines = $block['kept'] ?? [];
+                                $keptCount = count($keptLines);
+                                $hasDrift = $addedCount > 0 || $removedCount > 0;
+                            @endphp
+                            <div class="overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
+                                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/8 bg-brand-sand/20 px-4 py-3 sm:px-5">
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white text-brand-forest ring-1 ring-brand-ink/10">
+                                            <x-heroicon-m-user class="h-3.5 w-3.5" />
+                                        </span>
+                                        <h3 class="font-mono text-sm font-semibold text-brand-ink">{{ $user }}</h3>
+                                        @if ($user === $server->ssh_user)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('login') }}</span>
+                                        @endif
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2 text-[11px]">
+                                        @if ($keptCount > 0)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 font-semibold text-brand-moss ring-1 ring-brand-ink/10" title="{{ __('Already on the server — Sync would not change these.') }}">
+                                                <x-heroicon-m-check class="h-3 w-3" />
+                                                {{ trans_choice('{1} :count keeps|[2,*] :count keeps', $keptCount, ['count' => $keptCount]) }}
+                                            </span>
+                                        @endif
+                                        @if ($hasDrift)
+                                            @if ($addedCount > 0)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200" title="{{ __('Will be added to authorized_keys on next sync') }}">
+                                                    <x-heroicon-m-plus class="h-3 w-3" />
+                                                    {{ trans_choice('{1} +:count to add|[2,*] +:count to add', $addedCount, ['count' => $addedCount]) }}
+                                                </span>
+                                            @endif
+                                            @if ($removedCount > 0)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-700 ring-1 ring-rose-200" title="{{ __('Will be removed from authorized_keys on next sync') }}">
+                                                    <x-heroicon-m-minus class="h-3 w-3" />
+                                                    {{ trans_choice('{1} −:count to remove|[2,*] −:count to remove', $removedCount, ['count' => $removedCount]) }}
+                                                </span>
+                                            @endif
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                                                <x-heroicon-m-check class="h-3 w-3" />
+                                                {{ __('In sync') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div>
+                                    @if ($hasDrift)
+                                        <div class="border-b border-brand-ink/8 bg-emerald-50/30 px-4 py-2 sm:px-5">
+                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-900">
+                                                {{ __('Pending changes — Sync will apply these to the server') }}
+                                            </p>
+                                        </div>
+                                        <div class="divide-y divide-brand-ink/8">
+                                            @foreach ($block['added'] as $line)
+                                                <div class="flex items-start gap-3 px-4 py-2.5 sm:px-5">
+                                                    <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" title="{{ __('On next sync, this key will be written to authorized_keys on the server.') }}">
+                                                        <x-heroicon-m-plus class="h-3 w-3" />
+                                                    </span>
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="flex flex-wrap items-center gap-2">
+                                                            <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $sshTypeOf($line) }}</span>
+                                                            @if (($comment = $sshCommentOf($line)) !== '')
+                                                                <span class="text-xs font-medium text-brand-ink">{{ $comment }}</span>
+                                                            @endif
+                                                            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('panel · not yet on server') }}</span>
+                                                        </div>
+                                                        <p class="mt-1 break-all font-mono text-[11px] leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                            @foreach ($block['removed'] as $line)
+                                                <div class="flex items-start gap-3 px-4 py-2.5 sm:px-5">
+                                                    <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-700 ring-1 ring-rose-200" title="{{ __('On next sync, this key will be removed from authorized_keys on the server.') }}">
+                                                        <x-heroicon-m-minus class="h-3 w-3" />
+                                                    </span>
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="flex flex-wrap items-center gap-2">
+                                                            <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $sshTypeOf($line) }}</span>
+                                                            @if (($comment = $sshCommentOf($line)) !== '')
+                                                                <span class="text-xs font-medium text-brand-ink">{{ $comment }}</span>
+                                                            @else
+                                                                <span class="text-xs italic text-brand-mist">{{ __('untracked key on server') }}</span>
+                                                            @endif
+                                                            <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200">{{ __('on server · not in panel') }}</span>
+                                                        </div>
+                                                        <p class="mt-1 break-all font-mono text-[11px] leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if ($keptCount > 0)
+                                        <div class="border-b border-t border-brand-ink/8 bg-brand-sand/15 px-4 py-2 sm:px-5">
+                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                {{ __('Already on the server — no change') }}
+                                            </p>
+                                        </div>
+                                        <div class="divide-y divide-brand-ink/8 bg-brand-sand/10">
+                                            @foreach ($keptLines as $line)
+                                                @php $managedKind = $isManagedKey($line); @endphp
+                                                <div class="flex items-start gap-3 px-4 py-2.5 sm:px-5">
+                                                    <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-brand-moss ring-1 ring-brand-ink/15" title="{{ __('Already on the server. Sync will not change this line.') }}">
+                                                        <x-heroicon-m-check class="h-3 w-3" />
+                                                    </span>
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="flex flex-wrap items-center gap-2">
+                                                            <span class="inline-flex items-center rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ $sshTypeOf($line) }}</span>
+                                                            @if ($managedKind === 'operational')
+                                                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                                                    <x-heroicon-m-cog-6-tooth class="h-3 w-3" />
+                                                                    {{ __('Dply operational') }}
+                                                                </span>
+                                                                <span class="text-xs text-brand-moss">{{ __('used by Dply to reach this server') }}</span>
+                                                            @elseif (($comment = $sshCommentOf($line)) !== '')
+                                                                <span class="text-xs font-medium text-brand-ink">{{ $comment }}</span>
+                                                            @endif
+                                                        </div>
+                                                        <p class="mt-1 break-all font-mono text-[11px] leading-relaxed text-brand-mist" title="{{ $line }}">{{ \Illuminate\Support\Str::limit($sshBodyOf($line), 96) }}</p>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if (! $hasDrift && $keptCount === 0)
+                                        <div class="px-4 py-3 text-xs text-brand-moss sm:px-5">
+                                            {{ __('No keys on the server for this user, and none in the panel either. Sync would write an empty authorized_keys.') }}
+                                        </div>
+                                    @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>
                 @endif
+
+                {{-- The drift transcript renders in the workspace-level "console" banner above
+                     the tabs (same one the sync flow uses). Keeping the diff structure here on
+                     the tab and routing the transcript through the shared banner makes the UX
+                     consistent across both flows. --}}
             </div>
         </x-server-workspace-tab-panel>
 
@@ -475,7 +840,7 @@
         >
             <div class="{{ $card }} p-6 sm:p-8 space-y-6">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Advanced') }}</h2>
-                <form wire:submit="saveAdvancedSettings" class="space-y-4 max-w-xl">
+                <form wire:submit="requestSaveAdvancedSettings" class="space-y-4 max-w-xl">
                     <div class="flex items-start gap-3">
                         <input id="adv_disable" type="checkbox" wire:model.boolean="advanced_disable_sync" class="mt-1 rounded border-brand-ink/20" />
                         <div>
@@ -498,12 +863,62 @@
                             {{ __('Organization default: set the ssh_key_label_template key in organization server site preferences; per-server meta overrides it.') }}
                         </p>
                     </div>
-                    <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled">
-                        <span wire:loading.remove wire:target="saveAdvancedSettings">{{ __('Save advanced settings') }}</span>
-                        <span wire:loading wire:target="saveAdvancedSettings">{{ __('Saving…') }}</span>
+                    <x-primary-button type="submit" class="!py-2" wire:loading.attr="disabled" wire:target="requestSaveAdvancedSettings,saveAdvancedSettings">
+                        <span wire:loading.remove wire:target="requestSaveAdvancedSettings,saveAdvancedSettings">{{ __('Save advanced settings') }}</span>
+                        <span wire:loading wire:target="requestSaveAdvancedSettings,saveAdvancedSettings">{{ __('Saving…') }}</span>
                     </x-primary-button>
                 </form>
                 <p class="text-xs text-brand-moss">{{ __('Outbound webhooks: configure the server “Outbound webhook” URL in Settings to receive JSON when sync completes (signed with your webhook secret).') }}</p>
+            </div>
+        </x-server-workspace-tab-panel>
+
+        <x-server-workspace-tab-panel
+            id="ssh-panel-activity"
+            labelled-by="ssh-tab-activity"
+            :hidden="$ssh_workspace_tab !== 'activity'"
+        >
+            <div class="{{ $card }} p-6 sm:p-8">
+                @php
+                    $activityCount = $auditEvents->count();
+                    $latestActivity = $auditEvents->first()?->created_at;
+                @endphp
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                        <x-heroicon-o-clock class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Activity') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Key edits, syncs, deployments, and bulk imports — chronologically.') }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                            <span class="inline-flex items-center gap-1">
+                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $activityCount, ['count' => $activityCount]) }}
+                            </span>
+                            @if ($latestActivity)
+                                <span class="text-brand-mist/60">·</span>
+                                <span>{{ __('latest :time', ['time' => $latestActivity->diffForHumans()]) }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @if ($auditEvents->isNotEmpty())
+                    <div class="mt-6 space-y-2">
+                        @foreach ($auditEvents as $ev)
+                            <div wire:key="ssh-activity-{{ $ev->id }}">
+                                @include('livewire.servers.partials.activity-audit-row', ['event' => $ev, 'server' => $server])
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-clock class="h-5 w-5" />
+                        </span>
+                        <p class="text-sm font-medium text-brand-ink">{{ __('No SSH key activity yet.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Adding, editing, syncing, or deploying keys will all show up here.') }}</p>
+                    </div>
+                @endif
             </div>
         </x-server-workspace-tab-panel>
 

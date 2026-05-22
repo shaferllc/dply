@@ -6,6 +6,8 @@ namespace App\Livewire\Servers\Create;
 
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
+use App\Models\ForgeServer;
+use App\Models\PloiServer;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Support\Servers\ServerNameGenerator;
@@ -25,6 +27,17 @@ class StepType extends Component
 
     /** Used to show the "Create the remote Docker host first" framing on Step 1. */
     public bool $dockerHostHinted = false;
+
+    /** Set from ?from_ploi_server= when the user enters the wizard via the Ploi inventory. */
+    public ?string $migrationSourcePloiServerId = null;
+
+    /** Set from ?from_forge_server= when the user enters the wizard via the Forge inventory. */
+    public ?string $migrationSourceForgeServerId = null;
+
+    public ?string $migrationSourceLabel = null;
+
+    /** 'ploi' | 'forge' | null — which source family the banner reflects. */
+    public ?string $migrationSourceKind = null;
 
     public function mount(): mixed
     {
@@ -59,12 +72,95 @@ class StepType extends Component
             $requestedHostTarget = request()->query('host_target');
             if ($requestedHostTarget === 'docker') {
                 $this->dockerHostHinted = true;
-                $this->form->mode = 'custom';
-                $this->form->custom_host_kind = 'docker';
+                $this->form->mode = 'provider';
+                $this->form->provider_host_kind = 'docker';
+            } elseif ($requestedHostTarget === 'kubernetes') {
+                $this->form->mode = 'provider';
+                $this->form->provider_host_kind = 'kubernetes';
             }
         }
 
+        $this->applyPloiMigrationContext($draft);
+        $this->applyForgeMigrationContext($draft);
+
         return null;
+    }
+
+    /**
+     * Same shape as the Ploi handler; stashes the Forge server id under
+     * _forge_migration_source_id in the draft payload.
+     */
+    protected function applyForgeMigrationContext(?ServerCreateDraft $draft): void
+    {
+        if ($draft !== null && isset($draft->payload['_forge_migration_source_id'])) {
+            $this->hydrateMigrationContextFromForgeServer((string) $draft->payload['_forge_migration_source_id']);
+
+            return;
+        }
+        $param = request()->query('from_forge_server');
+        if (is_string($param) && $param !== '') {
+            $this->hydrateMigrationContextFromForgeServer($param);
+        }
+    }
+
+    protected function hydrateMigrationContextFromForgeServer(string $forgeServerId): void
+    {
+        $org = $this->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+        $forgeServer = ForgeServer::query()
+            ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
+            ->find($forgeServerId);
+        if ($forgeServer === null) {
+            return;
+        }
+        $this->migrationSourceForgeServerId = $forgeServer->id;
+        $this->migrationSourceLabel = $forgeServer->name;
+        $this->migrationSourceKind = 'forge';
+    }
+
+    /**
+     * Hydrate the migration-from-Ploi banner state from either an existing draft
+     * (mid-wizard) or the ?from_ploi_server= query param (entering Step 1). Once
+     * a draft is created in next(), the Ploi server id rides along in the payload
+     * under the _ploi_migration_source_id key — out of the form-field namespace so
+     * it doesn't conflict with any current or future ServerCreateForm property.
+     */
+    protected function applyPloiMigrationContext(?ServerCreateDraft $draft): void
+    {
+        // Prefer the draft when present — survives mid-wizard refreshes.
+        if ($draft !== null && isset($draft->payload['_ploi_migration_source_id'])) {
+            $stashed = (string) $draft->payload['_ploi_migration_source_id'];
+            $this->hydrateMigrationContextFromPloiServer($stashed);
+
+            return;
+        }
+
+        $param = request()->query('from_ploi_server');
+        if (is_string($param) && $param !== '') {
+            $this->hydrateMigrationContextFromPloiServer($param);
+        }
+    }
+
+    protected function hydrateMigrationContextFromPloiServer(string $ploiServerId): void
+    {
+        $org = $this->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $ploiServer = PloiServer::query()
+            ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
+            ->find($ploiServerId);
+
+        if ($ploiServer === null) {
+            return;
+        }
+
+        $this->migrationSourcePloiServerId = $ploiServer->id;
+        $this->migrationSourceLabel = $ploiServer->name;
+        $this->migrationSourceKind = 'ploi';
     }
 
     public function regenerateName(): void
@@ -103,7 +199,23 @@ class StepType extends Component
             $this->form->type = 'custom';
         }
 
-        $this->saveDraftFromForm($this->form, advanceTo: 2);
+        $draft = $this->saveDraftFromForm($this->form, advanceTo: 2);
+
+        // Stash the migration source on the draft so it survives subsequent steps.
+        $payload = is_array($draft->payload) ? $draft->payload : [];
+        $payloadChanged = false;
+        if ($this->migrationSourcePloiServerId !== null) {
+            $payload['_ploi_migration_source_id'] = $this->migrationSourcePloiServerId;
+            $payloadChanged = true;
+        }
+        if ($this->migrationSourceForgeServerId !== null) {
+            $payload['_forge_migration_source_id'] = $this->migrationSourceForgeServerId;
+            $payloadChanged = true;
+        }
+        if ($payloadChanged) {
+            $draft->payload = $payload;
+            $draft->save();
+        }
 
         return $this->redirect(route(self::routeNameForStep(2)), navigate: true);
     }

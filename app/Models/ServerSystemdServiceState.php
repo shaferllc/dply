@@ -20,6 +20,8 @@ class ServerSystemdServiceState extends Model
         'is_custom',
         'can_manage',
         'captured_at',
+        'pending_action',
+        'pending_action_at',
     ];
 
     protected function casts(): array
@@ -28,6 +30,7 @@ class ServerSystemdServiceState extends Model
             'is_custom' => 'boolean',
             'can_manage' => 'boolean',
             'captured_at' => 'datetime',
+            'pending_action_at' => 'datetime',
         ];
     }
 

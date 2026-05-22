@@ -17,6 +17,62 @@ class FirewallRuleTemplateApplicator
     ) {}
 
     /**
+     * Seed the server_firewall_rules table with the default rule set the
+     * provisioning bash script opens on the host (SSH on the server's
+     * actual ssh_port + HTTP/HTTPS for VM hosts that take inbound web
+     * traffic). Idempotent: createRulesFromDefinitions() dedupes by
+     * (port, protocol, source, action, site_id) so re-running this on
+     * an already-seeded server is a no-op.
+     *
+     * @return int Number of rules created
+     */
+    public function seedDefaultsForServer(Server $server, ?User $user = null, ?ApiToken $apiToken = null): int
+    {
+        $sshPort = (int) ($server->ssh_port ?: 22);
+
+        $definitions = [
+            [
+                'name' => 'SSH',
+                'port' => $sshPort,
+                'protocol' => 'tcp',
+                'source' => 'any',
+                'action' => 'allow',
+                'enabled' => true,
+                'profile' => 'ssh',
+            ],
+        ];
+
+        // Web ports only make sense on VM hosts that actually serve HTTP
+        // traffic. Functions/container hosts route through their cloud
+        // provider's edge, not nginx on the box.
+        if ($server->isVmHost()) {
+            $definitions[] = [
+                'name' => 'HTTP',
+                'port' => 80,
+                'protocol' => 'tcp',
+                'source' => 'any',
+                'action' => 'allow',
+                'enabled' => true,
+                'profile' => 'http',
+            ];
+            $definitions[] = [
+                'name' => 'HTTPS',
+                'port' => 443,
+                'protocol' => 'tcp',
+                'source' => 'any',
+                'action' => 'allow',
+                'enabled' => true,
+                'profile' => 'https',
+            ];
+        }
+
+        return $this->createRulesFromDefinitions($server, $definitions, $user, [
+            'template' => 'auto:provision-defaults',
+            'label' => 'Provision defaults',
+        ], $apiToken);
+    }
+
+    /**
      * Apply a config key from server_firewall.bundled_templates.
      *
      * @return int Number of rules created
@@ -91,7 +147,21 @@ class FirewallRuleTemplateApplicator
             $source = strtolower(trim((string) ($row['source'] ?? 'any'))) === 'any'
                 ? 'any'
                 : trim((string) ($row['source'] ?? 'any'));
-            $action = in_array($row['action'] ?? 'allow', ['allow', 'deny'], true) ? $row['action'] : 'allow';
+            $action = in_array($row['action'] ?? 'allow', ['allow', 'deny', 'limit'], true) ? $row['action'] : 'allow';
+            $appProfile = isset($row['app_profile']) && is_string($row['app_profile']) && trim($row['app_profile']) !== ''
+                ? substr(trim($row['app_profile']), 0, 64)
+                : null;
+            if ($appProfile !== null) {
+                $port = null;
+            }
+            $iface = isset($row['iface']) && is_string($row['iface']) && trim($row['iface']) !== ''
+                ? substr(trim($row['iface']), 0, 32)
+                : null;
+            $ifaceDirection = null;
+            if ($iface !== null) {
+                $dir = strtolower(trim((string) ($row['iface_direction'] ?? 'in')));
+                $ifaceDirection = in_array($dir, ['in', 'out'], true) ? $dir : 'in';
+            }
 
             $duplicateRuleExists = ServerFirewallRule::query()
                 ->where('server_id', $server->id)
@@ -99,6 +169,9 @@ class FirewallRuleTemplateApplicator
                 ->where('protocol', (string) ($row['protocol'] ?? 'tcp'))
                 ->where('source', $source)
                 ->where('action', $action)
+                ->where('app_profile', $appProfile)
+                ->where('iface', $iface)
+                ->where('iface_direction', $ifaceDirection)
                 ->where('site_id', $siteId)
                 ->exists();
 
@@ -111,6 +184,9 @@ class FirewallRuleTemplateApplicator
                 'site_id' => $siteId,
                 'name' => isset($row['name']) ? (string) $row['name'] : null,
                 'profile' => isset($row['profile']) && is_string($row['profile']) ? substr($row['profile'], 0, 32) : null,
+                'app_profile' => $appProfile,
+                'iface' => $iface,
+                'iface_direction' => $ifaceDirection,
                 'tags' => is_array($tags) && $tags !== [] ? array_values($tags) : null,
                 'runbook_url' => isset($row['runbook_url']) && is_string($row['runbook_url']) ? $row['runbook_url'] : null,
                 'port' => $port,

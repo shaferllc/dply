@@ -45,8 +45,16 @@ class StepWhere extends Component
         // Default the active provider tile to whatever the form already has,
         // or the first credentialled provider if blank.
         if ($this->form->mode === 'provider') {
+            if ($this->form->provider_host_kind === 'kubernetes' && $this->form->type === '') {
+                // Landed on this step with K8s already picked but no provider — try the
+                // singleton auto-pick first so the cluster fetch + cost preview can run.
+                $this->autoSelectSingletonKubernetesProvider();
+            }
+
             if ($this->form->type === '' || $this->form->type === 'custom') {
-                $this->applyCloudDefaults($this->defaultProvisionProvider());
+                if ($this->form->provider_host_kind !== 'kubernetes') {
+                    $this->applyCloudDefaults($this->defaultProvisionProvider());
+                }
             } else {
                 $this->active_provider = $this->form->type;
             }
@@ -95,8 +103,10 @@ class StepWhere extends Component
         if ($this->form->region === '' && $regions !== []) {
             $this->form->region = $this->preferredRegionValue($regions);
 
-            // Scaleway sizes depend on region — drop the catalog memo so the next read reloads.
-            if ($this->form->type === 'scaleway') {
+            // Scaleway and DigitalOcean sizes depend on region — drop the
+            // catalog memo so the next read reloads filtered by the
+            // newly-defaulted region.
+            if (in_array($this->form->type, ['scaleway', 'digitalocean'], true)) {
                 $this->memoServerCreateCatalog = null;
                 $this->memoServerCreateCatalogKey = null;
                 $catalog = $this->resolveServerCreateCatalog($org);
@@ -119,6 +129,66 @@ class StepWhere extends Component
         $this->form->custom_host_kind = $kind;
     }
 
+    public function chooseProviderHostKind(string $kind): void
+    {
+        if (! in_array($kind, ['vm', 'docker', 'kubernetes'], true)) {
+            return;
+        }
+        $this->form->provider_host_kind = $kind;
+
+        // For K8s the user picks the provider (DO or AWS) via the tile picker
+        // below, which calls chooseProvider() and resolves form.type to
+        // {provider}_kubernetes. Clearing any stale K8s type pin here lets the
+        // user freely toggle between vm/docker/kubernetes without ghost state.
+        if (in_array($this->form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true) && $kind !== 'kubernetes') {
+            $this->form->type = '';
+            $this->active_provider = '';
+        }
+        if ($kind === 'kubernetes') {
+            // If a non-K8s provider was previously selected, drop the type so
+            // the picker re-opens with a clean DO-or-AWS choice.
+            if (! in_array($this->form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true)) {
+                $this->form->type = '';
+                $this->active_provider = '';
+            }
+            $this->memoServerCreateCatalog = null;
+            $this->memoServerCreateCatalogKey = null;
+            $this->autoSelectSingletonKubernetesProvider();
+        }
+    }
+
+    /**
+     * When the user has credentials for exactly one of the K8s-capable providers
+     * (DigitalOcean DOKS or AWS EKS), pick it for them so the cost preview can
+     * resolve immediately instead of stalling on an empty provider tile.
+     */
+    private function autoSelectSingletonKubernetesProvider(): void
+    {
+        if ($this->form->type !== '') {
+            return;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $candidates = [];
+        foreach (['digitalocean', 'aws'] as $provider) {
+            $type = $provider.'_kubernetes';
+            if (! ServerProviderGate::enabled($type)) {
+                continue;
+            }
+            if (GetProviderCredentialsForServerType::run($org, $type)->isNotEmpty()) {
+                $candidates[] = $provider;
+            }
+        }
+
+        if (count($candidates) === 1) {
+            $this->chooseProvider($candidates[0]);
+        }
+    }
+
     public function updatedFormProviderCredentialId(): void
     {
         // Trait's version syncs stack defaults; we additionally pick a single region/size if available.
@@ -132,6 +202,27 @@ class StepWhere extends Component
 
     public function chooseProvider(string $provider): void
     {
+        // For K8s the tile id is the bare provider name (digitalocean / aws)
+        // but the form.type the wizard ultimately stores is the K8s-suffixed
+        // variant — that's what StoreServerFromCreateForm dispatches on.
+        if ($this->form->provider_host_kind === 'kubernetes') {
+            if (! in_array($provider, ['digitalocean', 'aws'], true)) {
+                return;
+            }
+            $type = $provider.'_kubernetes';
+            if (! ServerProviderGate::enabled($type)) {
+                return;
+            }
+            $this->form->mode = 'provider';
+            $this->form->type = $type;
+            $this->active_provider = $provider;
+            $this->memoServerCreateCatalog = null;
+            $this->memoServerCreateCatalogKey = null;
+            $this->autoSelectSingleOptions();
+
+            return;
+        }
+
         if (! ServerProviderGate::enabled($provider)) {
             return;
         }
@@ -159,17 +250,29 @@ class StepWhere extends Component
         $this->authorize('create', Server::class);
 
         if ($this->form->mode === 'provider') {
-            $this->validate([
+            $isKubernetes = $this->form->provider_host_kind === 'kubernetes';
+
+            $rules = [
                 'form.type' => ['required', 'string', 'max:64'],
+                'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker', 'kubernetes'])],
                 'form.provider_credential_id' => ['required', 'string'],
-                'form.region' => ['required', 'string'],
-                'form.size' => ['required', 'string'],
-            ], attributes: [
+            ];
+            $attributes = [
                 'form.type' => __('provider'),
+                'form.provider_host_kind' => __('host kind'),
                 'form.provider_credential_id' => __('account'),
-                'form.region' => __('region'),
-                'form.size' => __('plan'),
-            ]);
+            ];
+
+            // VM and Docker hosts pick a region + plan; K8s servers infer
+            // both from the selected cluster (chosen on the next step).
+            if (! $isKubernetes) {
+                $rules['form.region'] = ['required', 'string'];
+                $rules['form.size'] = ['required', 'string'];
+                $attributes['form.region'] = __('region');
+                $attributes['form.size'] = __('plan');
+            }
+
+            $this->validate($rules, attributes: $attributes);
         } else {
             $this->validate([
                 'form.custom_host_kind' => ['required', Rule::in(['vm', 'docker'])],
@@ -186,8 +289,9 @@ class StepWhere extends Component
             ]);
         }
 
-        // Custom + Docker host has no stack step — jump to Review (advance high-water mark to 4).
-        $skipsStack = $this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker';
+        // Docker host (either mode) has no stack step — jump to Review (advance high-water mark to 4).
+        $skipsStack = ($this->form->mode === 'custom' && $this->form->custom_host_kind === 'docker')
+            || ($this->form->mode === 'provider' && $this->form->provider_host_kind === 'docker');
         $next = $skipsStack ? 4 : 3;
 
         $this->saveDraftFromForm($this->form, advanceTo: $next);
@@ -198,6 +302,26 @@ class StepWhere extends Component
     protected function stepNumber(): int
     {
         return 2;
+    }
+
+    /**
+     * Provider tile picker. For VM/Docker hosts the full provider list applies;
+     * for Kubernetes hosts only DigitalOcean (DOKS) and AWS (EKS) are valid
+     * targets in this release.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function resolveProviderCards(): array
+    {
+        $cards = $this->provisionProviderCardsFromList($this->listServerProviderCards());
+        if ($this->form->provider_host_kind !== 'kubernetes') {
+            return $cards;
+        }
+
+        return array_values(array_filter(
+            $cards,
+            fn (array $card): bool => in_array($card['id'] ?? '', ['digitalocean', 'aws'], true),
+        ));
     }
 
     public function render(): View
@@ -212,7 +336,7 @@ class StepWhere extends Component
             'preflight' => $context['preflight'],
             'hasAnyProviderCredentials' => $context['hasAnyProviderCredentials'],
             'hasLinkedCredential' => $context['hasLinkedCredential'],
-            'providerCards' => $this->provisionProviderCardsFromList($this->listServerProviderCards()),
+            'providerCards' => $this->resolveProviderCards(),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
         ]);
     }

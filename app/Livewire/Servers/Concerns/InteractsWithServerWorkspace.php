@@ -2,11 +2,15 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\PollDoksClusterStatusJob;
+use App\Jobs\PollEksClusterStatusJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Workspace;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
+use Throwable;
 
 trait InteractsWithServerWorkspace
 {
@@ -26,6 +30,63 @@ trait InteractsWithServerWorkspace
                 $this->redirect(route('servers.show', $server), navigate: true);
             }
         }
+    }
+
+    /**
+     * For K8s hosts still in PENDING/PROVISIONING, kick a status poll when the
+     * user lands on a workspace page so a "cluster gone from provider" case is
+     * detected instead of leaving the page stuck on a "provisioning" banner
+     * forever. The poller itself handles the 404 → mark error transition;
+     * this just makes sure something is dispatching it when the operator is
+     * actively looking at the page.
+     *
+     * Runs synchronously so the very next render reflects the result —
+     * otherwise on a real (redis) queue the operator would have to reload to
+     * see the error banner. The job is a single GET against DO/EKS, bounded
+     * by the HTTP client timeout, so blocking the request is acceptable.
+     *
+     * Guard: skip if we polled within the last :seconds so an open tab
+     * sitting on wire:poll doesn't hammer the provider API. Treat a missing
+     * last_polled_at as stale.
+     */
+    protected function kickClusterPollIfStale(int $staleAfterSeconds = 30): void
+    {
+        $server = $this->server;
+        if (($server->meta['host_kind'] ?? null) !== Server::HOST_KIND_KUBERNETES) {
+            return;
+        }
+
+        if (! in_array($server->status, [Server::STATUS_PENDING, Server::STATUS_PROVISIONING], true)) {
+            return;
+        }
+
+        $lastPolledAt = $server->meta['kubernetes']['last_polled_at'] ?? null;
+        if (is_string($lastPolledAt) && $lastPolledAt !== '') {
+            try {
+                if (Carbon::parse($lastPolledAt)->isAfter(now()->subSeconds($staleAfterSeconds))) {
+                    return;
+                }
+            } catch (Throwable) {
+                // unparseable timestamp — fall through and dispatch anyway
+            }
+        }
+
+        $provider = (string) ($server->meta['kubernetes']['provider'] ?? 'digitalocean');
+        try {
+            if ($provider === 'aws') {
+                PollEksClusterStatusJob::dispatchSync($server);
+            } else {
+                PollDoksClusterStatusJob::dispatchSync($server);
+            }
+        } catch (Throwable) {
+            // Swallow — we don't want a transient provider hiccup to take
+            // down the workspace page. The async poll (already on the queue
+            // from the original create flow) will keep trying.
+        }
+
+        // The job mutated server.meta on a fresh() copy; reload our reference
+        // so the immediate render sees the new status / last_error.
+        $this->server = $server->fresh() ?? $server;
     }
 
     protected function currentUserIsDeployer(): bool

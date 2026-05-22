@@ -127,7 +127,7 @@ class ServerSystemdServicesCatalogTest extends TestCase
         $this->assertTrue($c->bootMenuShowEnableAtBoot(''));
         $this->assertTrue($c->bootMenuShowDisableAtBoot(''));
 
-        $this->assertTrue($c->bootMenuShowEnableAtBoot('not-found'));
-        $this->assertTrue($c->bootMenuShowDisableAtBoot('not-found'));
+        $this->assertFalse($c->bootMenuShowEnableAtBoot('not-found'));
+        $this->assertFalse($c->bootMenuShowDisableAtBoot('not-found'));
     }
 }

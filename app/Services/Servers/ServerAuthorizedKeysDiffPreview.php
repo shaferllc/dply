@@ -8,12 +8,32 @@ use Illuminate\Support\Collection;
 
 class ServerAuthorizedKeysDiffPreview
 {
+    /**
+     * Optional callback to surface per-target progress to the workspace's "View output" console.
+     * Same shape as {@see ServerAuthorizedKeysSynchronizer::withOutputCallback()} — we don't try
+     * to stream raw bash since the read result is already rendered as the diff itself; what's
+     * useful here is the high-level "what user did we just read" trail.
+     *
+     * @var (callable(string $type, string $line): void)|null
+     */
+    protected $outputCallback = null;
+
     public function __construct(
         protected ServerAuthorizedKeysRemoteReader $reader,
     ) {}
 
     /**
-     * @return array<string, array{remote: list<string>, desired: list<string>, added: list<string>, removed: list<string>}>
+     * @param  callable(string $type, string $line): void  $callback
+     */
+    public function withOutputCallback(callable $callback): static
+    {
+        $this->outputCallback = $callback;
+
+        return $this;
+    }
+
+    /**
+     * @return array<string, array{remote: list<string>, desired: list<string>, added: list<string>, removed: list<string>, kept: list<string>}>
      */
     public function diffPerUser(Server $server): array
     {
@@ -44,6 +64,18 @@ class ServerAuthorizedKeysDiffPreview
         // authorized_keys regardless of the panel state, otherwise the next sync
         // would lock Dply out of the box. Inject it into the desired set for root.
         $recoveryPubKey = trim((string) ($server->openSshPublicKeyFromRecoveryPrivate() ?? ''));
+        // Same idea for the operational key (the one Dply uses for `connectionAsUser`):
+        // the synchronizer always re-injects it into the connection user's desired set so
+        // a sync never locks Dply out, and the diff preview must mirror that — otherwise
+        // we'd show the operational key under "would remove" even though sync wouldn't
+        // actually drop it.
+        $operationalPubKey = trim((string) ($server->openSshPublicKeyFromOperationalPrivate() ?? ''));
+
+        $callback = $this->outputCallback;
+        if ($callback !== null) {
+            $callback('out', sprintf('> Connecting to %s …', $server->getSshConnectionString()));
+            $callback('out', sprintf('> Comparing %d target user(s): %s', count($targets), implode(', ', $targets)));
+        }
 
         $out = [];
         foreach ($targets as $targetUser) {
@@ -55,13 +87,44 @@ class ServerAuthorizedKeysDiffPreview
                 sort($desired);
             }
 
+            if ($targetUser === $connectionUser && $operationalPubKey !== '' && ! in_array($operationalPubKey, $desired, true)) {
+                $desired[] = $operationalPubKey;
+                sort($desired);
+            }
+
+            if ($callback !== null) {
+                $callback('out', sprintf('> Reading authorized_keys for %s …', $targetUser));
+            }
+
             $remote = $this->reader->normalizedKeyLines($server, $targetUser);
             $out[$targetUser] = [
                 'remote' => $remote,
                 'desired' => $desired,
                 'added' => array_values(array_diff($desired, $remote)),
                 'removed' => array_values(array_diff($remote, $desired)),
+                // Lines present in both — they stay on the server unchanged on the next sync.
+                // The workspace shows these alongside the diff so operators can see what's
+                // already in place (especially Dply's auto-injected operational/recovery keys)
+                // and not mistake "+1 to add" for "this is the only key".
+                'kept' => array_values(array_intersect($desired, $remote)),
             ];
+
+            if ($callback !== null) {
+                $addedCount = count($out[$targetUser]['added']);
+                $removedCount = count($out[$targetUser]['removed']);
+                $callback('out', sprintf(
+                    '  %s: %d remote, %d desired · +%d -%d',
+                    $targetUser,
+                    count($remote),
+                    count($desired),
+                    $addedCount,
+                    $removedCount,
+                ));
+            }
+        }
+
+        if ($callback !== null) {
+            $callback('out', '> Done.');
         }
 
         return $out;

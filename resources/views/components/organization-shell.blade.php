@@ -151,6 +151,7 @@
         </a>
     </aside>
     <div {{ $attributes->merge(['class' => 'lg:col-span-9 min-w-0']) }}>
+        <x-trial-pause-banner :organization="$organization" />
         {{ $slot }}
     </div>
 </div>

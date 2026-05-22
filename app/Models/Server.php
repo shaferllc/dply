@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Enums\ServerProvider;
+use App\Enums\ServerTier;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
+use App\Services\Billing\ServerTierClassifier;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -39,7 +41,13 @@ class Server extends Model
 
     public const HOST_KIND_DIGITALOCEAN_FUNCTIONS = 'digitalocean_functions';
 
+    public const HOST_KIND_DIGITALOCEAN_APP_PLATFORM = 'digitalocean_app_platform';
+
     public const HOST_KIND_AWS_LAMBDA = 'aws_lambda';
+
+    public const HOST_KIND_AWS_APP_RUNNER = 'aws_app_runner';
+
+    public const HOST_KIND_DPLY_EDGE = 'dply_edge';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -79,7 +87,6 @@ class Server extends Model
         'setup_status',
         'meta',
         'supervisor_package_status',
-        'deploy_command',
         'last_health_check_at',
         'health_status',
         'scheduled_deletion_at',
@@ -133,6 +140,84 @@ class Server extends Model
         return $this->hasMany(ServerDatabase::class);
     }
 
+    /**
+     * Database engines installed on this server (multi-engine support).
+     * Distinct from {@see serverDatabases} which lists user-created
+     * named DBs on top of an engine. See ServerDatabaseEngine docblock.
+     */
+    public function databaseEngines(): HasMany
+    {
+        return $this->hasMany(ServerDatabaseEngine::class);
+    }
+
+    /**
+     * The engine row marked is_default — the implicit choice for new sites
+     * that don't pick an engine explicitly. Null when nothing is installed
+     * (cache-only / load-balancer / static-only servers).
+     */
+    public function defaultDatabaseEngine(): ?ServerDatabaseEngine
+    {
+        return $this->databaseEngines()->where('is_default', true)->first();
+    }
+
+    /**
+     * Runtime keys (node / python / ruby / go / etc.) the server has a
+     * pinned global version for, derived from `meta.runtime_defaults`.
+     *
+     * Empty when the server hasn't been provisioned with any runtime
+     * defaults yet — mise itself may still be installed (the strategy
+     * memo's polyglot pitch lets any non-PHP runtime be installed on
+     * demand at the site-create moment), but the wizard hasn't pre-set
+     * a server-level default. The site-create form uses this list to
+     * decide whether to surface an "install missing runtime" affordance.
+     *
+     * @return list<string>
+     */
+    /**
+     * The L7 edge proxy (if any) sitting in front of this server's webserver.
+     * Returns null when the webserver handles :80 directly; otherwise one
+     * of {'traefik', 'haproxy'}.
+     *
+     * When this is non-null, dply runs Caddy as the per-site backend on
+     * ephemeral high ports and the edge proxy on :80 — see
+     * `App\Jobs\AddEdgeProxyJob` for the install flow.
+     */
+    public function edgeProxy(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $proxy = $meta['edge_proxy'] ?? null;
+
+        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy'], true) ? $proxy : null;
+    }
+
+    public function hasEdgeProxy(): bool
+    {
+        return $this->edgeProxy() !== null;
+    }
+
+    public function installedRuntimeKeys(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $defaults = $meta['runtime_defaults'] ?? null;
+        if (! is_array($defaults)) {
+            return [];
+        }
+
+        $keys = [];
+        foreach (array_keys($defaults) as $key) {
+            if (is_string($key) && $key !== '') {
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    public function hasRuntimeInstalled(string $runtime): bool
+    {
+        return in_array($runtime, $this->installedRuntimeKeys(), true);
+    }
+
     public function databaseAdminCredential(): HasOne
     {
         return $this->hasOne(ServerDatabaseAdminCredential::class);
@@ -178,6 +263,28 @@ class Server extends Model
         return $this->hasMany(ServerMetricSnapshot::class)->orderByDesc('captured_at');
     }
 
+    /**
+     * Billing tier derived from the most recent metric snapshot's cpu_count
+     * and mem_total_kb. Returns ServerTier::XS while specs are unknown so a
+     * freshly-connected server isn't accidentally billed at XL during the
+     * gap between provision and first agent report.
+     */
+    public function billingTier(): ServerTier
+    {
+        $snapshot = $this->metricSnapshots()->first();
+        $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
+
+        $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])
+            ? (int) $payload['cpu_count']
+            : null;
+
+        $memMb = isset($payload['mem_total_kb']) && is_numeric($payload['mem_total_kb'])
+            ? (int) round((float) $payload['mem_total_kb'] / 1024)
+            : null;
+
+        return app(ServerTierClassifier::class)->classify($cpuCount, $memMb);
+    }
+
     public function systemdServiceStates(): HasMany
     {
         return $this->hasMany(ServerSystemdServiceState::class)->orderBy('label');
@@ -201,6 +308,11 @@ class Server extends Model
     public function authorizedKeys(): HasMany
     {
         return $this->hasMany(ServerAuthorizedKey::class);
+    }
+
+    public function systemUsers(): HasMany
+    {
+        return $this->hasMany(ServerSystemUser::class)->orderBy('username');
     }
 
     public function sshKeyAuditEvents(): HasMany
@@ -238,7 +350,10 @@ class Server extends Model
             self::HOST_KIND_DOCKER,
             self::HOST_KIND_KUBERNETES,
             self::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+            self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
             self::HOST_KIND_AWS_LAMBDA,
+            self::HOST_KIND_AWS_APP_RUNNER,
+            self::HOST_KIND_DPLY_EDGE,
         ], true) ? $hostKind : self::HOST_KIND_VM;
     }
 
@@ -260,6 +375,40 @@ class Server extends Model
     public function isAwsLambdaHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_AWS_LAMBDA;
+    }
+
+    /**
+     * A FaaS host (DO Functions / AWS Lambda) — a namespace for functions,
+     * not a machine. Billing treats these differently: the host itself is
+     * not a spec-tiered server; its function-Sites bill per-function.
+     */
+    public function isServerlessHost(): bool
+    {
+        return $this->isDigitalOceanFunctionsHost() || $this->isAwsLambdaHost();
+    }
+
+    public function isDigitalOceanAppPlatformHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM;
+    }
+
+    public function isAwsAppRunnerHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_AWS_APP_RUNNER;
+    }
+
+    public function isDplyEdgeHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DPLY_EDGE;
+    }
+
+    public function isContainerHost(): bool
+    {
+        return in_array($this->hostKind(), [
+            self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
+            self::HOST_KIND_AWS_APP_RUNNER,
+            self::HOST_KIND_DPLY_EDGE,
+        ], true);
     }
 
     public function isDockerHost(): bool

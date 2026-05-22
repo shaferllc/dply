@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\RunServerCronJobNowJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\OrganizationCronJobTemplate;
@@ -25,12 +26,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class WorkspaceCron extends Component
 {
     use ConfirmsActionWithModal;
+    use EmitsPanelEvent;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -95,8 +98,17 @@ class WorkspaceCron extends Component
 
     public ?string $viewing_logs_job_id = null;
 
-    /** @var 'jobs'|'run'|'inspect'|'history'|'templates' */
+    /** @var 'jobs'|'history'|'inspect'|'templates'|'maintenance' */
+    #[Url(as: 'tab', except: 'jobs', history: true)]
     public string $cron_workspace_tab = 'jobs';
+
+    /** @var list<string> Tab values accepted by {@see setCronWorkspaceTab()}. */
+    protected array $cronWorkspaceTabs = ['jobs', 'history', 'inspect', 'templates', 'maintenance'];
+
+    public function setCronWorkspaceTab(string $tab): void
+    {
+        $this->cron_workspace_tab = in_array($tab, $this->cronWorkspaceTabs, true) ? $tab : 'jobs';
+    }
 
     public string $inspect_crontab_user = '';
 
@@ -269,6 +281,11 @@ class WorkspaceCron extends Component
     {
         $this->authorize('update', $this->server);
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
+        if ($job->system_managed) {
+            $this->toastError(__('This cron line is managed automatically by Dply and can\'t be edited from here.'));
+
+            return;
+        }
         $this->editing_job_id = $job->id;
         $this->new_cron_expression = $job->cron_expression;
         $this->new_cron_command = $job->command;
@@ -356,48 +373,379 @@ class WorkspaceCron extends Component
         ];
 
         if ($this->editing_job_id) {
-            ServerCronJob::query()
+            $job = ServerCronJob::query()
                 ->where('server_id', $this->server->id)
                 ->whereKey($this->editing_job_id)
-                ->firstOrFail()
-                ->update($payload);
+                ->firstOrFail();
+            $oldSnapshot = [
+                'cron_expression' => $job->cron_expression,
+                'command' => $job->command,
+                'user' => $job->user,
+                'description' => $job->description,
+                'site_id' => $job->site_id,
+                'overlap_policy' => $job->overlap_policy,
+                'alert_on_failure' => (bool) $job->alert_on_failure,
+                'schedule_timezone' => $job->schedule_timezone,
+            ];
+            $job->update($payload);
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.updated',
+                $this->server,
+                $oldSnapshot,
+                array_merge(
+                    array_intersect_key($payload, $oldSnapshot),
+                    ['cron_job_id' => (string) $job->id],
+                ),
+            );
+            $this->emitPanelEvent(
+                __('Cron job updated — sync to apply'),
+                array_filter([
+                    sprintf('> Updated "%s" in the panel.', $job->fresh()->description ?: $payload['command']),
+                    sprintf('  schedule: %s · user: %s', $payload['cron_expression'], $payload['user']),
+                    '> Click "Sync crontab" to install the new Dply-managed block on the server.',
+                ]),
+            );
             $this->toastSuccess(__('Cron job updated. Sync crontab on the server to apply changes.'));
         } else {
-            ServerCronJob::query()->create(array_merge($payload, [
+            $created = ServerCronJob::query()->create(array_merge($payload, [
                 'server_id' => $this->server->id,
                 'enabled' => true,
             ]));
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.created',
+                $this->server,
+                null,
+                [
+                    'cron_job_id' => (string) $created->id,
+                    'cron_expression' => $created->cron_expression,
+                    'command' => $created->command,
+                    'user' => $created->user,
+                    'description' => $created->description,
+                    'site_id' => $created->site_id,
+                    'schedule_timezone' => $created->schedule_timezone,
+                    'overlap_policy' => $created->overlap_policy,
+                ],
+            );
+            $this->emitPanelEvent(
+                __('Cron job added — sync to install on server'),
+                array_filter([
+                    sprintf('> Added "%s" to the panel.', $created->description ?: $payload['command']),
+                    sprintf('  schedule: %s · user: %s', $payload['cron_expression'], $payload['user']),
+                    '> Click "Sync crontab" to install the Dply-managed block on the server.',
+                ]),
+            );
             $this->toastSuccess(__('Cron job added. Sync crontab on the server to install the Dply-managed block.'));
         }
 
         $this->cancelEdit();
+        $this->dispatch('close-modal', 'add-cron-job-modal');
     }
 
-    public function toggleCronJob(string $jobId): void
+    /**
+     * Inserts panel rows from a `config('cron_workspace.bundled_jobs')` bundle. Skips entries
+     * that already match (same command + expression + user); commands often include placeholders
+     * the user must edit before syncing the crontab to the server.
+     */
+    public function applyCronBundle(string $key): void
+    {
+        $this->authorize('update', $this->server);
+
+        $bundle = config('cron_workspace.bundled_jobs.'.$key);
+        if (! is_array($bundle) || empty($bundle['entries'])) {
+            $this->toastError(__('Unknown cron bundle.'));
+
+            return;
+        }
+
+        $created = 0;
+        $skipped = 0;
+        $createdLines = [];
+        $defaultSshUser = trim((string) $this->server->ssh_user) ?: 'root';
+
+        foreach ($bundle['entries'] as $entry) {
+            $command = trim((string) ($entry['command'] ?? ''));
+            $expression = trim((string) ($entry['cron_expression'] ?? ''));
+            if ($command === '' || $expression === '') {
+                continue;
+            }
+            $user = trim((string) ($entry['user'] ?? '')) ?: $defaultSshUser;
+
+            $duplicate = ServerCronJob::query()
+                ->where('server_id', $this->server->id)
+                ->where('command', $command)
+                ->where('cron_expression', $expression)
+                ->where('user', $user)
+                ->exists();
+
+            if ($duplicate) {
+                $skipped++;
+
+                continue;
+            }
+
+            ServerCronJob::query()->create([
+                'server_id' => $this->server->id,
+                'cron_expression' => $expression,
+                'command' => $command,
+                'user' => $user,
+                'enabled' => true,
+                'is_synced' => false,
+                'description' => $entry['description'] ?? null,
+                'overlap_policy' => $entry['overlap_policy'] ?? ServerCronJob::OVERLAP_ALLOW,
+                'schedule_timezone' => config('app.timezone'),
+            ]);
+            $created++;
+            $createdLines[] = sprintf('  + %s   %s', $expression, Str::limit($command, 80));
+        }
+
+        if ($created === 0) {
+            $this->toastWarning(__('All entries from ":label" already exist on this server.', ['label' => $bundle['label'] ?? $key]));
+
+            return;
+        }
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.cron.bundle_applied',
+            $this->server,
+            null,
+            [
+                'bundle_key' => $key,
+                'bundle_label' => $bundle['label'] ?? $key,
+                'created' => $created,
+                'skipped' => $skipped,
+            ],
+        );
+
+        $this->emitPanelEvent(
+            __('Bundle ":label" added — sync to install on server', ['label' => $bundle['label'] ?? $key]),
+            array_values(array_filter([
+                sprintf('> Added %d cron %s from bundle "%s" to the panel.', $created, $created === 1 ? 'job' : 'jobs', $bundle['label'] ?? $key),
+                $skipped > 0 ? sprintf('  (%d duplicate %s skipped)', $skipped, $skipped === 1 ? 'entry' : 'entries') : null,
+                ...$createdLines,
+                '> Review commands (paths, domains, credentials), then click "Sync crontab" to install the Dply-managed block.',
+            ])),
+        );
+
+        $this->toastSuccess(__('Added :n cron :word from ":label". Review and sync.', [
+            'n' => $created,
+            'word' => $created === 1 ? 'job' : 'jobs',
+            'label' => $bundle['label'] ?? $key,
+        ]));
+    }
+
+    /**
+     * Returns the configured one-click bundles, augmented with `entry_count` and `applied`
+     * (true when every entry already exists on this server). The view renders an "Added"
+     * indicator when applied.
+     *
+     * @return array<string, array{label: string, description: string, entry_count: int, applied: bool}>
+     */
+    protected function bundledCronJobsForView(): array
+    {
+        $bundles = config('cron_workspace.bundled_jobs', []);
+        if (! is_array($bundles) || $bundles === []) {
+            return [];
+        }
+
+        $defaultSshUser = trim((string) $this->server->ssh_user) ?: 'root';
+        $existing = $this->server->cronJobs
+            ->map(fn (ServerCronJob $j) => trim((string) $j->cron_expression).'|'.trim((string) $j->command).'|'.trim((string) $j->user))
+            ->all();
+        $existingSet = array_flip($existing);
+
+        $out = [];
+        foreach ($bundles as $key => $bundle) {
+            $entries = $bundle['entries'] ?? [];
+            if (! is_array($entries) || $entries === []) {
+                continue;
+            }
+            $allApplied = true;
+            foreach ($entries as $entry) {
+                $cmd = trim((string) ($entry['command'] ?? ''));
+                $expr = trim((string) ($entry['cron_expression'] ?? ''));
+                if ($cmd === '' || $expr === '') {
+                    $allApplied = false;
+                    continue;
+                }
+                $user = trim((string) ($entry['user'] ?? '')) ?: $defaultSshUser;
+                if (! isset($existingSet[$expr.'|'.$cmd.'|'.$user])) {
+                    $allApplied = false;
+                    break;
+                }
+            }
+            $out[$key] = [
+                'label' => (string) ($bundle['label'] ?? $key),
+                'description' => (string) ($bundle['description'] ?? ''),
+                'entry_count' => count($entries),
+                'applied' => $allApplied,
+            ];
+        }
+
+        return $out;
+    }
+
+    public function toggleCronJob(string $jobId, ServerCronSynchronizer $synchronizer): void
     {
         $this->authorize('update', $this->server);
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
-        $job->update(['enabled' => ! $job->enabled, 'is_synced' => false]);
-        $this->toastSuccess($job->fresh()->enabled
-            ? __('Job enabled. Sync crontab to apply.')
-            : __('Job paused (omitted from crontab on next sync).'));
+        if ($job->system_managed) {
+            $this->toastError(__('This cron line is managed automatically by Dply and can\'t be paused from here.'));
+
+            return;
+        }
+
+        $newEnabled = ! $job->enabled;
+        // Flip the panel state first so the synchronizer composes the next
+        // crontab body with the new value, then push it straight to the host
+        // — pause/resume are single-click operations, the operator shouldn't
+        // need a separate Sync to make the line appear or disappear.
+        $job->update(['enabled' => $newEnabled, 'is_synced' => false]);
+        $this->server->refresh();
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            $newEnabled ? 'server.cron.enabled' : 'server.cron.disabled',
+            $this->server,
+            ['enabled' => ! $newEnabled],
+            [
+                'cron_job_id' => (string) $job->id,
+                'command' => $job->command,
+                'cron_expression' => $job->cron_expression,
+                'enabled' => $newEnabled,
+            ],
+        );
+
+        try {
+            // Pre-flight reuses the same validator the explicit Sync button uses.
+            $invalid = $synchronizer->invalidExpressions($this->server->cronJobs);
+            if ($invalid !== []) {
+                $job->update(['enabled' => ! $newEnabled]);
+                $this->toastError(__('Cannot apply: another cron job has an invalid expression. Fix it first.'));
+
+                return;
+            }
+
+            $out = $synchronizer->sync($this->server);
+            $ok = (bool) preg_match('/DPLY_CRON_EXIT:0\s*$/', $out);
+
+            if ($ok) {
+                $this->emitPanelEvent(
+                    $newEnabled
+                        ? __('Job resumed — added back to crontab on :host.', ['host' => $this->server->getSshConnectionString()])
+                        : __('Job paused — removed from crontab on :host.', ['host' => $this->server->getSshConnectionString()]),
+                    array_merge(
+                        ['> '.($newEnabled ? 'Installed the line in the Dply-managed block.' : 'Omitted the line from the Dply-managed block.')],
+                        $this->splitOutputForBanner($out),
+                    ),
+                    'completed',
+                );
+                $this->toastSuccess($newEnabled
+                    ? __('Job resumed and crontab updated.')
+                    : __('Job paused and crontab updated.'));
+
+                return;
+            }
+
+            // Host rejected the install — reuse the rich debug surface from syncCronJobs.
+            $body = (string) $synchronizer->lastBody();
+            $badLine = $synchronizer->lastBadLine();
+            $badContent = $synchronizer->lastBadLineContent();
+            $lines = $body === '' ? [] : (preg_split("/\r?\n/", $body) ?: []);
+            $width = strlen((string) count($lines));
+            $numbered = [];
+            foreach ($lines as $i => $line) {
+                $n = $i + 1;
+                $marker = $badLine !== null && $n === $badLine ? '>>' : '  ';
+                $numbered[] = sprintf('%s %'.$width.'d │ %s', $marker, $n, $line);
+            }
+            $transcript = array_merge(
+                ['> Crontab rejected by host — output:'],
+                $this->splitOutputForBanner($out),
+            );
+            if ($badLine !== null) {
+                $transcript[] = '> ';
+                $transcript[] = sprintf('> Offending line %d: %s', $badLine, (string) $badContent);
+            }
+            if ($numbered !== []) {
+                $transcript[] = '> ';
+                $transcript[] = '> --- rendered crontab body (lines marked with ">>" are the rejected ones) ---';
+                $transcript = array_merge($transcript, $numbered);
+            }
+            $this->emitPanelEvent(
+                $badLine !== null
+                    ? __('Crontab rejected — see line :line below.', ['line' => $badLine])
+                    : __('Crontab rejected by host.'),
+                $transcript,
+                'failed',
+            );
+            $this->toastError(__('Toggle applied to panel but host rejected the new crontab — see the banner.'));
+        } catch (\Throwable $e) {
+            // SSH/transport failure: leave the panel-side toggle in place so the
+            // operator can retry Sync once the host is reachable. is_synced
+            // stays false until a successful install.
+            $this->emitPanelEvent(
+                __('Crontab sync failed.'),
+                [
+                    '> Toggled :name to :state in the panel.',
+                    '> Tried to write the Dply-managed crontab block over SSH.',
+                    '> ERROR: '.Str::limit(trim($e->getMessage()), 800),
+                ],
+                'failed',
+            );
+            $this->toastError($e->getMessage());
+        }
     }
 
     public function deleteCronJob(string $jobId): void
     {
         $this->authorize('update', $this->server);
-        ServerCronJob::query()->where('server_id', $this->server->id)->whereKey($jobId)->firstOrFail()->delete();
+        $job = ServerCronJob::query()->where('server_id', $this->server->id)->whereKey($jobId)->firstOrFail();
+        if ($job->system_managed) {
+            $this->toastError(__('This cron line is managed automatically by Dply and can\'t be deleted from here.'));
+
+            return;
+        }
+        $jobLabel = $job->description ?: $job->command;
+        $snapshot = [
+            'cron_job_id' => (string) $job->id,
+            'cron_expression' => $job->cron_expression,
+            'command' => $job->command,
+            'user' => $job->user,
+            'description' => $job->description,
+            'site_id' => $job->site_id,
+        ];
+        $job->delete();
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.cron.deleted',
+            $this->server,
+            $snapshot,
+            null,
+        );
         if ($this->editing_job_id === $jobId) {
             $this->cancelEdit();
         }
+        $this->emitPanelEvent(
+            __('Cron job removed — sync to update server'),
+            [
+                sprintf('> Removed "%s" from the panel.', $jobLabel),
+                '> Click "Sync crontab" to remove it from the Dply-managed block on the server.',
+            ],
+        );
         $this->toastSuccess(__('Cron entry removed. Sync crontab again to update the server.'));
     }
 
     public function runCronJobNow(string $jobId): void
     {
         $this->authorize('update', $this->server);
-
-        $this->cron_workspace_tab = 'run';
 
         $job = ServerCronJob::query()->where('server_id', $this->server->id)->findOrFail($jobId);
         if (! $job->enabled) {
@@ -419,13 +767,40 @@ class WorkspaceCron extends Component
         $this->cron_run_meta_html = '';
         $this->cron_run_output = '';
 
+        // Seed the workspace's console banner so the operator gets immediate
+        // feedback at the top of the page rather than having to scroll to a
+        // separate "Live output" card. Chunks land in the same banner via
+        // {@see onCronRunChunk()}.
+        $this->emitPanelEvent(
+            __('Running :name on :host …', [
+                'name' => $job->description !== null && $job->description !== '' ? $job->description : Str::limit($job->command, 60),
+                'host' => $this->server->getSshConnectionString(),
+            ]),
+            [],
+            'running',
+        );
+
         RunServerCronJobNowJob::dispatch($this->server->id, $job->id, $runId);
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.cron.run_now_dispatched',
+            $this->server,
+            null,
+            [
+                'cron_job_id' => (string) $job->id,
+                'run_id' => $runId,
+                'command' => $job->command,
+                'description' => $job->description,
+            ],
+        );
 
         $rid = json_encode($runId);
         // Set active run id for Echo (may already be set from the first broadcast if the worker was fast).
         $this->js('window.__dplyCronRunActiveId='.$rid.';');
 
-        $this->toastSuccess(__('Run queued. A queue worker runs it over SSH; output appears here via Reverb or polling.'));
+        $this->toastSuccess(__('Run queued — output streams to the banner above.'));
     }
 
     /**
@@ -454,12 +829,26 @@ class WorkspaceCron extends Component
             $this->cron_run_output = $cachedOut;
         }
 
+        // Keep the console banner in lockstep with the polled output.
+        $this->panel_event_lines = $this->cron_run_output === ''
+            ? []
+            : (preg_split("/\r?\n/", rtrim($this->cron_run_output)) ?: []);
+
         if (! in_array($status, ['finished', 'failed'], true)) {
             return;
         }
 
+        $success = $status === 'finished';
+        $this->emitPanelEvent(
+            $success
+                ? (string) ($payload['flash_success'] ?? __('Run finished.'))
+                : (string) ($payload['error'] ?? __('Run failed.')),
+            $this->panel_event_lines,
+            $success ? 'completed' : 'failed',
+        );
+
         $this->cron_run_id = null;
-        if ($status === 'finished') {
+        if ($success) {
             $this->toastSuccess((string) ($payload['flash_success'] ?? __('Finished.')));
         } else {
             $this->toastError((string) ($payload['error'] ?? __('Run failed.')));
@@ -491,6 +880,7 @@ class WorkspaceCron extends Component
         }
 
         $this->cron_run_output .= $chunk;
+        $this->panel_event_lines = preg_split("/\r?\n/", rtrim($this->cron_run_output)) ?: [];
     }
 
     #[On('cron-run-finished')]
@@ -523,6 +913,17 @@ class WorkspaceCron extends Component
             $this->cron_run_meta_html = (string) ($cached['meta_html'] ?? $this->cron_run_meta_html);
             $this->cron_run_output = (string) ($cached['output'] ?? $this->cron_run_output);
         }
+
+        $finalLines = $this->cron_run_output === ''
+            ? []
+            : (preg_split("/\r?\n/", rtrim($this->cron_run_output)) ?: []);
+        $this->emitPanelEvent(
+            $success
+                ? (is_string($flashSuccess) && $flashSuccess !== '' ? $flashSuccess : __('Run finished.'))
+                : (is_string($error) && $error !== '' ? $error : __('Run failed.')),
+            $finalLines,
+            $success ? 'completed' : 'failed',
+        );
 
         $this->cron_run_id = null;
         if ($success) {
@@ -576,7 +977,7 @@ class WorkspaceCron extends Component
             $remote = Cache::remember(
                 'server_passwd_usernames:'.$this->server->id,
                 now()->addMinutes(5),
-                fn () => app(ServerPasswdUserLister::class)->listUsernames($this->server->fresh())
+                fn () => app(ServerPasswdUserLister::class)->listUsernames($this->server)
             );
         } catch (\Throwable) {
             $remote = [];
@@ -622,7 +1023,6 @@ class WorkspaceCron extends Component
     public function loadInspectCrontab(ServerCrontabReader $reader): void
     {
         $this->authorize('update', $this->server);
-        $this->cron_workspace_tab = 'troubleshooting';
         $this->inspect_crontab_body = null;
         $this->inspect_crontab_exit_code = null;
 
@@ -655,11 +1055,141 @@ class WorkspaceCron extends Component
         $this->authorize('update', $this->server);
         try {
             $this->server->refresh();
+
+            // Pre-flight: refuse to ship a crontab the host will reject — we
+            // surface invalid rows with edit links in the banner above the
+            // table so the operator can fix them in place. Without this, a
+            // bad expression aborts the whole DPLY MANAGED block install.
+            $invalid = $synchronizer->invalidExpressions($this->server->cronJobs);
+            if ($invalid !== []) {
+                $this->emitPanelEvent(
+                    __('Cannot sync — :count cron job(s) have invalid expressions.', ['count' => count($invalid)]),
+                    array_merge(
+                        ['> Pre-flight rejected the sync; fix the highlighted jobs and try again.'],
+                        array_map(
+                            static fn (array $row): string => sprintf(
+                                '> #%s  expr=%s  cmd=%s',
+                                substr($row['id'], -6),
+                                $row['cron_expression'],
+                                Str::limit($row['command'], 80),
+                            ),
+                            $invalid,
+                        ),
+                    ),
+                    'failed',
+                );
+                $this->toastError(trans_choice(
+                    '{1} :count cron job has an invalid expression — fix it before syncing.|[2,*] :count cron jobs have invalid expressions — fix them before syncing.',
+                    count($invalid),
+                    ['count' => count($invalid)],
+                ));
+
+                return;
+            }
+
             $out = $synchronizer->sync($this->server);
-            $this->toastSuccess(__('Crontab sync finished. Output: :out', ['out' => Str::limit(trim($out), 800)]));
+            $ok = (bool) preg_match('/DPLY_CRON_EXIT:0\s*$/', $out);
+
+            if (! $ok) {
+                // The host rejected the crontab. Render the proposed body with
+                // line numbers + a highlight for the offending line so the
+                // operator can identify exactly what crontab(1) didn't like.
+                $body = (string) $synchronizer->lastBody();
+                $badLine = $synchronizer->lastBadLine();
+                $badContent = $synchronizer->lastBadLineContent();
+
+                $lines = $body === '' ? [] : (preg_split("/\r?\n/", $body) ?: []);
+                $width = strlen((string) count($lines));
+                $numbered = [];
+                foreach ($lines as $i => $line) {
+                    $n = $i + 1;
+                    $marker = $badLine !== null && $n === $badLine ? '>>' : '  ';
+                    $numbered[] = sprintf('%s %'.$width.'d │ %s', $marker, $n, $line);
+                }
+
+                $transcript = ['> Crontab rejected by host — output:'];
+                $transcript = array_merge($transcript, $this->splitOutputForBanner($out));
+                if ($badLine !== null) {
+                    $transcript[] = '> ';
+                    $transcript[] = sprintf('> Offending line %d: %s', $badLine, (string) $badContent);
+                }
+                if ($numbered !== []) {
+                    $transcript[] = '> ';
+                    $transcript[] = '> --- rendered crontab body (lines marked with ">>" are the rejected ones) ---';
+                    $transcript = array_merge($transcript, $numbered);
+                }
+
+                $this->emitPanelEvent(
+                    $badLine !== null
+                        ? __('Crontab rejected — see line :line below.', ['line' => $badLine])
+                        : __('Crontab rejected by host.'),
+                    $transcript,
+                    'failed',
+                );
+                $this->toastError(__('Crontab install failed — banner shows the rendered body and the rejected line.'));
+
+                return;
+            }
+
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.synced',
+                $this->server,
+                null,
+                ['result' => 'success'],
+            );
+
+            $this->emitPanelEvent(
+                __('Crontab synced to server.'),
+                array_merge(
+                    ['> Wrote the Dply-managed crontab block via SSH.'],
+                    $this->splitOutputForBanner($out),
+                ),
+                'completed',
+            );
+            $this->toastSuccess(__('Crontab sync finished — see the banner for the host output.'));
         } catch (\Throwable $e) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'server.cron.synced',
+                $this->server,
+                null,
+                [
+                    'result' => 'failed',
+                    'error' => Str::limit($e->getMessage(), 500),
+                ],
+            );
+
+            $this->emitPanelEvent(
+                __('Crontab sync failed.'),
+                [
+                    '> Tried to write the Dply-managed crontab block via SSH.',
+                    '> ERROR: '.Str::limit(trim($e->getMessage()), 800),
+                ],
+                'failed',
+            );
             $this->toastError($e->getMessage());
         }
+    }
+
+    /**
+     * Split a buffered SSH command output into transcript lines for the panel banner —
+     * mirrors the helper on the firewall workspace, kept local since the format is the same.
+     *
+     * @return list<string>
+     */
+    protected function splitOutputForBanner(string $blob, int $maxLines = 200): array
+    {
+        $lines = array_values(array_filter(
+            array_map('rtrim', preg_split("/\r?\n/", trim($blob)) ?: []),
+            static fn (string $l): bool => $l !== '',
+        ));
+
+        return count($lines) > $maxLines
+            ? array_merge(array_slice($lines, 0, $maxLines), [sprintf('… (%d more lines truncated)', count($lines) - $maxLines)])
+            : $lines;
     }
 
     public function validateCronExpressionField(CronExpressionValidator $cronValidator): void
@@ -760,12 +1290,15 @@ class WorkspaceCron extends Component
             ->where('organization_id', $org->id)
             ->whereKey($templateId)
             ->firstOrFail();
+        $this->editing_job_id = null;
         $this->new_cron_expression = $tpl->cron_expression;
         $this->new_cron_command = $tpl->command;
         $this->new_cron_user = $tpl->user;
         $this->new_description = $tpl->description;
+        $this->command_preset = 'custom';
         $this->updatedNewCronExpression();
         $this->cron_workspace_tab = 'jobs';
+        $this->dispatch('open-modal', 'add-cron-job-modal');
         $this->toastSuccess(__('Loaded template into the form — review and save.'));
     }
 
@@ -856,8 +1389,7 @@ class WorkspaceCron extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
-        $this->server->load(['cronJobs.site.domains', 'sites', 'organization.cronJobTemplates']);
+        $this->server->loadMissing(['cronJobs.site.domains', 'sites', 'organization.cronJobTemplates']);
 
         $jobsQuery = ServerCronJob::query()
             ->where('server_id', $this->server->id)
@@ -894,12 +1426,20 @@ class WorkspaceCron extends Component
         $org = $this->server->organization;
         $canUpdateOrg = $org !== null && auth()->user()?->can('update', $org);
 
-        if (! $canUpdateOrg && $this->cron_workspace_tab === 'maintenance') {
+        if (! in_array($this->cron_workspace_tab, $this->cronWorkspaceTabs, true)
+            || (! $canUpdateOrg && $this->cron_workspace_tab === 'maintenance')) {
             $this->cron_workspace_tab = 'jobs';
         }
 
+        // Always compute the invalid-expressions list so the operator sees the
+        // problem before they try to sync — the warning banner above the cron
+        // table renders from this regardless of whether they've clicked Sync.
+        $invalidExpressionJobs = app(ServerCronSynchronizer::class)
+            ->invalidExpressions($filteredCronJobs);
+
         return view('livewire.servers.workspace-cron', [
             'contextSiteModel' => $contextSiteModel,
+            'invalidExpressionJobs' => $invalidExpressionJobs,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
@@ -909,6 +1449,7 @@ class WorkspaceCron extends Component
                     ->find($this->viewing_logs_job_id)
                 : null,
             'commandInstallPresets' => $this->commandInstallPresets(),
+            'bundledCronJobs' => $this->bundledCronJobsForView(),
             'crontabInspectUserChoices' => $this->crontabInspectUserChoices(),
             'runAsUserDatalistChoices' => $this->runAsUserDatalistChoices(),
             'cronRunEchoSubscribable' => $this->cronRunEchoSubscribable(),

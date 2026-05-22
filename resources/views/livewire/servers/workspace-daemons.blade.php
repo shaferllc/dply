@@ -13,6 +13,32 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer class="mb-4">
+        <p>{{ __('This workspace manages long-running supervisord-supervised processes for this server (queue workers, websocket servers, custom long-running PHP/Node binaries). Each daemon is a config file in /etc/supervisor/conf.d that dply rewrites in full on every change; supervisorctl reread + update applies the change.') }}</p>
+        <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. Restart, stop, and start map to the matching supervisorctl verbs. The audit log records every change.') }}</p>
+    </x-explainer>
+
+    {{-- At-a-glance counts. Match the Background-group convention used by Backups,
+         Schedule, and Queue workers. Numbers reflect the visible (filtered) program set. --}}
+    <section class="mb-4 grid gap-3 sm:grid-cols-4">
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Programs') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $daemonsStats['total'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-forest">{{ $daemonsStats['active'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</p>
+            <p class="mt-1 text-2xl font-semibold {{ $daemonsStats['inactive'] > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $daemonsStats['inactive'] }}</p>
+        </div>
+        <div class="dply-card p-4">
+            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total processes') }}</p>
+            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $daemonsStats['total_processes'] }}</p>
+        </div>
+    </section>
+
     @if ($siteContextUnavailable)
         <div class="rounded-2xl border border-amber-300/80 bg-amber-50/90 px-5 py-6 text-sm text-amber-950">
             <p class="font-semibold">{{ __('Supervisor workers are not available for this site’s runtime') }}</p>
@@ -125,6 +151,8 @@
                                 <option value="laravel-octane">{{ __('Laravel Octane') }}</option>
                                 <option value="nodejs">{{ __('Node.js process') }}</option>
                                 <option value="sidekiq">{{ __('Sidekiq (Ruby)') }}</option>
+                                <option value="solid-queue">{{ __('Solid Queue (Rails 8)') }}</option>
+                                <option value="action-cable">{{ __('Action Cable (Rails websockets)') }}</option>
                             </select>
                         </div>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Selecting a preset fills the form below — you can still tweak anything before saving.') }}</p>
@@ -553,7 +581,7 @@
                                     default => 'bg-brand-sand text-brand-moss ring-brand-ink/10',
                                 };
                             @endphp
-                            <li class="relative flex flex-col sm:flex-row">
+                            <li id="program-{{ $sp->id }}" class="relative flex flex-col scroll-mt-24 sm:flex-row">
                                 <span
                                     @class([
                                         'absolute bottom-0 left-0 top-0 w-1',
@@ -1099,6 +1127,15 @@
         </div>
     @else
         @include('livewire.servers.partials.workspace-ops-not-ready')
+    @endif
+
+    @if ($contextSiteModel)
+        <x-cli-snippet :commands="[
+            ['label' => __('Add or update a process'), 'command' => 'dply:site:process-set '.$contextSiteModel->slug.' worker --type=worker --command=\'php artisan queue:work\' --scale=1'],
+            ['label' => __('Remove a process'), 'command' => 'dply:site:process-remove '.$contextSiteModel->slug.' worker'],
+            ['label' => __('Restart a process'), 'command' => 'dply:site:restart-process '.$contextSiteModel->slug.' worker'],
+            ['label' => __('Show running processes'), 'command' => 'dply:site:ps '.$contextSiteModel->slug],
+        ]" />
     @endif
 
     <x-slot name="modals">

@@ -2,7 +2,9 @@
 
 namespace App\Services\Sites;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use Illuminate\Support\Str;
 
@@ -21,8 +23,11 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
         return 'traefik';
     }
 
-    public function provision(Site $site): string
+    public function provision(Site $site, ?ConsoleEmitter $emit = null): string
     {
+        $emit ??= new ConsoleEmitter;
+
+        $emit->step('traefik', 'resolving server connection');
         $server = $this->ensureServerReady($site);
         $backendPort = $this->backendPort($site);
         $basename = $this->configBasename($site);
@@ -31,12 +36,22 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
         $importLine = 'import /etc/caddy/sites-enabled/*.caddy';
 
         $ssh = $this->systemSsh($site);
-        $this->installPlaceholderPage($site, $ssh);
-        $this->ensureSuspendedPage($site, $ssh);
-        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
-        $this->writeSystemFile($ssh, $caddyConfig, $this->caddyBuilder->build($site, $backendPort));
-        $this->writeSystemFile($ssh, $dynamicConfig, $this->builder->build($site, $backendPort));
+        // First-apply only — meta.traefik_last_output is written at the end of
+        // the first successful provision, so subsequent applies skip the
+        // placeholder probe entirely.
+        if (! isset(($site->meta ?? [])['traefik_last_output'])) {
+            $this->installPlaceholderPage($site, $ssh, $emit);
+        }
+        $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        if ($this->writeSystemFileIfChanged($server, $ssh, $caddyConfig, $this->caddyBuilder->build($site, $backendPort))) {
+            $emit->step('traefik', 'writing caddy backend config: '.$caddyConfig);
+        }
+        if ($this->writeSystemFileIfChanged($server, $ssh, $dynamicConfig, $this->builder->build($site, $backendPort))) {
+            $emit->step('traefik', 'writing traefik dynamic config: '.$dynamicConfig);
+        }
 
+        $emit->step('traefik', 'running caddy validate and reloading caddy + traefik');
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_TRAEFIK_EXIT:%%s" "$?"',
             $this->privilegedCommand(
@@ -50,9 +65,18 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
             )
         ), 180);
 
+        foreach (preg_split('/\r\n|\r|\n/', trim($out)) ?: [] as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $emit($line, ConsoleAction::LEVEL_INFO, 'traefik');
+        }
+
         if (! preg_match('/DPLY_TRAEFIK_EXIT:0\s*$/', $out)) {
             throw new \RuntimeException('Traefik provisioning failed. Output: '.Str::limit($out, 2000));
         }
+
+        $emit->success('reload OK', 'traefik');
 
         $meta = is_array($site->meta) ? $site->meta : [];
         $meta['traefik_backend_port'] = $backendPort;

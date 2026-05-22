@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -26,6 +27,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceDaemons extends Component
 {
+    use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
@@ -140,9 +142,6 @@ class WorkspaceDaemons extends Component
 
     public string $copy_new_slug = '';
 
-    /** null = not checked yet (wire:init), true/false from dpkg on server */
-    public ?bool $supervisor_installed = null;
-
     public function mount(Server $server, ?Site $site = null): void
     {
         if ($site !== null) {
@@ -154,11 +153,7 @@ class WorkspaceDaemons extends Component
         $this->bootWorkspace($server);
         $this->new_sv_user = $this->defaultProgramUser();
         $this->new_sv_directory = $this->defaultProgramDirectory();
-        $this->supervisor_installed = match ($server->supervisor_package_status) {
-            Server::SUPERVISOR_PACKAGE_INSTALLED => true,
-            Server::SUPERVISOR_PACKAGE_MISSING => false,
-            default => null,
-        };
+        $this->initSupervisorInstallStatus($server);
 
         $resolvedSiteId = $site?->id;
         if ($resolvedSiteId === null) {
@@ -194,6 +189,8 @@ class WorkspaceDaemons extends Component
                 'laravel-octane',
                 'nodejs',
                 'sidekiq',
+                'solid-queue',
+                'action-cable',
             ], true)) {
             $this->applySupervisorPreset($preset);
         }
@@ -279,6 +276,18 @@ class WorkspaceDaemons extends Component
                 'sidekiq',
                 'custom',
                 'bundle exec sidekiq -C config/sidekiq.yml',
+                $this->defaultAppDirectory()
+            ),
+            'solid-queue' => $this->applySupervisorPresetValues(
+                'solid-queue',
+                'custom',
+                'bin/jobs',
+                $this->defaultAppDirectory()
+            ),
+            'action-cable' => $this->applySupervisorPresetValues(
+                'action-cable',
+                'custom',
+                'bundle exec puma -p 28080 cable/config.ru',
                 $this->defaultAppDirectory()
             ),
             default => null,
@@ -573,15 +582,34 @@ class WorkspaceDaemons extends Component
 
                 return;
             }
+            $oldSnapshot = [
+                'slug' => $prog->slug,
+                'program_type' => $prog->program_type,
+                'command' => $prog->command,
+                'directory' => $prog->directory,
+                'user' => $prog->user,
+                'numprocs' => $prog->numprocs,
+                'site_id' => $prog->site_id,
+            ];
             $prog->update($attrs);
+            SupervisorDaemonAudit::log($this->server->fresh(), $prog->fresh(), 'program_updated', [
+                'old' => $oldSnapshot,
+                'new' => array_intersect_key($attrs, $oldSnapshot),
+            ]);
             $this->toastSuccess(__('Program updated. Sync Supervisor on the server to apply changes.'));
             $this->cancelEditProgram();
         } else {
             $type = $this->new_sv_type;
             $nproc = $this->new_sv_numprocs;
-            SupervisorProgram::query()->create(array_merge($attrs, [
+            $created = SupervisorProgram::query()->create(array_merge($attrs, [
                 'server_id' => $this->server->id,
             ]));
+            SupervisorDaemonAudit::log($this->server->fresh(), $created->fresh(), 'program_created', [
+                'slug' => $created->slug,
+                'program_type' => $created->program_type,
+                'numprocs' => $created->numprocs,
+                'site_id' => $created->site_id,
+            ]);
             $this->cancelEditProgram();
             $this->resetDefaultsForNewProgramForm();
             $msg = __('Program saved. Sync Supervisor on the server to apply changes.');
@@ -756,10 +784,17 @@ class WorkspaceDaemons extends Component
     public function deleteOrgTemplate(string $templateId): void
     {
         $this->authorize('update', $this->server);
-        OrganizationSupervisorProgramTemplate::query()
+        $tpl = OrganizationSupervisorProgramTemplate::query()
             ->where('organization_id', $this->server->organization_id)
             ->whereKey($templateId)
-            ->delete();
+            ->first();
+        if ($tpl !== null) {
+            $tpl->delete();
+            SupervisorDaemonAudit::log($this->server->fresh(), null, 'template_deleted', [
+                'template_slug' => $tpl->slug,
+                'template_name' => $tpl->name,
+            ]);
+        }
         $this->toastSuccess(__('Template removed.'));
     }
 
@@ -902,34 +937,23 @@ class WorkspaceDaemons extends Component
         $this->authorize('update', $this->server);
         $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
         if ($prog) {
+            $snapshot = [
+                'slug' => $prog->slug,
+                'program_type' => $prog->program_type,
+                'command' => $prog->command,
+                'directory' => $prog->directory,
+                'user' => $prog->user,
+                'numprocs' => $prog->numprocs,
+                'site_id' => $prog->site_id,
+            ];
             $provisioner->deleteConfigFile($this->server, $prog->id);
             $prog->delete();
+            SupervisorDaemonAudit::log($this->server->fresh(), null, 'program_deleted', $snapshot);
         }
         if ($this->editing_program_id === $id) {
             $this->cancelEditProgram();
         }
         $this->toastSuccess(__('Removed. Sync Supervisor to reload on the server.'));
-    }
-
-    public function refreshSupervisorInstallStatus(SupervisorProvisioner $provisioner): void
-    {
-        $this->authorize('view', $this->server);
-        $this->server->refresh();
-        if ($this->server->supervisor_package_status !== null) {
-            $this->supervisor_installed = $this->server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED;
-
-            return;
-        }
-        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->supervisor_installed = false;
-
-            return;
-        }
-        $installed = $provisioner->isSupervisorPackageInstalled($this->server->fresh());
-        $this->server->update([
-            'supervisor_package_status' => $installed ? Server::SUPERVISOR_PACKAGE_INSTALLED : Server::SUPERVISOR_PACKAGE_MISSING,
-        ]);
-        $this->supervisor_installed = $installed;
     }
 
     public function installSupervisorPackage(SupervisorProvisioner $provisioner): void
@@ -945,6 +969,10 @@ class WorkspaceDaemons extends Component
             } else {
                 $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
             }
+            SupervisorDaemonAudit::log($this->server->fresh(), null, 'package_install_attempted', [
+                'installed' => (bool) $this->supervisor_installed,
+                'output' => Str::limit($out, 1000),
+            ]);
             $this->toastSuccess(__('Supervisor was installed on the server. You can add programs and sync.'));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -1151,6 +1179,16 @@ class WorkspaceDaemons extends Component
             ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
             : null;
 
+        // Header at-a-glance counts. Computed against the visible (filtered) set so the
+        // numbers match what the operator sees in the program list below — switching the
+        // programs_list_scope (site vs all) flips the stats too.
+        $stats = [
+            'total' => $filteredSupervisorPrograms->count(),
+            'active' => $filteredSupervisorPrograms->where('is_active', true)->count(),
+            'inactive' => $filteredSupervisorPrograms->where('is_active', false)->count(),
+            'total_processes' => (int) $filteredSupervisorPrograms->where('is_active', true)->sum('numprocs'),
+        ];
+
         return view('livewire.servers.workspace-daemons', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
@@ -1162,6 +1200,7 @@ class WorkspaceDaemons extends Component
             'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
             'contextSiteModel' => $contextSiteModel,
             'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
+            'daemonsStats' => $stats,
         ]);
     }
 }

@@ -78,7 +78,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
 
         $response->assertOk()
             ->assertSee('PHP')
@@ -188,7 +188,7 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
 
         $response->assertOk()
             ->assertSee('PHP version mismatch')
@@ -201,13 +201,16 @@ class SiteTest extends TestCase
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
+        // 5.6 is far below the supported floor (server_provision_options
+        // lists 8.5 / 8.4 / 8.3 / 7.4); 8.5 and 7.4 are still listed
+        // in the config so they don't make good "unsupported" fixtures.
         $server = Server::factory()->ready()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'meta' => [
                 'php_inventory' => [
                     'supported' => true,
-                    'installed_versions' => ['8.4', '8.5'],
+                    'installed_versions' => ['8.4', '5.6'],
                     'detected_default_version' => '8.4',
                 ],
             ],
@@ -220,11 +223,11 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
+        $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php'], false));
 
         $response->assertOk()
             ->assertSee('PHP 8.4')
-            ->assertDontSee('value="8.5"', escape: false);
+            ->assertDontSee('value="5.6"', escape: false);
     }
 
     public function test_site_php_settings_can_be_saved_from_site_settings_for_installed_versions_only(): void
@@ -658,6 +661,10 @@ class SiteTest extends TestCase
 
     public function test_functions_host_site_settings_deploy_hides_server_only_controls(): void
     {
+        // The deploy *config* tab for a functions site only exposes the
+        // recipe (repo URL / branch / build command / pipeline / hooks);
+        // serverless invocation metadata (target, function URL, runtime,
+        // ARN) lives on the Overview / serverless dashboard, not here.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -687,16 +694,24 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Serverless deploy target')
-            ->assertSee('DigitalOcean Functions')
+            // Positive: confirm we're on the functions-flavored deploy config tab.
+            // The "Deploy command" label and "Repository subdirectory" field
+            // only render when the site is a functions host.
+            ->assertSee('Deploy command')
+            ->assertSee('Repository subdirectory')
+            // Negative: server-only controls must not appear.
             ->assertDontSee('Install / update Nginx site')
             ->assertDontSee('Issue / renew SSL')
             ->assertDontSee('Push .env to server')
             ->assertDontSee('Generate deploy key');
     }
 
-    public function test_aws_lambda_site_settings_deploy_shows_lambda_details(): void
+    public function test_aws_lambda_site_settings_deploy_renders_recipe_only(): void
     {
+        // Lambda-specific invocation metadata (target = AWS Lambda, function
+        // ARN, runtime) now lives on the Overview / serverless dashboard.
+        // The deploy config tab is recipe-only and should render cleanly for
+        // a Lambda site without breaking on missing host concepts.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -729,10 +744,11 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
 
         $response->assertOk()
-            ->assertSee('Serverless deploy target')
-            ->assertSee('AWS Lambda')
-            ->assertSee('Function ARN')
-            ->assertSee('provided.al2023');
+            ->assertSee('Deploy command')
+            ->assertSee('Repository subdirectory')
+            // Invocation metadata moved to Overview — must not leak back here.
+            ->assertDontSee('Function ARN')
+            ->assertDontSee('Latest managed artifact');
     }
 
     public function test_functions_host_deploy_uses_digitalocean_functions_engine(): void
@@ -741,6 +757,8 @@ class SiteTest extends TestCase
             'https://faas-nyc1-example.doserverless.co/api/v1/namespaces/*' => Http::response([
                 'version' => '7',
             ], 200),
+            // The post-deploy health check GETs the web invocation URL.
+            'https://faas-nyc1-example.doserverless.co/api/v1/web/*' => Http::response('ok', 200),
         ]);
 
         $origin = storage_path('framework/testing/functions-deploy-repo-'.uniqid());
@@ -775,7 +793,6 @@ class SiteTest extends TestCase
                 'runtime_profile' => 'digitalocean_functions_web',
                 'serverless' => [
                     'runtime' => 'nodejs:18',
-                    'entrypoint' => 'index',
                     'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
                     'artifact_output_path' => 'dist',
                 ],
@@ -795,6 +812,24 @@ class SiteTest extends TestCase
         $this->assertSame('7', data_get($site->meta, 'serverless.last_revision_id'));
         $this->assertNotNull(data_get($site->meta, 'serverless.artifact_path'));
         $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
+        // The post-deploy health check ran and the function answered.
+        $this->assertStringContainsString('Health check: HTTP 200', (string) $deployment->log_output);
+
+        // The action API uses the `_` namespace placeholder (not the literal
+        // namespace, which 404s) and marks the action web-exported.
+        Http::assertSent(function ($request) {
+            if ($request->method() !== 'PUT') {
+                return false;
+            }
+            $annotations = collect($request['annotations'] ?? []);
+
+            return str_contains($request->url(), '/api/v1/namespaces/_/actions/')
+                && ! str_contains($request->url(), 'fn-namespace/actions')
+                // exec.main is the OpenWhisk handler function name — dply's
+                // runtimes export `main`, never the `index` file basename.
+                && data_get($request->data(), 'exec.main') === 'main'
+                && $annotations->contains(fn ($a) => ($a['key'] ?? null) === 'web-export' && ($a['value'] ?? null) === true);
+        });
     }
 
     public function test_aws_lambda_host_deploy_uses_aws_lambda_engine(): void
@@ -1079,13 +1114,20 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
         $response->assertOk()
-            ->assertSee('Installing your site')
+            ->assertSee('Site provisioning')
             ->assertSee('Checking reachability')
             ->assertSee('preview-app.dply.cc');
     }
 
-    public function test_site_settings_route_redirects_to_site_show_general_section(): void
+    public function test_site_settings_route_redirects_legacy_webhooks_section_to_notifications(): void
     {
+        // The legacy /servers/{server}/sites/{site}/settings/{section} URL now lives
+        // only as a redirect for renamed sections (webhooks → notifications;
+        // domains/aliases/redirects/preview/tenants → routing). A request without a
+        // section is handled by the wildcard SiteSettings route directly and does
+        // not 302 anywhere, so the older "bare URL → general" test no longer matches
+        // real behavior; this version exercises the actual rename path that still
+        // exists in routes/web.php.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1099,9 +1141,17 @@ class SiteTest extends TestCase
             'status' => Site::STATUS_NGINX_ACTIVE,
         ]);
 
-        $response = $this->actingAs($user)->get(route('sites.settings', [$server, $site], false));
+        $response = $this->actingAs($user)->get(route('sites.settings', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'webhooks',
+        ], false));
 
-        $response->assertRedirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
+        $response->assertRedirect(route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'notifications',
+        ], false));
     }
 
     public function test_site_show_defaults_to_general_site_workspace(): void
@@ -1188,7 +1238,7 @@ class SiteTest extends TestCase
             ->assertSee('Detected');
     }
 
-    public function test_site_environment_section_uses_shared_inventory_for_serverless_sites(): void
+    public function test_site_environment_section_renders_keys_for_serverless_sites(): void
     {
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
@@ -1228,18 +1278,16 @@ class SiteTest extends TestCase
             'section' => 'environment',
         ], false));
 
+        // Functions-backed sites have no host .env, so the cache IS the truth
+        // and the page hides Sync/Push CTAs but keeps the keys list usable.
+        // The explainer paragraph mentions the verbs as concepts; check for the
+        // CTA wire:click handlers to confirm the actual buttons are absent.
         $response->assertOk()
-            ->assertSee('Shared environment inventory')
-            ->assertSee('Final inventory')
-            ->assertSee('2')
-            ->assertSee('Runtime delivery')
-            ->assertSee('Injected into the provider runtime environment payload during publish.')
-            ->assertSee('Shared inventory preview')
+            ->assertSee('Environment variables')
             ->assertSee('APP_KEY')
-            ->assertSee('Redacted')
             ->assertSee('APP_NAME')
-            ->assertSee('Functions Demo')
-            ->assertDontSee('Push .env to server');
+            ->assertDontSee('wire:click="syncEnvFromServer"', false)
+            ->assertDontSee('wire:click="pushEnvToServer"', false);
     }
 
     public function test_site_settings_legacy_routing_section_redirects_to_routing_tab(): void
@@ -1372,7 +1420,7 @@ class SiteTest extends TestCase
             ->assertHasNoErrors()
             ->assertDispatched('notify', message: __('System user settings saved.'), type: 'success');
 
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
         $site->refresh();
 
@@ -1902,7 +1950,6 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime'], false));
 
         $response->assertOk()
-            ->assertSee('Container app workspace')
             ->assertSee('Back to apps')
             ->assertSee('Overview')
             ->assertSee('Deployments')
@@ -1910,16 +1957,21 @@ class SiteTest extends TestCase
             ->assertSee('Networking')
             ->assertDontSee('Certificates')
             ->assertSee('Docker discovery')
-            ->assertSee('Runtime management')
-            ->assertSee('Errors')
+            ->assertSee('Container lifecycle')
             ->assertSee('Refresh Docker details')
             ->assertSee('laravel.repo.orb.local')
             ->assertSee('192.168.107.2')
             ->assertSee('laravel.repo');
     }
 
-    public function test_site_settings_general_section_uses_app_language_for_cloud_runtime_paths(): void
+    public function test_site_settings_general_section_renders_container_dashboard_for_cloud_app(): void
     {
+        // Container workspaces (docker / k8s) get the dedicated container-dashboard
+        // partial on Overview — backend / region / port / instances / size / live URL
+        // — instead of the VM-shaped overview. The VM-shaped read-only overview,
+        // Status, project context, and Networking group are deliberately absent:
+        // those concepts belong to the dply edge or the operator's artifact, not
+        // to this workspace.
         $user = $this->userWithOrganization();
         $org = $user->currentOrganization();
         $server = Server::factory()->ready()->create([
@@ -1949,12 +2001,18 @@ class SiteTest extends TestCase
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
 
         $response->assertOk()
-            ->assertSee('Cloud app workspace')
-            ->assertSee('Primary hostname')
+            // Container-dashboard labels (the new Overview shape).
+            ->assertSee('Container deployment')
+            ->assertSee('Backend')
+            ->assertSee('Live URL')
+            // The Overview sidebar item still labels itself "Overview" for container sites.
             ->assertSee('Overview')
-            ->assertSee('Networking')
-            ->assertSee('App project settings')
-            ->assertSee('App details');
+            // VM-shaped overview content stays hidden for container workspaces.
+            ->assertDontSee('Primary hostname')
+            ->assertDontSee('App details')
+            // Networking is no longer a sidebar group for container workspaces —
+            // routing/DNS/certificates belong to the dply edge, not this workspace.
+            ->assertDontSee('>Networking<', false);
     }
 
     public function test_refresh_docker_details_persists_discovered_runtime_metadata(): void
@@ -2346,7 +2404,7 @@ class SiteTest extends TestCase
             ->call('confirmActionModal');
 
         $this->assertDatabaseMissing('site_domains', ['id' => $domain->id]);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_aliases_section_can_add_alias(): void
@@ -2373,14 +2431,14 @@ class SiteTest extends TestCase
             ->set('new_alias_label', 'Marketing alias')
             ->call('addAlias')
             ->assertHasNoErrors()
-            ->assertDispatched('notify', message: 'Alias added. Webserver config reloaded.', type: 'success');
+            ->assertDispatched('notify', message: 'Alias added. Webserver config queued.', type: 'success');
 
         $this->assertDatabaseHas('site_domain_aliases', [
             'site_id' => $site->id,
             'hostname' => 'www.example.com',
             'label' => 'Marketing alias',
         ]);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_tenants_section_can_add_tenant_domain(): void
@@ -2406,10 +2464,10 @@ class SiteTest extends TestCase
             ->set('new_tenant_hostname', 'acme.example.com')
             ->set('new_tenant_key', 'acme')
             ->set('new_tenant_label', 'Acme')
-            ->set('new_tenant_notes', 'App resolver uses the hostname.')
+            ->set('new_tenant_comment', 'App resolver uses the hostname.')
             ->call('addTenantDomain')
             ->assertHasNoErrors()
-            ->assertDispatched('notify', message: 'Tenant domain added. Webserver config reloaded.', type: 'success');
+            ->assertDispatched('notify', message: 'Tenant domain added. Webserver config queued.', type: 'success');
 
         $this->assertDatabaseHas('site_tenant_domains', [
             'site_id' => $site->id,
@@ -2417,7 +2475,7 @@ class SiteTest extends TestCase
             'tenant_key' => 'acme',
             'label' => 'Acme',
         ]);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_redirects_section_renders_separately(): void
@@ -2437,10 +2495,13 @@ class SiteTest extends TestCase
 
         $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'redirects'], false));
 
+        // Manual "Apply webserver config now" button was removed when the
+        // Routing page adopted the env-page UX (auto-apply on every save).
+        // The page still renders the section header, the Add CTA, and the
+        // "Auto-applied to the webserver after save." note in the modal.
         $response->assertOk()
             ->assertSee('Redirects')
-            ->assertSee('Add redirect')
-            ->assertSee('Apply webserver config now');
+            ->assertSee('Add redirect');
     }
 
     public function test_site_show_can_add_internal_redirect(): void
@@ -2542,10 +2603,9 @@ class SiteTest extends TestCase
 
         $response->assertOk()
             ->assertSee('Logs')
-            ->assertSee('Site logs')
-            ->assertSee('Platform activity')
             ->assertSee('Deploy completed successfully.')
             ->assertSee('Accepted deploy webhook.')
+            ->assertSee('Open server logs')
             ->assertSee(route('servers.logs', $server, false), escape: false);
     }
 
@@ -2585,7 +2645,7 @@ class SiteTest extends TestCase
 
         $this->assertSame('/srv/new/public', $site->document_root);
         $this->assertSame('new.example.com', $domain->hostname);
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_project_settings_can_assign_workspace(): void
@@ -2790,7 +2850,7 @@ class SiteTest extends TestCase
         $this->assertSame('preview-new.dply.cc', $previewDomain->hostname);
         $this->assertTrue($previewDomain->is_primary);
         $this->assertSame('preview-new.dply.cc', $site->testingHostname());
-        Bus::assertDispatchedSync(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+        Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
     }
 
     public function test_site_settings_domains_section_shows_quick_ssl_action_only_for_uncovered_domains(): void
@@ -3173,7 +3233,7 @@ class SiteTest extends TestCase
         $this->actingAs($user)
             ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'dns'], false))
             ->assertOk()
-            ->assertSee('DNS settings', escape: false);
+            ->assertSee('DNS automation', escape: false);
 
         Livewire::actingAs($user)
             ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])

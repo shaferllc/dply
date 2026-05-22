@@ -42,6 +42,11 @@ class Create extends Component
         session(['current_organization_id' => $org->id]);
         Session::forget('current_team_id');
 
+        audit_log($org, auth()->user(), 'organization.created', $org, null, [
+            'name' => $org->name,
+            'slug' => $org->slug,
+        ]);
+
         Session::flash('success', 'Organization created.');
 
         return $this->redirect(route('organizations.show', $org), navigate: true);

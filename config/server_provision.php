@@ -45,6 +45,63 @@ return [
     'deploy_ssh_user' => env('DPLY_SERVER_DEPLOY_SSH_USER', 'dply'),
 
     /*
+    | Install python3-minimal + deploy the metrics snapshot script
+    | during provision so freshly-built servers start collecting
+    | CPU/RAM/disk data automatically. Disable to keep the install
+    | behind the manual "Install Python for monitoring" service action.
+    */
+    'install_metrics_agent' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT', true),
+
+    /*
+    | Install the metrics agent INLINE during the bash provision script.
+    | When false (default), the inline step is skipped and the install
+    | runs over SSH after the journey completes via
+    | InstallMetricsAgentJob — saves 30–60s on the journey wall-clock at
+    | the cost of monitoring being unavailable for ~1 minute after the
+    | journey reads "ready". Set DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=true
+    | to force the inline behaviour back on.
+    */
+    'install_metrics_agent_inline' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE', false),
+
+    /*
+    | Disable cloud-init's apt-daily / apt-daily-upgrade /
+    | unattended-upgrades units at the very start of bash provisioning.
+    | Without this, freshly-booted droplets often hold the dpkg lock
+    | for 30–90s while cloud-init runs unattended-upgrades, and our
+    | bootstrap politely waits before evicting (see dply_wait_for_apt_locks).
+    | Pre-evicting up-front saves up to 90s of journey wall-clock on
+    | clean boots; security drift is closed by Dply's recurring
+    | maintenance scheduler instead.
+    */
+    'preempt_cloud_init_upgrades' => (bool) env('DPLY_PROVISION_PREEMPT_CLOUD_INIT_UPGRADES', true),
+
+    /*
+    | When true (default), mise installs Node / Python / Ruby from
+    | prebuilt release binaries (MISE_*_COMPILE=0). Saves 90–240s for
+    | Python/Ruby (which default to compile-from-source via
+    | python-build / ruby-build) and is a no-op for Node (which already
+    | defaults to binary). Set DPLY_MISE_PREFER_BINARY=false to fall
+    | back to the legacy compile path.
+    */
+    'mise_prefer_binary' => (bool) env('DPLY_MISE_PREFER_BINARY', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Per-step ETA (server_provision_step_runs)
+    |--------------------------------------------------------------------------
+    |
+    | The journey UI shows an "Avg X minutes (from N runs)" chip on the
+    | active step + each pending step, computed from the org's previous
+    | provisions in server_provision_step_runs. Below `step_eta_min_samples`
+    | non-resumed rows the chip falls back to the static "Usually X" copy
+    | so we don't display misleading averages from a single run.
+    | Cached at the org+label_hash level for `step_eta_cache_ttl_seconds`.
+    */
+    'step_eta_min_samples' => max(1, (int) env('DPLY_STEP_ETA_MIN_SAMPLES', 3)),
+
+    'step_eta_cache_ttl_seconds' => max(0, (int) env('DPLY_STEP_ETA_CACHE_TTL_SECONDS', 600)),
+
+    /*
     |--------------------------------------------------------------------------
     | Optional extras for application / docker roles
     |--------------------------------------------------------------------------
@@ -76,6 +133,23 @@ return [
     |
     */
     'install_supervisor_on_provision' => (bool) env('DPLY_INSTALL_SUPERVISOR_ON_PROVISION', true),
+
+    /*
+    |--------------------------------------------------------------------------
+    | mise (multi-runtime version manager)
+    |--------------------------------------------------------------------------
+    |
+    | When true (default), application + worker servers get mise installed
+    | system-wide and activated for the deploy user during initial setup.
+    | mise manages Node / Python / Ruby / Go versions per the multi-runtime
+    | strategy; PHP stays on ondrej/php apt instead.
+    |
+    | Set DPLY_INSTALL_MISE_ON_PROVISION=false to skip on hosts that should
+    | be PHP-only (or behind isolated networks where the mise apt repo is
+    | unreachable).
+    |
+    */
+    'install_mise_on_provision' => (bool) env('DPLY_INSTALL_MISE_ON_PROVISION', true),
 
     /*
     |--------------------------------------------------------------------------

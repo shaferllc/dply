@@ -18,11 +18,15 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class ProjectsTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.projects'];
 
     protected function userWithOrganization(string $role = 'owner'): User
     {

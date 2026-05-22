@@ -34,6 +34,16 @@
         'rectangle-group' => 'heroicon-o-rectangle-group',
         'server-stack' => 'heroicon-o-server-stack',
         'globe-alt' => 'heroicon-o-globe-alt',
+        'rocket-launch' => 'heroicon-o-rocket-launch',
+        'cpu-chip' => 'heroicon-o-cpu-chip',
+        'light-bulb' => 'heroicon-o-light-bulb',
+        'chart-bar' => 'heroicon-o-chart-bar',
+        'command-line' => 'heroicon-o-command-line',
+        'circle-stack' => 'heroicon-o-circle-stack',
+        'clock' => 'heroicon-o-clock',
+        'clipboard-document-list' => 'heroicon-o-clipboard-document-list',
+        'wrench-screwdriver' => 'heroicon-o-wrench-screwdriver',
+        'cog-8-tooth' => 'heroicon-o-cog-8-tooth',
     ];
 @endphp
 

@@ -13,11 +13,14 @@ use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
+use App\Services\Servers\ProvisionStepEtaService;
 use App\Services\Servers\ServerJourneyInfrastructureAlerts;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ClassifyProvisionFailure;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionPipelineLog;
+use App\Support\Servers\ProvisionStepDurations;
 use App\Support\Servers\ProvisionStepSnapshots;
 use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
@@ -33,6 +36,8 @@ class ProvisionJourney extends Component
     use InteractsWithServerWorkspace;
 
     public bool $showCancelProvisionModal = false;
+
+    public bool $showResumeInstallModal = false;
 
     /** @var string SHA-256 of last logged journey snapshot (avoids log spam on wire:poll). */
     public string $journeyViewLogSignature = '';
@@ -120,6 +125,12 @@ class ProvisionJourney extends Component
             'run' => $run,
             'infrastructureAlerts' => app(ServerJourneyInfrastructureAlerts::class)->forServer($this->server),
             'localDevShellHints' => $this->localDevShellHints(),
+            // True when this server row was created during a prior
+            // fake-cloud session but DPLY_FAKE_CLOUD_PROVISION is now
+            // off. The view surfaces a clear "orphan — delete and
+            // recreate" banner instead of misleading the operator with
+            // "100% complete" stats from cached fake-cloud step state.
+            'isOrphanedFakeServer' => FakeCloudProvision::isOrphanedFakeServer($this->server),
             'artifacts' => $artifacts,
             'steps' => $steps,
             'completedCount' => $completedCount,
@@ -131,6 +142,12 @@ class ProvisionJourney extends Component
             'verificationChecks' => $verificationChecks,
             'failureClassification' => $failureClassification,
             'repairGuidance' => $repairGuidance,
+            // Reconciled snapshot of what physically landed (vs the
+            // wizard's request). View uses this to render the
+            // "Requested vs Installed" divergence banner when applicable.
+            'installedStack' => InstalledStack::fromMeta($this->server),
+            'installedStackDiverges' => InstalledStack::fromMeta($this->server)->divergesFromRequest($this->server),
+            'requestedDatabase' => $this->server->meta['database'] ?? null,
             'stackSummary' => $stackSummary,
             'stackTiles' => $stackSummary ? [
                 ['label' => __('Role'),        'value' => $stackSummary['role'],         'icon' => 'heroicon-o-rectangle-stack'],
@@ -145,8 +162,6 @@ class ProvisionJourney extends Component
             'canCancelProvision' => $this->canCancelProvision($task),
             'liveTaskOutput' => $this->liveTaskOutput($task),
             'liveTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
-            'fullTaskOutput' => $this->fullTaskOutput($task),
-            'fullTaskOutputLineCount' => $this->liveTaskOutputLineCount($task),
             'taskUpdatedAt' => $task?->updated_at,
             'rollbackSummary' => $this->rollbackSummary($task),
             'failureReason' => $this->failureReason($task, collect($steps)->firstWhere('state', 'failed')),
@@ -230,7 +245,13 @@ class ProvisionJourney extends Component
      */
     protected function localDevShellHints(): ?array
     {
-        if (! app()->environment('local')) {
+        // Two gates per the local-dev pattern: only render when the
+        // operator is actually running fake-cloud locally. Disabling
+        // DPLY_FAKE_CLOUD_PROVISION (or moving to a non-local env)
+        // hides the local-docker shell hints entirely so production
+        // operators don't see "exec into the dply-ssh-dev container"
+        // hints that would mislead them.
+        if (! app()->environment('local') || ! FakeCloudProvision::enabled()) {
             return null;
         }
 
@@ -266,9 +287,21 @@ class ProvisionJourney extends Component
             && $this->server->setup_status === Server::SETUP_STATUS_DONE;
     }
 
+    public function openResumeInstallModal(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->showResumeInstallModal = true;
+    }
+
+    public function closeResumeInstallModal(): void
+    {
+        $this->showResumeInstallModal = false;
+    }
+
     public function rerunSetup(): void
     {
         $this->authorize('update', $this->server);
+        $this->showResumeInstallModal = false;
 
         $server = $this->server->fresh();
         if (! $server || ! RunSetupScriptJob::shouldDispatch($server)) {
@@ -386,13 +419,36 @@ class ProvisionJourney extends Component
         } elseif ($server->status === Server::STATUS_READY && $server->setup_status === Server::SETUP_STATUS_RUNNING) {
             $activeKey = $lastSeenScriptKey ?? ($scriptStepKeys[0] ?? 'setup');
         } elseif ($server->status === Server::STATUS_READY) {
-            $activeKey = 'ready';
+            // Only flip to the terminal 'ready' step once setup is *actually*
+            // done. Previously this branch matched on status alone, which
+            // caught the brief window after SSH comes up but before the
+            // setup job has stamped setup_status (= null) — and marked
+            // every cloud + setup step "completed", showing both progress
+            // bars at 100% on a server that hadn't started running its
+            // bash provision yet. Treat null/unknown like PENDING so the
+            // journey holds on 'ssh' until the setup job takes over.
+            $activeKey = $server->setup_status === Server::SETUP_STATUS_DONE ? 'ready' : 'ssh';
         }
 
         $stepIndex = array_flip(array_column($steps, 'key'));
         $activeIndex = $stepIndex[$activeKey] ?? 0;
 
-        return array_map(function (array $step, int $index) use ($activeIndex, $failedKey, $task, $server): array {
+        // Bulk-resolve ETAs for every script step in one query. The
+        // step key for script steps IS the label hash (both come from
+        // ProvisionStepSnapshots::keyForLabel), so we can hand the keys
+        // directly to the service. Cloud-side steps (queued, provisioning,
+        // ip, ssh, ready, setup placeholder) have no historical row and
+        // the lookup just returns nothing for them.
+        $etaByKey = app(ProvisionStepEtaService::class)
+            ->averagesForLabels(
+                array_values(array_filter(
+                    array_column($steps, 'key'),
+                    static fn (string $k): bool => str_starts_with($k, 'script_'),
+                )),
+                $server->organization,
+            );
+
+        return array_map(function (array $step, int $index) use ($activeIndex, $failedKey, $task, $server, $etaByKey): array {
             $state = 'pending';
 
             if ($failedKey === $step['key']) {
@@ -414,6 +470,11 @@ class ProvisionJourney extends Component
                 'detail' => $this->stepDetail($step['key'], $task, $server, $state),
                 'output' => $this->stepOutput($step['key'], $task, $server, $state),
                 'duration' => $this->stepDuration($step['key'], $task, $server, $state),
+                // null when no historical average is available (cold start
+                // org, or fewer than step_eta_min_samples runs for this
+                // step). View should fall back to the static "Usually X"
+                // copy when this is missing.
+                'eta' => $etaByKey[$step['key']] ?? null,
             ];
         }, $steps, array_keys($steps));
     }
@@ -459,11 +520,83 @@ class ProvisionJourney extends Component
             return null;
         }
 
-        if (($key === 'setup' || $this->scriptStepLabelForKey($task, $key) !== null) && $task) {
-            return $task->getDurationForHumans();
+        $isScriptStep = $key === 'setup' || $this->scriptStepLabelForKey($task, $key) !== null;
+
+        if (! $isScriptStep) {
+            // Cloud-side steps (queued / provisioning / ip / ssh / ready) —
+            // use the elapsed-since-server-created proxy. We don't track
+            // these steps in the duration table because their timing is
+            // owned by the cloud provider, not the bash script.
+            return $server->created_at?->diffForHumans(now(), true);
         }
 
-        return $server->created_at?->diffForHumans(now(), true);
+        if (! $task) {
+            return null;
+        }
+
+        // Per-step durations come from the `[dply-step-end]` markers
+        // emitted by ServerProvisionCommandBuilder::withStep(). For a
+        // step that's already completed we have the recorded value
+        // directly; for the *active* step there's no end marker yet,
+        // so we approximate "running for" as
+        //   (task elapsed) - (sum of all completed step durations).
+        // That folds out the time spent on prior steps and leaves only
+        // the time accumulated since this step started — which used to
+        // be wrong, the active script step was showing the entire task
+        // wall-clock instead of its own slice.
+        $endDurations = $this->stepEndDurations($task);
+
+        if ($state === 'completed' && $key !== 'setup') {
+            $hash = $key; // script_<md5> already matches label_hash
+            if (isset($endDurations[$hash])) {
+                return $this->formatRunDuration($endDurations[$hash]);
+            }
+        }
+
+        if ($state === 'active') {
+            $started = $task->started_at ?? $task->created_at;
+            if ($started === null) {
+                return null;
+            }
+
+            $taskElapsed = (int) abs(now()->diffInSeconds($started, true));
+            $completedTotal = array_sum($endDurations);
+            $sliceSeconds = max(0, $taskElapsed - $completedTotal);
+
+            return $this->formatRunDuration($sliceSeconds);
+        }
+
+        return $task->getDurationForHumans();
+    }
+
+    /**
+     * Map of label_hash → recorded duration_seconds for every step that
+     * has emitted an end marker so far in this task's output. Cached
+     * per-render via a property to avoid re-parsing on every step row.
+     *
+     * @return array<string, int>
+     */
+    private array $stepEndDurationsCache = [];
+
+    private function stepEndDurations(Task $task): array
+    {
+        $cacheKey = (string) $task->id.'@'.(string) ($task->updated_at?->timestamp ?? 0);
+        if (array_key_exists($cacheKey, $this->stepEndDurationsCache)) {
+            return $this->stepEndDurationsCache[$cacheKey];
+        }
+
+        $output = is_string($task->output) ? $task->output : '';
+        $rows = ProvisionStepDurations::parse($output);
+
+        $map = [];
+        foreach ($rows as $row) {
+            // Resumed-skip rows have duration_seconds = 0; ignoring them
+            // would still be correct here because the active-step math
+            // relies on summing real elapsed seconds, not a count.
+            $map[$row['label_hash']] = ($map[$row['label_hash']] ?? 0) + (int) $row['duration_seconds'];
+        }
+
+        return $this->stepEndDurationsCache[$cacheKey] = $map;
     }
 
     protected function stepOutput(string $key, ?Task $task, Server $server, string $state): ?string
@@ -518,24 +651,6 @@ class ProvisionJourney extends Component
     }
 
     /**
-     * Full untrimmed task output for the "View full" modal — capped to keep page size sane.
-     */
-    protected function fullTaskOutput(?Task $task): string
-    {
-        if (! $task || ! is_string($task->output)) {
-            return '';
-        }
-
-        $output = trim($task->output);
-        // Hard cap to ~1MB so a runaway log doesn't bloat the rendered HTML.
-        if (strlen($output) > 1_000_000) {
-            $output = '… [truncated to last 1 MB] …'."\n".substr($output, -1_000_000);
-        }
-
-        return $output;
-    }
-
-    /**
      * Extract a one-line "why did this fail" headline + a few supporting lines from the
      * captured step output (or full task output as a fallback). Surfaces the actual error
      * message to the user instead of a generic "step failed before finishing" framing.
@@ -575,7 +690,23 @@ class ProvisionJourney extends Component
             return null;
         }
 
-        // Prefer high-signal lines: scan from the end for a known error shape.
+        // High-priority root-cause patterns: when these appear, they're
+        // almost always the actual cause of the failure even if a
+        // downstream symptom appears later (e.g. a PPA fetch timeout
+        // followed by "couldn't find package php8.4-mysql"). Scan the
+        // FULL meaningful set (not just the tail) so we catch causes
+        // that scrolled past the symptom.
+        $rootCausePatterns = [
+            '/Could not connect to/i',
+            '/Connection (?:timed out|refused)/i',
+            '/Failed to fetch/i',
+            '/Some index files failed to download/i',
+            '/Network is unreachable/i',
+            '/Temporary failure resolving/i',
+        ];
+
+        // Lower-priority symptom patterns — match these only when no
+        // root cause was found. Scanned from the tail backwards.
         $errorPatterns = [
             '/^E:\s/i',                                  // apt
             '/^Err:/i',                                  // apt
@@ -588,8 +719,7 @@ class ProvisionJourney extends Component
             '/command not found/i',
             '/exited with (?:status|code)\s+\d+/i',
             '/Timeout was reached/i',
-            '/Connection (?:timed out|refused)/i',
-            '/Failed to (?:fetch|start|connect|enable)/i',
+            '/Failed to (?:start|connect|enable)/i',
             '/dpkg:\s+error/i',
             '/Sub-process\s+\S+\s+returned/i',
         ];
@@ -598,11 +728,22 @@ class ProvisionJourney extends Component
         $contextStart = max(0, count($meaningful) - 8);
         $tail = array_slice($meaningful, $contextStart);
 
-        foreach (array_reverse($tail, true) as $line) {
-            foreach ($errorPatterns as $pattern) {
+        foreach ($meaningful as $line) {
+            foreach ($rootCausePatterns as $pattern) {
                 if (preg_match($pattern, $line) === 1) {
                     $headline = $line;
                     break 2;
+                }
+            }
+        }
+
+        if ($headline === null) {
+            foreach (array_reverse($tail, true) as $line) {
+                foreach ($errorPatterns as $pattern) {
+                    if (preg_match($pattern, $line) === 1) {
+                        $headline = $line;
+                        break 2;
+                    }
                 }
             }
         }
@@ -898,7 +1039,15 @@ class ProvisionJourney extends Component
             $actions[] = 'Review the failed verification checks: '.implode(', ', $failingChecks).'.';
         }
 
-        if (($failureClassification['code'] ?? null) === 'config_validation') {
+        if (($failureClassification['code'] ?? null) === 'package_repo_unreachable') {
+            $actions = [
+                'This usually means a package mirror or PPA was briefly unreachable. Click Re-run setup to try again.',
+                'If it keeps failing, check whether the server can reach archive.ubuntu.com and ppa.launchpadcontent.net (HTTPS, port 443).',
+                'In rare cases the PPA itself is offline — in that case waiting a few minutes is the only fix.',
+            ];
+            $commands[] = 'curl -I https://ppa.launchpadcontent.net';
+            $commands[] = 'sudo apt-get update';
+        } elseif (($failureClassification['code'] ?? null) === 'config_validation') {
             $commands[] = 'sudo nginx -t';
             $commands[] = 'sudo haproxy -c -f /etc/haproxy/haproxy.cfg';
         } elseif (($failureClassification['code'] ?? null) === 'service_startup') {
@@ -953,8 +1102,8 @@ class ProvisionJourney extends Component
     }
 
     /**
-     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>  $steps
-     * @return array{eta:string,last_output:string,stalled:bool,warning:?string}|null
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string,eta:?array{seconds:int,samples:int}}>  $steps
+     * @return array{eta:string,eta_samples:?int,running_for:string,last_output:?string,stalled:bool,warning:?string}|null
      */
     protected function stallState(?Task $task, array $steps): ?array
     {
@@ -963,23 +1112,67 @@ class ProvisionJourney extends Component
         }
 
         $activeStep = collect($steps)->firstWhere('state', 'active');
-        $minutesSinceUpdate = (int) max(0, now()->diffInMinutes($task->updated_at ?? $task->started_at ?? now()));
-        $minutesRunning = (int) max(0, now()->diffInMinutes($task->started_at ?? $task->created_at ?? now()));
-        $eta = match ($activeStep['key'] ?? null) {
-            'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
-            'setup' => 'Usually 5-10 minutes',
-            default => 'Usually a few minutes',
-        };
+        $now = now();
+        // Carbon 3's diffInSeconds() returns a SIGNED float — when the
+        // argument is in the past it comes back negative, and max(0, …)
+        // then clamps the timer to zero. Operators saw "Running for 0s"
+        // sit there forever even after several minutes for that reason.
+        // Pass `true` for absolute, then int-cast — keeps the timer
+        // monotonic regardless of which Carbon version is active.
+        $secondsSinceUpdate = (int) abs($now->diffInSeconds($task->updated_at ?? $task->started_at ?? $now, true));
+        $secondsRunning = (int) abs($now->diffInSeconds($task->started_at ?? $task->created_at ?? $now, true));
 
+        // Prefer the data-driven ETA from past runs over the static
+        // "Usually X minutes" copy. The eta payload only lands on
+        // script_* steps (cloud-side keys never have one) and only
+        // when sample size cleared the configured threshold.
+        $etaSamples = null;
+        $stepEta = $activeStep['eta'] ?? null;
+        if (is_array($stepEta) && ($stepEta['seconds'] ?? 0) > 0) {
+            $eta = sprintf('Avg %s', $this->formatRunDuration((int) $stepEta['seconds']));
+            $etaSamples = (int) ($stepEta['samples'] ?? 0);
+        } else {
+            $eta = match ($activeStep['key'] ?? null) {
+                'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
+                'setup' => 'Usually 5-10 minutes',
+                default => 'Usually a few minutes',
+            };
+        }
+
+        // Stall heuristics in minutes (integer thresholds are fine here
+        // because we round up to favour the operator: a 2m59s gap should
+        // still tip into "looks stalled" sooner rather than later).
+        $minutesSinceUpdate = (int) ceil($secondsSinceUpdate / 60);
+        $minutesRunning = (int) ceil($secondsRunning / 60);
         $stalled = $minutesSinceUpdate >= 3 || $minutesRunning >= 8;
 
         return [
             'eta' => $eta,
-            'last_output' => $minutesSinceUpdate === 0
-                ? "Running for {$minutesRunning} minute".($minutesRunning === 1 ? '' : 's')
-                : "No new output for {$minutesSinceUpdate} minute".($minutesSinceUpdate === 1 ? '' : 's'),
+            'eta_samples' => $etaSamples,
+            'running_for' => 'Running for '.$this->formatRunDuration($secondsRunning),
+            // Only surface this when the gap is meaningful; under 30s
+            // is just normal poll cadence and would flicker on/off.
+            'last_output' => $secondsSinceUpdate >= 30
+                ? 'No new output for '.$this->formatRunDuration($secondsSinceUpdate)
+                : null,
             'stalled' => $stalled,
             'warning' => $stalled ? 'This run may be stalled. Review the latest output or cancel and retry if it does not recover soon.' : null,
         ];
+    }
+
+    private function formatRunDuration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return $seconds.'s';
+        }
+
+        $minutes = intdiv($seconds, 60);
+        $remainder = $seconds % 60;
+
+        if ($minutes < 10 && $remainder > 0) {
+            return "{$minutes}m {$remainder}s";
+        }
+
+        return $minutes.'m';
     }
 }

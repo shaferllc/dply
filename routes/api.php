@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
 use App\Http\Controllers\Api\OperatorReadmeController;
@@ -32,7 +33,9 @@ Route::prefix('v1')->group(function (): void {
 
     Route::middleware(['auth.api', 'throttle:api'])->group(function () use ($apiAbilities): void {
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
-        Route::post('/servers/{server}/deploy', [ServerController::class, 'deploy'])->middleware('ability:'.$apiAbilities['servers.deploy']);
+        // POST /servers/{id}/deploy was removed when the deploy_command
+        // column was dropped — there's no field for it to write to or
+        // execute against. /run-command stays for ad-hoc remote execution.
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
 
         Route::get('/servers/{server}/firewall', [ServerFirewallController::class, 'show'])->middleware('ability:'.$apiAbilities['firewall.show']);
@@ -47,5 +50,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/insights/summary', [InsightsController::class, 'organizationSummary'])->middleware('ability:'.$apiAbilities['insights.org_summary']);
         Route::get('/servers/{server}/insights', [InsightsController::class, 'serverFindings'])->middleware('ability:'.$apiAbilities['insights.server_findings']);
+
+        Route::get('/imports/migrations', [ImportMigrationController::class, 'index'])->middleware('ability:'.$apiAbilities['imports.migrations_index']);
+        Route::get('/imports/migrations/{migration}', [ImportMigrationController::class, 'show'])->middleware('ability:'.$apiAbilities['imports.migrations_show']);
     });
 });

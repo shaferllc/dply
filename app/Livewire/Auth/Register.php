@@ -12,6 +12,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
+use Laravel\Pennant\Feature;
 use Livewire\Component;
 
 class Register extends Component
@@ -22,6 +23,12 @@ class Register extends Component
 
     public function mount(): void
     {
+        if (! Feature::active('global.signups_open')) {
+            $this->redirect(route('coming-soon'), navigate: true);
+
+            return;
+        }
+
         if (! auth()->check()) {
             return;
         }

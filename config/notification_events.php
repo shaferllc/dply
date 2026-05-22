@@ -17,6 +17,10 @@ return [
                 'server.ssh_login' => 'SSH login',
                 'server.insights_alerts' => 'Insights alerts',
                 'server.monitoring' => 'Server monitoring',
+                'server.container_launch.completed' => 'Container app deploy ready',
+                'server.container_launch.failed' => 'Container app deploy failed (action required)',
+                'server.provisioned' => 'Server provisioned',
+                'server.provision_failed' => 'Server provisioning failed (action required)',
             ],
         ],
         'site' => [
@@ -40,6 +44,16 @@ return [
                 'project.deployments' => 'Project deploy batches',
                 'project.health' => 'Project health alerts',
                 'project.activity' => 'Project activity summaries',
+            ],
+        ],
+        'import' => [
+            'label' => 'Import & migration notifications',
+            'events' => [
+                'import.migration.cutover_ready' => 'Migration ready for cutover (action required)',
+                'import.migration.step_failed' => 'Migration step failed (action required)',
+                'import.migration.cutover_complete' => 'Migration cutover complete',
+                'import.migration.aborted' => 'Migration aborted',
+                'import.migration.paused_nudge' => 'Migration paused — auto-revoke in <96h (action required)',
             ],
         ],
     ],

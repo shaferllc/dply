@@ -4,12 +4,14 @@
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
         ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
-        ['label' => __('Backup configurations'), 'icon' => 'archive-box'],
+        ['label' => __('Backup destinations'), 'icon' => 'archive-box'],
     ]" />
 
     <x-page-header
-        :title="__('Backup configurations')"
-        :description="__('Create storage destinations for database or file backups. Credentials are encrypted at rest.')"
+        :title="__('Organization backup destinations')"
+        :description="$organization
+            ? __('External storage shared by everyone in :org and reusable across every server. Add the bucket / remote here, then pick it when creating a schedule on a server.', ['org' => $organization->name])
+            : __('External storage shared by your organization and reusable across every server. Add the bucket / remote here, then pick it when creating a schedule on a server.')"
         doc-route="docs.index"
         flush
     />
@@ -18,9 +20,9 @@
         <section class="dply-card overflow-hidden">
             <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                 <div class="lg:col-span-4">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Create backup configuration') }}</h2>
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Add backup destination') }}</h2>
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('Choose a storage provider and enter connection details. You can reuse these when configuring backups on servers or sites.') }}
+                        {{ __('Pick a storage provider and enter the connection details. Credentials are encrypted at rest and every server in the organization can use this destination.') }}
                     </p>
                 </div>
                 <div class="lg:col-span-8 space-y-5">
@@ -58,7 +60,7 @@
             <section class="rounded-2xl border border-brand-sage/40 bg-brand-sand/20 shadow-sm overflow-hidden" wire:key="edit-{{ $editing_id }}">
                 <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                     <div class="lg:col-span-4">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Edit backup configuration') }}</h2>
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Edit backup destination') }}</h2>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Update the label or credentials, then save.') }}</p>
                     </div>
                     <div class="lg:col-span-8 space-y-5">
@@ -94,7 +96,7 @@
             </section>
         @endif
 
-        <x-table-card :title="__('Your configurations')">
+        <x-table-card :title="__('Saved destinations')">
             <x-slot name="search">
                 <label for="bc_search" class="sr-only">{{ __('Search') }}</label>
                 <x-text-input id="bc_search" wire:model.live.debounce.300ms="search" type="search" class="block w-full" placeholder="{{ __('Search by name…') }}" autocomplete="off" />
@@ -104,9 +106,9 @@
                 $hasBackupSearch = trim($search ?? '') !== '';
             @endphp
             @if (! $hasBackupSearch && $configurations->isEmpty())
-                <x-table-card-empty>{{ __('No backup configurations yet.') }}</x-table-card-empty>
+                <x-table-card-empty>{{ __('No backup destinations yet. Add one above to start scheduling backups on your servers.') }}</x-table-card-empty>
             @elseif ($hasBackupSearch && $configurations->isEmpty())
-                <x-table-card-empty>{{ __('No configurations match your search.') }}</x-table-card-empty>
+                <x-table-card-empty>{{ __('No destinations match your search.') }}</x-table-card-empty>
             @else
                 <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                     <table class="min-w-full text-sm">
@@ -123,8 +125,8 @@
                                     <td class="px-4 py-3 font-medium text-brand-ink">{{ $row->name }}</td>
                                     <td class="px-4 py-3 text-brand-moss">{{ \App\Models\BackupConfiguration::labelForProvider($row->provider) }}</td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
-                                        <button type="button" wire:click="startEdit({{ $row->id }})" class="text-sm font-medium text-brand-sage hover:text-brand-ink mr-4">{{ __('Edit') }}</button>
-                                        <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', [{{ $row->id }}], @js(__('Delete backup configuration')), @js(__('Remove this backup configuration?')), @js(__('Delete')), true)" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Delete') }}</button>
+                                        <button type="button" wire:click="startEdit('{{ $row->id }}')" class="text-sm font-medium text-brand-sage hover:text-brand-ink mr-4">{{ __('Edit') }}</button>
+                                        <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Delete') }}</button>
                                     </td>
                                 </tr>
                             @endforeach

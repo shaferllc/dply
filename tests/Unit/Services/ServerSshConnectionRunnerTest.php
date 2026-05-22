@@ -3,8 +3,8 @@
 namespace Tests\Unit\Services;
 
 use App\Models\Server;
-use App\Services\SshConnection;
 use App\Services\Servers\ServerSshConnectionRunner;
+use App\Services\SshConnection;
 use Tests\TestCase;
 
 class ServerSshConnectionRunnerTest extends TestCase
@@ -25,9 +25,7 @@ class ServerSshConnectionRunnerTest extends TestCase
 
                 return new class($server, $loginUser, $credentialRole) extends SshConnection
                 {
-                    public function disconnect(): void
-                    {
-                    }
+                    public function disconnect(): void {}
                 };
             }
         };

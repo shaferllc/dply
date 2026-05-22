@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Services\Sites\TestingHostnameRecordPruner;
 use Mockery;
 use Tests\TestCase;

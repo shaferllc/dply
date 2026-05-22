@@ -17,6 +17,14 @@ class ServerCronJob extends Model
 
     protected $table = 'server_cron_jobs';
 
+    /**
+     * Identifier in the `managed_block` column for the metrics push
+     * agent's `# BEGIN DPLY METRICS GUEST` crontab block. Used by
+     * DeployGuestMetricsCallbackEnvJob to upsert a read-only mirror
+     * row so the workspace cron list shows the auto-installed line.
+     */
+    public const MANAGED_BLOCK_METRICS = 'metrics_guest';
+
     protected $fillable = [
         'server_id',
         'cron_expression',
@@ -26,6 +34,7 @@ class ServerCronJob extends Model
         'description',
         'site_id',
         'is_synced',
+        'last_synced_enabled',
         'last_sync_error',
         'last_run_at',
         'last_run_output',
@@ -38,16 +47,21 @@ class ServerCronJob extends Model
         'depends_on_job_id',
         'maintenance_tag',
         'applied_template_id',
+        'system_managed',
+        'managed_block',
+        'managed_signature',
     ];
 
     protected function casts(): array
     {
         return [
             'is_synced' => 'boolean',
+            'last_synced_enabled' => 'boolean',
             'enabled' => 'boolean',
             'last_run_at' => 'datetime',
             'alert_on_failure' => 'boolean',
             'alert_on_pattern_match' => 'boolean',
+            'system_managed' => 'boolean',
         ];
     }
 

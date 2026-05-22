@@ -80,9 +80,25 @@ return [
     'security' => [
         'max_script_size' => env('TASK_RUNNER_MAX_SCRIPT_SIZE', 1024 * 1024), // 1MB
         'allowed_commands' => env('TASK_RUNNER_ALLOWED_COMMANDS', []), // Empty array means all commands allowed
+        // Forbidden command list. Substring-with-word-boundary matching
+        // (see Task::validateScript): each entry matches when bracketed
+        // by start/whitespace AND not followed by another word/path
+        // char. This works cleanly for atomic commands ('mkfs', 'fdisk',
+        // 'parted') and for trailing-slash terminals like 'rm -rf /'.
+        //
+        // What it does NOT handle: patterns that need to match a
+        // PREFIX with arbitrary destructive suffix (e.g., 'dd if=/dev/
+        // zero of=/dev/sda' — destructive — vs 'dd if=/dev/zero of=
+        // /swapfile' — legitimate swap creation). Encoding both the
+        // "must end here" and "must match more" rules with one regex
+        // scheme is awkward, so 'dd if=/dev/zero' is intentionally
+        // omitted: the destructive disk operations it would catch are
+        // already covered by mkfs / fdisk / parted, our task runner
+        // generates the bash itself (untrusted input doesn't flow
+        // through), and adding a per-pattern regex format here would
+        // be a bigger change than the threat model warrants.
         'forbidden_commands' => env('TASK_RUNNER_FORBIDDEN_COMMANDS', [
             'rm -rf /',
-            'dd if=/dev/zero',
             'mkfs',
             'fdisk',
             'parted',

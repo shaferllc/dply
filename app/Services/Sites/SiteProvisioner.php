@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\Site;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
@@ -272,6 +273,15 @@ class SiteProvisioner
                 'status' => Site::activeStatusForWebserver($site->webserver()),
             ]);
 
+            // For non-PHP/static sites with a start_command, dispatch the
+            // systemd-unit installer so the runtime process NGINX now
+            // proxies to actually exists. Fire-and-forget; failures land
+            // in the worker log but don't roll back the activation.
+            if ($site->start_command !== null && $site->start_command !== ''
+                && ! in_array($site->runtimeKey(), ['php', 'static', null], true)) {
+                ProvisionSiteSystemdUnitsJob::dispatch($site->id);
+            }
+
             if ($previewDomain = $site->primaryPreviewDomain()) {
                 $previewDomain->update([
                     'dns_status' => 'ready',
@@ -294,11 +304,13 @@ class SiteProvisioner
                 'error' => null,
             ]);
 
-            if ($site->primaryPreviewDomain()?->hostname === $result['hostname']) {
+            $previewHostname = $site->primaryPreviewDomain()?->hostname;
+            if ($previewHostname !== null && $previewHostname !== '') {
                 $certificate = $this->certificateRequestService->queuePrimaryPreviewAutoSsl($site->fresh(['previewDomains']));
                 if ($certificate) {
                     $this->appendLog($site, 'info', 'ready', 'Queued automatic preview SSL after reachability succeeded.', [
-                        'hostname' => $result['hostname'],
+                        'hostname' => $previewHostname,
+                        'matched_hostname' => $result['hostname'],
                         'certificate_id' => $certificate->id,
                     ]);
                     ExecuteSiteCertificateJob::dispatch($certificate->id);

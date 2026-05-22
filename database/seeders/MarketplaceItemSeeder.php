@@ -924,8 +924,159 @@ NGINX
             ],
         ];
 
+        // Runtime / framework tags applied per slug so the marketplace can
+        // filter recipes by the site or server's runtime context. Items
+        // missing from this map are universal (no runtime tag) — guides,
+        // notification integrations, generic NGINX snippets, etc.
+        $runtimeTags = [
+            // PHP / Laravel
+            'nginx-laravel-php' => ['runtimes' => ['php'], 'frameworks' => ['laravel']],
+            'deploy-laravel' => ['runtimes' => ['php'], 'frameworks' => ['laravel']],
+            'deploy-laravel-migrate-only' => ['runtimes' => ['php'], 'frameworks' => ['laravel']],
+            'deploy-laravel-storage-link' => ['runtimes' => ['php'], 'frameworks' => ['laravel']],
+            'deploy-laravel-queue-restart' => ['runtimes' => ['php'], 'frameworks' => ['laravel']],
+            'deploy-laravel-octane-reload' => ['runtimes' => ['php'], 'frameworks' => ['laravel']],
+            // PHP / Symfony
+            'nginx-symfony-php' => ['runtimes' => ['php'], 'frameworks' => ['symfony']],
+            'deploy-symfony-prod' => ['runtimes' => ['php'], 'frameworks' => ['symfony']],
+            // PHP / WordPress
+            'nginx-wordpress-php' => ['runtimes' => ['php'], 'frameworks' => ['wordpress']],
+            // PHP / generic
+            'nginx-php-generic' => ['runtimes' => ['php']],
+            'deploy-composer-only' => ['runtimes' => ['php']],
+            'deploy-composer-no-scripts' => ['runtimes' => ['php']],
+            'deploy-php-fpm-reload' => ['runtimes' => ['php']],
+            'server-php-version-and-modules' => ['runtimes' => ['php']],
+            // Node
+            'nginx-node-reverse-proxy' => ['runtimes' => ['node']],
+            'nginx-node-websocket' => ['runtimes' => ['node']],
+            'nginx-node-long-timeout' => ['runtimes' => ['node']],
+            'deploy-node-npm' => ['runtimes' => ['node']],
+            'deploy-npm-build-prod' => ['runtimes' => ['node']],
+            'deploy-npm-run-prod' => ['runtimes' => ['node']],
+            'deploy-pnpm-ci-build' => ['runtimes' => ['node']],
+            'deploy-yarn-build' => ['runtimes' => ['node']],
+            // Python / Django
+            'nginx-gunicorn-django' => ['runtimes' => ['python'], 'frameworks' => ['django']],
+            'deploy-django-prod' => ['runtimes' => ['python'], 'frameworks' => ['django']],
+            // Ruby / Rails
+            'deploy-rails' => ['runtimes' => ['ruby'], 'frameworks' => ['rails']],
+            'deploy-rails-db-migrate-only' => ['runtimes' => ['ruby'], 'frameworks' => ['rails']],
+            'deploy-rails-assets-precompile-only' => ['runtimes' => ['ruby'], 'frameworks' => ['rails']],
+            // Static
+            'nginx-static-spa' => ['runtimes' => ['static']],
+            'deploy-static-git' => ['runtimes' => ['static']],
+        ];
+
+        // Curated v1 set of non-PHP worker / scheduler recipes. The detector
+        // layer pre-creates SiteProcess rows for the common ones; these
+        // marketplace items make it easy for a user to copy the recipe into a
+        // custom process row when they have a non-standard layout.
+        $nonPhpProcessRecipes = [
+            [
+                'slug' => 'process-node-bullmq-worker',
+                'name' => 'BullMQ worker (Node)',
+                'summary' => __('Run a BullMQ / Bull background queue worker as a SiteProcess; pair with Redis.', []),
+                'category' => MarketplaceItem::CATEGORY_SITES,
+                'recipe_type' => MarketplaceItem::RECIPE_DEPLOY_COMMAND,
+                'payload' => [
+                    'command' => 'npm run worker',
+                    'mode' => 'append',
+                    'process_type' => 'worker',
+                    'process_name' => 'worker',
+                ],
+                'runtimes' => ['node'],
+                'sort_order' => 600,
+            ],
+            [
+                'slug' => 'process-python-celery-worker',
+                'name' => 'Celery worker (Python)',
+                'summary' => __('Background task worker for Django / FastAPI / Flask apps using Celery.', []),
+                'category' => MarketplaceItem::CATEGORY_SITES,
+                'recipe_type' => MarketplaceItem::RECIPE_DEPLOY_COMMAND,
+                'payload' => [
+                    'command' => 'celery -A <project> worker --loglevel=info',
+                    'mode' => 'append',
+                    'process_type' => 'worker',
+                    'process_name' => 'celery',
+                ],
+                'runtimes' => ['python'],
+                'sort_order' => 610,
+            ],
+            [
+                'slug' => 'process-python-celery-beat',
+                'name' => 'Celery beat scheduler (Python)',
+                'summary' => __('Periodic-task scheduler that fires Celery jobs on a schedule.', []),
+                'category' => MarketplaceItem::CATEGORY_SITES,
+                'recipe_type' => MarketplaceItem::RECIPE_DEPLOY_COMMAND,
+                'payload' => [
+                    'command' => 'celery -A <project> beat --loglevel=info',
+                    'mode' => 'append',
+                    'process_type' => 'scheduler',
+                    'process_name' => 'celery-beat',
+                ],
+                'runtimes' => ['python'],
+                'sort_order' => 615,
+            ],
+            [
+                'slug' => 'process-ruby-sidekiq',
+                'name' => 'Sidekiq worker (Ruby)',
+                'summary' => __('Background job processor for Rails apps using the Sidekiq gem and Redis.', []),
+                'category' => MarketplaceItem::CATEGORY_SITES,
+                'recipe_type' => MarketplaceItem::RECIPE_DEPLOY_COMMAND,
+                'payload' => [
+                    'command' => 'bundle exec sidekiq -C config/sidekiq.yml',
+                    'mode' => 'append',
+                    'process_type' => 'worker',
+                    'process_name' => 'sidekiq',
+                ],
+                'runtimes' => ['ruby'],
+                'frameworks' => ['rails'],
+                'sort_order' => 620,
+            ],
+            [
+                'slug' => 'process-laravel-horizon',
+                'name' => 'Laravel Horizon (PHP)',
+                'summary' => __('Queue dashboard + worker manager for Laravel apps using Redis queues.', []),
+                'category' => MarketplaceItem::CATEGORY_SITES,
+                'recipe_type' => MarketplaceItem::RECIPE_DEPLOY_COMMAND,
+                'payload' => [
+                    'command' => 'php artisan horizon',
+                    'mode' => 'append',
+                    'process_type' => 'worker',
+                    'process_name' => 'horizon',
+                ],
+                'runtimes' => ['php'],
+                'frameworks' => ['laravel'],
+                'sort_order' => 630,
+            ],
+            [
+                'slug' => 'process-laravel-scheduler',
+                'name' => 'Laravel scheduler (PHP)',
+                'summary' => __('Run :code as a long-running scheduler process (Laravel 11+ replacement for cron).', ['code' => 'php artisan schedule:work']),
+                'category' => MarketplaceItem::CATEGORY_SITES,
+                'recipe_type' => MarketplaceItem::RECIPE_DEPLOY_COMMAND,
+                'payload' => [
+                    'command' => 'php artisan schedule:work',
+                    'mode' => 'append',
+                    'process_type' => 'scheduler',
+                    'process_name' => 'scheduler',
+                ],
+                'runtimes' => ['php'],
+                'frameworks' => ['laravel'],
+                'sort_order' => 635,
+            ],
+        ];
+
+        foreach ($nonPhpProcessRecipes as $row) {
+            $items[] = $row;
+        }
+
         foreach ($items as $row) {
             $row['is_active'] = true;
+            $tags = $runtimeTags[$row['slug']] ?? [];
+            $row['runtimes'] = $row['runtimes'] ?? ($tags['runtimes'] ?? null);
+            $row['frameworks'] = $row['frameworks'] ?? ($tags['frameworks'] ?? null);
 
             MarketplaceItem::query()->updateOrCreate(
                 ['slug' => $row['slug']],

@@ -1,0 +1,21 @@
+# Example dply.yaml for a Django + Celery app.
+
+runtime: python
+version: "3.12"
+
+build:
+  - pip install -r requirements.txt
+  - python manage.py collectstatic --noinput
+
+release:
+  - python manage.py migrate --noinput
+
+processes:
+  web:
+    command: gunicorn shop.wsgi:application --bind 0.0.0.0:8000
+  celery:
+    command: celery -A shop worker --loglevel=info
+    scale: 1
+  scheduler:
+    command: celery -A shop beat --loglevel=info
+    scale: 1

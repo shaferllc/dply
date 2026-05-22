@@ -20,14 +20,13 @@ class ServerController extends Controller
         $servers = Server::query()
             ->where('organization_id', $organization->id)
             ->orderBy('name')
-            ->get(['id', 'name', 'status', 'deploy_command', 'ip_address', 'provider', 'created_at']);
+            ->get(['id', 'name', 'status', 'ip_address', 'provider', 'created_at']);
 
         return response()->json([
             'data' => $servers->map(fn (Server $s) => [
                 'id' => $s->id,
                 'name' => $s->name,
                 'status' => $s->status,
-                'deploy_command' => $s->deploy_command,
                 'ip_address' => $s->ip_address,
                 'provider' => $s->provider->value,
                 'created_at' => $s->created_at?->toIso8601String(),
@@ -35,39 +34,10 @@ class ServerController extends Controller
         ]);
     }
 
-    /**
-     * Trigger deploy for a server (same logic as web ServerController::deploy).
-     */
-    public function deploy(Request $request, Server $server): JsonResponse
-    {
-        $organization = $request->attributes->get('api_organization');
-
-        if ($server->organization_id !== $organization->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
-        $command = $server->deploy_command;
-        if (empty(trim((string) $command))) {
-            return response()->json([
-                'message' => 'Set a deploy command first in the server settings.',
-            ], 422);
-        }
-
-        try {
-            $ssh = new SshConnection($server);
-            $output = $ssh->exec($command);
-
-            return response()->json([
-                'message' => 'Deploy started.',
-                'output' => $output,
-            ]);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'Deploy failed.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
+    // The `deploy()` action was removed alongside the legacy
+    // `Server.deploy_command` column. Server-level commands are now
+    // ServerRecipe rows runnable from the /run UI; programmatic
+    // execution can use `runCommand` below.
 
     /**
      * Run an arbitrary command on the server.

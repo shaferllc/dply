@@ -1,113 +1,83 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Servers;
 
-use App\Jobs\CheckServerHealthJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
-use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Models\User;
-use App\Services\Deploy\DeploymentContractBuilder;
-use App\Services\Deploy\DeploymentPreflightValidator;
-use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * Server workspace landing page — at-a-glance dashboard.
+ *
+ * Job is "is anything broken? what's running here?" Operator scans the
+ * tiles and click-through cards, then drills into the dedicated sub-page
+ * (sites, databases, monitor, deploys, insights) for detail.
+ *
+ * Heavy content lives on the dedicated sub-pages — this component is
+ * intentionally thin. If you find yourself adding a 100-line panel here,
+ * it probably belongs on the matching workspace nav entry instead.
+ */
 #[Layout('layouts.app')]
 class WorkspaceOverview extends Component
 {
+    use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
-    public string $health_check_url = '';
-
-    /** @var list<string> */
-    public array $quick_notification_channel_ids = [];
-
-    /** @var list<string> */
-    public array $quick_notification_event_keys = [];
-
-    public bool $showQuickNotificationChannelModal = false;
-
-    public string $quick_new_owner_scope = 'personal';
-
-    public string $quick_new_type = NotificationChannel::TYPE_SLACK;
-
-    public string $quick_new_label = '';
-
-    public string $quick_new_slack_webhook_url = '';
-
-    public string $quick_new_slack_channel = '';
-
-    public string $quick_new_discord_webhook_url = '';
-
-    public string $quick_new_email_address = '';
-
-    public string $quick_new_telegram_bot_token = '';
-
-    public string $quick_new_telegram_chat_id = '';
-
-    public string $quick_new_pushover_app_token = '';
-
-    public string $quick_new_pushover_user_key = '';
-
-    public string $quick_new_teams_webhook_url = '';
-
-    public string $quick_new_rocketchat_webhook_url = '';
-
-    public string $quick_new_google_chat_webhook_url = '';
-
-    public string $quick_new_mobile_device_token = '';
-
-    public string $quick_new_mobile_platform = 'ios';
-
-    public string $quick_new_webhook_url = '';
-
-    public function mount(Server $server): void
+    public function mount(Server $server): mixed
     {
         $this->bootWorkspace($server);
-        $this->health_check_url = (string) ($server->meta['health_check_url'] ?? '');
-        $types = NotificationChannel::typesForUi();
-        if ($types !== []) {
-            $this->quick_new_type = $types[0];
+
+        // A serverless function is not a server — the DO Functions namespace
+        // host is an implementation detail. Redirect to the function
+        // workspace so the operator never sees server-shaped chrome (SSH,
+        // setup, metrics) that does not apply to a function.
+        if ($server->isDigitalOceanFunctionsHost()) {
+            $function = $server->sites()->orderBy('created_at')->first();
+            if ($function !== null) {
+                return $this->redirect(
+                    route('sites.show', ['server' => $server, 'site' => $function]),
+                );
+            }
         }
-        $this->quick_new_owner_scope = $this->canManageOrganizationNotificationChannels() ? 'organization' : 'personal';
+
+        $this->kickClusterPollIfStale();
+
+        return null;
     }
 
-    public function checkHealth(): void
-    {
-        $this->authorize('view', $this->server);
-        if ($this->server->status === Server::STATUS_READY && ! empty($this->server->ip_address)) {
-            CheckServerHealthJob::dispatch($this->server);
-        }
-        $this->toastSuccess('Health check has been queued. Status will update shortly.');
-    }
-
-    public function saveHealthCheckUrl(): void
+    /**
+     * Manual "re-check the cluster at the provider" — surfaced as the retry
+     * button on the K8s error banner below. Mirrors WorkspaceCluster::retryPolling
+     * so operators landing on overview after a manual cluster deletion can
+     * trigger a fresh poll without bouncing to the dedicated cluster page.
+     */
+    public function retryClusterPolling(): void
     {
         $this->authorize('update', $this->server);
-        $this->validate(['health_check_url' => 'nullable|string|url|max:500']);
-        $meta = $this->server->meta ?? [];
-        $meta['health_check_url'] = trim($this->health_check_url) ?: null;
-        if ($meta['health_check_url'] === null) {
-            unset($meta['health_check_url']);
+
+        $provider = (string) ($this->server->meta['kubernetes']['provider'] ?? 'digitalocean');
+        if ($provider === 'aws') {
+            \App\Jobs\PollEksClusterStatusJob::dispatch($this->server);
+        } else {
+            \App\Jobs\PollDoksClusterStatusJob::dispatch($this->server);
         }
-        $this->server->update(['meta' => $meta]);
-        $this->toastSuccess('Health check URL updated.');
+        $this->toastSuccess(__('Re-checking cluster status…'));
     }
 
     public function rerunSetup(): void
@@ -123,449 +93,260 @@ class WorkspaceOverview extends Component
 
         $meta = $server->meta ?? [];
         unset($meta['provision_task_id']);
+        unset($meta['provision_step_snapshots']);
 
         $server->update([
             'setup_status' => Server::SETUP_STATUS_PENDING,
             'meta' => $meta,
         ]);
 
-        WaitForServerSshReadyJob::dispatch($server->fresh());
+        $fresh = $server->fresh();
+        WaitForServerSshReadyJob::dispatch($fresh ?? $server);
 
         $this->redirectRoute('servers.journey', $server, navigate: true);
-    }
-
-    public function saveQuickNotificationAssignments(): void
-    {
-        $this->authorize('view', $this->server);
-
-        $this->validate([
-            'quick_notification_channel_ids' => ['required', 'array', 'min:1'],
-            'quick_notification_channel_ids.*' => ['string', 'exists:notification_channels,id'],
-            'quick_notification_event_keys' => ['required', 'array', 'min:1'],
-            'quick_notification_event_keys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring'],
-        ], [], [
-            'quick_notification_channel_ids' => __('channels'),
-            'quick_notification_event_keys' => __('notification types'),
-        ]);
-
-        $org = Auth::user()?->currentOrganization();
-        $allowedChannelIds = AssignableNotificationChannels::forUser(Auth::user(), $org)
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        foreach ($this->quick_notification_channel_ids as $channelId) {
-            if (! in_array((string) $channelId, $allowedChannelIds, true)) {
-                $this->addError('quick_notification_channel_ids', __('Invalid channel selected.'));
-
-                return;
-            }
-        }
-
-        $created = 0;
-
-        foreach ($this->quick_notification_channel_ids as $channelId) {
-            $channel = NotificationChannel::query()->findOrFail((string) $channelId);
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-
-            foreach ($this->quick_notification_event_keys as $eventKey) {
-                $row = NotificationSubscription::firstOrCreate([
-                    'notification_channel_id' => $channel->id,
-                    'subscribable_type' => Server::class,
-                    'subscribable_id' => $this->server->id,
-                    'event_key' => $eventKey,
-                ]);
-
-                if ($row->wasRecentlyCreated) {
-                    $created++;
-                }
-            }
-        }
-
-        $this->toastSuccess(__('Saved :count new notification subscription(s) for this server.', ['count' => $created]));
-    }
-
-    public function createQuickNotificationChannel(): void
-    {
-        $owner = $this->quickNotificationChannelOwner();
-
-        Gate::authorize('manageNotificationChannels', $owner);
-
-        $rules = array_merge(
-            [
-                'quick_new_type' => ['required', 'string', Rule::in(NotificationChannel::typesForUi())],
-                'quick_new_owner_scope' => ['required', 'string', Rule::in($this->quickAddOwnerScopes())],
-            ],
-            $this->quickChannelValidationRulesForType($this->quick_new_type)
-        );
-
-        $this->validate($rules, [], $this->quickChannelValidationAttributes());
-
-        $channel = $owner->notificationChannels()->create([
-            'type' => $this->quick_new_type,
-            'label' => $this->quick_new_label,
-            'config' => $this->quickChannelConfigFromInput(),
-        ]);
-
-        $this->quick_notification_channel_ids = array_values(array_unique([
-            ...$this->quick_notification_channel_ids,
-            (string) $channel->id,
-        ]));
-
-        $this->resetQuickNotificationChannelFields();
-        $this->showQuickNotificationChannelModal = false;
-        $this->toastSuccess(__('Channel created and selected for this server.'));
-    }
-
-    public function openQuickNotificationChannelModal(): void
-    {
-        $this->resetErrorBag();
-        $this->showQuickNotificationChannelModal = true;
-    }
-
-    public function closeQuickNotificationChannelModal(): void
-    {
-        $this->showQuickNotificationChannelModal = false;
-    }
-
-    protected function quickNotificationChannelOwner(): User|Organization
-    {
-        if ($this->quick_new_owner_scope === 'organization' && $this->canManageOrganizationNotificationChannels()) {
-            return $this->server->organization;
-        }
-
-        return Auth::user();
-    }
-
-    protected function canManageOrganizationNotificationChannels(): bool
-    {
-        return $this->server->organization instanceof Organization
-            && Gate::allows('manageNotificationChannels', $this->server->organization);
-    }
-
-    /**
-     * @return list<string>
-     */
-    protected function quickAddOwnerScopes(): array
-    {
-        return $this->canManageOrganizationNotificationChannels()
-            ? ['personal', 'organization']
-            : ['personal'];
-    }
-
-    /**
-     * @return array<string, array<int, mixed>>
-     */
-    protected function quickChannelValidationRulesForType(string $type): array
-    {
-        $base = [
-            'quick_new_label' => ['required', 'string', 'max:255'],
-        ];
-
-        return match ($type) {
-            NotificationChannel::TYPE_SLACK => $base + [
-                'quick_new_slack_webhook_url' => ['required', 'url', 'max:2000'],
-                'quick_new_slack_channel' => ['nullable', 'string', 'max:255'],
-            ],
-            NotificationChannel::TYPE_DISCORD => $base + [
-                'quick_new_discord_webhook_url' => ['required', 'url', 'max:2000'],
-            ],
-            NotificationChannel::TYPE_EMAIL => $base + [
-                'quick_new_email_address' => ['required', 'email:rfc', 'max:255'],
-            ],
-            NotificationChannel::TYPE_TELEGRAM => $base + [
-                'quick_new_telegram_bot_token' => ['required', 'string', 'max:255'],
-                'quick_new_telegram_chat_id' => ['required', 'string', 'max:255'],
-            ],
-            NotificationChannel::TYPE_PUSHOVER => $base + [
-                'quick_new_pushover_app_token' => ['required', 'string', 'max:255'],
-                'quick_new_pushover_user_key' => ['required', 'string', 'max:255'],
-            ],
-            NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
-                'quick_new_teams_webhook_url' => ['required', 'url', 'max:2000'],
-            ],
-            NotificationChannel::TYPE_ROCKETCHAT => $base + [
-                'quick_new_rocketchat_webhook_url' => ['required', 'url', 'max:2000'],
-            ],
-            NotificationChannel::TYPE_GOOGLE_CHAT => $base + [
-                'quick_new_google_chat_webhook_url' => ['required', 'url', 'max:2000'],
-            ],
-            NotificationChannel::TYPE_MOBILE_APP => $base + [
-                'quick_new_mobile_device_token' => ['required', 'string', 'max:4000'],
-                'quick_new_mobile_platform' => ['required', 'string', 'in:ios,android'],
-            ],
-            default => $base + [
-                'quick_new_webhook_url' => ['required', 'url', 'max:2000'],
-            ],
-        };
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function quickChannelValidationAttributes(): array
-    {
-        return [
-            'quick_new_owner_scope' => __('owner'),
-            'quick_new_type' => __('type'),
-            'quick_new_label' => __('label'),
-            'quick_new_slack_webhook_url' => __('webhook URL'),
-            'quick_new_slack_channel' => __('channel'),
-            'quick_new_discord_webhook_url' => __('webhook URL'),
-            'quick_new_email_address' => __('email address'),
-            'quick_new_telegram_bot_token' => __('bot token'),
-            'quick_new_telegram_chat_id' => __('chat ID'),
-            'quick_new_pushover_app_token' => __('application token'),
-            'quick_new_pushover_user_key' => __('user key'),
-            'quick_new_teams_webhook_url' => __('webhook URL'),
-            'quick_new_rocketchat_webhook_url' => __('webhook URL'),
-            'quick_new_google_chat_webhook_url' => __('webhook URL'),
-            'quick_new_mobile_device_token' => __('device token'),
-            'quick_new_mobile_platform' => __('platform'),
-            'quick_new_webhook_url' => __('URL'),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function quickChannelConfigFromInput(): array
-    {
-        return match ($this->quick_new_type) {
-            NotificationChannel::TYPE_SLACK => array_filter([
-                'webhook_url' => $this->quick_new_slack_webhook_url,
-                'channel' => trim($this->quick_new_slack_channel) ?: null,
-            ], fn ($value) => $value !== null && $value !== ''),
-            NotificationChannel::TYPE_DISCORD => ['webhook_url' => $this->quick_new_discord_webhook_url],
-            NotificationChannel::TYPE_EMAIL => ['email' => $this->quick_new_email_address],
-            NotificationChannel::TYPE_TELEGRAM => [
-                'bot_token' => $this->quick_new_telegram_bot_token,
-                'chat_id' => $this->quick_new_telegram_chat_id,
-            ],
-            NotificationChannel::TYPE_PUSHOVER => [
-                'app_token' => $this->quick_new_pushover_app_token,
-                'user_key' => $this->quick_new_pushover_user_key,
-            ],
-            NotificationChannel::TYPE_MICROSOFT_TEAMS => ['webhook_url' => $this->quick_new_teams_webhook_url],
-            NotificationChannel::TYPE_ROCKETCHAT => ['webhook_url' => $this->quick_new_rocketchat_webhook_url],
-            NotificationChannel::TYPE_GOOGLE_CHAT => ['webhook_url' => $this->quick_new_google_chat_webhook_url],
-            NotificationChannel::TYPE_MOBILE_APP => [
-                'device_token' => $this->quick_new_mobile_device_token,
-                'platform' => $this->quick_new_mobile_platform,
-            ],
-            default => ['url' => $this->quick_new_webhook_url],
-        };
-    }
-
-    protected function resetQuickNotificationChannelFields(): void
-    {
-        $types = NotificationChannel::typesForUi();
-        if ($types !== [] && ! in_array($this->quick_new_type, $types, true)) {
-            $this->quick_new_type = $types[0];
-        }
-
-        $this->quick_new_label = '';
-        $this->quick_new_slack_webhook_url = '';
-        $this->quick_new_slack_channel = '';
-        $this->quick_new_discord_webhook_url = '';
-        $this->quick_new_email_address = '';
-        $this->quick_new_telegram_bot_token = '';
-        $this->quick_new_telegram_chat_id = '';
-        $this->quick_new_pushover_app_token = '';
-        $this->quick_new_pushover_user_key = '';
-        $this->quick_new_teams_webhook_url = '';
-        $this->quick_new_rocketchat_webhook_url = '';
-        $this->quick_new_google_chat_webhook_url = '';
-        $this->quick_new_mobile_device_token = '';
-        $this->quick_new_mobile_platform = 'ios';
-        $this->quick_new_webhook_url = '';
     }
 
     public function render(): View
     {
         $this->server->refresh();
-        $sites = $this->server->sites()
-            ->with(['domains'])
-            ->orderBy('name')
-            ->get();
 
-        $siteSummaries = $sites
-            ->take(4)
-            ->map(function (Site $site): array {
-                $primaryDomain = $site->domains->firstWhere('is_primary', true) ?? $site->domains->first();
-
-                return [
-                    'name' => $site->name,
-                    'status' => $site->status,
-                    'primary_domain' => $primaryDomain?->hostname,
-                    'route' => route('sites.show', ['server' => $this->server, 'site' => $site]),
-                ];
-            });
-
+        $sites = $this->server->sites()->get(['id', 'status']);
         $siteIds = $sites->pluck('id');
+
         $latestDeployment = $siteIds->isEmpty()
             ? null
             : SiteDeployment::query()
-                ->with('site')
+                ->with('site:id,name,server_id')
                 ->whereIn('site_id', $siteIds)
                 ->latest('created_at')
                 ->first();
 
-        $monitorLastSampleAt = isset(($this->server->meta ?? [])['monitoring_last_sample_at'])
-            ? Carbon::parse($this->server->meta['monitoring_last_sample_at'])->timezone(config('app.timezone'))
-            : null;
+        $databaseSummary = [
+            'count' => $this->server->serverDatabases()->count(),
+            // 'errors' field intended for a future health probe; leaving the
+            // shape stable so the view can always pull a 'X errors' badge.
+            'errors' => 0,
+        ];
+
+        $openInsightsCount = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->count();
+
+        $criticalInsightsCount = InsightFinding::query()
+            ->where('server_id', $this->server->id)
+            ->whereNull('site_id')
+            ->where('status', InsightFinding::STATUS_OPEN)
+            ->where('severity', InsightFinding::SEVERITY_CRITICAL)
+            ->count();
+
+        $deployingCount = $sites
+            ->whereIn('status', ['deploying', 'queued'])
+            ->count();
+
+        $healthSummary = [
+            'status' => $this->server->health_status,
+            'last_checked_at' => $this->server->last_health_check_at,
+        ];
 
         $currentUser = Auth::user();
         $hasProfileSshKeys = $currentUser?->sshKeys()->exists() ?? false;
         $serverHasPersonalProfileKey = $this->server->hasPersonalUserSshKey($currentUser);
 
-        $opsSummary = [
-            'firewall_rules_enabled' => $this->server->firewallRules()->where('enabled', true)->count(),
-            'cron_jobs' => $this->server->cronJobs()->count(),
-            'daemons' => $this->server->supervisorPrograms()->count(),
-            'ssh_keys' => $this->server->authorizedKeys()->count(),
+        $notificationSummary = [
+            'channel_count' => $this->server->notificationSubscriptions()->distinct('notification_channel_id')->count('notification_channel_id'),
+            'manage_url' => $this->server->organization_id
+                ? route('profile.notification-channels.bulk-assign', ['server' => $this->server->id])
+                : null,
         ];
 
-        $healthSummary = [
-            'status' => $this->server->health_status,
-            'last_checked_at' => $this->server->last_health_check_at,
-            'monitor_last_sample_at' => $monitorLastSampleAt,
+        // Background tile: surface active worker + schedule + backup health on the high-traffic
+        // Overview page so operators see drift (failed backups, paused schedules, stopped workers)
+        // without having to drill into the Background subpages individually.
+        $weekAgo = now()->subDays(7);
+        $backgroundSummary = [
+            'active_workers' => \App\Models\SupervisorProgram::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('program_type', \App\Livewire\Servers\WorkspaceQueueWorkers::QUEUE_TYPES)
+                ->where('is_active', true)
+                ->count(),
+            'active_schedules' => \App\Models\ServerBackupSchedule::query()
+                ->where('server_id', $this->server->id)
+                ->where('is_active', true)
+                ->count(),
+            'paused_schedules' => \App\Models\ServerBackupSchedule::query()
+                ->where('server_id', $this->server->id)
+                ->where('is_active', false)
+                ->count(),
+            'failed_backups_7d' => (int) \App\Models\ServerDatabaseBackup::query()
+                ->whereIn('server_database_id', $this->server->serverDatabases()->pluck('id'))
+                ->where('status', 'failed')
+                ->where('created_at', '>=', $weekAgo)
+                ->count()
+                + (int) \App\Models\SiteFileBackup::query()
+                    ->whereIn('site_id', $this->server->sites()->pluck('id'))
+                    ->where('status', 'failed')
+                    ->where('created_at', '>=', $weekAgo)
+                    ->count(),
         ];
-        $containerLaunch = $this->containerLaunchSummary();
 
-        $insightFindings = InsightFinding::query()
+        // Most-recent metric snapshot for the live CPU/Mem/Disk/Load card.
+        // One row, cheap. Same source the Monitor page uses — duplicating it
+        // here means the overview reflects current load without a full
+        // Monitor-tab fetch and the operator can decide whether to drill in.
+        $latestMetricSnapshot = ServerMetricSnapshot::query()
             ->where('server_id', $this->server->id)
-            ->whereNull('site_id')
-            ->where('status', InsightFinding::STATUS_OPEN)
-            ->orderByRaw("case severity when 'critical' then 0 when 'warning' then 1 else 2 end")
-            ->orderByDesc('detected_at')
-            ->limit(3)
+            ->orderByDesc('captured_at')
+            ->first();
+
+        // Sites preview for the overview. We already have $sites with id+status;
+        // pull the small bit extra we need to render five rows (name + updated_at)
+        // and the most recent deployment per site so each preview row can show
+        // "last deploy: 3m ago". Cap at 5 — the dedicated Sites tab owns the
+        // full list.
+        $sitesPreview = $this->server->sites()
+            ->select(['id', 'name', 'status', 'server_id', 'updated_at'])
+            ->orderByDesc('updated_at')
+            ->limit(5)
             ->get();
+        $sitesPreviewLatestDeploys = $sitesPreview->isEmpty()
+            ? collect()
+            : SiteDeployment::query()
+                ->whereIn('site_id', $sitesPreview->pluck('id'))
+                ->select(['id', 'site_id', 'status', 'created_at', 'finished_at'])
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('site_id')
+                ->map(fn ($group) => $group->first());
 
-        $openInsightQuery = InsightFinding::query()
-            ->where('server_id', $this->server->id)
-            ->whereNull('site_id')
-            ->where('status', InsightFinding::STATUS_OPEN);
+        // Onboarding checklist for a fresh server. Each step reads from
+        // already-computed state above (no extra queries), and a step is
+        // marked done when we can detect the artifact in the database.
+        // The checklist hides itself once every applicable step is done.
+        //
+        // Container hosts (Docker / K8s) skip the SSH-key / monitor-agent /
+        // backups steps because those don't apply to clusters — sites are
+        // deployed *into* the cluster, not onto an OS the operator manages.
+        $hostKind = $this->server->meta['host_kind'] ?? Server::HOST_KIND_VM;
+        $isContainerHostForChecklist = in_array(
+            $hostKind,
+            [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES],
+            true,
+        );
+        $monitorInstalled = $latestMetricSnapshot !== null
+            && is_array($latestMetricSnapshot->payload ?? null)
+            && isset($latestMetricSnapshot->payload['cpu_pct']);
+        $hasBackupSchedule = ($backgroundSummary['active_schedules'] ?? 0)
+            + ($backgroundSummary['paused_schedules'] ?? 0) > 0;
 
-        $insightSummary = [
-            'open_count' => (clone $openInsightQuery)->count(),
-            'critical_count' => (clone $openInsightQuery)->where('severity', InsightFinding::SEVERITY_CRITICAL)->count(),
-            'warning_count' => (clone $openInsightQuery)->where('severity', InsightFinding::SEVERITY_WARNING)->count(),
-            'info_count' => (clone $openInsightQuery)->where('severity', InsightFinding::SEVERITY_INFO)->count(),
-            'latest_detected_at' => (clone $openInsightQuery)->max('detected_at'),
-        ];
-
-        $assignableChannels = AssignableNotificationChannels::forUser(Auth::user(), Auth::user()?->currentOrganization());
-        $serverEventOptions = collect(config('notification_events.categories.server.events', []))->all();
-        $quickAddTypes = NotificationChannel::typesForUi();
-        $contractBuilder = app(DeploymentContractBuilder::class);
-        $preflightValidator = app(DeploymentPreflightValidator::class);
-        $siteFoundationSummaries = $sites->map(function (Site $site) use ($contractBuilder, $preflightValidator): array {
-            $contract = $contractBuilder->build($site);
-            $preflight = $preflightValidator->validate($site);
-
-            return [
-                'site_id' => (string) $site->id,
-                'name' => $site->name,
-                'route' => route('sites.show', ['server' => $this->server, 'site' => $site]),
-                'preflight_ok' => (bool) ($preflight['ok'] ?? false),
-                'error_count' => count($preflight['errors'] ?? []),
-                'warning_count' => count($preflight['warnings'] ?? []),
-                'runtime_drifted' => (bool) data_get($contract->status, 'runtime_drifted', false),
-                'resource_bindings' => $contract->resourceBindingArrays(),
+        $onboardingSteps = [];
+        if (! $isContainerHostForChecklist) {
+            $onboardingSteps[] = [
+                'key' => 'ssh_key',
+                'label' => __('Attach your personal SSH key'),
+                'help' => __('So your laptop can log in over SSH directly.'),
+                'done' => $serverHasPersonalProfileKey,
+                'cta_label' => __('Add key'),
+                'cta_route' => route('servers.ssh-keys', $this->server),
             ];
-        })->values();
-        $resourceSummary = $siteFoundationSummaries
-            ->flatMap(function (array $summary): array {
-                return array_filter(
-                    $summary['resource_bindings'],
-                    fn (mixed $binding): bool => is_array($binding)
-                        && (($binding['required'] ?? false)
-                            || ($binding['status'] ?? 'pending') === 'configured'
-                            || (($binding['status'] ?? 'pending') === 'pending'
-                                && ($binding['source'] ?? '') === 'environment'))
-                );
-            })
-            ->groupBy(fn (array $binding): string => (string) ($binding['type'] ?? 'resource'))
-            ->map(function ($bindings, string $type): array {
-                $bindingCollection = collect($bindings)->filter(fn (mixed $binding): bool => is_array($binding));
-
-                return [
-                    'type' => $type,
-                    'site_count' => $bindingCollection->count(),
-                    'configured_count' => $bindingCollection->where('status', 'configured')->count(),
-                    'pending_count' => $bindingCollection->where('status', '!=', 'configured')->count(),
-                ];
-            })
-            ->sortBy('type')
-            ->values();
-        $foundationSummary = [
-            'site_count' => $siteFoundationSummaries->count(),
-            'preflight_blocked_count' => $siteFoundationSummaries->where('preflight_ok', false)->count(),
-            'drifted_count' => $siteFoundationSummaries->where('runtime_drifted', true)->count(),
-            'warning_site_count' => $siteFoundationSummaries->filter(fn (array $summary): bool => $summary['warning_count'] > 0)->count(),
+        }
+        $onboardingSteps[] = [
+            'key' => 'first_site',
+            'label' => $isContainerHostForChecklist
+                ? __('Add your first container app')
+                : __('Add your first site'),
+            'help' => $isContainerHostForChecklist
+                ? __('Point dply at a Git repo and deploy a container.')
+                : __('Connect a Git repo, configure the web root, and deploy.'),
+            'done' => $sites->count() > 0,
+            'cta_label' => __('Add'),
+            'cta_route' => route('sites.create', $this->server),
         ];
+        if (! $isContainerHostForChecklist) {
+            $onboardingSteps[] = [
+                'key' => 'monitor',
+                'label' => __('Install the monitor agent'),
+                'help' => __('Streams CPU / memory / disk for the Live load card and Insights.'),
+                'done' => $monitorInstalled,
+                'cta_label' => __('Install'),
+                'cta_route' => route('servers.monitor', $this->server),
+            ];
+            $onboardingSteps[] = [
+                'key' => 'backups',
+                'label' => __('Schedule backups'),
+                'help' => __('Automatic database + site-files backups on a cron you choose.'),
+                'done' => $hasBackupSchedule,
+                'cta_label' => __('Open Backups'),
+                'cta_route' => route('servers.backups', $this->server),
+            ];
+        }
+        if ($notificationSummary['manage_url']) {
+            $onboardingSteps[] = [
+                'key' => 'notifications',
+                'label' => __('Hook up notifications'),
+                'help' => __('Get pinged on Slack / email when something this server runs misbehaves.'),
+                'done' => ($notificationSummary['channel_count'] ?? 0) > 0,
+                'cta_label' => __('Manage'),
+                'cta_route' => $notificationSummary['manage_url'],
+            ];
+        }
+
+        $onboardingTotal = count($onboardingSteps);
+        $onboardingDone = collect($onboardingSteps)->where('done', true)->count();
+        $onboardingComplete = $onboardingTotal > 0 && $onboardingDone === $onboardingTotal;
+
+        // K8s cluster gone / unreachable. PollDoksClusterStatusJob (and the EKS
+        // counterpart) flip the server to STATUS_ERROR and stash a human
+        // message in meta.kubernetes.last_error when the provider returns 404
+        // ("cluster deleted in console") or hits its retry cap. We render
+        // those as a prominent error banner instead of letting the overview
+        // look like a working cluster with empty tiles.
+        $isK8sHost = ($this->server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES;
+        $kubernetesError = null;
+        if ($isK8sHost && $this->server->status === Server::STATUS_ERROR) {
+            $k8sMeta = is_array($this->server->meta['kubernetes'] ?? null) ? $this->server->meta['kubernetes'] : [];
+            $provider = (string) ($k8sMeta['provider'] ?? 'digitalocean');
+            $kubernetesError = [
+                'message' => (string) ($k8sMeta['last_error'] ?? __('Cluster status check failed.')),
+                'cluster_name' => (string) ($k8sMeta['cluster_name'] ?? ''),
+                'cluster_id' => (string) ($k8sMeta['cluster_id'] ?? ''),
+                'provider' => $provider,
+                'provider_label' => $provider === 'aws' ? 'AWS' : 'DigitalOcean',
+                'provider_console_url' => $provider === 'aws'
+                    ? 'https://console.aws.amazon.com/eks/home'
+                    : 'https://cloud.digitalocean.com/kubernetes/clusters',
+                'errored_at' => (string) ($k8sMeta['errored_at'] ?? ''),
+            ];
+        }
 
         return view('livewire.servers.workspace-overview', [
-            'siteSummaries' => $siteSummaries,
             'siteCount' => $sites->count(),
+            'deployingCount' => $deployingCount,
             'latestDeployment' => $latestDeployment,
-            'opsSummary' => $opsSummary,
+            'databaseSummary' => $databaseSummary,
             'healthSummary' => $healthSummary,
-            'containerLaunch' => $containerLaunch,
+            'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,
-            'insightFindings' => $insightFindings,
-            'insightSummary' => $insightSummary,
-            'assignableChannels' => $assignableChannels,
-            'serverEventOptions' => $serverEventOptions,
             'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
-            'quickAddTypes' => $quickAddTypes,
-            'canManageOrganizationNotificationChannels' => $this->canManageOrganizationNotificationChannels(),
-            'foundationSummary' => $foundationSummary,
-            'resourceSummary' => $resourceSummary,
-            'siteFoundationSummaries' => $siteFoundationSummaries,
+            'installedStack' => InstalledStack::fromMeta($this->server),
+            'installedStackDiverges' => InstalledStack::fromMeta($this->server)->divergesFromRequest($this->server),
+            'openInsightsCount' => $openInsightsCount,
+            'criticalInsightsCount' => $criticalInsightsCount,
+            'notificationSummary' => $notificationSummary,
+            'backgroundSummary' => $backgroundSummary,
+            'kubernetesError' => $kubernetesError,
+            'latestMetricSnapshot' => $latestMetricSnapshot,
+            'sitesPreview' => $sitesPreview,
+            'sitesPreviewLatestDeploys' => $sitesPreviewLatestDeploys,
+            'onboardingSteps' => $onboardingSteps,
+            'onboardingDone' => $onboardingDone,
+            'onboardingTotal' => $onboardingTotal,
+            'onboardingComplete' => $onboardingComplete,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    protected function containerLaunchSummary(): ?array
-    {
-        $meta = is_array($this->server->meta) ? $this->server->meta : [];
-        $launch = is_array($meta['container_launch'] ?? null) ? $meta['container_launch'] : [];
-        if ($launch === []) {
-            return null;
-        }
-
-        $status = (string) ($launch['status'] ?? '');
-        if ($status === '' || $status === 'completed') {
-            return null;
-        }
-
-        $siteId = is_string($launch['site_id'] ?? null) ? $launch['site_id'] : null;
-        $site = $siteId ? $this->server->sites()->with('domains')->find($siteId) : null;
-        $events = collect(is_array($launch['events'] ?? null) ? $launch['events'] : [])
-            ->filter(fn (mixed $event): bool => is_array($event) && is_string($event['message'] ?? null))
-            ->take(-5)
-            ->values()
-            ->all();
-
-        return [
-            'status' => $status,
-            'target_family' => (string) ($launch['target_family'] ?? 'container'),
-            'repository_url' => (string) ($launch['repository_url'] ?? ''),
-            'repository_branch' => (string) ($launch['repository_branch'] ?? ''),
-            'repository_subdirectory' => (string) ($launch['repository_subdirectory'] ?? ''),
-            'current_step_label' => (string) ($launch['current_step_label'] ?? 'Container launch in progress'),
-            'summary' => (string) ($launch['summary'] ?? 'Dply is still preparing this container launch.'),
-            'updated_at' => isset($launch['updated_at']) ? Carbon::parse((string) $launch['updated_at']) : null,
-            'events' => $events,
-            'site' => $site,
-            'site_route' => $site ? route('sites.show', ['server' => $this->server, 'site' => $site]) : null,
-        ];
-    }
 }

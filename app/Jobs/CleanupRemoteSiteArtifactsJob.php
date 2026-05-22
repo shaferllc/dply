@@ -29,7 +29,8 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
      *     primary_hostname?: string|null,
      *     ssl_was_active?: bool,
      *     supervisor_program_ids?: array<int, int>,
-     *     site_id?: int
+     *     site_id?: int,
+     *     systemd_unit_names?: list<string>
      * }  $payload
      */
     public function __construct(
@@ -148,6 +149,36 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
                 'basename' => $basename,
                 'output' => Str::limit($log, 2500),
             ]);
+        }
+
+        // Tear down any systemd units that the SiteSystemdProvisioner
+        // installed for non-PHP/static runtimes. The unit names are passed
+        // through from the deleting hook because the Site row is gone by
+        // the time this job runs.
+        /** @var list<string> $unitNames */
+        $unitNames = $this->payload['systemd_unit_names'] ?? [];
+        $unitNames = array_values(array_filter($unitNames, 'is_string'));
+        if ($unitNames !== []) {
+            $disableLines = [];
+            foreach ($unitNames as $name) {
+                // Allow systemctl to fail (unit may never have been
+                // activated) without aborting the rm; combine into one
+                // SSH round-trip per unit.
+                $disableLines[] = sprintf(
+                    'sudo systemctl disable --now %1$s 2>/dev/null || true; sudo rm -f /etc/systemd/system/%1$s',
+                    escapeshellarg($name),
+                );
+            }
+            $disableLines[] = 'sudo systemctl daemon-reload';
+            try {
+                $ssh->exec(implode(' && ', $disableLines), 90);
+            } catch (\Throwable $e) {
+                Log::info('CleanupRemoteSiteArtifactsJob systemd teardown skipped', [
+                    'server_id' => $server->id,
+                    'units' => $unitNames,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 
 class SiteWebserverConfigApplier
 {
@@ -10,7 +11,12 @@ class SiteWebserverConfigApplier
         private readonly SiteWebserverProvisionerRegistry $registry,
     ) {}
 
-    public function apply(Site $site): string
+    /**
+     * Apply the webserver config for the site. The optional `$emit` is the
+     * console-actions-backed emitter used by the queued apply job; when absent,
+     * a no-op emitter is supplied so the provisioner code path is identical.
+     */
+    public function apply(Site $site, ?ConsoleEmitter $emit = null): string
     {
         $site->loadMissing('server');
 
@@ -22,6 +28,6 @@ class SiteWebserverConfigApplier
             throw new \RuntimeException('This host runtime does not support managed webserver config.');
         }
 
-        return $this->registry->for($site->webserver())->provision($site);
+        return $this->registry->for($site->webserver())->provision($site, $emit ?? new ConsoleEmitter);
     }
 }

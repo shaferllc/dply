@@ -20,11 +20,19 @@ class ServerInventoryProbeScript
      * Build the inventory + manage probe shell script. Extended adds disk/memory/uptime/fail2ban
      * from the original inventory probe; UNITS and PORTS sections always run (they're cheap and
      * cental to the Manage page Overview/Services tabs).
+     *
+     * $deployUser names the dply-managed Linux account that owns per-user toolchain state
+     * (mise's data dir under ~deploy/.local/share/mise). When non-empty the probe runs the
+     * per-user blocks (currently: MISE_RUNTIMES) as that user via sudo, since the SSH login
+     * defaults to root which has its own empty mise state. Null/empty skips those blocks.
      */
-    public function build(bool $extended, int $previewLines): string
+    public function build(bool $extended, int $previewLines, ?string $deployUser = null): string
     {
         $previewLines = max(10, min(200, $previewLines));
         $watched = implode(' ', array_map('escapeshellarg', self::WATCHED_UNITS));
+        $deployUser = is_string($deployUser) ? trim($deployUser) : '';
+        $hasDeployUser = $deployUser !== '' && $deployUser !== 'root';
+        $deployUserArg = $hasDeployUser ? escapeshellarg($deployUser) : '';
 
         $script = <<<SH
 printf "OS_BEGIN\n"
@@ -122,7 +130,100 @@ ls -1 /etc/nginx/conf.d/ 2>/dev/null | head -n 50
 echo "[supervisor_conf_d]"
 ls -1 /etc/supervisor/conf.d/ 2>/dev/null | head -n 50
 printf "DISCOVERED_END\n"
+printf "TOOLS_BEGIN\n"
+# Operator-installable server toolchain — surfaced on Manage → Tools as
+# version pills + Install/Reinstall buttons. Each tool emits PRESENT (1/0)
+# and VERSION (first line of --version output). Cheap: just `command -v`
+# + `<bin> --version` per tool. Adding a new tool here = one block here +
+# one row on the Tools tab + one entry in service_actions.
+mise_p=0; mise_v=
+if command -v mise >/dev/null 2>&1; then
+  mise_p=1
+  mise_v=\$(mise --version 2>/dev/null | head -n 1)
+fi
+printf "MISE_PRESENT=%s\n" "\$mise_p"
+[ -n "\$mise_v" ] && printf "MISE_VERSION=%s\n" "\$mise_v"
+docker_p=0; docker_v=
+if command -v docker >/dev/null 2>&1; then
+  docker_p=1
+  docker_v=\$(docker --version 2>/dev/null | head -n 1)
+fi
+printf "DOCKER_PRESENT=%s\n" "\$docker_p"
+[ -n "\$docker_v" ] && printf "DOCKER_VERSION=%s\n" "\$docker_v"
+wp_p=0; wp_v=
+if command -v wp >/dev/null 2>&1; then
+  wp_p=1
+  wp_v=\$(wp --info 2>/dev/null | awk -F': ' '/WP-CLI version/{print \$2; exit}')
+  [ -z "\$wp_v" ] && wp_v=\$(wp --version 2>/dev/null | head -n 1)
+fi
+printf "WP_CLI_PRESENT=%s\n" "\$wp_p"
+[ -n "\$wp_v" ] && printf "WP_CLI_VERSION=%s\n" "\$wp_v"
+printf "TOOLS_END\n"
+printf "SYSTEM_RUNTIMES_BEGIN\n"
+# System-level runtime detection — anything on the default PATH that the operator
+# laid down outside mise (apt-installed nodejs, Ubuntu's python3, etc.). Runs in
+# the probe's non-interactive root shell, so it only sees binaries in /usr/bin
+# /usr/local/bin. mise-managed runtimes under ~deploy/.local/share/mise/shims
+# are NOT visible here (those need login-shell activation) and live in the
+# separate MISE_RUNTIMES block below.
+node_p=0; node_v=
+if command -v node >/dev/null 2>&1; then
+  node_p=1
+  node_v=\$(node --version 2>/dev/null | head -n 1)
+fi
+printf "NODE_PRESENT=%s\n" "\$node_p"
+[ -n "\$node_v" ] && printf "NODE_VERSION=%s\n" "\$node_v"
+py_p=0; py_v=
+if command -v python3 >/dev/null 2>&1; then
+  py_p=1
+  py_v=\$(python3 --version 2>&1 | head -n 1)
+elif command -v python >/dev/null 2>&1; then
+  py_p=1
+  py_v=\$(python --version 2>&1 | head -n 1)
+fi
+printf "PYTHON_PRESENT=%s\n" "\$py_p"
+[ -n "\$py_v" ] && printf "PYTHON_VERSION=%s\n" "\$py_v"
+rb_p=0; rb_v=
+if command -v ruby >/dev/null 2>&1; then
+  rb_p=1
+  rb_v=\$(ruby --version 2>/dev/null | head -n 1)
+fi
+printf "RUBY_PRESENT=%s\n" "\$rb_p"
+[ -n "\$rb_v" ] && printf "RUBY_VERSION=%s\n" "\$rb_v"
+go_p=0; go_v=
+if command -v go >/dev/null 2>&1; then
+  go_p=1
+  go_v=\$(go version 2>/dev/null | head -n 1)
+fi
+printf "GO_PRESENT=%s\n" "\$go_p"
+[ -n "\$go_v" ] && printf "GO_VERSION=%s\n" "\$go_v"
+printf "SYSTEM_RUNTIMES_END\n"
 SH;
+
+        if ($hasDeployUser) {
+            // Per-user mise state — mise stores installed runtimes under
+            // ~deploy/.local/share/mise/installs and reads global pins from
+            // ~deploy/.config/mise/config.toml. The root SSH login can't see
+            // these directly; sudo into the deploy user so `mise ls` and
+            // friends report what the operator actually pinned.
+            $script .= <<<SH
+
+printf "MISE_RUNTIMES_BEGIN\n"
+if command -v mise >/dev/null 2>&1; then
+  # --json gives us {name, version, source, requested_version, active, install_path}
+  # per installed runtime. `mise current` gives the active version per runtime.
+  printf "LS_BEGIN\n"
+  (sudo -n -u {$deployUserArg} -i mise ls --json 2>/dev/null) || (sudo -u {$deployUserArg} -i mise ls --json 2>/dev/null) || printf "{}"
+  printf "\nLS_END\n"
+  for rt in node python ruby go; do
+    cur=\$( (sudo -n -u {$deployUserArg} -i mise current "\$rt" 2>/dev/null) || (sudo -u {$deployUserArg} -i mise current "\$rt" 2>/dev/null) || true)
+    cur=\$(printf '%s' "\$cur" | head -n 1 | tr -d '[:space:]')
+    [ -n "\$cur" ] && printf "CURRENT %s=%s\n" "\$rt" "\$cur"
+  done
+fi
+printf "MISE_RUNTIMES_END\n"
+SH;
+        }
 
         if ($extended) {
             $script .= <<<'SH'
@@ -304,6 +405,50 @@ SH;
         }
         $meta['manage_php_fpm'] = $phpFpm;
 
+        // Per-runtime mise state — drives the Tools → mise card's runtimes panel.
+        // The probe captures `mise ls --json` (all installed versions) and
+        // `mise current <rt>` (the active default) as the deploy user. Parse
+        // both into a stable shape: { node => { versions: ['18.20.4',...], active: '20.16.0' }, ... }.
+        $miseRuntimes = $this->parseMiseRuntimesBlock($out);
+        if ($miseRuntimes !== null) {
+            $meta['manage_mise_runtimes'] = $miseRuntimes;
+        }
+
+        // System-level runtimes — what's on PATH in the non-interactive root
+        // shell (apt-installed nodejs, Ubuntu's python3, etc.). Captured
+        // independently of mise so the Tools card can show both:
+        // "System Node v22.0.0" alongside "mise Node 20.16.0 (default)".
+        $systemRuntimesKv = $this->extractKvBlock($out, 'SYSTEM_RUNTIMES');
+        $systemRuntimes = [];
+        foreach (['node', 'python', 'ruby', 'go'] as $rt) {
+            $present = (string) ($systemRuntimesKv[$rt.'_present'] ?? '0') === '1';
+            $version = $present ? (string) ($systemRuntimesKv[$rt.'_version'] ?? '') : '';
+            $systemRuntimes[$rt] = [
+                'present' => $present,
+                'version' => $version !== '' ? $version : null,
+            ];
+        }
+        $meta['manage_system_runtimes'] = $systemRuntimes;
+
+        // Operator-installable server toolchain — drives the version pills + Install/Reinstall
+        // buttons on Manage → Tools. The probe block emits per-tool {NAME}_PRESENT / {NAME}_VERSION
+        // pairs; group them into a stable shape so the blade can iterate.
+        $toolsKv = $this->extractKvBlock($out, 'TOOLS');
+        $tools = [];
+        foreach ([
+            'mise' => 'mise',
+            'docker' => 'docker',
+            'wp_cli' => 'wp_cli',
+        ] as $slug => $prefix) {
+            $present = (string) ($toolsKv[$prefix.'_present'] ?? '0') === '1';
+            $version = $present ? (string) ($toolsKv[$prefix.'_version'] ?? '') : '';
+            $tools[$slug] = [
+                'present' => $present,
+                'version' => $version !== '' ? $version : null,
+            ];
+        }
+        $meta['manage_tools'] = $tools;
+
         // MySQL/MariaDB
         $meta['manage_mysql'] = $this->extractKvBlock($out, 'MYSQL');
 
@@ -385,6 +530,118 @@ SH;
         $meta['inventory_checked_at'] = now()->toIso8601String();
 
         return $meta;
+    }
+
+    /**
+     * Parse the MISE_RUNTIMES_BEGIN/_END block emitted by the probe (when the
+     * caller passed a deploy user) into per-runtime version lists + active default.
+     *
+     * Returns null when the block is absent (probe ran without deploy user context
+     * — leaves any pre-existing meta intact). Returns an empty per-runtime stub
+     * when mise itself isn't present (handlers can render an empty state).
+     *
+     * @return array<string, array{versions: list<string>, active: ?string}>|null
+     */
+    private function parseMiseRuntimesBlock(string $out): ?array
+    {
+        if (! preg_match('/MISE_RUNTIMES_BEGIN\s*\R(.*?)\RMISE_RUNTIMES_END/s', $out, $m)) {
+            return null;
+        }
+        $body = $m[1];
+
+        $shape = [
+            'node' => ['versions' => [], 'active' => null],
+            'python' => ['versions' => [], 'active' => null],
+            'ruby' => ['versions' => [], 'active' => null],
+            'go' => ['versions' => [], 'active' => null],
+        ];
+
+        // CURRENT <rt>=<version> lines drive the active-default pill.
+        foreach (explode("\n", $body) as $line) {
+            $line = trim($line);
+            if (! str_starts_with($line, 'CURRENT ')) {
+                continue;
+            }
+            $rest = substr($line, 8);
+            if (! str_contains($rest, '=')) {
+                continue;
+            }
+            [$rt, $ver] = explode('=', $rest, 2);
+            $rt = trim($rt);
+            $ver = trim($ver);
+            if ($ver !== '' && isset($shape[$rt])) {
+                $shape[$rt]['active'] = $ver;
+            }
+        }
+
+        // LS_BEGIN/_END holds the `mise ls --json` payload. mise emits either an
+        // object keyed by tool name with arrays of installs, or (in some recent
+        // versions) a flat list of records with a `name` field — accept both.
+        if (preg_match('/LS_BEGIN\s*\R(.*?)\RLS_END/s', $body, $lsm)) {
+            $json = trim($lsm[1]);
+            $decoded = $json !== '' ? json_decode($json, true) : null;
+            if (is_array($decoded)) {
+                $this->ingestMiseLsJson($decoded, $shape);
+            }
+        }
+
+        // Dedupe + stable sort each version list.
+        foreach ($shape as $rt => $entry) {
+            $versions = array_values(array_unique($entry['versions']));
+            usort($versions, 'version_compare');
+            $shape[$rt]['versions'] = $versions;
+        }
+
+        return $shape;
+    }
+
+    /**
+     * Merge mise's `ls --json` payload into the per-runtime shape. Tolerates
+     * both the object-of-lists ({"node": [{version, …}, …], …}) and the
+     * flat-list-of-records ([{name, version, …}, …]) variants mise has emitted
+     * across releases.
+     *
+     * @param  array<int|string, mixed>  $decoded
+     * @param  array<string, array{versions: list<string>, active: ?string}>  $shape
+     */
+    private function ingestMiseLsJson(array $decoded, array &$shape): void
+    {
+        // Variant 1: keyed by tool name.
+        $looksKeyed = false;
+        foreach (array_keys($decoded) as $k) {
+            if (is_string($k) && array_key_exists($k, $shape)) {
+                $looksKeyed = true;
+                break;
+            }
+        }
+
+        if ($looksKeyed) {
+            foreach ($decoded as $tool => $entries) {
+                if (! is_string($tool) || ! is_array($entries) || ! array_key_exists($tool, $shape)) {
+                    continue;
+                }
+                foreach ($entries as $entry) {
+                    if (is_array($entry) && isset($entry['version']) && is_string($entry['version']) && $entry['version'] !== '') {
+                        $shape[$tool]['versions'][] = $entry['version'];
+                    }
+                }
+            }
+
+            return;
+        }
+
+        // Variant 2: flat list of records.
+        foreach ($decoded as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $tool = isset($entry['name']) && is_string($entry['name']) ? $entry['name'] : null;
+            $version = isset($entry['version']) && is_string($entry['version']) ? $entry['version'] : null;
+            if ($tool === null || $version === null || $version === '' || ! array_key_exists($tool, $shape)) {
+                continue;
+            }
+            $shape[$tool]['versions'][] = $version;
+        }
     }
 
     /**

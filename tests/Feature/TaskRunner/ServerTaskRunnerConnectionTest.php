@@ -103,7 +103,15 @@ class ServerTaskRunnerConnectionTest extends TestCase
 
     public function test_fake_cloud_server_ssh_user_dply_uses_default_home_script_path(): void
     {
-        config(['server_provision_fake.provider_id_sentinel' => 'fake-local-test']);
+        // env_flag is now part of the isFakeServer() contract — without
+        // it set, the gate refuses to treat any server as fake even if
+        // the provider_id matches the sentinel. That guard exists to
+        // stop stale workers routing through localhost after the operator
+        // disables fake-cloud; tests need to opt in explicitly.
+        config([
+            'server_provision_fake.env_flag' => true,
+            'server_provision_fake.provider_id_sentinel' => 'fake-local-test',
+        ]);
 
         $server = Server::factory()->create([
             'ip_address' => '127.0.0.1',

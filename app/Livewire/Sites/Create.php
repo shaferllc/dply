@@ -2,17 +2,27 @@
 
 namespace App\Livewire\Sites;
 
+use App\Actions\Servers\InstallRuntimeOnServer;
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
+use App\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RunLaravelScaffoldJob;
+use App\Jobs\RunWordPressScaffoldJob;
+use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
+use App\Models\SiteProcess;
+use App\Services\Deploy\LocalRepositoryInspector;
+use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Servers\ServerPhpManager;
+use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
@@ -24,6 +34,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Create extends Component
 {
+    use DetectsRepositoryRuntime;
+
     public Server $server;
 
     public SiteCreateForm $form;
@@ -49,6 +61,87 @@ class Create extends Component
     public array $functionsDetection = [];
 
     public bool $functionsOverridesTouched = false;
+
+    /**
+     * Suggested non-web processes carried forward from the last detection
+     * run. The Site::created hook already creates a `web` SiteProcess
+     * (with command=null); after store() persists the site, we create
+     * one row per entry here so workers/schedulers/etc. land alongside.
+     *
+     * The {@see DetectsRepositoryRuntime} concern owns `$detectedPlan` and
+     * `$runtimeOverridesTouched`; this list is populated from the plan by
+     * {@see applyDetectedRuntimePrefills()}.
+     *
+     * @var list<array{type: string, name: string, command: string, reason: string}>
+     */
+    public array $detectedProcesses = [];
+
+    /**
+     * Surfaces the result of the most recent "install runtime on server"
+     * click for inline UI feedback. Empty until the user invokes
+     * {@see installDetectedRuntimeOnServer}.
+     *
+     * @var array<string, mixed>
+     */
+    public array $runtimeInstallResult = [];
+
+    /**
+     * Database engines installed on the target server, formatted for the
+     * site-create form's engine picker. Each entry is `{id, label}`.
+     * Picker is surfaced in the view only when this list has more than
+     * one entry — single-engine servers don't need to ask.
+     *
+     * @var list<array{id: string, label: string}>
+     */
+    public array $availableDatabaseEngines = [];
+
+    /**
+     * Container-mode state — populated only when the target server's host_kind
+     * is docker or kubernetes. The container path renders a wholly different
+     * form (repo URL + branch + subdir + namespace) instead of the VM-shaped
+     * fields, and submits via {@see storeContainer()} which dispatches the
+     * polling job FinalizeContainerCloudLaunchJob.
+     */
+    public string $container_repo_source = 'manual';
+
+    public string $container_repository_url = '';
+
+    public string $container_repository_branch = 'main';
+
+    public string $container_repository_subdirectory = '';
+
+    public string $container_source_control_account_id = '';
+
+    public string $container_repository_selection = '';
+
+    public string $container_kubernetes_namespace = '';
+
+    /**
+     * Most recent inspection payload (LocalRepositoryInspector output) for the
+     * container path. Empty until the user types a repo URL and the inspector
+     * fires on field-blur.
+     *
+     * @var array<string, mixed>
+     */
+    public array $container_inspection = [];
+
+    public bool $container_has_inspection = false;
+
+    /**
+     * Linked source-control accounts for the container path's repo picker —
+     * separate from $linkedSourceControlAccounts above which is wired to the
+     * functions/serverless flow.
+     *
+     * @var list<array{id: string, provider: string, label: string}>
+     */
+    public array $containerLinkedSourceControlAccounts = [];
+
+    /**
+     * Repositories surfaced from the picked source-control account.
+     *
+     * @var list<array{label: string, url: string, branch: string}>
+     */
+    public array $containerAvailableRepositories = [];
 
     public function mount(
         Server $server,
@@ -92,11 +185,392 @@ class Create extends Component
         }
 
         $this->form->applyPathDefaults();
+
+        // Build the list of database engines the user can pick from. The
+        // default ServerDatabaseEngine row pre-selects in the picker; the
+        // form->database_engine column override only applies when the
+        // user explicitly chooses a different engine.
+        $engines = $server->databaseEngines()->orderBy('engine')->get();
+        $this->availableDatabaseEngines = $engines->map(fn ($e) => [
+            'id' => (string) $e->engine,
+            'label' => trim((string) $e->engine.' '.($e->version ?? '')),
+        ])->values()->all();
+        $defaultEngine = $engines->firstWhere('is_default', true);
+        if ($defaultEngine !== null && $this->form->database_engine === '') {
+            $this->form->database_engine = (string) $defaultEngine->engine;
+        }
+
+        // Container hosts (docker / kubernetes) take a wholly different form;
+        // pre-load the OSS preset & source-control state so the container-mode
+        // partial renders without a second round-trip.
+        if ($this->isContainerMode()) {
+            $this->initializeContainerMode($repositoryBrowser);
+        }
+    }
+
+    /**
+     * True when the target server is a container-shaped host (docker or
+     * kubernetes). Drives the create page's branch between the existing
+     * VM-shaped form and the new container-mode form.
+     */
+    public function isContainerMode(): bool
+    {
+        return in_array(
+            $this->server->hostKind(),
+            [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES],
+            true,
+        );
+    }
+
+    private function initializeContainerMode(SourceControlRepositoryBrowser $repositoryBrowser): void
+    {
+        $this->containerLinkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
+        if ($this->containerLinkedSourceControlAccounts !== []) {
+            $this->container_source_control_account_id = (string) $this->containerLinkedSourceControlAccounts[0]['id'];
+            $this->refreshContainerRepositories($repositoryBrowser);
+        }
+
+        // K8s container apps land in the server's default namespace unless the
+        // user overrides per-container at create time (per Q10-C).
+        if ($this->server->hostKind() === Server::HOST_KIND_KUBERNETES && $this->container_kubernetes_namespace === '') {
+            $defaultNamespace = (string) data_get($this->server->meta, 'kubernetes.namespace', 'default');
+            $this->container_kubernetes_namespace = $defaultNamespace !== '' ? $defaultNamespace : 'default';
+        }
+    }
+
+    public function updatedContainerSourceControlAccountId(string $value): void
+    {
+        $this->container_source_control_account_id = $value;
+        $this->container_repository_selection = '';
+        $this->refreshContainerRepositories(app(SourceControlRepositoryBrowser::class));
+    }
+
+    private function refreshContainerRepositories(SourceControlRepositoryBrowser $repositoryBrowser): void
+    {
+        if ($this->container_source_control_account_id === '') {
+            $this->containerAvailableRepositories = [];
+
+            return;
+        }
+        $account = auth()->user()?->socialAccounts()->find($this->container_source_control_account_id);
+        $this->containerAvailableRepositories = $account
+            ? $repositoryBrowser->repositoriesForAccount($account)
+            : [];
+
+        if ($this->containerAvailableRepositories !== [] && $this->container_repository_selection === '') {
+            $first = $this->containerAvailableRepositories[0];
+            $this->container_repository_selection = (string) $first['url'];
+            $this->container_repository_branch = (string) ($first['branch'] ?? 'main');
+        }
+    }
+
+    /**
+     * One-click fill from an OSS preset (Plausible, Uptime Kuma, Listmonk,
+     * Vaultwarden). Lifted from the deprecated launcher so the container-mode
+     * page keeps the same try-an-app affordance.
+     *
+     * @return list<array{id: string, label: string, description: string, url: string, branch: string, subdirectory: string}>
+     */
+    public function containerOssPresets(): array
+    {
+        return [
+            ['id' => 'plausible', 'label' => 'Plausible Analytics', 'description' => __('Privacy-friendly web analytics (Elixir).'), 'url' => 'https://github.com/plausible/analytics.git', 'branch' => 'master', 'subdirectory' => ''],
+            ['id' => 'uptime-kuma', 'label' => 'Uptime Kuma', 'description' => __('Self-hosted uptime monitor (Node.js).'), 'url' => 'https://github.com/louislam/uptime-kuma.git', 'branch' => 'master', 'subdirectory' => ''],
+            ['id' => 'listmonk', 'label' => 'Listmonk', 'description' => __('Mailing-list and newsletter manager (Go).'), 'url' => 'https://github.com/knadh/listmonk.git', 'branch' => 'master', 'subdirectory' => ''],
+            ['id' => 'vaultwarden', 'label' => 'Vaultwarden', 'description' => __('Bitwarden-compatible password vault (Rust).'), 'url' => 'https://github.com/dani-garcia/vaultwarden.git', 'branch' => 'main', 'subdirectory' => ''],
+        ];
+    }
+
+    public function applyContainerOssPreset(string $id): void
+    {
+        $preset = collect($this->containerOssPresets())->firstWhere('id', $id);
+        if (! $preset) {
+            return;
+        }
+        $this->container_repo_source = 'manual';
+        $this->container_repository_url = (string) $preset['url'];
+        $this->container_repository_branch = (string) $preset['branch'];
+        $this->container_repository_subdirectory = (string) $preset['subdirectory'];
+        $this->container_inspection = [];
+        $this->container_has_inspection = false;
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Auto-inspect on field blur (per Q6-C). The blade wires this via
+     * wire:change on the URL/branch/subdir fields; users see the detection
+     * preview without clicking an "Inspect" button. Failures degrade to no
+     * preview — submit still works.
+     */
+    public function inspectContainerRepository(LocalRepositoryInspector $repositoryInspector): void
+    {
+        $url = trim($this->resolvedContainerRepositoryUrl());
+        if ($url === '') {
+            $this->container_inspection = [];
+            $this->container_has_inspection = false;
+
+            return;
+        }
+
+        try {
+            $inspection = $repositoryInspector->inspect(
+                repositoryUrl: $url,
+                branch: $this->container_repository_branch !== '' ? $this->container_repository_branch : 'main',
+                subdirectory: $this->container_repository_subdirectory,
+                userId: auth()->id(),
+                sourceControlAccountId: $this->container_repo_source === 'provider' ? $this->container_source_control_account_id : null,
+            );
+        } catch (\Throwable) {
+            $this->container_inspection = [];
+            $this->container_has_inspection = false;
+
+            return;
+        }
+
+        $this->container_inspection = $inspection;
+        $this->container_has_inspection = true;
+    }
+
+    private function resolvedContainerRepositoryUrl(): string
+    {
+        return $this->container_repo_source === 'provider'
+            ? $this->container_repository_selection
+            : $this->container_repository_url;
+    }
+
+    /**
+     * Container-mode submit. Validates the repo URL, ensures we have an
+     * inspection payload, then hands off to FinalizeContainerCloudLaunchJob.
+     * The job creates the Site row + chains ProvisionSiteJob +
+     * RunSiteDeploymentJob once the host is ready (it polls if the host is
+     * still provisioning, per Q5-B).
+     */
+    public function storeContainer(LocalRepositoryInspector $repositoryInspector): mixed
+    {
+        $this->authorize('update', $this->server);
+        $this->authorize('create', Site::class);
+
+        $rules = [
+            'container_repo_source' => ['required', 'string', 'in:manual,provider'],
+            'container_repository_branch' => ['required', 'string', 'max:120'],
+            'container_repository_subdirectory' => ['nullable', 'string', 'max:255'],
+        ];
+        if ($this->container_repo_source === 'manual') {
+            $rules['container_repository_url'] = ['required', 'string', 'max:500'];
+        } else {
+            $rules['container_source_control_account_id'] = ['required', 'string', 'max:26'];
+            $rules['container_repository_selection'] = ['required', 'string', 'max:500'];
+        }
+        if ($this->server->hostKind() === Server::HOST_KIND_KUBERNETES) {
+            $rules['container_kubernetes_namespace'] = ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'];
+        }
+        $this->validate($rules);
+
+        // Re-inspect at submit time if the user never blurred the field — the
+        // job needs the inspection payload to drive the Site creation.
+        if (! $this->container_has_inspection) {
+            $this->inspectContainerRepository($repositoryInspector);
+        }
+        if (! $this->container_has_inspection) {
+            $this->addError('container_repository_url', __('Could not inspect this repository. Check the URL and branch.'));
+
+            return null;
+        }
+
+        $user = auth()->user();
+        $org = $user?->currentOrganization();
+        if ($user === null || $org === null) {
+            abort(403);
+        }
+
+        // K8s containers may target a different namespace than the server's
+        // default. Stash the per-container namespace into the inspection
+        // payload so the job + CreateContainerSiteFromInspection see it.
+        $inspection = $this->container_inspection;
+        if ($this->server->hostKind() === Server::HOST_KIND_KUBERNETES) {
+            $inspection['detection']['kubernetes_namespace'] = $this->container_kubernetes_namespace !== ''
+                ? $this->container_kubernetes_namespace
+                : (string) data_get($this->server->meta, 'kubernetes.namespace', 'default');
+        }
+
+        $targetFamily = $this->server->hostKind() === Server::HOST_KIND_KUBERNETES
+            ? 'cloud_kubernetes'
+            : 'cloud_docker';
+
+        // Seed the in-flight launch state on the server so the overview
+        // banner has something to display while the job polls.
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $meta['container_launch'] = [
+            'status' => 'queued',
+            'target_family' => $targetFamily,
+            'repository_url' => (string) ($inspection['repository_url'] ?? $this->resolvedContainerRepositoryUrl()),
+            'repository_branch' => $this->container_repository_branch,
+            'repository_subdirectory' => $this->container_repository_subdirectory,
+            'current_step_label' => __('Queued'),
+            'summary' => __('Dply will create the site once the host is ready.'),
+            'events' => [[
+                'at' => now()->toIso8601String(),
+                'level' => 'info',
+                'message' => __('Container app launch queued from Sites/Create.'),
+            ]],
+        ];
+        $this->server->forceFill(['meta' => $meta])->save();
+
+        FinalizeContainerCloudLaunchJob::dispatch(
+            (string) $this->server->id,
+            (string) $user->id,
+            (string) $org->id,
+            $inspection,
+            $targetFamily,
+        );
+
+        $isKubernetes = $this->server->hostKind() === Server::HOST_KIND_KUBERNETES;
+        $destination = $isKubernetes ? 'servers.cluster' : 'servers.overview';
+        session()->flash('success', $isKubernetes
+            ? __('Container app queued. Watch progress on the cluster page.')
+            : __('Container app queued. Watch progress on the server overview.'));
+
+        return $this->redirect(route($destination, $this->server), navigate: true);
     }
 
     public function updatedFormType(string $value): void
     {
         $this->form->applyDefaultsForType($value);
+    }
+
+    /**
+     * Switch the wizard to "Import an existing repo" mode (default).
+     */
+    public function chooseImportMode(): void
+    {
+        $this->form->mode = 'import';
+        $this->form->scaffold_framework = '';
+        $this->form->scaffold_admin_email = '';
+    }
+
+    /**
+     * Switch the wizard to "Scaffold a new app" mode (Q3 branch).
+     * Hides the import form; reveals the tile picker + admin email field.
+     */
+    public function chooseScaffoldMode(): void
+    {
+        $this->form->mode = 'scaffold';
+    }
+
+    /**
+     * Pick a scaffold tile (laravel | wordpress).
+     */
+    public function chooseScaffoldFramework(string $framework): void
+    {
+        if (! in_array($framework, ['laravel', 'wordpress'], true)) {
+            return;
+        }
+        $this->form->scaffold_framework = $framework;
+    }
+
+    /**
+     * Submit handler for scaffold mode.
+     *
+     * Validates the three scaffold fields (slug + framework + admin email),
+     * verifies the feature flag, creates a Site row in STATUS_SCAFFOLDING,
+     * then redirects to the (still-WIP) scaffold journey.
+     *
+     * Pipeline execution lands in PR 5 (Laravel) / PR 6 (WordPress);
+     * for now this only persists the Site row + flashes a placeholder
+     * message so the wizard surface can be exercised end-to-end.
+     */
+    public function storeScaffold(): mixed
+    {
+        $this->authorize('update', $this->server);
+        $this->authorize('create', Site::class);
+
+        if (! config('dply.scaffold_v1_enabled')) {
+            $this->addError('form.mode', __('Scaffolding is not enabled on this dply install yet.'));
+
+            return null;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        abort_if($org === null, 403);
+        abort_if($this->server->organization_id !== $org->id, 403);
+
+        // Database-engine compat per Q5: WordPress requires MySQL/MariaDB.
+        // We don't auto-block here because the server's engine list may
+        // include MariaDB even on a Postgres-default server; the pipeline
+        // (PR 6) will pick a compatible engine and surface a wizard error
+        // before this if none exists. v1 keeps the gate light at submit
+        // time and defers strict checks to the journey's preflight step.
+
+        $this->form->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'mode' => ['required', 'in:scaffold'],
+            'scaffold_framework' => ['required', 'in:laravel,wordpress'],
+            'scaffold_admin_email' => ['required', 'email', 'max:255'],
+            'primary_hostname' => ['nullable', 'string', 'max:255'],
+        ], attributes: [
+            'scaffold_framework' => __('starter template'),
+            'scaffold_admin_email' => __('admin email'),
+        ]);
+
+        $slug = Str::slug($this->form->name) ?: 'site';
+
+        $site = Site::query()->create([
+            'server_id' => $this->server->id,
+            'user_id' => auth()->id(),
+            'organization_id' => $this->server->organization_id,
+            'name' => $this->form->name,
+            'slug' => $slug,
+            // Both Laravel and WordPress are PHP-shaped sites. Locking
+            // type=php keeps existing site listings + filters consistent;
+            // the framework-specific tabs render off meta.scaffold.framework.
+            'type' => SiteType::Php,
+            'runtime' => 'php',
+            'status' => Site::STATUS_SCAFFOLDING,
+            'meta' => [
+                'scaffold' => [
+                    'framework' => $this->form->scaffold_framework,
+                    'admin_email' => $this->form->scaffold_admin_email,
+                    'requested_hostname' => trim($this->form->primary_hostname) !== ''
+                        ? trim($this->form->primary_hostname)
+                        : null,
+                    'requested_at' => now()->toISOString(),
+                    'requested_by_user_id' => auth()->id(),
+                ],
+            ],
+        ]);
+
+        // Dispatch the framework-specific pipeline. The Site is already
+        // in STATUS_SCAFFOLDING; the worker walks it through the steps
+        // recorded under meta.scaffold.steps[] for the journey UI (PR 7).
+        if ($this->form->scaffold_framework === 'laravel') {
+            RunLaravelScaffoldJob::dispatch($site->id);
+            session()->flash('info', __('Laravel site queued for scaffolding. The pipeline runs in the background.'));
+        } else {
+            RunWordPressScaffoldJob::dispatch($site->id);
+            session()->flash('info', __('WordPress site queued for scaffolding. The pipeline runs in the background.'));
+        }
+
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'site.created',
+                $site,
+                null,
+                [
+                    'name' => $site->name,
+                    'slug' => $site->slug,
+                    'server_id' => (string) $this->server->id,
+                    'mode' => 'scaffold',
+                    'scaffold_framework' => $this->form->scaffold_framework,
+                ],
+            );
+        }
+
+        return $this->redirect(route('sites.scaffold-journey', [
+            'server' => $this->server,
+            'site' => $site,
+        ]), navigate: true);
     }
 
     public function updatedFormFunctionsRepoSource(): void
@@ -202,6 +676,185 @@ class Create extends Component
         if (! $value) {
             $this->form->applyPathDefaults();
         }
+    }
+
+    public function updatedFormRuntime(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    public function updatedFormRuntimeVersion(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    public function updatedFormBuildCommand(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    public function updatedFormStartCommand(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    /**
+     * Run URL-first runtime detection against the form's git URL + branch.
+     * Thin wrapper over {@see DetectsRepositoryRuntime::runDetection()}; the
+     * concern populates `$detectedPlan` and then calls
+     * {@see applyDetectedRuntimePrefills()} to pre-fill the form.
+     */
+    public function detectFromRepository(): void
+    {
+        $this->runDetection(
+            $this->form->git_repository_url,
+            $this->form->git_branch,
+        );
+    }
+
+    /**
+     * Copy the detected plan onto the form. Suggested non-web processes are
+     * stashed in {@see $detectedProcesses} for {@see store()} to materialize
+     * after the Site row is created; runtime / version / build / start are
+     * pre-filled only when the user hasn't manually edited them.
+     */
+    protected function applyDetectedRuntimePrefills(): void
+    {
+        $plan = $this->detectedPlan;
+
+        $this->detectedProcesses = is_array($plan['processes'] ?? null)
+            ? array_values($plan['processes'])
+            : [];
+
+        $runtime = (string) ($plan['runtime'] ?? '');
+        if ($runtime === '' || $this->runtimeOverridesTouched) {
+            return;
+        }
+
+        $this->form->runtime = $runtime;
+        $this->form->runtime_version = (string) ($plan['version'] ?? '');
+        $this->form->build_command = (string) ($plan['build_command'] ?? '');
+        $this->form->start_command = (string) ($plan['start_command'] ?? '');
+        // Sync the legacy `type` enum + php_version + app_port so the
+        // existing UI sections (which still bind on those) reflect the
+        // detected runtime instead of staying on the previous default.
+        $this->form->type = $this->mapRuntimeToLegacyType($runtime);
+        $this->form->applyPathDefaults();
+        if ($runtime === 'php' && ! empty($plan['version'])) {
+            $this->form->php_version = (string) $plan['version'];
+        }
+        if ($runtime === 'node' && ! empty($plan['app_port'])) {
+            $this->form->app_port = (int) $plan['app_port'];
+        }
+    }
+
+    /**
+     * Resolve the value to write to Site.database_engine. Returns null
+     * (use server default at read time) when the user accepted the
+     * server's default; returns the picked engine string when they
+     * chose a non-default one.
+     */
+    private function resolveDatabaseEngineOverride(): ?string
+    {
+        $picked = trim($this->form->database_engine);
+        if ($picked === '') {
+            return null;
+        }
+
+        $default = $this->server->defaultDatabaseEngine();
+        if ($default !== null && $default->engine === $picked) {
+            return null;
+        }
+
+        return $picked;
+    }
+
+    /**
+     * Whether the inline "Install <runtime> on this server" affordance
+     * should appear in the detection panel. True when:
+     *   - detection has produced a runtime,
+     *   - that runtime is one mise can manage (not PHP, not static), and
+     *   - the server hasn't already pinned it via meta.runtime_defaults.
+     *
+     * Exposed as a Livewire-magic computed property so the Blade panel
+     * can call `$this->detectedRuntimeNeedsInstall` without an in-template
+     *
+     * @php block (Blade's compileString has trouble parsing block-form
+     * @php with array literals containing 'php'/'static' string keys —
+     * Livewire-side computation sidesteps that entirely).
+     */
+    public function getDetectedRuntimeNeedsInstallProperty(): bool
+    {
+        $runtime = (string) ($this->detectedPlan['runtime'] ?? '');
+        if ($runtime === '' || in_array($runtime, ['php', 'static'], true)) {
+            return false;
+        }
+
+        return ! $this->server->hasRuntimeInstalled($runtime);
+    }
+
+    /**
+     * Trigger runtime installation on the current server using the
+     * detected runtime + version. Used by the inline "Install <runtime>
+     * on this server" affordance the panel surfaces when the detected
+     * runtime is missing from `server->installedRuntimeKeys()`.
+     */
+    public function installDetectedRuntimeOnServer(InstallRuntimeOnServer $action): void
+    {
+        $this->authorize('update', $this->server);
+
+        $runtime = (string) ($this->detectedPlan['runtime'] ?? '');
+        $version = (string) ($this->detectedPlan['version'] ?? '');
+
+        if ($runtime === '' || $version === '') {
+            $this->runtimeInstallResult = [
+                'ok' => false,
+                'message' => __('Run detection first so we have a runtime + version to install.'),
+            ];
+
+            return;
+        }
+
+        try {
+            $result = $action->execute($this->server, $runtime, $version);
+        } catch (\Throwable $e) {
+            $this->runtimeInstallResult = [
+                'ok' => false,
+                'runtime' => $runtime,
+                'version' => $version,
+                'message' => $e->getMessage(),
+            ];
+
+            return;
+        }
+
+        $this->server->refresh();
+
+        $this->runtimeInstallResult = [
+            'ok' => $result['installed'],
+            'runtime' => $result['runtime'],
+            'version' => $result['version'],
+            'message' => $result['installed']
+                ? __('Installed :runtime :version on this server.', ['runtime' => $runtime, 'version' => $version])
+                : __('Skipped — runtime not eligible for mise-managed install.'),
+        ];
+    }
+
+    /**
+     * Map a detected runtime onto the existing {@see SiteType} enum. The
+     * enum still drives a lot of legacy UI/provisioner branches; we'll
+     * collapse it into the new `runtime` column in a follow-up. For
+     * runtimes the enum doesn't yet model (python/ruby/go) we fall back
+     * to "node" as the closest approximation — the new `runtime` column
+     * carries the truth, and downstream provisioners read that.
+     */
+    private function mapRuntimeToLegacyType(string $runtime): string
+    {
+        return match ($runtime) {
+            'php' => 'php',
+            'static' => 'static',
+            default => 'node',
+        };
     }
 
     public function store(SiteProvisioner $siteProvisioner): mixed
@@ -361,6 +1014,31 @@ class Create extends Component
             ];
         }
 
+        // The new runtime-agnostic fields drive the URL-first flow. When
+        // they aren't populated (legacy flow, or non-VM hosts) we fall
+        // back to the existing type-based logic so behavior is unchanged.
+        $effectiveRuntime = $this->form->runtime !== ''
+            ? $this->form->runtime
+            : $this->form->type;
+        $allocatesInternalPort = ! $functionsHost
+            && ! $containerHost
+            && ! in_array($effectiveRuntime, ['php', 'static'], true);
+        $internalPort = null;
+        if ($allocatesInternalPort) {
+            $internalPort = app(InternalPortAllocator::class)->allocate($this->server->id);
+            if ($internalPort === null) {
+                $this->addError(
+                    'form.runtime',
+                    __('No free internal port available on this server (range 30000–39999 is full).'),
+                );
+
+                return null;
+            }
+        }
+
+        $vmGitUrl = trim($this->form->git_repository_url);
+        $vmGitBranch = trim($this->form->git_branch) !== '' ? trim($this->form->git_branch) : 'main';
+
         $site = Site::query()->create([
             'server_id' => $this->server->id,
             'user_id' => auth()->id(),
@@ -369,18 +1047,40 @@ class Create extends Component
             'name' => $this->form->name,
             'slug' => Str::slug($this->form->name) ?: 'site',
             'type' => SiteType::from($this->form->type),
+            // Prefer the explicit `runtime` set by detection or wizard;
+            // when the form only provides the legacy `type`, derive an
+            // equivalent runtime key so the new schema is always populated.
+            'runtime' => $this->form->runtime !== '' ? $this->form->runtime : $this->form->type,
+            // Prefer the new runtime_version field; for legacy PHP-only flow
+            // (no detection), copy form->php_version into runtime_version.
+            'runtime_version' => $this->form->runtime_version !== ''
+                ? $this->form->runtime_version
+                : ($this->form->type === 'php' && ! $functionsHost && ! $containerHost && $this->form->php_version !== ''
+                    ? $this->form->php_version
+                    : null),
+            'build_command' => $this->form->build_command !== '' ? $this->form->build_command : null,
+            'start_command' => $this->form->start_command !== '' ? $this->form->start_command : null,
+            'internal_port' => $internalPort,
+            // Persist the engine override only when the user picked one
+            // that differs from the server's default; otherwise leave the
+            // column null so the Site::databaseEngine() accessor falls
+            // back to the server's default. Keeps "follow the server's
+            // default" implicit and lets re-default-ing the server
+            // automatically apply to sites that haven't pinned.
+            'database_engine' => $this->resolveDatabaseEngineOverride(),
             'document_root' => $functionsHost
                 ? ($this->server->isAwsLambdaHost()
                     ? '/lambda/'.trim($this->form->functions_entrypoint, '/')
                     : '/functions/'.$this->form->functions_entrypoint)
                 : $this->form->document_root,
             'repository_path' => $functionsHost ? null : ($this->form->repository_path ?: null),
-            'php_version' => $this->form->type === 'php' && ! $functionsHost && ! $containerHost ? $this->form->php_version : null,
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
-            'git_repository_url' => $functionsHost ? trim($this->form->functions_repository_url) : null,
-            'git_branch' => $functionsHost ? trim($this->form->functions_repository_branch) : 'main',
+            'git_repository_url' => $functionsHost
+                ? trim($this->form->functions_repository_url)
+                : ($vmGitUrl !== '' ? $vmGitUrl : null),
+            'git_branch' => $functionsHost ? trim($this->form->functions_repository_branch) : $vmGitBranch,
             'webhook_secret' => Str::random(48),
             'deploy_strategy' => 'simple',
             'releases_to_keep' => 5,
@@ -393,6 +1093,47 @@ class Create extends Component
         $site->ensureUniqueSlug();
         $site->save();
 
+        // The Site::created hook auto-creates a `web` SiteProcess with
+        // command=null. For non-PHP runtimes with a detected start command,
+        // backfill that command now so the process row is immediately
+        // useful.
+        if ($this->form->start_command !== '') {
+            $site->processes()
+                ->where('type', SiteProcess::TYPE_WEB)
+                ->update(['command' => $this->form->start_command]);
+        }
+
+        // Materialize detector-suggested non-web processes (workers,
+        // schedulers) alongside the auto-created web row.
+        foreach ($this->detectedProcesses as $detected) {
+            $site->processes()->create([
+                'type' => $detected['type'],
+                'name' => $detected['name'],
+                'command' => $detected['command'],
+                'scale' => 1,
+                'is_active' => true,
+            ]);
+        }
+
+        // Materialize the canonical default deploy step set for this
+        // runtime + framework so the user's first deploy has sensible
+        // build/release steps without requiring a trip to the deploy-
+        // pipeline editor. Skips when no defaults apply (custom / null
+        // runtime / unknown runtime).
+        $effectiveFramework = (string) ($this->detectedPlan['framework'] ?? '');
+        $defaults = app(RuntimeAwareDeployStepDefaults::class)
+            ->defaultsFor($site->runtime, $effectiveFramework !== '' ? $effectiveFramework : null);
+        foreach ($defaults as $step) {
+            SiteDeployStep::create([
+                'site_id' => $site->id,
+                'sort_order' => $step['sort_order'],
+                'step_type' => $step['step_type'],
+                'phase' => $step['phase'],
+                'custom_command' => $step['custom_command'] ?? null,
+                'timeout_seconds' => $step['timeout_seconds'],
+            ]);
+        }
+
         SiteDomain::query()->create([
             'site_id' => $site->id,
             'hostname' => strtolower(trim($this->form->primary_hostname)),
@@ -403,6 +1144,27 @@ class Create extends Component
         $site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($site);
         ProvisionSiteJob::dispatch($site->id);
+
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'site.created',
+                $site,
+                null,
+                [
+                    'name' => $site->name,
+                    'slug' => $site->slug,
+                    'server_id' => (string) $this->server->id,
+                    'type' => (string) $site->type->value,
+                    'runtime' => $site->runtime,
+                    'runtime_version' => $site->runtime_version,
+                    'primary_hostname' => strtolower(trim($this->form->primary_hostname)),
+                    'git_repository_url' => $site->git_repository_url,
+                    'git_branch' => $site->git_branch,
+                ],
+            );
+        }
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
     }
@@ -473,6 +1235,8 @@ class Create extends Component
 
         return view('livewire.sites.create', [
             'phpVersions' => $this->phpVersions,
+            'isContainerMode' => $this->isContainerMode(),
+            'containerOssPresets' => $this->isContainerMode() ? $this->containerOssPresets() : [],
         ]);
     }
 

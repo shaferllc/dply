@@ -7,15 +7,18 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerSystemdServices;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class WorkspaceServices extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.services';
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -26,16 +29,12 @@ class WorkspaceServices extends Component
         $this->bootWorkspace($server);
         $this->hydrateSystemdInventoryFromDatabase();
         $this->hydrateSystemdServiceActivityFromDatabase();
+        $this->hydrateSystemdSyncBannerDismissalFromSession();
     }
 
     public function render(): View
     {
         $this->server->refresh();
-
-        $user = auth()->user();
-        $bulkNotifyChannelOptions = $user !== null
-            ? AssignableNotificationChannels::forUser($user, $user->currentOrganization())
-            : collect();
 
         $deployerSystemdLocked = $this->currentUserIsDeployer()
             && ! (bool) ($this->server->organization?->mergedServicesPreferences()['deployer_systemd_actions_enabled'] ?? false);
@@ -49,7 +48,6 @@ class WorkspaceServices extends Component
                 : null,
             'filteredSystemdInventory' => $this->systemdFilteredInventoryRows(),
             'systemdSyncMeta' => $this->systemdInventorySyncMeta(),
-            'bulkNotifyChannelOptions' => $bulkNotifyChannelOptions,
         ]);
     }
 }

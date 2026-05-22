@@ -16,6 +16,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Provision auto-retry on transient failures
+    |--------------------------------------------------------------------------
+    | When true, a failed setup task whose output matches transient patterns
+    | (apt fetch timeout, dpkg error, network blip) reschedules itself with a
+    | backoff up to MAX_AUTO_RETRY_ATTEMPTS. Default is off — operators
+    | iterating on the bash script tend to want the failure to sit visible so
+    | they can inspect output and re-run by hand. Flip on once provisioning
+    | is stable in production and you want resilience to upstream blips.
+    */
+    'auto_retry_enabled' => filter_var(env('DPLY_AUTO_RETRY_ENABLED', false), FILTER_VALIDATE_BOOL),
+
+    /*
+    |--------------------------------------------------------------------------
     | Community / docs links (optional)
     |--------------------------------------------------------------------------
     | Used on profile for “contribute a translation” style links.
@@ -146,5 +159,16 @@ return [
     'supervisor_health_check_enabled' => filter_var(env('DPLY_SUPERVISOR_HEALTH_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     'supervisor_health_notify_org_admins' => filter_var(env('DPLY_SUPERVISOR_HEALTH_NOTIFY_ADMINS', true), FILTER_VALIDATE_BOOL),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Site scaffolding (Laravel + WordPress one-click installs)
+    |--------------------------------------------------------------------------
+    | Gates the new "scaffold a fresh app" branch of the Site Create wizard
+    | plus the WordPress Site Settings section. Default off until the
+    | back-end pipelines (PR 5–6) and journey UI (PR 7) ship; flips on once
+    | the pipeline is reliable end-to-end.
+    */
+    'scaffold_v1_enabled' => filter_var(env('DPLY_SCAFFOLD_V1_ENABLED', false), FILTER_VALIDATE_BOOL),
 
 ];

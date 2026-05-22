@@ -54,10 +54,11 @@ class SiteCreationGateTest extends TestCase
         $this->get(route('sites.create', $server))->assertForbidden();
     }
 
-    public function test_site_create_forbidden_when_org_at_site_limit(): void
+    public function test_site_create_always_allowed_now_that_site_caps_are_retired(): void
     {
-        Config::set('subscription.limits.sites_free', 1);
-
+        // Under the Standard pricing model sites are uncapped. The previous
+        // "forbidden when at trial site limit" behavior is gone — billing is
+        // per-server and trial-state gating handles abuse.
         $user = User::factory()->create();
         $org = Organization::factory()->create();
         $org->users()->attach($user->id, ['role' => 'owner']);
@@ -73,7 +74,7 @@ class SiteCreationGateTest extends TestCase
 
         $this->actingInOrg($user, $org);
 
-        $this->get(route('sites.create', $server))->assertForbidden();
+        $this->get(route('sites.create', $server))->assertOk();
     }
 
     public function test_owner_can_delete_site(): void
@@ -151,6 +152,7 @@ class SiteCreationGateTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
             'php_version' => '8.3',
+            'status' => Site::STATUS_NGINX_ACTIVE,
             'meta' => [
                 'php_runtime' => [
                     'memory_limit' => '512M',
@@ -162,7 +164,7 @@ class SiteCreationGateTest extends TestCase
 
         $this->actingInOrg($user, $org);
 
-        $response = $this->get(route('sites.show', [$server, $site]));
+        $response = $this->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime-php']));
 
         $response->assertOk()
             ->assertSee('PHP')

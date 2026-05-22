@@ -6,6 +6,7 @@ use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SiteUptimeMonitor;
+use App\Services\Notifications\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -32,7 +33,10 @@ class RunSiteUptimeMonitorCheckJobTest extends TestCase
             'last_ok' => null,
         ]);
 
-        (new RunSiteUptimeMonitorCheckJob($monitor->id))->handle(app(SiteUptimeCheckUrlResolver::class));
+        (new RunSiteUptimeMonitorCheckJob($monitor->id))->handle(
+            app(SiteUptimeCheckUrlResolver::class),
+            app(NotificationPublisher::class),
+        );
 
         $monitor->refresh();
         $this->assertTrue($monitor->last_ok);

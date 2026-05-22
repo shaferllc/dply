@@ -18,6 +18,20 @@
         </include>
     </source>
     <php>
+        <!-- Bump the per-process memory limit from PHP's default 512M to 1G. The Feature
+             suite renders the caches/databases/webserver workspaces (each ~3K-line blade
+             templates with deep nested Livewire children) many times across the run in
+             a single PHPUnit process; cumulative resident sets cross 512M near the end
+             and the worker dies mid-render. Lifting the limit keeps `php artisan test`
+             green without forcing per-test process isolation. -->
+        <ini name="memory_limit" value="1G"/>
+        <!-- Disable PHP's per-request max_execution_time during tests. Cumulative
+             render time inside a single PHPUnit process (especially for tests that
+             exercise the large workspace blades many times) drifts past PHP's
+             default 90s slot, killing the worker. CLI defaults to 0 (unlimited)
+             but Laravel's HandleExceptions reapplies a per-request limit; setting
+             it to 0 explicitly removes the cap. Production keeps its own limits. -->
+        <ini name="max_execution_time" value="0"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

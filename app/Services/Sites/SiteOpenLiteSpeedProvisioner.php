@@ -2,7 +2,9 @@
 
 namespace App\Services\Sites;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use Illuminate\Support\Str;
 
@@ -20,8 +22,11 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
         return 'openlitespeed';
     }
 
-    public function provision(Site $site): string
+    public function provision(Site $site, ?ConsoleEmitter $emit = null): string
     {
+        $emit ??= new ConsoleEmitter;
+
+        $emit->step('openlitespeed', 'resolving server connection');
         $server = $this->ensureServerReady($site);
         $basename = $this->configBasename($site);
         $vhostsPath = rtrim(config('sites.openlitespeed_vhosts_path'), '/');
@@ -29,10 +34,17 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
         $httpdConfig = (string) config('sites.openlitespeed_httpd_config');
 
         $ssh = $this->systemSsh($site);
-        $this->installPlaceholderPage($site, $ssh);
-        $this->ensureSuspendedPage($site, $ssh);
-        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
-        $this->writeSystemFile($ssh, $configFile, $this->builder->build($site));
+        // First-apply only — meta.openlitespeed_last_output is written at the
+        // end of the first successful provision, so subsequent applies skip
+        // the placeholder probe entirely.
+        if (! isset(($site->meta ?? [])['openlitespeed_last_output'])) {
+            $this->installPlaceholderPage($site, $ssh, $emit);
+        }
+        $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        if ($this->writeSystemFileIfChanged($server, $ssh, $configFile, $this->builder->build($site))) {
+            $emit->step('openlitespeed', 'writing site config: '.$configFile);
+        }
 
         $includeBlock = sprintf(
             "\nvhTemplate %s {\n  templateFile %s\n  listeners Default\n  vhDomain %s\n}\n",
@@ -41,6 +53,7 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
             implode(',', $site->webserverHostnames())
         );
 
+        $emit->step('openlitespeed', 'restarting lsws');
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_OLS_EXIT:%%s" "$?"',
             $this->privilegedCommand(
@@ -57,10 +70,18 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
             )
         ), 180);
 
+        foreach (preg_split('/\r\n|\r|\n/', trim($out)) ?: [] as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $emit($line, ConsoleAction::LEVEL_INFO, 'openlitespeed');
+        }
+
         if (! preg_match('/DPLY_OLS_EXIT:0\s*$/', $out)) {
             throw new \RuntimeException('OpenLiteSpeed config update failed. Output: '.Str::limit($out, 2000));
         }
 
+        $emit->success('lsws restart OK', 'openlitespeed');
         $this->updateSiteMeta($site, 'openlitespeed_last_output', $out);
 
         return $out;

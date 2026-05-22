@@ -63,11 +63,30 @@ if (! function_exists('server_workspace_nav_for_server')) {
 
         $installed = ServerInstalledServices::tagsFor($server);
         $unknownStack = array_key_exists('unknown', $installed);
+        $hostKind = (string) ($server->meta['host_kind'] ?? 'vm');
 
-        $filtered = array_filter($items, static function ($item) use ($installed, $unknownStack): bool {
+        $filtered = array_filter($items, static function ($item) use ($installed, $unknownStack, $hostKind): bool {
             if (! is_array($item)) {
                 return false;
             }
+
+            // Host-kind gating first — drops VM-shaped items for K8s servers
+            // (PHP, Webserver, Databases, Caches, Cron, etc.) and conversely
+            // keeps the Cluster page off non-K8s servers.
+            $onlyHostKinds = $item['only_host_kinds'] ?? null;
+            if (is_array($onlyHostKinds) && $onlyHostKinds !== [] && ! in_array($hostKind, $onlyHostKinds, true)) {
+                return false;
+            }
+            $exceptHostKinds = $item['except_host_kinds'] ?? null;
+            if (is_array($exceptHostKinds) && in_array($hostKind, $exceptHostKinds, true)) {
+                return false;
+            }
+
+            $feature = $item['feature'] ?? null;
+            if (is_string($feature) && $feature !== '' && ! \Laravel\Pennant\Feature::active($feature)) {
+                return false;
+            }
+
             $required = $item['requires_any_tags'] ?? null;
             if (! is_array($required) || $required === []) {
                 return true;
@@ -83,6 +102,18 @@ if (! function_exists('server_workspace_nav_for_server')) {
 
             return false;
         });
+
+        // Daemons + Queue workers are visible before Supervisor is installed (the
+        // page itself offers the install CTA). Surface a "needs_setup" flag so the
+        // sidebar can render a small indicator until the package is in place.
+        $needsSupervisorSetup = $server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_INSTALLED;
+        $filtered = array_map(static function (array $item) use ($needsSupervisorSetup): array {
+            if (in_array($item['key'] ?? null, ['daemons', 'queue-workers'], true) && $needsSupervisorSetup) {
+                $item['needs_setup'] = true;
+            }
+
+            return $item;
+        }, $filtered);
 
         return array_values($filtered);
     }

@@ -4,12 +4,36 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\ServerDatabaseAdminCredential;
+use Illuminate\Support\Str;
 
 class ServerDatabaseRemoteExec
 {
+    /**
+     * Per-instance memo. The probes (probeMysql + probePostgres) and the
+     * mysql/postgres command builders all call this method on the same
+     * RemoteExec instance during a single render, leading to two-plus
+     * duplicate selects against `server_database_admin_credentials`.
+     *
+     * Keyed by server id so a single RemoteExec used across two servers
+     * (rare, but possible in batch jobs) still loads each independently.
+     * The value is a tuple `[loaded?, model|null]` so a memoized "no
+     * credential exists" result short-circuits subsequent calls.
+     *
+     * @var array<string, array{0: bool, 1: ?ServerDatabaseAdminCredential}>
+     */
+    protected array $adminCredentialMemo = [];
+
     public function adminCredential(Server $server): ?ServerDatabaseAdminCredential
     {
-        return ServerDatabaseAdminCredential::query()->where('server_id', $server->id)->first();
+        $key = (string) $server->id;
+        if (isset($this->adminCredentialMemo[$key])) {
+            return $this->adminCredentialMemo[$key][1];
+        }
+
+        $cred = ServerDatabaseAdminCredential::query()->where('server_id', $server->id)->first();
+        $this->adminCredentialMemo[$key] = [true, $cred];
+
+        return $cred;
     }
 
     public function probeMysql(Server $server): bool
@@ -65,15 +89,15 @@ BASH;
         return str_contains($out, 'OK');
     }
 
-    public function probeRedis(Server $server): bool
+    public function probeSqlite(Server $server): bool
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             return false;
         }
 
-        $out = trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg('command -v redis-cli >/dev/null && redis-cli ping 2>/dev/null'), 30));
+        $out = trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg('command -v sqlite3 >/dev/null && echo OK'), 30));
 
-        return strtoupper($out) === 'PONG';
+        return str_contains($out, 'OK');
     }
 
     public function mysqlExecute(Server $server, string $sql, int $timeout = 120): string
@@ -202,6 +226,88 @@ BASH;
             .' psql -h 127.0.0.1 -U '.escapeshellarg($username).' -d '.escapeshellarg($database).' 2>&1';
 
         return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
+     * Run a raw bash command and return [stdout+stderr, exit_code].
+     * Public wrapper so engine-specific provisioners can run filesystem-style
+     * commands (sqlite touch / rm, etc.) without re-implementing the
+     * root-ssh-with-deploy-fallback selection logic.
+     *
+     * @return array{0: string, 1: int|null}
+     */
+    public function shellRunWithExit(Server $server, string $command, int $timeout = 60): array
+    {
+        return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($command), $timeout);
+    }
+
+    /**
+     * Run arbitrary SQL against a SQLite file via the `sqlite3` binary.
+     * SQL is base64-piped through stdin so embedded single quotes,
+     * double quotes, semicolons, and newlines all survive the SSH +
+     * shell layers without escaping gymnastics.
+     *
+     * `-header -column` makes SELECT output readable in the workspace's
+     * console pane without us doing extra formatting.
+     *
+     * @return array{0: string, 1: int|null}
+     */
+    public function sqliteExec(Server $server, string $path, string $sql, int $timeout = 60): array
+    {
+        $b64 = base64_encode($sql);
+        $cmd = 'echo '.escapeshellarg($b64).' | base64 -d | sqlite3 -header -column '.escapeshellarg($path).' 2>&1';
+
+        return $this->shellRunWithExit($server, $cmd, $timeout);
+    }
+
+    /**
+     * Snapshot a SQLite database via the online backup API and stream the result back over SSH.
+     * Uses `sqlite3 source.db ".backup tmp.db"` so concurrent writers see a consistent file.
+     * The temp file on the remote is removed on every shell exit path via `trap`.
+     *
+     * @throws \RuntimeException on non-zero remote exit, an empty result, or a payload above $maxBytes
+     */
+    public function sqliteBackup(Server $server, string $sourcePath, int $maxBytes, int $timeout = 300): string
+    {
+        $tmp = '/tmp/dply-sqlite-backup-'.Str::ulid().'.db';
+        $script = 'set -e; '.
+            'trap "rm -f '.escapeshellarg($tmp).'" EXIT; '.
+            'sqlite3 '.escapeshellarg($sourcePath).' ".backup '.escapeshellarg($tmp).'" >/dev/null; '.
+            'base64 -w0 '.escapeshellarg($tmp);
+
+        [$out, $exit] = $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($script), $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        $b64 = trim($out);
+        if ($b64 === '') {
+            throw new \RuntimeException('SQLite backup produced no output.');
+        }
+
+        // Cheap pre-check before decoding: base64 inflates by ~33%, so encoded length > maxBytes*1.34 means
+        // the underlying file is definitely over the cap. Saves us from decoding hundreds of megabytes only to throw.
+        if (strlen($b64) > (int) ceil($maxBytes * 1.4)) {
+            throw new \RuntimeException(sprintf(
+                'SQLite backup exceeds the %d byte cap; raise SERVER_DATABASE_SQLITE_BACKUP_MAX_BYTES if needed.',
+                $maxBytes
+            ));
+        }
+
+        $decoded = base64_decode($b64, true);
+        if ($decoded === false) {
+            throw new \RuntimeException('SQLite backup output was not valid base64.');
+        }
+
+        if (strlen($decoded) > $maxBytes) {
+            throw new \RuntimeException(sprintf(
+                'SQLite backup exceeds the %d byte cap; raise SERVER_DATABASE_SQLITE_BACKUP_MAX_BYTES if needed.',
+                $maxBytes
+            ));
+        }
+
+        return $decoded;
     }
 
     protected function execWithCandidates(Server $server, string $command, int $timeout): string

@@ -16,6 +16,13 @@ class ServerDatabaseAuditEvent extends Model
 
     public const EVENT_DATABASE_DROPPED_REMOTE = 'database_dropped_remote';
 
+    /**
+     * Operator changed metadata or SQLite file path on a tracked
+     * database via the unified Edit modal. The {@see meta} payload
+     * carries the diff (e.g. `description`, `mysql_charset`, `host`).
+     */
+    public const EVENT_DATABASE_UPDATED = 'database_updated';
+
     public const EVENT_SYNC_RAN = 'sync_ran';
 
     public const EVENT_ADMIN_CREDENTIALS_SAVED = 'admin_credentials_saved';

@@ -7,8 +7,12 @@ use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
+use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
+use App\Listeners\UpdateDispatchedJobLifecycle;
 use App\Models\BackupConfiguration;
+use App\Models\ServerDatabaseBackup;
+use App\Models\SiteFileBackup;
 use App\Models\Incident;
 use App\Models\NotificationChannel;
 use App\Models\Organization;
@@ -16,13 +20,19 @@ use App\Models\ProviderCredential;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteProcess;
+use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
 use App\Models\SupervisorProgram;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSshKey;
 use App\Models\Workspace;
+use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use App\Observers\BackupAutoResumeObserver;
+use App\Observers\BackupFailureNotifyObserver;
+use App\Observers\ImportSiteWakeupObserver;
 use App\Observers\ServerObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
@@ -52,6 +62,16 @@ use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
 use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesDeployEngine;
+use App\Services\Deploy\RuntimeDetection\GitCloner;
+use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
+use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Services\Deploy\RuntimeDetection\NodeRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\ProcessGitCloner;
+use App\Services\Deploy\RuntimeDetection\PythonRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\RubyRuntimeDetector;
+use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
+use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
@@ -66,6 +86,7 @@ use App\Services\Sites\SiteCaddyProvisioner;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
+use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
@@ -75,8 +96,15 @@ use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
+use App\Services\WordPress\Advisories\AdvisoryProvider;
+use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
+use App\Support\Debug\TaskRunnerBroadcastBridge;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Events\JobQueued;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -91,6 +119,40 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // WordPress advisory feed (Q20 — Wordfence Intelligence default).
+        // Singleton because it caches per-request lookups in process.
+        $this->app->singleton(AdvisoryProvider::class, WordfenceIntelligenceProvider::class);
+
+        // Scoped (request-singleton, Octane-safe): the resolver memoizes its expensive
+        // per-site count queries on the instance, and is hit twice per render
+        // (DeploymentContractBuilder::build + DeploymentPreflightValidator::validate).
+        $this->app->scoped(SiteResourceBindingResolver::class);
+
+        // Scoped: the engine-overview panel renders one chart card per active
+        // engine (e.g. caddy backend + traefik edge), and the range fetch +
+        // latest-snapshot select would otherwise run once per engine instance.
+        // The class memoizes snapshots per (server, range) on the instance.
+        $this->app->scoped(\App\Services\Servers\ServerMetricsRangeQuery::class);
+
+        // Scoped: the webserver picker calls plan()/isBlocked() once per known
+        // target during a single render, and each non-cached target triggers
+        // its own varnish-running select. The instance already memoizes plan()
+        // results — we add an explicit binding to make sure every call site
+        // hits the same instance.
+        $this->app->scoped(\App\Services\Servers\WebserverSwitchPreflight::class);
+
+        // Migration step handler registry — bind handler classes to their step keys.
+        // Bind eagerly so the orchestrator always has a fully populated registry; the
+        // resolved handler instances are still container-managed (per-resolve).
+        $this->app->singleton(\App\Services\Imports\StepRegistry::class, function (): \App\Services\Imports\StepRegistry {
+            $registry = new \App\Services\Imports\StepRegistry();
+            foreach (\App\Services\Imports\Handlers\HandlerManifest::all() as $handlerClass) {
+                $registry->register($handlerClass::key(), $handlerClass);
+            }
+
+            return $registry;
+        });
+
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
         $this->app->singleton(ServerlessProvisionerFactory::class);
@@ -158,6 +220,21 @@ class AppServiceProvider extends ServiceProvider
             ImportedCertificateInstaller::class,
             CertificateSigningRequestGenerator::class,
         ], 'site.certificate.engines');
+
+        $this->app->singleton(RuntimeDetectionEngine::class, function ($app) {
+            return new RuntimeDetectionEngine($app->tagged('site.runtime.detectors'));
+        });
+
+        $this->app->tag([
+            PhpRuntimeDetector::class,
+            NodeRuntimeDetector::class,
+            PythonRuntimeDetector::class,
+            RubyRuntimeDetector::class,
+            GoRuntimeDetector::class,
+            StaticRuntimeDetector::class,
+        ], 'site.runtime.detectors');
+
+        $this->app->bind(GitCloner::class, ProcessGitCloner::class);
     }
 
     /**
@@ -170,9 +247,19 @@ class AppServiceProvider extends ServiceProvider
         $this->mergeServerMonitoringInstallScript();
 
         Cashier::useCustomerModel(Organization::class);
+        Cashier::useSubscriptionModel(\App\Models\Subscription::class);
+        Cashier::useSubscriptionItemModel(\App\Models\SubscriptionItem::class);
 
         Event::listen(WebhookReceived::class, ProcessReferralInvoicePayment::class);
+        Event::listen(WebhookReceived::class, \App\Listeners\SyncBillingOnSubscriptionWebhook::class);
         Event::listen(ServerAuthorizedKeysSynced::class, DispatchServerAuthorizedKeysSyncedWebhook::class);
+
+        // Mirror Livewire-dispatched queue jobs into task_runner_tasks so the
+        // bottom debug panel surfaces "what's running for me right now".
+        Event::listen(JobQueued::class, [RecordLivewireDispatchedJob::class, 'handle']);
+        Event::listen(JobProcessing::class, [UpdateDispatchedJobLifecycle::class, 'handleProcessing']);
+        Event::listen(JobProcessed::class, [UpdateDispatchedJobLifecycle::class, 'handleProcessed']);
+        Event::listen(JobFailed::class, [UpdateDispatchedJobLifecycle::class, 'handleFailed']);
 
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);
@@ -186,6 +273,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Workspace::class, WorkspacePolicy::class);
         Gate::policy(StatusPage::class, StatusPagePolicy::class);
         Gate::policy(Incident::class, IncidentPolicy::class);
+        Gate::policy(\App\Models\ImportServerMigration::class, \App\Policies\ImportServerMigrationPolicy::class);
 
         Gate::define('manageNotificationChannels', function (User $user, User|Organization|Team $owner): bool {
             return match (true) {
@@ -234,9 +322,27 @@ class AppServiceProvider extends ServiceProvider
             });
         });
 
+        /*
+         * Bridge TaskRunner StreamingLogger events to the org-scoped Reverb
+         * channel so the global TaskRunner debug panel (platform admins) can
+         * tail every SSH/SCP/Process invocation in real time. Deferred to
+         * booted() so the package's TaskServiceProvider has finished wiring
+         * its singleton before we attach.
+         */
+        $this->app->booted(function (): void {
+            TaskRunnerBroadcastBridge::register(
+                $this->app->make(StreamingLoggerInterface::class)
+            );
+        });
+
         Server::observe(ServerObserver::class);
+        Site::observe(ImportSiteWakeupObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
+        ServerDatabaseBackup::observe(BackupAutoResumeObserver::class);
+        SiteFileBackup::observe(BackupAutoResumeObserver::class);
+        ServerDatabaseBackup::observe(BackupFailureNotifyObserver::class);
+        SiteFileBackup::observe(BackupFailureNotifyObserver::class);
 
         Server::created(function (Server $server): void {
             if ($server->status === Server::STATUS_READY && ! empty($server->ssh_private_key)) {
@@ -245,6 +351,26 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Site::created(function (Site $site): void {
+            rescue(
+                function () use ($site): void {
+                    $regions = array_keys((array) config('site_uptime.probe_regions', []));
+                    if ($regions === []) {
+                        return;
+                    }
+
+                    SiteUptimeMonitor::query()->firstOrCreate(
+                        ['site_id' => $site->id, 'sort_order' => 0],
+                        [
+                            'label' => __('Homepage check'),
+                            'path' => null,
+                            // Probe from the region nearest the host, not a fixed default.
+                            'probe_region' => app(\App\Services\Sites\UptimeProbeRegionResolver::class)->forSite($site),
+                        ],
+                    );
+                },
+                report: false,
+            );
+
             $server = $site->server;
             if ($server === null) {
                 return;
@@ -318,6 +444,25 @@ class AppServiceProvider extends ServiceProvider
             } elseif ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
                 // Non-DO serverless targets do not have remote SSH artifacts to clean up here.
             } else {
+                // Compute systemd unit names from the live site so the
+                // cleanup job (which runs after the row is gone) can
+                // disable + remove them. Empty for PHP/static sites —
+                // SiteSystemdProvisioner only manages units for
+                // long-running non-PHP runtimes.
+                $unitBuilder = app(SiteSystemdUnitBuilder::class);
+                $systemdUnitNames = [];
+                $runtimeKey = $site->runtimeKey();
+                if ($runtimeKey !== null && $runtimeKey !== 'php' && $runtimeKey !== 'static') {
+                    $systemdUnitNames[] = $unitBuilder->webUnitName($site);
+                    $site->loadMissing('processes');
+                    foreach ($site->processes as $process) {
+                        if ($process->type === SiteProcess::TYPE_WEB) {
+                            continue;
+                        }
+                        $systemdUnitNames[] = $unitBuilder->processUnitName($site, $process);
+                    }
+                }
+
                 CleanupRemoteSiteArtifactsJob::dispatch([
                     'server_id' => $site->server_id,
                     'webserver' => $site->webserver(),
@@ -328,6 +473,7 @@ class AppServiceProvider extends ServiceProvider
                     'ssl_was_active' => $site->ssl_status === Site::SSL_ACTIVE,
                     'supervisor_program_ids' => $svIds,
                     'site_id' => $site->id,
+                    'systemd_unit_names' => $systemdUnitNames,
                 ]);
             }
             SupervisorProgram::query()->where('site_id', $site->id)->delete();
@@ -348,6 +494,17 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('metrics-ingest', function (Request $request) {
             return Limit::perMinute(300)->by($request->ip());
+        });
+
+        // Per-request log POSTs from deployed serverless functions. Keyed by
+        // site so one busy function can't starve another; generous because a
+        // function fires this once per request it serves. Over the limit the
+        // handler's fire-and-forget POST just 429s and the row is dropped.
+        RateLimiter::for('function-log-ingest', function (Request $request) {
+            $site = $request->route('site');
+            $key = $site instanceof Site ? 'fli:'.$site->id : 'fli-ip:'.$request->ip();
+
+            return Limit::perMinute((int) config('sites.function_log_ingest_per_minute', 1000))->by($key);
         });
 
         RateLimiter::for('metrics-guest-push', function (Request $request) {

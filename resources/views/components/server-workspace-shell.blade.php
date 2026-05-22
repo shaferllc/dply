@@ -9,7 +9,16 @@
     $card = 'dply-card overflow-hidden';
     $navLink = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors';
     $workspaceNav = server_workspace_nav_for_server($server);
-    $showNavigation = $showNavigation ?? ($server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE);
+    // A host is navigable once READY. VM hosts additionally wait for the
+    // setup script (setup_status === done); hosts with no SSH setup phase
+    // — serverless / functions namespaces — are ready as soon as they are.
+    $showNavigation = $showNavigation ?? (
+        $server->status === \App\Models\Server::STATUS_READY
+        && (
+            $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE
+            || ! $server->hostCapabilities()->supportsSsh()
+        )
+    );
 @endphp
 
 @php
@@ -81,11 +90,11 @@
         <aside class="lg:col-span-3 mb-8 lg:mb-0">
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 p-4 sm:p-5">
-                    <div class="flex items-start gap-3">
+                    <div class="flex items-center gap-3">
                         <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $avatarStyle }}">
                             {{ $avatarInitials }}
                         </span>
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0 flex-1 leading-tight">
                             <p class="truncate text-base font-semibold text-brand-ink">{{ $server->name }}</p>
                             @if ($server->workspace)
                                 <p class="mt-0.5 truncate text-xs text-brand-moss">
@@ -142,12 +151,42 @@
                     </div>
                 </div>
                 <nav class="flex flex-col gap-0.5 p-2" aria-label="{{ __('Server sections') }}">
-                    @foreach ($workspaceNav as $item)
+                    @php
+                        // Cluster the flat nav into groups by their `group` key. Items
+                        // without a group end up in `_ungrouped` and render headerless
+                        // (back-compat for any nav entries that haven't been tagged yet).
+                        $navGroups = collect($workspaceNav)
+                            ->groupBy(fn ($i) => $i['group'] ?? '_ungrouped')
+                            ->all();
+                        $groupLabels = (array) config('server_workspace.nav_groups', []);
+                        // Render groups in the order they first appear in the flat config,
+                        // so a future config rearrangement reorders the sidebar with no
+                        // additional code change.
+                        $orderedGroupKeys = [];
+                        foreach ($workspaceNav as $i) {
+                            $gk = $i['group'] ?? '_ungrouped';
+                            if (! in_array($gk, $orderedGroupKeys, true)) {
+                                $orderedGroupKeys[] = $gk;
+                            }
+                        }
+                    @endphp
+                    @foreach ($orderedGroupKeys as $groupKey)
+                        @php $itemsInGroup = $navGroups[$groupKey] ?? collect(); @endphp
+                        @if ($itemsInGroup->isEmpty())
+                            @continue
+                        @endif
+                        @if ($groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]))
+                            <p class="{{ ! $loop->first ? 'mt-3 ' : '' }}px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                                {{ __($groupLabels[$groupKey]) }}
+                            </p>
+                        @endif
+                        @foreach ($itemsInGroup as $item)
                         @php
                             $key = $item['key'];
                             $icon = $item['icon'];
                             $label = __($item['label']);
                             $navHref = server_workspace_nav_item_url($server, $item);
+                            $needsSetup = (bool) ($item['needs_setup'] ?? false);
                         @endphp
                         <a
                             href="{{ $navHref }}"
@@ -207,9 +246,36 @@
                                 @case('command-line')
                                     <x-heroicon-o-command-line class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('play-circle')
+                                    <x-heroicon-o-play-circle class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('bolt')
+                                    <x-heroicon-o-bolt class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('user-group')
+                                    <x-heroicon-o-user-group class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('calendar-days')
+                                    <x-heroicon-o-calendar-days class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('archive-box')
+                                    <x-heroicon-o-archive-box class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('folder')
+                                    <x-heroicon-o-folder class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                             @endswitch
-                            {{ $label }}
+                            <span class="flex-1 truncate">{{ $label }}</span>
+                            @if ($needsSetup)
+                                <span
+                                    class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                    role="img"
+                                    aria-label="{{ __('Setup required') }}"
+                                    title="{{ __('Supervisor is not installed yet. Open this section to set it up.') }}"
+                                ></span>
+                            @endif
                         </a>
+                        @endforeach
                     @endforeach
                 </nav>
                 <div class="border-t border-brand-ink/10 p-3">
@@ -230,7 +296,9 @@
             'min-w-0',
             'lg:col-span-9' => $showNavigation,
         ])>
+            <x-trial-pause-banner :organization="$server->organization" />
             {{ $slot }}
         </div>
     </div>
+
 </div>

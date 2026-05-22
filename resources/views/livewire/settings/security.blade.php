@@ -98,55 +98,10 @@
                         />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Optional. Helps you recognize this passkey in the list below.') }}</p>
                     </div>
-                    <fieldset class="space-y-3 mb-4">
-                        <legend class="text-sm font-medium text-brand-ink">{{ __('Passkey type') }}</legend>
-                        <p class="text-xs text-brand-moss leading-relaxed">{{ __('Choose where to save this passkey. Pick “This device” for Touch ID, Face ID, or Windows Hello.') }}</p>
-                        <div class="space-y-2">
-                            <label class="flex items-start gap-3 cursor-pointer rounded-lg border border-brand-mist/80 bg-white px-4 py-3 text-sm has-[:checked]:border-brand-ink/30 has-[:checked]:bg-brand-sand/20">
-                                <input
-                                    type="radio"
-                                    name="dply-passkey-attachment"
-                                    value="platform"
-                                    class="mt-0.5 rounded-full border-brand-mist text-brand-forest focus:ring-brand-forest"
-                                    checked
-                                />
-                                <span>
-                                    <span class="font-medium text-brand-ink">{{ __('This device') }}</span>
-                                    <span class="block text-xs text-brand-moss mt-0.5">{{ __('Operating system passkey (recommended for signing in on this computer)') }}</span>
-                                </span>
-                            </label>
-                            <label class="flex items-start gap-3 cursor-pointer rounded-lg border border-brand-mist/80 bg-white px-4 py-3 text-sm has-[:checked]:border-brand-ink/30 has-[:checked]:bg-brand-sand/20">
-                                <input
-                                    type="radio"
-                                    name="dply-passkey-attachment"
-                                    value="cross-platform"
-                                    class="mt-0.5 rounded-full border-brand-mist text-brand-forest focus:ring-brand-forest"
-                                />
-                                <span>
-                                    <span class="font-medium text-brand-ink">{{ __('Security key or password manager') }}</span>
-                                    <span class="block text-xs text-brand-moss mt-0.5">{{ __('YubiKey or an app such as 1Password / Bitwarden') }}</span>
-                                </span>
-                            </label>
-                            <label class="flex items-start gap-3 cursor-pointer rounded-lg border border-brand-mist/80 bg-white px-4 py-3 text-sm has-[:checked]:border-brand-ink/30 has-[:checked]:bg-brand-sand/20">
-                                <input
-                                    type="radio"
-                                    name="dply-passkey-attachment"
-                                    value=""
-                                    class="mt-0.5 rounded-full border-brand-mist text-brand-forest focus:ring-brand-forest"
-                                />
-                                <span>
-                                    <span class="font-medium text-brand-ink">{{ __('Let my browser decide') }}</span>
-                                    <span class="block text-xs text-brand-moss mt-0.5">{{ __('No preference—the browser may offer several options.') }}</span>
-                                </span>
-                            </label>
-                        </div>
-                    </fieldset>
                     <div>
                         <button
                             type="button"
                             id="dply-passkey-register-btn"
-                            data-options-url="{{ route('webauthn.register.options', absolute: false) }}"
-                            data-register-url="{{ route('webauthn.register', absolute: false) }}"
                             class="inline-flex items-center px-5 py-2.5 bg-brand-ink border border-transparent rounded-xl font-semibold text-sm text-brand-cream shadow-md hover:bg-brand-forest transition-colors disabled:opacity-60"
                         >
                             {{ __('Add a passkey') }}

@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\Servers\ServerDateFormatter;
+
 /**
  * Labels for the server "OS version" field (stored in server meta as `os_version` key).
  */
@@ -81,6 +83,37 @@ return [
     'inventory_scan_depths' => [
         'basic' => 'Basic (OS, apt, packages preview)',
         'extended' => 'Extended (+ disk, memory, uptime, fail2ban status)',
+    ],
+
+    /**
+     * Per-server date display preference. The `key` is what gets saved
+     * into server meta; the `label` is shown in the Settings → Reference
+     * select. The {@see ServerDateFormatter} helper
+     * resolves a key to a rendered string at view time.
+     *
+     * Adding a new option here automatically surfaces it in the picker.
+     */
+    'date_formats' => [
+        'absolute_utc' => [
+            'label' => 'Absolute UTC',
+            'sample' => '2026-05-05 04:59:02 UTC',
+        ],
+        'absolute_local' => [
+            'label' => 'Absolute (server timezone)',
+            'sample' => '2026-05-05 00:59:02 EDT',
+        ],
+        'short_local' => [
+            'label' => 'Short (server timezone)',
+            'sample' => 'May 5 · 12:59 AM',
+        ],
+        'relative' => [
+            'label' => 'Relative (e.g. "1 minute ago")',
+            'sample' => '1 minute ago',
+        ],
+        'iso8601' => [
+            'label' => 'ISO 8601',
+            'sample' => '2026-05-05T04:59:02Z',
+        ],
     ],
 
     /**

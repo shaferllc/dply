@@ -5,14 +5,27 @@ namespace App\Services\Sites;
 use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
 use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
 {
-    public function build(Site $site): string
+    /**
+     * Per-vhost config (vhconf.conf contents). For signature symmetry with the
+     * other engine builders we accept a `$listenPort` argument, but OLS routes
+     * port handling through the listener block in httpd_config.conf — the
+     * per-vhost file itself is portless. So the parameter is intentionally
+     * unused here; callers in the switch-flow path get a port mismatch via the
+     * httpd_config the OpenLiteSpeedHttpdConfigBuilder emits instead.
+     */
+    public function build(Site $site, ?int $listenPort = null): string
     {
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 
         $hostnames = collect($site->webserverHostnames())
             ->filter()
@@ -29,11 +42,16 @@ class OpenLiteSpeedSiteConfigBuilder
         }
 
         $root = $site->effectiveDocumentRoot();
-        $phpBinary = '/usr/local/lsws/lsphp'.str_replace('.', '', (string) ($site->php_version ?? '83')).'/bin/lsphp';
+        $phpBinary = '/usr/local/lsws/lsphp'.str_replace('.', '', (string) ($site->phpVersion() ?? '83')).'/bin/lsphp';
 
         if ($site->type === SiteType::Php && $site->octane_port) {
             return $this->buildPhpOctaneProxy($site, $hostnames, $vhostRoot);
         }
+
+        $authRealms = $this->olsBasicAuthRealmBlocks($site);
+        $authPrefixContexts = $this->olsBasicAuthPrefixContexts($site);
+        $rootAuthLines = $this->olsBasicAuthRootContextLines($site);
+        $lscacheBlock = app(SiteCacheDirectivesBuilder::class)->olsLscacheBlock($site);
 
         return match ($site->type) {
             SiteType::Php => <<<CONF
@@ -72,12 +90,12 @@ extprocessor {$this->configName($site)} {
   extGroup                nogroup
   runOnStartUp            3
 }
-{$this->rewriteBlock($site)}
-context / {
+{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site)}
+{$authPrefixContexts}context / {
   type                    appserver
   location                {$root}
   allowBrowse             1
-}
+{$rootAuthLines}}
 CONF,
             SiteType::Static => <<<CONF
 docRoot                   {$root}/
@@ -88,7 +106,11 @@ index  {
   useServer               0
   indexFiles              index.html
 }
-{$this->rewriteBlock($site)}
+{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site)}
+{$authPrefixContexts}context / {
+  location                {$root}
+  allowBrowse             1
+{$rootAuthLines}}
 errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
@@ -113,6 +135,7 @@ accesslog {$vhostRoot}/logs/access.log {
   logFormat               "%h %l %u %t \"%r\" %>s %b"
 }
 CONF,
+            SiteType::Custom => '',
         };
     }
 
@@ -143,14 +166,25 @@ CONF;
     private function buildPhpOctaneProxy(Site $site, Collection $hostnames, string $vhostRoot): string
     {
         $oct = (int) $site->octane_port;
+        $authRealms = $this->olsBasicAuthRealmBlocks($site);
+        $authPrefixContexts = $this->olsBasicAuthPrefixContexts($site);
+        $rootAuthLines = $this->olsBasicAuthRootContextLines($site);
+        // OLS Octane proxies every request through the vhost rewrite block. To
+        // gate that with basic auth we wrap the proxy in a context / { ... }
+        // and let OLS evaluate auth before the rewrite fires. Per-prefix
+        // contexts (when the runtime supports them) sit before the catch-all so
+        // longer prefixes win OLS's longest-match resolution.
+        $rootContext = $rootAuthLines !== ''
+            ? "context / {\n  allowBrowse             1\n{$rootAuthLines}}\n"
+            : '';
 
         return <<<CONF
 docRoot                   {$vhostRoot}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-{$this->rewriteBlock($site, $oct)}
-errorlog {$vhostRoot}/logs/error.log {
+{$authRealms}{$this->rewriteBlock($site, $oct)}
+{$authPrefixContexts}{$rootContext}errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
 }
@@ -166,9 +200,142 @@ CONF;
         return str_replace(['.', '-'], '_', $site->webserverConfigBasename());
     }
 
+    /**
+     * Vhost-level realm declarations — one per enforceable basic-auth path group.
+     * OLS resolves `userDB { location <htpasswd> }` against the htpasswd files
+     * we already write at provision time, so no per-realm hash filtering is needed.
+     */
+    protected function olsBasicAuthRealmBlocks(Site $site): string
+    {
+        $groups = $this->olsBasicAuthPathGroups($site);
+        if ($groups === []) {
+            return '';
+        }
+
+        $out = '';
+        foreach ($groups as $g) {
+            $out .= "realm {$g['realm']} {\n"
+                ."  userDB {\n"
+                ."    location              {$g['users_file']}\n"
+                ."    userNameField         User-Name\n"
+                ."    maxCacheSize          200\n"
+                ."    cacheTimeout          60\n"
+                ."  }\n"
+                ."}\n";
+        }
+
+        return $out;
+    }
+
+    /**
+     * Per-prefix `context /admin { ... }` blocks for path-prefix basic auth.
+     * Each block proxies to the same handler the parent vhost uses for static
+     * content (or PHP, depending on type). Keep these BEFORE the catch-all
+     * `context /` so longer prefixes win OLS's longest-match resolution.
+     */
+    protected function olsBasicAuthPrefixContexts(Site $site): string
+    {
+        if (! $site->basicAuthSupportsPathPrefixes()) {
+            return '';
+        }
+
+        $groups = $this->olsBasicAuthPathGroups($site);
+        $prefixGroups = array_filter($groups, fn (array $g): bool => $g['path'] !== '/');
+        if ($prefixGroups === []) {
+            return '';
+        }
+
+        $out = '';
+        foreach ($prefixGroups as $g) {
+            $out .= "context {$g['path']} {\n"
+                ."  allowBrowse             1\n"
+                ."  realm                   {$g['realm']}\n"
+                ."  authName                Restricted\n"
+                ."  required                valid-user\n"
+                ."}\n";
+        }
+
+        return $out;
+    }
+
+    /**
+     * Lines to splice INSIDE the `context / { ... }` block of the parent vhost
+     * when the root path itself is gated. Returns empty when not gated so the
+     * vhost stays unchanged. Includes a leading newline because the splice
+     * lives just before the closing brace.
+     */
+    protected function olsBasicAuthRootContextLines(Site $site): string
+    {
+        $groups = $this->olsBasicAuthPathGroups($site);
+        $rootGroup = null;
+        foreach ($groups as $g) {
+            if ($g['path'] === '/') {
+                $rootGroup = $g;
+                break;
+            }
+        }
+        if ($rootGroup === null) {
+            return '';
+        }
+
+        return "  realm                   {$rootGroup['realm']}\n"
+            ."  authName                Restricted\n"
+            ."  required                valid-user\n";
+    }
+
+    /**
+     * @return array<int, array{path: string, realm: string, users_file: string}>
+     */
+    private function olsBasicAuthPathGroups(Site $site): array
+    {
+        $users = $site->enforceableBasicAuthUsers();
+        if ($users->isEmpty()) {
+            return [];
+        }
+
+        $groups = [];
+        $configName = $this->configName($site);
+
+        if ($users->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+            $groups[] = [
+                'path' => '/',
+                'realm' => 'dply_'.$configName.'_root',
+                'users_file' => $site->basicAuthHtpasswdPathForNormalizedPath('/'),
+            ];
+        }
+
+        if ($site->basicAuthSupportsPathPrefixes()) {
+            $paths = $users
+                ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
+                ->unique()
+                ->filter(fn (string $p): bool => $p !== '/')
+                ->sortByDesc(fn (string $p): int => strlen($p))
+                ->values();
+
+            foreach ($paths as $locPath) {
+                $hash = substr(hash('sha256', SiteBasicAuthUser::normalizePath($locPath)), 0, 16);
+                $groups[] = [
+                    'path' => $locPath,
+                    'realm' => 'dply_'.$configName.'_'.$hash,
+                    'users_file' => $site->basicAuthHtpasswdPathForNormalizedPath($locPath),
+                ];
+            }
+        }
+
+        return $groups;
+    }
+
     private function rewriteBlock(Site $site, ?int $proxyPort = null): string
     {
         $rules = collect();
+
+        // Block any path with a leading dot segment (`/.env`, `/.git`, etc.),
+        // exempting `/.well-known/` for ACME challenges. Matches the deny
+        // behavior the Nginx, Apache, and Caddy builders inject by default.
+        // The [F,L] flags return 403 and stop processing — placed FIRST so
+        // it short-circuits before any redirect or proxy rule below.
+        $rules->push('RewriteRule ^/?\.(?!well-known)[^/]+ - [F,L]');
+
         $olsHeaderNote = false;
         foreach ($site->redirects->sortBy('sort_order') as $redirect) {
             $from = SiteRedirectConfigSupport::sanitizeFromPath((string) $redirect->from_path);

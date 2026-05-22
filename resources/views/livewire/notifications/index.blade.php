@@ -1,5 +1,10 @@
 <div class="py-12">
     <div class="dply-page-shell space-y-6">
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Notifications'), 'icon' => 'bell-alert'],
+        ]" />
+
         <x-page-header
             :title="__('Notifications')"
             :description="$notificationsReady ? __('Unread: :count', ['count' => $unreadCount]) : __('Run the latest database migrations to enable the shared inbox.')"
@@ -38,38 +43,33 @@
 
         <div class="space-y-3">
             @forelse ($items as $item)
-                <article class="rounded-2xl border {{ $item->read_at ? 'border-brand-ink/10 bg-white' : 'border-brand-gold/50 bg-brand-sand/25' }} p-5 shadow-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h2 class="text-base font-semibold text-brand-ink">{{ $item->title }}</h2>
-                            @if ($item->event?->category)
-                                <p class="mt-1 text-xs uppercase tracking-wide text-brand-mist">{{ $item->event->category }}</p>
-                            @endif
-                        </div>
-                        <div class="flex items-center gap-2">
-                            @if (! $item->read_at)
-                                <button
-                                    type="button"
-                                    wire:click="markAsRead('{{ $item->id }}')"
-                                    class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink"
-                                >
-                                    {{ __('Mark read') }}
-                                </button>
-                            @endif
-                            <span class="text-xs text-brand-mist">{{ $item->created_at?->diffForHumans() }}</span>
-                        </div>
-                    </div>
-                    @if ($item->body)
-                        <p class="mt-3 text-sm leading-6 text-brand-moss">{{ $item->body }}</p>
+                @php
+                    $meta = is_array($item->event?->metadata ?? null) ? $item->event->metadata : [];
+                    $itemSeverity = $item->event?->severity ?? ($meta['severity'] ?? null);
+                    $itemResolved = strtolower((string) ($meta['insight_state'] ?? '')) === 'resolved';
+                @endphp
+                <x-notification-card
+                    :severity="$itemSeverity"
+                    :is-resolved="$itemResolved"
+                    :unread="! $item->read_at"
+                    :title="$item->title"
+                    :body="$item->body"
+                    :category="$item->event?->category"
+                    :time="$item->created_at?->diffForHumans()"
+                    :url="$item->url"
+                >
+                    @if (! $item->read_at)
+                        <x-slot name="actions">
+                            <button
+                                type="button"
+                                wire:click="markAsRead('{{ $item->id }}')"
+                                class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
+                            >
+                                {{ __('Mark read') }}
+                            </button>
+                        </x-slot>
                     @endif
-                    @if ($item->url)
-                        <div class="mt-4">
-                            <a href="{{ $item->url }}" class="text-sm font-medium text-brand-forest hover:text-brand-ink">
-                                {{ __('Open') }}
-                            </a>
-                        </div>
-                    @endif
-                </article>
+                </x-notification-card>
             @empty
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-8 text-sm text-brand-moss shadow-sm">
                     {{ $notificationsReady

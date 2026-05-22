@@ -11,8 +11,18 @@ use Illuminate\Support\Collection;
 
 class ApacheSiteConfigBuilder
 {
-    public function build(Site $site): string
+    /**
+     * Full vhost config. `$listenPort` produces an HTTP-only variant bound to the supplied port —
+     * used by the webserver-switch flow to validate Apache on :8080 alongside the production
+     * webserver on :80. TLS plumbing isn't templated in this builder (certbot manages 443 vhosts
+     * via `--apache` in a separate file), so the rewrite only needs to change the `*:80` bind.
+     */
+    public function build(Site $site, ?int $listenPort = null): string
     {
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 
         $hostnames = collect($site->webserverHostnames());
@@ -21,7 +31,7 @@ class ApacheSiteConfigBuilder
         }
 
         if ($site->isSuspended()) {
-            return $this->suspendedVirtualHost($site, $hostnames);
+            return $this->applyListenPort($this->suspendedVirtualHost($site, $hostnames), $listenPort);
         }
 
         $primary = $hostnames->first();
@@ -29,7 +39,7 @@ class ApacheSiteConfigBuilder
         $root = $site->effectiveDocumentRoot();
         $phpSock = str_replace(
             '{version}',
-            $site->php_version ?? '8.3',
+            $site->phpVersion() ?? '8.3',
             config('sites.php_fpm_socket')
         );
         $basename = $site->webserverConfigBasename();
@@ -43,7 +53,7 @@ class ApacheSiteConfigBuilder
             $reverb = $this->reverbProxyDirectives($site);
             $octBa = $this->apacheRootLocationBasicAuth($site);
 
-            return <<<APACHE
+            return $this->applyListenPort(<<<APACHE
 # Managed by Dply — {$basename} (Laravel Octane)
 <VirtualHost *:80>
     ServerName {$primary}
@@ -55,7 +65,7 @@ class ApacheSiteConfigBuilder
 {$redirectLines}{$reverb}{$octBa}    ProxyPass / http://127.0.0.1:{$port}/
     ProxyPassReverse / http://127.0.0.1:{$port}/
 </VirtualHost>
-APACHE;
+APACHE, $listenPort);
         }
 
         $reverbPhp = $site->type === SiteType::Php ? $this->reverbProxyDirectives($site) : '';
@@ -63,8 +73,9 @@ APACHE;
         $phpBa = $this->apacheDirectoryAndPrefixLocations($site, $root);
         $staticBa = $this->apacheDirectoryAndPrefixLocations($site, $root);
         $nodeBa = $this->apacheRootLocationBasicAuth($site);
+        $dotfileDeny = $this->apacheDotfileDenyBlock();
 
-        return match ($site->type) {
+        $config = match ($site->type) {
             SiteType::Php => <<<APACHE
 # Managed by Dply — {$basename}
 <VirtualHost *:80>
@@ -73,7 +84,7 @@ APACHE;
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-{$engineApache}{$redirectLines}{$reverbPhp}    <Directory {$root}>
+{$dotfileDeny}{$engineApache}{$redirectLines}{$reverbPhp}    <Directory {$root}>
         AllowOverride All
 {$phpBa['directory']}
         Options FollowSymLinks
@@ -94,7 +105,7 @@ APACHE,
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
 
-{$redirectLines}    <Directory {$root}>
+{$dotfileDeny}{$redirectLines}    <Directory {$root}>
         AllowOverride All
 {$staticBa['directory']}
         Options FollowSymLinks
@@ -111,11 +122,49 @@ APACHE,
 {$aliasLines}    ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-{$redirectLines}{$nodeBa}    ProxyPass / http://127.0.0.1:{$site->app_port}/
+{$dotfileDeny}{$redirectLines}{$nodeBa}    ProxyPass / http://127.0.0.1:{$site->app_port}/
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
+            SiteType::Custom => '',
         };
+
+        if ($config === '') {
+            return '';
+        }
+
+        return $this->applyListenPort($config, $listenPort);
+    }
+
+    /**
+     * Rewrite a built Apache vhost to bind a non-:80 port for the switch
+     * validation phase. Returns $config unchanged when $listenPort is null —
+     * production paths through this helper are no-ops.
+     */
+    private function applyListenPort(string $config, ?int $listenPort): string
+    {
+        if ($listenPort === null) {
+            return $config;
+        }
+
+        return preg_replace('/<VirtualHost \*:80>/', '<VirtualHost *:'.$listenPort.'>', $config);
+    }
+
+    /**
+     * Block requests for any URL whose path component starts with `.` —
+     * e.g. `/.env`, `/.git/HEAD`, `/some/dir/.htaccess`. The `.well-known/`
+     * prefix is exempted because ACME challenges and similar legitimate
+     * mechanisms live there. Mirrors the equivalent rule the Nginx builder
+     * has injected by default.
+     */
+    protected function apacheDotfileDenyBlock(): string
+    {
+        return <<<'APACHE'
+    <LocationMatch "(?i)(^|/)\.(?!well-known)">
+        Require all denied
+    </LocationMatch>
+
+APACHE;
     }
 
     /**
@@ -124,7 +173,8 @@ APACHE,
     protected function apacheDirectoryAndPrefixLocations(Site $site, string $documentRoot): array
     {
         $site->loadMissing('basicAuthUsers');
-        if ($site->basicAuthUsers->isEmpty()) {
+        $users = $site->enforceableBasicAuthUsers();
+        if ($users->isEmpty()) {
             return [
                 'directory' => '        Require all granted'."\n",
                 'locations' => '',
@@ -132,7 +182,7 @@ APACHE,
         }
 
         $directory = '        Require all granted'."\n";
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($users->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $f = $site->basicAuthHtpasswdPathForNormalizedPath('/');
             $directory = <<<AUTH
         AuthType Basic
@@ -144,7 +194,7 @@ AUTH;
         }
 
         $locations = '';
-        $paths = $site->basicAuthUsers
+        $paths = $users
             ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
             ->unique()
             ->filter(fn (string $p): bool => $p !== '/')
@@ -152,7 +202,7 @@ AUTH;
             ->values();
 
         foreach ($paths as $locPath) {
-            if (! $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath)) {
+            if (! $users->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath)) {
                 continue;
             }
             $f = $site->basicAuthHtpasswdPathForNormalizedPath($locPath);
@@ -173,7 +223,7 @@ APACHE;
     protected function apacheRootLocationBasicAuth(Site $site): string
     {
         $site->loadMissing('basicAuthUsers');
-        if (! $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if (! $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             return '';
         }
 

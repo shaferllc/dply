@@ -51,4 +51,9 @@
             {{ __('Delete site') }}
         </button>
     @endcan
+
+    <x-cli-snippet :commands="[
+        ['label' => __('Tear down systemd units'), 'command' => 'dply:site:teardown-systemd '.$site->slug],
+        ['label' => __('Re-sync systemd units'), 'command' => 'dply:site:redeploy-systemd '.$site->slug],
+    ]" />
 </section>

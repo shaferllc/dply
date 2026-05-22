@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# dply — operator wrapper for common server actions.
+#
+# This is a thin bash script. Everything it does is auditable by reading
+# the source: `cat $(command -v dply)`. It never phones home; it reads
+# /etc/dply/state.json for dply-specific data (sites, recipes, log paths)
+# which dply pushes over SSH on relevant config changes.
+#
+# Distributed by dply (https://dply.io). Replace via the workspace Console
+# page's "Install dply CLI" button or by re-provisioning the server.
+
+set -euo pipefail
+
+DPLY_VERSION="0.1.0"
+DPLY_STATE_FILE="${DPLY_STATE_FILE:-/etc/dply/state.json}"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+die() { echo "dply: $*" >&2; exit 1; }
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# Read a jq expression against state.json. Empty string when the file or
+# expression yields no value. Requires jq (installed by dply alongside this
+# script). All callers must tolerate empty output.
+state() {
+    local expr="$1"
+    if [[ ! -f "$DPLY_STATE_FILE" ]]; then
+        return 0
+    fi
+    have jq || die "jq not installed — re-run the Install dply CLI button"
+    jq -r "$expr // empty" "$DPLY_STATE_FILE" 2>/dev/null || true
+}
+
+# Translate a friendly service alias (nginx, php, web, db) into a
+# systemd unit name. Falls back to the literal argument when no alias
+# matches, so `dply restart valkey-server` works the same way.
+resolve_unit() {
+    local arg="$1"
+    case "$arg" in
+        php)        local v; v=$(state '.services.php_version'); [[ -n "$v" ]] && echo "php${v}-fpm" || echo "php-fpm" ;;
+        php-fpm)    state '.services.php_fpm_unit' | grep -q . && state '.services.php_fpm_unit' || echo php-fpm ;;
+        web|webserver) state '.services.webserver_unit' | grep -q . && state '.services.webserver_unit' || echo nginx ;;
+        db|database)   state '.services.db_unit' | grep -q . && state '.services.db_unit' || echo mysql ;;
+        cache)         state '.services.cache_unit' | grep -q . && state '.services.cache_unit' || echo redis-server ;;
+        *)             echo "$arg" ;;
+    esac
+}
+
+# Look up a known log path by service alias.
+resolve_log_path() {
+    local arg="$1"
+    case "$arg" in
+        nginx|nginx-error)   state '.services.log_paths.nginx_error' ;;
+        nginx-access)        state '.services.log_paths.nginx_access' ;;
+        php|php-fpm)         state '.services.log_paths.php_fpm' ;;
+        syslog)              echo /var/log/syslog ;;
+        auth)                echo /var/log/auth.log ;;
+        mysql|mysql-error)   state '.services.log_paths.mysql_error' ;;
+        postgres)            state '.services.log_paths.postgres' ;;
+        *)                   echo "$arg" ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Subcommands
+# ---------------------------------------------------------------------------
+
+cmd_help() {
+    cat <<EOF
+dply ${DPLY_VERSION} — operator wrapper
+
+Usage:
+  dply <command> [args]
+
+Commands:
+  status                    Server health summary (uptime, units, last config push).
+  restart <service>         Graceful restart of a managed unit.
+                            Aliases: php, web, db, cache.
+  tail <service> [-n N]     Tail a known log. Aliases: nginx, php, syslog, auth, mysql, postgres.
+  site list                 Sites managed by dply on this server.
+  site show <name>          Detail for one site (path, deploy script, log).
+  recipe list               Saved Run-page commands available offline.
+  recipe run <name>         Execute a saved recipe by name.
+  ssl renew                 Run certbot renewal (dry-run with --dry-run).
+  ssl list                  Installed certificates + expiry dates.
+  version                   Print dply CLI version.
+  help                      Show this message.
+
+State file: ${DPLY_STATE_FILE}
+EOF
+}
+
+cmd_version() { echo "dply ${DPLY_VERSION}"; }
+
+cmd_status() {
+    echo "host:       $(hostname)"
+    echo "uptime:     $(uptime -p 2>/dev/null || uptime)"
+    echo "load:       $(awk '{print $1, $2, $3}' /proc/loadavg)"
+    echo "kernel:     $(uname -r)"
+    local generated
+    generated=$(state '.generated_at')
+    echo "state file: ${DPLY_STATE_FILE} (${generated:-not-pushed})"
+    echo
+    local units
+    units=$(state '.services.units[]?')
+    if [[ -z "$units" ]]; then
+        echo "no managed units listed in state file."
+        return 0
+    fi
+    printf "%-24s %s\n" UNIT STATE
+    while IFS= read -r unit; do
+        [[ -z "$unit" ]] && continue
+        local s
+        s=$(systemctl is-active "$unit" 2>/dev/null || echo unknown)
+        printf "%-24s %s\n" "$unit" "$s"
+    done <<<"$units"
+}
+
+cmd_restart() {
+    local svc="${1:-}"
+    [[ -z "$svc" ]] && die "usage: dply restart <service>"
+    local unit; unit=$(resolve_unit "$svc")
+
+    # Soft whitelist: when state.json knows the managed unit set, refuse
+    # to restart anything outside it. Avoids typo'd unit names. Operators
+    # with state.json-not-yet-pushed servers fall through unchecked.
+    local known; known=$(state '.services.units[]?')
+    if [[ -n "$known" ]] && ! grep -qx -- "$unit" <<<"$known"; then
+        die "'$unit' is not in the managed-units list. Use 'sudo systemctl restart $unit' if you really mean it."
+    fi
+
+    echo "+ sudo systemctl restart $unit"
+    sudo systemctl restart "$unit"
+    echo "ok."
+}
+
+cmd_tail() {
+    local svc="${1:-}"
+    [[ -z "$svc" ]] && die "usage: dply tail <service> [-n N]"
+    shift
+    local n=200
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -n) n="${2:-200}"; shift 2 ;;
+            *)  die "unknown flag: $1" ;;
+        esac
+    done
+    local path; path=$(resolve_log_path "$svc")
+    [[ -z "$path" ]] && die "no log path known for '$svc' — try a full path."
+    [[ -e "$path" ]] || die "log not found: $path"
+    exec tail -n "$n" -f "$path"
+}
+
+cmd_site() {
+    local sub="${1:-list}"
+    shift || true
+    case "$sub" in
+        list)
+            local sites; sites=$(state '.sites[]? | "\(.name)\t\(.path)"')
+            if [[ -z "$sites" ]]; then
+                echo "no sites in state file."
+                return 0
+            fi
+            printf "%-32s %s\n" NAME PATH
+            echo "$sites" | awk -F'\t' '{ printf "%-32s %s\n", $1, $2 }'
+            ;;
+        show)
+            local name="${1:-}"
+            [[ -z "$name" ]] && die "usage: dply site show <name>"
+            local row; row=$(state ".sites[]? | select(.name == \"${name}\")")
+            [[ -z "$row" ]] && die "site '$name' not found."
+            echo "$row" | jq .
+            ;;
+        *) die "unknown site subcommand: $sub" ;;
+    esac
+}
+
+cmd_recipe() {
+    local sub="${1:-list}"
+    shift || true
+    case "$sub" in
+        list)
+            local names; names=$(state '.recipes[]?.name')
+            if [[ -z "$names" ]]; then
+                echo "no recipes in state file."
+                return 0
+            fi
+            echo "$names"
+            ;;
+        run)
+            local name="${1:-}"
+            [[ -z "$name" ]] && die "usage: dply recipe run <name>"
+            local script; script=$(state ".recipes[]? | select(.name == \"${name}\") | .script")
+            [[ -z "$script" ]] && die "recipe '$name' not found."
+            echo "+ running recipe: $name"
+            bash -c "$script"
+            ;;
+        *) die "unknown recipe subcommand: $sub" ;;
+    esac
+}
+
+cmd_ssl() {
+    local sub="${1:-list}"
+    shift || true
+    case "$sub" in
+        list)
+            if ! have certbot; then
+                echo "certbot not installed."
+                return 0
+            fi
+            sudo certbot certificates 2>/dev/null
+            ;;
+        renew)
+            if ! have certbot; then
+                die "certbot not installed."
+            fi
+            local dry=0
+            [[ "${1:-}" == "--dry-run" ]] && dry=1
+            if (( dry )); then
+                sudo certbot renew --dry-run
+            else
+                sudo certbot renew
+            fi
+            ;;
+        *) die "unknown ssl subcommand: $sub" ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+    case "$cmd" in
+        status)             cmd_status "$@" ;;
+        restart)            cmd_restart "$@" ;;
+        tail)               cmd_tail "$@" ;;
+        site)               cmd_site "$@" ;;
+        recipe)             cmd_recipe "$@" ;;
+        ssl)                cmd_ssl "$@" ;;
+        version|-v|--version) cmd_version ;;
+        help|-h|--help)     cmd_help ;;
+        *) echo "dply: unknown command '$cmd'" >&2; cmd_help >&2; exit 2 ;;
+    esac
+}
+
+main "$@"

@@ -18,6 +18,51 @@ class NginxSiteConfigBuilderTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_node_block_routes_to_internal_port_when_set(): void
+    {
+        $site = Site::factory()->create([
+            'slug' => 'jobs-app',
+            'type' => SiteType::Node,
+            'app_port' => 3000,
+            'internal_port' => 30007,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'jobs.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $site->refresh()->load('domains', 'redirects');
+        $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+        $this->assertStringContainsString('proxy_pass http://127.0.0.1:30007;', $nginx);
+        $this->assertStringNotContainsString('proxy_pass http://127.0.0.1:3000;', $nginx);
+    }
+
+    public function test_node_block_falls_back_to_app_port_when_internal_port_is_null(): void
+    {
+        // Sites created before the runtime-agnostic columns landed only
+        // have app_port. Routing must still work for them.
+        $site = Site::factory()->create([
+            'slug' => 'legacy-node',
+            'type' => SiteType::Node,
+            'app_port' => 4001,
+            'internal_port' => null,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'legacy.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $site->refresh()->load('domains', 'redirects');
+        $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+        $this->assertStringContainsString('proxy_pass http://127.0.0.1:4001;', $nginx);
+    }
+
     public function test_per_site_access_and_error_log_paths_are_included(): void
     {
         $site = Site::factory()->create([
@@ -39,7 +84,7 @@ class NginxSiteConfigBuilderTest extends TestCase
         $this->assertStringContainsString('error_log /var/log/nginx/'.$basename.'-error.log;', $nginx);
     }
 
-    public function test_webserver_hostnames_include_aliases_and_tenants_but_not_preview_domains(): void
+    public function test_webserver_hostnames_include_aliases_tenants_and_preview_domains(): void
     {
         $site = Site::factory()->create([
             'slug' => 'my-app',
@@ -71,8 +116,11 @@ class NginxSiteConfigBuilderTest extends TestCase
         $site->refresh()->load('domains', 'domainAliases', 'tenantDomains', 'previewDomains', 'redirects');
         $nginx = app(NginxSiteConfigBuilder::class)->build($site);
 
-        $this->assertStringContainsString('server_name example.test www.example.test tenant.example.test;', $nginx);
-        $this->assertStringNotContainsString('preview.dply.cc', $nginx);
+        // Preview hostnames must land in server_name so the temporary
+        // testing URL (issued by TestingHostnameProvisioner) actually
+        // routes to this site's nginx block instead of falling through
+        // to the default server and serving a bare 404.
+        $this->assertStringContainsString('server_name example.test www.example.test tenant.example.test preview.dply.cc;', $nginx);
     }
 
     public function test_basic_auth_adds_acme_bypass_and_htpasswd_for_static_site(): void
@@ -218,5 +266,32 @@ class NginxSiteConfigBuilderTest extends TestCase
         $nginx = app(NginxSiteConfigBuilder::class)->build($site);
 
         $this->assertStringNotContainsString('fastcgi_cache', $nginx);
+    }
+
+    public function test_listen_port_mode_rewrites_listens_and_strips_tls(): void
+    {
+        $site = Site::factory()->create([
+            'slug' => 'switch-target',
+            'type' => SiteType::Static,
+        ]);
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => 'app.example.test',
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        $site->refresh()->load('domains', 'redirects');
+
+        $production = app(NginxSiteConfigBuilder::class)->build($site);
+        $this->assertStringContainsString('listen 80;', $production);
+
+        $testPort = app(NginxSiteConfigBuilder::class)->build($site, null, 8080);
+        $this->assertStringContainsString('listen 8080;', $testPort);
+        $this->assertStringNotContainsString('listen 80;', $testPort);
+        $this->assertStringNotContainsString('listen [::]:80;', $testPort);
+        // No TLS plumbing should remain at the test port.
+        $this->assertStringNotContainsString('listen 443', $testPort);
+        $this->assertStringNotContainsString('ssl_certificate', $testPort);
     }
 }

@@ -26,7 +26,8 @@ class SiteUptimeCheckUrlResolver
     }
 
     /**
-     * Best-effort public URL for the site (no path). Primary domain → preview/testing → runtime publication.
+     * Best-effort public URL for the site (no path). Primary domain →
+     * serverless function host → preview/testing → runtime publication.
      */
     public function resolveBaseUrl(Site $site): ?string
     {
@@ -37,6 +38,21 @@ class SiteUptimeCheckUrlResolver
             $host = strtolower(trim($primary->hostname));
 
             return 'https://'.$host;
+        }
+
+        // A serverless function publishes at its friendly hostname (and,
+        // failing that, its raw DigitalOcean Functions invocation URL) —
+        // neither is a `domains` row, so the checks above miss it.
+        if ($site->usesFunctionsRuntime()) {
+            $functionHost = $site->serverlessFunctionHost();
+            if (is_string($functionHost) && trim($functionHost) !== '') {
+                return 'https://'.strtolower(trim($functionHost));
+            }
+
+            $actionUrl = trim((string) ($site->serverlessConfig()['action_url'] ?? ''));
+            if ($actionUrl !== '') {
+                return rtrim($actionUrl, '/');
+            }
         }
 
         $testing = $site->testingHostname();

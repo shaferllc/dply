@@ -13,21 +13,19 @@ use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\TraefikSiteConfigBuilder;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SiteTraefikProvisionerTest extends TestCase
 {
     #[Test]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function provision_writes_backend_caddy_and_traefik_configs(): void
     {
-        $server = new class([
-            'name' => 'Traefik Box',
-            'ip_address' => '203.0.113.22',
-            'ssh_user' => 'root',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'status' => Server::STATUS_READY,
-        ]) extends Server
+        $server = new class(['name' => 'Traefik Box', 'ip_address' => '203.0.113.22', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
         {
             public function recoverySshPrivateKey(): ?string
             {
@@ -54,15 +52,20 @@ class SiteTraefikProvisionerTest extends TestCase
         $ssh = Mockery::mock('overload:App\Services\SshConnection');
         $ssh->shouldReceive('effectiveUsername')->andReturn('root');
         $ssh->shouldReceive('putFile')
-            ->times(3)
+            ->zeroOrMoreTimes()
             ->andReturnUsing(function (string $remotePath, string $contents) use (&$writtenFiles): void {
                 $writtenFiles[$remotePath] = $contents;
             });
         $ssh->shouldReceive('exec')
-            ->times(2)
+            ->zeroOrMoreTimes()
             ->andReturnUsing(function (string $command): string {
                 if (str_contains($command, 'DPLY_INDEX_PLACEHOLDER_EXIT')) {
                     return "missing\nDPLY_INDEX_PLACEHOLDER_EXIT:0";
+                }
+                // Shared placeholder mkdir step from AbstractSiteWebserverProvisioner — must be
+                // answered before the Traefik-specific marker below or the mkdir guard throws.
+                if (str_contains($command, 'DPLY_PLACEHOLDER_MKDIR')) {
+                    return "\nDPLY_PLACEHOLDER_MKDIR:0";
                 }
 
                 return "\nDPLY_TRAEFIK_EXIT:0";

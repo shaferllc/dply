@@ -22,6 +22,9 @@
         <x-heroicon-o-bolt {{ $iconAttrs }} />
         @break
     @case('cloudflare')
+    @case('gandi')
+    @case('namecheap')
+    @case('vercel_dns')
         <x-heroicon-o-globe-alt {{ $iconAttrs }} />
         @break
     @case('equinix_metal')
@@ -59,6 +62,10 @@
     @case('azure')
     @case('oracle')
         <x-heroicon-o-cloud {{ $iconAttrs }} />
+        @break
+    @case('ploi')
+    @case('forge')
+        <x-heroicon-o-arrow-down-tray {{ $iconAttrs }} />
         @break
     @default
         <x-heroicon-o-server {{ $iconAttrs }} />

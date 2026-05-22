@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Marketplace;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\MarketplaceItem;
 use App\Models\Server;
 use App\Models\User;
@@ -12,11 +13,17 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'surface.marketplace';
+    use DispatchesToastNotifications;
+
     #[Url(history: true)]
     public string $category = 'all';
 

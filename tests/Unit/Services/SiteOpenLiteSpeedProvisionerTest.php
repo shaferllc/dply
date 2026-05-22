@@ -12,21 +12,19 @@ use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\Sites\SiteOpenLiteSpeedProvisioner;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SiteOpenLiteSpeedProvisionerTest extends TestCase
 {
     #[Test]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function provision_writes_openlitespeed_vhost_and_placeholder_page(): void
     {
-        $server = new class([
-            'name' => 'OLS Box',
-            'ip_address' => '203.0.113.21',
-            'ssh_user' => 'root',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'status' => Server::STATUS_READY,
-        ]) extends Server
+        $server = new class(['name' => 'OLS Box', 'ip_address' => '203.0.113.21', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
         {
             public function recoverySshPrivateKey(): ?string
             {
@@ -42,7 +40,7 @@ class SiteOpenLiteSpeedProvisionerTest extends TestCase
             'repository_path' => '/var/www/shop',
             'php_version' => '8.3',
         ]);
-        $site->id = '01HZYTESTOLS000000000000001';
+        $site->id = '01HZYTESTOLS00000000000001';
         $site->setRelation('server', $server);
         $site->setRelation('domains', new Collection([
             new SiteDomain(['hostname' => 'shop.example.com', 'is_primary' => true]),
@@ -58,10 +56,15 @@ class SiteOpenLiteSpeedProvisionerTest extends TestCase
                 $writtenFiles[$remotePath] = $contents;
             });
         $ssh->shouldReceive('exec')
-            ->times(2)
+            ->zeroOrMoreTimes()
             ->andReturnUsing(function (string $command): string {
                 if (str_contains($command, 'DPLY_INDEX_PLACEHOLDER_EXIT')) {
                     return "missing\nDPLY_INDEX_PLACEHOLDER_EXIT:0";
+                }
+                // Shared placeholder mkdir step from AbstractSiteWebserverProvisioner — must be
+                // answered before the OLS-specific marker below or the mkdir guard throws.
+                if (str_contains($command, 'DPLY_PLACEHOLDER_MKDIR')) {
+                    return "\nDPLY_PLACEHOLDER_MKDIR:0";
                 }
 
                 return "\nDPLY_OLS_EXIT:0";

@@ -19,11 +19,16 @@ class InsightFinding extends Model
 
     public const SEVERITY_CRITICAL = 'critical';
 
+    public const KIND_PROBLEM = 'problem';
+
+    public const KIND_SUGGESTION = 'suggestion';
+
     protected $fillable = [
         'server_id',
         'site_id',
         'team_id',
         'insight_key',
+        'kind',
         'dedupe_hash',
         'status',
         'severity',
@@ -33,6 +38,10 @@ class InsightFinding extends Model
         'correlation',
         'detected_at',
         'resolved_at',
+        'acknowledged_at',
+        'acknowledged_by_user_id',
+        'ignored_at',
+        'ignored_by_user_id',
     ];
 
     protected function casts(): array
@@ -42,6 +51,8 @@ class InsightFinding extends Model
             'correlation' => 'array',
             'detected_at' => 'datetime',
             'resolved_at' => 'datetime',
+            'acknowledged_at' => 'datetime',
+            'ignored_at' => 'datetime',
         ];
     }
 
@@ -60,8 +71,37 @@ class InsightFinding extends Model
         return $this->belongsTo(Team::class);
     }
 
+    public function acknowledgedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'acknowledged_by_user_id');
+    }
+
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_OPEN;
+    }
+
+    public function isIgnored(): bool
+    {
+        return $this->status === self::STATUS_IGNORED;
+    }
+
+    public function isAcknowledged(): bool
+    {
+        return $this->acknowledged_at !== null;
+    }
+
+    /**
+     * Higher number = more important. Used by the Insights banner and
+     * findings list to push critical entries to the top.
+     */
+    public function severityRank(): int
+    {
+        return match ($this->severity) {
+            self::SEVERITY_CRITICAL => 30,
+            self::SEVERITY_WARNING => 20,
+            self::SEVERITY_INFO => 10,
+            default => 0,
+        };
     }
 }

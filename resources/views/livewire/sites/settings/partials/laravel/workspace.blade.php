@@ -50,6 +50,9 @@
                 'reverb' => __('Reverb'),
                 'logs' => __('Logs'),
                 'setup' => __('Setup'),
+                'schedule' => __('Schedule'),
+                'migrations' => __('Migrations'),
+                'pail' => __('Pail'),
             ] as $tabId => $tabLabel)
                 <button
                     type="button"
@@ -68,8 +71,6 @@
 
     @if ($laravel_tab === 'commands')
         <div class="space-y-6">
-            @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 14])
-
             @if ($laravel_console_error)
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif
@@ -212,7 +213,6 @@
 
     @if ($laravel_tab === 'logs')
         <div class="space-y-6">
-            @include('livewire.servers.partials.remote-ssh-stream-panel', ['logViewportLines' => 14])
             @if ($laravel_console_error)
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif
@@ -277,5 +277,17 @@
                 </div>
             </div>
         </div>
+    @endif
+
+    @if ($laravel_tab === 'schedule')
+        @include('livewire.sites.settings.partials.laravel.schedule-tab')
+    @endif
+
+    @if ($laravel_tab === 'migrations')
+        @include('livewire.sites.settings.partials.laravel.migrations-tab')
+    @endif
+
+    @if ($laravel_tab === 'pail')
+        @include('livewire.sites.settings.partials.laravel.pail-tab')
     @endif
 </div>

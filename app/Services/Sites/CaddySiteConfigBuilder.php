@@ -5,13 +5,19 @@ namespace App\Services\Sites;
 use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
+use Illuminate\Support\Collection;
 
 class CaddySiteConfigBuilder
 {
     public function build(Site $site, ?int $listenPort = null): string
     {
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects']);
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 
         $hostnames = collect($listenPort === null ? $site->webserverHostnames() : [])
             ->filter()
@@ -33,10 +39,12 @@ class CaddySiteConfigBuilder
         $root = $site->effectiveDocumentRoot();
         $phpSock = str_replace(
             '{version}',
-            $site->php_version ?? '8.3',
+            $site->phpVersion() ?? '8.3',
             config('sites.php_fpm_socket')
         );
         $redirectLines = $this->redirectLines($site);
+        $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $dotfileDeny = $this->caddyDotfileDenyBlock();
 
         if ($site->type === SiteType::Php && $site->octane_port) {
             $port = (int) $site->octane_port;
@@ -44,7 +52,7 @@ class CaddySiteConfigBuilder
 
             return <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverb}    encode zstd gzip
+{$redirectLines}{$reverb}{$basicAuth}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -58,7 +66,7 @@ CADDY;
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverbPhp}    root * {$root}
+{$redirectLines}{$reverbPhp}{$basicAuth}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -69,7 +77,7 @@ CADDY;
 CADDY,
             SiteType::Static => <<<CADDY
 {$hosts} {
-{$redirectLines}    root * {$root}
+{$redirectLines}{$basicAuth}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -79,14 +87,112 @@ CADDY,
 CADDY,
             SiteType::Node => <<<CADDY
 {$hosts} {
-{$redirectLines}    encode zstd gzip
+{$redirectLines}{$basicAuth}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
     reverse_proxy 127.0.0.1:{$site->app_port}
 }
 CADDY,
+            SiteType::Custom => '',
         };
+    }
+
+    /**
+     * Block any path with a leading dot segment ( /.env, /.git, etc. ), but
+     * still allow `/.well-known/` for ACME challenges and the like.
+     * Mirrors the Nginx and Apache default deny rules.
+     *
+     * Caddy's regex engine is Go's RE2, which has no lookaround — so the
+     * `well-known` exclusion is expressed as a separate `not path` matcher
+     * AND'd with the dotfile regex.
+     */
+    protected function caddyDotfileDenyBlock(): string
+    {
+        return <<<'CADDY'
+    @dply_dotfiles {
+        path_regexp dotfiles (?i)(^|/)\.
+        not path */.well-known*
+    }
+    respond @dply_dotfiles 403
+
+CADDY;
+    }
+
+    /**
+     * Emit one or more `basic_auth` directives — site-wide and (when supported) per
+     * path prefix. Caddy v2 expects bcrypt hashes inline; rows whose `password_hash`
+     * is not bcrypt are skipped with a config comment so the operator can rotate
+     * them and re-apply.
+     */
+    protected function caddyBasicAuthBlocks(Site $site): string
+    {
+        $users = $site->enforceableBasicAuthUsers();
+        if ($users->isEmpty()) {
+            return '';
+        }
+
+        $output = '';
+
+        $rootUsers = $users->filter(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/');
+        if ($rootUsers->isNotEmpty()) {
+            $output .= $this->caddyBasicAuthBlock($rootUsers, null);
+        }
+
+        if ($site->basicAuthSupportsPathPrefixes()) {
+            $paths = $users
+                ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
+                ->unique()
+                ->filter(fn (string $p): bool => $p !== '/')
+                ->sortByDesc(fn (string $p): int => strlen($p))
+                ->values();
+
+            foreach ($paths as $locPath) {
+                $groupUsers = $users->filter(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
+                if ($groupUsers->isEmpty()) {
+                    continue;
+                }
+                $matcher = rtrim($locPath, '/').'/*';
+                $output .= $this->caddyBasicAuthBlock($groupUsers, $matcher);
+            }
+        }
+
+        return $output;
+    }
+
+    /**
+     * Render a single `basic_auth [matcher] { ... }` block. Bcrypt-only entries
+     * are emitted inline; other algorithms (apr1, sha) are listed in a leading
+     * comment because Caddy v2 cannot enforce them.
+     */
+    protected function caddyBasicAuthBlock(Collection $users, ?string $matcher): string
+    {
+        $bcryptUsers = $users->filter(fn (SiteBasicAuthUser $u): bool => $this->caddyHashIsBcrypt((string) $u->password_hash));
+        $skipped = $users->reject(fn (SiteBasicAuthUser $u): bool => $this->caddyHashIsBcrypt((string) $u->password_hash));
+
+        $comment = '';
+        if ($skipped->isNotEmpty()) {
+            $names = $skipped->map(fn (SiteBasicAuthUser $u): string => (string) $u->username)->implode(', ');
+            $comment = "    # dply: skipped non-bcrypt hash(es) for {$names} — rotate the password to enforce on Caddy.\n";
+        }
+
+        if ($bcryptUsers->isEmpty()) {
+            return $comment;
+        }
+
+        $matcherText = $matcher !== null ? ' '.$matcher : '';
+        $userLines = $bcryptUsers
+            ->map(fn (SiteBasicAuthUser $u): string => '        '.$u->username.' '.$u->password_hash)
+            ->implode("\n");
+
+        return $comment."    basic_auth{$matcherText} {\n{$userLines}\n    }\n";
+    }
+
+    private function caddyHashIsBcrypt(string $hash): bool
+    {
+        return str_starts_with($hash, '$2y$')
+            || str_starts_with($hash, '$2a$')
+            || str_starts_with($hash, '$2b$');
     }
 
     private function suspendedSiteBlock(string $hosts, string $basename, Site $site): string

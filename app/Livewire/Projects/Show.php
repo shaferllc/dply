@@ -22,11 +22,15 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'surface.projects';
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 

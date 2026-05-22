@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Launches;
 
-use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -29,13 +28,7 @@ class Path extends Component
      */
     public function page(): array
     {
-        $page = $this->definitions()[$this->path];
-
-        if ($this->path === 'containers') {
-            $page['existing_targets'] = $this->existingContainerTargets();
-        }
-
-        return $page;
+        return $this->definitions()[$this->path];
     }
 
     /**
@@ -44,38 +37,11 @@ class Path extends Component
      *     title: string,
      *     description: string,
      *     items: list<array{title: string, description: string, href: string, cta: string, priority?: 'primary'|'secondary'}>,
-     *     existing_targets?: list<array{id: string, name: string, kind: string, href: string}>
      * }>
      */
     protected function definitions(): array
     {
         return [
-            'containers' => [
-                'eyebrow' => __('Containers'),
-                'title' => __('Start with the shared container platform'),
-                'description' => __('Use one repo-first container lane for local Docker, remote Docker, and remote Kubernetes targets.'),
-                'items' => [
-                    [
-                        'title' => __('Local Docker'),
-                        'description' => __('Inspect a repo, confirm the inferred runtime, and launch the first workload locally on your machine.'),
-                        'href' => route('launches.local-docker'),
-                        'cta' => __('Open local Docker'),
-                        'priority' => 'primary',
-                    ],
-                    [
-                        'title' => __('Remote Docker'),
-                        'description' => __('Use the same inspected repo and continue into a remote Docker target on your own server or a cloud host.'),
-                        'href' => route('launches.local-docker'),
-                        'cta' => __('Open remote Docker'),
-                    ],
-                    [
-                        'title' => __('Remote Kubernetes'),
-                        'description' => __('Carry the same repo-first inspection into Kubernetes when the target needs a cluster instead of plain Docker.'),
-                        'href' => route('launches.kubernetes'),
-                        'cta' => __('Open Kubernetes lane'),
-                    ],
-                ],
-            ],
             'serverless' => [
                 'eyebrow' => __('Serverless'),
                 'title' => __('Start with a serverless target'),
@@ -113,29 +79,10 @@ class Path extends Component
                         'cta' => __('Open AWS cloud lane'),
                     ],
                     [
-                        'title' => __('Local Kubernetes'),
-                        'description' => __('Use the same repo-first workflow when you want to test Kubernetes locally before moving to a remote cluster.'),
-                        'href' => route('launches.local-docker'),
-                        'cta' => __('Open local container lane'),
-                    ],
-                ],
-            ],
-            'edge-network' => [
-                'eyebrow' => __('Edge network'),
-                'title' => __('Start with an edge network deployment'),
-                'description' => __('Use this lane for edge-runtime, static, and globally distributed delivery models.'),
-                'items' => [
-                    [
-                        'title' => __('Edge runtime'),
-                        'description' => __('Prepare edge-native execution flows for worker-style runtime targets.'),
-                        'href' => route('launches.edge-network'),
-                        'cta' => __('Open edge lane'),
-                    ],
-                    [
-                        'title' => __('Static delivery'),
-                        'description' => __('Prepare static and JS framework deploys that should run close to the network edge.'),
-                        'href' => route('launches.edge-network'),
-                        'cta' => __('Open static edge path'),
+                        'title' => __('Managed Kubernetes (DOKS)'),
+                        'description' => __('Register an existing DOKS cluster as a dply server, then add container apps to it.'),
+                        'href' => route('servers.create', ['host_target' => 'kubernetes']),
+                        'cta' => __('Open server wizard'),
                     ],
                 ],
             ],
@@ -159,36 +106,6 @@ class Path extends Component
                 ],
             ],
         ];
-    }
-
-    /**
-     * @return list<array{id: string, name: string, kind: string, href: string}>
-     */
-    protected function existingContainerTargets(): array
-    {
-        $organization = auth()->user()?->currentOrganization();
-
-        if (! $organization) {
-            return [];
-        }
-
-        return Server::query()
-            ->where('organization_id', $organization->id)
-            ->where(function ($query): void {
-                $query
-                    ->whereJsonContains('meta->host_kind', Server::HOST_KIND_DOCKER)
-                    ->orWhereJsonContains('meta->host_kind', Server::HOST_KIND_KUBERNETES);
-            })
-            ->orderByDesc('created_at')
-            ->limit(4)
-            ->get()
-            ->map(fn (Server $server): array => [
-                'id' => (string) $server->id,
-                'name' => $server->name,
-                'kind' => $server->isDockerHost() ? __('Docker host') : __('Kubernetes cluster'),
-                'href' => route('sites.create', $server),
-            ])
-            ->all();
     }
 
     public function render(): View

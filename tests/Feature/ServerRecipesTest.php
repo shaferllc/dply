@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Livewire\Servers\WorkspaceRecipes;
+use App\Livewire\Servers\WorkspaceRun;
 use App\Models\Organization;
 use App\Models\Script;
 use App\Models\Server;
@@ -10,11 +10,15 @@ use App\Models\ServerRecipe;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class ServerRecipesTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['workspace.run'];
 
     protected function userWithOrganization(): User
     {
@@ -26,7 +30,7 @@ class ServerRecipesTest extends TestCase
         return $user;
     }
 
-    public function test_saved_commands_page_explains_boundaries(): void
+    public function test_run_page_explains_boundaries(): void
     {
         $user = $this->userWithOrganization();
         $server = Server::factory()->ready()->create([
@@ -35,13 +39,17 @@ class ServerRecipesTest extends TestCase
             'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
         ]);
 
+        // The page used to be /recipes — it's now /run, the merged
+        // surface for executing things on the server. The "Server-level
+        // commands" banner above the cards explicitly redirects users
+        // who were looking for site deploys.
         $this->actingAs($user)
-            ->get(route('servers.recipes', $server))
+            ->get(route('servers.run', $server))
             ->assertOk()
-            ->assertSee('Saved commands')
+            ->assertSee('Server-level commands')
             ->assertSee('Browse library')
             ->assertSee('Where else commands live')
-            ->assertSee('Open deploy')
+            ->assertSee('Run a one-off command')
             ->assertSee('Open scripts');
     }
 
@@ -64,7 +72,7 @@ class ServerRecipesTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(WorkspaceRecipes::class, ['server' => $server])
+            ->test(WorkspaceRun::class, ['server' => $server])
             ->call('setLibraryTab', 'organization')
             ->call('saveOrganizationScriptToServer', (string) $script->id);
 
@@ -88,7 +96,7 @@ class ServerRecipesTest extends TestCase
         $name = $presets[$key]['name'];
 
         Livewire::actingAs($user)
-            ->test(WorkspaceRecipes::class, ['server' => $server])
+            ->test(WorkspaceRun::class, ['server' => $server])
             ->call('saveMarketplacePresetToServer', $key);
 
         $this->assertDatabaseHas('server_recipes', [
@@ -97,28 +105,9 @@ class ServerRecipesTest extends TestCase
         ]);
     }
 
-    public function test_user_can_promote_saved_command_into_deploy_command(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()?->id,
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-        ]);
-
-        $recipe = ServerRecipe::query()->create([
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'name' => 'Deploy me',
-            'script' => 'cd /var/www && git pull',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceRecipes::class, ['server' => $server])
-            ->call('useRecipeAsDeployCommand', (string) $recipe->id);
-
-        $this->assertSame('cd /var/www && git pull', $server->fresh()->deploy_command);
-    }
+    // test_user_can_promote_saved_command_into_deploy_command was removed
+    // when the deploy_command column was dropped. Recipes are now the only
+    // server-level command store; "promoting" no longer has any target.
 
     public function test_user_can_edit_existing_saved_command(): void
     {
@@ -137,7 +126,7 @@ class ServerRecipesTest extends TestCase
         ]);
 
         Livewire::actingAs($user)
-            ->test(WorkspaceRecipes::class, ['server' => $server])
+            ->test(WorkspaceRun::class, ['server' => $server])
             ->call('editRecipe', (string) $recipe->id)
             ->set('new_recipe_name', 'Updated name')
             ->set('new_recipe_script', 'whoami')

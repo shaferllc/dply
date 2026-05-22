@@ -1,0 +1,252 @@
+#!/bin/sh
+# dply-scheduler-tick — v1 wrapper for framework schedulers.
+#
+# Invoked from cron in place of the bare framework scheduler command, e.g.:
+#   * * * * * /usr/local/bin/dply-scheduler-tick <site-id> laravel -- \
+#       cd /home/dply/sites/marketing/current && php artisan schedule:run
+#
+# Responsibilities (per the schedule-page-v1 plan):
+#   1. Acquire a non-blocking file lock so Run-now and real ticks can't double-fire.
+#   2. Execute the operator's scheduler command, preserving exit code + signals.
+#   3. Capture exit code, duration, peak memory, stderr-on-failure.
+#   4. Write `<heartbeats>/<site-id>.tick` (mtime = completion) and
+#      `<heartbeats>/<site-id>.json` (v=1 sidecar) for the metrics agent to ship.
+#   5. Circuit-breaker: if this wrapper itself crashes 3× in a row, future
+#      invocations fall through to invoking the operator command directly so
+#      our bug doesn't break their scheduler. State stored in a small file.
+#
+# POSIX shell on purpose — runs on every Debian/Ubuntu we provision, no bash
+# dependency, no Python dependency, no Perl. The Laravel per-task parser is
+# small enough to do in awk; lives at the end so non-Laravel kinds skip it.
+#
+# Exit code: forwards the operator command's exit code. If the wrapper itself
+# errors before invoking the operator command (lock failure, mkdir failure),
+# exits 0 to avoid masking the operator's intent — better silent skip than
+# cron emails about wrapper bugs. The skip is still visible via the heartbeat
+# (no fresh .tick file).
+
+set -u
+
+WRAPPER_VERSION=1
+HEARTBEAT_DIR=${DPLY_SCHEDULER_HEARTBEAT_DIR:-/var/lib/dply/scheduler-heartbeats}
+LOCK_DIR=${DPLY_SCHEDULER_LOCK_DIR:-/var/lib/dply/scheduler-locks}
+STATE_DIR=${DPLY_SCHEDULER_STATE_DIR:-/var/lib/dply/scheduler-state}
+CIRCUIT_THRESHOLD=3
+
+usage() {
+    cat <<USAGE >&2
+usage: $0 <site-id> <scheduler-kind> -- <command...>
+       <site-id>         ULID identifying the site (used as the heartbeat filename).
+       <scheduler-kind>  laravel | rails | generic
+USAGE
+    exit 64
+}
+
+# -------- arg parse --------
+[ $# -ge 4 ] || usage
+SITE_ID=$1
+SCHEDULER_KIND=$2
+[ "$3" = "--" ] || usage
+shift 3
+# Remaining $@ is the operator command.
+
+# Defensive: SITE_ID must look ULID-shaped (26 chars, alnum). The wrapper
+# writes to filesystem paths derived from this — refuse anything that could
+# escape the heartbeats directory.
+case "$SITE_ID" in
+    *[!A-Za-z0-9]*|"") echo "dply-scheduler-tick: invalid site id" >&2; exit 64;;
+esac
+[ "${#SITE_ID}" -le 64 ] || { echo "dply-scheduler-tick: site id too long" >&2; exit 64; }
+
+case "$SCHEDULER_KIND" in
+    laravel|rails|generic) ;;
+    *) echo "dply-scheduler-tick: unknown scheduler kind: $SCHEDULER_KIND" >&2; exit 64;;
+esac
+
+# -------- ensure directories exist --------
+# Failure here means we can't write the heartbeat but we should still run the
+# operator's command — never let dply infrastructure break the scheduler.
+mkdir -p "$HEARTBEAT_DIR" "$LOCK_DIR" "$STATE_DIR" 2>/dev/null || true
+
+HEARTBEAT_TICK="$HEARTBEAT_DIR/${SITE_ID}.tick"
+HEARTBEAT_JSON="$HEARTBEAT_DIR/${SITE_ID}.json"
+LOCK_FILE="$LOCK_DIR/${SITE_ID}.lock"
+STATE_FILE="$STATE_DIR/${SITE_ID}.state"
+
+# -------- circuit breaker --------
+# If this wrapper has crashed N consecutive times, fall through to running the
+# operator command directly. The metrics agent flags this via the JSON sidecar
+# (circuit_open=true) so dply sees the problem without operator action.
+WRAPPER_CRASHES=0
+if [ -r "$STATE_FILE" ]; then
+    WRAPPER_CRASHES=$(awk -F= '$1=="wrapper_crashes"{print $2}' "$STATE_FILE" 2>/dev/null)
+    [ -z "$WRAPPER_CRASHES" ] && WRAPPER_CRASHES=0
+fi
+
+if [ "$WRAPPER_CRASHES" -ge "$CIRCUIT_THRESHOLD" ] 2>/dev/null; then
+    # Circuit open. Skip lock + capture; just exec the operator command directly.
+    # We still touch the .tick file so the page doesn't show "scheduler not
+    # ticking" — the underlying scheduler IS running.
+    touch "$HEARTBEAT_TICK" 2>/dev/null || true
+    exec "$@"
+fi
+
+# -------- acquire lock (non-blocking) --------
+# `flock -n` exits non-zero immediately if lock is held. We exit 0 silently in
+# that case — overlap means another tick is in flight, which is what the lock
+# is for.
+if command -v flock >/dev/null 2>&1; then
+    exec 9>"$LOCK_FILE" || exit 0
+    flock -n 9 || exit 0
+fi
+
+# -------- run + capture --------
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+STARTED_EPOCH=$(date +%s%N 2>/dev/null || date +%s000000000)
+
+# Capture stderr separately so we can excerpt it for the JSON sidecar (only on
+# failure per Q16). stdout is forwarded so Laravel's `schedule:run --verbose`
+# output can be parsed by an upstream agent if it wants — but the per-task
+# parsing happens here in the wrapper (Q9). Tempfiles in a path the operator
+# can read; cleaned up on exit.
+STDOUT_TMP=$(mktemp 2>/dev/null) || STDOUT_TMP=/tmp/dply-sched-out-$$
+STDERR_TMP=$(mktemp 2>/dev/null) || STDERR_TMP=/tmp/dply-sched-err-$$
+trap 'rm -f "$STDOUT_TMP" "$STDERR_TMP"' EXIT
+
+# Run the operator command. GNU /usr/bin/time -f gives us peak memory in KB;
+# Debian/Ubuntu ship this, but BSD time (macOS) doesn't recognise the flag.
+# Probe once with /bin/true; only use time-wrapping if the probe succeeds, so
+# the operator command's exit code never gets confused with /usr/bin/time's.
+TIME_BIN=
+TIME_TMP=
+if [ -x /usr/bin/time ] && /usr/bin/time -f '%M' -o /dev/null /bin/true >/dev/null 2>&1; then
+    TIME_BIN=/usr/bin/time
+    TIME_TMP=$(mktemp 2>/dev/null) || TIME_TMP=/tmp/dply-sched-time-$$
+    trap 'rm -f "$STDOUT_TMP" "$STDERR_TMP" "$TIME_TMP"' EXIT
+fi
+
+if [ -n "$TIME_BIN" ]; then
+    "$TIME_BIN" -f '%M' -o "$TIME_TMP" "$@" >"$STDOUT_TMP" 2>"$STDERR_TMP"
+    EXIT_CODE=$?
+    PEAK_KB=$(cat "$TIME_TMP" 2>/dev/null)
+else
+    "$@" >"$STDOUT_TMP" 2>"$STDERR_TMP"
+    EXIT_CODE=$?
+    PEAK_KB=
+fi
+
+# PEAK_KB must be a valid integer for the JSON payload — sanitize whitespace
+# and reject anything non-numeric (e.g. an error message from time).
+case "$PEAK_KB" in
+    ''|*[!0-9]*) PEAK_KB= ;;
+esac
+
+FINISHED_EPOCH=$(date +%s%N 2>/dev/null || date +%s000000000)
+FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Duration in ms. POSIX-shell arithmetic on nanoseconds. If the date binary
+# doesn't support %N (older BSDs), the epochs end in 000000000 and we get
+# second-precision rounded to nearest 1000ms.
+if [ "$STARTED_EPOCH" -gt 0 ] 2>/dev/null && [ "$FINISHED_EPOCH" -gt 0 ] 2>/dev/null; then
+    DURATION_MS=$(( (FINISHED_EPOCH - STARTED_EPOCH) / 1000000 ))
+    [ "$DURATION_MS" -lt 0 ] && DURATION_MS=0
+else
+    DURATION_MS=0
+fi
+
+# -------- stderr excerpt (last 50 lines, capped at 16KB) --------
+# Only captured on failure per Q16 (a2). Successful runs get an empty excerpt
+# so we don't hoard customer-data-bearing output for tasks that worked fine.
+STDERR_EXCERPT=
+if [ "$EXIT_CODE" -ne 0 ] && [ -s "$STDERR_TMP" ]; then
+    STDERR_EXCERPT=$(tail -n 50 "$STDERR_TMP" | head -c 16384)
+fi
+
+# -------- per-task parse (Laravel only) --------
+# Laravel's `schedule:run --verbose` output format (loosely):
+#   Running scheduled command: <name> > /dev/null 2>&1
+#   ⇂ <name> ........ <duration>ms DONE / FAIL
+# Parser is intentionally defensive: anything unparseable is skipped silently,
+# leaving an empty `tasks` array rather than failing the whole tick.
+TASKS_JSON='[]'
+if [ "$SCHEDULER_KIND" = "laravel" ] && [ -s "$STDOUT_TMP" ]; then
+    TASKS_JSON=$(awk '
+        BEGIN { first=1; printf "["; }
+        /Running scheduled command:/ {
+            # Strip leading prefix to capture the command identifier. We keep
+            # everything after "Running scheduled command: " as the task name.
+            sub(/.*Running scheduled command: /, "");
+            sub(/ > \/dev\/null.*/, "");
+            sub(/^['\''"]/, ""); sub(/['\''"]$/, "");
+            name = $0;
+            if (!first) printf ",";
+            printf "{\"name\":\"%s\",\"exit_code\":0}", name;
+            first = 0;
+        }
+        END { printf "]"; }
+    ' "$STDOUT_TMP" 2>/dev/null) || TASKS_JSON='[]'
+    [ -z "$TASKS_JSON" ] && TASKS_JSON='[]'
+fi
+
+# -------- write heartbeat + sidecar atomically --------
+# Atomic write: render the JSON to a temp file in the same dir, then mv into
+# place. Avoids the agent reading a half-written sidecar between our two
+# fprintfs.
+touch "$HEARTBEAT_TICK" 2>/dev/null || true
+
+JSON_TMP="${HEARTBEAT_JSON}.tmp.$$"
+{
+    printf '{"v":%s,' "$WRAPPER_VERSION"
+    printf '"site_id":"%s",' "$SITE_ID"
+    printf '"scheduler_kind":"%s",' "$SCHEDULER_KIND"
+    printf '"started_at":"%s",' "$STARTED_AT"
+    printf '"finished_at":"%s",' "$FINISHED_AT"
+    printf '"duration_ms":%s,' "$DURATION_MS"
+    printf '"exit_code":%s,' "$EXIT_CODE"
+    if [ -n "$PEAK_KB" ]; then
+        printf '"memory_peak_kb":%s,' "$PEAK_KB"
+    else
+        printf '"memory_peak_kb":null,'
+    fi
+    printf '"circuit_open":false,'
+    if [ -n "$STDERR_EXCERPT" ]; then
+        # Escape for JSON: backslash, doublequote, control chars 0x00-0x1f.
+        # Use python3 if available for correctness; fall back to a defensive
+        # ascii-only filter otherwise.
+        if command -v python3 >/dev/null 2>&1; then
+            ENCODED=$(printf '%s' "$STDERR_EXCERPT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+        else
+            # Strip everything outside printable ASCII + escape backslash/quote.
+            # Lossy but safe. Operators wanting full fidelity get it via python3.
+            ENCODED=$(printf '%s' "$STDERR_EXCERPT" | tr -d '\000-\010\013\014\016-\037' | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n' | sed 's/^/"/; s/\\n$/"/')
+        fi
+        printf '"stderr_excerpt":%s,' "$ENCODED"
+    else
+        printf '"stderr_excerpt":null,'
+    fi
+    printf '"tasks":%s' "$TASKS_JSON"
+    printf '}\n'
+} >"$JSON_TMP" 2>/dev/null
+
+if [ -s "$JSON_TMP" ]; then
+    mv "$JSON_TMP" "$HEARTBEAT_JSON" 2>/dev/null || rm -f "$JSON_TMP" 2>/dev/null
+else
+    rm -f "$JSON_TMP" 2>/dev/null
+fi
+
+# -------- reset circuit breaker on success --------
+# If we made it this far, the wrapper itself didn't crash. Reset the crash
+# counter — a previously open circuit closes after one healthy wrapper run.
+if [ "$WRAPPER_CRASHES" -gt 0 ]; then
+    printf 'wrapper_crashes=0\n' >"$STATE_FILE" 2>/dev/null || true
+fi
+
+# -------- forward stdout to original (some operators tee scheduler output) --------
+# We swallowed stdout/stderr into tempfiles above to capture them; forward to
+# the original streams now. Cron typically discards them but operators with
+# >> /var/log/...-style redirection expect the output to land there.
+cat "$STDOUT_TMP" 2>/dev/null
+cat "$STDERR_TMP" >&2 2>/dev/null
+
+# Forward the operator command's exit code.
+exit "$EXIT_CODE"

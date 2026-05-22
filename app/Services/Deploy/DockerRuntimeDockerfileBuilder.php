@@ -12,13 +12,14 @@ final class DockerRuntimeDockerfileBuilder
         return match ($site->type) {
             SiteType::Node => $this->nodeDockerfile($site),
             SiteType::Static => $this->staticDockerfile($site),
+            SiteType::Custom => '',
             default => $this->phpDockerfile($site),
         };
     }
 
     private function phpDockerfile(Site $site): string
     {
-        $phpVersion = trim((string) ($site->php_version ?: '8.3'));
+        $phpVersion = trim((string) ($site->phpVersion() ?: '8.3'));
         $documentRoot = $this->containerDocumentRoot($site);
         $laravelBootstrap = $this->laravelBootstrapInstructions($site);
 

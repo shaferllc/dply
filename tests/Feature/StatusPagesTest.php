@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Status\PublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Models\Organization;
@@ -12,11 +13,15 @@ use App\Models\StatusPage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class StatusPagesTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['surface.status_pages'];
 
     protected function userWithOrg(string $role = 'owner'): User
     {
@@ -40,7 +45,10 @@ class StatusPagesTest extends TestCase
             'is_public' => true,
         ]);
 
-        $response = $this->get(route('status.public', $page));
+        // Guest pages are caught by RedirectGuestsToComingSoon middleware in
+        // non-local envs; bypass for tests asserting actual page render.
+        $response = $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
+            ->get(route('status.public', $page));
 
         $response->assertOk();
         $response->assertSee('API');
@@ -57,7 +65,9 @@ class StatusPagesTest extends TestCase
             'is_public' => false,
         ]);
 
-        $this->get(route('status.public', $page))->assertNotFound();
+        $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
+            ->get(route('status.public', $page))
+            ->assertNotFound();
     }
 
     public function test_user_can_create_status_page(): void

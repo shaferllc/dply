@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Models\Server;
-use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\ProcessOutput;
@@ -14,7 +14,6 @@ use App\Modules\TaskRunner\Services\TaskRunnerService;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\Traits\HandlesCallbacks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
@@ -30,6 +29,14 @@ class TestWebhookCallbackHandler
 class TaskRunnerCancellationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Webhook routes are guest-accessible — bypass the coming-soon
+        // middleware so the controller can run.
+        $this->withoutMiddleware([RedirectGuestsToComingSoon::class]);
+    }
 
     public function test_remote_task_cancellation_stops_process_and_marks_task_cancelled(): void
     {

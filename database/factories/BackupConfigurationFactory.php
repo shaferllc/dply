@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\BackupConfiguration;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -16,7 +17,8 @@ class BackupConfigurationFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'organization_id' => Organization::factory(),
+            'created_by_user_id' => null,
             'name' => fake()->words(2, true),
             'provider' => BackupConfiguration::PROVIDER_CUSTOM_S3,
             'config' => [
@@ -24,16 +26,23 @@ class BackupConfigurationFactory extends Factory
                 'secret' => fake()->sha256(),
                 'bucket' => fake()->slug(2),
                 'region' => 'us-east-1',
-                'endpoint' => '',
+                'endpoint' => 'https://s3.example.com',
                 'use_path_style' => false,
             ],
         ];
     }
 
-    public function forUser(User $user): static
+    public function forOrganization(Organization $organization): static
     {
         return $this->state(fn (array $attributes) => [
-            'user_id' => $user->id,
+            'organization_id' => $organization->id,
+        ]);
+    }
+
+    public function createdBy(User $user): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'created_by_user_id' => $user->id,
         ]);
     }
 }

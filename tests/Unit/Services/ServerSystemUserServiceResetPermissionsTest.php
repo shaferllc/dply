@@ -7,11 +7,20 @@ use App\Models\Site;
 use App\Services\Servers\ServerSshConnectionRunner;
 use App\Services\Servers\ServerSystemUserDeletionPolicy;
 use App\Services\Servers\ServerSystemUserService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
 
 class ServerSystemUserServiceResetPermissionsTest extends TestCase
 {
+    // Required even though we use ->make() — Server::factory() and
+    // Site::factory() reference User::factory() / Server::factory()
+    // for foreign keys, and Laravel auto-creates (persists) those
+    // nested factories even when the outer call is make(). Without
+    // RefreshDatabase those Users + Servers leak into the suite and
+    // break global counts in dply:fleet:* tests downstream.
+    use RefreshDatabase;
+
     protected function tearDown(): void
     {
         Mockery::close();

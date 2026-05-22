@@ -1,6 +1,21 @@
 @php
     $card = 'dply-card overflow-hidden';
-    $setupIncomplete = $server->status !== \App\Models\Server::STATUS_READY || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE;
+    // Container hosts (docker/kubernetes) don't run the VM-shaped setup journey,
+    // so they're "setup complete" the moment they're STATUS_READY — even when
+    // setup_status is null. Without this branch, Docker / K8s hosts show the
+    // VM-shaped "setup in progress" hero instead of the at-a-glance overview
+    // (and the new "Add your first container app" CTA below).
+    $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    // Only VM hosts run the setup journey. Container, serverless (DO
+    // Functions), and other non-VM hosts have no setup script — their
+    // setup_status stays null — so they are complete the moment they are
+    // STATUS_READY. Gating on isVmHost() instead of an explicit host-kind
+    // list keeps every non-VM host out of the VM-shaped "setup in progress"
+    // hero.
+    $setupIncomplete = $server->isVmHost() && (
+        $server->status !== \App\Models\Server::STATUS_READY
+        || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE
+    );
     $containerLaunchTranscript = collect($containerLaunch['events'] ?? [])->map(function (array $event): string {
         $timestamp = (string) ($event['at'] ?? '');
         $level = strtoupper((string) ($event['level'] ?? 'info'));
@@ -27,13 +42,103 @@
     :server="$server"
     active="overview"
     :title="__('Overview')"
-    :description="__('At-a-glance health, sites, deploy status, and operations shortcuts for this server.')"
     :show-navigation="! $setupIncomplete"
-    doc-route="docs.create-first-server"
-    :doc-label="__('First server guide')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
+
+    @php
+        $provisionError = is_array($server->meta['provision_error'] ?? null) ? $server->meta['provision_error'] : null;
+    @endphp
+    @if ($provisionError && $server->status === \App\Models\Server::STATUS_ERROR)
+        <div class="mx-auto mt-4 max-w-7xl px-4 sm:px-6 lg:px-8" data-testid="server-provision-error">
+            <div class="rounded-2xl border-2 border-brand-rust/40 bg-brand-rust/5 p-4">
+                <div class="flex items-start gap-3">
+                    <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-rust text-white">
+                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold text-brand-rust">
+                            {{ __('Provisioning failed at :provider', ['provider' => $provisionError['provider'] ?? 'the provider']) }}
+                        </p>
+                        <p class="mt-1 text-sm text-brand-ink">{{ $provisionError['message'] ?? __('Unknown error.') }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
+                            @if (! empty($provisionError['region']))
+                                <span><strong class="text-brand-ink">{{ __('Region') }}:</strong> {{ $provisionError['region'] }}</span>
+                            @endif
+                            @if (! empty($provisionError['size']))
+                                <span><strong class="text-brand-ink">{{ __('Size') }}:</strong> {{ $provisionError['size'] }}</span>
+                            @endif
+                            @if (! empty($provisionError['at']))
+                                <span><strong class="text-brand-ink">{{ __('At') }}:</strong> {{ $provisionError['at'] }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- K8s host whose cluster has gone away at the provider (deleted in the
+         DO/AWS console, or the poller gave up after :tries attempts). Stays
+         prominent at the top of the overview so the operator can't miss it —
+         the rest of the overview's tiles read off a missing cluster and would
+         otherwise look like a healthy-but-empty server. --}}
+    @if (! empty($kubernetesError))
+        <section data-testid="kubernetes-cluster-error" class="overflow-hidden rounded-[2rem] border border-rose-200 bg-rose-50 p-6 shadow-sm">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div class="flex min-w-0 flex-1 items-start gap-3">
+                    <x-heroicon-o-exclamation-triangle class="mt-1 h-6 w-6 shrink-0 text-rose-600" />
+                    <div class="min-w-0 space-y-3">
+                        <span class="inline-flex items-center gap-2 rounded-full border border-rose-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700">
+                            <span class="h-2 w-2 rounded-full bg-rose-500"></span>
+                            {{ __('Cluster unavailable') }}
+                        </span>
+                        <h3 class="text-2xl font-semibold tracking-tight text-rose-900">
+                            {{ __(':provider can\'t find this cluster anymore', ['provider' => $kubernetesError['provider_label']]) }}
+                        </h3>
+                        <p class="text-sm leading-6 text-rose-800">
+                            {{ $kubernetesError['message'] }}
+                        </p>
+                        <dl class="grid gap-3 text-xs text-rose-900 sm:grid-cols-2">
+                            @if ($kubernetesError['cluster_name'] !== '')
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Cluster name') }}</dt>
+                                    <dd class="mt-1 font-mono">{{ $kubernetesError['cluster_name'] }}</dd>
+                                </div>
+                            @endif
+                            @if ($kubernetesError['cluster_id'] !== '')
+                                <div>
+                                    <dt class="font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Cluster id') }}</dt>
+                                    <dd class="mt-1 break-all font-mono">{{ $kubernetesError['cluster_id'] }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                        <div class="flex flex-wrap gap-2 pt-2">
+                            <button
+                                type="button"
+                                wire:click="retryClusterPolling"
+                                wire:loading.attr="disabled"
+                                wire:target="retryClusterPolling"
+                                class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-path wire:loading.remove wire:target="retryClusterPolling" class="h-4 w-4" />
+                                <x-spinner wire:loading wire:target="retryClusterPolling" variant="white" size="sm" />
+                                {{ __('Re-check now') }}
+                            </button>
+                            <a href="{{ route('servers.cluster', $server) }}" wire:navigate class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100">
+                                {{ __('Open cluster page') }}
+                            </a>
+                            <a href="{{ $kubernetesError['provider_console_url'] }}" target="_blank" rel="noopener" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100">
+                                {{ __('Open in :provider', ['provider' => $kubernetesError['provider_label']]) }}
+                                <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    @endif
 
     @if ($server->workspace)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
@@ -50,6 +155,10 @@
 
     <div class="{{ $card }} p-6 sm:p-8">
         @if ($setupIncomplete)
+            {{-- Setup-in-progress hero — unchanged from the previous design.
+                 Renders only while server.setup_status hasn't reached DONE.
+                 Its job is to push the operator to the journey page; nothing
+                 else on this view matters until setup completes. --}}
             <section class="relative overflow-hidden rounded-[2rem] border border-brand-ink/10 bg-brand-ink px-6 py-7 text-brand-cream shadow-[0_30px_90px_rgba(19,28,23,0.18)] sm:px-8 sm:py-8">
                 <div class="pointer-events-none absolute inset-0">
                     <div class="absolute inset-x-0 top-0 h-px bg-white/10"></div>
@@ -126,51 +235,220 @@
                 </div>
             </section>
         @else
-            <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 p-6 sm:p-7">
-                <div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="max-w-3xl space-y-4">
-                        <div class="flex flex-wrap items-center gap-2 text-sm">
-                            <span class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 font-medium text-brand-ink">
-                                <span class="inline-flex h-2 w-2 rounded-full {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? 'bg-emerald-500' : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? 'bg-rose-500' : 'bg-brand-gold') }}"></span>
+            {{-- Compact identity strip — name + SSH on the left, the chip rail
+                 on the right. Was a generous two-column hero with a 24-line
+                 H2 + SSH block; collapsed to a single row at lg+ so the
+                 actual overview content (live metrics, tiles, sites preview)
+                 sits above the fold. --}}
+            <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-5 py-4">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="min-w-0 space-y-1.5">
+                        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <h2 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $server->name }}</h2>
+                            <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? 'bg-emerald-500' : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? 'bg-rose-500' : 'bg-brand-gold') }}"></span>
                                 {{ $healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Needs attention') : __('No health check yet')) }}
                             </span>
-                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-brand-moss">
-                                {{ __('Provider') }}: <span class="ml-2 font-semibold text-brand-ink">{{ $server->provider->label() }}</span>
-                            </span>
-                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-brand-moss">
-                                {{ __('IP') }}: <span class="ml-2 font-mono font-semibold text-brand-ink">{{ $server->ip_address ?? '—' }}</span>
-                            </span>
                         </div>
-                        <div class="space-y-2">
-                            <h2 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Overview') }}</h2>
-                            <p class="max-w-2xl text-sm leading-6 text-brand-moss">
-                                {{ __('A lighter, development-facing summary for this server while the overview flag is enabled.') }}
-                            </p>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
+                            <span class="inline-flex items-center gap-1.5 font-mono">
+                                <span class="text-[10px] uppercase tracking-[0.18em] text-brand-mist">SSH</span>
+                                <span class="break-all text-brand-ink">{{ $server->getSshConnectionString() }}</span>
+                            </span>
+                            @if ($server->setup_script_key)
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="text-[10px] uppercase tracking-[0.18em] text-brand-mist">{{ __('Setup') }}</span>
+                                    <span class="text-brand-ink">{{ config("setup_scripts.scripts.{$server->setup_script_key}.name", $server->setup_script_key) }}</span>
+                                </span>
+                            @endif
                             @if ($healthSummary['last_checked_at'])
-                                <p class="text-sm text-brand-mist">
-                                    {{ __('Last health check') }}: {{ $healthSummary['last_checked_at']->diffForHumans() }}
-                                </p>
+                                <span class="text-brand-mist" title="{{ __('Last health check') }}">
+                                    {{ __('Checked :ago', ['ago' => $healthSummary['last_checked_at']->diffForHumans()]) }}
+                                </span>
                             @endif
                         </div>
                     </div>
-
-                    <div class="flex flex-wrap gap-3 lg:max-w-sm lg:justify-end">
-                        <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:bg-brand-sand/20">
-                            <x-heroicon-o-globe-alt class="h-4 w-4" />
-                            {{ __('Open Sites') }}
-                        </a>
-                        <a href="{{ route('servers.deploy', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:bg-brand-sand/20">
-                            <x-heroicon-o-rocket-launch class="h-4 w-4" />
-                            {{ __('Open Deploy') }}
-                        </a>
-                        <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:bg-brand-sand/20">
-                            <x-heroicon-o-chart-bar class="h-4 w-4" />
-                            {{ __('Open Metrics') }}
-                        </a>
+                    <div class="flex flex-wrap gap-1.5 text-xs">
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                            <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Provider') }}</span>
+                            <span class="ml-1.5 font-semibold text-brand-ink">{{ $server->provider->label() }}</span>
+                        </span>
+                        @if ($server->region)
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Region') }}</span>
+                                <span class="ml-1.5 font-semibold text-brand-ink">{{ $server->region }}</span>
+                            </span>
+                        @endif
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                            <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('IP') }}</span>
+                            <span class="ml-1.5 font-mono font-semibold text-brand-ink">{{ $server->ip_address ?? '—' }}</span>
+                        </span>
+                        @if ($server->size)
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 text-brand-moss">
+                                <span class="text-[10px] uppercase tracking-[0.16em] text-brand-mist">{{ __('Size') }}</span>
+                                <span class="ml-1.5 font-mono font-semibold text-brand-ink">{{ $server->size }}</span>
+                            </span>
+                        @endif
                     </div>
                 </div>
             </section>
 
+            {{-- Onboarding checklist. Auto-vanishes once every applicable step
+                 is done, so a long-lived server's overview is unencumbered.
+                 Container hosts get a shorter list (no SSH-key / monitor /
+                 backups items — those don't apply when sites live in a
+                 cluster). Collapsed by default once at least one step is
+                 done so the operator can fold it away. --}}
+            @if (! $onboardingComplete && $onboardingTotal > 0)
+                @php $onboardingPct = max(0, min(100, (int) round(100 * $onboardingDone / $onboardingTotal))); @endphp
+                <section
+                    data-testid="server-onboarding-checklist"
+                    x-data="{ open: @js($onboardingDone === 0) }"
+                    class="mt-6 overflow-hidden rounded-2xl border border-sky-200 bg-gradient-to-br from-sky-50/80 via-white to-sky-50/40 shadow-sm"
+                >
+                    <button
+                        type="button"
+                        x-on:click="open = ! open"
+                        class="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left"
+                    >
+                        <div class="flex min-w-0 items-center gap-3">
+                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-sky-600 text-xs font-bold text-white shadow-sm">
+                                {{ $onboardingDone }}/{{ $onboardingTotal }}
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-brand-ink">{{ __('Get started') }}</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">
+                                    {{ trans_choice('{1} :n step left to make this server useful|[2,*] :n steps left to make this server useful', $onboardingTotal - $onboardingDone, ['n' => $onboardingTotal - $onboardingDone]) }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="hidden w-32 sm:block">
+                                <div class="h-1.5 w-full overflow-hidden rounded-full bg-brand-ink/5">
+                                    <div class="h-full rounded-full bg-sky-500 transition-[width] duration-500" style="width: {{ $onboardingPct }}%"></div>
+                                </div>
+                            </div>
+                            <x-heroicon-m-chevron-down class="h-5 w-5 text-brand-moss transition-transform" x-bind:class="{ 'rotate-180': open }" />
+                        </div>
+                    </button>
+                    <ul x-show="open" x-collapse class="divide-y divide-sky-100 border-t border-sky-100 bg-white/60">
+                        @foreach ($onboardingSteps as $step)
+                            <li class="flex items-center justify-between gap-3 px-5 py-3">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    @if ($step['done'])
+                                        <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                                            <x-heroicon-m-check class="h-3.5 w-3.5" />
+                                        </span>
+                                    @else
+                                        <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-300 bg-white"></span>
+                                    @endif
+                                    <div class="min-w-0">
+                                        <p class="text-sm {{ $step['done'] ? 'text-brand-moss line-through' : 'font-medium text-brand-ink' }}">{{ $step['label'] }}</p>
+                                        @if (! $step['done'])
+                                            <p class="mt-0.5 text-xs text-brand-moss">{{ $step['help'] }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                                @if (! $step['done'])
+                                    <a href="{{ $step['cta_route'] }}" wire:navigate class="shrink-0 inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700">
+                                        {{ $step['cta_label'] }}
+                                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5" />
+                                    </a>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </section>
+            @endif
+
+            {{-- Live system metrics card. Reads the same ServerMetricSnapshot
+                 the Monitor tab uses, just the latest row — three bars and a
+                 load number so the operator gets a real "is this box ok"
+                 read above the click-through stat tiles. Empty state nudges
+                 toward installing the monitor agent. --}}
+            @php
+                $metricPayload = is_object($latestMetricSnapshot) && is_array($latestMetricSnapshot->payload ?? null)
+                    ? $latestMetricSnapshot->payload
+                    : [];
+                $metricCpu = isset($metricPayload['cpu_pct']) && is_numeric($metricPayload['cpu_pct']) ? (float) $metricPayload['cpu_pct'] : null;
+                $metricMem = isset($metricPayload['mem_pct']) && is_numeric($metricPayload['mem_pct']) ? (float) $metricPayload['mem_pct'] : null;
+                $metricDisk = isset($metricPayload['disk_pct']) && is_numeric($metricPayload['disk_pct']) ? (float) $metricPayload['disk_pct'] : null;
+                $metricLoad1m = isset($metricPayload['load_1m']) && is_numeric($metricPayload['load_1m']) ? (float) $metricPayload['load_1m'] : null;
+                $metricLoadPerCpu = isset($metricPayload['load_per_cpu_1m']) && is_numeric($metricPayload['load_per_cpu_1m']) ? (float) $metricPayload['load_per_cpu_1m'] : null;
+                $metricHasAny = $metricCpu !== null || $metricMem !== null || $metricDisk !== null;
+                $metricCapturedAt = is_object($latestMetricSnapshot) ? $latestMetricSnapshot->captured_at : null;
+                $metricStale = $metricCapturedAt && $metricCapturedAt->lt(now()->subMinutes(10));
+                $metricBar = function (?float $pct): array {
+                    if ($pct === null) {
+                        return ['width' => 0, 'color' => 'bg-brand-mist/40'];
+                    }
+                    $clamped = max(0.0, min(100.0, $pct));
+                    if ($pct >= 95) {
+                        $color = 'bg-rose-500';
+                    } elseif ($pct >= 85) {
+                        $color = 'bg-amber-500';
+                    } else {
+                        $color = 'bg-emerald-500';
+                    }
+
+                    return ['width' => $clamped, 'color' => $color];
+                };
+                $metricRow = function (string $label, ?float $pct) use ($metricBar): string {
+                    $bar = $metricBar($pct);
+                    $val = $pct === null ? '—' : number_format($pct, 0).'%';
+
+                    return view('livewire.servers.partials._overview-metric-row', [
+                        'label' => $label,
+                        'value' => $val,
+                        'barColor' => $bar['color'],
+                        'barWidth' => $bar['width'],
+                    ])->render();
+                };
+            @endphp
+            <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <div class="flex items-baseline gap-2">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Live load') }}</p>
+                        @if ($metricCapturedAt)
+                            <span class="text-[11px] text-brand-mist {{ $metricStale ? 'text-amber-700' : '' }}">
+                                {{ __('Sampled :ago', ['ago' => $metricCapturedAt->diffForHumans()]) }}
+                                @if ($metricStale)
+                                    · <span class="font-semibold uppercase tracking-wide">{{ __('stale') }}</span>
+                                @endif
+                            </span>
+                        @endif
+                    </div>
+                    <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:text-brand-forest">
+                        {{ __('Open Monitor') }} →
+                    </a>
+                </div>
+                @if (! $metricHasAny)
+                    <div class="mt-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
+                        {{ __('No metric snapshots yet — install the monitor agent from the Monitor tab so this card lights up.') }}
+                    </div>
+                @else
+                    <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                        {!! $metricRow(__('CPU'), $metricCpu) !!}
+                        {!! $metricRow(__('Memory'), $metricMem) !!}
+                        {!! $metricRow(__('Disk'), $metricDisk) !!}
+                    </div>
+                    @if ($metricLoad1m !== null)
+                        <p class="mt-3 text-xs text-brand-moss">
+                            {{ __('Load (1m)') }}:
+                            <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
+                            @if ($metricLoadPerCpu !== null)
+                                <span class="text-brand-mist"> · </span>
+                                {{ __('per CPU') }}:
+                                <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoadPerCpu, 2) }}</span>
+                            @endif
+                        </p>
+                    @endif
+                @endif
+            </section>
+
+            {{-- SSH-key reminder. Conditional, fires only when the
+                 operator's personal profile key isn't yet on the server.
+                 Carried over unchanged from the previous design. --}}
             @if (! $serverHasPersonalProfileKey)
                 <section class="mt-6 rounded-2xl border border-brand-gold/40 bg-brand-sand/35 p-6">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -184,578 +462,315 @@
                                 @endif
                             </p>
                         </div>
-                        <div class="flex flex-wrap gap-3">
-                            <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest">
-                                <x-heroicon-o-key class="h-4 w-4" />
-                                {{ __('Open SSH keys') }}
-                            </a>
+                        <div class="flex flex-wrap gap-2">
                             @if (! $hasProfileSshKeys)
-                                <a href="{{ route('profile.ssh-keys') }}" wire:navigate class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
-                                    {{ __('Add profile key') }}
+                                <a href="{{ route('profile.ssh-keys') }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-cream transition-colors hover:bg-brand-forest">
+                                    {{ __('Add a profile key') }}
                                 </a>
                             @endif
+                            <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink transition-colors hover:bg-brand-sand/30">
+                                {{ __('Open SSH keys workspace') }}
+                            </a>
                         </div>
                     </div>
                 </section>
             @endif
 
-            @if ($containerLaunch)
-                <section class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-sky-50/90 p-6 shadow-sm">
-                    <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                        <div class="max-w-3xl">
-                            <div class="flex flex-wrap items-center gap-3">
-                                <span class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-700">
-                                    <span class="inline-flex h-2 w-2 rounded-full bg-sky-500 shadow-[0_0_0_4px_rgba(14,165,233,0.16)]"></span>
-                                    {{ __('Container launch in progress') }}
-                                </span>
-                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss">
-                                    {{ $containerLaunch['target_family'] }}
-                                </span>
-                            </div>
+            {{-- Container launch progress (extracted partial — also rendered on
+                 the /cluster page so K8s users see launch progress in their
+                 main destination too). --}}
+            <div class="mt-6">
+                @include('livewire.servers.partials._container-launch-progress')
+            </div>
 
-                            <div class="mt-5">
-                                <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ $containerLaunch['current_step_label'] }}</h3>
-                                <p class="mt-2 max-w-2xl text-sm leading-6 text-brand-moss">{{ $containerLaunch['summary'] }}</p>
-                                @if ($containerLaunch['updated_at'])
-                                    <p class="mt-3 text-xs text-brand-mist">{{ __('Updated :time', ['time' => $containerLaunch['updated_at']->diffForHumans()]) }}</p>
-                                @endif
-                            </div>
-
-                            <dl class="mt-6 grid gap-4 md:grid-cols-3">
-                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Repository') }}</dt>
-                                    <dd class="mt-2 break-all text-sm font-medium text-brand-ink">{{ $containerLaunch['repository_url'] !== '' ? $containerLaunch['repository_url'] : __('Not recorded') }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Branch') }}</dt>
-                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $containerLaunch['repository_branch'] !== '' ? $containerLaunch['repository_branch'] : '—' }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-brand-ink/10 bg-white/90 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-mist">{{ __('Subdirectory') }}</dt>
-                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $containerLaunch['repository_subdirectory'] !== '' ? $containerLaunch['repository_subdirectory'] : __('Repo root') }}</dd>
-                                </div>
-                            </dl>
+            {{-- Container-host empty state. Only visible when the host is docker/kubernetes,
+                 there are no sites yet, and there's no in-flight launch banner above. The
+                 corresponding VM-host welcome / first-site CTA stays in the existing flow.
+                 ($isContainerHost is computed above with $setupIncomplete.) --}}
+            @if ($isContainerHost && $siteCount === 0 && ! $containerLaunch)
+                <section data-testid="add-first-container-cta" class="mt-6 overflow-hidden rounded-[2rem] border border-sky-200 bg-gradient-to-br from-sky-50 via-white to-sky-50/50 p-8 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-6">
+                        <div class="max-w-xl space-y-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">{{ __('Next step') }}</p>
+                            <h3 class="text-2xl font-semibold tracking-tight text-brand-ink">{{ __('Add your first container app') }}</h3>
+                            <p class="text-sm leading-6 text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
                         </div>
-
-                        <div class="w-full max-w-xl">
-                            @include('livewire.partials.deployment-activity-console', [
-                                'title' => __('Install activity'),
-                                'meta' => __('last :count entries', ['count' => count($containerLaunch['events'])]),
-                                'transcript' => $containerLaunchTranscript,
-                                'maxHeight' => '26rem',
-                                'linkHref' => $containerLaunch['site_route'],
-                                'linkLabel' => $containerLaunch['site_route'] ? __('Open site') : null,
-                            ])
-                        </div>
+                        <a href="{{ route('sites.create', $server) }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-sky-700">
+                            <x-heroicon-o-plus class="h-4 w-4" />
+                            {{ __('Add a container app') }}
+                        </a>
                     </div>
                 </section>
             @endif
 
-            <section class="mt-6 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
-                <x-stat-card
-                    :label="__('Health')"
-                    :value="$healthSummary['status'] === \App\Models\Server::HEALTH_REACHABLE ? __('Reachable') : ($healthSummary['status'] === \App\Models\Server::HEALTH_UNREACHABLE ? __('Unreachable') : __('Not checked yet'))"
-                    :meta="$healthSummary['last_checked_at'] ? __('Last checked :time', ['time' => $healthSummary['last_checked_at']->diffForHumans()]) : __('No health checks recorded yet.')"
-                    tone="subtle"
-                />
-                <x-stat-card
-                    :label="__('Sites')"
-                    :value="$siteCount"
-                    :meta="trans_choice('{0} No hosted sites yet.|{1} 1 site connected to this server.|[2,*] :count sites connected to this server.', $siteCount, ['count' => $siteCount])"
-                />
-                <x-stat-card
-                    :label="__('Latest deploy')"
-                    :value="$latestDeployment?->status ? str($latestDeployment->status)->headline() : __('None yet')"
-                    :meta="$latestDeployment?->site ? __('Latest run for :site', ['site' => $latestDeployment->site->name]).($latestDeployment->finished_at ? ' '.__('(:time)', ['time' => $latestDeployment->finished_at->diffForHumans()]) : '') : __('No deploys have been recorded for this server yet.')"
-                />
-                <x-stat-card
-                    :label="__('Operations')"
-                    :value="array_sum($opsSummary)"
-                    :meta="__('Configured items across firewall, cron, daemons, and SSH keys.')"
-                />
-            </section>
+            {{-- 5 click-through stat tiles. Each lands at its dedicated
+                 workspace sub-page. xl:grid-cols-5 keeps them on one row
+                 instead of stranding the 5th tile alone underneath. --}}
+            <section class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                @php
+                    $healthValue = match ($healthSummary['status']) {
+                        \App\Models\Server::HEALTH_REACHABLE => __('Reachable'),
+                        \App\Models\Server::HEALTH_UNREACHABLE => __('Unreachable'),
+                        default => __('Not checked yet'),
+                    };
+                    $healthMeta = $healthSummary['last_checked_at']
+                        ? __('Last checked :time', ['time' => $healthSummary['last_checked_at']->diffForHumans()])
+                        : __('No checks yet');
+                    $deployingMeta = $deployingCount > 0
+                        ? trans_choice('{1} :count site deploying|[2,*] :count sites deploying', $deployingCount, ['count' => $deployingCount])
+                        : trans_choice('{0} No sites yet|{1} 1 site|[2,*] :count sites', $siteCount, ['count' => $siteCount]);
+                    $latestDeployValue = $latestDeployment?->status
+                        ? str($latestDeployment->status)->headline()
+                        : __('None yet');
+                    $latestDeployMeta = $latestDeployment?->site
+                        ? __(':site · :time', [
+                            'site' => $latestDeployment->site->name,
+                            'time' => ($latestDeployment->finished_at ?? $latestDeployment->created_at)?->diffForHumans() ?? __('just now'),
+                        ])
+                        : __('No deploys yet');
+                @endphp
 
-            <section class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div class="max-w-2xl">
-                        <h3 class="text-lg font-semibold text-slate-900">{{ __('Deployment foundation') }}</h3>
-                        <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('Shared preflight, runtime drift, and attached resource state aggregated across sites on this server.') }}</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <x-badge tone="{{ ($foundationSummary['preflight_blocked_count'] ?? 0) > 0 ? 'danger' : 'accent' }}">
-                            {{ trans_choice('{0} No blocked sites|{1} :count blocked site|[2,*] :count blocked sites', $foundationSummary['preflight_blocked_count'] ?? 0, ['count' => $foundationSummary['preflight_blocked_count'] ?? 0]) }}
-                        </x-badge>
-                        @if (($foundationSummary['drifted_count'] ?? 0) > 0)
-                            <x-badge tone="warning">
-                                {{ trans_choice('{1} :count drifted runtime|[2,*] :count drifted runtimes', $foundationSummary['drifted_count'], ['count' => $foundationSummary['drifted_count']]) }}
-                            </x-badge>
-                        @endif
-                        @if (($foundationSummary['warning_site_count'] ?? 0) > 0)
-                            <x-badge tone="warning">
-                                {{ trans_choice('{1} :count site with warnings|[2,*] :count sites with warnings', $foundationSummary['warning_site_count'], ['count' => $foundationSummary['warning_site_count']]) }}
-                            </x-badge>
-                        @endif
-                    </div>
-                </div>
+                <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm transition hover:border-brand-sage hover:shadow-md">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Health') }}</p>
+                    <p class="mt-2 text-xl font-semibold text-brand-ink">{{ $healthValue }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ $healthMeta }}</p>
+                    <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Monitor →') }}</p>
+                </a>
 
-                @if (($foundationSummary['site_count'] ?? 0) === 0)
-                    <x-empty-state
-                        :title="__('No site foundation data yet.')"
-                        :description="__('Attach a site to this server and Dply will summarize preflight and resource state here.')"
-                        class="mt-5"
-                    />
-                @else
-                    <div class="mt-5 grid gap-6 xl:grid-cols-[0.9fr,1.1fr]">
-                        <div class="space-y-4">
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <h4 class="text-sm font-semibold text-slate-900">{{ __('Attached resources') }}</h4>
-                                <div class="mt-3 space-y-2">
-                                    @forelse ($resourceSummary as $resource)
-                                        <div class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                                            <div>
-                                                <p class="text-sm font-medium text-slate-900">{{ str($resource['type'])->headline() }}</p>
-                                                <p class="mt-1 text-xs text-slate-500">
-                                                    {{ trans_choice('{1} :count site|[2,*] :count sites', $resource['site_count'], ['count' => $resource['site_count']]) }}
-                                                </p>
-                                            </div>
-                                            <div class="text-right text-xs">
-                                                <p class="font-medium text-sky-700">{{ __('Configured: :count', ['count' => $resource['configured_count']]) }}</p>
-                                                @if ($resource['pending_count'] > 0)
-                                                    <p class="mt-1 text-amber-700">{{ __('Pending: :count', ['count' => $resource['pending_count']]) }}</p>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    @empty
-                                        <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                                            {{ __('No resource bindings are summarized yet.') }}
-                                        </div>
-                                    @endforelse
-                                </div>
-                            </div>
-                        </div>
+                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm transition hover:border-brand-sage hover:shadow-md">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Sites') }}</p>
+                    <p class="mt-2 text-xl font-semibold text-brand-ink">{{ $siteCount }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">{{ $deployingMeta }}</p>
+                    <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Sites →') }}</p>
+                </a>
 
-                        <div class="space-y-3">
-                            @foreach ($siteFoundationSummaries as $siteFoundation)
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <a href="{{ $siteFoundation['route'] }}" wire:navigate class="font-semibold text-slate-900 hover:text-sky-700">{{ $siteFoundation['name'] }}</a>
-                                            <p class="mt-1 text-sm text-slate-600">
-                                                @if (! $siteFoundation['preflight_ok'])
-                                                    {{ trans_choice('{1} :count blocking preflight issue|[2,*] :count blocking preflight issues', $siteFoundation['error_count'], ['count' => $siteFoundation['error_count']]) }}
-                                                @elseif ($siteFoundation['warning_count'] > 0)
-                                                    {{ trans_choice('{1} :count warning|[2,*] :count warnings', $siteFoundation['warning_count'], ['count' => $siteFoundation['warning_count']]) }}
-                                                @else
-                                                    {{ __('Preflight clear') }}
-                                                @endif
-                                            </p>
-                                        </div>
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['preflight_ok'] ? 'bg-sky-100 text-sky-800' : 'bg-red-100 text-red-800' }}">
-                                                {{ $siteFoundation['preflight_ok'] ? __('Ready') : __('Blocked') }}
-                                            </span>
-                                            <span class="rounded-full px-3 py-1 text-xs font-medium {{ $siteFoundation['runtime_drifted'] ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700' }}">
-                                                {{ $siteFoundation['runtime_drifted'] ? __('Drift detected') : __('In sync') }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-            </section>
-
-            <section class="mt-8 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div class="max-w-2xl">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Insights') }}</h3>
-                        <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Open server findings are summarized here so you can spot issues without leaving overview.') }}</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <x-badge tone="accent">
-                            {{ trans_choice('{0} No open findings|{1} :count open finding|[2,*] :count open findings', $insightSummary['open_count'], ['count' => $insightSummary['open_count']]) }}
-                        </x-badge>
-                        @if ($insightSummary['critical_count'] > 0)
-                            <x-badge tone="danger">
-                                {{ trans_choice('{1} :count critical|[2,*] :count critical', $insightSummary['critical_count'], ['count' => $insightSummary['critical_count']]) }}
-                            </x-badge>
-                        @endif
-                        @if ($insightSummary['warning_count'] > 0)
-                            <x-badge tone="warning">
-                                {{ trans_choice('{1} :count warning|[2,*] :count warnings', $insightSummary['warning_count'], ['count' => $insightSummary['warning_count']]) }}
-                            </x-badge>
-                        @endif
-                        <a href="{{ route('servers.insights', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Insights') }}</a>
-                    </div>
-                </div>
-
-                @if ($insightFindings->isEmpty())
-                    <x-empty-state
-                        :title="__('No open server insights right now.')"
-                        :description="__('If you expected to see something here, open Insights to refresh checks, review enabled settings, and confirm this server has recent metrics when metric-based checks are enabled.')"
-                        class="mt-5"
-                    />
-                @else
-                    <div class="mt-5 grid gap-3 lg:grid-cols-3">
-                        @foreach ($insightFindings as $finding)
-                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span class="text-[11px] font-semibold uppercase tracking-wide rounded-md px-2 py-0.5
-                                        @class([
-                                            'bg-amber-50 text-amber-950' => $finding->severity === 'warning',
-                                            'bg-red-50 text-red-900' => $finding->severity === 'critical',
-                                            'bg-brand-sand/80 text-brand-ink' => $finding->severity === 'info',
-                                        ])">{{ $finding->severity }}</span>
-                                    <p class="text-sm font-semibold text-brand-ink">{{ $finding->title }}</p>
-                                </div>
-                                @if ($finding->body)
-                                    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ $finding->body }}</p>
-                                @endif
-                                <p class="mt-3 text-xs text-brand-mist">
-                                    {{ __('Detected') }}:
-                                    {{ $finding->detected_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s T') ?? '—' }}
-                                </p>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </section>
-
-            <section class="mt-8 grid gap-10 xl:grid-cols-[1.1fr,0.9fr]">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Sites') }}</h3>
-                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Review the sites on this server and jump into each app or the full sites workspace.') }}</p>
-                        </div>
-                        <a href="{{ route('servers.sites', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Sites') }}</a>
-                    </div>
-
-                    <div class="mt-5 space-y-3">
-                        @forelse ($siteSummaries as $siteSummary)
-                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <a href="{{ $siteSummary['route'] }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage">{{ $siteSummary['name'] }}</a>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ $siteSummary['primary_domain'] ?? __('No primary domain yet') }}</p>
-                                    </div>
-                                    <span class="rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-medium text-brand-moss">{{ str($siteSummary['status'])->headline() }}</span>
-                                </div>
-                            </div>
-                        @empty
-                            <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/10 px-4 py-6 text-sm text-brand-moss">
-                                {{ __('No sites are attached to this server yet.') }}
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-
-                <div class="space-y-10">
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Notifications') }}</h3>
-                                <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Add channels, assign common server events here, and open the deeper notification pages only when you need more control.') }}</p>
-                            </div>
-                            @if ($server->organization_id)
-                                <a
-                                    href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
-                                    wire:navigate
-                                    class="text-sm font-medium text-brand-sage hover:text-brand-forest"
-                                >
-                                    {{ __('Assign events') }}
-                                </a>
-                            @endif
-                        </div>
-
-                        <div class="mt-5 space-y-4">
-                            <x-resource-notification-summary
-                                :resource="$server"
-                                :heading="__('Server notifications')"
-                                :manage-url="route('profile.notification-channels.bulk-assign', ['server' => $server->id])"
-                            />
-
-                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 p-4">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Quick assign') }}</h4>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Pick one or more channels plus the server events you want routed from this server.') }}</p>
-                                    </div>
-                                    <a
-                                        href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
-                                        wire:navigate
-                                        class="text-xs font-medium text-brand-sage hover:text-brand-forest"
-                                    >
-                                        {{ __('Open advanced assignment') }}
-                                    </a>
-                                </div>
-
-                                <div class="mt-4 rounded-2xl border border-brand-ink/10 bg-white p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <h5 class="text-sm font-semibold text-brand-ink">{{ __('Quick add channel') }}</h5>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('Create a new destination here, then it will be selected automatically for assignment below.') }}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            wire:click="openQuickNotificationChannelModal"
-                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                        >
-                                            <x-heroicon-o-plus class="h-4 w-4 shrink-0 opacity-90" />
-                                            {{ __('Add channel') }}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="mt-4 grid gap-5 lg:grid-cols-2">
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Channels') }}</p>
-                                        <div class="mt-3 space-y-2">
-                                            @forelse ($assignableChannels as $channel)
-                                                <label class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm text-brand-ink">
-                                                    <input
-                                                        type="checkbox"
-                                                        wire:model.live="quick_notification_channel_ids"
-                                                        value="{{ $channel->id }}"
-                                                        class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
-                                                    >
-                                                    <span>
-                                                        <span class="font-medium">{{ $channel->label }}</span>
-                                                        <span class="text-brand-mist">[{{ \App\Models\NotificationChannel::labelForType($channel->type) }}]</span>
-                                                    </span>
-                                                </label>
-                                            @empty
-                                                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-3 py-3 text-sm text-brand-moss">
-                                                    {{ __('No channels available yet. Create one from My channels or Organization channels first.') }}
-                                                </div>
-                                            @endforelse
-                                        </div>
-                                        @error('quick_notification_channel_ids')
-                                            <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
-                                        @enderror
-                                    </div>
-
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Server events') }}</p>
-                                        <div class="mt-3 space-y-2">
-                                            @foreach ($serverEventOptions as $eventKey => $eventLabel)
-                                                <label class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm text-brand-ink">
-                                                    <input
-                                                        type="checkbox"
-                                                        wire:model.live="quick_notification_event_keys"
-                                                        value="{{ $eventKey }}"
-                                                        class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
-                                                    >
-                                                    <span>{{ $eventLabel }}</span>
-                                                </label>
-                                            @endforeach
-                                        </div>
-                                        @error('quick_notification_event_keys')
-                                            <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
-                                        @enderror
-                                    </div>
-                                </div>
-
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        wire:click="saveQuickNotificationAssignments"
-                                        wire:loading.attr="disabled"
-                                        wire:target="saveQuickNotificationAssignments"
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        <x-heroicon-o-bell-alert class="h-4 w-4 shrink-0 opacity-90" />
-                                        <span wire:loading.remove wire:target="saveQuickNotificationAssignments">{{ __('Save quick assignment') }}</span>
-                                        <span wire:loading wire:target="saveQuickNotificationAssignments">{{ __('Saving…') }}</span>
-                                    </button>
-                                    <a
-                                        href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
-                                        wire:navigate
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                    >
-                                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 opacity-90" />
-                                        {{ __('Advanced assignment') }}
-                                    </a>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2">
-                                <a
-                                    href="{{ route('profile.notification-channels') }}"
-                                    wire:navigate
-                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" />
-                                    {{ __('My channels') }}
-                                </a>
-                                @if ($server->organization_id)
-                                    <a
-                                        href="{{ route('organizations.notification-channels', $server->organization_id) }}"
-                                        wire:navigate
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                    >
-                                        <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0 opacity-90" />
-                                        {{ __('Organization channels') }}
-                                    </a>
-                                    <a
-                                        href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}"
-                                        wire:navigate
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest"
-                                    >
-                                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 opacity-90" />
-                                        {{ __('Assign server events') }}
-                                    </a>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Latest deploy') }}</h3>
-                                <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Use this summary to spot the most recent release outcome before opening the full deploy workspace.') }}</p>
-                            </div>
-                            <a href="{{ route('servers.deploy', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Deploy') }}</a>
-                        </div>
-
-                        @if ($latestDeployment?->site)
-                            <div class="mt-5 rounded-2xl border border-brand-ink/10 bg-brand-sand/10 p-4">
-                                <p class="text-sm font-semibold text-brand-ink">{{ $latestDeployment->site->name }}</p>
-                                <p class="mt-1 text-sm text-brand-moss">{{ str($latestDeployment->status)->headline() }}</p>
-                                @if ($latestDeployment->finished_at)
-                                    <p class="mt-2 text-xs text-brand-mist">{{ __('Finished :time', ['time' => $latestDeployment->finished_at->diffForHumans()]) }}</p>
-                                @endif
-                            </div>
+                <a href="{{ route('servers.databases', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm transition hover:border-brand-sage hover:shadow-md">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Databases') }}</p>
+                    <p class="mt-2 text-xl font-semibold text-brand-ink">{{ $databaseSummary['count'] }}</p>
+                    <p class="mt-1 text-xs text-brand-moss">
+                        @if ($installedStack->database)
+                            {{ str($installedStack->database)->headline() }}@if ($installedStack->databaseVersion) · {{ $installedStack->databaseVersion }}@endif
                         @else
-                            <div class="mt-5 rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/10 p-4 text-sm text-brand-moss">
-                                {{ __('No deploys have been recorded for this server yet.') }}
-                            </div>
+                            {{ __('No engine recorded') }}
                         @endif
-                    </div>
+                    </p>
+                    <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Databases →') }}</p>
+                </a>
 
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Operations') }}</h3>
-                                <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Keep this compact. Use the dedicated workspace pages when you need to manage firewall, jobs, daemons, or SSH access in detail.') }}</p>
-                            </div>
-                        </div>
+                <a href="{{ route('servers.deploys', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm transition hover:border-brand-sage hover:shadow-md">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Latest deploy') }}</p>
+                    <p class="mt-2 text-xl font-semibold text-brand-ink">{{ $latestDeployValue }}</p>
+                    <p class="mt-1 truncate text-xs text-brand-moss">{{ $latestDeployMeta }}</p>
+                    <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Deploys →') }}</p>
+                </a>
 
-                        <div class="mt-5 grid gap-3 sm:grid-cols-2">
-                            <a href="{{ route('servers.firewall', $server) }}" wire:navigate class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4 transition hover:border-brand-sage/40 hover:bg-brand-sand/20">
-                                <p class="text-sm font-semibold text-brand-ink">{{ trans_choice('{1} :count enabled firewall rule|[2,*] :count enabled firewall rules', $opsSummary['firewall_rules_enabled'], ['count' => $opsSummary['firewall_rules_enabled']]) }}</p>
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Firewall') }}</p>
-                            </a>
-                            <a href="{{ route('servers.cron', $server) }}" wire:navigate class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4 transition hover:border-brand-sage/40 hover:bg-brand-sand/20">
-                                <p class="text-sm font-semibold text-brand-ink">{{ trans_choice('{1} :count cron job|[2,*] :count cron jobs', $opsSummary['cron_jobs'], ['count' => $opsSummary['cron_jobs']]) }}</p>
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Cron') }}</p>
-                            </a>
-                            <a href="{{ route('servers.daemons', $server) }}" wire:navigate class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4 transition hover:border-brand-sage/40 hover:bg-brand-sand/20">
-                                <p class="text-sm font-semibold text-brand-ink">{{ trans_choice('{1} :count daemon|[2,*] :count daemons', $opsSummary['daemons'], ['count' => $opsSummary['daemons']]) }}</p>
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Daemons') }}</p>
-                            </a>
-                            <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4 transition hover:border-brand-sage/40 hover:bg-brand-sand/20">
-                                <p class="text-sm font-semibold text-brand-ink">{{ trans_choice('{1} :count SSH key|[2,*] :count SSH keys', $opsSummary['ssh_keys'], ['count' => $opsSummary['ssh_keys']]) }}</p>
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('SSH keys') }}</p>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                {{-- Background health — surfaces queue workers + schedules + recent backup failures
+                     to the high-traffic Overview page. Click-through lands on Backups, which is
+                     where operators typically need to act when this tile shows anything red. --}}
+                <a href="{{ route('servers.backups', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm transition hover:border-brand-sage hover:shadow-md">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Background') }}</p>
+                    <p class="mt-2 flex items-baseline gap-2">
+                        <span class="text-xl font-semibold text-brand-ink">{{ $backgroundSummary['active_workers'] }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('workers') }}</span>
+                    </p>
+                    <p class="mt-1 truncate text-xs text-brand-moss">
+                        @if ($backgroundSummary['failed_backups_7d'] > 0)
+                            <span class="font-semibold text-red-700">{{ trans_choice('{1} :count failed backup (7d)|[2,*] :count failed backups (7d)', $backgroundSummary['failed_backups_7d'], ['count' => $backgroundSummary['failed_backups_7d']]) }}</span>
+                        @elseif ($backgroundSummary['paused_schedules'] > 0)
+                            <span class="text-amber-700">{{ trans_choice('{1} :count paused schedule|[2,*] :count paused schedules', $backgroundSummary['paused_schedules'], ['count' => $backgroundSummary['paused_schedules']]) }}</span>
+                        @elseif ($backgroundSummary['active_schedules'] > 0)
+                            {{ trans_choice('{1} :count active schedule|[2,*] :count active schedules', $backgroundSummary['active_schedules'], ['count' => $backgroundSummary['active_schedules']]) }}
+                        @else
+                            {{ __('No schedules yet') }}
+                        @endif
+                    </p>
+                    <p class="mt-3 text-[11px] font-medium text-brand-sage opacity-0 transition group-hover:opacity-100">{{ __('Open Backups →') }}</p>
+                </a>
             </section>
 
-            <section class="mt-8 grid gap-10 xl:grid-cols-[1fr,1fr]">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-brand-ink">{{ __('Server snapshot') }}</h3>
-                    <dl class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div><dt class="text-sm text-brand-moss">{{ __('Status') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ str($server->status)->headline() }}</dd></div>
-                        <div><dt class="text-sm text-brand-moss">{{ __('Provider') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $server->provider->label() }}</dd></div>
-                        <div><dt class="text-sm text-brand-moss">{{ __('Region') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd></div>
-                        <div><dt class="text-sm text-brand-moss">{{ __('Size') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ $server->size ?: '—' }}</dd></div>
-                        @if ($server->setup_script_key)
-                            <div><dt class="text-sm text-brand-moss">{{ __('Setup script') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ config("setup_scripts.scripts.{$server->setup_script_key}.name", $server->setup_script_key) }}</dd></div>
-                        @endif
-                        <div><dt class="text-sm text-brand-moss">{{ __('Setup status') }}</dt><dd class="mt-1 font-medium text-brand-ink">{{ str($server->setup_status ?: 'pending')->headline() }}</dd></div>
-                        <div><dt class="text-sm text-brand-moss">{{ __('IP address') }}</dt><dd class="mt-1 font-mono font-medium text-brand-ink">{{ $server->ip_address ?? '—' }}</dd></div>
-                        <div class="sm:col-span-2"><dt class="text-sm text-brand-moss">{{ __('SSH') }}</dt><dd class="mt-1 break-all font-mono text-sm font-medium text-brand-ink">{{ $server->getSshConnectionString() }}</dd></div>
-                    </dl>
-
-                    @if (\App\Jobs\RunSetupScriptJob::shouldDispatch($server))
-                        <div class="mt-6 border-t border-brand-ink/10 pt-6">
-                            <h4 class="text-sm font-semibold text-brand-ink">{{ __('Provisioning') }}</h4>
-                            <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('Open the setup journey to review the tracked install flow, inspect output, or run setup again after changing provisioning inputs.') }}</p>
-                            <div class="mt-4">
-                                <a href="{{ route('servers.journey', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm transition-colors hover:bg-brand-forest">
-                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0 opacity-90" />
-                                    {{ __('Open setup journey') }}
-                                </a>
-                            </div>
-                        </div>
-                    @endif
-                </div>
-
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-                    <h3 class="text-lg font-semibold text-brand-ink">{{ __('Health monitoring') }}</h3>
-                    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('Add an HTTP URL when you want Dply to check your app itself. If you leave it blank, Dply only checks whether the server is reachable over SSH.') }}</p>
-                    @if ($healthSummary['monitor_last_sample_at'])
+            {{-- Sites preview — top 5 by last-touched, with each site's most
+                 recent deploy status. Lets the operator scan "what is
+                 actually running on this box" without bouncing to the Sites
+                 tab. Empty-state path is handled above (first-container
+                 CTA for K8s/Docker, the existing VM first-site CTA elsewhere). --}}
+            @if ($sitesPreview->isNotEmpty())
+                <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Sites') }}</p>
+                        <a href="{{ route('servers.sites', $server) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:text-brand-forest">
+                            {{ __('Open Sites') }} →
+                        </a>
+                    </div>
+                    <ul class="mt-3 divide-y divide-brand-ink/10">
+                        @foreach ($sitesPreview as $previewSite)
+                            @php
+                                $deploy = $sitesPreviewLatestDeploys[$previewSite->id] ?? null;
+                                $deployStatus = $deploy?->status ? (string) $deploy->status : null;
+                                $deployTime = $deploy ? ($deploy->finished_at ?? $deploy->created_at) : null;
+                                $statusBadge = match ($previewSite->status) {
+                                    'active', 'ready' => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
+                                    'deploying', 'queued' => 'bg-sky-50 text-sky-800 ring-sky-200',
+                                    'failed', 'error' => 'bg-rose-50 text-rose-800 ring-rose-200',
+                                    default => 'bg-brand-sand/40 text-brand-moss ring-brand-ink/10',
+                                };
+                            @endphp
+                            <li class="flex items-center justify-between gap-3 py-2.5">
+                                <div class="min-w-0">
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $previewSite]) }}" wire:navigate class="block truncate font-medium text-brand-ink hover:text-brand-sage">
+                                        {{ $previewSite->name }}
+                                    </a>
+                                    @if ($deployTime)
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">
+                                            {{ __('Last deploy :time', ['time' => $deployTime->diffForHumans()]) }}
+                                            @if ($deployStatus)
+                                                <span class="text-brand-mist"> · </span>
+                                                <span class="text-brand-moss">{{ str($deployStatus)->headline() }}</span>
+                                            @endif
+                                        </p>
+                                    @else
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('No deploys yet') }}</p>
+                                    @endif
+                                </div>
+                                <span class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $statusBadge }}">
+                                    {{ $previewSite->status ?? '—' }}
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($siteCount > $sitesPreview->count())
                         <p class="mt-3 text-xs text-brand-mist">
-                            {{ __('Last stored metrics sample') }}: {{ $healthSummary['monitor_last_sample_at']->format('Y-m-d H:i') }}
-                            <span class="text-brand-moss">({{ $healthSummary['monitor_last_sample_at']->diffForHumans() }})</span>
+                            {{ __('Showing :n of :total — open Sites to see the rest.', ['n' => $sitesPreview->count(), 'total' => $siteCount]) }}
                         </p>
                     @endif
-                    <div class="mt-5 flex flex-wrap items-center gap-3">
-                        <button type="button" wire:click="checkHealth" wire:loading.attr="disabled" wire:target="checkHealth" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 text-sm font-medium text-brand-ink transition hover:bg-brand-sand/35">
-                            <span wire:loading.remove wire:target="checkHealth" class="inline-flex items-center gap-2">
-                                <x-heroicon-o-bolt class="h-4 w-4" />
-                                {{ __('Check health now') }}
-                            </span>
-                            <span wire:loading wire:target="checkHealth" class="inline-flex items-center gap-2">
-                                <x-spinner variant="ink" size="sm" />
-                                {{ __('Checking…') }}
-                            </span>
-                        </button>
-                        <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Metrics') }}</a>
+                </section>
+            @endif
+
+            {{-- Stack summary card. One line of installed-runtime
+                 facts (database engine + version, php, webserver, cache)
+                 with a low-memory-mode badge when applicable. Reads via
+                 InstalledStack::fromMeta so legacy servers degrade
+                 gracefully to wizard meta. --}}
+            <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stack') }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                            @if ($installedStack->database)
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1 font-medium text-brand-ink">
+                                    {{ str($installedStack->database)->headline() }}@if ($installedStack->databaseVersion)<span class="ml-1 font-mono text-xs text-brand-moss">{{ $installedStack->databaseVersion }}</span>@endif
+                                </span>
+                            @endif
+                            @if ($installedStack->phpVersion)
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1 font-medium text-brand-ink">
+                                    PHP <span class="ml-1 font-mono text-xs text-brand-moss">{{ $installedStack->phpVersion }}</span>
+                                </span>
+                            @endif
+                            @if ($installedStack->webserver)
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1 font-medium text-brand-ink">
+                                    {{ str($installedStack->webserver)->headline() }}
+                                </span>
+                            @endif
+                            @if ($installedStack->cacheService && $installedStack->cacheService !== 'none')
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/20 px-2.5 py-1 font-medium text-brand-ink">
+                                    {{ str($installedStack->cacheService)->headline() }}
+                                </span>
+                            @endif
+                            @if ($installedStack->lowMemoryMode)
+                                <span class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800" title="{{ __('Provisioned in low-memory mode — substituted lighter services where possible.') }}">
+                                    <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ __('Low-memory mode') }}
+                                </span>
+                            @endif
+                        </div>
+                        @if ($installedStackDiverges)
+                            <p class="mt-2 text-xs text-amber-700">
+                                {{ __('Wizard requested :requested but :installed was installed instead. See journey for context.', [
+                                    'requested' => $server->meta['database'] ?? '—',
+                                    'installed' => $installedStack->database ?? '—',
+                                ]) }}
+                            </p>
+                        @endif
                     </div>
-                    <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-4">
-                        <p class="text-sm leading-6 text-brand-moss">
-                            {{ __('This overview is internal. If you want a public heartbeat later, publish that through a') }}
-                            <a href="{{ route('status-pages.index') }}" class="font-medium text-brand-ink hover:underline">{{ __('status page') }}</a>
-                            {{ __('instead of exposing this workspace page.') }}
-                        </p>
-                    </div>
-                    <p class="mt-4 text-sm text-brand-moss">{{ __('Optional HTTP health URL (2xx = healthy). Leave it blank to use SSH reachability only.') }}</p>
-                    <form wire:submit="saveHealthCheckUrl" class="mt-4 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-center">
-                        <input type="url" wire:model="health_check_url" placeholder="https://…" class="flex-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30" />
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveHealthCheckUrl" class="shrink-0 !py-2">
-                            <span wire:loading.remove wire:target="saveHealthCheckUrl">{{ __('Save') }}</span>
-                            <span wire:loading wire:target="saveHealthCheckUrl" class="inline-flex items-center gap-2">
-                                <x-spinner variant="cream" size="sm" />
-                                {{ __('Saving…') }}
-                            </span>
-                        </x-primary-button>
-                    </form>
+                    <a href="{{ route('servers.services', $server) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">{{ __('Open Services →') }}</a>
                 </div>
             </section>
+
+            {{-- Conditional cards: Insights + Notifications. Each only
+                 renders when there's something to surface (open insights,
+                 attached channels). Empty-state operators see a cleaner
+                 page; populated-state operators get the high-signal
+                 summary at a glance. --}}
+            @if ($openInsightsCount > 0)
+                <section class="mt-4 rounded-2xl border {{ $criticalInsightsCount > 0 ? 'border-red-200 bg-red-50/40' : 'border-amber-200 bg-amber-50/40' }} p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] {{ $criticalInsightsCount > 0 ? 'text-red-700' : 'text-amber-700' }}">{{ __('Insights') }}</p>
+                            <p class="mt-2 text-sm font-semibold text-brand-ink">
+                                {{ trans_choice('{1} :count open finding|[2,*] :count open findings', $openInsightsCount, ['count' => $openInsightsCount]) }}
+                                @if ($criticalInsightsCount > 0)
+                                    <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
+                                        {{ trans_choice('{1} :count critical|[2,*] :count critical', $criticalInsightsCount, ['count' => $criticalInsightsCount]) }}
+                                    </span>
+                                @endif
+                            </p>
+                        </div>
+                        <a href="{{ route('servers.insights', $server) }}" wire:navigate class="text-sm font-medium {{ $criticalInsightsCount > 0 ? 'text-red-700 hover:text-red-900' : 'text-amber-700 hover:text-amber-900' }}">
+                            {{ __('Open Insights →') }}
+                        </a>
+                    </div>
+                </section>
+            @endif
+
+            @if ($notificationSummary['manage_url'])
+                <section class="mt-4 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
+                            <p class="mt-2 text-sm text-brand-ink">
+                                @if ($notificationSummary['channel_count'] > 0)
+                                    {{ trans_choice('{1} :count channel routing this server|[2,*] :count channels routing this server', $notificationSummary['channel_count'], ['count' => $notificationSummary['channel_count']]) }}
+                                @else
+                                    {{ __('No channels routing yet — add one to get pinged when something matters.') }}
+                                @endif
+                            </p>
+                        </div>
+                        <a href="{{ $notificationSummary['manage_url'] }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-forest">
+                            {{ __('Manage →') }}
+                        </a>
+                    </div>
+                </section>
+            @endif
         @endif
     </div>
-    @if (! $setupIncomplete)
-    @can('delete', $server)
-        <div class="rounded-2xl border border-red-200/60 bg-white p-5 shadow-sm space-y-2">
-            <p class="text-sm text-brand-moss leading-relaxed">{{ __('You must type the server name to confirm. You can remove the server now or pick a future date (removal runs at the end of that day in your app timezone).') }}</p>
-            <button type="button" wire:click="openRemoveServerModal" class="text-sm font-medium text-red-700 hover:text-red-900">{{ __('Remove or schedule removal…') }}</button>
-        </div>
-    @endcan
-    @endif
 
-    <x-notification-channel-quick-add-modal
-        :show="$showQuickNotificationChannelModal"
-        :types="$quickAddTypes"
-        :current-type="$quick_new_type"
-        :can-manage-organization-notification-channels="$canManageOrganizationNotificationChannels"
-        :title="__('Quick add channel')"
-        :description="__('Create a new destination here, then it will be selected automatically for assignment below.')"
-    />
+    @if (! $setupIncomplete)
+        @can('delete', $server)
+            <section class="overflow-hidden rounded-2xl border-2 border-red-300 bg-red-50/60 shadow-sm">
+                <div class="border-b border-red-200 bg-red-100/60 px-5 py-2.5">
+                    <p class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-red-800">
+                        <x-heroicon-m-exclamation-triangle class="h-4 w-4" />
+                        {{ __('Danger zone') }}
+                    </p>
+                </div>
+                <div class="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="max-w-2xl min-w-0">
+                        <h3 class="text-base font-semibold text-red-900">{{ __('Remove this server') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-red-900/80">
+                            {{ __('Deletes the dply server record, runs any provider teardown, and detaches sites / databases / backups. You\'ll be asked to type the server name to confirm and can schedule removal for a future date (runs at the end of that day in your app timezone).') }}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="openRemoveServerModal"
+                        class="shrink-0 inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700"
+                    >
+                        <x-heroicon-o-trash class="h-4 w-4" />
+                        {{ __('Remove or schedule removal') }}
+                    </button>
+                </div>
+            </section>
+        @endcan
+    @endif
 
     <x-slot name="modals">
         @include('livewire.servers.partials.remove-server-modal', [

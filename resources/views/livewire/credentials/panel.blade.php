@@ -2,6 +2,15 @@
     $link = 'text-brand-sage hover:text-brand-ink underline underline-offset-2';
     $hint = 'mt-1 text-sm text-brand-moss leading-relaxed';
     $code = 'rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-xs font-mono text-brand-ink';
+    $capabilityChip = function (string $cap): array {
+        return match ($cap) {
+            'compute' => ['label' => __('compute'), 'class' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10'],
+            'dns' => ['label' => __('DNS'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
+            'cdn' => ['label' => __('CDN'), 'class' => 'bg-sky-100 text-sky-900 ring-sky-200'],
+            'import' => ['label' => __('import'), 'class' => 'bg-amber-100 text-amber-900 ring-amber-200'],
+            default => ['label' => $cap, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
+        };
+    };
 @endphp
 
 @if ($credentials->isNotEmpty())
@@ -23,8 +32,14 @@
             @foreach ($credentials as $cred)
                 <li class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-4" wire:key="cred-{{ $cred->id }}">
                     <div class="min-w-0">
-                        <span class="font-medium text-brand-ink">{{ $cred->name }}</span>
-                        <span class="text-brand-mist ml-2 font-mono text-xs">{{ $cred->provider }}</span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium text-brand-ink">{{ $cred->name }}</span>
+                            <span class="text-brand-mist font-mono text-xs">{{ $cred->provider }}</span>
+                            @foreach ($cred->capabilities() as $cap)
+                                @php $chip = $capabilityChip($cap); @endphp
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chip['class'] }}">{{ $chip['label'] }}</span>
+                            @endforeach
+                        </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3 shrink-0">
                         @if ($this->canVerifyCredentialProvider($cred->provider))
@@ -404,6 +419,11 @@
     @case('fly_io')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('What Fly.io adds to Dply') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a Fly.io API token to deploy your Node and static sites globally on Fly\'s edge platform. Best fit for stateless workloads where you want sub-100ms response times in 30+ regions for ~$3/mo per app.') }}</p>
+                    <p class="text-xs text-brand-moss leading-relaxed">{{ __('Your existing VM-hosted PHP/Ruby/Python sites stay where they are — Fly.io is purely additive.') }}</p>
+                </div>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="fly_io_name" :value="__('Label (optional)')" />
@@ -427,6 +447,64 @@
                             {{ __('Connecting…') }}
                         </span>
                     </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('digitalocean_app_platform')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a DigitalOcean API token (the same one as DigitalOcean droplets — both APIs share scopes). Dply uses this to deploy your container apps to DigitalOcean App Platform.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="do_app_platform_name" :value="__('Label (optional)')" />
+                        <x-text-input id="do_app_platform_name" wire:model="do_app_platform_name" type="text" class="mt-1 block w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="do_app_platform_api_token" :value="__('API token')" />
+                        <x-text-input id="do_app_platform_api_token" wire:model="do_app_platform_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create at :link with read+write scope.', ['link' => '<a href="https://cloud.digitalocean.com/account/api/tokens" target="_blank" rel="noopener" class="'.$link.'">DigitalOcean → API → Tokens</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('do_app_platform_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeDigitalOceanAppPlatform" wire:loading.attr="disabled" wire:target="storeDigitalOceanAppPlatform">{{ __('Save credential') }}</x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('aws_app_runner')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect an IAM access key with apprunner:* scope. Dply uses this to deploy your container apps to AWS App Runner — managed containers with auto-scaling and built-in HTTPS.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="aws_app_runner_name" :value="__('Label (optional)')" />
+                        <x-text-input id="aws_app_runner_name" wire:model="aws_app_runner_name" type="text" class="mt-1 block w-full" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_access_key_id" :value="__('Access key ID')" />
+                        <x-text-input id="aws_app_runner_access_key_id" wire:model="aws_app_runner_access_key_id" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('aws_app_runner_access_key_id')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_secret_access_key" :value="__('Secret access key')" />
+                        <x-text-input id="aws_app_runner_secret_access_key" wire:model="aws_app_runner_secret_access_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('aws_app_runner_secret_access_key')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="aws_app_runner_region" :value="__('Region')" />
+                        <x-text-input id="aws_app_runner_region" wire:model="aws_app_runner_region" type="text" class="mt-1 block w-full" placeholder="us-east-1" required />
+                        <p class="{{ $hint }}">{{ __('App Runner is available in 8 regions; us-east-1, us-west-2, eu-west-1, ap-northeast-1 are the cheapest.') }}</p>
+                        <x-input-error :messages="$errors->get('aws_app_runner_region')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeAwsAppRunner" wire:loading.attr="disabled" wire:target="storeAwsAppRunner">{{ __('Save credential') }}</x-primary-button>
                 </div>
             </div>
         </div>
@@ -591,6 +669,194 @@
                         <x-text-input id="oracle_api_token" wire:model="oracle_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOracle" wire:loading.attr="disabled" wire:target="storeOracle">{{ __('Save') }}</x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('gandi')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect Gandi LiveDNS so Dply can manage records for the zones you host at Gandi. This is independent of where your servers run.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="gandi_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="gandi_name" wire:model="gandi_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production DNS') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="gandi_api_token" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Personal Access Token') }}
+                        </x-input-label>
+                        <x-text-input id="gandi_api_token" wire:model="gandi_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in the :link with the "Manage domain name technical configurations" permission.', ['link' => '<a href="https://account.gandi.net/" target="_blank" rel="noopener" class="'.$link.'">Gandi account → Security</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('gandi_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeGandi" wire:loading.attr="disabled" wire:target="storeGandi">
+                        <span wire:loading.remove wire:target="storeGandi" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Gandi') }}
+                        </span>
+                        <span wire:loading wire:target="storeGandi" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('namecheap')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect the Namecheap API so Dply can manage host records for your domains. Enable API access and allowlist this server\'s IP in your Namecheap profile first.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="namecheap_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="namecheap_name" wire:model="namecheap_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production DNS') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="namecheap_api_user" :value="__('API user')" />
+                        <x-text-input id="namecheap_api_user" wire:model="namecheap_api_user" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{{ __('Usually your Namecheap account username.') }}</p>
+                        <x-input-error :messages="$errors->get('namecheap_api_user')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="namecheap_api_key" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('API key') }}
+                        </x-input-label>
+                        <x-text-input id="namecheap_api_key" wire:model="namecheap_api_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Enable API access and copy the key from :link.', ['link' => '<a href="https://ap.www.namecheap.com/settings/tools/apiaccess/" target="_blank" rel="noopener" class="'.$link.'">Namecheap → Profile → Tools → API Access</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('namecheap_api_key')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeNamecheap" wire:loading.attr="disabled" wire:target="storeNamecheap">
+                        <span wire:loading.remove wire:target="storeNamecheap" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Namecheap') }}
+                        </span>
+                        <span wire:loading wire:target="storeNamecheap" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('vercel_dns')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect a Vercel API token so Dply can manage DNS records and put the Vercel Edge Network in front of your sites.') }}
+                </p>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="vercel_dns_name" class="flex items-center gap-2">
+                            <x-heroicon-o-tag class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Label (optional)') }}
+                        </x-input-label>
+                        <x-text-input id="vercel_dns_name" wire:model="vercel_dns_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production CDN') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="vercel_dns_api_token" class="flex items-center gap-2">
+                            <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('API token') }}
+                        </x-input-label>
+                        <x-text-input id="vercel_dns_api_token" wire:model="vercel_dns_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://vercel.com/account/tokens" target="_blank" rel="noopener" class="'.$link.'">Vercel → Account Settings → Tokens</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('vercel_dns_api_token')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="vercel_dns_team_id" :value="__('Team ID (optional)')" />
+                        <x-text-input id="vercel_dns_team_id" wire:model="vercel_dns_team_id" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="team_…" />
+                        <p class="{{ $hint }}">{{ __('Leave blank for a personal account. Required when the domains live under a Vercel team.') }}</p>
+                        <x-input-error :messages="$errors->get('vercel_dns_team_id')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeVercelDns" wire:loading.attr="disabled" wire:target="storeVercelDns">
+                        <span wire:loading.remove wire:target="storeVercelDns" class="inline-flex items-center justify-center gap-2">
+                            <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Connect Vercel DNS') }}
+                        </span>
+                        <span wire:loading wire:target="storeVercelDns" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('forge')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                    <p class="font-semibold">{{ __('Migrate sites from Laravel Forge to dply') }}</p>
+                    <p class="mt-1 leading-relaxed">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="forge_name" :value="__('Label (optional)')" />
+                        <x-text-input id="forge_name" wire:model="forge_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Agency Forge') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="forge_api_token" :value="__('API token')" />
+                        <x-text-input id="forge_api_token" wire:model="forge_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://forge.laravel.com/user-profile/api" target="_blank" rel="noopener" class="'.$link.'">Forge → My Profile → API</a>']) !!}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('The token needs read access to servers and sites, plus SSH-key management (we add and remove a short-lived key per migration). We do not mutate your Forge configuration outside of cutover.') }}</p>
+                        <x-input-error :messages="$errors->get('forge_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeForge" wire:loading.attr="disabled" wire:target="storeForge">
+                        <span wire:loading.remove wire:target="storeForge">{{ __('Connect Laravel Forge') }}</span>
+                        <span wire:loading wire:target="storeForge" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('ploi')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                    <p class="font-semibold">{{ __('Migrate sites from Ploi to dply') }}</p>
+                    <p class="mt-1 leading-relaxed">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="ploi_name" :value="__('Label (optional)')" />
+                        <x-text-input id="ploi_name" wire:model="ploi_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Personal Ploi') }}" />
+                    </div>
+                    <div>
+                        <x-input-label for="ploi_api_token" :value="__('API token')" />
+                        <x-text-input id="ploi_api_token" wire:model="ploi_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://ploi.io/profile/api-keys" target="_blank" rel="noopener" class="'.$link.'">Ploi → Profile → API Keys</a>']) !!}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('The token needs read access to servers and sites, plus SSH-key management (we add and remove a short-lived key per migration). It is never used to mutate your Ploi configuration outside of cutover.') }}</p>
+                        <x-input-error :messages="$errors->get('ploi_api_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storePloi" wire:loading.attr="disabled" wire:target="storePloi">
+                        <span wire:loading.remove wire:target="storePloi">{{ __('Connect Ploi') }}</span>
+                        <span wire:loading wire:target="storePloi" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>

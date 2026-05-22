@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use Illuminate\Bus\Queueable;
@@ -12,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class ServerManageRemoteSshJob implements ShouldQueue
@@ -28,11 +31,52 @@ class ServerManageRemoteSshJob implements ShouldQueue
         public int $timeoutSeconds,
         public ?string $flashSuccessMessage = null,
         public ?string $logId = null,
+        /**
+         * Fully-qualified class name of an event to broadcast on completion (success or failure).
+         * Constructor signature must accept (serverId, taskId, taskName, success, error,
+         * flashSuccess, finalOutput) to match {@see broadcastCompletion}. Cache write happens
+         * before the broadcast so listeners can re-read the authoritative cache state.
+         */
+        public ?string $broadcastEventClass = null,
+        /**
+         * Optional ConsoleAction row ID. When set, the job mirrors progress into
+         * the row via {@see ConsoleEmitter} so the page-top banner partial can
+         * render it the same way it renders the webserver-switch job. The
+         * cache-poll layer continues to work in parallel — callers that haven't
+         * migrated to the banner keep their existing UI.
+         */
+        public ?string $consoleActionId = null,
     ) {
         $this->timeout = max(60, $timeoutSeconds + 60);
         $queue = config('server_manage.remote_task_queue');
         if (is_string($queue) && $queue !== '') {
             $this->onQueue($queue);
+        }
+    }
+
+    /**
+     * Fire the optional completion broadcast configured at construction time. No-op when no
+     * event class was provided — keeps SSH-keys / Firewall callers on the cache-poll path.
+     */
+    private function broadcastCompletion(bool $success, ?string $error, string $output): void
+    {
+        if ($this->broadcastEventClass === null || ! class_exists($this->broadcastEventClass)) {
+            return;
+        }
+
+        try {
+            broadcast(new $this->broadcastEventClass(
+                $this->serverId,
+                $this->cacheKey,
+                $this->taskName,
+                $success,
+                $error,
+                $this->flashSuccessMessage,
+                $output,
+            ));
+        } catch (\Throwable) {
+            // Swallow broadcast failures: the cache write already happened, so the wire:poll
+            // fallback will resolve the banner. We never want a Reverb hiccup to fail the job.
         }
     }
 
@@ -66,6 +110,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'flash_success' => null,
             ]);
             $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
+            $this->broadcastCompletion(false, __('This request was replaced by a newer one.'), '');
 
             return;
         }
@@ -76,6 +121,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
             'error' => null,
         ]);
         $this->updateLog(ServerManageAction::STATUS_RUNNING, started: true);
+        $this->markConsoleRunning();
 
         $fullOutput = '';
         $lastFlush = microtime(true);
@@ -83,7 +129,13 @@ class ServerManageRemoteSshJob implements ShouldQueue
         $flushInterval = (float) config('server_manage.remote_task_cache_flush_seconds', 0.5);
         $supersedeCheckInterval = max(0.15, $flushInterval);
 
-        $onOutput = function (string $type, string $buffer) use (&$fullOutput, &$lastFlush, &$lastSupersedeCheck, $flushInterval, $supersedeCheckInterval): void {
+        // The ConsoleEmitter writes line-shaped entries into the row's output
+        // column. We split the cache-flush buffer on \n so each terminal line
+        // becomes its own banner row, instead of one giant blob.
+        $emitter = new ConsoleEmitter($this->consoleActionId);
+        $lastEmittedLen = 0;
+
+        $onOutput = function (string $type, string $buffer) use (&$fullOutput, &$lastFlush, &$lastSupersedeCheck, &$lastEmittedLen, $flushInterval, $supersedeCheckInterval, $emitter): void {
             $fullOutput .= $buffer;
             $now = microtime(true);
             if ($now - $lastSupersedeCheck >= $supersedeCheckInterval) {
@@ -94,9 +146,21 @@ class ServerManageRemoteSshJob implements ShouldQueue
             }
             if ($now - $lastFlush >= $flushInterval || strlen($buffer) > 8192) {
                 $lastFlush = $now;
-                $this->mergePayload([
-                    'output' => ServerManageSshExecutor::stripSshClientNoise($fullOutput),
-                ]);
+                $cleaned = ServerManageSshExecutor::stripSshClientNoise($fullOutput);
+                $this->mergePayload(['output' => $cleaned]);
+                // Emit only the newly-completed lines (between the last flush
+                // and the last newline in $cleaned) so the banner builds up
+                // incrementally without re-emitting earlier rows.
+                $lastNewline = strrpos($cleaned, "\n");
+                if ($lastNewline !== false && $lastNewline + 1 > $lastEmittedLen) {
+                    $slice = substr($cleaned, $lastEmittedLen, $lastNewline + 1 - $lastEmittedLen);
+                    foreach (preg_split('/\R/', rtrim($slice, "\n")) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emitter($line);
+                        }
+                    }
+                    $lastEmittedLen = $lastNewline + 1;
+                }
             }
         };
 
@@ -118,7 +182,10 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'error' => __('This request was replaced by a newer one.'),
                     'flash_success' => null,
                 ]);
-                $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
+                $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'), output: $trimmed);
+                $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
+                $this->markConsoleFailed(__('This request was replaced by a newer one.'));
+                $this->broadcastCompletion(false, __('This request was replaced by a newer one.'), $trimmed);
 
                 return;
             }
@@ -131,7 +198,10 @@ class ServerManageRemoteSshJob implements ShouldQueue
                     'error' => $error,
                     'flash_success' => null,
                 ]);
-                $this->updateLog(ServerManageAction::STATUS_FAILED, error: $error);
+                $this->updateLog(ServerManageAction::STATUS_FAILED, error: $error, output: $trimmed);
+                $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
+                $this->markConsoleFailed($error);
+                $this->broadcastCompletion(false, $error, $trimmed);
 
                 return;
             }
@@ -142,7 +212,11 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => null,
                 'flash_success' => $this->flashSuccessMessage,
             ]);
-            $this->updateLog(ServerManageAction::STATUS_FINISHED);
+            $this->updateLog(ServerManageAction::STATUS_FINISHED, output: $trimmed);
+            $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
+            $this->emitConsolePlaceholderIfEmpty($emitter, $trimmed);
+            $this->markConsoleCompleted();
+            $this->broadcastCompletion(true, null, $trimmed);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
                 $server = Server::query()->find($this->serverId);
@@ -162,16 +236,100 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 'error' => __('This request was replaced by a newer one.'),
                 'flash_success' => null,
             ]);
-            $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'));
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: __('Replaced by a newer request.'), output: $trimmed);
+            $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
+            $this->markConsoleFailed(__('This request was replaced by a newer one.'));
+            $this->broadcastCompletion(false, __('This request was replaced by a newer one.'), $trimmed);
         } catch (Throwable $e) {
+            $trimmed = trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput));
             $this->mergePayload([
                 'status' => 'failed',
-                'output' => trim(ServerManageSshExecutor::stripSshClientNoise($fullOutput)),
+                'output' => $trimmed,
                 'error' => $e->getMessage(),
                 'flash_success' => null,
             ]);
-            $this->updateLog(ServerManageAction::STATUS_FAILED, error: $e->getMessage());
+            $this->updateLog(ServerManageAction::STATUS_FAILED, error: $e->getMessage(), output: $trimmed);
+            $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
+            $this->markConsoleFailed($e->getMessage());
+            $this->broadcastCompletion(false, $e->getMessage(), $trimmed);
         }
+    }
+
+    /**
+     * Emit any tail content that arrived between the last flush and the run's
+     * terminal state. Without this, output that didn't end with a newline (a
+     * common shape for short utility scripts) would be lost from the banner.
+     */
+    private function emitConsoleTail(ConsoleEmitter $emitter, string $finalOutput, int $alreadyEmittedLen): void
+    {
+        if ($this->consoleActionId === null) {
+            return;
+        }
+        if (strlen($finalOutput) <= $alreadyEmittedLen) {
+            return;
+        }
+        $tail = substr($finalOutput, $alreadyEmittedLen);
+        foreach (preg_split('/\R/', rtrim($tail, "\n")) ?: [] as $line) {
+            if ($line !== '') {
+                $emitter($line);
+            }
+        }
+    }
+
+    /**
+     * Drop a friendly placeholder when a successful run produced no terminal
+     * output at all — some daemons (e.g. `lshttpd -t`) write their diagnostics
+     * into the server's own log file instead of stdout/stderr, so the SSH
+     * stream stays empty even though the run finished cleanly. Without this
+     * the banner shows the unhelpful "No output recorded." copy.
+     */
+    private function emitConsolePlaceholderIfEmpty(ConsoleEmitter $emitter, string $finalOutput): void
+    {
+        if ($this->consoleActionId === null) {
+            return;
+        }
+        if (trim($finalOutput) !== '') {
+            return;
+        }
+        $emitter->success(__('Command finished with no terminal output.'), 'dply');
+    }
+
+    private function markConsoleRunning(): void
+    {
+        if ($this->consoleActionId === null) {
+            return;
+        }
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => DB::raw('coalesce(started_at, now())'),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function markConsoleCompleted(): void
+    {
+        if ($this->consoleActionId === null) {
+            return;
+        }
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => ConsoleAction::STATUS_COMPLETED,
+            'finished_at' => now(),
+            'error' => null,
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function markConsoleFailed(string $error): void
+    {
+        if ($this->consoleActionId === null) {
+            return;
+        }
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => ConsoleAction::STATUS_FAILED,
+            'finished_at' => now(),
+            'error' => mb_substr($error, 0, 2000),
+            'updated_at' => now(),
+        ]);
     }
 
     protected function shouldRerunProbeAfterFinish(): bool
@@ -187,7 +345,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
         return is_array($entry) && (bool) ($entry['rerun_probe_after_finish'] ?? false);
     }
 
-    protected function updateLog(string $status, bool $started = false, ?string $error = null): void
+    protected function updateLog(string $status, bool $started = false, ?string $error = null, ?string $output = null): void
     {
         if ($this->logId === null || $this->logId === '') {
             return;
@@ -207,6 +365,17 @@ class ServerManageRemoteSshJob implements ShouldQueue
         }
         if ($error !== null && $error !== '') {
             $update['error_message'] = $error;
+        }
+        if ($output !== null) {
+            // Cap output so a runaway script can't bloat the row. The
+            // last 64KB is what an operator usually wants — final apt
+            // resolver output, error trace, etc. Earlier chunks live
+            // in the in-memory cache during the run.
+            $maxOutputBytes = 65_536;
+            if (strlen($output) > $maxOutputBytes) {
+                $output = "[…output truncated…]\n".substr($output, -$maxOutputBytes);
+            }
+            $update['output'] = $output;
         }
         $row->update($update);
     }

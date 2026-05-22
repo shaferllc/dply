@@ -48,16 +48,6 @@
             @endif
 
             <div class="@if (! $canCreateServer) pointer-events-none opacity-60 @endif space-y-8">
-                @if ($launchSource === 'launches.containers' && $form->custom_host_kind === 'docker')
-                    <section class="rounded-2xl border border-sky-200 bg-sky-50/70 p-6">
-                        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">{{ __('Remote Docker path') }}</p>
-                        <h2 class="mt-2 text-2xl font-semibold text-slate-900">{{ __('Create the remote Docker host first') }}</h2>
-                        <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
-                            {{ __('This form is preconfigured for the remote Docker lane. Save the Docker host here, then create a site on it so Dply can assign the Docker runtime profile and prepare Docker deploy artifacts for your project.') }}
-                        </p>
-                    </section>
-                @endif
-
                 <section class="rounded-2xl border border-slate-200 bg-sky-50/70 px-5 py-4 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                         <p class="text-sm text-slate-600">{{ __('Switch launch paths or update SSH keys before you continue.') }}</p>

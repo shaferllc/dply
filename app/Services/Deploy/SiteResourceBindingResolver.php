@@ -12,6 +12,15 @@ use App\Support\Deployment\SiteResourceBinding;
 
 final class SiteResourceBindingResolver
 {
+    /**
+     * Per-request memo keyed by site id. Lives as long as this instance does;
+     * the AppServiceProvider binds the class as `scoped` so the cache resets
+     * between requests (Octane-safe).
+     *
+     * @var array<string, list<SiteResourceBinding>>
+     */
+    private array $cache = [];
+
     public function __construct(
         private readonly DeploymentSecretInventory $secretInventory,
     ) {}
@@ -21,6 +30,11 @@ final class SiteResourceBindingResolver
      */
     public function forSite(Site $site): array
     {
+        $key = (string) $site->id;
+        if ($key !== '' && isset($this->cache[$key])) {
+            return $this->cache[$key];
+        }
+
         $bindings = [];
         $mode = $site->runtimeTargetMode();
         $serverId = $site->server_id;
@@ -90,6 +104,10 @@ final class SiteResourceBindingResolver
         $bindings[] = $this->redisBinding($env);
         $bindings[] = $this->queueBinding($env);
         $bindings[] = $this->objectStorageBinding($env);
+
+        if ($key !== '') {
+            $this->cache[$key] = $bindings;
+        }
 
         return $bindings;
     }

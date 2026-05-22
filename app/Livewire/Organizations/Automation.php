@@ -54,6 +54,10 @@ class Automation extends Component
 
     public bool $deploy_email_notifications_enabled = true;
 
+    public bool $email_server_credentials_enabled = false;
+
+    public bool $email_database_credentials_enabled = false;
+
     public ?string $new_token_plaintext = null;
 
     public ?string $new_token_name = null;
@@ -77,6 +81,8 @@ class Automation extends Component
                 'sites' => fn ($q) => $q->orderBy('name'),
             ]);
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
+        $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
+        $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
     }
 
     public function updatedDeployEmailNotificationsEnabled(): void
@@ -91,6 +97,34 @@ class Automation extends Component
         ]);
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Deploy email preferences updated.');
+    }
+
+    public function updatedEmailServerCredentialsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'email_server_credentials_enabled' => $this->email_server_credentials_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.email_server_credentials_updated', null, null, [
+            'enabled' => $this->email_server_credentials_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Server credentials email preference updated.');
+    }
+
+    public function updatedEmailDatabaseCredentialsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'email_database_credentials_enabled' => $this->email_database_credentials_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.email_database_credentials_updated', null, null, [
+            'enabled' => $this->email_database_credentials_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Database credentials email preference updated.');
     }
 
     public function createApiToken(): void

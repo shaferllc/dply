@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task as TaskModel;
 use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use App\Modules\TaskRunner\TrackTaskInBackground;
@@ -27,7 +28,7 @@ class TrackTaskInBackgroundScriptTest extends TestCase
         $taskModel = TaskModel::query()->create([
             'name' => 'Wrapper Task',
             'action' => 'provision_stack',
-            'status' => \App\Modules\TaskRunner\Enums\TaskStatus::Pending,
+            'status' => TaskStatus::Pending,
             'script' => 'wrapper.sh',
             'timeout' => 300,
             'user' => 'root',

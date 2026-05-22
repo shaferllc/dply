@@ -27,6 +27,7 @@ class ServerManageAction extends Model
         'started_at',
         'finished_at',
         'error_message',
+        'output',
     ];
 
     protected function casts(): array

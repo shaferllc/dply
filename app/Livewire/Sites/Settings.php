@@ -3,10 +3,15 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
-use App\Jobs\DeleteServerSystemUserJob;
+use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\ProvisionSiteSystemdUnitsJob;
+use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SiteResetPermissionsJob;
-use App\Jobs\SiteSystemUserMutationJob;
+use App\Jobs\SyncBasicAuthFromServerJob;
+use App\Jobs\TearDownSiteSystemdUnitJob;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
+use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -16,10 +21,13 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
+use App\Models\SiteDeployment;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
+use App\Models\SiteProcess;
 use App\Models\SiteTenantDomain;
+use App\Models\Snapshot;
 use App\Models\Workspace;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Cloudflare\CloudflareDnsService;
@@ -27,6 +35,9 @@ use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\DigitalOceanService;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\RemoteCli\Artisan;
+use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
@@ -34,17 +45,30 @@ use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Services\Sites\SiteScopedCommandWrapper;
+use App\Services\Sites\SiteSystemdProvisioner;
+use App\Services\Sites\SiteSystemdUnitBuilder;
+use App\Services\Snapshots\LocalDiskDestination;
+use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class Settings extends Show
 {
+    use DismissesConsoleActionRun;
+    use ManagesContainerSite;
     use StreamsRemoteSshLivewire;
+
+    protected function consoleActionSubject(): Model
+    {
+        return $this->site;
+    }
 
     private const ROUTING_TABS = ['domains', 'aliases', 'redirects', 'preview', 'tenants'];
 
@@ -71,6 +95,10 @@ class Settings extends Show
 
     public string $settings_document_root = '';
 
+    public string $settings_site_name = '';
+
+    public string $settings_site_slug = '';
+
     public ?string $project_workspace_id = null;
 
     public string $site_notes = '';
@@ -79,11 +107,29 @@ class Settings extends Show
 
     public string $new_alias_label = '';
 
+    public string $new_alias_comment = '';
+
+    /** Multi-line bulk paste — `hostname` or `hostname,label` per line. */
+    public string $bulk_alias_input = '';
+
+    /** When non-null, the aliases list shows an inline edit form for this row. */
+    public ?string $editing_alias_id = null;
+
+    public string $editing_alias_hostname = '';
+
+    public string $editing_alias_label = '';
+
+    public string $editing_alias_comment = '';
+
     public string $new_basic_auth_username = '';
 
     public string $new_basic_auth_password = '';
 
     public string $new_basic_auth_path = '/';
+
+    public string $bulk_basic_auth_input = '';
+
+    public string $bulk_basic_auth_path = '/';
 
     public string $new_tenant_hostname = '';
 
@@ -91,7 +137,26 @@ class Settings extends Show
 
     public string $new_tenant_label = '';
 
-    public string $new_tenant_notes = '';
+    /**
+     * Free-text comment for tenant rows. Replaces the legacy `notes` field
+     * (column dropped in the routing-tables migration); existing notes were
+     * backfilled into `comment`.
+     */
+    public string $new_tenant_comment = '';
+
+    /** Multi-line bulk paste — `hostname,key,label` per line. */
+    public string $bulk_tenant_input = '';
+
+    /** When non-null, the tenants list shows an inline edit form for this row. */
+    public ?string $editing_tenant_id = null;
+
+    public string $editing_tenant_hostname = '';
+
+    public string $editing_tenant_key = '';
+
+    public string $editing_tenant_label = '';
+
+    public string $editing_tenant_comment = '';
 
     public string $preview_primary_hostname = '';
 
@@ -139,25 +204,74 @@ class Settings extends Show
 
     public ?string $laravel_ssh_setup_error = null;
 
-    public string $system_user_panel_mode = 'existing';
-
-    public string $system_user_new_username = '';
-
-    public bool $system_user_new_sudo = false;
-
     public string $system_user_assign_username = '';
 
-    public string $system_user_remove_username = '';
-
-    public string $system_user_remove_confirm = '';
-
-    /** @var list<array{username: string, site_count: int}> */
+    /**
+     * Cached list of usernames present on the server. Populated by
+     * {@see loadSystemUsersForPanel()} on first load of the system-user section
+     * and used as both the picker's option list and the validation allow-list
+     * for {@see queueAssignSystemUser()}. Site-count metadata lives only on the
+     * server-level /system-users page now; here we just need the usernames.
+     *
+     * @var list<array{username: string, site_count: int}>
+     */
     public array $system_user_remote_rows = [];
 
     public ?string $system_user_list_error = null;
 
-    /** @var 'commands'|'octane'|'reverb'|'logs'|'setup' */
+    /** @var 'commands'|'octane'|'reverb'|'logs'|'setup'|'schedule'|'migrations'|'pail' */
     public string $laravel_tab = 'commands';
+
+    /**
+     * Schedule sub-tab: parsed `php artisan schedule:list --json` rows.
+     * Empty until the operator clicks Load.
+     *
+     * @var list<array{command?: string, description?: string, expression?: string, next_due?: string}>
+     */
+    public array $laravelScheduleEntries = [];
+
+    public bool $laravelScheduleLoaded = false;
+
+    /**
+     * Migrations sub-tab: parsed `php artisan migrate:status --json`
+     * rows ordered as the framework returns them (oldest → newest).
+     *
+     * @var list<array{migration?: string, batch?: int|string|null, ran?: bool}>
+     */
+    public array $laravelMigrationEntries = [];
+
+    public bool $laravelMigrationsLoaded = false;
+
+    /** UI flash flag set after a successful pre-rollback snapshot+rollback. */
+    public ?string $laravelMigrationsFlash = null;
+
+    /**
+     * Pail sub-tab buffer — recent log entries from storage/logs/laravel.log.
+     *
+     * v1 (PR 11c) shipped operator-driven "Tail logs" button.
+     * v1.1 (this slice) adds wire:poll-driven live tail with byte-offset
+     * tracking: every 2s we fetch only the bytes appended since the
+     * last poll, append to the buffer client-side, and trim to a
+     * cap so memory stays bounded. Real WebSocket/SSE streaming is
+     * still a v2 concern but for typical Laravel sites with
+     * single-line-per-event JSON logs this looks "live enough".
+     */
+    public string $laravelPailBuffer = '';
+
+    public bool $laravelPailLoaded = false;
+
+    /**
+     * Byte offset into the log file we've already streamed up to.
+     * Sent to `tail -c +<offset>` on each poll so we only ship new
+     * bytes. Reset to 0 on Refresh so the user can re-baseline.
+     */
+    public int $laravelPailOffset = 0;
+
+    /** Live-poll on/off — operator toggles on the sub-tab. */
+    public bool $laravelPailLive = false;
+
+    /** Soft cap on buffer size (chars) so a chatty log doesn't OOM Livewire state. */
+    public const PAIL_BUFFER_MAX_CHARS = 64_000;
 
     public string $laravel_custom_commands_text = '';
 
@@ -200,6 +314,18 @@ class Settings extends Show
 
     public string $sync_group_leader_site_id = '';
 
+    /**
+     * New SiteProcess form. The user fills these in and clicks "Add" to
+     * materialize a row. Type is one of SiteProcess::TYPE_WORKER /
+     * TYPE_SCHEDULER / TYPE_CUSTOM — the auto-created `web` row is
+     * managed by the Site::created hook, not this form.
+     */
+    public string $new_site_process_type = 'worker';
+
+    public string $new_site_process_name = '';
+
+    public string $new_site_process_command = '';
+
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
         if ($site->server_id !== $server->id) {
@@ -210,14 +336,26 @@ class Settings extends Show
             abort(404);
         }
 
-        $requestedSection = request()->query('section');
-
-        if (is_string($requestedSection) && $requestedSection !== '') {
-            $section = $requestedSection;
+        // Section is a path segment (servers/{server}/sites/{site}/{section}).
+        // Default to 'general' so /sites/{site} (no trailing segment) still
+        // resolves.
+        if ($section === null || $section === '') {
+            $section = 'general';
         }
 
-        if ($section === null) {
-            $this->redirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']), navigate: true);
+        // Backward-compat for old ?section=X bookmarks. Translate the
+        // query param into the path segment and redirect, preserving
+        // every other query param (?tab=, ?laravel_tab=, etc.).
+        $querySection = request()->query('section');
+        if (is_string($querySection) && $querySection !== '') {
+            $rest = collect(request()->query())->except('section')->all();
+
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => $querySection,
+                ...$rest,
+            ]), navigate: true);
 
             return;
         }
@@ -243,6 +381,19 @@ class Settings extends Show
             return;
         }
 
+        // Serverless workspaces use the dedicated `sites.repository` Livewire
+        // page (file browser, branch picker, connection panel) instead of
+        // the legacy section-router config form. Catch back-compat links
+        // and the sidebar pre-route-update before they hit this component.
+        if ($section === 'repository' && in_array($site->runtimeTargetMode(), ['docker', 'kubernetes', 'serverless'], true)) {
+            $this->redirect(route('sites.repository', [
+                'server' => $server,
+                'site' => $site,
+            ]), navigate: true);
+
+            return;
+        }
+
         $allowed = array_keys(config('site_settings.workspace_tabs', []));
 
         if (! in_array($section, $allowed, true)) {
@@ -253,12 +404,14 @@ class Settings extends Show
         $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
 
         $laravelTabQuery = request()->query('laravel_tab');
-        if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup'], true)) {
+        if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup', 'schedule', 'migrations', 'pail'], true)) {
             $this->laravel_tab = $laravelTabQuery;
         }
 
         parent::mount($server, $site);
-        $this->syncGeneralSettingsForm();
+        // parent::mount → syncFormFromSite already refreshed the site; skip the
+        // redundant refresh here.
+        $this->syncGeneralSettingsForm(skipRefresh: true);
         $this->syncPreviewSettingsForm();
         if ($this->section === 'dns') {
             $this->syncDnsSettingsForm();
@@ -359,6 +512,28 @@ class Settings extends Show
         $this->syncRepositorySyncUiState();
     }
 
+    /**
+     * Trigger a (re)deploy of a serverless function from the General-section
+     * dashboard, then send the operator to the journey page to watch it run.
+     */
+    public function redeployServerlessFunction(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! ($this->site->server?->isDigitalOceanFunctionsHost() ?? false)) {
+            $this->toastError(__('This site is not a serverless function.'));
+
+            return;
+        }
+
+        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+
+        $this->redirect(route('serverless.journey', [
+            'server' => $this->server,
+            'site' => $this->site,
+        ]), navigate: true);
+    }
+
     protected function loadSiteNotificationPreferences(): void
     {
         $subs = NotificationSubscription::query()
@@ -435,6 +610,15 @@ class Settings extends Show
         }
 
         $this->loadSiteNotificationPreferences();
+
+        $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+        if ($auditOrg) {
+            audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
+                'channel_ids' => array_values(array_map('strval', $this->site_notification_channel_ids)),
+                'event_keys' => array_values($this->site_notification_event_keys),
+            ]);
+        }
+
         $this->dispatch('notify', message: __('Site notification subscriptions saved.'));
     }
 
@@ -474,7 +658,7 @@ class Settings extends Show
             $events[] = 'uptime_recovered';
         }
 
-        NotificationWebhookDestination::query()->create([
+        $created = NotificationWebhookDestination::query()->create([
             'organization_id' => $this->site->organization_id,
             'site_id' => $this->site->id,
             'name' => $this->site_int_hook_name,
@@ -483,6 +667,16 @@ class Settings extends Show
             'events' => $events !== [] ? $events : null,
             'enabled' => true,
         ]);
+
+        $org = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.integration_webhook.created', $this->site, null, [
+                'destination_id' => (string) $created->id,
+                'name' => $this->site_int_hook_name,
+                'driver' => $this->site_int_hook_driver,
+                'events' => $events,
+            ]);
+        }
 
         $this->reset([
             'site_int_hook_name',
@@ -514,7 +708,18 @@ class Settings extends Show
             ->where('site_id', $this->site->id)
             ->whereKey($id)
             ->firstOrFail();
+        $snapshot = [
+            'destination_id' => (string) $hook->id,
+            'name' => $hook->name,
+            'driver' => $hook->driver,
+            'events' => $hook->events,
+        ];
         $hook->delete();
+
+        $org = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.integration_webhook.deleted', $this->site, $snapshot, null);
+        }
 
         $this->dispatch('notify', message: __('Webhook destination removed.'));
     }
@@ -582,6 +787,233 @@ class Settings extends Show
         $this->authorize('view', $this->site);
         $executor = app(LaravelConsoleExecutor::class);
         $this->laravel_artisan_discovery = $executor->listArtisanCommands($this->site->fresh(), $force);
+    }
+
+    /**
+     * Schedule sub-tab loader (PR 11).
+     *
+     * Runs `php artisan schedule:list --json` via the new Artisan
+     * service (PR 1+2) — sync execution because schedule:list is on
+     * the INSTANT allowlist. Parses the JSON output into a flat array
+     * the schedule-tab partial renders. Failures land as inline errors
+     * rather than throwing; broken parsing leaves the entry list empty
+     * with a friendly message.
+     */
+    public function loadLaravelSchedule(Artisan $artisan): void
+    {
+        $this->authorize('view', $this->site);
+
+        try {
+            $result = $artisan->run(
+                site: $this->site,
+                command: 'schedule:list',
+                args: ['--json'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('laravel_schedule', __('Your role can\'t inspect the Laravel schedule.'));
+
+            return;
+        }
+
+        $stdout = trim($result->stdout());
+        $rows = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+
+        $this->laravelScheduleEntries = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
+        $this->laravelScheduleLoaded = true;
+    }
+
+    /**
+     * Migrations sub-tab loader (PR 11b).
+     *
+     * Runs `php artisan migrate:status --json` via the Artisan service.
+     * The command is INSTANT-allowlisted so it returns inline. Parsed
+     * rows feed the migrations-tab partial.
+     */
+    public function loadLaravelMigrations(Artisan $artisan): void
+    {
+        $this->authorize('view', $this->site);
+
+        try {
+            $result = $artisan->run(
+                site: $this->site,
+                command: 'migrate:status',
+                args: ['--json'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('laravel_migrations', __('Your role can\'t inspect migrations.'));
+
+            return;
+        }
+
+        $stdout = trim($result->stdout());
+        $rows = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+
+        $this->laravelMigrationEntries = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
+        $this->laravelMigrationsLoaded = true;
+    }
+
+    /**
+     * Rollback the most-recent N migration batches, optionally taking
+     * a pre-rollback snapshot via SnapshotService for the safety net
+     * (Q9 + Q19). Admin/owner only because this is destructive — losing
+     * data without a snapshot to restore from is a real possibility.
+     */
+    public function rollbackLastMigrationBatch(
+        Artisan $artisan,
+        SnapshotService $snapshots,
+        ExecuteRemoteTaskOnServer $executor,
+    ): void {
+        $this->authorize('update', $this->site);
+
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('laravel_migrations', __('Admin or owner role required to roll back migrations.'));
+
+            return;
+        }
+
+        // Pre-rollback safety-net snapshot to local disk (Q19 transient).
+        try {
+            $snapshot = $snapshots->take(
+                site: $this->site,
+                destination: new LocalDiskDestination($executor),
+                reason: Snapshot::REASON_PRE_MIGRATION_ROLLBACK,
+                userId: auth()->id(),
+            );
+        } catch (\Throwable $e) {
+            $this->addError('laravel_migrations', __('Pre-rollback snapshot failed; aborting rollback. :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        try {
+            $artisan->run(
+                site: $this->site,
+                command: 'migrate:rollback',
+                args: ['--force', '--step=1'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('laravel_migrations', __('Permission denied: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->laravelMigrationsFlash = __('Rolled back last migration batch. Pre-rollback snapshot saved as snap-:id.', ['id' => $snapshot->id]);
+        $this->laravelMigrationsLoaded = false; // Force reload to refresh status table
+    }
+
+    /**
+     * Pail sub-tab loader.
+     *
+     * Initial load: fetches the last 200 lines + records the file's
+     * current size as the byte offset to stream from. Subsequent calls
+     * (driven by wire:poll when laravelPailLive is true OR by manual
+     * Refresh) emit `tail -c +<offset+1>` so only the bytes appended
+     * since last poll come back; appended to the buffer + trimmed at
+     * PAIL_BUFFER_MAX_CHARS so chatty logs don't blow Livewire state.
+     *
+     * Real WebSocket/SSE streaming is still a v2 concern — wire:poll
+     * is the right tradeoff for a logs panel where 2s latency is fine
+     * and dply already has the polling primitive plumbed everywhere
+     * (no new infra to maintain).
+     */
+    public function loadLaravelPail(ExecuteRemoteTaskOnServer $executor, int $lines = 200): void
+    {
+        $this->authorize('view', $this->site);
+
+        $logPath = $this->laravelLogPath();
+        $script = $this->laravelPailLoaded
+            // Incremental fetch: send bytes after current offset, plus
+            // the new file size so we can advance the offset locally.
+            ? sprintf(
+                'if [ -r %1$s ]; then SIZE=$(stat -c %%s %1$s 2>/dev/null || stat -f %%z %1$s); echo "DPLY-PAIL-SIZE:$SIZE"; tail -c +%2$d %1$s 2>/dev/null; else echo "DPLY-PAIL-MISSING"; fi',
+                escapeshellarg($logPath),
+                $this->laravelPailOffset + 1,
+            )
+            // First fetch: tail the last N lines AND record the file's
+            // total size as the new offset so the next poll continues
+            // from there.
+            : sprintf(
+                'if [ -r %1$s ]; then SIZE=$(stat -c %%s %1$s 2>/dev/null || stat -f %%z %1$s); echo "DPLY-PAIL-SIZE:$SIZE"; tail -n %2$d %1$s 2>/dev/null; else echo "DPLY-PAIL-MISSING"; fi',
+                escapeshellarg($logPath),
+                max(10, min(1000, $lines)),
+            );
+
+        try {
+            $out = $executor->runInlineBash(
+                server: $this->site->server,
+                name: 'laravel:pail-tail',
+                inlineBash: $script,
+                timeoutSeconds: 15,
+            );
+        } catch (\Throwable $e) {
+            $this->addError('laravel_pail', __('Pail tail failed: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        $raw = (string) $out->getBuffer();
+
+        if (str_starts_with(trim($raw), 'DPLY-PAIL-MISSING')) {
+            $this->laravelPailBuffer = '(no log file at '.$logPath.')';
+            $this->laravelPailLoaded = true;
+
+            return;
+        }
+
+        // Strip the size header line and parse the new offset.
+        if (preg_match('/^DPLY-PAIL-SIZE:(\d+)\n?/', $raw, $matches)) {
+            $newOffset = (int) $matches[1];
+            $body = substr($raw, strlen($matches[0]));
+        } else {
+            $newOffset = $this->laravelPailOffset;
+            $body = $raw;
+        }
+
+        if ($this->laravelPailLoaded) {
+            $this->laravelPailBuffer .= $body;
+        } else {
+            $this->laravelPailBuffer = $body;
+            $this->laravelPailLoaded = true;
+        }
+
+        // Cap buffer so a chatty log doesn't blow up Livewire payload.
+        if (strlen($this->laravelPailBuffer) > self::PAIL_BUFFER_MAX_CHARS) {
+            $this->laravelPailBuffer = '… (older lines trimmed) …'."\n".substr($this->laravelPailBuffer, -self::PAIL_BUFFER_MAX_CHARS);
+        }
+
+        $this->laravelPailOffset = $newOffset;
+    }
+
+    /**
+     * Operator-toggled live mode (wire:poll firing every 2s in the view).
+     */
+    public function toggleLaravelPailLive(): void
+    {
+        $this->laravelPailLive = ! $this->laravelPailLive;
+    }
+
+    /**
+     * Manual reset — clears the buffer and re-baselines offset so
+     * Refresh fetches the last 200 lines again instead of incremental.
+     */
+    public function resetLaravelPail(): void
+    {
+        $this->laravelPailBuffer = '';
+        $this->laravelPailOffset = 0;
+        $this->laravelPailLoaded = false;
+    }
+
+    private function laravelLogPath(): string
+    {
+        $deployPath = $this->site->document_root ?: $this->site->repository_path ?: '/home/dply/'.$this->site->slug;
+        // strip "/public" suffix if document_root points at the public/ dir
+        $deployBase = preg_replace('#/public/?$#', '', $deployPath);
+
+        return rtrim((string) $deployBase, '/').'/storage/logs/laravel.log';
     }
 
     public function saveLaravelCustomCommands(LaravelConsoleExecutor $executor): void
@@ -853,13 +1285,10 @@ class Settings extends Show
             return;
         }
 
-        $rules = [
-            'deployment_environment' => 'required|string|max:32',
-        ];
+        $rules = [];
 
         if ($this->shouldShowRuntimePhpRolloutFields()) {
             $rules['laravel_scheduler'] = 'boolean';
-            $rules['restart_supervisor_programs_after_deploy'] = 'boolean';
             if (! $this->shouldShowSystemUserPanel()) {
                 $rules['php_fpm_user'] = 'nullable|string|max:64';
             }
@@ -884,13 +1313,10 @@ class Settings extends Show
 
         $this->validate($rules);
 
-        $update = [
-            'deployment_environment' => $this->deployment_environment,
-        ];
+        $update = [];
 
         if ($this->shouldShowRuntimePhpRolloutFields()) {
             $update['laravel_scheduler'] = $this->laravel_scheduler;
-            $update['restart_supervisor_programs_after_deploy'] = $this->restart_supervisor_programs_after_deploy;
             if (! $this->shouldShowSystemUserPanel()) {
                 $update['php_fpm_user'] = $this->php_fpm_user !== '' ? $this->php_fpm_user : null;
             }
@@ -1005,11 +1431,18 @@ class Settings extends Show
             : self::ROUTING_TABS[0];
     }
 
-    private function syncGeneralSettingsForm(): void
+    private function syncGeneralSettingsForm(bool $skipRefresh = false): void
     {
-        $this->site->refresh();
+        // Skip the refresh when the caller has just refreshed (mount path —
+        // parent::mount → syncFormFromSite already pulled a fresh site, and after
+        // $this->site->update() / load() the in-memory model is current).
+        if (! $skipRefresh) {
+            $this->site->refresh();
+        }
         $this->settings_primary_domain = (string) optional($this->site->primaryDomain())->hostname;
         $this->settings_document_root = (string) ($this->site->document_root ?? '');
+        $this->settings_site_name = (string) $this->site->name;
+        $this->settings_site_slug = (string) $this->site->slug;
         $this->project_workspace_id = $this->site->workspace_id;
         $this->site_notes = (string) data_get($this->site->meta, 'notes', '');
     }
@@ -1026,7 +1459,6 @@ class Settings extends Show
 
     private function syncDnsSettingsForm(): void
     {
-        $this->site->refresh();
         $this->settings_dns_provider_credential_id = (string) ($this->site->dns_provider_credential_id ?? '');
         $savedZone = trim((string) ($this->site->dns_zone ?? ''));
         $this->settings_dns_zone = $savedZone !== '' ? strtolower($savedZone) : '';
@@ -1135,24 +1567,16 @@ class Settings extends Show
         $this->toastSuccess(__('DNS settings saved.'));
     }
 
-    public function saveGeneralSettings(): void
+    /**
+     * Update the site's web directory (document_root). The primary hostname is
+     * intentionally edited from Routing > Domains now — keeping the cascade
+     * (cert re-issue, container backend cycle) next to its trigger.
+     */
+    public function saveWebDirectory(): void
     {
         $this->authorize('update', $this->site);
 
-        $primaryDomain = $this->site->primaryDomain();
-
         $validated = $this->validate([
-            'settings_primary_domain' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('site_domains', 'hostname')->ignore($primaryDomain?->id),
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
-                        $fail('Enter a valid domain name like app.example.com.');
-                    }
-                },
-            ],
             'settings_document_root' => ['required', 'string', 'max:500'],
         ]);
 
@@ -1160,22 +1584,38 @@ class Settings extends Show
             'document_root' => trim($validated['settings_document_root']),
         ]);
 
-        if ($primaryDomain) {
-            $primaryDomain->update([
-                'hostname' => strtolower(trim($validated['settings_primary_domain'])),
-            ]);
-        } else {
-            SiteDomain::query()->create([
-                'site_id' => $this->site->id,
-                'hostname' => strtolower(trim($validated['settings_primary_domain'])),
-                'is_primary' => true,
-                'www_redirect' => false,
-            ]);
-        }
-
-        $this->site->load('domains');
         $this->syncGeneralSettingsForm();
-        $this->finalizeRoutingMutation('Site settings saved.');
+        $this->finalizeRoutingMutation('Web directory saved.');
+    }
+
+    /**
+     * Update the site display name and slug. Mirrors `dply:site:rename` semantics
+     * (the CLI command at app/Console/Commands/RenameSiteCommand.php): updates
+     * the row only — the on-disk path under `/var/www/<slug>` is intentionally
+     * left untouched, since that affects deployments mid-flight.
+     */
+    public function saveSiteIdentity(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $validated = $this->validate([
+            'settings_site_name' => ['required', 'string', 'max:255'],
+            'settings_site_slug' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/',
+                Rule::unique('sites', 'slug')->ignore($this->site->id),
+            ],
+        ]);
+
+        $this->site->update([
+            'name' => trim($validated['settings_site_name']),
+            'slug' => strtolower(trim($validated['settings_site_slug'])),
+        ]);
+
+        $this->syncGeneralSettingsForm();
+        $this->toastSuccess(__('Site identity saved.'));
     }
 
     public function saveProjectSettings(): void
@@ -1249,19 +1689,35 @@ class Settings extends Show
                 },
             ],
             'new_alias_label' => ['nullable', 'string', 'max:255'],
+            'new_alias_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
         SiteDomainAlias::query()->create([
             'site_id' => $this->site->id,
             'hostname' => strtolower(trim($validated['new_alias_hostname'])),
             'label' => trim((string) ($validated['new_alias_label'] ?? '')) ?: null,
+            'comment' => trim((string) ($validated['new_alias_comment'] ?? '')) ?: null,
             'sort_order' => (int) ($this->site->domainAliases()->max('sort_order') ?? 0) + 1,
         ]);
 
         $this->new_alias_hostname = '';
         $this->new_alias_label = '';
+        $this->new_alias_comment = '';
         $this->site->load('domainAliases');
         $this->finalizeRoutingMutation('Alias added.');
+    }
+
+    public function confirmRemoveAlias(string $aliasId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            'removeAlias',
+            [$aliasId],
+            __('Remove alias'),
+            __('Remove this alias from the webserver server_name list?'),
+            __('Remove alias'),
+            true,
+        );
     }
 
     public function removeAlias(string $aliasId): void
@@ -1271,6 +1727,120 @@ class Settings extends Show
         $this->site->domainAliases()->findOrFail($aliasId)->delete();
         $this->site->load('domainAliases');
         $this->finalizeRoutingMutation('Alias removed.');
+    }
+
+    public function editAlias(string $aliasId): void
+    {
+        $this->authorize('update', $this->site);
+        $alias = $this->site->domainAliases()->findOrFail($aliasId);
+        $this->editing_alias_id = (string) $alias->id;
+        $this->editing_alias_hostname = (string) $alias->hostname;
+        $this->editing_alias_label = (string) ($alias->label ?? '');
+        $this->editing_alias_comment = (string) ($alias->comment ?? '');
+    }
+
+    public function cancelEditAlias(): void
+    {
+        $this->editing_alias_id = null;
+        $this->editing_alias_hostname = '';
+        $this->editing_alias_label = '';
+        $this->editing_alias_comment = '';
+    }
+
+    public function saveEditedAlias(): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->editing_alias_id === null) {
+            return;
+        }
+        $alias = $this->site->domainAliases()->findOrFail($this->editing_alias_id);
+        $this->validate([
+            'editing_alias_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('site_domain_aliases', 'hostname')->ignore($alias->id),
+                Rule::unique('site_domains', 'hostname'),
+                Rule::unique('site_preview_domains', 'hostname'),
+                Rule::unique('site_tenant_domains', 'hostname'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid alias like www.example.com.');
+                    }
+                },
+            ],
+            'editing_alias_label' => ['nullable', 'string', 'max:255'],
+            'editing_alias_comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $alias->forceFill([
+            'hostname' => strtolower(trim($this->editing_alias_hostname)),
+            'label' => trim($this->editing_alias_label) ?: null,
+            'comment' => trim($this->editing_alias_comment) ?: null,
+        ])->save();
+
+        $this->cancelEditAlias();
+        $this->site->load('domainAliases');
+        $this->finalizeRoutingMutation('Alias updated.');
+    }
+
+    /**
+     * Bulk paste aliases — `hostname` or `hostname,label` per line. Existing
+     * hostnames (in any routing table) are silently skipped to make repeated
+     * pastes safe.
+     */
+    public function bulkImportAliases(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['bulk_alias_input' => 'required|string|max:65535']);
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($this->bulk_alias_input)) ?: [];
+        $rows = [];
+        foreach ($lines as $i => $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            $parts = array_map('trim', explode(',', $line, 2));
+            $hostname = strtolower($parts[0] ?? '');
+            $label = $parts[1] ?? null;
+            if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
+                $this->addError('bulk_alias_input', sprintf('Line %d: "%s" is not a valid hostname.', $i + 1, $hostname));
+
+                return;
+            }
+            $rows[] = ['hostname' => $hostname, 'label' => $label];
+        }
+
+        // Filter out hostnames already present anywhere in the routing
+        // namespace (domains, aliases, preview, tenants). Skipping silently
+        // keeps `paste a snapshot from prod` ergonomic.
+        $taken = collect()
+            ->merge(SiteDomain::query()->pluck('hostname'))
+            ->merge(SiteDomainAlias::query()->pluck('hostname'))
+            ->merge(SitePreviewDomain::query()->pluck('hostname'))
+            ->merge(SiteTenantDomain::query()->pluck('hostname'))
+            ->map(fn ($h) => strtolower((string) $h))
+            ->unique()
+            ->all();
+
+        $sortBase = (int) ($this->site->domainAliases()->max('sort_order') ?? 0);
+        $imported = 0;
+        foreach ($rows as $row) {
+            if (in_array($row['hostname'], $taken, true)) {
+                continue;
+            }
+            SiteDomainAlias::query()->create([
+                'site_id' => $this->site->id,
+                'hostname' => $row['hostname'],
+                'label' => $row['label'] !== null && $row['label'] !== '' ? $row['label'] : null,
+                'sort_order' => ++$sortBase,
+            ]);
+            $imported++;
+        }
+
+        $this->bulk_alias_input = '';
+        $this->site->load('domainAliases');
+        $this->finalizeRoutingMutation(__(':count alias(es) imported.', ['count' => $imported]));
     }
 
     public function addBasicAuthUser(): void
@@ -1324,7 +1894,33 @@ class Settings extends Show
         $this->new_basic_auth_password = '';
         $this->new_basic_auth_path = '/';
         $this->site->load('basicAuthUsers');
-        $this->finalizeRoutingMutation(__('Basic authentication user saved.'));
+        $this->dispatch('close-modal', 'add-basic-auth-modal');
+        $this->finalizeRoutingMutation(__('Basic authentication user saved.'), __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
+    }
+
+    /**
+     * Open a confirm-modal before removing a basic-auth credential. The actual
+     * mark-and-apply happens in {@see removeBasicAuthUser()} only after the
+     * operator clicks through the modal.
+     */
+    public function confirmRemoveBasicAuthUser(string $userId): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            return;
+        }
+
+        $user = $this->site->basicAuthUsers()->findOrFail($userId);
+
+        $this->openConfirmActionModal(
+            'removeBasicAuthUser',
+            [$userId],
+            __('Remove credential?'),
+            __('Stops :username from passing the basic-auth gate. The credential is marked Removing while the webserver config rewrites; we hard-delete the row only after the apply succeeds.', ['username' => $user->username]),
+            __('Remove credential'),
+            true,
+        );
     }
 
     public function removeBasicAuthUser(string $userId): void
@@ -1335,15 +1931,225 @@ class Settings extends Show
             return;
         }
 
-        $this->site->basicAuthUsers()->findOrFail($userId)->delete();
+        // Stamp pending_removal_at instead of hard-deleting. The htpasswd-sync
+        // step in the apply skips pending rows, so this row stops authenticating
+        // the moment the apply succeeds. ApplySiteWebserverConfigJob hard-deletes
+        // the row after a clean run — that way the UI never claims the credential
+        // is gone before the webserver actually agrees.
+        $user = $this->site->basicAuthUsers()->findOrFail($userId);
+        if ($user->pending_removal_at === null) {
+            $user->forceFill(['pending_removal_at' => now()])->save();
+        }
+
         $this->site->load('basicAuthUsers');
-        $this->finalizeRoutingMutation(__('Basic authentication user removed.'));
+        $this->finalizeRoutingMutation(
+            __('Basic auth credential marked for removal — track the apply in the banner.'),
+            __('Removing credential from :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
     }
 
     public function generateBasicAuthPassword(): void
     {
         $this->authorize('update', $this->site);
         $this->new_basic_auth_password = Str::password(20);
+    }
+
+    /**
+     * Dispatches a backgrounded job that walks the server, finds every .htpasswd
+     * inside the site repo, and imports the user entries Dply doesn't already
+     * track. Progress streams into a console_actions row whose banner is mounted
+     * at the top of the settings page, so the operator can watch the scan happen
+     * line-by-line instead of seeing a synchronous toast that hides the work.
+     */
+    public function syncBasicAuthFromServer(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
+
+            return;
+        }
+
+        // Seed a queued ConsoleAction row BEFORE dispatch so the page-top banner
+        // shows immediately on this re-render. Without this, the row only exists
+        // once the worker calls beginConsoleAction(), which is async — the
+        // banner reads from the DB on parent render and would stay empty until
+        // the user navigated or another action triggered a re-render.
+        $this->seedQueuedConsoleAction('basic_auth_sync');
+
+        SyncBasicAuthFromServerJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Sync queued — track progress in the banner at the top of this page.'));
+    }
+
+    // seedQueuedConsoleAction lives on Show.php and is inherited — see
+    // {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()}.
+
+    // The webserver-apply banner is now read in settings.blade as a `console_actions`
+    // query and rendered through `livewire.partials.console-action-banner-static`,
+    // which lives in the parent component's render tree (no nested Livewire component).
+    // The banner's Dismiss button posts to {@see dismissConsoleActionRun()} below.
+
+    /**
+     * @param  string  $customPassword  Operator-supplied plaintext from the rotate
+     *                                  dialog. The dialog generates a random default and lets the operator copy
+     *                                  it before submit, so by the time we hit this method the value is always
+     *                                  present. Validated against the same min:8/max:255 rules used by the
+     *                                  add-credential form.
+     */
+    public function rotateBasicAuthPassword(string $userId, string $customPassword): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
+
+            return;
+        }
+
+        /** @var SiteBasicAuthUser $user */
+        $user = $this->site->basicAuthUsers()->findOrFail($userId);
+
+        $validator = Validator::make(
+            ['password' => $customPassword],
+            ['password' => ['required', 'string', 'min:8', 'max:255']],
+        );
+        if ($validator->fails()) {
+            $this->toastError($validator->errors()->first('password') ?: __('Password must be 8–255 characters.'));
+
+            return;
+        }
+
+        $user->password_hash = Hash::make($customPassword);
+        $user->save();
+
+        $this->site->load('basicAuthUsers');
+        $this->finalizeRoutingMutation(
+            __('Password rotated.'),
+            __('Rotating credential password on :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
+    }
+
+    public function bulkImportBasicAuth(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsBasicAuthProvisioning()) {
+            $this->toastError(__('Basic authentication is not available for this site runtime.'));
+
+            return;
+        }
+
+        $path = SiteBasicAuthUser::normalizePath($this->bulk_basic_auth_path ?: '/');
+        if (! $this->site->basicAuthSupportsPathPrefixes() && $path !== '/') {
+            $this->addError('bulk_basic_auth_path', __('Use path / for this site type.'));
+
+            return;
+        }
+        if (! preg_match('#^(/|/[a-zA-Z0-9/_-]*)$#', $path)) {
+            $this->addError('bulk_basic_auth_path', __('Enter a path like / or /wp-admin.'));
+
+            return;
+        }
+
+        $raw = (string) $this->bulk_basic_auth_input;
+        if (trim($raw) === '') {
+            $this->addError('bulk_basic_auth_input', __('Paste at least one user:password line.'));
+
+            return;
+        }
+
+        $existing = $this->site->basicAuthUsers()->pluck('username')->all();
+        $seen = [];
+        $created = 0;
+        $skipped = 0;
+        $invalid = 0;
+        $sortBase = (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0);
+
+        foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+
+            // Split on the first colon — htpasswd-style lines for bcrypt/apr1 contain `$` chars
+            // and additional colons in some encodings, so we never split more than once.
+            $colon = strpos($line, ':');
+            if ($colon === false || $colon === 0 || $colon === strlen($line) - 1) {
+                $invalid++;
+
+                continue;
+            }
+            $username = trim(substr($line, 0, $colon));
+            $secret = substr($line, $colon + 1);
+
+            if ($username === '' || strlen($username) > 128 || ! preg_match('/^[A-Za-z0-9._@\-]+$/', $username)) {
+                $invalid++;
+
+                continue;
+            }
+            if (in_array($username, $existing, true) || in_array($username, $seen, true)) {
+                $skipped++;
+
+                continue;
+            }
+
+            // Accept already-hashed entries (bcrypt $2y / apr1 $apr1$ / sha $5$/$6$) verbatim;
+            // otherwise treat the secret as plaintext and bcrypt-hash it server-side.
+            $alreadyHashed = (bool) preg_match('/^\$(2[aby]|apr1|5|6)\$/', $secret);
+            if (! $alreadyHashed && (strlen($secret) < 8 || strlen($secret) > 255)) {
+                $invalid++;
+
+                continue;
+            }
+            $hash = $alreadyHashed ? $secret : Hash::make($secret);
+
+            SiteBasicAuthUser::query()->create([
+                'site_id' => $this->site->id,
+                'username' => $username,
+                'password_hash' => $hash,
+                'path' => $path,
+                'sort_order' => ++$sortBase,
+            ]);
+            $seen[] = $username;
+            $created++;
+        }
+
+        if ($created === 0) {
+            $this->addError('bulk_basic_auth_input', __('No valid user:password lines were found.'));
+
+            return;
+        }
+
+        $this->bulk_basic_auth_input = '';
+        $this->bulk_basic_auth_path = '/';
+        $this->site->load('basicAuthUsers');
+        $this->dispatch('close-modal', 'add-basic-auth-modal');
+
+        $message = trans_choice(
+            '{1} :count user imported.|[2,*] :count users imported.',
+            $created,
+            ['count' => $created],
+        );
+        if ($skipped > 0 || $invalid > 0) {
+            $detail = [];
+            if ($skipped > 0) {
+                $detail[] = trans_choice('{1} :count duplicate skipped|[2,*] :count duplicates skipped', $skipped, ['count' => $skipped]);
+            }
+            if ($invalid > 0) {
+                $detail[] = trans_choice('{1} :count invalid line|[2,*] :count invalid lines', $invalid, ['count' => $invalid]);
+            }
+            $message .= ' ('.implode(', ', $detail).')';
+        }
+
+        $this->finalizeRoutingMutation(
+            $message,
+            __('Importing credentials to :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
     }
 
     public function addTenantDomain(): void
@@ -1367,7 +2173,7 @@ class Settings extends Show
             ],
             'new_tenant_key' => ['nullable', 'string', 'max:255'],
             'new_tenant_label' => ['nullable', 'string', 'max:255'],
-            'new_tenant_notes' => ['nullable', 'string', 'max:2000'],
+            'new_tenant_comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
         SiteTenantDomain::query()->create([
@@ -1375,16 +2181,29 @@ class Settings extends Show
             'hostname' => strtolower(trim($validated['new_tenant_hostname'])),
             'tenant_key' => trim((string) ($validated['new_tenant_key'] ?? '')) ?: null,
             'label' => trim((string) ($validated['new_tenant_label'] ?? '')) ?: null,
-            'notes' => trim((string) ($validated['new_tenant_notes'] ?? '')) ?: null,
+            'comment' => trim((string) ($validated['new_tenant_comment'] ?? '')) ?: null,
             'sort_order' => (int) ($this->site->tenantDomains()->max('sort_order') ?? 0) + 1,
         ]);
 
         $this->new_tenant_hostname = '';
         $this->new_tenant_key = '';
         $this->new_tenant_label = '';
-        $this->new_tenant_notes = '';
+        $this->new_tenant_comment = '';
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain added.');
+    }
+
+    public function confirmRemoveTenantDomain(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            'removeTenantDomain',
+            [$tenantDomainId],
+            __('Remove tenant domain'),
+            __('Remove this tenant domain? Your application is responsible for resolving traffic for it; that traffic stops being routed after the next webserver apply.'),
+            __('Remove tenant'),
+            true,
+        );
     }
 
     public function removeTenantDomain(string $tenantDomainId): void
@@ -1394,6 +2213,127 @@ class Settings extends Show
         $this->site->tenantDomains()->findOrFail($tenantDomainId)->delete();
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain removed.');
+    }
+
+    public function editTenantDomain(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+        $this->editing_tenant_id = (string) $tenant->id;
+        $this->editing_tenant_hostname = (string) $tenant->hostname;
+        $this->editing_tenant_key = (string) ($tenant->tenant_key ?? '');
+        $this->editing_tenant_label = (string) ($tenant->label ?? '');
+        $this->editing_tenant_comment = (string) ($tenant->comment ?? '');
+    }
+
+    public function cancelEditTenantDomain(): void
+    {
+        $this->editing_tenant_id = null;
+        $this->editing_tenant_hostname = '';
+        $this->editing_tenant_key = '';
+        $this->editing_tenant_label = '';
+        $this->editing_tenant_comment = '';
+    }
+
+    public function saveEditedTenantDomain(): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->editing_tenant_id === null) {
+            return;
+        }
+        $tenant = $this->site->tenantDomains()->findOrFail($this->editing_tenant_id);
+        $this->validate([
+            'editing_tenant_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('site_tenant_domains', 'hostname')->ignore($tenant->id),
+                Rule::unique('site_domains', 'hostname'),
+                Rule::unique('site_domain_aliases', 'hostname'),
+                Rule::unique('site_preview_domains', 'hostname'),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail('Enter a valid tenant domain like customer.example.com.');
+                    }
+                },
+            ],
+            'editing_tenant_key' => ['nullable', 'string', 'max:255'],
+            'editing_tenant_label' => ['nullable', 'string', 'max:255'],
+            'editing_tenant_comment' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $tenant->forceFill([
+            'hostname' => strtolower(trim($this->editing_tenant_hostname)),
+            'tenant_key' => trim($this->editing_tenant_key) ?: null,
+            'label' => trim($this->editing_tenant_label) ?: null,
+            'comment' => trim($this->editing_tenant_comment) ?: null,
+        ])->save();
+
+        $this->cancelEditTenantDomain();
+        $this->site->load('tenantDomains');
+        $this->finalizeRoutingMutation('Tenant domain updated.');
+    }
+
+    /**
+     * Bulk paste tenants — `hostname,key,label` per line; key/label optional.
+     * Hostnames already present anywhere in the routing namespace are skipped
+     * (same convention as the alias bulk import).
+     */
+    public function bulkImportTenantDomains(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['bulk_tenant_input' => 'required|string|max:65535']);
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($this->bulk_tenant_input)) ?: [];
+        $rows = [];
+        foreach ($lines as $i => $rawLine) {
+            $line = trim($rawLine);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            $parts = array_map('trim', explode(',', $line, 3));
+            $hostname = strtolower($parts[0] ?? '');
+            $key = $parts[1] ?? null;
+            $label = $parts[2] ?? null;
+            if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
+                $this->addError('bulk_tenant_input', sprintf('Line %d: "%s" is not a valid hostname.', $i + 1, $hostname));
+
+                return;
+            }
+            $rows[] = [
+                'hostname' => $hostname,
+                'key' => $key !== null && $key !== '' ? $key : null,
+                'label' => $label !== null && $label !== '' ? $label : null,
+            ];
+        }
+
+        $taken = collect()
+            ->merge(SiteDomain::query()->pluck('hostname'))
+            ->merge(SiteDomainAlias::query()->pluck('hostname'))
+            ->merge(SitePreviewDomain::query()->pluck('hostname'))
+            ->merge(SiteTenantDomain::query()->pluck('hostname'))
+            ->map(fn ($h) => strtolower((string) $h))
+            ->unique()
+            ->all();
+
+        $sortBase = (int) ($this->site->tenantDomains()->max('sort_order') ?? 0);
+        $imported = 0;
+        foreach ($rows as $row) {
+            if (in_array($row['hostname'], $taken, true)) {
+                continue;
+            }
+            SiteTenantDomain::query()->create([
+                'site_id' => $this->site->id,
+                'hostname' => $row['hostname'],
+                'tenant_key' => $row['key'],
+                'label' => $row['label'],
+                'sort_order' => ++$sortBase,
+            ]);
+            $imported++;
+        }
+
+        $this->bulk_tenant_input = '';
+        $this->site->load('tenantDomains');
+        $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
     }
 
     public function savePreviewSettings(): void
@@ -1444,6 +2384,19 @@ class Settings extends Show
         $this->site->load('previewDomains');
         $this->syncPreviewSettingsForm();
         $this->finalizeRoutingMutation('Preview settings saved.');
+    }
+
+    public function confirmRemovePreviewDomain(string $previewDomainId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            'removePreviewDomain',
+            [$previewDomainId],
+            __('Remove preview domain'),
+            __('Remove this preview hostname? Any pending preview certificate is dropped after the next webserver apply.'),
+            __('Remove preview'),
+            true,
+        );
     }
 
     public function removePreviewDomain(string $previewDomainId): void
@@ -1530,18 +2483,14 @@ class Settings extends Show
             ],
         ]);
 
-        try {
-            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
-            $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
-                ? 'ZeroSSL'
-                : 'Let\'s Encrypt';
-            $this->toastSuccess(__('SSL request started for :domain via :provider.', [
-                'domain' => $hostname,
-                'provider' => $providerLabel,
-            ]));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
+        ExecuteSiteCertificateJob::dispatch($certificate->id);
+        $providerLabel = $validated['quick_ssl_provider_type'] === SiteCertificate::PROVIDER_ZEROSSL
+            ? 'ZeroSSL'
+            : 'Let\'s Encrypt';
+        $this->toastSuccess(__('SSL request queued for :domain via :provider.', [
+            'domain' => $hostname,
+            'provider' => $providerLabel,
+        ]));
 
         $this->site->load('certificates');
         $this->closeQuickDomainSslModal();
@@ -1722,9 +2671,12 @@ class Settings extends Show
 
         try {
             if (in_array($certificate->provider_type, [SiteCertificate::PROVIDER_IMPORTED, SiteCertificate::PROVIDER_CSR], true)) {
+                // Imported / CSR-backed certs are processed inline because there's no
+                // long-running ACME or remote install step — the cert material is
+                // already in hand and the service just persists/installs it.
                 $certificateRequestService->execute($certificate);
             } else {
-                ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+                ExecuteSiteCertificateJob::dispatch($certificate->id);
             }
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -1734,7 +2686,7 @@ class Settings extends Show
         }
 
         $this->resetCertificateRequestForm();
-        $this->toastSuccess('Certificate request saved.');
+        $this->toastSuccess(__('Certificate request saved.'));
         $this->site->load('certificates');
     }
 
@@ -1799,15 +2751,6 @@ class Settings extends Show
         }
     }
 
-    public function openSystemUserCreateModal(): void
-    {
-        $this->authorize('update', $this->site);
-        $this->resetErrorBag();
-        $this->system_user_new_username = '';
-        $this->system_user_new_sudo = false;
-        $this->dispatch('open-modal', 'site-system-user-create-modal');
-    }
-
     public function openSystemUserAssignModal(): void
     {
         $this->authorize('update', $this->site);
@@ -1819,15 +2762,6 @@ class Settings extends Show
         ]);
 
         $this->dispatch('open-modal', 'site-system-user-assign-modal');
-    }
-
-    public function openSystemUserRemoveModal(): void
-    {
-        $this->authorize('update', $this->server);
-        $this->resetErrorBag();
-        $this->system_user_remove_username = '';
-        $this->system_user_remove_confirm = '';
-        $this->dispatch('open-modal', 'site-system-user-remove-modal');
     }
 
     public function openSystemUserResetPermissionsModal(): void
@@ -1842,49 +2776,9 @@ class Settings extends Show
         $this->dispatch('close-modal', 'site-reset-permissions-modal');
     }
 
-    public function closeSystemUserCreateModal(): void
-    {
-        $this->dispatch('close-modal', 'site-system-user-create-modal');
-    }
-
     public function closeSystemUserAssignModal(): void
     {
         $this->dispatch('close-modal', 'site-system-user-assign-modal');
-    }
-
-    public function closeSystemUserRemoveModal(): void
-    {
-        $this->dispatch('close-modal', 'site-system-user-remove-modal');
-    }
-
-    public function queueCreateSystemUser(): void
-    {
-        $this->authorize('update', $this->site);
-
-        if (! $this->shouldShowSystemUserPanel()) {
-            return;
-        }
-
-        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->toastError(__('The server must be ready with SSH.'));
-
-            return;
-        }
-
-        $this->validate([
-            'system_user_new_username' => ['required', 'string', 'max:32', 'regex:/^[a-z_][a-z0-9_-]*$/'],
-            'system_user_new_sudo' => ['boolean'],
-        ]);
-
-        SiteSystemUserMutationJob::dispatch(
-            $this->site->id,
-            'create',
-            $this->system_user_new_username,
-            $this->system_user_new_sudo,
-        );
-
-        $this->closeSystemUserCreateModal();
-        $this->toastSuccess(__('System user operation queued. Refresh in a moment to see updates.'));
     }
 
     public function queueAssignSystemUser(): void
@@ -1906,38 +2800,14 @@ class Settings extends Show
             'system_user_assign_username' => ['required', 'string', 'max:64', Rule::in($allowed)],
         ]);
 
-        SiteSystemUserMutationJob::dispatch(
+        AssignSystemUserToSiteJob::dispatch(
             $this->site->id,
-            'assign',
             $this->system_user_assign_username,
-            false,
+            auth()->id(),
         );
 
         $this->closeSystemUserAssignModal();
-        $this->toastSuccess(__('System user operation queued. Refresh in a moment to see updates.'));
-    }
-
-    public function queueRemoveSystemUser(): void
-    {
-        $this->authorize('update', $this->server);
-
-        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
-            $this->toastError(__('The server must be ready with SSH.'));
-            $this->closeSystemUserRemoveModal();
-
-            return;
-        }
-
-        $allowed = collect($this->system_user_remote_rows)->pluck('username')->filter()->all();
-        $this->validate([
-            'system_user_remove_username' => ['required', 'string', 'max:64', Rule::in($allowed)],
-            'system_user_remove_confirm' => ['required', 'same:system_user_remove_username'],
-        ]);
-
-        DeleteServerSystemUserJob::dispatch($this->server->id, $this->system_user_remove_username);
-
-        $this->closeSystemUserRemoveModal();
-        $this->toastSuccess(__('User removal queued. Refresh server and site lists shortly.'));
+        $this->toastSuccess(__('System user assignment queued. Refresh in a moment to see updates.'));
     }
 
     public function queueResetSitePermissions(): void
@@ -1987,13 +2857,277 @@ class Settings extends Show
         $this->new_certificate_chain_pem = '';
     }
 
+    /**
+     * Add a SiteProcess (worker / scheduler / custom) to the site.
+     *
+     * The auto-created `web` row is owned by the Site::created hook —
+     * users edit its command via the start_command field, not this
+     * form. The form only accepts non-web types so a duplicate web
+     * SiteProcess can't appear (the relation already enforces unique
+     * `(site_id, name)`, but we belt-and-suspenders here for clarity).
+     */
+    public function addSiteProcess(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $allowedTypes = [SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER, SiteProcess::TYPE_CUSTOM];
+        $validated = $this->validate([
+            'new_site_process_type' => ['required', 'string', 'in:'.implode(',', $allowedTypes)],
+            'new_site_process_name' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9_-]+$/'],
+            'new_site_process_command' => ['required', 'string', 'max:2000'],
+        ], attributes: [
+            'new_site_process_type' => __('process type'),
+            'new_site_process_name' => __('process name'),
+            'new_site_process_command' => __('process command'),
+        ]);
+
+        $name = trim($validated['new_site_process_name']);
+        if ($name === 'web') {
+            $this->addError(
+                'new_site_process_name',
+                __('The name "web" is reserved for the upstream process.'),
+            );
+
+            return;
+        }
+
+        if ($this->site->processes()->where('name', $name)->exists()) {
+            $this->addError(
+                'new_site_process_name',
+                __('A process named ":name" already exists for this site.', ['name' => $name]),
+            );
+
+            return;
+        }
+
+        $this->site->processes()->create([
+            'type' => $validated['new_site_process_type'],
+            'name' => $name,
+            'command' => trim($validated['new_site_process_command']),
+            'scale' => 1,
+            'is_active' => true,
+        ]);
+
+        // Re-provision systemd units so the new process gets its own unit
+        // file installed without waiting for the next deploy. The job
+        // skips PHP/static sites internally so this is safe to call
+        // unconditionally for non-PHP runtimes.
+        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
+            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
+        }
+
+        $this->new_site_process_name = '';
+        $this->new_site_process_command = '';
+        $this->new_site_process_type = SiteProcess::TYPE_WORKER;
+
+        $this->toastSuccess(__('Process :name added.', ['name' => $name]));
+    }
+
+    /**
+     * Remove a non-web SiteProcess. The web row is the upstream the
+     * NGINX vhost depends on — deleting it would break routing — so
+     * the method refuses to touch it.
+     *
+     * Side effect: dispatches TearDownSiteSystemdUnitJob to disable +
+     * remove the matching systemd unit file on the server. Computed
+     * from the live process before deletion (the unit name is derived
+     * from the process name), then queued so the SSH round-trip
+     * doesn't block the form response.
+     */
+    public function removeSiteProcess(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+
+        if ($process->type === SiteProcess::TYPE_WEB) {
+            $this->toastError(__('The web process is managed by dply and cannot be removed from this UI.'));
+
+            return;
+        }
+
+        $name = $process->name;
+        $unitName = app(SiteSystemdUnitBuilder::class)
+            ->processUnitName($this->site, $process);
+        $process->delete();
+
+        // For non-PHP/static sites, dispatch the per-unit teardown so
+        // the systemd unit file goes away alongside the row. PHP and
+        // static runtimes never had a unit installed in the first
+        // place, so dispatching for them is a guaranteed no-op (the
+        // job's runtime guard would skip).
+        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
+            TearDownSiteSystemdUnitJob::dispatch($this->site->id, $unitName);
+        }
+
+        $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
+    }
+
+    /**
+     * Flip a SiteProcess between active and inactive.
+     *
+     * Active is the default; flipping to inactive prevents the deploy
+     * pipeline from registering / starting the unit (the systemd unit
+     * file is still removed/refreshed when the process is added or
+     * removed, but skipped from `systemctl enable --now` when the row
+     * is inactive). Useful for temporarily silencing a worker without
+     * deleting + recreating the row.
+     *
+     * Refuses to deactivate the auto-created `web` row — that would
+     * disable the upstream NGINX proxies to and 502 the site. The user
+     * can deactivate workers / schedulers / custom processes only.
+     */
+    public function toggleSiteProcessActive(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+
+        $next = ! (bool) $process->is_active;
+        if ($process->type === SiteProcess::TYPE_WEB && ! $next) {
+            $this->toastError(__('The web process must stay active.'));
+
+            return;
+        }
+
+        $process->update(['is_active' => $next]);
+
+        $this->toastSuccess($next
+            ? __('Process :name reactivated.', ['name' => $process->name])
+            : __('Process :name deactivated.', ['name' => $process->name]),
+        );
+    }
+
+    /**
+     * Update a SiteProcess's scale (number of replicas).
+     *
+     * Per the strategy memo: "scale (default 1, implemented via systemd
+     *
+     * @.service templates)". The data-layer update lands here; the
+     * actual systemd template + multi-instance enable happens on the
+     * next deploy / re-converge — re-running ProvisionSiteSystemdUnitsJob
+     * picks up the new scale value when it builds the unit content.
+     *
+     * Bounds: 1 (minimum, "process exists") to 16 (a reasonable cap
+     * for single-server scale; horizontal scale beyond that wants more
+     * servers, not more replicas on one).
+     */
+    public function setSiteProcessScale(string $id, int $scale): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($scale < 1 || $scale > 16) {
+            $this->toastError(__('Scale must be between 1 and 16.'));
+
+            return;
+        }
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+
+        $process->update(['scale' => $scale]);
+
+        // Re-provision the unit so the next deploy emits the right
+        // number of @{N}.service instances. Skipped for PHP/static —
+        // those don't have systemd units to reflect scale into.
+        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
+            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
+        }
+
+        $this->toastSuccess(__('Scale set to :n for :name.', [
+            'n' => $scale,
+            'name' => $process->name,
+        ]));
+    }
+
+    /**
+     * Recent SiteDeployment rows that carry structured phase_results
+     * (i.e. went through the new DeployPhaseRunner). Used by the
+     * settings.blade.php "Recent deployments" panel so the view stays
+     * free of inline @php(…) blocks that fight Blade's lexer when the
+     * expression has nested parens / method chains.
+     */
+    public function getRecentDeploymentsWithPhasesProperty()
+    {
+        return $this->site->deployments()
+            ->whereNotNull('phase_results')
+            ->orderByDesc('started_at')
+            ->limit(5)
+            ->get();
+    }
+
+    /**
+     * Most recent SiteDeployment for the dashboard's "Last deploy"
+     * badge. Computed in PHP because Blade's @php(...) inline form
+     * trips on the method-chain length of `$site->latestDeployment()`.
+     */
+    public function getLatestDeploymentProperty()
+    {
+        return $this->site->latestDeployment();
+    }
+
+    /**
+     * Restart a single non-web SiteProcess via systemctl.
+     *
+     * Mirror of the dply:site:restart-process CLI — both routes call
+     * SiteSystemdProvisioner::restartUnit so UI and CLI behavior
+     * stay aligned. Refuses to touch the web row (NGINX upstream —
+     * the deploy pipeline's restart phase owns that). Refuses for
+     * PHP/static sites that have no systemd units.
+     */
+    public function restartSiteProcess(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        $runtime = $this->site->runtimeKey();
+        if (in_array($runtime, ['php', 'static', null], true)) {
+            $this->toastError(__('PHP and static sites have no systemd units to restart.'));
+
+            return;
+        }
+
+        $process = $this->site->processes()->whereKey($id)->first();
+        if ($process === null) {
+            return;
+        }
+        if ($process->type === SiteProcess::TYPE_WEB) {
+            $this->toastError(__('The web process is owned by the deploy pipeline; trigger the restart phase instead.'));
+
+            return;
+        }
+
+        $unitName = app(SiteSystemdUnitBuilder::class)
+            ->processUnitName($this->site, $process);
+
+        try {
+            app(SiteSystemdProvisioner::class)->restartUnit($this->site, $unitName);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Restart failed: :msg', ['msg' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->toastSuccess(__('Restarted :name.', ['name' => $process->name]));
+    }
+
     public function render(): View
     {
         if (! $this->site->isReadyForWorkspace()) {
             return parent::render();
         }
 
-        $this->site->load([
+        // loadMissing instead of load: earlier lifecycle hooks (mount,
+        // syncGeneralSettingsForm, syncPreviewSettingsForm) already loadMissing some of
+        // these — reloading them in render() doubled queries on every render.
+        $this->site->loadMissing([
             'domains',
             'domainAliases',
             'basicAuthUsers',
@@ -2001,7 +3135,6 @@ class Settings extends Show
             'dnsProviderCredential',
             'certificates.previewDomain',
             'deployments',
-            'environmentVariables',
             'redirects',
             'tenantDomains',
             'deployHooks',

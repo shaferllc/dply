@@ -18,6 +18,12 @@ return [
     'timeout_seconds' => (int) env('SITE_FILE_BACKUP_TIMEOUT_SECONDS', 7200),
 
     /**
+     * Time-based retention for {@see App\Console\Commands\PruneBackupsCommand} (days).
+     * Floor of 7 days enforced in code.
+     */
+    'run_retention_days' => (int) env('SITE_FILE_BACKUP_RETENTION_DAYS', 90),
+
+    /**
      * Path segments excluded from each full archive (relative to the site repository root).
      * Uses GNU tar --exclude; patterns apply to any matching path component.
      *

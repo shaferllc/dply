@@ -6,6 +6,8 @@ namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
 use App\Enums\ServerProvider;
+use App\Jobs\PollDoksClusterStatusJob;
+use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\ProvisionEquinixMetalServerJob;
@@ -22,10 +24,13 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Services\AwsEksService;
+use App\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Persists a server from the create wizard (cloud API providers or custom SSH).
@@ -67,7 +72,7 @@ final class StoreServerFromCreateForm
             )->validate();
         }
 
-        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
+        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
             Validator::make(
                 [
@@ -85,6 +90,7 @@ final class StoreServerFromCreateForm
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
             'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
             'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
+            'aws_kubernetes' => $this->storeAwsKubernetes($user, $org, $form),
             'aws_lambda' => $this->storeAwsLambda($user, $org, $form),
             'hetzner' => $this->storeHetzner($user, $org, $form, $scriptKeys),
             'linode' => $this->storeLinode($user, $org, $form, $scriptKeys),
@@ -105,14 +111,28 @@ final class StoreServerFromCreateForm
      */
     private function meta(ServerCreateForm $form): array
     {
-        return BuildServerProvisionMeta::run(
+        $meta = BuildServerProvisionMeta::run(
             $form->install_profile,
             $form->server_role,
             $form->cache_service,
             $form->webserver,
             $form->php_version,
             $form->database,
+            [
+                'ruby' => $form->ruby_version,
+                'node' => $form->node_version,
+                'python' => $form->python_version,
+                'go' => $form->go_version,
+            ],
         );
+
+        // Provider-mode Docker hosts: tag the meta so Server::hostKind() returns
+        // HOST_KIND_DOCKER. Custom-mode does this inline in its own branch.
+        if ($form->mode === 'provider' && $form->provider_host_kind === 'docker') {
+            $meta['host_kind'] = Server::HOST_KIND_DOCKER;
+        }
+
+        return $meta;
     }
 
     /**
@@ -233,32 +253,96 @@ final class StoreServerFromCreateForm
 
     private function storeDigitalOceanKubernetes(User $user, Organization $org, ServerCreateForm $form): Server
     {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'do_kubernetes_cluster_name' => $form->do_kubernetes_cluster_name,
-                'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'do_kubernetes_cluster_name' => 'required|string|max:255',
-                'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
-            ]
-        )->validate();
+        $isCreatingNew = $form->do_kubernetes_source === 'new';
+
+        $payload = [
+            'name' => $form->name,
+            'provider_credential_id' => $form->provider_credential_id,
+            'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
+        ];
+        $rules = [
+            'name' => 'required|string|max:255',
+            'provider_credential_id' => 'required|exists:provider_credentials,id',
+            'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+        ];
+        if ($isCreatingNew) {
+            $payload['do_kubernetes_new_name'] = $form->do_kubernetes_new_name;
+            $payload['do_kubernetes_new_region'] = $form->do_kubernetes_new_region;
+            $payload['do_kubernetes_new_node_size'] = $form->do_kubernetes_new_node_size;
+            $payload['do_kubernetes_new_node_count'] = $form->do_kubernetes_new_node_count;
+            $rules['do_kubernetes_new_name'] = ['required', 'string', 'min:3', 'max:63', 'regex:/^[a-z]([-a-z0-9]*[a-z0-9])?$/'];
+            $rules['do_kubernetes_new_region'] = ['required', 'string'];
+            $rules['do_kubernetes_new_node_size'] = ['required', 'string'];
+            $rules['do_kubernetes_new_node_count'] = ['required', 'integer', 'min:1', 'max:20'];
+        } else {
+            $payload['do_kubernetes_cluster_name'] = $form->do_kubernetes_cluster_name;
+            $rules['do_kubernetes_cluster_name'] = 'required|string|max:255';
+        }
+        Validator::make($payload, $rules)->validate();
 
         $credential = ProviderCredential::where('organization_id', $org->id)
             ->where('provider', 'digitalocean')
             ->findOrFail($form->provider_credential_id);
 
+        $clusterName = trim($form->do_kubernetes_cluster_name);
+        $clusterRegion = '';
+        $clusterId = null;
+        $serverStatus = Server::STATUS_READY;
+        $health = Server::HEALTH_REACHABLE;
+
+        if ($isCreatingNew) {
+            try {
+                $created = (new DigitalOceanService($credential))->createKubernetesCluster(
+                    name: trim($form->do_kubernetes_new_name),
+                    region: trim($form->do_kubernetes_new_region),
+                    nodeSize: trim($form->do_kubernetes_new_node_size),
+                    nodeCount: (int) $form->do_kubernetes_new_node_count,
+                    ha: (bool) $form->do_kubernetes_new_ha,
+                    version: $form->do_kubernetes_new_version !== '' ? $form->do_kubernetes_new_version : null,
+                );
+            } catch (Throwable $e) {
+                throw ValidationException::withMessages([
+                    'form.do_kubernetes_new_name' => __('DigitalOcean refused to create the cluster: :detail', ['detail' => $e->getMessage()]),
+                ]);
+            }
+
+            $clusterName = (string) ($created['name'] ?? $form->do_kubernetes_new_name);
+            $clusterRegion = (string) ($created['region'] ?? $form->do_kubernetes_new_region);
+            $clusterId = isset($created['id']) ? (string) $created['id'] : null;
+            // Cluster is "provisioning" at DO until node pool VMs come up; the
+            // server card surfaces that state. PollDoksClusterStatusJob flips
+            // it to READY when DO reports status.state == "running" (and also
+            // fetches kubeconfig at that moment).
+            $serverStatus = Server::STATUS_PROVISIONING;
+            $health = Server::HEALTH_UNREACHABLE;
+        } else {
+            // Registered-existing mode: look up the cluster ID by name so the
+            // poller has something to fetch with. We accept registration even
+            // if the lookup fails (DO blip, account permissions) — the cluster
+            // page surfaces the missing-id state and offers a "Try again".
+            try {
+                foreach ((new DigitalOceanService($credential))->getKubernetesClusters() as $cluster) {
+                    if (is_array($cluster) && (string) ($cluster['name'] ?? '') === $clusterName) {
+                        $clusterId = (string) ($cluster['id'] ?? '');
+                        $clusterRegion = (string) ($cluster['region'] ?? '');
+                        break;
+                    }
+                }
+            } catch (Throwable) {
+                //
+            }
+        }
+
         $meta = [
             'host_kind' => Server::HOST_KIND_KUBERNETES,
-            'kubernetes' => [
+            'kubernetes' => array_filter([
                 'provider' => 'digitalocean',
-                'cluster_name' => trim($form->do_kubernetes_cluster_name),
+                'cluster_name' => $clusterName,
+                'cluster_id' => $clusterId,
+                'region' => $clusterRegion !== '' ? $clusterRegion : null,
                 'namespace' => trim($form->do_kubernetes_namespace) !== '' ? trim($form->do_kubernetes_namespace) : 'default',
-            ],
+                'provisioned_by_dply' => $isCreatingNew ? true : null,
+            ], static fn ($v): bool => $v !== null),
         ];
 
         $server = $user->servers()->create([
@@ -268,12 +352,111 @@ final class StoreServerFromCreateForm
             'provider_credential_id' => $credential->id,
             'ssh_port' => 22,
             'ssh_user' => 'kubernetes',
-            'status' => Server::STATUS_PENDING,
-            'health_status' => null,
+            // Existing-cluster registrations are READY immediately; created
+            // clusters live in PROVISIONING until the poller flips them.
+            'status' => $serverStatus,
+            'health_status' => $health,
             'meta' => $meta,
         ]);
 
         audit_log($org, $user, 'server.created', $server);
+
+        // Dispatch the poller for both paths: created clusters need recurring
+        // checks until state=running; registered clusters get a single-shot
+        // hydration (the poller will see state=running on poll #1, grab the
+        // kubeconfig, and stop). Skipped when cluster_id couldn't be looked up
+        // — the cluster page will surface a "missing id, try again" affordance.
+        if ($clusterId !== null && $clusterId !== '') {
+            PollDoksClusterStatusJob::dispatch($server);
+        }
+
+        return $server;
+    }
+
+    /**
+     * Register an existing AWS EKS cluster as a dply server. Mirrors the DOKS path —
+     * cluster + namespace come from the wizard form (do_kubernetes_* fields are
+     * provider-agnostic at the form layer despite the prefix; renaming is churn).
+     */
+    private function storeAwsKubernetes(User $user, Organization $org, ServerCreateForm $form): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'do_kubernetes_cluster_name' => $form->do_kubernetes_cluster_name,
+                'do_kubernetes_namespace' => $form->do_kubernetes_namespace,
+                'do_kubernetes_aws_region' => $form->do_kubernetes_aws_region,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'do_kubernetes_cluster_name' => 'required|string|max:255',
+                'do_kubernetes_namespace' => ['required', 'string', 'max:63', 'regex:/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/'],
+                'do_kubernetes_aws_region' => 'required|string',
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'aws')
+            ->findOrFail($form->provider_credential_id);
+
+        // The wizard's region picker is the source of truth (the credential's
+        // stored region was just the seed value). Fall back to credential region
+        // only if the form field was somehow empty.
+        $region = trim($form->do_kubernetes_aws_region) !== ''
+            ? trim($form->do_kubernetes_aws_region)
+            : (string) ($credential->credentials['region'] ?? config('services.aws.default_region', 'us-east-1'));
+
+        // Look up the cluster ARN at register time so the poller has a stable
+        // identifier (EKS API takes cluster name + region; ARN is informational
+        // but useful for audit + cross-region deduping). Accept registration
+        // even if the lookup fails so a transient AWS hiccup doesn't block
+        // the user — the poller will retry on its own cadence.
+        $clusterArn = null;
+        try {
+            $service = new AwsEksService($credential, $region);
+            $cluster = $service->getCluster(trim($form->do_kubernetes_cluster_name));
+            if ($cluster !== null) {
+                $clusterArn = isset($cluster['arn']) ? (string) $cluster['arn'] : null;
+            }
+        } catch (Throwable) {
+            //
+        }
+
+        $meta = [
+            'host_kind' => Server::HOST_KIND_KUBERNETES,
+            'kubernetes' => array_filter([
+                'provider' => 'aws',
+                'cluster_name' => trim($form->do_kubernetes_cluster_name),
+                'cluster_id' => $clusterArn,
+                'namespace' => trim($form->do_kubernetes_namespace) !== '' ? trim($form->do_kubernetes_namespace) : 'default',
+                'region' => $region,
+                'provisioned_by_dply' => null, // explicit: never provisioned by dply for EKS
+            ], static fn ($v): bool => $v !== null),
+        ];
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Aws,
+            'provider_credential_id' => $credential->id,
+            'region' => $region,
+            'ssh_port' => 22,
+            'ssh_user' => 'kubernetes',
+            // Existing cluster — assume READY. The poller will flip to ERROR
+            // if DescribeCluster returns a non-ACTIVE status on first hit.
+            'status' => Server::STATUS_READY,
+            'health_status' => Server::HEALTH_REACHABLE,
+            'meta' => $meta,
+        ]);
+
+        audit_log($org, $user, 'server.created', $server);
+
+        // One-shot hydration: poller fetches DescribeCluster + nodegroups +
+        // generates kubeconfig. Stops on first poll since cluster is ACTIVE
+        // (or marks ERROR if not). Same job runs on the Refresh button later.
+        PollEksClusterStatusJob::dispatch($server);
 
         return $server;
     }

@@ -550,14 +550,20 @@ class ServerSystemLogReader
             return $fromMeta;
         }
 
+        // Inferring the server's PHP version from a site row: post-
+        // php_version-drop the canonical column is runtime_version
+        // (when runtime='php'). Site::phpVersion() encapsulates the
+        // null-when-not-php semantics.
         $site = Site::query()
             ->where('server_id', $server->id)
-            ->whereNotNull('php_version')
+            ->where('runtime', 'php')
+            ->whereNotNull('runtime_version')
             ->orderByDesc('updated_at')
             ->first();
 
-        if ($site && is_string($site->php_version) && preg_match('/^\d+(\.\d+)?$/', $site->php_version)) {
-            return $site->php_version;
+        $version = $site?->phpVersion();
+        if (is_string($version) && preg_match('/^\d+(\.\d+)?$/', $version)) {
+            return $version;
         }
 
         return (string) config('server_system_logs.default_php_version', '8.3');

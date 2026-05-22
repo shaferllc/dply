@@ -161,6 +161,16 @@ final class ServerJourneyInfrastructureAlerts
 
     /**
      * Avoid noisy TCP warnings while the cloud IP or sshd may not exist yet.
+     *
+     * Only probe once setup is genuinely settled (done/failed). During
+     * provisioning AND during setup-running, sshd routinely flaps —
+     * cloud-init triggers package installs that restart the service,
+     * config edits do daemon-reload, etc. Probing during those windows
+     * produces a banner that disappears + reappears every 20 seconds
+     * (the TCP probe cache TTL), which reads like dply is broken when
+     * really the server is mid-setup. Once setup_status flips to done
+     * or failed, sshd is stable and a probe failure means something
+     * the operator should see.
      */
     private function shouldProbeSshPortForAlert(Server $server): bool
     {
@@ -168,8 +178,9 @@ final class ServerJourneyInfrastructureAlerts
             return false;
         }
 
-        if ($server->status === Server::STATUS_READY
-            && $server->setup_status === Server::SETUP_STATUS_PENDING) {
+        // setup_status mid-flight (pending or running) — skip the probe.
+        // Only DONE / FAILED are stable enough to surface a real alert.
+        if (! in_array($server->setup_status, [Server::SETUP_STATUS_DONE, Server::SETUP_STATUS_FAILED], true)) {
             return false;
         }
 

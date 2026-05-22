@@ -5,6 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\Server;
+use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
@@ -122,7 +123,7 @@ trait RunsServerPackageInstalls
             ? $out
             : match ($status) {
                 'queued' => $stalledQueued
-                    ? __('Task still queued. Ensure a queue worker is running (e.g. php artisan queue:work) and that CACHE_DRIVER is shared with the worker (not "array").')
+                    ? __('Still preparing this task. If it stays stuck, contact your administrator.')
                     : __('Task queued…'),
                 'running' => __('Running on server…'),
                 default => '',
@@ -201,6 +202,19 @@ trait RunsServerPackageInstalls
             );
         }
 
+        // Persist a recent-activity row so install progress survives a
+        // page reload — the cache-only state vanishes if the operator
+        // navigates away. The job updates this row through its lifecycle
+        // (queued → running → finished/failed) via updateLog().
+        $label = $this->guessInstallActionLabel($taskName) ?? $streamTitle;
+        $logRow = ServerManageAction::create([
+            'server_id' => $server->id,
+            'user_id' => auth()->id(),
+            'task_name' => $taskName,
+            'label' => $label,
+            'status' => ServerManageAction::STATUS_QUEUED,
+        ]);
+
         ServerManageRemoteSshJob::dispatch(
             $server->id,
             $id,
@@ -208,6 +222,7 @@ trait RunsServerPackageInstalls
             $inlineBash,
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
+            $logRow->id,
         );
 
         $this->servicesRemoteTaskId = $id;
@@ -217,8 +232,24 @@ trait RunsServerPackageInstalls
         $this->remoteSshStreamSetMeta(
             $streamTitle,
             $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$inlineBash."\n\n"
-            .__('Runs in a queue worker so the browser request returns immediately. Use a non-sync queue and run `php artisan queue:work`.')
+            .__('Runs in the background so the browser does not block on SSH.')
         );
+    }
+
+    /**
+     * Best-effort human label for an install/services-* task — used in
+     * the activity log row so Overview / Services panels show
+     * "Install Redis" rather than "services-install:install_redis".
+     */
+    protected function guessInstallActionLabel(string $taskName): ?string
+    {
+        if (! preg_match('/^services-install:(.+)$/', $taskName, $m)) {
+            return null;
+        }
+        $key = $m[1];
+        $def = config('server_services.install_actions', [])[$key] ?? null;
+
+        return is_array($def) && isset($def['label']) ? (string) $def['label'] : null;
     }
 
     protected function manageSshConnectionLabel(Server $server): string

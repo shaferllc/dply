@@ -4,10 +4,10 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\WebhookDeliveryLog;
-use Dply\Core\Net\IpAllowList;
-use Dply\Core\Security\WebhookSignature;
+use App\Support\WebhookSignature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Symfony\Component\HttpFoundation\IpUtils;
 
 class SiteWebhookSignatureValidator
 {
@@ -39,7 +39,7 @@ class SiteWebhookSignatureValidator
         $allowed = $site->webhook_allowed_ips;
         if (is_array($allowed) && $allowed !== []) {
             $ip = (string) $request->ip();
-            if (! IpAllowList::contains($ip, $allowed)) {
+            if (! IpUtils::checkIp($ip, $allowed)) {
                 return [
                     'ok' => false,
                     'status' => 403,

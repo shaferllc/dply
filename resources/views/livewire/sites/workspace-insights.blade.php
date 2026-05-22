@@ -39,6 +39,88 @@
         <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{{ session('success') }}</div>
     @endif
 
+    {{-- Workspace console banner. Two banner sources participate at the site level —
+         `run` (site insight sweep) and `fix` (apply-fix on a site-scoped finding). The
+         underlying jobs route their state writes to site.meta when the operation is
+         site-scoped, keeping the server insights banner free of site-specific noise. --}}
+    @php
+        $insightsBanner = null;
+        foreach (['run', 'fix'] as $kind) {
+            $status = (string) data_get($site->meta ?? [], config("insights_workspace.meta_{$kind}_status_key"));
+            $runId = (string) data_get($site->meta ?? [], config("insights_workspace.meta_{$kind}_run_id_key"));
+            if ($runId === '' || ! in_array($status, ['queued', 'running', 'completed', 'failed', 'refused'], true)) {
+                continue;
+            }
+            $busy = in_array($status, ['queued', 'running'], true);
+            $startedAt = (string) data_get($site->meta ?? [], config("insights_workspace.meta_{$kind}_started_at_key"));
+            $rank = $busy ? '9999-12-31T23:59:59Z' : $startedAt;
+            if ($insightsBanner === null
+                || ($busy && ! $insightsBanner['busy'])
+                || ($busy === $insightsBanner['busy'] && $rank > $insightsBanner['rank'])
+            ) {
+                $insightsBanner = [
+                    'kind' => $kind,
+                    'status' => $status,
+                    'busy' => $busy,
+                    'rank' => $rank,
+                    'started_at' => $startedAt,
+                    'finished_at' => (string) data_get($site->meta ?? [], config("insights_workspace.meta_{$kind}_finished_at_key")),
+                    'error' => (string) data_get($site->meta ?? [], config("insights_workspace.meta_{$kind}_error_key")),
+                ];
+            }
+        }
+
+        if ($insightsBanner !== null) {
+            $bk = $insightsBanner['kind'];
+            $bs = $insightsBanner['status'];
+            $bbusy = $insightsBanner['busy'];
+
+            $insightsBanner['output'] = match ($bk) {
+                'run' => $this->runOutputLines,
+                'fix' => $this->fixOutputLines,
+            };
+
+            $insightsBanner['message'] = match ([$bk, $bs]) {
+                ['run', 'queued'] => __('Insights run queued — waiting for a worker to pick it up…'),
+                ['run', 'running'] => __('Running insight checks on site :site …', ['site' => $site->name]),
+                ['run', 'completed'] => __('Insight checks complete.'),
+                ['run', 'failed'] => __('Insight checks failed.'),
+                ['fix', 'queued'] => __('Apply fix queued — waiting for a worker to pick it up…'),
+                ['fix', 'running'] => __('Applying fix on site :site …', ['site' => $site->name]),
+                ['fix', 'completed'] => __('Fix applied.'),
+                ['fix', 'failed'] => __('Fix failed.'),
+                ['fix', 'refused'] => __('Fix refused.'),
+                default => '',
+            };
+
+            $insightsBanner['subtitle'] = $bbusy
+                ? __('Refreshing every 4s · safe to leave this page — the job runs on the queue.')
+                : match (true) {
+                    in_array($bs, ['failed', 'refused'], true) && $insightsBanner['error'] !== ''
+                        => $insightsBanner['error'],
+                    $bs === 'completed' && $insightsBanner['finished_at'] !== ''
+                        => __('Finished :time', ['time' => \Illuminate\Support\Carbon::parse($insightsBanner['finished_at'])->diffForHumans()]),
+                    default => null,
+                };
+
+            $insightsBanner['banner_status'] = $bs === 'refused' ? 'failed' : $bs;
+        }
+    @endphp
+
+    @if ($insightsBanner !== null)
+        <x-workspace-console-banner
+            :status="$insightsBanner['banner_status']"
+            :message="$insightsBanner['message']"
+            :subtitle="$insightsBanner['subtitle']"
+            :output="$insightsBanner['output']"
+            :busy="$insightsBanner['busy']"
+            :dismiss-action="$insightsBanner['busy'] ? null : 'dismissInsightsBanner(\'' . $insightsBanner['kind'] . '\')'"
+            :poll-action="$insightsBanner['busy'] ? 'pollInsightsStatus' : null"
+            poll-interval="4s"
+            :default-expanded="true"
+        />
+    @endif
+
     <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
         <x-server-workspace-tablist ariaLabel="{{ __('Insights sections') }}">
             <x-server-workspace-tab wire:click="setTab('overview')" :active="$tab === 'overview'">{{ __('Overview') }}</x-server-workspace-tab>
@@ -59,7 +141,7 @@
                     @foreach ($findings as $f)
                         @php
                             $fix = config('insights.insights.'.$f->insight_key.'.fix');
-                            $canFix = is_array($fix) && ($fix['action'] ?? null);
+                            $canFix = is_array($fix) && ($fix['handler'] ?? null);
                         @endphp
                         <li class="px-5 py-4 flex flex-wrap items-start justify-between gap-4">
                             <div class="min-w-0">

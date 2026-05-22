@@ -31,7 +31,6 @@ trait AsAction
     use AsEvent;
     use AsFactory;
     use AsFake;
-    use AsFeatureFlagged;
     use AsFiltered;
     use AsHydratable;
     use AsIdempotent;

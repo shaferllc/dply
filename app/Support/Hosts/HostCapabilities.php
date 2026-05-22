@@ -50,7 +50,7 @@ final class HostCapabilities
         return $this->supportsSsh();
     }
 
-    public function supportsNginxProvisioning(): bool
+    public function supportsWebserverProvisioning(): bool
     {
         return $this->supportsSsh();
     }

@@ -53,5 +53,38 @@ class ServerCronCommandBuilderTest extends TestCase
 
         $this->assertStringContainsString('export TZ=', $inner);
         $this->assertStringContainsString('America/New_York', $inner);
+        $this->assertStringNotContainsString("\n", $inner, 'inner segment must stay on one crontab line');
+    }
+
+    public function test_flattens_multiline_env_prefix_and_command_onto_one_line(): void
+    {
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'ssh_user' => 'deploy',
+        ]);
+        $job = ServerCronJob::query()->create([
+            'server_id' => $server->id,
+            'cron_expression' => '0 6 * * 0',
+            'command' => "apt-get update -qq\napt-get -y -qq upgrade",
+            'user' => 'deploy',
+            'schedule_timezone' => 'UTC',
+            'env_prefix' => "export DEBIAN_FRONTEND=noninteractive\n# weekly upgrade\nexport PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin",
+        ]);
+
+        $segment = app(ServerCronCommandBuilder::class)->crontabCommandSegment($server, $job->fresh());
+
+        $this->assertStringNotContainsString("\n", $segment, 'crontab segment must be a single line');
+        $this->assertStringNotContainsString("\r", $segment);
+        // Comments inside env_prefix are dropped so they can't be parsed as crontab.
+        $this->assertStringNotContainsString('# weekly upgrade', $segment);
+        // The pieces are present in declaration order: TZ → env → command.
+        $tzPos = strpos($segment, 'TZ=');
+        $envPos = strpos($segment, 'DEBIAN_FRONTEND=noninteractive');
+        $cmdPos = strpos($segment, 'apt-get update');
+        $this->assertNotFalse($tzPos);
+        $this->assertNotFalse($envPos);
+        $this->assertNotFalse($cmdPos);
+        $this->assertLessThan($envPos, $tzPos);
+        $this->assertLessThan($cmdPos, $envPos);
     }
 }

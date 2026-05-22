@@ -27,6 +27,8 @@ final class ServerlessDeploymentConfigResolver
      *     supports_runtime_detection: bool,
      *     supports_php_runtime: bool,
      *     supports_node_runtime: bool,
+     *     supports_python_runtime: bool,
+     *     supports_go_runtime: bool,
      *     host_label: string
      * }
      */
@@ -49,6 +51,8 @@ final class ServerlessDeploymentConfigResolver
             'supports_runtime_detection' => $capabilities['supports_runtime_detection'],
             'supports_php_runtime' => $capabilities['supports_php_runtime'],
             'supports_node_runtime' => $capabilities['supports_node_runtime'],
+            'supports_python_runtime' => $capabilities['supports_python_runtime'],
+            'supports_go_runtime' => $capabilities['supports_go_runtime'],
             'host_label' => $capabilities['host_label'],
         ];
     }

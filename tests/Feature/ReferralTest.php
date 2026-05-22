@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Auth\Register;
 use App\Models\Organization;
 use App\Models\ReferralReward;
@@ -20,7 +21,8 @@ class ReferralTest extends TestCase
     {
         $referrer = User::factory()->create();
 
-        $this->get(route('register', ['referrer' => $referrer->referral_code], false))
+        $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
+            ->get(route('register', ['referrer' => $referrer->referral_code], false))
             ->assertOk();
 
         $this->assertSame($referrer->referral_code, session('referral_code'));
@@ -28,7 +30,8 @@ class ReferralTest extends TestCase
 
     public function test_invalid_referrer_query_does_not_set_session(): void
     {
-        $this->get(route('register', ['referrer' => 'not-a-real-code'], false))
+        $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
+            ->get(route('register', ['referrer' => 'not-a-real-code'], false))
             ->assertOk();
 
         $this->assertNull(session('referral_code'));

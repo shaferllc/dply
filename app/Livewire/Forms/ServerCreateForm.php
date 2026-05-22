@@ -34,6 +34,14 @@ class ServerCreateForm extends Form
 
     public string $custom_host_kind = 'vm';
 
+    /**
+     * Provider mode host kind: 'vm' (default — full stack install) or 'docker' (skip stack,
+     * just provision the cloud VM with Docker on it). Mirrors custom_host_kind but for the
+     * provider/cloud-provisioned path. Set via StepWhere's tile picker or pre-filled by the
+     * Containers launcher hint (host_target=docker query param).
+     */
+    public string $provider_host_kind = 'vm';
+
     public string $server_role = 'application';
 
     public string $cache_service = 'redis';
@@ -41,6 +49,20 @@ class ServerCreateForm extends Form
     public string $webserver = 'nginx';
 
     public string $php_version = '8.3';
+
+    /**
+     * Per-language runtime versions, set when the operator picks a stack
+     * template (Rails → ruby_version, Next.js → node_version, etc.) and
+     * overridable individually on Step 3. Empty string means "not used
+     * by this stack" and the form treats it as not-installed.
+     */
+    public string $ruby_version = '';
+
+    public string $node_version = '';
+
+    public string $python_version = '';
+
+    public string $go_version = '';
 
     public string $database = 'mysql84';
 
@@ -70,6 +92,39 @@ class ServerCreateForm extends Form
     public string $do_kubernetes_cluster_name = '';
 
     public string $do_kubernetes_namespace = 'default';
+
+    /**
+     * AWS region for EKS register-existing — clusters are region-scoped and
+     * a single credential can reach any region the user has IAM access to.
+     * Defaults to the credential's stored region (set by StepWhat::mount) but
+     * the picker lets the user override per-cluster.
+     */
+    public string $do_kubernetes_aws_region = '';
+
+    /**
+     * 'existing' (register a cluster already in the DO/AWS account) or 'new'
+     * (have dply call the provider API to provision a brand-new cluster as part
+     * of submit). When 'new', the do_kubernetes_new_* fields below describe the
+     * cluster spec. EKS only supports 'existing' for now.
+     */
+    public string $do_kubernetes_source = 'existing';
+
+    public string $do_kubernetes_new_name = '';
+
+    public string $do_kubernetes_new_region = '';
+
+    public string $do_kubernetes_new_node_size = '';
+
+    public int $do_kubernetes_new_node_count = 2;
+
+    public bool $do_kubernetes_new_ha = false;
+
+    /**
+     * Kubernetes version slug ("1.30.1-do.0" etc.). Empty means "let DO pick
+     * the recommended/latest" — we pass nothing in that case so DO assigns
+     * the default; keeps us out of the version-pinning maintenance grind.
+     */
+    public string $do_kubernetes_new_version = '';
 
     public string $do_functions_package = 'default';
 

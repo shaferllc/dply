@@ -1,0 +1,12 @@
+# Example dply.yaml for a Next.js app (Node-runtime).
+
+runtime: node
+version: "22"
+
+build:
+  - npm ci
+  - npm run build
+
+processes:
+  web:
+    command: npm start

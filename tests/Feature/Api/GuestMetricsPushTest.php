@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -48,11 +49,14 @@ class GuestMetricsPushTest extends TestCase
             'tx_bytes_per_sec' => 2048.25,
         ];
 
+        // Use a recent captured_at — ServerMetricsRecorder::pruneOldSnapshots
+        // deletes anything older than 30 days, so a hardcoded date eventually
+        // gets pruned the moment it's stored.
         $this->postJson('/api/metrics', [
             'server_id' => $server->id,
             'token' => $plain,
             'metrics' => $metrics,
-            'captured_at' => '2026-03-30T12:00:00Z',
+            'captured_at' => now()->subMinutes(5)->toIso8601String(),
         ])->assertAccepted()->assertJson(['ok' => true]);
 
         $this->assertSame(1, ServerMetricSnapshot::query()->where('server_id', $server->id)->count());
@@ -89,6 +93,8 @@ class GuestMetricsPushTest extends TestCase
 
     public function test_guest_push_normalizes_offsetless_timestamp_using_server_timezone(): void
     {
+        Carbon::setTestNow('2026-03-30 13:00:00');
+
         config([
             'server_metrics.guest_push.enabled' => true,
             'server_metrics.ingest.enabled' => false,
@@ -113,5 +119,7 @@ class GuestMetricsPushTest extends TestCase
         $snap = ServerMetricSnapshot::query()->where('server_id', $server->id)->firstOrFail();
 
         $this->assertSame('2026-03-30T19:00:00+00:00', $snap->captured_at->utc()->toIso8601String());
+
+        Carbon::setTestNow();
     }
 }

@@ -38,6 +38,8 @@ class MarketplaceItem extends Model
         'category',
         'recipe_type',
         'payload',
+        'runtimes',
+        'frameworks',
         'sort_order',
         'is_active',
     ];
@@ -46,6 +48,8 @@ class MarketplaceItem extends Model
     {
         return [
             'payload' => 'array',
+            'runtimes' => 'array',
+            'frameworks' => 'array',
             'is_active' => 'boolean',
         ];
     }
@@ -62,6 +66,43 @@ class MarketplaceItem extends Model
         }
 
         return $query->where('category', $category);
+    }
+
+    /**
+     * Filters to items that apply to the given runtime, plus all "universal"
+     * items (where the runtimes tag is null or an empty list).
+     *
+     * Pass null to return everything regardless of runtime tags — used by the
+     * standalone marketplace page where there's no site/server context.
+     */
+    public function scopeForRuntime(Builder $query, ?string $runtime): Builder
+    {
+        if ($runtime === null || $runtime === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($runtime) {
+            $q->whereNull('runtimes')
+                ->orWhereJsonLength('runtimes', 0)
+                ->orWhereJsonContains('runtimes', $runtime);
+        });
+    }
+
+    /**
+     * Filters to items that apply to the given framework, plus all items that
+     * don't declare a framework tag (which are framework-agnostic).
+     */
+    public function scopeForFramework(Builder $query, ?string $framework): Builder
+    {
+        if ($framework === null || $framework === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($framework) {
+            $q->whereNull('frameworks')
+                ->orWhereJsonLength('frameworks', 0)
+                ->orWhereJsonContains('frameworks', $framework);
+        });
     }
 
     /**

@@ -138,11 +138,12 @@ class Hub extends Component
             'quiet_hours_enabled' => (bool) ($d['quiet_hours_enabled'] ?? false),
             'quiet_hours_start' => (int) ($d['quiet_hours_start'] ?? 22),
             'quiet_hours_end' => (int) ($d['quiet_hours_end'] ?? 7),
+            'allow_config_mutation' => (bool) ($d['allow_config_mutation'] ?? true),
         ];
     }
 
     /**
-     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int}
+     * @return array{digest_non_critical: bool, digest_frequency: string, quiet_hours_enabled: bool, quiet_hours_start: int, quiet_hours_end: int, allow_config_mutation: bool}
      */
     protected function insightsStateFromOrg(Organization $org): array
     {
@@ -155,6 +156,9 @@ class Hub extends Component
             'quiet_hours_enabled' => (bool) ($m['quiet_hours_enabled'] ?? false),
             'quiet_hours_start' => (int) ($m['quiet_hours_start'] ?? 22),
             'quiet_hours_end' => (int) ($m['quiet_hours_end'] ?? 7),
+            'allow_config_mutation' => array_key_exists('allow_config_mutation', $m)
+                ? (bool) $m['allow_config_mutation']
+                : true,
         ];
     }
 
@@ -236,6 +240,7 @@ class Hub extends Component
             'organizationInsights.quiet_hours_enabled' => ['boolean'],
             'organizationInsights.quiet_hours_start' => ['required', 'integer', 'min:0', 'max:23'],
             'organizationInsights.quiet_hours_end' => ['required', 'integer', 'min:0', 'max:23'],
+            'organizationInsights.allow_config_mutation' => ['boolean'],
         ]);
 
         $stored = $org->insights_preferences ?? [];
@@ -248,6 +253,7 @@ class Hub extends Component
         $stored['quiet_hours_enabled'] = (bool) ($this->organizationInsights['quiet_hours_enabled'] ?? false);
         $stored['quiet_hours_start'] = (int) ($this->organizationInsights['quiet_hours_start'] ?? 22);
         $stored['quiet_hours_end'] = (int) ($this->organizationInsights['quiet_hours_end'] ?? 7);
+        $stored['allow_config_mutation'] = (bool) ($this->organizationInsights['allow_config_mutation'] ?? true);
 
         $org->update(['insights_preferences' => $stored]);
 

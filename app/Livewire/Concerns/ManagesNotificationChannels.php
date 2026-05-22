@@ -146,10 +146,16 @@ trait ManagesNotificationChannels
         $this->validate($rules, [], array_merge(['new_type' => __('type')], $this->validationAttributes('new_')));
 
         $config = $this->configFromInput($this->new_type, 'new_');
-        $this->owner()->notificationChannels()->create([
+        $channel = $this->owner()->notificationChannels()->create([
             'type' => $this->new_type,
             'label' => $this->new_label,
             'config' => $config,
+        ]);
+
+        $this->recordChannelAudit('notification_channel.created', $channel, null, [
+            'channel_id' => (string) $channel->id,
+            'type' => $channel->type,
+            'label' => $channel->label,
         ]);
 
         $this->resetNewChannelFields();
@@ -250,10 +256,21 @@ trait ManagesNotificationChannels
         );
         $this->validate($rules, [], array_merge(['edit_type' => __('type')], $this->validationAttributes('edit_')));
 
+        $oldSnapshot = [
+            'channel_id' => (string) $channel->id,
+            'type' => $channel->type,
+            'label' => $channel->label,
+        ];
         $channel->update([
             'type' => $this->edit_type,
             'label' => $this->edit_label,
             'config' => $this->configFromInput($this->edit_type, 'edit_'),
+        ]);
+
+        $this->recordChannelAudit('notification_channel.updated', $channel, $oldSnapshot, [
+            'channel_id' => (string) $channel->id,
+            'type' => $channel->type,
+            'label' => $channel->label,
         ]);
 
         $this->cancelEdit();
@@ -265,7 +282,13 @@ trait ManagesNotificationChannels
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
         Gate::authorize('delete', $channel);
+        $snapshot = [
+            'channel_id' => (string) $channel->id,
+            'type' => $channel->type,
+            'label' => $channel->label,
+        ];
         $channel->delete();
+        $this->recordChannelAudit('notification_channel.deleted', null, $snapshot, null);
         unset($this->channels);
         $this->toastSuccess(__('Channel removed.'));
     }
@@ -277,11 +300,41 @@ trait ManagesNotificationChannels
         $this->testing_id = (string) $id;
         $result = $channel->sendTest(Auth::user());
         $this->testing_id = null;
+
+        $this->recordChannelAudit('notification_channel.test_sent', $channel, null, [
+            'channel_id' => (string) $channel->id,
+            'type' => $channel->type,
+            'label' => $channel->label,
+            'result' => $result['ok'] ? 'success' : 'failed',
+            'message' => isset($result['message']) ? (string) $result['message'] : null,
+        ]);
+
         if ($result['ok']) {
             $this->toastSuccess($result['message']);
         } else {
             $this->toastError($result['message']);
         }
+    }
+
+    /**
+     * Resolve the organization that should own this channel's audit entry and
+     * dispatch the log. Channels owned directly by an Organization or Team
+     * route to that org; user-owned (personal) channels route to the user's
+     * current org so the action surfaces alongside their other audit events.
+     */
+    protected function recordChannelAudit(string $action, ?\Illuminate\Database\Eloquent\Model $subject, ?array $oldValues, ?array $newValues): void
+    {
+        $owner = $this->owner();
+        $org = match (true) {
+            $owner instanceof Organization => $owner,
+            $owner instanceof Team => $owner->organization,
+            $owner instanceof User => Auth::user()?->currentOrganization(),
+            default => null,
+        };
+        if ($org === null) {
+            return;
+        }
+        audit_log($org, Auth::user(), $action, $subject, $oldValues, $newValues);
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers\Concerns;
 
 use App\Services\Servers\ServerSshAccessRepairer;
+use App\Support\Servers\ServerDateFormatter;
 use Illuminate\Validation\Rule;
 
 trait ManagesWorkspaceSettingsForm
@@ -26,6 +27,8 @@ trait ManagesWorkspaceSettingsForm
     public ?string $settingsWorkspaceId = null;
 
     public string $settingsTimezone = 'UTC';
+
+    public string $settingsDateFormat = 'absolute_utc';
 
     public string $settingsNotes = '';
 
@@ -117,8 +120,19 @@ trait ManagesWorkspaceSettingsForm
         try {
             $repairer->repairOperationalAccess($this->server->fresh());
             $this->server->refresh();
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.ssh_access_repaired', $this->server, null, [
+                    'result' => 'success',
+                ]);
+            }
             $this->toastSuccess(__('SSH access repaired. Dply reinstalled the operational key for this server.'));
         } catch (\Throwable $e) {
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.ssh_access_repaired', $this->server, null, [
+                    'result' => 'failed',
+                    'error' => mb_strimwidth($e->getMessage(), 0, 500),
+                ]);
+            }
             $this->toastError($e->getMessage());
         }
     }
@@ -137,11 +151,37 @@ trait ManagesWorkspaceSettingsForm
         ]);
 
         $meta = $this->server->meta ?? [];
+        $old = $meta['timezone'] ?? null;
         $meta['timezone'] = $this->settingsTimezone;
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
+        if ($old !== $this->settingsTimezone && $this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'server.timezone_updated', $this->server, ['timezone' => $old], ['timezone' => $this->settingsTimezone]);
+        }
         $this->syncSettingsFormFromServer();
         $this->toastSuccess(__('Timezone preference saved (for your notes; Dply does not change the OS clock).'));
+    }
+
+    public function saveServerDateFormat(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $allowed = array_keys((array) config('server_settings.date_formats', []));
+        $this->validate([
+            'settingsDateFormat' => ['required', 'string', 'in:'.implode(',', $allowed)],
+        ]);
+
+        $meta = $this->server->meta ?? [];
+        $meta['date_format'] = $this->settingsDateFormat;
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+        $this->syncSettingsFormFromServer();
+        $this->toastSuccess(__('Date format preference saved.'));
     }
 
     public function applyDetectedOsFromInventory(): void
@@ -207,6 +247,7 @@ trait ManagesWorkspaceSettingsForm
         $this->settingsOsVersion = (string) ($meta['os_version'] ?? '');
         $this->settingsWorkspaceId = $s->workspace_id;
         $this->settingsTimezone = (string) ($meta['timezone'] ?? 'UTC');
+        $this->settingsDateFormat = ServerDateFormatter::resolveKey($s);
         $this->settingsNotes = (string) ($meta['notes'] ?? '');
     }
 }

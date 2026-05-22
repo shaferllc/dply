@@ -115,7 +115,7 @@
     {{-- Health grid --}}
     @if ($hasAnyData)
         <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <a href="{{ route('servers.manage', ['server' => $server, 'section' => 'services']) }}" wire:navigate class="{{ $card }} block p-5 hover:border-brand-sage/40 hover:bg-brand-sand/10 transition-colors">
+            <a href="{{ route('servers.services', ['server' => $server]) }}" wire:navigate class="{{ $card }} block p-5 hover:border-brand-sage/40 hover:bg-brand-sand/10 transition-colors">
                 <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Services') }}</dt>
                 <dd class="mt-1 flex items-baseline gap-2">
                     <span class="text-2xl font-semibold text-brand-ink">{{ $servicesRunning }}</span>

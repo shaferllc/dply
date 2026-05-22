@@ -6,7 +6,9 @@ use App\Enums\SiteType;
 use App\Livewire\Sites\Settings;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\LaravelComposerPackageDetector;
+use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Deploy\ServerlessDeploymentConfigResolver;
+use App\Services\Scaffold\PlaceholderDnsManager;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class Site extends Model
@@ -47,6 +51,44 @@ class Site extends Model
 
     public const STATUS_FUNCTIONS_ACTIVE = 'functions_active';
 
+    public const STATUS_CONTAINER_PROVISIONING = 'container_provisioning';
+
+    public const STATUS_CONTAINER_ACTIVE = 'container_active';
+
+    public const STATUS_CONTAINER_FAILED = 'container_failed';
+
+    /**
+     * Serverless function resource limits. These map onto the OpenWhisk
+     * action `limits` block DigitalOcean Functions is built on, and are
+     * applied to the action on the next deploy.
+     *
+     * @var array<int, int>
+     */
+    public const SERVERLESS_MEMORY_OPTIONS_MB = [128, 256, 512, 1024];
+
+    public const SERVERLESS_DEFAULT_MEMORY_MB = 512;
+
+    public const SERVERLESS_DEFAULT_TIMEOUT_MS = 60000;
+
+    public const SERVERLESS_MIN_TIMEOUT_MS = 1000;
+
+    public const SERVERLESS_MAX_TIMEOUT_MS = 900000;
+
+    public const SERVERLESS_DEFAULT_CONCURRENCY = 1;
+
+    public const SERVERLESS_MAX_CONCURRENCY = 50;
+
+    /**
+     * Site row exists, scaffold pipeline (PR 5/6) is in flight.
+     * Distinct from container_provisioning so Container vs Scaffold
+     * journeys don't share states or audit shapes.
+     */
+    public const STATUS_SCAFFOLDING = 'scaffolding';
+
+    public const STATUS_SCAFFOLD_FAILED = 'scaffold_failed';
+
+    public const STATUS_CUSTOM_ACTIVE = 'custom_active';
+
     public const STATUS_ERROR = 'error';
 
     public const SSL_NONE = 'none';
@@ -69,10 +111,13 @@ class Site extends Model
         'type',
         'document_root',
         'repository_path',
-        'php_version',
+        'runtime',
         'runtime_version',
+        'database_engine',
         'app_port',
+        'internal_port',
         'build_command',
+        'start_command',
         'status',
         'ssl_status',
         'nginx_installed_at',
@@ -98,6 +143,15 @@ class Site extends Model
         'deployment_environment',
         'php_fpm_user',
         'env_file_content',
+        'env_synced_at',
+        'env_cache_origin',
+        'env_file_path',
+        'container_image',
+        'container_registry',
+        'container_port',
+        'container_backend',
+        'container_backend_id',
+        'container_region',
         'meta',
     ];
 
@@ -109,6 +163,7 @@ class Site extends Model
             'webhook_secret' => 'encrypted',
             'webhook_allowed_ips' => 'array',
             'env_file_content' => 'encrypted',
+            'env_synced_at' => 'datetime',
             'meta' => 'array',
             'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
@@ -122,6 +177,23 @@ class Site extends Model
 
     protected static function booted(): void
     {
+        // Keep the legacy `engine_http_cache_enabled` column in sync with
+        // `meta['caching']` so existing direct-column readers (5 in
+        // NginxSiteConfigBuilder / SiteNginxProvisioner) keep working until
+        // the column is dropped in a follow-up release. The reverse mapping
+        // lives in {@see Site::cachingConfig()}, which falls back to the
+        // boolean when `meta['caching']` is absent.
+        static::saving(function (Site $site): void {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            if (! isset($meta['caching']) || ! is_array($meta['caching'])) {
+                return;
+            }
+            $enabled = (bool) ($meta['caching']['enabled'] ?? false);
+            $methods = $meta['caching']['methods'] ?? [];
+            $hasNginxHttp = is_array($methods) && in_array('nginx_http', $methods, true);
+            $site->engine_http_cache_enabled = $enabled && $hasNginxHttp;
+        });
+
         static::creating(function (Site $site): void {
             if (empty($site->slug)) {
                 $site->slug = Str::slug($site->name) ?: 'site';
@@ -138,7 +210,11 @@ class Site extends Model
                     $site->workspace_id = $server->workspace_id;
                 }
             }
-            if ($site->project_id === null) {
+            if ($site->project_id === null && $site->organization_id && $site->user_id) {
+                // Auto-create a BYO-site Project only when we can satisfy its NOT NULL
+                // owners (organization_id + user_id). In-memory test fixtures and other
+                // edge cases that lack those skip the auto-creation rather than
+                // crashing the host save() — the operator can attach a project later.
                 $project = Project::query()->create([
                     'organization_id' => $site->organization_id,
                     'user_id' => $site->user_id,
@@ -151,10 +227,15 @@ class Site extends Model
         });
 
         static::created(function (Site $site): void {
-            $site->project()->update([
-                'slug' => $site->slug.'-'.$site->id,
-                'name' => $site->name,
-            ]);
+            if ($site->project_id !== null) {
+                // The `creating` hook only auto-attaches a Project when org_id + user_id
+                // are present; without a project we skip the rename pass rather than firing
+                // an UPDATE against zero rows. Sites without a project attach one later.
+                $site->project()->update([
+                    'slug' => $site->slug.'-'.$site->id,
+                    'name' => $site->name,
+                ]);
+            }
 
             // Every site that runs *something* (i.e. not a pure static host) gets a
             // canonical "web" process row. The row's command is null at create time:
@@ -168,6 +249,50 @@ class Site extends Model
                     'command' => null,
                     'scale' => 1,
                     'is_active' => true,
+                ]);
+            }
+        });
+
+        static::deleting(function (Site $site): void {
+            // Dispatch on-server cleanup for Custom (headless) sites
+            // before the row vanishes. We capture the resolved values
+            // here because effectiveSystemUser() needs the server, and
+            // we don't want the job racing on a stale lookup.
+            if ($site->isCustom() && $site->server_id !== null) {
+                try {
+                    $server = $site->server;
+                    if ($server) {
+                        \App\Jobs\CleanupCustomSiteJob::dispatch(
+                            (string) $server->id,
+                            (string) ($site->repository_path ?? ''),
+                            $site->effectiveSystemUser($server),
+                            trim((string) $site->php_fpm_user) !== '',
+                            $site->deploy_script_id ? (string) $site->deploy_script_id : null,
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Custom site cleanup dispatch failed', [
+                        'site_id' => $site->getKey(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Release any placeholder DNS record + ondply.io zone entry
+            // assigned to this site by the scaffold pipeline. release()
+            // is idempotent + safe to call on non-scaffolded sites
+            // (it short-circuits when meta.scaffold.placeholder_dns is
+            // absent), so it runs unconditionally on every site delete.
+            try {
+                app(PlaceholderDnsManager::class)->release($site);
+            } catch (\Throwable $e) {
+                // Best-effort cleanup. We do NOT want a transient DNS
+                // provider failure to block deletion of the site row;
+                // any orphaned record is recoverable via the manager's
+                // audit trail.
+                Log::warning('Site::deleting placeholder release failed', [
+                    'site_id' => $site->getKey(),
+                    'error' => $e->getMessage(),
                 ]);
             }
         });
@@ -254,6 +379,20 @@ class Site extends Model
     {
         $this->loadMissing('domains');
         $host = strtolower(trim((string) optional($this->primaryDomain())->hostname));
+
+        return self::apexGuessForHostname($host);
+    }
+
+    /**
+     * Apex extraction helper for an arbitrary hostname — same rule as
+     * {@see guessDnsZoneFromPrimaryHostname()} but doesn't read from the
+     * site's current domain. Used by the rename-cascade planner to decide
+     * whether the saved `dns_zone` was the operator's choice or matched
+     * what dply would have auto-suggested from the *old* hostname.
+     */
+    public static function apexGuessForHostname(string $hostname): ?string
+    {
+        $host = strtolower(trim($hostname));
         if ($host === '' || ! str_contains($host, '.')) {
             return null;
         }
@@ -266,9 +405,38 @@ class Site extends Model
         return $parts[count($parts) - 2].'.'.$parts[count($parts) - 1];
     }
 
+    /**
+     * True when the saved `dns_zone` equals the apex dply would auto-guess
+     * from the supplied hostname. Treats an empty saved zone as "no operator
+     * value" — also auto-derived for cascade purposes.
+     */
+    public function dnsZoneMatchesAutoGuessForHostname(string $hostname): bool
+    {
+        $saved = strtolower(trim((string) ($this->dns_zone ?? '')));
+        if ($saved === '') {
+            return true;
+        }
+
+        $guess = self::apexGuessForHostname($hostname);
+
+        return $guess !== null && strtolower($guess) === $saved;
+    }
+
     public function domains(): HasMany
     {
         return $this->hasMany(SiteDomain::class);
+    }
+
+    /**
+     * The OpenWhisk actions on this serverless function-Site. A Site is an
+     * OpenWhisk package: one `kind=code` action for a plain function, more
+     * once the package model lands. Code actions sort before sequences.
+     */
+    public function functionActions(): HasMany
+    {
+        return $this->hasMany(FunctionAction::class)
+            ->orderByRaw("CASE WHEN kind = 'code' THEN 0 ELSE 1 END")
+            ->orderBy('name');
     }
 
     public function previewDomains(): HasMany
@@ -284,6 +452,25 @@ class Site extends Model
     public function basicAuthUsers(): HasMany
     {
         return $this->hasMany(SiteBasicAuthUser::class)->orderBy('sort_order')->orderBy('username');
+    }
+
+    /**
+     * Subset of {@see basicAuthUsers()} that the webserver should actually
+     * enforce: managed (Dply wrote the htpasswd) AND not pending-removal
+     * (the next apply will drop them). Both the nginx config builder and the
+     * htpasswd-sync helper must use this same subset — otherwise the config
+     * can reference an htpasswd file the sync just deleted, locking everyone
+     * out with a 500 from nginx.
+     *
+     * @return Collection<int, SiteBasicAuthUser>
+     */
+    public function enforceableBasicAuthUsers(): Collection
+    {
+        $this->loadMissing('basicAuthUsers');
+
+        return $this->basicAuthUsers->reject(
+            fn (SiteBasicAuthUser $u): bool => $u->isPendingRemoval() || $u->isDiscoveredFromServer()
+        )->values();
     }
 
     public function uptimeMonitors(): HasMany
@@ -306,6 +493,19 @@ class Site extends Model
         return $this->hasMany(SiteDeployment::class)->orderByDesc('id');
     }
 
+    /**
+     * Convenience accessor for the most recent SiteDeployment by start
+     * time. Used by dashboard headers and "latest deploy" badges so
+     * callers don't have to repeatedly write the orderBy + limit.
+     */
+    public function latestDeployment(): ?SiteDeployment
+    {
+        // The deployments() relation pre-orders by id desc; reorder()
+        // resets so started_at desc is the only sort and ULIDs created
+        // out-of-order (test fixtures, backdated rows) sort correctly.
+        return $this->deployments()->reorder('started_at', 'desc')->first();
+    }
+
     public function webhookDeliveryLogs(): HasMany
     {
         return $this->hasMany(WebhookDeliveryLog::class)->orderByDesc('id');
@@ -319,11 +519,6 @@ class Site extends Model
     public function processes(): HasMany
     {
         return $this->hasMany(SiteProcess::class)->orderBy('name');
-    }
-
-    public function environmentVariables(): HasMany
-    {
-        return $this->hasMany(SiteEnvironmentVariable::class)->orderBy('env_key');
     }
 
     public function redirects(): HasMany
@@ -364,10 +559,45 @@ class Site extends Model
             && $server->hasAnySshPrivateKey();
     }
 
+    /** Memoized result of the lazy-load path in primaryDomain(). */
+    private ?SiteDomain $primaryDomainCache = null;
+
+    private bool $primaryDomainResolved = false;
+
     public function primaryDomain(): ?SiteDomain
     {
-        return $this->domains()->where('is_primary', true)->first()
-            ?? $this->domains()->first();
+        // Avoid re-querying when callers have already eager-loaded `domains`
+        // (Settings::render() does this) — the in-memory collection is the same
+        // source of truth for is_primary/first.
+        if ($this->relationLoaded('domains')) {
+            return $this->domains->firstWhere('is_primary', true) ?? $this->domains->first();
+        }
+
+        // primaryDomain() is hit repeatedly per request (blade views, Site::url(),
+        // service classes). Memoize so the lazy path queries at most once.
+        if ($this->primaryDomainResolved) {
+            return $this->primaryDomainCache;
+        }
+
+        $this->primaryDomainResolved = true;
+
+        // Order is_primary descending so the primary domain wins, falling back
+        // to any domain — one query instead of a where + a separate fallback.
+        return $this->primaryDomainCache = $this->domains()
+            ->orderByDesc('is_primary')
+            ->first();
+    }
+
+    /**
+     * Drop the memoized primaryDomain() result. Call this after creating or
+     * re-prioritising a SiteDomain on an in-memory Site instance that may have
+     * already resolved primaryDomain() — e.g. the scaffold pipelines, which
+     * read primaryDomain() in a later step than the one that creates it.
+     */
+    public function flushPrimaryDomainCache(): void
+    {
+        $this->primaryDomainCache = null;
+        $this->primaryDomainResolved = false;
     }
 
     public function testingHostname(): string
@@ -556,7 +786,33 @@ class Site extends Model
                 self::STATUS_DOCKER_CONFIGURED,
                 self::STATUS_KUBERNETES_CONFIGURED,
                 self::STATUS_FUNCTIONS_CONFIGURED,
+                self::STATUS_CONTAINER_PROVISIONING,
+                self::STATUS_CONTAINER_ACTIVE,
+                self::STATUS_CONTAINER_FAILED,
+                self::STATUS_CUSTOM_ACTIVE,
             ], true);
+    }
+
+    public function isCustom(): bool
+    {
+        return $this->type === SiteType::Custom;
+    }
+
+    public function isCustomGitMode(): bool
+    {
+        return $this->isCustom() && trim((string) $this->git_repository_url) !== '';
+    }
+
+    public function isCustomNoRepoMode(): bool
+    {
+        return $this->isCustom() && trim((string) $this->git_repository_url) === '';
+    }
+
+    public function supportsWebserver(): bool
+    {
+        return $this->type instanceof SiteType
+            ? $this->type->managesWebserver()
+            : true;
     }
 
     public function statusLabel(): string
@@ -573,6 +829,7 @@ class Site extends Model
             self::STATUS_KUBERNETES_ACTIVE => 'kubernetes active',
             self::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
             self::STATUS_FUNCTIONS_ACTIVE => 'functions active',
+            self::STATUS_CUSTOM_ACTIVE => 'custom active',
             default => str_replace('_', ' ', $this->status),
         };
     }
@@ -605,7 +862,103 @@ class Site extends Model
             return $version;
         }
 
-        return $this->php_version;
+        return null;
+    }
+
+    /**
+     * Returns the canonical runtime key for this site (php/node/python/
+     * ruby/go/static).
+     *
+     * Prefers the new `runtime` column; falls back to the existing `type`
+     * enum for rows that predate the column. The fallback only covers the
+     * three values the form historically supported (php/node/static) —
+     * python/ruby/go sites can only exist via the new code path.
+     */
+    public function runtimeKey(): ?string
+    {
+        $runtime = $this->runtime;
+        if (is_string($runtime) && $runtime !== '') {
+            return $runtime;
+        }
+
+        return $this->type?->value;
+    }
+
+    /**
+     * The PHP version this site runs on, when the runtime is PHP.
+     *
+     * Reads from the new `runtime_version` column (canonical source per
+     * the strategy memo's "drop php_version column entirely" decision)
+     * and falls back to the legacy `php_version` column for rows that
+     * predate the column drop. Returns null for non-PHP runtimes so
+     * call sites can distinguish "not a PHP site" from "PHP version
+     * unknown".
+     */
+    public function phpVersion(): ?string
+    {
+        if ($this->runtimeKey() !== 'php') {
+            return null;
+        }
+
+        $version = $this->runtime_version;
+
+        return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    /**
+     * The database engine this site targets.
+     *
+     * Prefers the explicit `database_engine` column when set (the user
+     * picked an engine on a multi-engine server), and falls back to the
+     * server's default ServerDatabaseEngine row. Returns null on hosts
+     * with no DB at all (cache-only / load-balancer / static-only servers).
+     *
+     * Per the strategy memo: "Site database_engine defaults to server's
+     * default; can be overridden to any engine installed on the server."
+     */
+    public function databaseEngine(): ?string
+    {
+        if (is_string($this->database_engine) && $this->database_engine !== '') {
+            return $this->database_engine;
+        }
+
+        $server = $this->server ?? Server::query()->find($this->server_id);
+        if ($server === null) {
+            return null;
+        }
+
+        $default = $server->defaultDatabaseEngine();
+
+        return $default?->engine;
+    }
+
+    /**
+     * Back-compat shim for the dropped `php_version` column.
+     *
+     * The strategy memo's "drop php_version column entirely" decision
+     * removed the underlying column, but a lot of test code (and
+     * possibly third-party callers) still passes `'php_version' => '8.3'`
+     * to factory `->create([...])` calls or to `Site::query()->update()`.
+     * Routing those through to `runtime_version` keeps the old call
+     * shape working while the canonical column is the new one.
+     *
+     * Reads return runtime_version when the runtime is PHP, null otherwise
+     * — matches phpVersion()'s semantics so consumers can call either.
+     */
+    public function setPhpVersionAttribute($value): void
+    {
+        if ($value === null || $value === '') {
+            return;
+        }
+        if (! is_string($this->runtime) || $this->runtime === '') {
+            $this->runtime = 'php';
+        }
+        $this->runtime_version = (string) $value;
+    }
+
+    public function getPhpVersionAttribute(): ?string
+    {
+        return $this->phpVersion();
     }
 
     public function runtimeProfile(): string
@@ -738,6 +1091,28 @@ class Site extends Model
         return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'laravel';
     }
 
+    public function isRailsFrameworkDetected(): bool
+    {
+        return strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'rails';
+    }
+
+    /**
+     * True when the site's detected runtime app is WordPress (per
+     * {@see PhpRuntimeDetector}),
+     * OR when the site was scaffolded with the WordPress framework
+     * pipeline (Q14 — gates the WordPress Settings section).
+     */
+    public function isWordPressDetected(): bool
+    {
+        if (strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? '')) === 'wordpress') {
+            return true;
+        }
+
+        $scaffoldFramework = $this->meta['scaffold']['framework'] ?? null;
+
+        return is_string($scaffoldFramework) && strtolower($scaffoldFramework) === 'wordpress';
+    }
+
     /**
      * @param  array<string, mixed>  $blob
      */
@@ -774,6 +1149,72 @@ class Site extends Model
     public function usesKubernetesRuntime(): bool
     {
         return $this->runtimeProfile() === 'kubernetes_web';
+    }
+
+    public function usesContainerRuntime(): bool
+    {
+        return $this->type === SiteType::Container
+            || in_array($this->container_backend, [
+                'digitalocean_app_platform',
+                'aws_app_runner',
+                'dply_edge',
+            ], true);
+    }
+
+    /**
+     * URL the container deployment is reachable at, set by the
+     * provisioner once the backend reports an "ingress" hostname
+     * (DO App Platform default ondigitalocean.app, App Runner's
+     * default *.awsapprunner.com).
+     */
+    /**
+     * Rough monthly cost estimate for the container site, in USD.
+     * Based on backend × size_tier × instance_count, using public
+     * list pricing as of 2026-05. Returns 0 for non-container sites.
+     *
+     * Not authoritative — used as a "ballpark" surface in the
+     * dashboard / CLI so operators can compare fleets without
+     * digging into the cloud billing console.
+     */
+    public function estimatedMonthlyCostUsd(): int
+    {
+        if ($this->container_backend === null) {
+            return 0;
+        }
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $tier = (string) ($meta['container']['size_tier'] ?? 'small');
+        $instances = is_int($meta['container']['instance_count'] ?? null)
+            ? (int) $meta['container']['instance_count']
+            : 1;
+
+        // Per-instance pricing rough estimates. DO's instance_size_slug
+        // pricing is monthly + flat; App Runner is per-vCPU-hour for
+        // active time so this is more uncertain (we assume active 24/7).
+        $perInstance = match ($this->container_backend) {
+            'digitalocean_app_platform' => match ($tier) {
+                'medium' => 10,
+                'large' => 25,
+                'xlarge' => 50,
+                default => 5,
+            },
+            'aws_app_runner' => match ($tier) {
+                'medium' => 50,
+                'large' => 100,
+                'xlarge' => 200,
+                default => 25,
+            },
+            default => 0,
+        };
+
+        return $perInstance * max(1, $instances);
+    }
+
+    public function containerLiveUrl(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $url = $meta['container']['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     /**
@@ -1204,6 +1645,116 @@ class Site extends Model
     }
 
     /**
+     * Normalised serverless resource limits — memory (MB), timeout (ms), and
+     * per-container concurrency — with platform defaults filled in. The
+     * DigitalOcean Functions deployer reads these straight onto the
+     * OpenWhisk action's `limits` block at deploy time.
+     *
+     * @return array{memory: int, timeout: int, concurrency: int}
+     */
+    public function serverlessLimits(): array
+    {
+        $limits = $this->serverlessConfig()['limits'] ?? [];
+        $limits = is_array($limits) ? $limits : [];
+
+        $memory = (int) ($limits['memory'] ?? self::SERVERLESS_DEFAULT_MEMORY_MB);
+        if (! in_array($memory, self::SERVERLESS_MEMORY_OPTIONS_MB, true)) {
+            $memory = self::SERVERLESS_DEFAULT_MEMORY_MB;
+        }
+
+        $timeout = (int) ($limits['timeout'] ?? self::SERVERLESS_DEFAULT_TIMEOUT_MS);
+        $timeout = max(self::SERVERLESS_MIN_TIMEOUT_MS, min(self::SERVERLESS_MAX_TIMEOUT_MS, $timeout));
+
+        $concurrency = (int) ($limits['concurrency'] ?? self::SERVERLESS_DEFAULT_CONCURRENCY);
+        $concurrency = max(1, min(self::SERVERLESS_MAX_CONCURRENCY, $concurrency));
+
+        return [
+            'memory' => $memory,
+            'timeout' => $timeout,
+            'concurrency' => $concurrency,
+        ];
+    }
+
+    /**
+     * The function's globally-unique friendly slug — the one that gives it a
+     * clean dply-hosted URL ({app}/fn/{slug}) instead of the raw DigitalOcean
+     * Functions invocation URL. Generated and persisted on first access.
+     */
+    public function ensureServerlessProxySlug(): string
+    {
+        $existing = (string) ($this->serverlessConfig()['proxy_slug'] ?? '');
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $base = \Illuminate\Support\Str::slug((string) $this->name) ?: 'fn';
+        $slug = $base;
+        while (static::query()
+            ->where('meta->serverless->proxy_slug', $slug)
+            ->whereKeyNot($this->getKey())
+            ->exists()) {
+            $slug = $base.'-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(4));
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $serverless['proxy_slug'] = $slug;
+        $meta['serverless'] = $serverless;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $slug;
+    }
+
+    /**
+     * The stable secret dply signs background ticks (scheduler / queue) with.
+     *
+     * Deliberately separate from {@see webhook_secret}: that one is operator-
+     * rotatable, and rotating it must never silently break the function's
+     * scheduler. This secret is minted once, persisted in `meta.serverless`,
+     * and reused — the deploy bakes it into the function's env and every tick
+     * signs with the same value, so the two can never drift apart.
+     */
+    public function ensureServerlessCommandSecret(): string
+    {
+        $existing = trim((string) ($this->serverlessConfig()['command_secret'] ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $secret = \Illuminate\Support\Str::random(48);
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $serverless['command_secret'] = $secret;
+        $meta['serverless'] = $serverless;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $secret;
+    }
+
+    /**
+     * The function's live hostname — its proxy slug under a deterministically
+     * chosen DPLY_TESTING_DOMAINS entry (e.g. orders-api.dply.cc), matching
+     * how VM sites get a testing hostname. Null when no testing domains are
+     * configured, in which case the path URL (/fn/{slug}) is the address.
+     */
+    public function serverlessFunctionHost(): ?string
+    {
+        $domains = array_values(array_filter(
+            (array) config('services.digitalocean.testing_domains', []),
+            static fn ($domain): bool => is_string($domain) && trim($domain) !== '',
+        ));
+
+        if ($domains === []) {
+            return null;
+        }
+
+        $domain = trim((string) $domains[abs(crc32((string) $this->getKey())) % count($domains)]);
+
+        return $this->ensureServerlessProxySlug().'.'.$domain;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function serverlessResolvedConfig(): array
@@ -1309,14 +1860,43 @@ class Site extends Model
             ...$this->customerDomainHostnames(),
             ...$this->aliasHostnames(),
             ...$this->tenantHostnames(),
+            ...$this->previewHostnames(),
         ])->unique()->values()->all();
+    }
+
+    /**
+     * Hostnames issued by {@see TestingHostnameProvisioner}. Stored on
+     * SitePreviewDomain (not SiteDomain) — without this in the webserver
+     * server_name list, freshly-provisioned testing URLs fall through to
+     * the default nginx server and serve a bare 404.
+     *
+     * @return list<string>
+     */
+    public function previewHostnames(): array
+    {
+        $previewDomains = $this->relationLoaded('previewDomains')
+            ? $this->previewDomains
+            : $this->previewDomains()->get();
+
+        return $previewDomains->pluck('hostname')
+            ->filter(fn (mixed $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->map(fn (string $hostname): string => strtolower(trim($hostname)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function effectiveRepositoryPath(): string
     {
         $path = $this->repository_path;
+        if ($path !== null && $path !== '') {
+            return $path;
+        }
 
-        return $path !== null && $path !== '' ? $path : $this->document_root;
+        // Container sites have neither a repo path nor a document
+        // root — return a stable placeholder so callers that derive
+        // sub-paths (basic-auth dir, etc.) can still build strings.
+        return $this->document_root ?? '/var/www/'.($this->slug ?: 'site');
     }
 
     /**
@@ -1345,8 +1925,17 @@ class Site extends Model
         }
 
         $server = $this->server;
+        if ($server === null || ! $server->hostCapabilities()->supportsSsh()) {
+            return false;
+        }
 
-        return $server !== null && $server->hostCapabilities()->supportsNginxProvisioning();
+        return in_array($this->webserver(), [
+            'nginx',
+            'apache',
+            'caddy',
+            'traefik',
+            'openlitespeed',
+        ], true);
     }
 
     /**
@@ -1409,6 +1998,27 @@ class Site extends Model
         return rtrim($this->effectiveRepositoryPath(), '/');
     }
 
+    /**
+     * Absolute path on the host where Dply reads/writes the .env file.
+     * Defaults to {@see effectiveEnvDirectory()}/.env, but the operator can
+     * override via the env_file_path column to relocate the file outside the
+     * docroot — e.g. /etc/dply/<slug>.env — so it cannot be served by the
+     * webserver even if the deny rule is bypassed.
+     *
+     * Override paths are validated to be absolute at the service layer; this
+     * helper trusts the stored value (validation lives at write time, not
+     * read time).
+     */
+    public function effectiveEnvFilePath(): string
+    {
+        $override = trim((string) ($this->env_file_path ?? ''));
+        if ($override !== '') {
+            return $override;
+        }
+
+        return rtrim($this->effectiveEnvDirectory(), '/').'/.env';
+    }
+
     public function isSuspended(): bool
     {
         return $this->suspended_at !== null;
@@ -1416,20 +2026,110 @@ class Site extends Model
 
     /**
      * Managed VM vhosts may emit engine-level HTTP cache directives (e.g. nginx FastCGI / proxy_cache).
+     *
+     * Reads from {@see Site::cachingConfig()} (`meta['caching']`) and falls back to the legacy
+     * boolean column for sites that haven't run through the `migrate_engine_http_cache_to_meta_caching`
+     * migration yet. The boolean column is also kept in sync by a `saving` observer so existing
+     * direct-column reads keep working until the column is dropped in a follow-up release.
      */
     public function wantsEngineHttpCache(): bool
     {
-        if (! $this->engine_http_cache_enabled) {
-            return false;
-        }
-
         if ($this->isSuspended()) {
             return false;
         }
 
-        return ! $this->usesFunctionsRuntime()
-            && ! $this->usesDockerRuntime()
-            && ! $this->usesKubernetesRuntime();
+        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        return $this->hasCachingMethod('nginx_http');
+    }
+
+    /**
+     * Site-level caching configuration, materialised with sensible defaults.
+     *
+     * Lives under `meta['caching']`. Pre-migration sites (no `caching` key yet) get a synthetic
+     * structure derived from the legacy `engine_http_cache_enabled` boolean so the rest of the
+     * code can read one shape regardless of migration state.
+     *
+     * @return array<string, mixed>
+     */
+    public function cachingConfig(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $caching = $meta['caching'] ?? null;
+
+        if (is_array($caching)) {
+            return $caching;
+        }
+
+        $legacyEnabled = (bool) $this->engine_http_cache_enabled;
+
+        return [
+            'enabled' => $legacyEnabled,
+            'methods' => $legacyEnabled ? ['nginx_http'] : [],
+            'nginx_http' => [
+                'fcgi' => ['ttl_200' => '60m', 'ttl_404' => '10m', 'min_uses' => 1],
+                'proxy' => ['ttl_200' => '60m', 'ttl_404' => '10m'],
+                'bypass_cookies' => [],
+            ],
+            'lscache' => ['enabled' => false, 'rules' => []],
+            'varnish' => ['enabled' => false, 'ttl_default' => '120s'],
+        ];
+    }
+
+    /**
+     * Whether the master caching toggle is on AND the given method id appears in `methods`.
+     * The single gate every consumer should funnel through — keeps the "enabled vs methods"
+     * invariant in one place.
+     */
+    public function hasCachingMethod(string $method): bool
+    {
+        $cfg = $this->cachingConfig();
+        if (empty($cfg['enabled'])) {
+            return false;
+        }
+        $methods = $cfg['methods'] ?? [];
+
+        return is_array($methods) && in_array($method, $methods, true);
+    }
+
+    /**
+     * Methods this site is eligible to enable, given its type/runtime/webserver. Single source
+     * of truth for the Livewire toggle list, validation, and the audit-event payload.
+     *
+     * Webserver-native cache modules surface only for the webserver the server currently runs;
+     * Varnish + OPcache are webserver-agnostic and surface for any non-container PHP/static/node
+     * site. v2 will add `apache_modcache` and `caddy_souin`.
+     *
+     * @return list<string>
+     */
+    public function availableCachingMethods(): array
+    {
+        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+            return [];
+        }
+
+        $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
+        $webserver = strtolower((string) ($serverMeta['webserver'] ?? 'nginx'));
+
+        $methods = ['varnish'];
+
+        if ($this->type === SiteType::Php) {
+            $methods[] = 'opcache';
+        }
+
+        switch ($webserver) {
+            case 'nginx':
+                $methods[] = 'nginx_http';
+                break;
+            case 'openlitespeed':
+                $methods[] = 'lscache';
+                break;
+            // apache mod_cache + caddy souin land in v2.
+        }
+
+        return array_values(array_unique($methods));
     }
 
     /**
@@ -1480,6 +2180,33 @@ class Site extends Model
     public function deployHookUrl(): string
     {
         return route('hooks.site.deploy', ['site' => $this->id]);
+    }
+
+    /**
+     * Signed URL CI can POST to for redeploying an edge container
+     * site. The signature uses Laravel's signed-route mechanism
+     * keyed on APP_KEY — no expiry (CI scripts shouldn't have to
+     * refresh the URL on a schedule). Operators can rotate by
+     * regenerating webhook_secret on the site, which invalidates
+     * the URL via that field's inclusion in the signature.
+     */
+    public function edgeRedeployHookUrl(): string
+    {
+        return URL::signedRoute(
+            'hooks.edge.redeploy',
+            ['site' => $this->id, 's' => substr((string) $this->webhook_secret, 0, 8)],
+        );
+    }
+
+    /**
+     * Inbound GitHub webhook URL — paste this into the repository's
+     * webhook settings on GitHub. The site's webhook_secret is the
+     * shared HMAC-SHA256 signing secret operators paste alongside.
+     * No URL signing here: GitHub signs the body, not the URL.
+     */
+    public function edgeGithubHookUrl(): string
+    {
+        return route('hooks.edge.github', ['site' => $this->id]);
     }
 
     /**

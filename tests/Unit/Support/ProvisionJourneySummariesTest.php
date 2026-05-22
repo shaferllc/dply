@@ -43,4 +43,34 @@ class ProvisionJourneySummariesTest extends TestCase
 
         $this->assertSame('verification_failure', $result['code']);
     }
+
+    public function test_failure_classifier_detects_ppa_unreachable(): void
+    {
+        $tail = "Err:5 https://ppa.launchpadcontent.net/ondrej/php/ubuntu noble InRelease\n"
+            ."Could not connect to ppa.launchpadcontent.net:443 (185.125.190.80), connection timed out\n"
+            ."W: Failed to fetch https://ppa.launchpadcontent.net/...\n"
+            ."E: Couldn't find any package by regex 'php8.4-mysql'";
+
+        $result = ClassifyProvisionFailure::classify(
+            'Installing PHP 8.4 packages',
+            $tail,
+            [],
+            null,
+        );
+
+        $this->assertSame('package_repo_unreachable', $result['code']);
+        $this->assertStringContainsString('transient', $result['detail']);
+    }
+
+    public function test_failure_classifier_detects_apt_failed_to_fetch(): void
+    {
+        $result = ClassifyProvisionFailure::classify(
+            'Installing packages',
+            'W: Failed to fetch http://archive.ubuntu.com/ubuntu/dists/noble/InRelease',
+            [],
+            null,
+        );
+
+        $this->assertSame('package_repo_unreachable', $result['code']);
+    }
 }

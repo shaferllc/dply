@@ -20,6 +20,19 @@
     @endif
 
     @php
+        $activePageItem = null;
+        if (filled($active) && $active !== 'overview') {
+            foreach (config('server_workspace.nav', []) as $navItem) {
+                if (is_array($navItem) && ($navItem['key'] ?? null) === $active) {
+                    $activePageItem = [
+                        'label' => __($navItem['label'] ?? ucfirst((string) $active)),
+                        'icon' => $navItem['icon'] ?? null,
+                    ];
+                    break;
+                }
+            }
+        }
+
         $workspaceBreadcrumbs = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
@@ -39,14 +52,19 @@
             ];
             $workspaceBreadcrumbs[] = [
                 'label' => $contextSite->name,
-                'href' => route('sites.show', ['server' => $server, 'site' => $contextSite]),
+                'href' => $activePageItem ? route('sites.show', ['server' => $server, 'site' => $contextSite]) : null,
                 'icon' => 'globe-alt',
             ];
         } else {
             $workspaceBreadcrumbs[] = [
                 'label' => $server->name,
+                'href' => $activePageItem ? route('servers.overview', $server) : null,
                 'icon' => 'server-stack',
             ];
+        }
+
+        if ($activePageItem) {
+            $workspaceBreadcrumbs[] = $activePageItem;
         }
     @endphp
     <x-breadcrumb-trail :items="$workspaceBreadcrumbs" />
@@ -66,16 +84,21 @@
                 {{ $headerLeading }}
             </x-slot>
         @endisset
-        @if ($server->workspace)
+        @if ($server->workspace || isset($headerActions))
             <x-slot name="actions">
-                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                    {{ __('Open project workspace') }}
-                </a>
+                @isset($headerActions)
+                    {{ $headerActions }}
+                @endisset
+                @if ($server->workspace)
+                    <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                        {{ __('Open project workspace') }}
+                    </a>
+                @endif
             </x-slot>
         @endif
     </x-page-header>
 
-    <div class="space-y-8">
+    <div class="mt-6 space-y-8 sm:mt-8">
         {{ $slot }}
     </div>
 

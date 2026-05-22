@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\TaskRunner;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Tests\Helpers\TestTask;
@@ -17,6 +18,15 @@ use Tests\TestCase;
 class TaskRunnerWebhookTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Webhook routes are guest-accessible — RedirectGuestsToComingSoon
+        // catches them in non-local envs and returns 302 instead of letting
+        // the controller's signature check run. Bypass for the whole class.
+        $this->withoutMiddleware([RedirectGuestsToComingSoon::class]);
+    }
 
     public function test_unsigned_webhook_update_output_is_rejected(): void
     {

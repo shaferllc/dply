@@ -149,6 +149,7 @@ trait ManagesExtendedServerSettings
         Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $created = 0;
+        $createdKeys = [];
         foreach ($this->notifAddEventKeys as $eventKey) {
             $row = NotificationSubscription::firstOrCreate([
                 'notification_channel_id' => $channel->id,
@@ -158,7 +159,24 @@ trait ManagesExtendedServerSettings
             ]);
             if ($row->wasRecentlyCreated) {
                 $created++;
+                $createdKeys[] = $eventKey;
             }
+        }
+
+        if ($created > 0 && $this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                Auth::user(),
+                'server.notifications.subscription_added',
+                $this->server,
+                null,
+                [
+                    'channel_id' => (string) $channel->id,
+                    'channel_label' => $channel->label,
+                    'event_keys' => $createdKeys,
+                    'count' => $created,
+                ],
+            );
         }
 
         $this->notifAddChannelId = '';
@@ -194,7 +212,24 @@ trait ManagesExtendedServerSettings
             Gate::authorize('manageNotificationChannels', $channel->owner);
         }
 
+        $snapshot = [
+            'channel_id' => (string) $sub->notification_channel_id,
+            'channel_label' => $channel?->label,
+            'event_key' => $sub->event_key,
+        ];
         $sub->delete();
+
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                Auth::user(),
+                'server.notifications.subscription_removed',
+                $this->server,
+                $snapshot,
+                null,
+            );
+        }
+
         $this->toastSuccess(__('Subscription removed.'));
     }
 

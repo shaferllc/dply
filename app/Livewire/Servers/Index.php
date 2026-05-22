@@ -8,8 +8,10 @@ use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
+use App\Models\ServerMetricSnapshot;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\ProvisioningDigest;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -117,6 +119,30 @@ class Index extends Component
         $server = Server::query()->findOrFail($this->deleteModalServerId);
         $this->authorize('delete', $server);
 
+        // Type-to-confirm — required for every mode. Mirrors the workspace
+        // page's HandlesServerRemovalFlow behaviour.
+        if (trim($this->deleteConfirmName) !== $server->name) {
+            $this->addError('deleteConfirmName', __('Type the server name exactly to confirm.'));
+
+            return;
+        }
+
+        // "In 30 min" mode — stamp scheduled_deletion_at to now+30 so the
+        // every-minute scheduler picks it up. Operator can cancel from the
+        // workspace page anytime in the window.
+        if ($this->removeMode === 'in_30') {
+            $reason = trim($this->deletionReason);
+            $at = now()->addMinutes(30);
+            $this->writeScheduledRemoval($server, $at, $reason !== '' ? $reason : null);
+            $this->closeRemoveServerModal();
+            $this->serverListEpoch++;
+            $this->toastSuccess(__(':name will be removed in 30 minutes. Cancel from the workspace page anytime before that.', [
+                'name' => $server->name,
+            ]));
+
+            return;
+        }
+
         if ($this->removeMode === 'scheduled') {
             $this->validate([
                 'scheduledRemovalDate' => ['required', 'date'],
@@ -130,29 +156,7 @@ class Index extends Component
             }
 
             $reason = trim($this->deletionReason);
-            $meta = $server->meta ?? [];
-            if ($reason !== '') {
-                $meta['scheduled_deletion_reason'] = $reason;
-            } else {
-                unset($meta['scheduled_deletion_reason']);
-            }
-
-            $org = $server->organization;
-            if ($org) {
-                $auditNew = [
-                    'scheduled_deletion_at' => $at->toIso8601String(),
-                ];
-                if ($reason !== '') {
-                    $auditNew['reason'] = $reason;
-                }
-                audit_log($org, auth()->user(), 'server.deletion_scheduled', $server, null, $auditNew);
-            }
-
-            $server->update([
-                'scheduled_deletion_at' => $at,
-                'meta' => $meta,
-            ]);
-            $this->notifyOrgAdminsOfScheduledRemoval($server->fresh(['organization']), $at, $reason !== '' ? $reason : null);
+            $this->writeScheduledRemoval($server, $at, $reason !== '' ? $reason : null);
             $this->closeRemoveServerModal();
             $this->serverListEpoch++;
             $this->toastSuccess(__(':name is scheduled for removal at the end of :date.', [
@@ -191,6 +195,36 @@ class Index extends Component
         $deleteServer->execute($server, $actor, $auditExtras, $emailContext);
         $this->serverListEpoch++;
         $this->toastSuccess(__('Server removed.'));
+    }
+
+    /**
+     * Stamp scheduled_deletion_at + audit + notify. Shared between the
+     * 30-minute grace mode and the date-picker mode so the two only differ
+     * on the choice of $at.
+     */
+    private function writeScheduledRemoval(Server $server, Carbon $at, ?string $reason): void
+    {
+        $meta = $server->meta ?? [];
+        if ($reason !== null && $reason !== '') {
+            $meta['scheduled_deletion_reason'] = $reason;
+        } else {
+            unset($meta['scheduled_deletion_reason']);
+        }
+
+        $org = $server->organization;
+        if ($org) {
+            $auditNew = ['scheduled_deletion_at' => $at->toIso8601String()];
+            if ($reason !== null && $reason !== '') {
+                $auditNew['reason'] = $reason;
+            }
+            audit_log($org, auth()->user(), 'server.deletion_scheduled', $server, null, $auditNew);
+        }
+
+        $server->update([
+            'scheduled_deletion_at' => $at,
+            'meta' => $meta,
+        ]);
+        $this->notifyOrgAdminsOfScheduledRemoval($server->fresh(['organization']), $at, $reason);
     }
 
     public function cancelScheduledServerRemoval(string $serverId): void
@@ -298,6 +332,24 @@ class Index extends Component
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
 
+        // Live metric pulse per server — latest CPU/Mem/Disk for fleet
+        // glance. One distinct subquery joining the latest captured_at
+        // per server, keyed by id for the blade.
+        $latestSnapshots = collect();
+        if ($servers->isNotEmpty()) {
+            $serverIds = $servers->pluck('id')->all();
+            $latestPerServer = ServerMetricSnapshot::query()
+                ->whereIn('server_id', $serverIds)
+                ->whereIn('id', function ($q) use ($serverIds): void {
+                    $q->from('server_metric_snapshots')
+                        ->selectRaw('MAX(id)')
+                        ->whereIn('server_id', $serverIds)
+                        ->groupBy('server_id');
+                })
+                ->get(['id', 'server_id', 'captured_at', 'payload']);
+            $latestSnapshots = $latestPerServer->keyBy('server_id');
+        }
+
         $summary = [
             'total' => $servers->count(),
             'ready' => $servers->where('status', Server::STATUS_READY)->count(),
@@ -320,6 +372,20 @@ class Index extends Component
         $hasProviderCredentials = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
+        // Q19 onboarding empty state: surface per-source "Migrate from {X}" CTAs
+        // alongside Create Server when matching inventory-import credentials are
+        // connected for the current org. Keeps Ploi and Forge as separate buttons
+        // so an empty page doesn't push a user toward a source they aren't on.
+        $importSources = collect();
+        if ($org) {
+            $importSources = ProviderCredential::query()
+                ->where('organization_id', $org->id)
+                ->whereIn('provider', \App\Enums\ServerProvider::importProviderKeys())
+                ->pluck('provider')
+                ->unique()
+                ->values();
+        }
+        $hasImportCredentials = $importSources->isNotEmpty();
 
         $deleteModalServer = $this->deleteModalServerId
             ? Server::query()->find($this->deleteModalServerId)
@@ -330,14 +396,34 @@ class Index extends Component
 
         $serverCreateDraft = ServerCreateDraft::forCurrentScope(auth()->user(), $org);
 
+        // Per-server "what's happening right now" digest. Returns null for
+        // servers that aren't mid-provision; the blade only renders the
+        // detail row when there's something to show.
+        $provisioningDigests = $servers
+            ->mapWithKeys(static fn (Server $server) => [$server->id => ProvisioningDigest::forServer($server)])
+            ->filter();
+
+        // Servers whose provision step flipped to failed. Surfaced as a
+        // page-level banner above the fleet list so a stalled provision is
+        // visible without scrolling — pairs with the per-card "Setup failed"
+        // chip rendered by displayStatus().
+        $failedSetups = $servers
+            ->where('setup_status', Server::SETUP_STATUS_FAILED)
+            ->values();
+
         return view('livewire.servers.index', [
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
             'groupedServers' => $groupedServers,
             'insightRollup' => $insightRollup,
+            'latestSnapshots' => $latestSnapshots,
+            'provisioningDigests' => $provisioningDigests,
+            'failedSetups' => $failedSetups,
             'summary' => $summary,
             'openInsights' => $openInsights,
             'hasProviderCredentials' => $hasProviderCredentials,
+            'hasImportCredentials' => $hasImportCredentials,
+            'importSources' => $importSources,
             'deleteModalServer' => $deleteModalServer,
             'deletionSummary' => $deletionSummary,
             'serverCreateDraft' => $serverCreateDraft,

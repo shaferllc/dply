@@ -105,7 +105,7 @@ class ApiKeys extends Component
 
         $this->authorize('update', $org);
 
-        if (config('dply.api_tokens_require_paid_plan', false) && ! $org->onProSubscription()) {
+        if (config('dply.api_tokens_require_paid_plan', false) && ! $org->onAnyPaidPlan()) {
             $this->addError('token_name', __('API tokens require an active Pro plan for this organization.'));
 
             return;
@@ -152,6 +152,14 @@ class ApiKeys extends Component
             $abilities,
             $allowedIps
         );
+
+        audit_log($org, $user, 'api_token.created', $created['token'] ?? null, null, [
+            'token_name' => $this->token_name,
+            'abilities' => $abilities,
+            'expires_at' => $expiresAt?->toIso8601String(),
+            'allowed_ips' => $allowedIps,
+            'token_id' => isset($created['token']) ? (string) $created['token']->id : null,
+        ]);
 
         $this->new_token_plaintext = $created['plaintext'];
         $this->new_token_name = $this->token_name;
@@ -210,7 +218,16 @@ class ApiKeys extends Component
             ->where('user_id', Auth::id())
             ->findOrFail($apiTokenId);
 
+        $snapshot = [
+            'token_id' => (string) $token->id,
+            'token_name' => $token->name,
+            'token_prefix' => $token->token_prefix,
+            'abilities' => $token->abilities,
+            'expires_at' => $token->expires_at?->toIso8601String(),
+        ];
         $token->delete();
+
+        audit_log($org, Auth::user(), 'api_token.revoked', null, $snapshot, null);
     }
 
     /**
@@ -289,7 +306,7 @@ class ApiKeys extends Component
             'permissionCategories' => config('api_token_permissions.categories', []),
             'isDeployerRole' => $org ? $org->userIsDeployer(Auth::user()) : false,
             'requiresPaidPlan' => (bool) config('dply.api_tokens_require_paid_plan', false),
-            'orgHasProPlan' => $org?->onProSubscription() ?? false,
+            'orgHasProPlan' => $org?->onAnyPaidPlan() ?? false,
         ]);
     }
 }

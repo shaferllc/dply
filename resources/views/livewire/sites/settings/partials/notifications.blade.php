@@ -173,4 +173,6 @@
             <x-primary-button type="submit">{{ __('Save allow list') }}</x-primary-button>
         </form>
     </section>
+
+    <x-cli-snippet tone="stub" />
 </div>

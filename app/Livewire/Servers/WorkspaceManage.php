@@ -2,16 +2,26 @@
 
 namespace App\Livewire\Servers;
 
+use App\Actions\Servers\CloneServerOnDigitalOcean;
+use App\Enums\ServerProvider;
+use App\Jobs\AddEdgeProxyJob;
+use App\Jobs\RemoveEdgeProxyJob;
+use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Jobs\SwitchServerWebserverJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\Servers\MiseInstallScriptBuilder;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\WebserverSwitchPreflight;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -22,6 +32,7 @@ use Livewire\Component;
 class WorkspaceManage extends Component
 {
     use ConfirmsActionWithModal;
+    use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RunsServerInventoryProbe;
@@ -29,13 +40,44 @@ class WorkspaceManage extends Component
     /** @var string Manage sub-page slug (see config server_manage.workspace_tabs). */
     public string $section = 'overview';
 
-    public string $manage_db_bind_host = '';
-
-    public ?int $manage_db_port = null;
-
-    public string $manage_db_password = '';
-
     public string $manage_auto_updates_interval = 'off';
+
+    /**
+     * Lazy-loaded list of mise's upstream-available versions per runtime. Empty
+     * until the operator clicks "Load versions" on the Tools → mise card; then
+     * cached for the lifetime of the Livewire component instance so the dropdown
+     * doesn't re-SSH on every render. Shape: ['node' => ['22.7.0', '20.16.0', …], …].
+     * Filtered to stable releases only (pre/rc/beta/alpha tags stripped).
+     *
+     * @var array<string, list<string>>
+     */
+    public array $mise_available_versions = [];
+
+    /** Per-runtime "loading versions" state for the dropdown spinner. */
+    public ?string $mise_loading_versions_for = null;
+
+    /**
+     * Clone-server modal state. `clone_open` is the modal-show toggle (driven by
+     * Alpine via dispatch('open-modal', 'clone-server-modal')), and clone_name
+     * is the editable target name. Region + size stay locked to the source's
+     * values for v1; the operator can resize on DO after the clone lands.
+     */
+    public bool $clone_open = false;
+
+    public string $clone_name = '';
+
+    /**
+     * Cascade preview for a pending webserver switch — set by openSwitchWebserver()
+     * when the operator clicks "Switch to <target>" on the web tab. Consumed by
+     * the confirmation modal in group-web.blade.php. Null when no switch is pending.
+     * Shape matches {@see WebserverSwitchPreflight::plan()}.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $switch_plan = null;
+
+    /** Opt-in: hand TLS to caddy auto-HTTPS at cutover. Greyed out for apache. */
+    public bool $switch_tls_to_caddy = false;
 
     public ?string $remote_output = null;
 
@@ -54,7 +96,38 @@ class WorkspaceManage extends Component
             return;
         }
 
+        // 'web' was promoted to its own top-level sidebar entry (servers.webserver) so
+        // operators get to the picker / cascade modal / switch history without
+        // drilling through Manage. Old deep links + bookmarks redirect.
+        // Note: this redirect runs only when WorkspaceWebserver inherits via parent::mount();
+        // since WorkspaceWebserver's mount() passes 'web' explicitly, the check below
+        // is the back-compat path for direct /manage/web URLs only — by the time the
+        // child class is mounted, the route has already routed to /webserver.
+        if ($section === 'web' && static::class === self::class) {
+            $this->redirect(route('servers.webserver', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
+        // 'services' was retired from the Manage workspace_tabs because the
+        // standalone /services page is the canonical surface. Redirect deep
+        // links instead of 404-ing — bookmarks and any cached external URLs
+        // (digest emails, etc.) keep working.
+        if ($section === 'services') {
+            $this->redirect(route('servers.services', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
+        // Subclasses (currently WorkspaceWebserver) get a small section allowlist
+        // extension so their inherited mount() can pass a logical section name
+        // ('web') that's no longer in workspace_tabs config — the tab strip in the
+        // Manage view doesn't render 'web' anymore but the inherited state still
+        // needs a non-null $section for the rest of the flow.
         $allowed = array_keys(config('server_manage.workspace_tabs', []));
+        if (static::class !== self::class) {
+            $allowed[] = 'web';
+        }
         if (! in_array($section, $allowed, true)) {
             abort(404);
         }
@@ -63,9 +136,6 @@ class WorkspaceManage extends Component
 
         $this->bootWorkspace($server);
         $meta = $server->meta ?? [];
-        $this->manage_db_bind_host = (string) ($meta['manage_db_bind_host'] ?? '');
-        $port = $meta['manage_db_port'] ?? null;
-        $this->manage_db_port = is_numeric($port) ? (int) $port : null;
         $this->manage_auto_updates_interval = (string) ($meta['manage_auto_updates_interval'] ?? 'off');
     }
 
@@ -79,22 +149,13 @@ class WorkspaceManage extends Component
         }
 
         $this->validate([
-            'manage_db_bind_host' => ['nullable', 'string', 'max:255'],
-            'manage_db_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'manage_auto_updates_interval' => ['required', 'string', 'in:'.implode(',', array_keys(config('server_manage.auto_update_intervals', [])))],
         ]);
 
         $meta = $this->server->meta ?? [];
-        $meta['manage_db_bind_host'] = $this->manage_db_bind_host !== '' ? $this->manage_db_bind_host : null;
-        $meta['manage_db_port'] = $this->manage_db_port;
         $meta['manage_auto_updates_interval'] = $this->manage_auto_updates_interval;
 
-        if ($this->manage_db_password !== '') {
-            $meta['manage_internal_db_password'] = $this->manage_db_password;
-        }
-
         $this->server->update(['meta' => $meta]);
-        $this->manage_db_password = '';
         $this->server->refresh();
         $this->toastSuccess(__('Manage preferences saved.'));
     }
@@ -249,6 +310,7 @@ BASH;
             $server = $this->server->fresh();
             $timeout = isset($def['timeout']) ? (int) $def['timeout'] : null;
             $flash = ($def['label'] ?? $key).' '.__('finished.');
+            $label = (string) ($def['label'] ?? $key);
 
             if ($this->shouldQueueManageRemoteTasks()) {
                 $this->dispatchQueuedManageScript(
@@ -257,29 +319,796 @@ BASH;
                     $script,
                     $timeout,
                     $flash,
-                    __('TaskRunner (SSH)').' — '.($def['label'] ?? $key),
+                    __('TaskRunner (SSH)').' — '.$label,
+                    $label,
                 );
 
                 return;
             }
 
+            // Sync path — seed the ConsoleAction row so the banner picks it up
+            // in real time, then stream output lines into it as they arrive
+            // alongside the existing remote_output buffer.
+            $consoleId = $this->seedManageConsoleAction($server, $label);
+            $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+                'started_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             $this->resetRemoteSshStreamTargets();
             $this->remoteSshStreamSetMeta(
-                __('TaskRunner (SSH)').' — '.($def['label'] ?? $key),
+                __('TaskRunner (SSH)').' — '.$label,
                 $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$script
             );
-            $out = $this->runManageInlineBash(
-                $server,
-                'manage-action:'.$key,
-                $script,
-                fn (string $type, string $buffer) => $this->remoteSshStreamAppendStdout($buffer),
-                $timeout,
-            );
-            $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
-            $this->toastSuccess($flash);
+            try {
+                $out = $this->runManageInlineBash(
+                    $server,
+                    'manage-action:'.$key,
+                    $script,
+                    function (string $type, string $buffer) use ($emitter): void {
+                        $this->remoteSshStreamAppendStdout($buffer);
+                        foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
+                            if ($line !== '') {
+                                $emitter($line);
+                            }
+                        }
+                    },
+                    $timeout,
+                );
+                $this->remote_output = trim(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
+                // Some daemons (e.g. `lshttpd -t`) write diagnostics into their
+                // own log file rather than stdout/stderr, so the streaming
+                // callback never fires and the banner shows "No output
+                // recorded." Drop a placeholder line so the operator at least
+                // sees that the command finished cleanly.
+                if (trim((string) $this->remote_output) === '') {
+                    $emitter->success(__('Command finished with no terminal output.'), 'dply');
+                }
+                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                    'finished_at' => now(),
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
+                $this->toastSuccess($flash);
+            } catch (\Throwable $inner) {
+                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                    'finished_at' => now(),
+                    'error' => mb_substr($inner->getMessage(), 0, 2000),
+                    'updated_at' => now(),
+                ]);
+                throw $inner;
+            }
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
         }
+    }
+
+    /**
+     * Install a runtime version under the deploy user's mise without changing
+     * the global default. The Tools tab's "Install version" button is wired
+     * here. Output streams via the hoisted manage-action banner; the seeded
+     * ConsoleAction row carries the per-line progress mise emits.
+     */
+    public function miseInstallRuntime(string $runtime, string $version): void
+    {
+        $this->dispatchMiseRuntimeAction(
+            runtime: $runtime,
+            version: $version,
+            kind: 'install',
+            taskName: 'mise-runtime:install',
+            labelTemplate: __('Installing :runtime :version'),
+        );
+    }
+
+    /**
+     * Uninstall a runtime version from the deploy user's mise. Blocked when
+     * the requested version is the current global default — operator must
+     * pick a new default first (mise itself errors out the same way).
+     */
+    public function miseUninstallRuntime(string $runtime, string $version): void
+    {
+        $current = $this->miseCurrentRuntimeDefault($runtime);
+        if ($current !== null && $current === trim($version)) {
+            $this->toastError(__('Cannot uninstall :runtime :version while it is the global default — set a different version as default first.', [
+                'runtime' => $runtime,
+                'version' => $version,
+            ]));
+
+            return;
+        }
+
+        $this->dispatchMiseRuntimeAction(
+            runtime: $runtime,
+            version: $version,
+            kind: 'uninstall',
+            taskName: 'mise-runtime:uninstall',
+            labelTemplate: __('Uninstalling :runtime :version'),
+        );
+    }
+
+    /**
+     * Set a runtime version as the deploy user's global default (`mise use
+     * --global`). Installs the version as a side-effect if it isn't already
+     * present, so this doubles as a "switch to this version" affordance.
+     */
+    public function miseSetRuntimeDefault(string $runtime, string $version): void
+    {
+        $this->dispatchMiseRuntimeAction(
+            runtime: $runtime,
+            version: $version,
+            kind: 'default',
+            taskName: 'mise-runtime:default',
+            labelTemplate: __('Setting :runtime :version as default'),
+        );
+    }
+
+    /**
+     * Shared plumbing for the three mise runtime actions. Validates inputs,
+     * builds the right bash via {@see MiseInstallScriptBuilder}, and dispatches
+     * through the queued manage-action pipeline so output flows into the
+     * existing console-action banner.
+     */
+    protected function dispatchMiseRuntimeAction(
+        string $runtime,
+        string $version,
+        string $kind,
+        string $taskName,
+        string $labelTemplate,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot manage server runtimes.'));
+
+            return;
+        }
+
+        $runtime = strtolower(trim($runtime));
+        $version = trim($version);
+
+        if (! in_array($runtime, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES, true)) {
+            $this->toastError(__('Unsupported runtime: :runtime.', ['runtime' => $runtime]));
+
+            return;
+        }
+
+        // Loose version validation — accept semver-ish, plain digits, and mise
+        // shorthand like "lts" or "20". Reject anything with shell metacharacters
+        // even though the builder escapes via `escapeshellarg`, since the value
+        // also lands in console-action labels we surface to the operator.
+        if ($version === '' || ! preg_match('/^[A-Za-z0-9._-]+$/', $version)) {
+            $this->toastError(__('Invalid version: :version.', ['version' => $version]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before managing runtimes.'));
+
+            return;
+        }
+
+        $deployUser = trim((string) ($this->server->ssh_user ?? '')) !== ''
+            ? (string) $this->server->ssh_user
+            : (string) config('server_provision.deploy_ssh_user', 'dply');
+        if ($deployUser === '' || $deployUser === 'root') {
+            $this->toastError(__('This server has no deploy user configured; cannot manage mise runtimes.'));
+
+            return;
+        }
+
+        $builder = app(MiseInstallScriptBuilder::class);
+        $lines = match ($kind) {
+            'install' => $builder->installRuntimeVersionForUserLines($deployUser, $runtime, $version),
+            'uninstall' => $builder->uninstallRuntimeVersionForUserLines($deployUser, $runtime, $version),
+            'default' => $builder->setRuntimeDefaultForUserLines($deployUser, $runtime, $version),
+            default => [],
+        };
+        if ($lines === []) {
+            $this->toastError(__('Could not build the runtime script for :runtime :version.', [
+                'runtime' => $runtime,
+                'version' => $version,
+            ]));
+
+            return;
+        }
+
+        // The builder emits ash-safe lines; join them with set -e so a mid-script
+        // failure surfaces in the banner rather than silently passing.
+        $script = "set -e\n".implode("\n", $lines)."\n";
+        $label = strtr($labelTemplate, [':runtime' => $runtime, ':version' => $version]);
+
+        $this->dispatchQueuedManageScript(
+            $this->server->fresh() ?? $this->server,
+            $taskName.':'.$runtime.'@'.$version,
+            $script,
+            300, // mise installs (Python/Ruby builds) can take a few minutes.
+            $label.' '.__('finished.'),
+            __('TaskRunner (SSH)').' — '.$label,
+            $label,
+        );
+    }
+
+    /**
+     * Populate {@see $mise_available_versions} for one runtime by SSHing
+     * `mise ls-remote <tool>` as the deploy user. Filters to stable releases
+     * (drops pre/rc/beta/alpha/dev tags) and caps the dropdown size — there's
+     * no value in showing the operator hundreds of Node patch releases.
+     *
+     * Runs synchronously and blocks the Livewire request for ~1–3s on a warm
+     * mise plugin; first-ever invocation can take longer if mise has to clone
+     * the plugin repo. Errors surface as a toast and a null entry so the UI
+     * can offer "try again" without re-fetching on every render.
+     */
+    public function loadMiseAvailableVersions(string $runtime): void
+    {
+        $this->authorize('update', $this->server);
+
+        $runtime = strtolower(trim($runtime));
+        if (! in_array($runtime, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES, true)) {
+            $this->toastError(__('Unsupported runtime: :runtime.', ['runtime' => $runtime]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before loading versions.'));
+
+            return;
+        }
+
+        $deployUser = trim((string) ($this->server->ssh_user ?? '')) !== ''
+            ? (string) $this->server->ssh_user
+            : (string) config('server_provision.deploy_ssh_user', 'dply');
+        if ($deployUser === '' || $deployUser === 'root') {
+            $this->toastError(__('This server has no deploy user configured; cannot list mise versions.'));
+
+            return;
+        }
+
+        $this->mise_loading_versions_for = $runtime;
+
+        try {
+            $userArg = escapeshellarg($deployUser);
+            $toolArg = escapeshellarg($runtime);
+            $script = "sudo -u {$userArg} -i mise ls-remote {$toolArg} 2>/dev/null || true";
+            $ssh = new \App\Services\SshConnection($this->server, 'root');
+            $output = $ssh->exec('/bin/sh -c '.escapeshellarg($script), 30);
+            $ssh->disconnect();
+
+            $versions = $this->filterStableMiseVersions($output);
+            $this->mise_available_versions[$runtime] = $versions;
+
+            if ($versions === []) {
+                $this->toastError(__(':runtime: no stable versions returned. Is the mise plugin installed?', ['runtime' => $runtime]));
+            }
+        } catch (\Throwable $e) {
+            $this->toastError(__(':runtime versions: :err', ['runtime' => $runtime, 'err' => $e->getMessage()]));
+        } finally {
+            $this->mise_loading_versions_for = null;
+        }
+    }
+
+    /**
+     * Strip pre-release tags and dedupe `mise ls-remote` output down to the
+     * shortlist the dropdown actually wants. Versions sort descending so the
+     * latest is at the top.
+     *
+     * @return list<string>
+     */
+    protected function filterStableMiseVersions(string $output): array
+    {
+        $versions = [];
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            // Drop anything that doesn't start with a digit (e.g. "system",
+            // header noise) and any release tagged pre/rc/beta/alpha/dev.
+            if (! preg_match('/^\d/', $line)) {
+                continue;
+            }
+            if (preg_match('/-(?:pre|rc|beta|alpha|dev|nightly|preview|next)/i', $line)) {
+                continue;
+            }
+            $versions[] = $line;
+        }
+        $versions = array_values(array_unique($versions));
+        usort($versions, fn (string $a, string $b) => version_compare($b, $a));
+        // Cap at a reasonable size — operators rarely need anything older.
+        return array_slice($versions, 0, 60);
+    }
+
+    /**
+     * Read the current global default for a runtime from the cached probe
+     * snapshot. Returns null when the runtime hasn't been probed yet or has
+     * no default. Used by miseUninstallRuntime() to refuse to uninstall the
+     * active default (mise itself would refuse anyway, but failing fast in
+     * Livewire gives a friendlier toast than the SSH banner does).
+     */
+    protected function miseCurrentRuntimeDefault(string $runtime): ?string
+    {
+        $meta = $this->server->fresh()->meta ?? [];
+        $runtimes = is_array($meta['manage_mise_runtimes'] ?? null) ? $meta['manage_mise_runtimes'] : [];
+        $entry = $runtimes[$runtime] ?? null;
+        if (! is_array($entry)) {
+            return null;
+        }
+        $active = $entry['active'] ?? null;
+
+        return is_string($active) && $active !== '' ? $active : null;
+    }
+
+    /**
+     * Eligibility gate for the Configuration tab's Clone server button.
+     * Mirrors the assertCloneable checks on the action so the UI hides /
+     * disables the affordance instead of relying on a post-click toast.
+     */
+    public function canCloneServer(): bool
+    {
+        if ($this->server->provider !== ServerProvider::DigitalOcean) {
+            return false;
+        }
+        $hostKind = (string) (($this->server->meta ?? [])['host_kind'] ?? Server::HOST_KIND_VM);
+        if ($hostKind !== Server::HOST_KIND_VM) {
+            return false;
+        }
+        if (! $this->server->providerCredential || $this->server->providerCredential->provider !== 'digitalocean') {
+            return false;
+        }
+        if ($this->server->provider_id === null || $this->server->provider_id === '') {
+            return false;
+        }
+
+        return $this->server->status === Server::STATUS_READY;
+    }
+
+    public function openCloneServerModal(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->canCloneServer()) {
+            $this->toastError(__('This server is not currently cloneable.'));
+
+            return;
+        }
+
+        $this->clone_name = $this->server->name.' (clone)';
+        $this->clone_open = true;
+        $this->dispatch('open-modal', 'clone-server-modal');
+    }
+
+    public function cancelCloneServer(): void
+    {
+        $this->clone_open = false;
+        $this->dispatch('close-modal', 'clone-server-modal');
+    }
+
+    public function confirmCloneServer(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! $this->canCloneServer()) {
+            $this->toastError(__('This server is not currently cloneable.'));
+
+            return;
+        }
+
+        $this->validate([
+            'clone_name' => ['required', 'string', 'min:2', 'max:120'],
+        ]);
+
+        $user = auth()->user();
+        $org = $user?->currentOrganization();
+        if ($user === null || $org === null) {
+            $this->toastError(__('No active organization context.'));
+
+            return;
+        }
+
+        try {
+            $clone = app(CloneServerOnDigitalOcean::class)->handle(
+                actor: $user,
+                org: $org,
+                source: $this->server,
+                overrides: ['name' => $this->clone_name],
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $messages = collect($e->errors())->flatten()->all();
+            $this->toastError($messages[0] ?? __('Clone failed.'));
+
+            return;
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->clone_open = false;
+        $this->dispatch('close-modal', 'clone-server-modal');
+        $this->toastSuccess(__('Clone queued. Track progress on the new server\'s page.'));
+        $this->redirect(route('servers.manage', ['server' => $clone, 'section' => 'overview']), navigate: true);
+    }
+
+    /**
+     * Open the webserver-switch cascade modal. Computes the preflight server-side
+     * (PHP-compat hard block, drift warnings, computed downtime breakdown, opt-in
+     * TLS cascade) and stashes the result on the component for the modal to render.
+     *
+     * Refuses to open if there's already an in-flight switch ConsoleAction —
+     * the live progress banner is the canonical UI while a switch is running.
+     */
+    public function openSwitchWebserver(string $target): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('A webserver switch is already in flight — wait for it to finish before starting another.'));
+
+            return;
+        }
+
+        $target = strtolower(trim($target));
+        if (! in_array($target, WebserverSwitchPreflight::KNOWN_WEBSERVERS, true)) {
+            $this->toastError(__('Unknown webserver target: :t.', ['t' => $target]));
+
+            return;
+        }
+
+        $this->switch_plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
+        $this->switch_tls_to_caddy = false;
+        $this->dispatch('open-modal', 'webserver-switch-modal');
+    }
+
+    /**
+     * Dispatch the SwitchServerWebserverJob with the operator's opt-in selections.
+     * The job seeds its own ConsoleAction row inside handle(), and the banner
+     * picks it up from there. We just need to fire and forget; UI updates via
+     * the banner poll.
+     */
+    public function confirmSwitchWebserver(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->switch_plan === null) {
+            return;
+        }
+        if (($this->switch_plan['blocker'] ?? null) !== null) {
+            // Modal shouldn't have allowed confirm with a blocker, but be defensive.
+            $this->toastError(__('Cannot switch: :reason', ['reason' => $this->switch_plan['blocker']['label']]));
+
+            return;
+        }
+        if ($this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('A webserver switch is already in flight.'));
+
+            return;
+        }
+
+        $from = (string) ($this->switch_plan['from'] ?? '—');
+        $target = (string) $this->switch_plan['to'];
+
+        // Seed a queued ConsoleAction row BEFORE dispatch so the banner shows
+        // immediately — without this the row only gets created when the worker
+        // picks the job up, leaving operators staring at a button that "did
+        // nothing." Mirrors the seedQueuedConsoleAction pattern from Sites\Show
+        // for ApplySiteWebserverConfigJob.
+        $this->seedQueuedWebserverSwitchAction(
+            label: __('Switching webserver: :from → :to …', ['from' => $from, 'to' => $target]),
+            from: $from,
+            to: $target,
+        );
+
+        SwitchServerWebserverJob::dispatch(
+            serverId: $this->server->id,
+            target: $target,
+            tlsToCaddy: $this->switch_tls_to_caddy,
+            userId: auth()->id(),
+        );
+
+        $this->switch_plan = null;
+        $this->switch_tls_to_caddy = false;
+        $this->dispatch('close-modal', 'webserver-switch-modal');
+        $this->toastSuccess(__('Webserver switch queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * Seed a queued `ConsoleAction` row for the upcoming `webserver_switch` job
+     * so the banner-static partial picks it up on the next render — without
+     * waiting for the worker to claim the job. Auto-dismisses prior terminal +
+     * stale-running rows so the operator sees only the run they just started.
+     * Mirrors {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()} but
+     * scoped to a Server subject instead of a Site.
+     *
+     * `from`/`to` are persisted in `output['meta']` so {@see stopAndRevertWebserverSwitch()}
+     * can recover them without label parsing if the operator aborts a stuck
+     * switch later. The banner's {@see ConsoleAction::lines()} reader ignores
+     * non-`lines` keys, so this extra metadata is safe to carry alongside.
+     */
+    protected function seedQueuedWebserverSwitchAction(
+        ?string $label = null,
+        ?string $from = null,
+        ?string $to = null,
+    ): ConsoleAction {
+        $subjectType = $this->server->getMorphClass();
+        $subjectId = $this->server->id;
+
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->update(['dismissed_at' => now()]);
+
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        $output = ['v' => (int) config('console_actions.current_version', 1), 'lines' => []];
+        if ($from !== null || $to !== null) {
+            $output['meta'] = array_filter([
+                'from' => $from,
+                'to' => $to,
+            ], static fn ($v) => $v !== null);
+        }
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'kind' => 'webserver_switch',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => request()->user()?->id,
+            'output' => $output,
+        ]);
+    }
+
+    /**
+     * Discard the pending switch — closes the modal, leaves the server untouched.
+     */
+    public function cancelSwitchWebserver(): void
+    {
+        $this->switch_plan = null;
+        $this->switch_tls_to_caddy = false;
+        $this->dispatch('close-modal', 'webserver-switch-modal');
+    }
+
+    /**
+     * Operator escape hatch for a stuck switch: marks the in-flight (or stale)
+     * webserver_switch ConsoleAction as failed + dismissed and dispatches a
+     * {@see RevertServerWebserverSwitchJob} that best-effort uninstalls the
+     * partial target and brings the original webserver back on :80.
+     *
+     * Triggered from the "Stop & revert" button rendered alongside the banner
+     * when {@see hasInflightWebserverSwitch()} is true. The from/to pair comes
+     * from the seeded ConsoleAction's `output['meta']` (set by
+     * {@see seedQueuedWebserverSwitchAction()}); we fall back to label parsing
+     * for older rows that predate that field.
+     */
+    public function stopAndRevertWebserverSwitch(string $runId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'webserver_switch')
+            ->whereNull('dismissed_at')
+            ->first();
+
+        if ($row === null || ! $row->isInFlight()) {
+            $this->toastError(__('No in-flight webserver switch to revert.'));
+
+            return;
+        }
+
+        $output = is_array($row->output) ? $row->output : [];
+        $meta = is_array($output['meta'] ?? null) ? $output['meta'] : [];
+        $serverWebserver = strtolower((string) ($this->server->meta['webserver'] ?? 'nginx'));
+        $from = strtolower((string) ($meta['from'] ?? $serverWebserver));
+        $to = strtolower((string) ($meta['to'] ?? ''));
+
+        if ($to === '' && is_string($row->label) && preg_match('/→\s*(\S+)/u', $row->label, $m)) {
+            $to = strtolower((string) $m[1]);
+        }
+
+        if ($to === '' || $to === $from) {
+            $this->toastError(__('Cannot determine the revert target from the failed switch.'));
+
+            return;
+        }
+
+        // Mark the stuck row failed + dismissed so hasInflightWebserverSwitch()
+        // releases and the seed below isn't auto-dismissed by its own pre-clean.
+        $row->forceFill([
+            'status' => ConsoleAction::STATUS_FAILED,
+            'finished_at' => now(),
+            'error' => 'Aborted by operator',
+            'dismissed_at' => now(),
+        ])->save();
+
+        // Seed a fresh row so the banner immediately switches to the revert
+        // progress view rather than going blank between dispatch and worker
+        // pickup. Same kind so the banner partial transparently picks it up.
+        $this->seedQueuedWebserverSwitchAction(
+            label: __('Reverting webserver switch: :to → :from …', ['to' => $to, 'from' => $from]),
+            from: $to,
+            to: $from,
+        );
+
+        RevertServerWebserverSwitchJob::dispatch(
+            serverId: $this->server->id,
+            target: $to,
+            from: $from,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Stopping the switch and reverting :to → :from. Progress shows in the banner.', [
+            'to' => $to,
+            'from' => $from,
+        ]));
+    }
+
+    /**
+     * Required by {@see DismissesConsoleActionRun}: identifies which model the
+     * banner is scoped to. WorkspaceManage's banner shows server-level runs
+     * (webserver_switch, etc.), so the subject is the server.
+     */
+    protected function consoleActionSubject(): \Illuminate\Database\Eloquent\Model
+    {
+        return $this->server;
+    }
+
+    /**
+     * True when there's a queued/running webserver_switch ConsoleAction for this
+     * server. Used to disable the switch CTAs and short-circuit re-entry.
+     */
+    public function hasInflightWebserverSwitch(): bool
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'webserver_switch')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->whereNull('dismissed_at')
+            ->exists();
+    }
+
+    /**
+     * Inflight check for edge-proxy add/remove. Same shape as
+     * {@see hasInflightWebserverSwitch()} but scoped to the `edge_proxy`
+     * console-action kind so the two banners don't shadow each other.
+     */
+    public function hasInflightEdgeProxyAction(): bool
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'edge_proxy')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->whereNull('dismissed_at')
+            ->exists();
+    }
+
+    /**
+     * Dispatch {@see AddEdgeProxyJob}. Seeds a queued ConsoleAction so the
+     * banner shows immediately rather than blanking until the worker picks
+     * the job up.
+     */
+    public function addEdgeProxy(string $target): void
+    {
+        $this->authorize('update', $this->server);
+
+        $target = strtolower(trim($target));
+        if (! in_array($target, ['traefik', 'haproxy'], true)) {
+            $this->toastError(__('Unknown edge proxy: :t.', ['t' => $target]));
+
+            return;
+        }
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $this->seedQueuedEdgeProxyAction(
+            label: __('Adding edge proxy: :target …', ['target' => $target]),
+            meta: ['op' => 'add', 'target' => $target],
+        );
+
+        AddEdgeProxyJob::dispatch(
+            serverId: $this->server->id,
+            target: $target,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Edge proxy queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * Dispatch {@see RemoveEdgeProxyJob}. Caddy takes over :80 again once
+     * the job lands; meta.webserver lands as 'caddy' since that's what's
+     * actually serving content post-remove.
+     */
+    public function removeEdgeProxy(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $edge = $this->server->edgeProxy();
+        if ($edge === null) {
+            $this->toastError(__('No edge proxy is active on this server.'));
+
+            return;
+        }
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $this->seedQueuedEdgeProxyAction(
+            label: __('Removing edge proxy: :target …', ['target' => $edge]),
+            meta: ['op' => 'remove', 'target' => $edge],
+        );
+
+        RemoveEdgeProxyJob::dispatch(
+            serverId: $this->server->id,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Edge proxy removal queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    protected function seedQueuedEdgeProxyAction(?string $label, array $meta = []): ConsoleAction
+    {
+        $subjectType = $this->server->getMorphClass();
+        $subjectId = $this->server->id;
+
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->update(['dismissed_at' => now()]);
+
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $subjectType)
+            ->where('subject_id', $subjectId)
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        $output = [
+            'v' => (int) config('console_actions.current_version', 1),
+            'lines' => [],
+            'meta' => $meta,
+        ];
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'kind' => 'edge_proxy',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => request()->user()?->id,
+            'output' => $output,
+        ]);
     }
 
     public function syncManageRemoteTaskFromCache(): void
@@ -307,7 +1136,7 @@ BASH;
             ? $out
             : match ($status) {
                 'queued' => $stalledQueued
-                    ? __('Task still queued. Ensure a queue worker is running (e.g. php artisan queue:work) and that CACHE_DRIVER is shared with the worker (not "array").')
+                    ? __('Still preparing this task. If it stays stuck, contact your administrator.')
                     : __('Task queued…'),
                 'running' => __('Running on server…'),
                 default => '',
@@ -409,6 +1238,7 @@ BASH;
         ?int $timeoutSeconds,
         ?string $flashSuccess,
         string $streamTitle,
+        ?string $consoleLabel = null,
     ): void {
         $this->manageRemoteTaskId = null;
 
@@ -434,6 +1264,13 @@ BASH;
         // Persist a recent-activity row so Overview can show what's happened.
         $logId = $this->logManageActionStart($server, $taskName, $streamTitle);
 
+        // Seed a `manage_action` ConsoleAction row so workspaces that opt in to
+        // the streaming banner partial (currently: Webserver) show progress in
+        // the same banner-and-View-output UI the switch job uses. Other
+        // workspaces ignore the row and continue rendering the legacy
+        // "Command output" panel — no UX regression there.
+        $consoleId = $this->seedManageConsoleAction($server, $consoleLabel ?? $streamTitle);
+
         ServerManageRemoteSshJob::dispatch(
             $server->id,
             $id,
@@ -442,6 +1279,8 @@ BASH;
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
             $logId,
+            null,
+            $consoleId,
         );
 
         $this->manageRemoteTaskId = $id;
@@ -451,8 +1290,45 @@ BASH;
         $this->remoteSshStreamSetMeta(
             $streamTitle,
             $this->manageSshConnectionLabel($server)."\n".__('Remote script').":\n".$inlineBash."\n\n"
-            .__('Runs in a queue worker so the browser request returns immediately. Use a non-sync queue and run `php artisan queue:work`.')
+            .__('Runs in the background so the browser does not block on SSH.')
         );
+    }
+
+    /**
+     * Create a `manage_action` ConsoleAction row scoped to the given server so
+     * the streaming banner partial can render it. Auto-dismisses any prior
+     * terminal manage_action rows for this subject so the banner-getter (which
+     * picks the most recent non-dismissed run) doesn't get stuck showing an
+     * old completed action.
+     *
+     * Scoping dismissal to `kind = manage_action` is deliberate — the
+     * webserver_switch banner has its own lifecycle and we don't want one
+     * manage button press to wipe out a "switch failed" surface.
+     */
+    protected function seedManageConsoleAction(Server $server, string $label): string
+    {
+        \App\Models\ConsoleAction::query()
+            ->where('subject_type', $server->getMorphClass())
+            ->where('subject_id', $server->id)
+            ->where('kind', 'manage_action')
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [
+                \App\Models\ConsoleAction::STATUS_COMPLETED,
+                \App\Models\ConsoleAction::STATUS_FAILED,
+            ])
+            ->update(['dismissed_at' => now()]);
+
+        $row = \App\Models\ConsoleAction::query()->create([
+            'subject_type' => $server->getMorphClass(),
+            'subject_id' => $server->id,
+            'kind' => 'manage_action',
+            'status' => \App\Models\ConsoleAction::STATUS_QUEUED,
+            'user_id' => auth()->id(),
+            'label' => $label.' …',
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+
+        return (string) $row->id;
     }
 
     protected function manageSshConnectionLabel(Server $server): string

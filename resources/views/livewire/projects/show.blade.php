@@ -579,11 +579,11 @@
 
             @if ($section === 'delivery')
             <x-server-workspace-tab-panel id="project-delivery" labelled-by="project-delivery-tab" panelClass="space-y-8">
-                <x-resource-notification-summary
-                    :resource="$workspace"
-                    :heading="__('Project notifications')"
-                    :manage-url="route('projects.delivery', $workspace)"
-                />
+                @livewire(\App\Livewire\Notifications\ResourceSummary::class, [
+                    'resource' => $workspace,
+                    'heading' => __('Project notifications'),
+                    'manageUrl' => route('profile.notification-channels'),
+                ], key('resource-summary-project-'.$workspace->id))
 
                 <div class="bg-white border border-slate-200 rounded-lg p-6">
                     <h3 class="font-medium text-slate-900">{{ __('How to use delivery') }}</h3>

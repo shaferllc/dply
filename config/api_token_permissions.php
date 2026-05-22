@@ -20,9 +20,13 @@ return [
     |--------------------------------------------------------------------------
     */
     'presets' => [
+        // 'servers.deploy' was removed when the legacy deploy_command
+        // column was dropped — the underlying API endpoint no longer
+        // exists. Existing tokens that hold the ability remain valid
+        // tokens, the ability just no-ops.
         'read' => ['servers.read', 'sites.read', 'insights.read'],
-        'deploy' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy'],
-        'ops' => ['servers.read', 'sites.read', 'servers.deploy', 'sites.deploy', 'commands.run'],
+        'deploy' => ['servers.read', 'sites.read', 'sites.deploy'],
+        'ops' => ['servers.read', 'sites.read', 'sites.deploy', 'commands.run'],
         'full' => ['*'],
     ],
 
@@ -34,7 +38,6 @@ return [
     'deployer_api_allowlist' => [
         'servers.read',
         'sites.read',
-        'servers.deploy',
         'sites.deploy',
     ],
 
@@ -45,7 +48,6 @@ return [
     */
     'http_route_abilities' => [
         'servers.index' => 'servers.read',
-        'servers.deploy' => 'servers.deploy',
         'servers.run_command' => 'commands.run',
         'sites.index' => 'sites.read',
         'sites.deploy' => 'sites.deploy',
@@ -57,6 +59,8 @@ return [
         'firewall.template_apply' => 'network.write',
         'insights.server_findings' => 'insights.read',
         'insights.org_summary' => 'insights.read',
+        'imports.migrations_index' => 'imports.read',
+        'imports.migrations_show' => 'imports.read',
     ],
 
     'categories' => [
@@ -65,8 +69,7 @@ return [
             'label' => 'Servers',
             'permissions' => [
                 ['ability' => 'servers.read', 'label' => 'Read'],
-                ['ability' => 'servers.deploy', 'label' => 'Write'],
-                ['ability' => 'commands.run', 'label' => 'Delete'],
+                ['ability' => 'commands.run', 'label' => 'Run commands'],
             ],
         ],
         [
@@ -180,6 +183,13 @@ return [
             'label' => 'Insights',
             'permissions' => [
                 ['ability' => 'insights.read', 'label' => 'Read'],
+            ],
+        ],
+        [
+            'id' => 'imports',
+            'label' => 'Imports & migrations',
+            'permissions' => [
+                ['ability' => 'imports.read', 'label' => 'Read'],
             ],
         ],
     ],

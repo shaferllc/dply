@@ -86,6 +86,18 @@ class ServerDatabaseProvisioner
         $name = $db->name;
         $user = $db->username;
 
+        if ($db->engine === 'sqlite') {
+            // SQLite "drop" is just removing the file. The path lives
+            // in the host column (set when the row was created). We
+            // hard-fail if it points outside the configured root so a
+            // typo or tampering can never wipe `/etc` or similar.
+            $path = $this->safeSqlitePath($db);
+            $cmd = 'rm -f '.escapeshellarg($path);
+            [$out] = $this->remoteExec->shellRunWithExit($server, $cmd, 30);
+
+            return $out;
+        }
+
         if ($db->engine === 'postgres') {
             $terminate = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '".str_replace("'", "''", $name)."' AND pid <> pg_backend_pid();";
             [$out] = $this->remoteExec->postgresRun($server, $terminate, 120);
@@ -117,6 +129,29 @@ class ServerDatabaseProvisioner
         $name = $db->name;
         $user = $db->username;
         $pass = $db->password;
+
+        if ($db->engine === 'sqlite') {
+            // SQLite "create" is just `mkdir -p` the parent + `touch`
+            // the file + chown. No auth, no cluster, no port. The path
+            // is stored in the host column; we sanity-check it sits
+            // under the configured root before any filesystem op.
+            $path = $this->safeSqlitePath($db);
+            $owner = $this->resolveSqliteOwner($db);
+            $dir = dirname($path);
+
+            $cmd = 'mkdir -p '.escapeshellarg($dir).' && '.
+                   'touch '.escapeshellarg($path).' && '.
+                   'chown '.escapeshellarg($owner.':'.$owner).' '.escapeshellarg($path).' 2>/dev/null || true; '.
+                   'chmod 0664 '.escapeshellarg($path).' 2>/dev/null || true; '.
+                   'echo "[dply] sqlite database ready at '.escapeshellarg($path).'"';
+
+            [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $cmd, 30);
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException(Str::limit($out, 800));
+            }
+
+            return $out;
+        }
 
         if ($db->engine === 'postgres') {
             $userSql = "CREATE USER {$user} WITH PASSWORD '".str_replace("'", "''", $pass)."';";
@@ -214,7 +249,255 @@ class ServerDatabaseProvisioner
         return $out;
     }
 
+    /**
+     * Engine-agnostic dispatcher: routes the extra-user create call to
+     * the appropriate per-engine implementation. Lets the workspace
+     * manage extra users on PostgreSQL databases the same way it does
+     * for MySQL/MariaDB instead of throwing "MySQL only" mid-flow.
+     */
+    public function createExtraDatabaseUser(ServerDatabase $db, ServerDatabaseExtraUser $extra): string
+    {
+        return match ($db->engine) {
+            'postgres' => $this->createExtraPostgresUser($db, $extra),
+            default => $this->createExtraMysqlUser($db, $extra),
+        };
+    }
+
+    public function dropExtraDatabaseUser(ServerDatabase $db, ServerDatabaseExtraUser $extra): string
+    {
+        return match ($db->engine) {
+            'postgres' => $this->dropExtraPostgresUser($db, $extra),
+            default => $this->dropExtraMysqlUser($db, $extra),
+        };
+    }
+
+    /**
+     * Grant an additional PostgreSQL user on an existing database.
+     * Mirrors {@see createExtraMysqlUser} but uses Postgres semantics:
+     * roles are global (no @host), GRANT is on the database object.
+     */
+    public function createExtraPostgresUser(ServerDatabase $db, ServerDatabaseExtraUser $extra): string
+    {
+        if ($db->engine !== 'postgres') {
+            throw new \InvalidArgumentException('createExtraPostgresUser called on a non-postgres database.');
+        }
+
+        $server = $db->server;
+        $name = $this->sanitizePostgresIdentifier($db->name, 'app');
+        $user = $this->sanitizePostgresIdentifier($extra->username, 'extrauser');
+        $pass = str_replace("'", "''", $extra->password);
+
+        $sql = "CREATE USER {$user} WITH PASSWORD '{$pass}'; ".
+               "GRANT CONNECT ON DATABASE {$name} TO {$user}; ".
+               "GRANT ALL PRIVILEGES ON DATABASE {$name} TO {$user};";
+
+        [$out] = $this->remoteExec->postgresRun($server, $sql, 120);
+
+        return $out;
+    }
+
+    /**
+     * Drop an extra PostgreSQL user. Revokes grants first so DROP USER
+     * doesn't fail with "role cannot be dropped because some objects
+     * depend on it" when the user owns nothing concrete.
+     */
+    public function dropExtraPostgresUser(ServerDatabase $db, ServerDatabaseExtraUser $extra): string
+    {
+        if ($db->engine !== 'postgres') {
+            throw new \InvalidArgumentException('dropExtraPostgresUser called on a non-postgres database.');
+        }
+
+        $server = $db->server;
+        $name = $this->sanitizePostgresIdentifier($db->name, 'app');
+        $user = $this->sanitizePostgresIdentifier($extra->username, 'extrauser');
+
+        $sql = "REVOKE ALL PRIVILEGES ON DATABASE {$name} FROM {$user}; ".
+               "REVOKE CONNECT ON DATABASE {$name} FROM {$user}; ".
+               "DROP USER IF EXISTS {$user};";
+
+        [$out] = $this->remoteExec->postgresRun($server, $sql, 120);
+
+        return $out;
+    }
+
+    /**
+     * Move a SQLite database file from its current `host` path to a
+     * new path on the server. Both paths are jailed under
+     * `config('server_database.sqlite_root')` via {@see safeSqlitePath()}.
+     * The Livewire caller is responsible for updating the row's `host`
+     * column AFTER this method returns successfully — that ordering
+     * means a failed `mv` doesn't leave the dashboard pointing at a
+     * file that no longer exists at the recorded path.
+     *
+     * Idempotent when old == new: returns a noop status string without
+     * touching the filesystem.
+     */
+    public function relocateSqliteFile(ServerDatabase $db, string $newPath): string
+    {
+        if ($db->engine !== 'sqlite') {
+            throw new \InvalidArgumentException('relocateSqliteFile called on a non-sqlite database.');
+        }
+
+        $server = $db->server;
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $oldPath = $this->safeSqlitePath($db);
+
+        // safeSqlitePath() reads from $db->host. Build a temporary
+        // db clone with the new host so the same validator covers the
+        // destination — same path-jail rules, no second implementation.
+        $probe = $db->replicate();
+        $probe->host = $newPath;
+        $resolved = $this->safeSqlitePath($probe);
+
+        if ($oldPath === $resolved) {
+            return '[dply] sqlite path unchanged at '.$oldPath;
+        }
+
+        $owner = $this->resolveSqliteOwner($db);
+        $cmd = 'mkdir -p '.escapeshellarg(dirname($resolved)).' && '.
+               'mv '.escapeshellarg($oldPath).' '.escapeshellarg($resolved).' && '.
+               'chown '.escapeshellarg($owner.':'.$owner).' '.escapeshellarg($resolved).' 2>/dev/null || true; '.
+               'echo "[dply] moved '.escapeshellarg($oldPath).' -> '.escapeshellarg($resolved).'"';
+
+        [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $cmd, 60);
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit($out, 800));
+        }
+
+        return $out;
+    }
+
+    /**
+     * Run arbitrary SQL against a SQLite database file. Statement size
+     * is capped at the same `import_max_bytes` ceiling MySQL/Postgres
+     * imports use so a paste-of-doom can't OOM the host. Path goes
+     * through {@see safeSqlitePath()} as belt-and-suspenders even
+     * though the caller already validated on create.
+     *
+     * Returns the trimmed stdout/stderr — sqlite3 writes both to
+     * stdout when invoked with the heredoc-style stdin we use, so the
+     * console panel shows error messages inline with successful rows.
+     */
+    public function executeSqliteSql(ServerDatabase $db, string $sql, int $timeout = 60): string
+    {
+        if ($db->engine !== 'sqlite') {
+            throw new \InvalidArgumentException('executeSqliteSql called on a non-sqlite database.');
+        }
+
+        $sql = trim($sql);
+        if ($sql === '') {
+            throw new \InvalidArgumentException('SQL statement is empty.');
+        }
+
+        $maxBytes = (int) config('server_database.import_max_bytes', 10485760);
+        if (strlen($sql) > $maxBytes) {
+            throw new \InvalidArgumentException('SQL statement exceeds the configured size limit.');
+        }
+
+        $server = $db->server;
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $path = $this->safeSqlitePath($db);
+
+        [$out] = $this->remoteExec->sqliteExec($server, $path, $sql, $timeout);
+
+        return trim($out);
+    }
+
+    /**
+     * Resolve and sanity-check the SQLite file path on the host.
+     * The path is stored in `server_databases.host` (repurposed for
+     * SQLite — no host:port concept). We require it to sit under the
+     * configured root (default `/var/lib/dply/sqlite`) so a typo or
+     * tampered row can never wipe paths like `/etc/shadow`.
+     */
+    private function safeSqlitePath(ServerDatabase $db): string
+    {
+        $primaryRoot = '/'.trim((string) config('server_database.sqlite_root', '/var/lib/dply/sqlite'), '/');
+
+        /** @var list<string> $extra */
+        $extra = (array) config('server_database.sqlite_extra_safe_roots', []);
+        $allowedRoots = array_values(array_unique(array_merge(
+            [$primaryRoot],
+            array_map(fn (string $r): string => '/'.trim($r, '/'), array_filter($extra, 'is_string'))
+        )));
+
+        $rawHost = trim((string) $db->host);
+        $candidate = $rawHost !== '' ? '/'.ltrim($rawHost, '/') : $primaryRoot.'/'.$db->name.'.db';
+
+        // Resolve `..` segments in-process so a stored path of
+        // `/var/lib/dply/sqlite/../../etc/shadow` never escapes.
+        $segments = [];
+        foreach (explode('/', $candidate) as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                array_pop($segments);
+
+                continue;
+            }
+            $segments[] = $part;
+        }
+        $resolved = '/'.implode('/', $segments);
+
+        $insideAllowed = false;
+        foreach ($allowedRoots as $root) {
+            if ($resolved === $root || str_starts_with($resolved, $root.'/')) {
+                $insideAllowed = true;
+                break;
+            }
+        }
+
+        if (! $insideAllowed) {
+            throw new \InvalidArgumentException('SQLite path must sit under '.implode(' or ', $allowedRoots).'.');
+        }
+
+        if (substr($resolved, -3) !== '.db' && substr($resolved, -7) !== '.sqlite') {
+            $resolved .= '.db';
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Owner of the on-disk SQLite file. Defaults to the deploy user
+     * configured in server_provision.deploy_ssh_user — that's the user
+     * whose web app actually opens the file, so it needs read+write.
+     */
+    private function resolveSqliteOwner(ServerDatabase $db): string
+    {
+        $configured = (string) config('server_provision.deploy_ssh_user', 'dply');
+        if ($configured !== '' && preg_match('/^[a-z_][a-z0-9_-]{0,31}$/', $configured)) {
+            return $configured;
+        }
+
+        return 'root';
+    }
+
     private function sanitizeMysqlIdentifier(string $value, string $fallback): string
+    {
+        if ($value !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $value)) {
+            return $value;
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * Postgres identifiers (database/role names) accept the same
+     * [a-zA-Z0-9_] subset for unquoted use. We don't quote here because
+     * upstream callers pass user-controlled values that have already
+     * been validated by the Livewire form regex; the fallback covers
+     * the "validation skipped somehow" case so we never inject random
+     * SQL into a CREATE USER call.
+     */
+    private function sanitizePostgresIdentifier(string $value, string $fallback): string
     {
         if ($value !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $value)) {
             return $value;

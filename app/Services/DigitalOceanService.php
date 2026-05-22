@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProviderCredential;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class DigitalOceanService
@@ -201,12 +202,7 @@ class DigitalOceanService
      */
     public function getRegions(): array
     {
-        $response = $this->request('get', '/regions');
-        $this->assertSuccess($response, 'list regions');
-        $data = $response->json();
-        $regions = $data['regions'] ?? $data['data'] ?? [];
-
-        return is_array($regions) ? $regions : [];
+        return $this->cachedCatalogList('do_regions', '/regions', 'regions');
     }
 
     /**
@@ -216,12 +212,373 @@ class DigitalOceanService
      */
     public function getSizes(): array
     {
-        $response = $this->request('get', '/sizes');
-        $this->assertSuccess($response, 'list sizes');
-        $data = $response->json();
-        $sizes = $data['sizes'] ?? $data['data'] ?? [];
+        return $this->cachedCatalogList('do_sizes', '/sizes', 'sizes');
+    }
 
-        return is_array($sizes) ? $sizes : [];
+    /**
+     * List managed DOKS clusters in this account. Same caching shape as regions/sizes.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getKubernetesClusters(): array
+    {
+        return $this->cachedCatalogList('do_kubernetes_clusters', '/kubernetes/clusters', 'kubernetes_clusters');
+    }
+
+    /**
+     * Fetch a single DOKS cluster (status, node_pools with per-node statuses,
+     * ha, version, region). Bypasses the list-cache because the poller needs
+     * fresh data on every call. Returns null when the cluster has been deleted
+     * out from under us (404) so the caller can stop polling cleanly.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getKubernetesCluster(string $clusterId): ?array
+    {
+        $response = $this->request('get', '/kubernetes/clusters/'.$clusterId);
+        if ($response->status() === 404) {
+            return null;
+        }
+        $this->assertSuccess($response, 'get kubernetes cluster');
+        $data = $response->json();
+        $cluster = $data['kubernetes_cluster'] ?? null;
+
+        return is_array($cluster) ? $cluster : null;
+    }
+
+    /**
+     * Pull the YAML kubeconfig for a cluster — bearer-token credentials inside,
+     * caller is responsible for encrypting at rest. Only useful once the cluster
+     * has reached state=running (DO returns 503 / empty during provisioning).
+     */
+    public function getKubernetesClusterKubeconfig(string $clusterId): string
+    {
+        $response = $this->request('get', '/kubernetes/clusters/'.$clusterId.'/kubeconfig');
+        $this->assertSuccess($response, 'get kubernetes cluster kubeconfig');
+
+        return $response->body();
+    }
+
+    /**
+     * Tear down a DOKS cluster the user provisioned through dply. DigitalOcean
+     * deletes the cluster + node pools but NOT attached load balancers / block
+     * storage (per their docs) — those linger on the bill until separately
+     * removed. Returns true on 204, false on 404 (already gone).
+     */
+    public function deleteKubernetesCluster(string $clusterId): bool
+    {
+        $response = $this->request('delete', '/kubernetes/clusters/'.$clusterId);
+        if ($response->status() === 404) {
+            Cache::forget('do_kubernetes_clusters:'.sha1($this->token));
+
+            return false;
+        }
+        $this->assertSuccess($response, 'delete kubernetes cluster');
+        Cache::forget('do_kubernetes_clusters:'.sha1($this->token));
+
+        return true;
+    }
+
+    /**
+     * Read DO's published Kubernetes options (supported versions, regions, sizes
+     * for DOKS specifically). The "versions" array is what we use to populate
+     * the version dropdown on the create-cluster form — DO usually publishes
+     * 3-4 supported minor versions with one flagged as default/recommended.
+     *
+     * @return array<string, mixed>
+     */
+    public function getKubernetesOptions(): array
+    {
+        $cacheKey = 'do_kubernetes_options:'.sha1($this->token);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $response = $this->request('get', '/kubernetes/options');
+        $this->assertSuccess($response, 'list kubernetes options');
+        $data = $response->json();
+        $options = is_array($data['options'] ?? null) ? $data['options'] : [];
+
+        Cache::put($cacheKey, $options, now()->addMinutes(60));
+
+        return $options;
+    }
+
+    /**
+     * Provision a new DOKS cluster. DO returns the cluster shell immediately
+     * (with status.state="provisioning"); the actual node pool VMs take 5-10
+     * minutes to come up. Callers should treat the returned cluster as
+     * pending until status.state="running".
+     *
+     * Bypasses the cluster-list cache on success so a subsequent
+     * getKubernetesClusters() call doesn't return the pre-create snapshot.
+     *
+     * @return array<string, mixed>
+     */
+    public function createKubernetesCluster(
+        string $name,
+        string $region,
+        string $nodeSize,
+        int $nodeCount,
+        bool $ha = false,
+        ?string $version = null,
+        string $nodePoolName = 'default-pool',
+    ): array {
+        // DigitalOcean's create-cluster endpoint requires an explicit version
+        // slug — passing nothing (or the literal "latest") trips the API into
+        // "invalid version slug" / VersionFeatureDockerVpcBugFixed errors.
+        // When the caller didn't specify one, fetch the published options and
+        // use the first slug (DO orders them newest-first).
+        $versionSlug = is_string($version) ? trim($version) : '';
+        if ($versionSlug === '') {
+            $versionSlug = $this->resolveLatestKubernetesVersionSlug();
+        }
+
+        $body = [
+            'name' => $name,
+            'region' => $region,
+            'version' => $versionSlug,
+            'ha' => $ha,
+            'node_pools' => [[
+                'size' => $nodeSize,
+                'count' => $nodeCount,
+                'name' => $nodePoolName,
+            ]],
+        ];
+
+        $response = $this->request('post', '/kubernetes/clusters', $body);
+        $this->assertSuccess($response, 'create kubernetes cluster');
+        $data = $response->json();
+        $cluster = $data['kubernetes_cluster'] ?? $data;
+        if (! is_array($cluster) || empty($cluster)) {
+            throw new \RuntimeException('DigitalOcean API did not return a kubernetes cluster.');
+        }
+
+        Cache::forget('do_kubernetes_clusters:'.sha1($this->token));
+
+        return $cluster;
+    }
+
+    /**
+     * Look up the newest published DOKS version slug from /kubernetes/options.
+     * Used when the caller didn't pin a specific version on create.
+     */
+    private function resolveLatestKubernetesVersionSlug(): string
+    {
+        $options = $this->getKubernetesOptions();
+        $versions = is_array($options['versions'] ?? null) ? $options['versions'] : [];
+        foreach ($versions as $version) {
+            if (! is_array($version)) {
+                continue;
+            }
+            $slug = (string) ($version['slug'] ?? '');
+            if ($slug !== '') {
+                return $slug;
+            }
+        }
+
+        throw new \RuntimeException('DigitalOcean returned no available Kubernetes versions; cannot create a cluster without a version slug.');
+    }
+
+    /**
+     * Cache regions/sizes responses per token. The wizard renders these on every
+     * step and they don't change often — a 10 minute cache keeps the page fast
+     * even when the DO API is slow, and bounded HTTP timeouts (in request())
+     * keep the worst-case render under ~10s instead of stalling for 30s+.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function cachedCatalogList(string $kind, string $path, string $primaryKey): array
+    {
+        $cacheKey = $kind.':'.sha1($this->token);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $response = $this->request('get', $path);
+        $this->assertSuccess($response, 'list '.$primaryKey);
+        $data = $response->json();
+        $items = $data[$primaryKey] ?? $data['data'] ?? [];
+        $items = is_array($items) ? $items : [];
+
+        Cache::put($cacheKey, $items, now()->addMinutes(10));
+
+        return $items;
+    }
+
+    /**
+     * Create a DigitalOcean Functions (serverless) namespace. The returned
+     * api_host + access_key are the OpenWhisk credentials a function deploy
+     * needs — stored on the serverless host Server's meta.
+     *
+     * @return array{api_host: string, namespace: string, access_key: string, region: string}
+     */
+    public function createFunctionsNamespace(string $region, string $label): array
+    {
+        $response = $this->request('post', '/functions/namespaces', [
+            'region' => $region,
+            'label' => $label,
+        ]);
+        $this->assertSuccess($response, 'create functions namespace');
+
+        $ns = $response->json('namespace');
+        $ns = is_array($ns) ? $ns : [];
+
+        // OpenWhisk (which backs DO Functions) authenticates with a
+        // `uuid:key` pair — the deployer splits the access key on the colon.
+        // DO returns `uuid` and `key` separately, so recombine them here.
+        $uuid = (string) ($ns['uuid'] ?? '');
+        $key = (string) ($ns['key'] ?? '');
+        $accessKey = ($uuid !== '' && $key !== '') ? $uuid.':'.$key : $key;
+
+        return [
+            'api_host' => (string) ($ns['api_host'] ?? ''),
+            'namespace' => (string) ($ns['namespace'] ?? $ns['uuid'] ?? ''),
+            'access_key' => $accessKey,
+            'region' => (string) ($ns['region'] ?? $region),
+        ];
+    }
+
+    /**
+     * List the DigitalOcean Functions scheduled triggers in a namespace.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function functionTriggers(string $namespace): array
+    {
+        $response = $this->request('get', "/functions/namespaces/{$namespace}/triggers");
+        $this->assertSuccess($response, 'list function triggers');
+
+        $triggers = $response->json('triggers');
+
+        return is_array($triggers) ? array_values($triggers) : [];
+    }
+
+    /**
+     * Create a SCHEDULED trigger — DigitalOcean fires `$function` on the cron
+     * (evaluated in UTC). `body` must be a JSON object, so an empty payload is
+     * sent as `{}` (a PHP `[]` would serialize to `[]` and DO rejects it).
+     *
+     * @return array<string, mixed>  the created trigger
+     */
+    public function createScheduledFunctionTrigger(string $namespace, string $name, string $function, string $cron): array
+    {
+        $response = $this->request('post', "/functions/namespaces/{$namespace}/triggers", [
+            'name' => $name,
+            'function' => $function,
+            'type' => 'SCHEDULED',
+            'is_enabled' => true,
+            'scheduled_details' => ['cron' => $cron, 'body' => (object) []],
+        ]);
+        $this->assertSuccess($response, 'create scheduled function trigger');
+
+        return (array) $response->json('trigger');
+    }
+
+    /**
+     * Delete a function trigger. A 404 (already gone) is treated as success
+     * so removal is idempotent.
+     */
+    public function deleteFunctionTrigger(string $namespace, string $name): void
+    {
+        $response = $this->request('delete', "/functions/namespaces/{$namespace}/triggers/{$name}");
+
+        if (! $response->successful() && $response->status() !== 404) {
+            $this->assertSuccess($response, 'delete function trigger');
+        }
+    }
+
+    /**
+     * Create a DigitalOcean Managed Database cluster. It returns immediately
+     * with status `creating`; poll {@see getDatabaseCluster()} until `online`.
+     *
+     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function createDatabaseCluster(string $engine, string $region, string $size, string $name): array
+    {
+        $response = $this->request('post', '/databases', [
+            'name' => $name,
+            'engine' => $engine,
+            'region' => $region,
+            'size' => $size,
+            'num_nodes' => 1,
+        ]);
+        $this->assertSuccess($response, 'create database cluster');
+
+        return $this->normalizeDatabaseCluster($response->json('database'));
+    }
+
+    /**
+     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function getDatabaseCluster(string $id): array
+    {
+        $response = $this->request('get', '/databases/'.$id);
+        $this->assertSuccess($response, 'get database cluster');
+
+        return $this->normalizeDatabaseCluster($response->json('database'));
+    }
+
+    /**
+     * Create a transaction-mode connection pool (PgBouncer) on a Postgres
+     * cluster. Serverless functions open a fresh connection on every cold
+     * start; a pool multiplexes those onto a small set of backend
+     * connections so the cluster's connection limit is not exhausted.
+     *
+     * @return array{name: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    public function createDatabaseConnectionPool(string $clusterId, string $name, string $database, string $user, int $size = 10): array
+    {
+        $response = $this->request('post', '/databases/'.$clusterId.'/pools', [
+            'name' => $name,
+            'mode' => 'transaction',
+            'size' => $size,
+            'db' => $database,
+            'user' => $user,
+        ]);
+        $this->assertSuccess($response, 'create database connection pool');
+
+        $pool = $response->json('pool');
+        $pool = is_array($pool) ? $pool : [];
+        $connection = is_array($pool['connection'] ?? null) ? $pool['connection'] : [];
+
+        return [
+            'name' => (string) ($pool['name'] ?? $name),
+            'connection' => [
+                'host' => (string) ($connection['host'] ?? ''),
+                'port' => (int) ($connection['port'] ?? 0),
+                'user' => (string) ($connection['user'] ?? ''),
+                'password' => (string) ($connection['password'] ?? ''),
+                'database' => (string) ($connection['database'] ?? ''),
+                'ssl' => (bool) ($connection['ssl'] ?? true),
+            ],
+        ];
+    }
+
+    /**
+     * @return array{id: string, status: string, engine: string, connection: array{host: string, port: int, user: string, password: string, database: string, uri: string, ssl: bool}}
+     */
+    private function normalizeDatabaseCluster(mixed $database): array
+    {
+        $database = is_array($database) ? $database : [];
+        $connection = is_array($database['connection'] ?? null) ? $database['connection'] : [];
+
+        return [
+            'id' => (string) ($database['id'] ?? ''),
+            'status' => (string) ($database['status'] ?? ''),
+            'engine' => (string) ($database['engine'] ?? ''),
+            'connection' => [
+                'host' => (string) ($connection['host'] ?? ''),
+                'port' => (int) ($connection['port'] ?? 0),
+                'user' => (string) ($connection['user'] ?? ''),
+                'password' => (string) ($connection['password'] ?? ''),
+                'database' => (string) ($connection['database'] ?? ''),
+                'uri' => (string) ($connection['uri'] ?? ''),
+                'ssl' => (bool) ($connection['ssl'] ?? true),
+            ],
+        ];
     }
 
     /**
@@ -285,6 +642,20 @@ class DigitalOceanService
     }
 
     /**
+     * Delete an account SSH key by its DO numeric id or fingerprint.
+     */
+    public function deleteSshKey(int|string $idOrFingerprint): void
+    {
+        $value = is_string($idOrFingerprint) ? trim($idOrFingerprint) : (string) $idOrFingerprint;
+        if ($value === '') {
+            throw new \InvalidArgumentException('SSH key id or fingerprint is required.');
+        }
+
+        $response = $this->request('delete', '/account/keys/'.rawurlencode($value));
+        $this->assertSuccess($response, 'delete SSH key');
+    }
+
+    /**
      * Whether the domain exists in this DigitalOcean account (Networking → Domains).
      */
     public function domainExistsInAccount(string $domain): bool
@@ -315,16 +686,45 @@ class DigitalOceanService
     }
 
     /**
+     * List every DNS record in a zone, following DO's pagination.
+     *
+     * DO paginates record lists (20 per page by default). Returning only the
+     * first page silently truncates large zones — and callers that purge
+     * conflicting records before a CNAME write MUST see every record, or DO
+     * rejects the create with "CNAME records cannot share a name with other
+     * records". So we request the max page size and walk `links.pages.next`
+     * until the zone is exhausted.
+     *
      * @return array<int, array<string, mixed>>
      */
     public function getDomainRecords(string $domain, array $query = []): array
     {
-        $response = $this->request('get', '/domains/'.$domain.'/records', $query);
-        $this->assertSuccess($response, 'list domain records');
-        $data = $response->json();
-        $records = $data['domain_records'] ?? $data['data'] ?? [];
+        $all = [];
+        $page = 1;
 
-        return is_array($records) ? $records : [];
+        // Hard cap at 50 pages (× 200 = 10k records) so a malformed
+        // pagination response can never spin this loop forever.
+        do {
+            $response = $this->request('get', '/domains/'.$domain.'/records', array_merge($query, [
+                'per_page' => 200,
+                'page' => $page,
+            ]));
+            $this->assertSuccess($response, 'list domain records');
+            $data = $response->json();
+            $records = $data['domain_records'] ?? $data['data'] ?? [];
+
+            if (is_array($records)) {
+                foreach ($records as $record) {
+                    $all[] = $record;
+                }
+            }
+
+            $hasNext = is_array($records) && $records !== []
+                && is_string(data_get($data, 'links.pages.next'));
+            $page++;
+        } while ($hasNext && $page <= 50);
+
+        return $all;
     }
 
     /**
@@ -404,12 +804,156 @@ class DigitalOceanService
         $this->assertSuccess($response, 'delete droplet');
     }
 
+    /**
+     * Issue a power_off action against a droplet. Snapshots require the droplet
+     * to be off — DO will accept "snapshot" against a running droplet but uses a
+     * crash-consistent freeze that is less reliable for application servers.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function powerOffDroplet(int $id): array
+    {
+        $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_off']);
+        $this->assertSuccess($response, 'power off droplet');
+
+        return $this->extractAction($response->json(), 'power off droplet');
+    }
+
+    /**
+     * Trigger a snapshot of the droplet's disk into a custom image.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function snapshotDroplet(int $id, string $name): array
+    {
+        $name = trim($name);
+        if ($name === '') {
+            throw new \InvalidArgumentException('Snapshot name is required.');
+        }
+
+        $response = $this->request('post', '/droplets/'.$id.'/actions', [
+            'type' => 'snapshot',
+            'name' => $name,
+        ]);
+        $this->assertSuccess($response, 'snapshot droplet');
+
+        return $this->extractAction($response->json(), 'snapshot droplet');
+    }
+
+    /**
+     * Fetch a droplet-scoped action so callers can poll for completion.
+     *
+     * @return array<string, mixed>
+     */
+    public function getDropletAction(int $dropletId, int $actionId): array
+    {
+        $response = $this->request('get', '/droplets/'.$dropletId.'/actions/'.$actionId);
+        $this->assertSuccess($response, 'get droplet action');
+
+        return $this->extractAction($response->json(), 'get droplet action');
+    }
+
+    /**
+     * Block until a droplet action completes or errors.
+     *
+     * @param  int  $timeoutSeconds  Hard cap; long snapshots can run several minutes.
+     * @param  int  $pollSeconds  Poll interval; snapshot actions only advance every 10–30s.
+     * @param  callable(array<string, mixed>): void|null  $onTick
+     * @return array<string, mixed> Final action payload (status === 'completed' on success)
+     */
+    public function waitForDropletAction(
+        int $dropletId,
+        int $actionId,
+        int $timeoutSeconds = 1800,
+        int $pollSeconds = 10,
+        ?callable $onTick = null,
+    ): array {
+        $deadline = time() + max(30, $timeoutSeconds);
+        $pollSeconds = max(2, $pollSeconds);
+
+        while (true) {
+            $action = $this->getDropletAction($dropletId, $actionId);
+            if ($onTick !== null) {
+                $onTick($action);
+            }
+
+            $status = strtolower((string) ($action['status'] ?? ''));
+            if ($status === 'completed') {
+                return $action;
+            }
+            if ($status === 'errored') {
+                throw new \RuntimeException('DigitalOcean action errored: '.json_encode($action));
+            }
+            if (time() >= $deadline) {
+                throw new \RuntimeException('Timed out waiting for DigitalOcean action '.$actionId.' (status='.$status.').');
+            }
+
+            sleep($pollSeconds);
+        }
+    }
+
+    /**
+     * List custom snapshots, optionally filtered to droplet snapshots.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSnapshots(?string $resourceType = 'droplet'): array
+    {
+        $query = $resourceType !== null && $resourceType !== '' ? ['resource_type' => $resourceType] : [];
+        $response = $this->request('get', '/snapshots', $query);
+        $this->assertSuccess($response, 'list snapshots');
+        $data = $response->json();
+        $snapshots = $data['snapshots'] ?? $data['data'] ?? [];
+
+        return is_array($snapshots) ? $snapshots : [];
+    }
+
+    /**
+     * Delete a snapshot by ID. Snapshot IDs are returned as strings by the API.
+     */
+    public function deleteSnapshot(string $snapshotId): void
+    {
+        $snapshotId = trim($snapshotId);
+        if ($snapshotId === '') {
+            throw new \InvalidArgumentException('Snapshot id is required.');
+        }
+
+        $response = $this->request('delete', '/snapshots/'.rawurlencode($snapshotId));
+        $this->assertSuccess($response, 'delete snapshot');
+    }
+
+    /**
+     * @param  mixed  $payload
+     * @return array<string, mixed>
+     */
+    private function extractAction($payload, string $action): array
+    {
+        if (! is_array($payload)) {
+            throw new \RuntimeException("DigitalOcean API did not return an action for {$action}.");
+        }
+
+        $data = $payload['action'] ?? $payload;
+        if (! is_array($data) || $data === []) {
+            throw new \RuntimeException("DigitalOcean API did not return an action for {$action}.");
+        }
+
+        return $data;
+    }
+
     protected function request(string $method, string $path, array $bodyOrQuery = []): Response
     {
         $url = $this->baseUrl.$path;
+        // Bounded timeouts: connect within 5s, finish within 8s. Without these,
+        // a slow or stuck DO endpoint can consume the request's entire 30s
+        // PHP max-execution-time budget — the server-create wizard hits the
+        // catalog (regions/sizes) on every render, so any stall blocks the
+        // whole page. The catalog calls also cache for 10 minutes upstream,
+        // so this timeout only applies to fresh fetches.
         $request = Http::withToken($this->token)
             ->acceptJson()
-            ->contentType('application/json');
+            ->contentType('application/json')
+            ->connectTimeout(5)
+            ->timeout(8);
 
         $method = strtolower($method);
         if ($method === 'get') {
@@ -423,6 +967,217 @@ class DigitalOceanService
         }
 
         throw new \InvalidArgumentException("Unsupported method: {$method}");
+    }
+
+    /**
+     * Create a DigitalOcean Kubernetes (DOKS) cluster.
+     *
+     * @param  array{
+     *     name: string,
+     *     region: string,
+     *     version: string,
+     *     node_pool: array{
+     *         size: string,
+     *         count: int,
+     *         name?: string,
+     *         tags?: list<string>,
+     *         labels?: array<string,string>,
+     *         auto_scale?: bool,
+     *         min_nodes?: int,
+     *         max_nodes?: int,
+     *     },
+     *     ha?: bool,
+     *     vpc_uuid?: string|null,
+     *     tags?: list<string>,
+     * }  $config
+     * @return array<string, mixed> The created kubernetes cluster
+     */
+    public function createKubernetesCluster(array $config): array
+    {
+        $body = [
+            'name' => $config['name'],
+            'region' => $config['region'],
+            'version' => $config['version'],
+            'node_pools' => [
+                [
+                    'name' => $config['node_pool']['name'] ?? 'default-pool',
+                    'size' => $config['node_pool']['size'],
+                    'count' => $config['node_pool']['count'],
+                    'tags' => $config['node_pool']['tags'] ?? [],
+                    'labels' => $config['node_pool']['labels'] ?? new \stdClass,
+                ],
+            ],
+        ];
+
+        // Add autoscaling if enabled
+        if (! empty($config['node_pool']['auto_scale'])) {
+            $body['node_pools'][0]['auto_scale'] = true;
+            $body['node_pools'][0]['min_nodes'] = $config['node_pool']['min_nodes'] ?? 1;
+            $body['node_pools'][0]['max_nodes'] = $config['node_pool']['max_nodes'] ?? 10;
+        }
+
+        if (isset($config['ha'])) {
+            $body['ha'] = (bool) $config['ha'];
+        }
+
+        if (! empty($config['vpc_uuid'])) {
+            $body['vpc_uuid'] = $config['vpc_uuid'];
+        }
+
+        if (! empty($config['tags'])) {
+            $body['tags'] = $config['tags'];
+        }
+
+        $response = $this->request('post', '/kubernetes/clusters', $body);
+        $this->assertSuccess($response, 'create kubernetes cluster');
+
+        $cluster = $response->json('kubernetes_cluster');
+
+        return is_array($cluster) ? $cluster : [];
+    }
+
+    /**
+     * Get a Kubernetes cluster by ID.
+     *
+     * @return array<string, mixed>|null Null if cluster has been deleted
+     */
+    public function getKubernetesCluster(string $clusterId): ?array
+    {
+        $response = $this->request('get', '/kubernetes/clusters/'.$clusterId);
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        $this->assertSuccess($response, 'get kubernetes cluster');
+
+        $cluster = $response->json('kubernetes_cluster');
+
+        return is_array($cluster) ? $cluster : null;
+    }
+
+    /**
+     * Get the kubeconfig for a cluster.
+     * This returns a YAML string that can be used with kubectl.
+     */
+    public function getKubernetesKubeconfig(string $clusterId, ?string $expirySeconds = null): string
+    {
+        $url = '/kubernetes/clusters/'.$clusterId.'/kubeconfig';
+        if ($expirySeconds !== null) {
+            $url .= '?expiry_seconds='.$expirySeconds;
+        }
+
+        $response = $this->request('get', $url);
+        $this->assertSuccess($response, 'get kubernetes kubeconfig');
+
+        return $response->body();
+    }
+
+    /**
+     * Delete a Kubernetes cluster.
+     */
+    public function deleteKubernetesCluster(string $clusterId): void
+    {
+        $response = $this->request('delete', '/kubernetes/clusters/'.$clusterId);
+        $this->assertSuccess($response, 'delete kubernetes cluster');
+    }
+
+    /**
+     * Get available Kubernetes versions.
+     *
+     * @return list<string>
+     */
+    public function getKubernetesVersions(): array
+    {
+        $options = $this->getKubernetesOptions();
+        $versions = $options['versions'] ?? [];
+        $slugs = [];
+        foreach ($versions as $version) {
+            if (is_array($version) && ! empty($version['slug'])) {
+                $slugs[] = (string) $version['slug'];
+            }
+        }
+
+        return $slugs;
+    }
+
+    /**
+     * Get the latest (default) Kubernetes version slug.
+     */
+    public function getLatestKubernetesVersion(): string
+    {
+        $versions = $this->getKubernetesVersions();
+        if (empty($versions)) {
+            throw new \RuntimeException('No Kubernetes versions available from DigitalOcean');
+        }
+
+        return $versions[0];
+    }
+
+    /**
+     * Get available node sizes for Kubernetes.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getKubernetesNodeSizes(): array
+    {
+        $options = $this->getKubernetesOptions();
+        $sizes = $options['sizes'] ?? [];
+
+        return is_array($sizes) ? array_values($sizes) : [];
+    }
+
+    /**
+     * Create a container registry in DigitalOcean.
+     *
+     * @return array<string, mixed>
+     */
+    public function createContainerRegistry(string $name, string $subscriptionTier = 'starter'): array
+    {
+        $response = $this->request('post', '/registry', [
+            'name' => $name,
+            'subscription_tier_slug' => $subscriptionTier,
+        ]);
+        $this->assertSuccess($response, 'create container registry');
+
+        $registry = $response->json('registry');
+
+        return is_array($registry) ? $registry : [];
+    }
+
+    /**
+     * Get container registry details.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getContainerRegistry(string $name): ?array
+    {
+        $response = $this->request('get', '/registry/'.$name);
+
+        if ($response->status() === 404) {
+            return null;
+        }
+
+        $this->assertSuccess($response, 'get container registry');
+
+        $registry = $response->json('registry');
+
+        return is_array($registry) ? $registry : null;
+    }
+
+    /**
+     * Get Docker credentials for registry authentication.
+     *
+     * @return array{auths: array<string, array{auth: string}>}
+     */
+    public function getContainerRegistryCredentials(): array
+    {
+        $response = $this->request('get', '/registry/docker-credentials');
+        $this->assertSuccess($response, 'get registry credentials');
+
+        $dockerConfig = $response->json();
+
+        return is_array($dockerConfig) ? $dockerConfig : [];
     }
 
     protected function assertSuccess(Response $response, string $action): void

@@ -170,6 +170,142 @@ function bindDplyServerCronRunChannel() {
     });
 }
 
+/**
+ * Cache workspace MONITOR tail: queued SSH + Reverb chunks on private server channel.
+ * Mirrors the cron-run binder above. Subscribes when the workspace renders the
+ * #dply-server-cache-monitor-context element with subscribe="1" (i.e. there is an
+ * active run); leaves on navigation away.
+ */
+function bindDplyServerCacheMonitorChannel() {
+    if (!window.Echo || typeof window.Livewire === 'undefined') {
+        return;
+    }
+
+    const el = document.getElementById('dply-server-cache-monitor-context');
+    const serverId = el?.dataset?.serverId?.trim() ?? '';
+    const subscribe = el?.dataset?.subscribe === '1';
+
+    if (!subscribe || !serverId) {
+        if (window.__dplyCacheMonitorEchoSub) {
+            window.Echo.leave('server.' + window.__dplyCacheMonitorEchoSub);
+            window.__dplyCacheMonitorEchoSub = null;
+        }
+
+        return;
+    }
+
+    if (window.__dplyCacheMonitorEchoSub === serverId) {
+        return;
+    }
+
+    if (window.__dplyCacheMonitorEchoSub) {
+        window.Echo.leave('server.' + window.__dplyCacheMonitorEchoSub);
+    }
+
+    window.__dplyCacheMonitorEchoSub = serverId;
+
+    const ch = window.Echo.private('server.' + serverId);
+
+    ch.listen('.server.cache.monitor.chunk', (payload) => {
+        if (!payload?.run_id || !payload?.chunk) {
+            return;
+        }
+        window.Livewire.dispatch('cache-monitor-chunk', {
+            runId: payload.run_id,
+            chunk: payload.chunk,
+        });
+    });
+
+    /**
+     * Completion clears the active run-id Livewire-side. wire:poll.1s still
+     * syncs the cache buffer fallback when Reverb is off or events are missed.
+     */
+    ch.listen('.server.cache.monitor.completed', (payload) => {
+        if (!payload?.run_id) {
+            return;
+        }
+        window.Livewire.dispatch('cache-monitor-completed', {
+            runId: payload.run_id,
+            success: !!payload.success,
+            lineCount: payload.line_count ?? 0,
+            error: payload.error ?? null,
+        });
+    });
+}
+
+/**
+ * Systemd service action (Restart/Stop/Start/Reload/Enable/Disable on a unit, single or bulk):
+ * fast path for the workspace-services action banner. Subscribes to the private server channel
+ * while a queued task id is in flight; on completion broadcast, dispatches a Livewire event so
+ * the banner updates immediately. wire:poll.2s remains as a fallback when this channel is off.
+ */
+function bindDplyServerSystemdActionChannel() {
+    if (!window.Echo || typeof window.Livewire === 'undefined') {
+        return;
+    }
+
+    const el = document.getElementById('dply-server-systemd-action-context');
+    const serverId = el?.dataset?.serverId?.trim() ?? '';
+    const subscribe = el?.dataset?.subscribe === '1';
+
+    if (!subscribe || !serverId) {
+        if (window.__dplySystemdActionEchoSub) {
+            window.Echo.leave('server.' + window.__dplySystemdActionEchoSub);
+            window.__dplySystemdActionEchoSub = null;
+        }
+
+        return;
+    }
+
+    if (window.__dplySystemdActionEchoSub === serverId) {
+        return;
+    }
+
+    if (window.__dplySystemdActionEchoSub) {
+        window.Echo.leave('server.' + window.__dplySystemdActionEchoSub);
+    }
+
+    window.__dplySystemdActionEchoSub = serverId;
+
+    const ch = window.Echo.private('server.' + serverId);
+
+    /**
+     * Workers can broadcast before the Livewire response runs $this->js() to set
+     * __dplySystemdActionActiveId — adopt task_id from the first event if not yet known.
+     */
+    function systemdActionAccepts(payloadTaskId) {
+        if (!payloadTaskId) {
+            return false;
+        }
+        if (!window.__dplySystemdActionActiveId) {
+            window.__dplySystemdActionActiveId = payloadTaskId;
+
+            return true;
+        }
+
+        return payloadTaskId === window.__dplySystemdActionActiveId;
+    }
+
+    ch.listen('.server.systemd.action.completed', (payload) => {
+        const taskId = payload?.task_id;
+        if (!taskId || !systemdActionAccepts(taskId)) {
+            return;
+        }
+        window.Livewire.dispatch('systemd-action-completed', {
+            runId: taskId,
+            success: !!payload.success,
+            error: payload.error ?? null,
+            flashSuccess: payload.flash_success ?? null,
+            finalOutput: payload.final_output ?? null,
+        });
+        window.__dplySystemdActionActiveId = null;
+    });
+}
+
+// Exposed so the workspace blade can re-bind after Livewire morphs the data-subscribe attribute
+// from "0" → "1" (i.e. the operator just queued a task on a freshly-loaded page).
+window.__dplyBindServicesEcho = bindDplyServerSystemdActionChannel;
+
 function bindDplySiteProvisioningChannel() {
     if (!window.Echo || typeof window.Livewire === 'undefined') {
         return;
@@ -215,6 +351,8 @@ document.addEventListener('livewire:init', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplyServerCacheMonitorChannel();
+    bindDplyServerSystemdActionChannel();
     bindDplySiteProvisioningChannel();
 });
 
@@ -222,6 +360,8 @@ document.addEventListener('livewire:navigated', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplyServerCacheMonitorChannel();
+    bindDplyServerSystemdActionChannel();
     bindDplySiteProvisioningChannel();
 });
 
@@ -230,5 +370,7 @@ document.addEventListener('dply:echo-ready', () => {
     bindDplyOrganizationServerChannel();
     bindDplyServerLogChannel();
     bindDplyServerCronRunChannel();
+    bindDplyServerCacheMonitorChannel();
+    bindDplyServerSystemdActionChannel();
     bindDplySiteProvisioningChannel();
 });

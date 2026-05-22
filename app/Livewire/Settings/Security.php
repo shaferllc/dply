@@ -45,10 +45,10 @@ class Security extends Component
     protected function loadPasskeyAliases(): void
     {
         $this->passkeyAliases = $this->user()
-            ->webAuthnCredentials()
+            ->passkeys()
             ->orderByDesc('created_at')
             ->get()
-            ->mapWithKeys(fn ($credential) => [$credential->getKey() => $credential->alias ?? ''])
+            ->mapWithKeys(fn ($credential) => [$credential->getKey() => $credential->name ?? ''])
             ->all();
     }
 
@@ -63,9 +63,11 @@ class Security extends Component
         $raw = $this->passkeyAliases[$credentialId] ?? '';
         $trimmed = is_string($raw) ? trim($raw) : '';
 
-        $credential = $this->user()->webAuthnCredentials()->whereKey($credentialId)->firstOrFail();
+        // The new package's `passkeys.name` column is NOT NULL; fall back to a
+        // generic label when the operator clears the field rather than failing.
+        $credential = $this->user()->passkeys()->whereKey($credentialId)->firstOrFail();
         $credential->forceFill([
-            'alias' => $trimmed === '' ? null : $trimmed,
+            'name' => $trimmed === '' ? __('Passkey') : $trimmed,
         ])->save();
     }
 
@@ -96,14 +98,14 @@ class Security extends Component
     {
         $user = $this->user();
 
-        $otherPasskeys = $user->webAuthnCredentials()->whereKeyNot($credentialId)->whereEnabled()->count();
+        $otherPasskeys = $user->passkeys()->whereKeyNot($credentialId)->count();
         if ($user->password === null && $user->socialAccounts()->count() === 0 && $otherPasskeys === 0) {
             $this->addError('passkey', __('Add a password or OAuth sign-in before removing your only passkey.'));
 
             return;
         }
 
-        $credential = $user->webAuthnCredentials()->whereKey($credentialId)->firstOrFail();
+        $credential = $user->passkeys()->whereKey($credentialId)->firstOrFail();
         $credential->delete();
 
         unset($this->passkeyAliases[$credentialId]);
@@ -136,7 +138,7 @@ class Security extends Component
 
         return view('livewire.settings.security', [
             'oauthProviders' => OAuthController::getEnabledProviders(),
-            'passkeys' => $user->webAuthnCredentials()->orderByDesc('created_at')->get(),
+            'passkeys' => $user->passkeys()->orderByDesc('created_at')->get(),
             'socialAccounts' => $user->socialAccounts()->orderBy('provider')->orderBy('id')->get(),
         ]);
     }

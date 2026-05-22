@@ -45,7 +45,7 @@ class ServerPhpConfigEditorTest extends TestCase
     public function it_resolves_the_expected_paths_and_labels_for_each_supported_target(): void
     {
         $server = $this->makeServerWithMeta();
-        $editor = new ServerPhpConfigEditor;
+        $editor = app(ServerPhpConfigEditor::class);
 
         $cliTarget = $editor->resolveEditableTarget($server, '8.3', 'cli_ini');
         $fpmTarget = $editor->resolveEditableTarget($server, '8.3', 'fpm_ini');
@@ -64,7 +64,7 @@ class ServerPhpConfigEditorTest extends TestCase
     {
         $server = $this->makeServerWithMeta();
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
         $editor->shouldReceive('readRemoteTarget')
             ->once()
             ->withArgs(fn (Server $refreshedServer, array $target) => $refreshedServer->is($server) && $target['path'] === '/etc/php/8.3/cli/php.ini')
@@ -82,7 +82,7 @@ class ServerPhpConfigEditorTest extends TestCase
     {
         $server = $this->makeServerWithMeta();
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
         $editor->shouldReceive('verifyProposedContent')
             ->once()
             ->andThrow(new ServerPhpConfigValidationException(
@@ -101,7 +101,7 @@ class ServerPhpConfigEditorTest extends TestCase
     public function it_fails_clearly_for_unsupported_target_types(): void
     {
         $server = $this->makeServerWithMeta();
-        $editor = new ServerPhpConfigEditor;
+        $editor = app(ServerPhpConfigEditor::class);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Unknown PHP config target.');
@@ -114,7 +114,7 @@ class ServerPhpConfigEditorTest extends TestCase
     {
         $server = $this->makeServerWithMeta();
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
         $editor->shouldReceive('readRemoteTarget')
             ->once()
             ->andThrow(new \RuntimeException('Pool config is not available for PHP 8.3 on this server.'));
@@ -130,7 +130,7 @@ class ServerPhpConfigEditorTest extends TestCase
     {
         $server = $this->makeServerWithMeta();
 
-        $editor = Mockery::mock(ServerPhpConfigEditor::class)->makePartial()->shouldAllowMockingProtectedMethods();
+        $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(\App\Services\ConfigRevisions\ConfigRevisionRecorder::class)])->makePartial()->shouldAllowMockingProtectedMethods();
         $editor->shouldReceive('verifyProposedContent')
             ->once()
             ->andReturn([
@@ -154,7 +154,7 @@ class ServerPhpConfigEditorTest extends TestCase
     public function it_rejects_config_edits_while_another_server_level_php_mutation_is_running(): void
     {
         $server = $this->makeServerWithMeta();
-        $editor = new ServerPhpConfigEditor;
+        $editor = app(ServerPhpConfigEditor::class);
         $lock = Cache::lock('server-php-package-action:'.$server->id, 150);
 
         $this->assertTrue($lock->get());

@@ -13,9 +13,19 @@ class NginxSiteConfigBuilder
 {
     /**
      * Full vhost config. Pass a profile for layered includes and main snippet; omit for legacy nginx_extra_raw-only behavior.
+     *
+     * `$listenPort` produces a minimal HTTP-only vhost bound to that port instead of :80/:443 — used by the
+     * webserver-switch flow to validate the new daemon on :8080 alongside the production webserver on :80.
+     * In listen-port mode TLS plumbing (`listen 443 ssl`, `ssl_certificate*`, HSTS) is stripped because the
+     * test port has no real certificate; the test only proves the daemon parses + serves on the alternate
+     * port, not that it can negotiate TLS.
      */
-    public function build(Site $site, ?SiteWebserverConfigProfile $profile = null): string
+    public function build(Site $site, ?SiteWebserverConfigProfile $profile = null, ?int $listenPort = null): string
     {
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
         $hostnames = collect($site->webserverHostnames());
         if ($hostnames->isEmpty()) {
@@ -36,7 +46,7 @@ class NginxSiteConfigBuilder
         $root = $site->effectiveDocumentRootForNginx();
         $phpSock = str_replace(
             '{version}',
-            $site->php_version ?? '8.3',
+            $site->phpVersion() ?? '8.3',
             config('sites.php_fpm_socket')
         );
 
@@ -99,11 +109,69 @@ class NginxSiteConfigBuilder
             ? "\n    # php-fpm pool user (configure pool on server): {$poolUser}\n"
             : '';
 
-        return match ($site->type) {
+        $config = match ($site->type) {
             SiteType::Php => $this->phpBlock($basename, $names, $root, $phpSock, $redirectBlock, $layerPrefix, $extraBlock, $poolNote, $site),
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $layerPrefix, $extraBlock, $site),
-            SiteType::Node => $this->nodeBlock($basename, $names, (int) ($site->app_port ?? 3000), $redirectBlock, $layerPrefix, $extraBlock, $site),
+            SiteType::Node => $this->nodeBlock($basename, $names, $this->resolveUpstreamPort($site), $redirectBlock, $layerPrefix, $extraBlock, $site),
+            SiteType::Custom => null,
         };
+
+        if ($config === null) {
+            return '';
+        }
+
+        return $listenPort === null ? $config : $this->rewriteForListenPort($config, $listenPort);
+    }
+
+    /**
+     * Mutate a built vhost into a port-test variant:
+     *   - `listen 80` and `listen [::]:80` → single `listen <port>` (drop IPv6 dual bind)
+     *   - Remove TLS bind lines (`listen 443 ssl`, `listen [::]:443 ssl`, http2/http3 variants)
+     *   - Remove `ssl_certificate` / `ssl_certificate_key` / `ssl_*` directives so the rewritten config
+     *     loads without requiring cert paths the test daemon won't have.
+     *   - Remove HSTS / TLS-only headers since the test port serves HTTP.
+     *
+     * Idempotent and best-effort. Operates only on directive patterns nginx writes in its standard
+     * Debian/Ubuntu layout; sites with handwritten weird directives may need post-cutover cleanup.
+     */
+    private function rewriteForListenPort(string $config, int $listenPort): string
+    {
+        // Collapse the IPv4 + IPv6 listen pair into a single port-only listen.
+        $config = preg_replace('/^\s*listen\s+80\s*;.*$/m', '    listen '.$listenPort.';', $config);
+        $config = preg_replace('/^\s*listen\s+\[::\]:80\s*;.*$/m', '', $config);
+
+        // Strip TLS binds (443 + http2/http3 + reuseport + ssl).
+        $config = preg_replace('/^\s*listen\s+\[?::\]?:?443[^\n]*;.*$/m', '', $config);
+        $config = preg_replace('/^\s*listen\s+443[^\n]*;.*$/m', '', $config);
+
+        // Strip SSL plumbing — every directive starting with ssl_, plus the well-known HSTS add_header.
+        $config = preg_replace('/^\s*ssl_[a-z_]+\s+[^;]+;\s*$/m', '', $config);
+        $config = preg_replace('/^\s*add_header\s+Strict-Transport-Security[^;]+;\s*$/m', '', $config);
+
+        // Collapse runs of blank lines the stripping leaves behind so the result still reads cleanly.
+        return preg_replace("/\n{3,}/", "\n\n", $config);
+    }
+
+    /**
+     * Resolve the upstream port for non-PHP/static sites.
+     *
+     * Prefers the new `internal_port` column (allocated from 30000–39999
+     * by InternalPortAllocator and unique per server) and falls back to
+     * the legacy `app_port` (which sites created before the runtime-
+     * agnostic columns landed still carry). The 3000 default is the last
+     * resort for sites that have neither — a typical Node convention.
+     */
+    private function resolveUpstreamPort(Site $site): int
+    {
+        if ($site->internal_port !== null && $site->internal_port > 0) {
+            return (int) $site->internal_port;
+        }
+
+        if ($site->app_port !== null && $site->app_port > 0) {
+            return (int) $site->app_port;
+        }
+
+        return 3000;
     }
 
     /**
@@ -160,7 +228,7 @@ NGINX;
         if ($site->octane_port) {
             $port = (int) $site->octane_port;
             $reverb = $this->reverbProxyLocationBlock($site);
-            $octaneProxyCache = $site->wantsEngineHttpCache() ? $this->nginxProxyCacheDirectives() : '';
+            $octaneProxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
             $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
 
             return <<<NGINX
@@ -196,8 +264,8 @@ NGINX;
         }
 
         $reverbPlain = $this->reverbProxyLocationBlock($site);
-        $fcgiEngine = $site->wantsEngineHttpCache() && $site->type === SiteType::Php
-            ? $this->nginxFastcgiCacheDirectives()
+        $fcgiEngine = $site->type === SiteType::Php
+            ? app(SiteCacheDirectivesBuilder::class)->nginxFastcgiDirectives($site)
             : '';
         $phpBa = $this->nginxBasicAuthPhpFragments($site, $root, $phpSock, $fcgiEngine);
 
@@ -241,9 +309,7 @@ NGINX;
         string $extraBlock,
         Site $site
     ): string {
-        $openFile = $site->wantsEngineHttpCache()
-            ? "    open_file_cache max=4000 inactive=30s;\n    open_file_cache_valid 45s;\n    open_file_cache_min_uses 2;\n"
-            : '';
+        $openFile = app(SiteCacheDirectivesBuilder::class)->nginxOpenFileCacheBlock($site);
         $staticBa = $this->nginxBasicAuthStaticFragments($site, $root);
 
         return <<<NGINX
@@ -278,7 +344,7 @@ NGINX;
         string $extraBlock,
         Site $site
     ): string {
-        $proxyCache = $site->wantsEngineHttpCache() ? $this->nginxProxyCacheDirectives() : '';
+        $proxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
         $webRoot = rtrim($site->effectiveDocumentRootForNginx(), '/');
         $nodeBa = $this->nginxBasicAuthNodeFragments($site, $webRoot);
 
@@ -301,40 +367,6 @@ server {
     }
 {$extraBlock}
 }
-NGINX;
-    }
-
-    protected function nginxFastcgiCacheDirectives(): string
-    {
-        $zone = config('sites.nginx_engine_fcgi_cache_zone');
-
-        return <<<NGINX
-        fastcgi_cache {$zone};
-        fastcgi_cache_key "\$scheme\$request_method\$host\$request_uri";
-        fastcgi_cache_valid 200 60m;
-        fastcgi_cache_valid 404 10m;
-        fastcgi_cache_bypass \$http_pragma \$http_authorization;
-        fastcgi_no_cache \$http_pragma \$http_authorization;
-        fastcgi_cache_min_uses 1;
-        fastcgi_cache_use_stale error timeout updating http_500 http_503;
-        add_header X-Dply-Engine-Cache \$upstream_cache_status;
-
-NGINX;
-    }
-
-    protected function nginxProxyCacheDirectives(): string
-    {
-        $zone = config('sites.nginx_engine_proxy_cache_zone');
-
-        return <<<NGINX
-        proxy_cache {$zone};
-        proxy_cache_key "\$scheme\$request_method\$host\$request_uri";
-        proxy_cache_valid 200 60m;
-        proxy_cache_valid 404 10m;
-        proxy_cache_bypass \$http_pragma \$http_authorization;
-        proxy_cache_use_stale error timeout updating http_500 http_503;
-        add_header X-Dply-Engine-Cache \$upstream_cache_status;
-
 NGINX;
     }
 
@@ -375,7 +407,7 @@ NGINX;
             ? $this->nginxBasicAuthPhpPrefixLocations($site, $phpSock, $fcgiEngine)
             : '';
         $slashAuth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $slashAuth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -396,7 +428,7 @@ NGINX;
             ? $this->nginxBasicAuthStaticPrefixLocations($site)
             : '';
         $slashAuth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $slashAuth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -414,7 +446,7 @@ NGINX;
 
         $preamble = $webRoot !== '' ? $this->nginxBasicAuthAcmeChallengeBlock($webRoot) : '';
         $slashAuth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $slashAuth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -432,7 +464,7 @@ NGINX;
 
         $preamble = $this->nginxBasicAuthAcmeChallengeBlock($root);
         $auth = '';
-        if ($site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
+        if ($site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             $auth = $this->nginxBasicAuthDirectives($site->basicAuthHtpasswdPathForNormalizedPath('/'));
         }
 
@@ -445,7 +477,7 @@ NGINX;
 
     protected function nginxBasicAuthEnabled(Site $site): bool
     {
-        return $site->basicAuthUsers->isNotEmpty();
+        return $site->enforceableBasicAuthUsers()->isNotEmpty();
     }
 
     protected function nginxBasicAuthAcmeChallengeBlock(string $root): string
@@ -468,7 +500,7 @@ NGINX;
 
     protected function nginxBasicAuthPhpPrefixLocations(Site $site, string $phpSock, string $fcgiEngine): string
     {
-        $paths = $site->basicAuthUsers
+        $paths = $site->enforceableBasicAuthUsers()
             ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
             ->unique()
             ->filter(fn (string $p): bool => $p !== '/')
@@ -477,7 +509,7 @@ NGINX;
 
         $out = '';
         foreach ($paths as $locPath) {
-            $has = $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
+            $has = $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
             if (! $has) {
                 continue;
             }
@@ -501,7 +533,7 @@ NGINX;
 
     protected function nginxBasicAuthStaticPrefixLocations(Site $site): string
     {
-        $paths = $site->basicAuthUsers
+        $paths = $site->enforceableBasicAuthUsers()
             ->map(fn (SiteBasicAuthUser $u): string => $u->normalizedPath())
             ->unique()
             ->filter(fn (string $p): bool => $p !== '/')
@@ -510,7 +542,7 @@ NGINX;
 
         $out = '';
         foreach ($paths as $locPath) {
-            $has = $site->basicAuthUsers->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
+            $has = $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === $locPath);
             if (! $has) {
                 continue;
             }

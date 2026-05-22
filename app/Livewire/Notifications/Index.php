@@ -3,8 +3,8 @@
 namespace App\Livewire\Notifications;
 
 use App\Models\NotificationInboxItem;
+use App\Support\NotificationTablesReady;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -68,7 +68,6 @@ class Index extends Component
 
     protected function notificationTablesReady(): bool
     {
-        return Schema::hasTable('notification_inbox_items')
-            && Schema::hasTable('notification_events');
+        return NotificationTablesReady::all();
     }
 }

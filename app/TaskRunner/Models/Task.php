@@ -448,6 +448,17 @@ class Task extends Model
         $publicRoot = $usePublicRoot ? config('dply.public_app_url') : null;
         if (is_string($publicRoot) && $publicRoot !== '') {
             $publicRoot = rtrim($publicRoot, '/');
+            // Defensively prefix a scheme if missing — operators
+            // routinely set DPLY_PUBLIC_APP_URL to a bare hostname
+            // ("xyz.tunnels.example.com") expecting it to "just work".
+            // Without a scheme, URL::forceRootUrl produces a malformed
+            // base + URL::signedRoute silently emits an empty/broken
+            // string. The provision wrapper script then runs on the
+            // droplet with no callback to dply, so the journey stays
+            // "running" forever. Detect and repair.
+            if (! preg_match('~^https?://~i', $publicRoot)) {
+                $publicRoot = 'https://'.$publicRoot;
+            }
             $restoreRoot = rtrim((string) config('app.url'), '/');
             URL::forceRootUrl($publicRoot);
             try {

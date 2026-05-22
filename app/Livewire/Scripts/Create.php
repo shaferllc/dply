@@ -6,11 +6,15 @@ use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class Create extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'surface.scripts';
     public string $name = '';
 
     public string $content = "#!/bin/bash\nset -euo pipefail\n\necho \"OK\"\n";

@@ -134,11 +134,28 @@
                                 <option value="{{ $channel->id }}">{{ $channel->label }} ({{ ucfirst($channel->type) }})</option>
                             @endforeach
                         </select>
-                        @if ($assignableChannels->isEmpty())
-                            <p class="mt-2 text-xs text-brand-moss">
-                                {{ __('No assignable channels found. Create one in Settings → Notifications first.') }}
-                            </p>
-                        @endif
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            @if ($assignableChannels->isEmpty())
+                                <p class="text-xs text-brand-moss">
+                                    {{ __('No assignable channels found.') }}
+                                </p>
+                            @endif
+                            <button
+                                type="button"
+                                wire:click="openCreateChannelModal"
+                                class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-ink hover:text-brand-sage"
+                            >
+                                <x-heroicon-o-plus-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('Create new channel') }}
+                            </button>
+                            <span class="text-[10px] text-brand-mist">·</span>
+                            <a
+                                href="{{ route('profile.notification-channels') }}"
+                                class="inline-flex items-center gap-1 text-xs text-brand-mist hover:text-brand-ink"
+                            >
+                                {{ __('Manage all in Settings →') }}
+                            </a>
+                        </div>
                         <x-input-error :messages="$errors->get('notifAddChannelId')" class="mt-2" />
                     </div>
                     <div>

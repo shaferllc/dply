@@ -1,8 +1,18 @@
 {
   "version": 1,
-  "lastRunAtMs": 1777489540361,
-  "turnsSinceLastRun": 9,
-  "lastTranscriptMtimeMs": 1777489539867.3438,
-  "lastProcessedGenerationId": "84cf2c2e-04db-4426-8f3a-03f535c5d0ed",
+<<<<<<< Updated upstream
+  "lastRunAtMs": 1778281457456,
+  "turnsSinceLastRun": 0,
+  "lastTranscriptMtimeMs": 1778281457341.976,
+  "lastProcessedGenerationId": "2037fdbd-d7e5-4097-9285-949fa2386779",
+=======
+  "lastRunAtMs": 1777425351973,
+  "turnsSinceLastRun": 4,
+  "lastTranscriptMtimeMs": 1777425351797.8076,
+  "lastProcessedGenerationId": "ba007460-36df-47f0-8ae3-c53572b4dbf8",
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   "trialStartedAtMs": null
 }

@@ -33,6 +33,19 @@ class ClassifyProvisionFailure
             ];
         }
 
+        // APT / PPA network failure — "couldn't find package X" downstream
+        // symptom is misleading; the real cause is the package list fetch.
+        // Detect this BEFORE the generic connectivity branch so
+        // "connection timed out" against a launchpad/apt URL routes here.
+        if ((str_contains($output, 'failed to fetch') || str_contains($output, 'could not connect to') || str_contains($output, 'index files failed to download'))
+            && (str_contains($output, 'ppa.launchpad') || str_contains($output, 'ubuntu.com') || str_contains($output, 'launchpadcontent') || str_contains($output, 'apt-get') || str_contains($output, 'inrelease'))) {
+            return [
+                'code' => 'package_repo_unreachable',
+                'label' => 'Package repo unreachable',
+                'detail' => 'A package repository (apt source or PPA) could not be reached during install. This is usually transient — retry the run in a minute.',
+            ];
+        }
+
         if (str_contains($step, 'testing server connection') || str_contains($output, 'permission denied') || str_contains($output, 'connection timed out') || str_contains($output, 'connection refused')) {
             return [
                 'code' => 'provider_or_connectivity',

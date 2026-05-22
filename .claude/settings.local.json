@@ -8,7 +8,25 @@
       "Bash(./vendor/bin/phpunit --filter=InsightsFeatureTest)",
       "Bash(./vendor/bin/phpunit --filter=ServerTest)",
       "Bash(git stash *)",
-      "Bash(./vendor/bin/phpunit --filter='test_kubernetes_launch_path_is_displayed_with_organization|test_servers_create_is_displayed_with_organization')"
+      "Bash(./vendor/bin/phpunit --filter='test_kubernetes_launch_path_is_displayed_with_organization|test_servers_create_is_displayed_with_organization')",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(bash)",
+      "Bash(bash -n /tmp/dply_ondrej.sh)",
+      "Bash(bash -n /tmp/dply_preamble3.sh)",
+      "Bash(bash -n /tmp/dply_full3.sh)",
+      "Bash(php *)",
+      "Bash(grep -n 'ServerProvisionArtifact\\\\|class.*Artifact\\\\|protected $fillable\\\\|->label\\\\|->content' /Users/tomshafer/Projects/Apps/dply/app/Models/ServerProvisionArtifact.php)",
+      "Bash(bash -n /tmp/dply_full6.sh)",
+      "Bash(bash -n /tmp/dply_recon.sh)",
+      "Bash(bash -c ' *)",
+      "Bash(tee /tmp/recon-line)",
+      "Read(//tmp/**)",
+      "Bash(python3 -m json.tool)",
+      "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/ServerWorkspaceSshKeysTest.php --filter test_add_key_writes_audit_event)",
+      "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/ServerWorkspaceSshKeysTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/SyncAuthorizedKeysJobTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/SshKeysTest.php)",
+      "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/WorkspaceFirewallTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/ApplyFirewallJobTest.php /Users/tomshafer/Projects/Apps/dply/tests/Unit/Services/ServerFirewallProvisionerTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/Api/FirewallApiTest.php)",
+      "mcp__context7__resolve-library-id"
     ]
   }
 }

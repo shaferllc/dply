@@ -18,6 +18,11 @@ class NotificationPublisher
      * @param  array<string, mixed>  $metadata
      * @param  array<string, mixed>  $contextOverrides
      * @param  list<User|string>|null  $recipientUsers
+     * @param  list<string>  $excludeChannelIds  NotificationChannel ULIDs to skip during routing.
+     *                                           Use when the caller has already delivered the event
+     *                                           through those channels directly (e.g. always-send
+     *                                           fan-out for provision failure) and the subscription
+     *                                           pipe would otherwise produce a duplicate message.
      */
     public function publish(
         string $eventKey,
@@ -29,6 +34,7 @@ class NotificationPublisher
         array $contextOverrides = [],
         ?User $actor = null,
         ?array $recipientUsers = null,
+        array $excludeChannelIds = [],
     ): NotificationEvent {
         $definition = $this->registry->definition($eventKey);
         $context = array_replace($this->contextResolver->resolve($subject), $contextOverrides);
@@ -57,7 +63,7 @@ class NotificationPublisher
             'occurred_at' => now(),
         ]);
 
-        $this->routingResolver->route($event, $recipientUserIds);
+        $this->routingResolver->route($event, $recipientUserIds, $excludeChannelIds);
 
         return $event;
     }

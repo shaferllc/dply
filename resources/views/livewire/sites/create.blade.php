@@ -16,7 +16,33 @@
     </div>
 
     <div class="py-10">
-        <div class="dply-page-shell">
+        <div class="dply-page-shell space-y-8">
+            @if ($isContainerMode)
+                @include('livewire.sites._create-container-mode')
+            @else
+            @if (config('dply.scaffold_v1_enabled'))
+                @include('livewire.sites._create-mode-toggle')
+            @elseif ($server->hostKind() === \App\Models\Server::HOST_KIND_VM)
+                <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-4 text-sm text-brand-moss">
+                    <div class="flex items-start gap-3">
+                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest shadow-sm">
+                            <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-brand-ink">{{ __('Headless workload?') }}</p>
+                            <p class="mt-0.5 text-xs leading-relaxed">{{ __('For workers, daemons, microservices on private ports, or pure deploy-pipeline targets — skip the webserver and SSL setup.') }}</p>
+                        </div>
+                        <a href="{{ route('sites.create-custom', $server) }}" wire:navigate class="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg bg-brand-ink px-3 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                            {{ __('Create a Custom site') }}
+                            <x-heroicon-o-arrow-right class="h-3 w-3" />
+                        </a>
+                    </div>
+                </div>
+            @endif
+
+            @if ($form->mode === 'scaffold' && config('dply.scaffold_v1_enabled'))
+                @include('livewire.sites._create-scaffold-panel')
+            @else
             <form wire:submit="store" class="space-y-10">
                 <section aria-labelledby="server-context-heading">
                     <h2 id="server-context-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('1. Confirm server context') }}</h2>
@@ -105,6 +131,33 @@
                 </section>
 
                 @if (! $functionsHost)
+                <section aria-labelledby="auto-detect-heading">
+                    <h2 id="auto-detect-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('Auto-detect (optional)') }}</h2>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-900">{{ __('Detect runtime from a repository URL') }}</h3>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('Paste a git URL and dply will inspect the repo to suggest the runtime, version, build command, start command, and any worker / scheduler processes. You can override anything before saving.') }}</p>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-[1fr,180px,auto] sm:items-end">
+                            <div>
+                                <x-input-label for="git_repository_url" :value="__('Repository URL')" />
+                                <x-text-input id="git_repository_url" wire:model="form.git_repository_url" placeholder="https://github.com/your/app.git" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                            </div>
+                            <div>
+                                <x-input-label for="git_branch" :value="__('Branch')" />
+                                <x-text-input id="git_branch" wire:model="form.git_branch" placeholder="main" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                            </div>
+                            <button type="button" wire:click="detectFromRepository" wire:loading.attr="disabled" wire:target="detectFromRepository" class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-ink/90 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="detectFromRepository">{{ __('Detect') }}</span>
+                                <span wire:loading wire:target="detectFromRepository">{{ __('Detecting…') }}</span>
+                            </button>
+                        </div>
+
+                        @include('livewire.partials._runtime-detection-panel', ['detectionInstallable' => true])
+                    </div>
+                </section>
+
                 <section aria-labelledby="deploy-paths-heading">
                     <h2 id="deploy-paths-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('3. Deploy paths') }}</h2>
                     <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
@@ -161,7 +214,10 @@
                     <h2 id="repo-build-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('3. Repository and build') }}</h2>
                     <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
                         <div>
-                            <x-input-label for="functions_repo_source" :value="__('Repository source')" />
+                            <div class="flex items-center justify-between gap-2">
+                                <x-input-label for="functions_repo_source" :value="__('Repository source')" />
+                                <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                            </div>
                             <select id="functions_repo_source" wire:model.live="form.functions_repo_source" class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 @if (count($linkedSourceControlAccounts) > 0)
                                     <option value="provider">{{ __('Connected Git provider') }}</option>
@@ -324,6 +380,19 @@
                                 {{ __('Static sites ship with a placeholder page first so the temporary testing hostname can return a healthy response before your real assets are deployed.') }}
                             </div>
                         @endif
+
+                        @if (count($availableDatabaseEngines) > 1 && ! $functionsHost && $form->type !== 'static')
+                            <div>
+                                <x-input-label for="database_engine" :value="__('Database engine')" />
+                                <select id="database_engine" wire:model="form.database_engine" class="mt-1 block w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                    @foreach ($availableDatabaseEngines as $engine)
+                                        <option value="{{ $engine['id'] }}">{{ $engine['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-2 text-sm text-slate-600">{{ __('This server has multiple engines installed. Pick which one this site connects to — defaults to the server\'s default engine.') }}</p>
+                                <x-input-error :messages="$errors->get('form.database_engine')" class="mt-1" />
+                            </div>
+                        @endif
                     </div>
                 </section>
 
@@ -343,6 +412,10 @@
                     </button>
                 </div>
             </form>
+            @endif
+            @endif {{-- @if ($isContainerMode) ... @else ... --}}
         </div>
     </div>
+
+    <x-connect-provider-modal />
 </div>

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Credentials;
 
+use App\Enums\ServerProvider;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -13,10 +14,20 @@ class Index extends Component
 {
     use ManagesProviderCredentials;
 
+    /**
+     * Valid values for the capability tab (`?tab=`). Used to filter the provider sidebar.
+     *
+     * @var list<string>
+     */
+    private const TABS = ['all', 'server', 'dns', 'cdn', 'imports'];
+
     public ?Organization $organization = null;
 
     /** @var string Provider key from {@see credentialProviderNav()} */
     public string $active_provider = 'digitalocean';
+
+    /** @var string One of {@see self::TABS}: filters the provider sidebar by capability. */
+    public string $tab = 'all';
 
     public function mount(?Organization $organization = null): void
     {
@@ -29,31 +40,66 @@ class Index extends Component
 
         $this->authorize('viewAny', ProviderCredential::class);
 
-        $ids = self::credentialProviderIds();
+        // Tab first — the capability filter constrains which providers are available, so
+        // we honor `?tab=` before we resolve `active_provider` against the filtered list.
+        $tabParam = request()->query('tab');
+        if (is_string($tabParam) && in_array($tabParam, self::TABS, true)) {
+            $this->tab = $tabParam;
+        }
+
+        $ids = self::credentialProviderIds($this->capabilityForTab());
         if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
             $this->active_provider = $ids[0];
         }
 
         $q = request()->query('provider');
-        if (is_string($q) && ServerProviderGate::enabled($q) && in_array($q, $ids, true)) {
+        if (is_string($q) && ServerProviderGate::visible($q) && in_array($q, $ids, true)) {
             $this->active_provider = $q;
         }
     }
 
     public function updatedActiveProvider(mixed $value): void
     {
-        $ids = self::credentialProviderIds();
+        $ids = self::credentialProviderIds($this->capabilityForTab());
         if (! is_string($value) || ! in_array($value, $ids, true)) {
             $this->active_provider = $ids[0] ?? 'digitalocean';
         }
     }
 
+    public function updatedTab(mixed $value): void
+    {
+        if (! is_string($value) || ! in_array($value, self::TABS, true)) {
+            $this->tab = 'all';
+        }
+
+        $ids = self::credentialProviderIds($this->capabilityForTab());
+        if ($ids !== [] && ! in_array($this->active_provider, $ids, true)) {
+            $this->active_provider = $ids[0];
+        }
+    }
+
+    /**
+     * Resolve the capability filter for the current `tab` value. `null` means no filter.
+     */
+    private function capabilityForTab(): ?string
+    {
+        return match ($this->tab) {
+            'server' => 'compute',
+            'dns' => 'dns',
+            'cdn' => 'cdn',
+            'imports' => 'import',
+            default => null,
+        };
+    }
+
     /**
      * Sidebar groups for the provider picker (IDs match `provider_credentials.provider` where applicable).
      *
-     * @return list<array{label: string, items: list<array{id: string, label: string}>}>
+     * @param  string|null  $capability  If set, restricts items to providers whose enum supports the capability
+     *                                   ('compute' or 'dns'). Items with no matching enum case are dropped.
+     * @return list<array{label: string, items: list<array{id: string, label: string, comingSoon: bool}>}>
      */
-    public static function credentialProviderNav(): array
+    public static function credentialProviderNav(?string $capability = null): array
     {
         $groups = [
             [
@@ -70,6 +116,9 @@ class Index extends Component
                 'label' => __('DNS & CDN'),
                 'items' => [
                     ['id' => 'cloudflare', 'label' => 'Cloudflare'],
+                    ['id' => 'gandi', 'label' => 'Gandi'],
+                    ['id' => 'namecheap', 'label' => 'Namecheap'],
+                    ['id' => 'vercel_dns', 'label' => __('Vercel DNS')],
                 ],
             ],
             [
@@ -86,6 +135,8 @@ class Index extends Component
                 'label' => __('Platforms'),
                 'items' => [
                     ['id' => 'fly_io', 'label' => 'Fly.io'],
+                    ['id' => 'digitalocean_app_platform', 'label' => 'DigitalOcean App Platform'],
+                    ['id' => 'aws_app_runner', 'label' => 'AWS App Runner'],
                     ['id' => 'render', 'label' => 'Render'],
                     ['id' => 'railway', 'label' => 'Railway'],
                     ['id' => 'coolify', 'label' => 'Coolify'],
@@ -101,14 +152,43 @@ class Index extends Component
                     ['id' => 'oracle', 'label' => __('Oracle Cloud')],
                 ],
             ],
+            [
+                'label' => __('Migrate from'),
+                'items' => [
+                    ['id' => 'ploi', 'label' => 'Ploi'],
+                    ['id' => 'forge', 'label' => 'Laravel Forge'],
+                ],
+            ],
         ];
 
         $filtered = [];
         foreach ($groups as $group) {
-            $items = array_values(array_filter(
-                $group['items'],
-                static fn (array $item) => ServerProviderGate::enabled($item['id'])
-            ));
+            $items = [];
+            foreach ($group['items'] as $item) {
+                if (! ServerProviderGate::visible($item['id'])) {
+                    continue;
+                }
+                if ($capability !== null) {
+                    $enum = ServerProvider::tryFrom($item['id']);
+                    if ($enum === null) {
+                        continue;
+                    }
+                    $matches = match ($capability) {
+                        'dns' => $enum->supportsDns(),
+                        'cdn' => $enum->supportsCdn(),
+                        'import' => $enum->supportsImport(),
+                        default => $enum->supportsCompute(),
+                    };
+                    if (! $matches) {
+                        continue;
+                    }
+                }
+                $items[] = [
+                    'id' => $item['id'],
+                    'label' => $item['label'],
+                    'comingSoon' => ServerProviderGate::comingSoon($item['id']),
+                ];
+            }
             if ($items !== []) {
                 $filtered[] = [
                     'label' => $group['label'],
@@ -121,12 +201,13 @@ class Index extends Component
     }
 
     /**
+     * @param  string|null  $capability  Optional capability filter forwarded to {@see credentialProviderNav()}.
      * @return list<string>
      */
-    public static function credentialProviderIds(): array
+    public static function credentialProviderIds(?string $capability = null): array
     {
         $ids = [];
-        foreach (self::credentialProviderNav() as $group) {
+        foreach (self::credentialProviderNav($capability) as $group) {
             foreach ($group['items'] as $item) {
                 $ids[] = $item['id'];
             }
@@ -167,10 +248,11 @@ class Index extends Component
 
         return view('livewire.credentials.index', [
             'credentials' => $credentials,
-            'providerNav' => self::credentialProviderNav(),
+            'providerNav' => self::credentialProviderNav($this->capabilityForTab()),
             'activeProviderLabel' => $this->resolveActiveProviderLabel(),
             'organization' => $org,
             'useOrgShell' => $org instanceof Organization,
+            'activeProviderComingSoon' => ServerProviderGate::comingSoon($this->active_provider),
         ])->layout($org instanceof Organization ? 'layouts.app' : 'layouts.settings');
     }
 }

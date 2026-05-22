@@ -55,6 +55,27 @@ class RunSiteDeploymentJob implements ShouldQueue
             return;
         }
 
+        $this->site->loadMissing('server.organization');
+        $organization = $this->site->server?->organization;
+        if ($organization !== null && ! $organization->canDeploy()) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'exit_code' => null,
+                'log_output' => 'Deploys are paused while this organization\'s trial is expired. Add a payment method on the billing page to resume.',
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+            $this->notifyStakeholders($deployment, $notificationPublisher);
+
+            return;
+        }
+
         $lock = Cache::lock('site-deploy:'.$this->site->id, $this->timeout);
         $activeKey = 'site-deploy-active:'.$this->site->id;
 
@@ -206,10 +227,30 @@ class RunSiteDeploymentJob implements ShouldQueue
             SiteDeployment::STATUS_SKIPPED => 'site.deploy.skipped',
             default => 'site.deploy.finished',
         };
+
+        $startedAt = $deployment->started_at;
+        $finishedAt = $deployment->finished_at;
+        $durationMs = $startedAt && $finishedAt
+            ? (int) round(($finishedAt->getTimestamp() - $startedAt->getTimestamp()) * 1000)
+            : null;
+
+        $errorExcerpt = null;
+        if ($deployment->status === SiteDeployment::STATUS_FAILED && $deployment->log_output) {
+            $errorExcerpt = mb_strimwidth((string) $deployment->log_output, 0, 1000, '…');
+        }
+
         audit_log($org, $user, $action, $deployment, null, [
             'site' => $this->site->name,
+            'site_id' => (string) $this->site->id,
+            'deployment_id' => (string) $deployment->id,
             'trigger' => $this->trigger,
             'status' => $deployment->status,
+            'exit_code' => $deployment->exit_code,
+            'git_sha' => $deployment->git_sha,
+            'duration_ms' => $durationMs,
+            'started_at' => $startedAt?->toIso8601String(),
+            'finished_at' => $finishedAt?->toIso8601String(),
+            'error_excerpt' => $errorExcerpt,
         ]);
     }
 

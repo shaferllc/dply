@@ -1,0 +1,11 @@
+# Example dply.yaml for a Go app.
+
+runtime: go
+version: "1.22"
+
+build:
+  - go build -o bin/app ./cmd/server
+
+processes:
+  web:
+    command: ./bin/app

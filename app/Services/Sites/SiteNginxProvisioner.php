@@ -3,8 +3,10 @@
 namespace App\Services\Sites;
 
 use App\Enums\SiteType;
+use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
 use Illuminate\Support\Str;
@@ -23,8 +25,11 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         return 'nginx';
     }
 
-    public function provision(Site $site): string
+    public function provision(Site $site, ?ConsoleEmitter $emit = null): string
     {
+        $emit ??= new ConsoleEmitter;
+
+        $emit->step('nginx', 'resolving server connection');
         $server = $this->ensureServerReady($site);
 
         $profile = SiteWebserverConfigProfile::query()->firstOrCreate(
@@ -44,12 +49,26 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $linkFile = $enabled.'/'.$this->configBasename($site).'.conf';
 
         $ssh = $this->systemSsh($site);
-        $this->installPlaceholderPage($site, $ssh);
-        $this->ensureSuspendedPage($site, $ssh);
-        $this->ensureNginxEngineHttpCacheInfrastructure($site, $ssh);
-        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
-        $this->writeNginxLayerSnippetFiles($site, $profile, $ssh);
-        $this->writeSystemFile($ssh, $confFile, $config);
+
+        // First-apply only — nginx_installed_at flips on the first successful
+        // provision, so subsequent applies (rotations, SSL, etc.) never even
+        // probe the doc root for a placeholder.
+        if ($site->nginx_installed_at === null) {
+            $this->installPlaceholderPage($site, $ssh, $emit);
+        }
+        $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureNginxEngineHttpCacheInfrastructure($site, $ssh, $emit);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->writeNginxLayerSnippetFiles($site, $profile, $ssh, $emit);
+
+        // Vhost write only emits when content actually changed; an apply that
+        // didn't touch anything the vhost references (e.g. a sync that found
+        // nothing) produces no banner line here either.
+        if ($this->writeSystemFileIfChanged($server, $ssh, $confFile, $config)) {
+            $emit->step('nginx', 'writing site config file: '.$confFile);
+        }
+
+        $emit->step('nginx', 'running nginx -t and reloading');
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_NGINX_EXIT:%%s" "$?"',
             $this->privilegedCommand(
@@ -62,10 +81,20 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             ),
         ), 120);
 
-        $nginxOk = (bool) preg_match('/DPLY_NGINX_EXIT:0\s*$/', $out);
-        if (! $nginxOk) {
+        // The nginx -t output is multi-line; emit each non-blank line so the
+        // console pane shows them as separate entries instead of one giant blob.
+        foreach (preg_split('/\r\n|\r|\n/', trim($out)) ?: [] as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $emit($line, ConsoleAction::LEVEL_INFO, 'nginx');
+        }
+
+        if (! preg_match('/DPLY_NGINX_EXIT:0\s*$/', $out)) {
             throw new \RuntimeException('Nginx test or reload failed. Output: '.Str::limit($out, 2000));
         }
+
+        $emit->success('reload OK', 'nginx');
 
         $site->update([
             'nginx_installed_at' => now(),
@@ -274,14 +303,20 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
 
     /**
      * Writes before/after snippet files for layered nginx profiles so include globs always match at least one file.
+     * Emits a `step` only when at least one snippet actually changed.
      */
-    protected function writeNginxLayerSnippetFiles(Site $site, SiteWebserverConfigProfile $profile, SshConnection $ssh): void
+    protected function writeNginxLayerSnippetFiles(Site $site, SiteWebserverConfigProfile $profile, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
     {
         if ($profile->mode !== SiteWebserverConfigProfile::MODE_LAYERED) {
             return;
         }
 
         $this->ensureNginxLayerDirectories($site, $ssh);
+
+        $server = $site->server;
+        if ($server === null) {
+            return;
+        }
 
         $basename = $this->configBasename($site);
         $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
@@ -292,14 +327,20 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $beforeContent = $beforeBody !== '' ? $beforeBody : "# Dply placeholder (empty before layer)\n";
         $afterContent = $afterBody !== '' ? $afterBody : "# Dply placeholder (empty after layer)\n";
 
-        $this->writeSystemFile($ssh, $beforeDir.'/10-dply-layer.conf', $beforeContent);
-        $this->writeSystemFile($ssh, $afterDir.'/10-dply-layer.conf', $afterContent);
+        $changed = $this->writeSystemFileIfChanged($server, $ssh, $beforeDir.'/10-dply-layer.conf', $beforeContent);
+        $changed = $this->writeSystemFileIfChanged($server, $ssh, $afterDir.'/10-dply-layer.conf', $afterContent) || $changed;
+
+        if ($changed) {
+            $emit?->step('nginx', 'updating layer snippet files');
+        }
     }
 
     /**
      * Shared {@see fastcgi_cache_path} / {@see proxy_cache_path} zones for engine HTTP cache (referenced by site vhosts).
+     * Emits a `step` only when the conf file actually had to be (re)written —
+     * a steady-state apply (no cache-config change) produces no banner line.
      */
-    protected function ensureNginxEngineHttpCacheInfrastructure(Site $site, SshConnection $ssh): void
+    protected function ensureNginxEngineHttpCacheInfrastructure(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
     {
         $server = $site->server;
         if ($server === null) {
@@ -312,11 +353,27 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $fcgiZone = config('sites.nginx_engine_fcgi_cache_zone');
         $proxyZone = config('sites.nginx_engine_proxy_cache_zone');
 
-        $contents = "# Managed by Dply — shared HTTP cache zones (do not edit by hand)\n";
-        $contents .= "fastcgi_cache_path {$fcgiPath} levels=1:2 keys_zone={$fcgiZone}:100m inactive=60m max_size=2g;\n";
-        $contents .= "proxy_cache_path {$proxyPath} levels=1:2 keys_zone={$proxyZone}:100m inactive=60m max_size=2g;\n";
+        // Zone sizes live on `server_webserver_cache_features` so operators
+        // can tune them per-server from the workspace. The row is created
+        // lazily here with the legacy defaults (100m/100m/2g/60m) so existing
+        // servers get the same on-disk output until someone touches it.
+        $feature = \App\Models\ServerWebserverCacheFeature::findOrCreateFor(
+            $server->id,
+            \App\Models\ServerWebserverCacheFeature::WEBSERVER_NGINX,
+        );
+        $fcgiSize = (int) $feature->nginx_fcgi_zone_size_mb;
+        $proxySize = (int) $feature->nginx_proxy_zone_size_mb;
+        $maxSize = (int) $feature->nginx_zone_max_size_gb;
+        $inactive = (int) $feature->nginx_zone_inactive_minutes;
 
-        $this->writeSystemFile($ssh, $confPath, $contents);
+        $contents = "# Managed by Dply — shared HTTP cache zones (do not edit by hand)\n";
+        $contents .= "fastcgi_cache_path {$fcgiPath} levels=1:2 keys_zone={$fcgiZone}:{$fcgiSize}m inactive={$inactive}m max_size={$maxSize}g;\n";
+        $contents .= "proxy_cache_path {$proxyPath} levels=1:2 keys_zone={$proxyZone}:{$proxySize}m inactive={$inactive}m max_size={$maxSize}g;\n";
+
+        $wrote = $this->writeSystemFileIfChanged($server, $ssh, $confPath, $contents);
+        if ($wrote) {
+            $emit?->step('nginx', 'updating engine HTTP cache config');
+        }
 
         $cmd = sprintf(
             'mkdir -p %s %s && (chown -R www-data:www-data %s %s 2>/dev/null || chown -R nginx:nginx %s %s 2>/dev/null || true)',

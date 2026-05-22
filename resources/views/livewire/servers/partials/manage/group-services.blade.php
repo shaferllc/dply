@@ -54,33 +54,6 @@
         }
     };
 
-    // Parse listening-ports block for a small port table.
-    $portRows = [];
-    if (! empty($meta['manage_listening_ports'])) {
-        foreach (explode("\n", $meta['manage_listening_ports']) as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                continue;
-            }
-            // ss -lntpH columns: State Recv-Q Send-Q Local Address:Port Peer Address:Port Process
-            $cols = preg_split('/\s+/', $line);
-            if (count($cols) < 5) {
-                continue;
-            }
-            $local = $cols[3] ?? '';
-            if (! preg_match('/(\S+):(\d+)$/', $local, $m)) {
-                continue;
-            }
-            $bind = $m[1];
-            $port = $m[2];
-            $proc = '';
-            if (! empty($cols[5]) && preg_match('/users:\(\("([^"]+)"/', implode(' ', array_slice($cols, 5)), $pm)) {
-                $proc = $pm[1];
-            }
-            $portRows[] = ['port' => $port, 'bind' => $bind, 'process' => $proc];
-        }
-        usort($portRows, fn ($a, $b) => (int) $a['port'] <=> (int) $b['port']);
-    }
 @endphp
 
 <section class="space-y-6" aria-labelledby="manage-services-title">
@@ -173,32 +146,9 @@
         @endif
     </div>
 
-    @if (! empty($portRows))
-        <div class="{{ $card }} p-6 sm:p-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Listening ports') }}</h3>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('From `ss -lntp`. Useful for sanity-checking which process is bound where.') }}</p>
-            <div class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10">
-                <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                    <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
-                        <tr>
-                            <th class="px-4 py-2 font-semibold">{{ __('Port') }}</th>
-                            <th class="px-4 py-2 font-semibold">{{ __('Process') }}</th>
-                            <th class="px-4 py-2 font-semibold">{{ __('Bind address') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-brand-ink/5 bg-white">
-                        @foreach ($portRows as $row)
-                            <tr>
-                                <td class="px-4 py-1.5 font-mono text-xs text-brand-ink">{{ $row['port'] }}</td>
-                                <td class="px-4 py-1.5 font-mono text-xs text-brand-ink">{{ $row['process'] ?: '—' }}</td>
-                                <td class="px-4 py-1.5 font-mono text-xs text-brand-moss">{{ $row['bind'] }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    @endif
+    {{-- Listening-ports moved to the Firewall page (workspace-firewall.blade.php),
+         where it informs rule decisions. Keeping it here would have meant two
+         copies of the same parser drifting apart. --}}
 
     @if ($checkedAt)
         <p class="text-right text-xs text-brand-moss">

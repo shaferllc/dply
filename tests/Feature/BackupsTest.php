@@ -91,7 +91,8 @@ class BackupsTest extends TestCase
         $org = $user->currentOrganization();
 
         BackupConfiguration::query()->create([
-            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'created_by_user_id' => $user->id,
             'name' => 'Primary S3',
             'provider' => BackupConfiguration::PROVIDER_CUSTOM_S3,
             'config' => [
@@ -145,7 +146,8 @@ class BackupsTest extends TestCase
         $org = $user->currentOrganization();
 
         BackupConfiguration::query()->create([
-            'user_id' => $user->id,
+            'organization_id' => $org->id,
+            'created_by_user_id' => $user->id,
             'name' => 'Archive Bucket',
             'provider' => BackupConfiguration::PROVIDER_AWS_S3,
             'config' => [

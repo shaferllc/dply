@@ -99,7 +99,10 @@ final class ServerlessRepositoryCheckout
     {
         $accountId = is_string($sourceControlAccountId) ? trim($sourceControlAccountId) : '';
         if ($accountId === '' || $userId === null) {
-            return $repositoryUrl;
+            // No connected account — clone anonymously. A repo stored as the
+            // bare "owner/name" shorthand (e.g. the serverless demos) is not
+            // a valid clone target, so expand it to a GitHub HTTPS URL.
+            return $this->normalizeRepositoryUrl($repositoryUrl);
         }
 
         $account = SocialAccount::query()
@@ -111,6 +114,26 @@ final class ServerlessRepositoryCheckout
         }
 
         return $this->repositoryBrowser->authenticatedCloneUrl($account, $repositoryUrl);
+    }
+
+    /**
+     * Turn a bare "owner/name" repo shorthand into a clone-able GitHub HTTPS
+     * URL. Anything already URL-shaped (https / git / ssh / scp) or a local
+     * filesystem path is returned untouched.
+     */
+    private function normalizeRepositoryUrl(string $repositoryUrl): string
+    {
+        $repositoryUrl = trim($repositoryUrl);
+
+        if (preg_match('#^(https?://|git://|ssh://|git@)#i', $repositoryUrl) === 1) {
+            return $repositoryUrl;
+        }
+
+        if (preg_match('#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repositoryUrl) === 1) {
+            return 'https://github.com/'.$repositoryUrl.'.git';
+        }
+
+        return $repositoryUrl;
     }
 
     /**

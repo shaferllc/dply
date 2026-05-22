@@ -2,7 +2,20 @@
 # bootstrap script (apt installs, useradd, systemctl enable/start, /etc writes)
 # behaves the same way as on a fresh Ubuntu cloud VM. Requires the compose
 # privileged + cgroup mount setup in docker-compose.ssh-dev.yml.
-FROM ubuntu:24.04
+#
+# Pinned to ubuntu:24.04 (noble) to match what dply provisions on
+# DigitalOcean by default — see ProvisionDigitalOceanDropletJob:52
+# (`ubuntu-24-04-x64`). Keep these in lockstep so a script that
+# passes locally will also pass on a real droplet without surprise
+# package-availability or systemd-unit differences.
+#
+# The platform is pinned to linux/amd64 because DO droplets are x86_64
+# (note the "-x64" in the image slug), and several apt sources we rely
+# on — most notably packages.sury.org/php — only ship a meaningful
+# package set for amd64 on noble. On Apple Silicon hosts this runs
+# under QEMU emulation; that's an acceptable cost for staying faithful
+# to the cloud target and avoiding arch-specific package gaps.
+FROM --platform=linux/amd64 ubuntu:24.04
 
 ENV container=docker
 ARG DEBIAN_FRONTEND=noninteractive
@@ -11,7 +24,25 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         systemd systemd-sysv dbus dbus-user-session \
         openssh-server sudo \
-        ca-certificates curl iproute2 lsb-release locales \
+        ca-certificates curl gnupg iproute2 lsb-release locales \
+ # ─── DO ubuntu-24-04-x64 cloud-image package set ──────────────────
+ # Mirror the package list a freshly-spun DigitalOcean droplet has on
+ # first boot. Scripts that "just work" on droplets but fail locally
+ # are almost always tripping over one of these missing utilities.
+ # Sourced from a `dpkg --get-selections` dump on a real DO droplet,
+ # trimmed to what the bootstrap script and workspace shells touch.
+        cloud-init cloud-initramfs-growroot cloud-guest-utils \
+        netplan.io netbase ifupdown isc-dhcp-client \
+        cron rsyslog logrotate \
+        wget dnsutils netcat-openbsd telnet \
+        unattended-upgrades update-notifier-common landscape-common \
+        python3 python3-yaml python3-requests python3-apt \
+        software-properties-common \
+        tzdata xz-utils bzip2 unzip zip \
+        less rsync \
+        htop iotop \
+        git vim-tiny nano \
+        man-db manpages \
  # Pre-install common bootstrap deps so they survive `docker compose down && up`.
  # On a real cloud VM the bootstrap installs these and they persist for the life
  # of the box; in our throwaway dev container they get wiped on recreate, which
@@ -22,7 +53,57 @@ RUN apt-get update \
         supervisor \
         fail2ban \
  && rm -rf /var/lib/apt/lists/* \
- && locale-gen en_US.UTF-8
+ && locale-gen en_US.UTF-8 \
+ # DO droplets default the timezone to UTC; do the same so timestamps
+ # in logs (rsyslog, systemd-journal) match what an operator sees on
+ # a real droplet.
+ && ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
+ && echo "Etc/UTC" > /etc/timezone \
+ # DO cloud images ship with /etc/update-motd.d/00-header etc. that
+ # aren't critical, but matching the motd skeleton avoids surprising
+ # operators who SSH in expecting the standard Ubuntu welcome banner.
+ && (printf 'Welcome to Ubuntu 24.04 LTS (dply ssh-dev container)\n\n  This container mirrors DigitalOcean ubuntu-24-04-x64.\n  Local fake-cloud target — not a real droplet.\n\n' > /etc/motd || true)
+
+# DO droplets typically have a non-root sudo user (`ubuntu` on cloud
+# images, sometimes `root`-only). Add a passwordless-sudo `ubuntu`
+# user so scripts that assume `su - ubuntu` or `sudo -u ubuntu`
+# work the same way as on a real droplet. Root SSH still works for
+# the bootstrap path; this is only for parity with cloud images.
+#
+# Recent ubuntu:24.04 base images already ship with a UID-1000 `ubuntu`
+# user (matching the cloud image), so create-if-missing and then ensure
+# group membership / home / .ssh regardless of which side created it.
+RUN id -u ubuntu >/dev/null 2>&1 || useradd -m -s /bin/bash ubuntu \
+ && usermod -aG sudo ubuntu \
+ && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/90-ubuntu \
+ && chmod 0440 /etc/sudoers.d/90-ubuntu \
+ && install -d -m 0700 -o ubuntu -g ubuntu /home/ubuntu/.ssh
+
+# Pre-install Ondřej Surý's PHP 8.4 packages so the bootstrap script's
+# skip-if-already-present checks short-circuit the launchpad fetch path
+# entirely.
+#
+# We pull from packages.sury.org (Surý's own apt repo) instead of the
+# Launchpad PPA mirror. Both ship the same packages — Surý maintains
+# them — but Docker on macOS routinely cannot reach
+# ppa.launchpadcontent.net (185.125.190.*) due to NAT/IPv4 routing,
+# which would otherwise stall fake-cloud provisioning ~80s before
+# timing out. sury.org rides a Fastly-fronted CDN that's reachable
+# from the same Docker network in <1s, so swapping the source
+# eliminates the flake without changing what gets installed.
+RUN install -d -m 0755 /etc/apt/keyrings \
+ && curl -fsSL --retry 5 --retry-delay 3 --max-time 90 \
+        https://packages.sury.org/php/apt.gpg \
+        -o /etc/apt/keyrings/sury-php.gpg \
+ && chmod 0644 /etc/apt/keyrings/sury-php.gpg \
+ && echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ noble main" \
+        > /etc/apt/sources.list.d/sury-php.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+        php8.4-cli php8.4-fpm php8.4-common \
+        php8.4-mbstring php8.4-xml php8.4-curl php8.4-zip \
+        php8.4-intl php8.4-bcmath php8.4-opcache php8.4-mysql \
+ && rm -rf /var/lib/apt/lists/*
 
 # Strip systemd units that don't make sense in a container so boot stays fast and clean.
 RUN find /lib/systemd/system/sysinit.target.wants -type l ! -name 'systemd-tmpfiles-setup*' -delete \

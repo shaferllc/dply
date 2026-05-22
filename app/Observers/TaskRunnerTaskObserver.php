@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Actions\Servers\RecordProvisionStepDurations;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Support\Servers\InstalledStack;
 use App\Support\Servers\ProvisionLogSections;
 use App\Support\Servers\ProvisionStepSnapshots;
+use Illuminate\Support\Facades\Log;
 
 class TaskRunnerTaskObserver
 {
@@ -46,12 +49,47 @@ class TaskRunnerTaskObserver
                 $meta['provision_step_snapshots'] = $snapshots;
                 $server->update(['meta' => $meta]);
             }
+
+            // Reconcile the installed-stack snapshot. The bash script
+            // emits a single `[dply-installed-stack] {json}` line at the
+            // very end of a successful run; until that lands,
+            // parseFromOutput returns null and we leave existing meta
+            // untouched. Once it appears, we hydrate the value object,
+            // diff against current meta, and write only on actual change
+            // (cheap idempotency — observer fires every output update,
+            // but DB write happens at most once per run).
+            $installedStack = InstalledStack::parseFromOutput(is_string($task->output) ? $task->output : '');
+            if ($installedStack !== null) {
+                $serialized = $installedStack->toArray();
+                if (($meta[InstalledStack::META_KEY] ?? null) !== $serialized) {
+                    $meta[InstalledStack::META_KEY] = $serialized;
+                    $server->update(['meta' => $meta]);
+                }
+            }
         }
 
         $run = $this->provisionRunForTask($task, $server);
 
         if ($run && ($task->wasChanged('output') || $task->wasChanged('status'))) {
             $this->persistStructuredArtifacts($run, $task);
+        }
+
+        // Record per-step durations whenever new output arrives. The
+        // recorder is idempotent on (task_id, label_hash) so we can
+        // call it on every poll — completed steps land as soon as their
+        // [dply-step-end] line is in the buffer, not just at the end.
+        if ($task->wasChanged('output') || $task->wasChanged('status')) {
+            try {
+                app(RecordProvisionStepDurations::class)->handle($server, $task, $run);
+            } catch (\Throwable $e) {
+                // Best-effort: a duration insert failing should never
+                // halt provision bookkeeping. Log and move on.
+                Log::warning('server.provision.step_durations.record_failed', [
+                    'server_id' => $server->id,
+                    'task_id' => $task->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         if (! $task->wasChanged('status')) {

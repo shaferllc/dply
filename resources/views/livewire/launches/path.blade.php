@@ -47,20 +47,6 @@
                 @endforeach
             </div>
 
-            @if (($page['existing_targets'] ?? []) !== [])
-                <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{{ __('Continue on an existing local target') }}</p>
-                    <div class="mt-4 grid gap-3 md:grid-cols-2">
-                        @foreach ($page['existing_targets'] as $target)
-                            <a href="{{ $target['href'] }}" wire:navigate class="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 transition hover:border-sky-300 hover:bg-white">
-                                <p class="text-sm font-semibold text-slate-900">{{ $target['name'] }}</p>
-                                <p class="mt-1 text-sm text-slate-600">{{ $target['kind'] }}</p>
-                                <p class="mt-3 text-sm font-medium text-sky-700">{{ __('Create site on this target') }} →</p>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
         </div>
     </div>
 </div>

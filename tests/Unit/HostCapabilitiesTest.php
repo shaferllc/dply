@@ -17,7 +17,7 @@ class HostCapabilitiesTest extends TestCase
 
         $this->assertTrue($server->isVmHost());
         $this->assertTrue($capabilities->supportsSsh());
-        $this->assertTrue($capabilities->supportsNginxProvisioning());
+        $this->assertTrue($capabilities->supportsWebserverProvisioning());
         $this->assertFalse($capabilities->supportsFunctionDeploy());
     }
 
@@ -33,7 +33,7 @@ class HostCapabilitiesTest extends TestCase
 
         $this->assertTrue($server->isDigitalOceanFunctionsHost());
         $this->assertFalse($capabilities->supportsSsh());
-        $this->assertFalse($capabilities->supportsNginxProvisioning());
+        $this->assertFalse($capabilities->supportsWebserverProvisioning());
         $this->assertFalse($capabilities->supportsEnvPushToHost());
         $this->assertTrue($capabilities->supportsFunctionDeploy());
         $this->assertSame('DigitalOcean Functions', $server->providerDisplayLabel());
@@ -53,7 +53,7 @@ class HostCapabilitiesTest extends TestCase
         $this->assertFalse($capabilities->supportsSsh());
         $this->assertTrue($capabilities->supportsContainerDeploy());
         $this->assertFalse($capabilities->supportsClusterDeploy());
-        $this->assertFalse($capabilities->supportsNginxProvisioning());
+        $this->assertFalse($capabilities->supportsWebserverProvisioning());
         $this->assertSame('Docker', $server->providerDisplayLabel());
     }
 

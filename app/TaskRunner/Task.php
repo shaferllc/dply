@@ -799,10 +799,18 @@ abstract class Task
             $errors['script_size'] = 'Script is too large (max '.(self::MAX_SCRIPT_SIZE / 1024).'KB).';
         }
 
-        // Check for forbidden commands
+        // Check for forbidden commands. The naive stripos() check this
+        // replaced was too eager: forbidden 'rm -rf /' matched against
+        // legitimate scoped removals like 'rm -rf /var/lib/mysql'
+        // because it's a substring. Word-boundary matching is what we
+        // actually want — match the forbidden command only when it
+        // isn't extended by another word/path character. Boundary
+        // class [\w/.-] catches the path-extending chars (var, /usr,
+        // -rf followed by another -).
         $forbiddenCommands = config('task-runner.security.forbidden_commands', []);
         foreach ($forbiddenCommands as $command) {
-            if (stripos($script, $command) !== false) {
+            $pattern = '/(?:^|\s)'.preg_quote($command, '/').'(?![\w\/.\-])/i';
+            if (preg_match($pattern, $script)) {
                 $errors['forbidden_command'] = "Script contains forbidden command: {$command}";
                 break;
             }

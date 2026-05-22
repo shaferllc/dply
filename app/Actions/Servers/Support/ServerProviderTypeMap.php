@@ -22,6 +22,7 @@ final class ServerProviderTypeMap
             'fly_io' => 'fly_io',
             'aws' => 'aws',
             'aws_lambda' => 'aws',
+            'aws_kubernetes' => 'aws',
             default => null,
         };
     }

@@ -1,7 +1,7 @@
 @php
     $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
     $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
-    $supportsNginxProvisioning = $server->hostCapabilities()->supportsNginxProvisioning();
+    $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
     $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
         && ! $site->usesFunctionsRuntime()
         && ! $site->usesDockerRuntime()
@@ -27,7 +27,12 @@
     $runtimeMode = $site->runtimeTargetMode();
     $runtimePlatform = $site->runtimeTargetPlatform();
     $runtimeFamily = $site->runtimeTargetFamily();
-    $isContainerWorkspace = in_array($runtimeMode, ['docker', 'kubernetes', 'serverless'], true);
+    // A SiteType::Container edge app has runtimeTargetMode() === 'vm' (there is
+    // no "edge container" runtime family), so the mode check alone misses it.
+    // usesContainerRuntime() catches container-type sites and backend-bound
+    // sites so the container dashboard renders and the VM overview is hidden.
+    $isContainerWorkspace = in_array($runtimeMode, ['docker', 'kubernetes', 'serverless'], true)
+        || $site->usesContainerRuntime();
     $settingsSidebarItems = \App\Support\SiteSettingsSidebar::items($site, $server);
     $routingTabIcons = [
         'domains' => 'heroicon-o-globe-alt',
@@ -106,9 +111,43 @@
         default => null,
     };
     $workspaceTitle = $workspacePrefix ? $workspacePrefix.' '.$resourceNounLower.' '.__('workspace') : $resourceNoun.' '.__('workspace');
-    $workspaceDescription = $workspacePrefix
-        ? __('Manage this :resource from one workspace tuned for its :prefix runtime path, with General as the default landing section.', ['resource' => strtolower($resourceNoun), 'prefix' => strtolower($workspacePrefix)])
-        : __('Manage this :resource from one workspace with General as the default landing section.', ['resource' => strtolower($resourceNoun)]);
+
+    // Per-section header metadata (title, description, icon) — drives the
+    // <x-page-header> on each settings section so the operator sees a specific
+    // orientation ("HTTP basic authentication", "Routing", …) rather than the
+    // generic "Site workspace" copy on every tab.
+    $sectionHeader = \App\Support\SiteSettingsHeader::for($site, $server, $section);
+
+    // Authorization snapshot for the header. Drives the role badge and the
+    // description fallback for read-only / deployer roles. Resolved once so the
+    // view doesn't re-call Gate::allows for every conditional.
+    $headerUser = auth()->user();
+    $headerOrg = $headerUser?->currentOrganization();
+    $headerCanUpdateSite = (bool) $headerUser?->can('update', $site);
+    $headerCanDeleteSite = (bool) $headerUser?->can('delete', $site);
+    $headerIsDeployer = (bool) $headerOrg?->userIsDeployer($headerUser);
+    $headerIsAdmin = (bool) $headerOrg?->hasAdminAccess($headerUser);
+    $headerRoleLabel = match (true) {
+        $headerIsAdmin => null, // admins/owners get no badge — full power is the default
+        $headerIsDeployer => __('Deployer'),
+        $headerCanUpdateSite => __('Editor'),
+        default => __('Read-only'),
+    };
+    $headerRoleTone = match (true) {
+        $headerIsDeployer => 'bg-amber-100 text-amber-900 ring-amber-200/60',
+        $headerCanUpdateSite => 'bg-emerald-100 text-emerald-900 ring-emerald-200/60',
+        default => 'bg-slate-100 text-slate-700 ring-slate-200/60',
+    };
+
+    // For read-only / deployer roles, swap the section's "Manage / Configure / …"
+    // copy with a role-aware sentence so the user knows up-front why the editing
+    // affordances are missing or disabled. Admin and editor roles see the
+    // section's native description as written.
+    $sectionDescription = $headerCanUpdateSite
+        ? $sectionHeader['description']
+        : ($headerIsDeployer
+            ? __('Review this section — settings are read-only for the Deployer role. Use Deploy actions to ship changes.')
+            : __('You have read-only access to this section — settings cannot be changed from this account.'));
     $generalOverviewTitle = $runtimeMode === 'vm' ? __('Site domain') : __('Primary hostname');
     $generalOverviewDescription = $runtimeMode === 'vm'
         ? __('Update the primary domain and web directory for this site here. Changing the primary hostname updates the site record Dply uses for routing and future server automation.')
@@ -139,292 +178,316 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-slate-500" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Dashboard') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Servers') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $server->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $site->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li class="font-medium text-slate-900">{{ $workspaceTitle }}</li>
-        </ol>
-    </nav>
+    @php
+        $settingsBreadcrumbs = [
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
+        ];
+        if ($server->workspace) {
+            $settingsBreadcrumbs[] = [
+                'label' => $server->workspace->name,
+                'href' => route('projects.resources', $server->workspace),
+                'icon' => 'rectangle-group',
+            ];
+        }
+        $settingsBreadcrumbs[] = [
+            'label' => $server->name,
+            'href' => route('servers.overview', $server),
+            'icon' => 'server-stack',
+        ];
+        $settingsBreadcrumbs[] = [
+            'label' => $site->name,
+            'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
+            'icon' => 'globe-alt',
+        ];
+        if ($section !== 'general') {
+            // Match the breadcrumb tail to the section the user is on (e.g. "HTTP basic
+            // authentication") instead of the generic "Site workspace" — keeps trail
+            // and page header aligned.
+            $settingsBreadcrumbs[] = ['label' => $sectionHeader['title'], 'icon' => 'cog-6-tooth'];
+        }
+    @endphp
+    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
+        @include('livewire.sites.settings.partials.sidebar')
 
-    <div class="space-y-6">
-        <x-page-header
-            :title="$workspaceTitle"
-            :description="$workspaceDescription"
-            doc-route="docs.index"
-            flush
-        >
-            <x-slot name="actions">
-                <div class="flex flex-wrap items-center gap-3">
-                    @if ($showWebserverConfigEditor)
-                        <a
-                            href="{{ route('sites.webserver-config', [$server, $site]) }}"
-                            wire:navigate
-                            class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
-                        >
-                            {{ __('Web server config') }}
-                        </a>
-                    @endif
-                    <a
-                        href="{{ route('sites.insights', [$server, $site]) }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
-                    >
-                        {{ __('Insights') }}
-                    </a>
-                    <a
-                        href="{{ route('sites.monitor', [$server, $site]) }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
-                    >
-                        {{ __('Monitor') }}
-                    </a>
+        <div class="min-w-0 lg:col-span-9">
+            <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
+
+            {{-- Page-level workspace eyebrow. Pairs the runtime family (Edge / Cloud /
+                 Container / etc.) with the resource noun and lives ABOVE the per-section
+                 page header so operators reading top-to-bottom see "Site workspace · General"
+                 rather than landing on a bare "General" with no orientation. --}}
+            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
+
+            @if ($headerRoleLabel !== null)
+                {{-- Role badge sits above the page-header title so a viewer/deployer
+                     sees the access level before they look for save actions that
+                     aren't there. Admins/owners get no badge — full power is the
+                     default reading. --}}
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                          title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                        @if ($headerIsDeployer)
+                            <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                        @elseif ($headerCanUpdateSite)
+                            <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                        @else
+                            <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                        @endif
+                        {{ $headerRoleLabel }}
+                    </span>
                 </div>
-            </x-slot>
-        </x-page-header>
+            @endif
 
-        <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
-            @include('livewire.sites.settings.partials.sidebar')
+            <x-page-header
+                :title="$sectionHeader['title']"
+                :description="$sectionDescription"
+                doc-route="docs.index"
+                toolbar
+                flush
+                class="mt-3"
+            >
+                <x-slot name="leading">
+                    {{-- Section icon: the same icon family the sidebar uses, so the title
+                         and the active sidebar item visually agree. --}}
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                        @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
+                    </span>
+                </x-slot>
+                {{-- Web server config / Insights / Monitor links removed from the section
+                     header — they're already in the sidebar / dedicated routes. The
+                     header keeps just the Documentation link (rendered by <x-page-header>
+                     when doc-route is set) so the action area stays focused on docs. --}}
+            </x-page-header>
 
-            <main class="min-w-0 space-y-6 lg:col-span-9">
+            <main class="min-w-0 space-y-6 mt-8">
+                {{-- Single console-actions banner. Each Settings section declares the kinds
+                     it cares about in config/console_actions.php#section_kinds; sections
+                     without an entry (notifications, logs, environment, …) render no
+                     banner so unrelated runs don't leak across tabs. Newer runs supersede
+                     older ones; dismiss hides the current one until the next run starts. --}}
+                @php
+                    $sectionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
+                    $consoleActionRun = $sectionKinds === [] ? null : \App\Models\ConsoleAction::query()
+                        ->where('subject_type', $site->getMorphClass())
+                        ->where('subject_id', $site->id)
+                        ->whereIn('kind', $sectionKinds)
+                        ->whereNull('dismissed_at')
+                        ->orderByDesc('created_at')
+                        ->first();
+                @endphp
+                @if ($sectionKinds !== [])
+                    @include('livewire.partials.console-action-banner-static', [
+                        'run' => $consoleActionRun,
+                        'kindLabels' => (array) config('console_actions.kinds', []),
+                    ])
+                @endif
+
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
+                    {{-- Container workspace = docker / kubernetes (managed or VM-hosted).
+                         The dashboard partial uses container_backend to pick its labels;
+                         when the site hasn't been bound to a backend yet it still gets
+                         the same container-shaped Overview so the page isn't blank. --}}
+                    @if ($section === 'general' && $isContainerWorkspace && ! $site->usesFunctionsRuntime())
+                        @include('livewire.sites.partials.container-dashboard')
+                    @endif
+
+                    @if ($section === 'general' && $site->usesFunctionsRuntime())
+                        @include('livewire.sites.partials.serverless-dashboard')
+                    @endif
+
                     @if ($section === 'general')
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <form wire:submit="saveGeneralSettings">
-                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-slate-200 bg-slate-50 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $generalOverviewTitle }}</h2>
-                                        <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ $generalOverviewDescription }}
-                                        </p>
-                                        @if ($testingHostname !== '')
-                                            <div class="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-                                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
-                                                <p class="mt-2 break-all font-mono text-sm text-slate-900">{{ $testingHostname }}</p>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <div class="p-6 sm:p-8">
-                                        <div class="grid gap-5">
-                                            <div>
-                                                <x-input-label for="settings_primary_domain" :value="$primaryHostnameLabel" />
-                                                <x-text-input id="settings_primary_domain" wire:model="settings_primary_domain" class="mt-2 block w-full font-mono text-sm" placeholder="app.example.com" />
-                                                <x-input-error :messages="$errors->get('settings_primary_domain')" class="mt-2" />
-                                            </div>
-
-                                            <div>
-                                                <x-input-label for="settings_document_root" :value="$documentRootLabel" />
-                                                <x-text-input id="settings_document_root" wire:model="settings_document_root" class="mt-2 block w-full font-mono text-sm" :placeholder="$documentRootPlaceholder" />
-                                                <x-input-error :messages="$errors->get('settings_document_root')" class="mt-2" />
-                                            </div>
-
-                                            <dl class="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
-                                                @foreach ($summaryCards as $card)
-                                                    <div>
-                                                        <dt class="text-slate-500">{{ $card['label'] }}</dt>
-                                                        <dd class="mt-1 break-all font-medium text-slate-900">{{ $card['value'] }}</dd>
-                                                    </div>
-                                                @endforeach
-                                            </dl>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-8">
-                                    <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
-                                </div>
-                            </form>
-                        </section>
-
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <form wire:submit="saveProjectSettings">
-                                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-slate-200 bg-slate-50 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $projectSettingsTitle }}</h2>
-                                        <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ $projectSettingsDescription }}
-                                        </p>
-                                    </div>
-
-                                    <div class="space-y-5 p-6 sm:p-8">
-                                        <div>
-                                            <x-input-label for="project_workspace_id" value="Project" />
-                                            <select id="project_workspace_id" wire:model="project_workspace_id" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm">
-                                                <option value="">{{ __('No project') }}</option>
-                                                @foreach ($availableWorkspaces as $workspace)
-                                                    <option value="{{ $workspace->id }}">{{ $workspace->name }}</option>
-                                                @endforeach
-                                            </select>
-                                            <x-input-error :messages="$errors->get('project_workspace_id')" class="mt-2" />
-                                            <p class="mt-2 text-sm text-slate-600">
-                                                {{ __('Project membership can be managed here or from the project resources page.') }}
+                        {{-- Container / serverless Overview = dashboard partial (rendered
+                             above) + Recent deployments (below). The VM-shaped read-only
+                             overview, Status, etc. surface concepts that don't apply
+                             here (host webserver, document root, system user, certificate
+                             status) — gated on `! $isContainerWorkspace` so the page
+                             stays tight for the container/serverless workspaces. --}}
+                        @if (! $isContainerWorkspace)
+                        {{-- Read-only overview. Edit affordances live elsewhere:
+                             primary hostname → Routing > Domains (pencil on the row);
+                             everything else → Settings tab. --}}
+                        <section class="dply-card overflow-hidden">
+                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                                <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                    <div class="flex items-start gap-3">
+                                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                            <x-heroicon-o-globe-alt class="h-5 w-5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
+                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                {{ __('At-a-glance summary. Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}
                                             </p>
                                         </div>
+                                    </div>
+                                    @if ($testingHostname !== '')
+                                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
+                                            <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
+                                        </div>
+                                    @endif
+                                </div>
 
-                                        @if ($site->workspace)
-                                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                                <p class="text-sm font-semibold text-slate-900">{{ __('Current project') }}</p>
-                                                <p class="mt-1 text-sm text-slate-600">
-                                                    {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
-                                                </p>
-                                                <div class="mt-3 flex flex-wrap gap-3 text-sm">
-                                                    <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project resources') }}</a>
-                                                    <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project operations') }}</a>
-                                                    <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open project delivery') }}</a>
+                                <div class="p-6 sm:p-8">
+                                    <div class="grid gap-5">
+                                        <div>
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $primaryHostnameLabel }}</p>
+                                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_primary_domain !== '' ? $settings_primary_domain : '—' }}</span>
+                                                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
+                                                    <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                                    {{ __('Edit in Routing') }}
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $documentRootLabel }}</p>
+                                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</span>
+                                                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
+                                                    <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                                    {{ __('Edit in Settings') }}
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                        <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-2">
+                                            @foreach ($summaryCards as $card)
+                                                <div>
+                                                    <dt class="text-brand-mist">{{ $card['label'] }}</dt>
+                                                    <dd class="mt-1 break-all font-medium text-brand-ink">{{ $card['value'] }}</dd>
                                                 </div>
-                                            </div>
-                                        @endif
+                                            @endforeach
+                                        </dl>
                                     </div>
                                 </div>
-
-                                <div class="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4 sm:px-8">
-                                    <x-primary-button type="submit">{{ __('Save project settings') }}</x-primary-button>
-                                </div>
-                            </form>
-                        </section>
-
-                        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-                            <div class="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Deployment foundation') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Shared preflight, revision drift, and resource attachment state for this site.') }}</p>
-                                </div>
-                                <span class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] {{ ($foundationStatus['runtime_drifted'] ?? false) ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800' }}">
-                                    {{ ($foundationStatus['runtime_drifted'] ?? false) ? __('Detected') : __('In sync') }}
-                                </span>
-                            </div>
-
-                            <dl class="grid gap-4 sm:grid-cols-3">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Current revision') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $foundationStatus['current_runtime_revision'] ?? '—' }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Last applied revision') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-xs text-slate-900">{{ $foundationStatus['last_applied_runtime_revision'] ?? __('Not applied yet') }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Launch preflight') }}</dt>
-                                    <dd class="mt-2 text-sm font-medium text-slate-900">{{ $preflightErrors->isEmpty() ? __('Ready to review') : __('Needs attention') }}</dd>
-                                </div>
-                            </dl>
-
-                            <div class="grid gap-4 lg:grid-cols-2">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <h3 class="text-sm font-semibold text-slate-900">{{ __('Launch preflight') }}</h3>
-                                    <div class="mt-3 space-y-2">
-                                        @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
-                                            <p class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">{{ __('No blocking preflight issues.') }}</p>
-                                        @endif
-                                        @foreach ($preflightErrors as $error)
-                                            <p class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $error }}</p>
-                                        @endforeach
-                                        @foreach ($preflightWarnings as $warning)
-                                            <p class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ $warning }}</p>
-                                        @endforeach
-                                    </div>
-                                </div>
-
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <h3 class="text-sm font-semibold text-slate-900">{{ __('Attached resources') }}</h3>
-                                    <div class="mt-3 space-y-2">
-                                        @foreach ($resourceBindings as $binding)
-                                            @include('livewire.sites.partials.resource-binding-row', ['binding' => $binding])
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                <div class="flex flex-wrap items-start justify-between gap-4">
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-slate-900">{{ __('Shared secrets & config') }}</h3>
-                                        <p class="mt-1 text-sm text-slate-600">{{ __('Dply-managed environment inventory for this site across env file, site variables, workspace variables, and deploy-managed credentials.') }}</p>
-                                    </div>
-                                    <div class="flex flex-wrap gap-2">
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            {{ trans_choice('{1} :count secret|[2,*] :count secrets', $secretEntries->count(), ['count' => $secretEntries->count()]) }}
-                                        </span>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            {{ trans_choice('{1} :count config value|[2,*] :count config values', $configEntries->count(), ['count' => $configEntries->count()]) }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <p class="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">
-                                    {{ $secretDeliveryLabel }}
-                                </p>
-                                <div class="mt-4 grid gap-4 xl:grid-cols-2">
-                                    <div class="space-y-2">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Secrets') }}</p>
-                                        @forelse ($secretEntries as $entry)
-                                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                                    <div>
-                                                        <p class="font-mono text-sm font-medium text-slate-900">{{ $entry['key'] }}</p>
-                                                        <p class="mt-1 text-xs text-slate-500">
-                                                            {{ str($entry['scope'] ?? 'site')->headline() }} · {{ str_replace('_', ' ', (string) ($entry['source'] ?? 'managed')) }} · {{ str($entry['classification'] ?? 'config')->headline() }}
-                                                        </p>
-                                                    </div>
-                                                    <span class="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">
-                                                        {{ __('Redacted') }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        @empty
-                                            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                                                {{ __('No shared secrets are inventoried yet.') }}
-                                            </div>
-                                        @endforelse
-                                    </div>
-                                    <div class="space-y-2">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Config values') }}</p>
-                                        @forelse ($configEntries as $entry)
-                                            <div class="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                                    <div>
-                                                        <p class="font-mono text-sm font-medium text-slate-900">{{ $entry['key'] }}</p>
-                                                        <p class="mt-1 text-xs text-slate-500">
-                                                            {{ str($entry['scope'] ?? 'site')->headline() }} · {{ str_replace('_', ' ', (string) ($entry['source'] ?? 'managed')) }}
-                                                        </p>
-                                                    </div>
-                                                    <p class="max-w-[16rem] break-all text-right font-mono text-xs text-slate-700">
-                                                        {{ \Illuminate\Support\Str::limit((string) ($entry['value'] ?? ''), 80) }}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        @empty
-                                            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-600">
-                                                {{ __('No non-secret config values are inventoried yet.') }}
-                                            </div>
-                                        @endforelse
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                @foreach ($preflightChecks as $check)
-                                    <div class="rounded-xl border px-3 py-2 text-sm {{ ($check['level'] ?? 'ok') === 'error' ? 'border-red-200 bg-red-50 text-red-800' : (($check['level'] ?? 'ok') === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-sky-200 bg-sky-50 text-sky-800') }}">
-                                        <span class="font-medium">{{ str($check['key'] ?? 'check')->headline() }}</span>
-                                        <p class="mt-1 text-xs leading-5">{{ $check['message'] ?? '' }}</p>
-                                    </div>
-                                @endforeach
                             </div>
                         </section>
 
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <section class="dply-card overflow-hidden">
+                            <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                        <x-heroicon-o-chart-bar class="h-5 w-5" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Status') }}</h2>
+                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('At-a-glance deploy, runtime, and certificate state. Detailed editors live on the dedicated tabs.') }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" />
+                                        {{ __('Deploy') }}
+                                    </a>
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-cube-transparent class="h-3.5 w-3.5" />
+                                        {{ __('Runtime') }}
+                                    </a>
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'certificates']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-shield-check class="h-3.5 w-3.5" />
+                                        {{ __('Certificates') }}
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="p-6 sm:p-8">
+                                <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                    @if ($this->latestDeployment !== null)
+                                        @php
+                                            // Tone-coded badge: failed deploys rose, running sky, success emerald.
+                                            // Tests assert the bg-rose-100 class for failed deploys so the badge
+                                            // colour is part of the contract, not just a decorative cue.
+                                            $latestStatus = (string) $this->latestDeployment->status;
+                                            $latestTone = match ($latestStatus) {
+                                                'failed' => 'bg-rose-100 text-rose-800',
+                                                'running' => 'bg-sky-100 text-sky-800',
+                                                'success' => 'bg-emerald-100 text-emerald-800',
+                                                default => 'bg-brand-sand/60 text-brand-ink',
+                                            };
+                                        @endphp
+                                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Last deploy') }}</dt>
+                                            <dd class="mt-2 text-sm font-medium text-brand-ink">
+                                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}"
+                                                    wire:navigate
+                                                    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize {{ $latestTone }} hover:opacity-90">
+                                                    {{ $latestStatus }}
+                                                </a>
+                                                @if ($this->latestDeployment->started_at)
+                                                    <span class="ml-1 text-xs font-normal text-brand-mist">· {{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
+                                                @endif
+                                            </dd>
+                                            <dd class="mt-1 text-xs">
+                                                <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-medium text-brand-sage hover:underline">{{ __('All deploys') }}</a>
+                                            </dd>
+                                        </div>
+                                    @endif
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Runtime') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium text-brand-ink">
+                                            @if ($site->runtimeKey())
+                                                <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                                                    <span class="font-mono text-brand-mist"> · {{ $site->runtimeVersion() }}</span>
+                                                @endif
+                                            @else
+                                                <span class="text-brand-mist">—</span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Preflight') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium">
+                                            @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
+                                                <span class="inline-flex items-center gap-1.5 text-emerald-700">
+                                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                                                    {{ __('Ready') }}
+                                                </span>
+                                            @elseif ($preflightErrors->isNotEmpty())
+                                                <span class="inline-flex items-center gap-1.5 text-rose-700">
+                                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-600"></span>
+                                                    {{ trans_choice('{1} :count blocker|[2,*] :count blockers', $preflightErrors->count(), ['count' => $preflightErrors->count()]) }}
+                                                </span>
+                                            @else
+                                                <span class="inline-flex items-center gap-1.5 text-amber-700">
+                                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                                                    {{ trans_choice('{1} :count warning|[2,*] :count warnings', $preflightWarnings->count(), ['count' => $preflightWarnings->count()]) }}
+                                                </span>
+                                            @endif
+                                        </dd>
+                                    </div>
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('SSL') }}</dt>
+                                        <dd class="mt-2 text-sm font-medium text-brand-ink">{{ $site->currentSslSummary() }}</dd>
+                                    </div>
+                                </dl>
+
+                                @if (in_array($site->runtime, ['node', 'static'], true))
+                                    <div class="mt-5 rounded-xl border border-brand-sage/30 bg-brand-sage/10 p-3 text-xs text-brand-ink">
+                                        <span class="font-semibold text-brand-forest">{{ __('Edge-eligible') }}</span> —
+                                        <span class="text-brand-moss">{{ __('this :runtime site can deploy globally on dply edge — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}</span>
+                                        <a href="{{ route('edge.create') }}" wire:navigate class="ml-1 font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('Deploy to dply edge') }} →</a>
+                                    </div>
+                                @endif
+                            </div>
+                        </section>
+
+                        <section class="dply-card overflow-hidden">
                             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-slate-200 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ $detailsTitle }}</h2>
-                                    <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ $detailsDescription }}
-                                    </p>
+                                <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                    <div class="flex items-start gap-3">
+                                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                            <x-heroicon-o-identification class="h-5 w-5" />
+                                        </span>
+                                        <div class="min-w-0">
+                                            <h2 class="text-lg font-semibold text-brand-ink">{{ $detailsTitle }}</h2>
+                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                {{ $detailsDescription }}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="p-6 sm:p-8">
@@ -433,20 +496,20 @@
                                     @endphp
                                     <dl class="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2">
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Created at') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">{{ $site->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
+                                            <dt class="text-brand-mist">{{ __('Created at') }}</dt>
+                                            <dd class="mt-1 font-medium text-brand-ink">{{ $site->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Site ID') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">{{ $site->id }}</dd>
+                                            <dt class="text-brand-mist">{{ __('Site ID') }}</dt>
+                                            <dd class="mt-1 font-mono text-xs font-medium text-brand-ink">{{ $site->id }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Stack') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">{{ $site->type->label() }}</dd>
+                                            <dt class="text-brand-mist">{{ __('Stack') }}</dt>
+                                            <dd class="mt-1 font-medium text-brand-ink">{{ $site->type->label() }}</dd>
                                         </div>
                                         <div>
-                                            <dt class="text-slate-500">{{ __('Disk usage') }}</dt>
-                                            <dd class="mt-1 font-medium text-slate-900">
+                                            <dt class="text-brand-mist">{{ __('Disk usage') }}</dt>
+                                            <dd class="mt-1 font-medium text-brand-ink">
                                                 {{ is_numeric($diskUsageBytes) ? \Illuminate\Support\Number::fileSize((int) $diskUsageBytes) : __('Not recorded yet') }}
                                             </dd>
                                         </div>
@@ -455,214 +518,87 @@
                             </div>
                         </section>
 
-                        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-                            <div class="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Operations summary') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Keep the most important deploy, runtime, and certificate context visible on General while deeper editing lives in focused sections.') }}</p>
-                                </div>
-                                <div class="flex flex-wrap gap-3 text-sm">
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deploy') }}</a>
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deployment log') }}</a>
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'certificates']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open certificate settings') }}</a>
-                                </div>
-                            </div>
-
-                            @if ($previewDomain || $site->certificates->isNotEmpty())
-                                <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <h3 class="text-base font-semibold text-slate-900">{{ __('Preview & SSL') }}</h3>
-                                            <p class="mt-1 text-sm text-slate-600">{{ __('Preview hostname reachability and the latest certificate state for this site.') }}</p>
-                                        </div>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            {{ $site->currentSslSummary() }}
-                                        </span>
-                                    </div>
-
-                                    <dl class="grid gap-4 sm:grid-cols-2">
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Preview hostname') }}</dt>
-                                            <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $previewDomain?->hostname ?? __('No preview domain') }}</dd>
-                                        </div>
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Preview DNS') }}</dt>
-                                            <dd class="mt-2 text-sm text-slate-900">{{ $previewDomain?->dns_status ?? __('Not configured') }}</dd>
-                                        </div>
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest certificate') }}</dt>
-                                            <dd class="mt-2 text-sm text-slate-900">
-                                                @if ($latestCertificate)
-                                                    {{ ucfirst($latestCertificate->provider_type) }} · {{ $latestCertificate->status }}
-                                                @else
-                                                    {{ __('No certificates requested') }}
-                                                @endif
-                                            </dd>
-                                        </div>
-                                        <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                            <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Certificate scope') }}</dt>
-                                            <dd class="mt-2 text-sm text-slate-900">{{ $latestCertificate ? ucfirst($latestCertificate->scope_type) : __('—') }}</dd>
-                                        </div>
-                                        @if ($latestCertificate)
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Certificate domains') }}</dt>
-                                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ implode(', ', $latestCertificate->domainHostnames()) }}</dd>
-                                            </div>
-                                            @if (! empty($latestCertificate->last_output))
-                                                <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Latest certificate output') }}</dt>
-                                                    <dd class="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-slate-900">{{ \Illuminate\Support\Str::limit($latestCertificate->last_output, 800) }}</dd>
-                                                </div>
-                                            @endif
-                                        @endif
-                                    </dl>
-
-                                    @if ($latestCertificate && in_array($latestCertificate->status, [
-                                        \App\Models\SiteCertificate::STATUS_FAILED,
-                                        \App\Models\SiteCertificate::STATUS_PENDING,
-                                        \App\Models\SiteCertificate::STATUS_ISSUED,
-                                    ], true))
-                                        <div class="flex flex-wrap gap-3">
-                                            <button
-                                                type="button"
-                                                wire:click="retryCertificate('{{ $latestCertificate->id }}')"
-                                                wire:loading.attr="disabled"
-                                                class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50"
-                                            >
-                                                <span wire:loading.remove wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retry certificate') }}</span>
-                                                <span wire:loading wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retrying...') }}</span>
-                                            </button>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-
-                            @if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime())
-                                <div class="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <h3 class="text-base font-semibold text-slate-900">{{ __('Runtime target') }}</h3>
-                                            <p class="mt-1 text-sm text-slate-600">{{ __('The latest managed deploy details for this runtime target.') }}</p>
-                                        </div>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">
-                                            @if ($site->usesAwsLambdaRuntime())
-                                                {{ __('AWS Lambda') }}
-                                            @elseif ($site->usesFunctionsRuntime())
-                                                {{ __('DigitalOcean Functions') }}
-                                            @elseif ($site->usesDockerRuntime())
-                                                {{ __('Docker host') }}
-                                            @else
-                                                {{ __('Kubernetes cluster') }}
-                                            @endif
-                                        </span>
-                                    </div>
-
-                                    @if ($site->usesFunctionsRuntime())
-                                        <dl class="grid gap-4 sm:grid-cols-2">
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Runtime') }}</dt>
-                                                <dd class="mt-2 font-mono text-sm text-slate-900">{{ $serverlessRuntime['runtime'] ?? '—' }}</dd>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Entrypoint') }}</dt>
-                                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['entrypoint'] ?? '—' }}</dd>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Revision') }}</dt>
-                                                <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['last_revision_id'] ?? __('Not deployed yet') }}</dd>
-                                            </div>
-                                            @if (! empty($serverlessRuntime['function_arn']))
-                                                <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Function ARN') }}</dt>
-                                                    <dd class="mt-2 break-all font-mono text-sm text-slate-900">{{ $serverlessRuntime['function_arn'] }}</dd>
-                                                </div>
-                                            @endif
-                                        </dl>
-                                    @elseif ($site->usesDockerRuntime())
-                                        <div class="grid gap-4 sm:grid-cols-2">
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Last generated compose file') }}</p>
-                                                <pre class="mt-2 max-h-64 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Managed Dockerfile') }}</p>
-                                                <pre class="mt-2 max-h-64 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <div class="grid gap-4 sm:grid-cols-2">
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Namespace') }}</p>
-                                                <p class="mt-2 text-sm font-medium text-slate-900">{{ $kubernetesRuntime['namespace'] ?? __('default') }}</p>
-                                            </div>
-                                            <div class="rounded-2xl border border-slate-200 bg-white p-4 sm:col-span-2">
-                                                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{{ __('Manifest') }}</p>
-                                                <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-                        </section>
-
-                        <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <form wire:submit="saveSiteNotes">
+                        @if (data_get($site->meta, 'notes'))
+                            <section class="dply-card overflow-hidden">
                                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                    <div class="border-b border-slate-200 bg-slate-50/70 p-6 lg:border-b-0 lg:border-r">
-                                        <h2 class="text-lg font-semibold text-slate-900">{{ __('Site notes') }}</h2>
-                                        <p class="mt-3 text-sm leading-6 text-slate-600">
-                                            {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
-                                        </p>
-                                    </div>
-
-                                    <div class="space-y-4 p-6 sm:p-8">
-                                        <div>
-                                            <x-input-label for="site_notes" value="Notes" />
-                                            <textarea id="site_notes" wire:model="site_notes" rows="5" class="mt-2 block w-full rounded-md border-slate-300 text-sm shadow-sm"></textarea>
-                                            <x-input-error :messages="$errors->get('site_notes')" class="mt-2" />
+                                    <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                                        <div class="flex items-start gap-3">
+                                            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                                                <x-heroicon-o-pencil-square class="h-5 w-5" />
+                                            </span>
+                                            <div class="min-w-0">
+                                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
+                                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Edit in Settings') }}</a>
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div class="flex justify-end border-t border-slate-200 bg-slate-50/40 px-6 py-4 sm:px-8">
-                                    <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+                                    <div class="p-6 sm:p-8">
+                                        <p class="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{{ data_get($site->meta, 'notes') }}</p>
+                                    </div>
                                 </div>
-                            </form>
-                        </section>
+                            </section>
+                        @endif
+                        @endif {{-- /! $isContainerWorkspace --}}
+
+                        @if (! $isContainerWorkspace)
+                        <x-cli-snippet :commands="[
+                            ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
+                            ['label' => __('Diagnose site'), 'command' => 'dply:site:doctor '.$site->slug],
+                            ['label' => __('Rename site'), 'command' => 'dply:site:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
+                            ['label' => __('Export full config'), 'command' => 'dply:site:export-config '.$site->slug.' --to=site.json'],
+                            ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
+                            ['label' => __('List all sites'), 'command' => 'dply:site:list'],
+                        ]" />
+                        @endif
+
+                        @php
+                            // Recent deployments with structured phase_results (set by the deploy
+                            // runner). Predates-the-runner rows are excluded so the panel only
+                            // surfaces drill-into-able deploys. Capped at 10 — Deploys page has
+                            // pagination for older history.
+                            $deployments = $site->deployments
+                                ->filter(fn (\App\Models\SiteDeployment $d): bool => is_array($d->phase_results) && $d->phase_results !== [])
+                                ->take(10)
+                                ->values();
+                        @endphp
+                        @if ($deployments->isNotEmpty())
+                            <div class="mt-6">
+                                @include('livewire.sites.partials.recent-deployments')
+                            </div>
+                        @endif
+                    @elseif ($section === 'settings')
+                        @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
                     @elseif ($section === 'dns')
                         @include('livewire.sites.settings.partials.dns')
                     @elseif ($section === 'certificates')
                         @include('livewire.sites.settings.partials.certificates')
-                    @elseif ($section === 'deploy')
+                    @elseif (in_array($section, ['deploy', 'repository'], true))
+                        {{-- Repository = the *recipe* (Q3/Q11): Source → Build → Pipeline →
+                             Hooks → Activate/Rollout → less-touched runtime artifacts.
+                             `section=deploy` is kept as a backward-compat alias so old
+                             bookmarks don't 404; the sidebar's "Deployments" item now
+                             routes to sites.deployments.index (the history list). --}}
                         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div>
-                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Deploy') }}</h2>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Keep repository source, no-downtime rollout strategy, deploy scripts, hooks, and release/log access together here. Deploy execution itself stays on the site overview page.') }}</p>
+                                    <h2 class="text-lg font-semibold text-slate-900">{{ __('Repository') }}</h2>
+                                    <p class="mt-1 text-sm text-slate-600">{{ __('Repository source, rollout strategy, pipeline steps, and hooks — the deploy recipe top to bottom. Deploy execution itself lives on the site overview.') }}</p>
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-sm">
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open deploy actions') }}</a>
+                                    <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deployments') }}</a>
                                     <a href="{{ route('sites.commits', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Commits') }}</a>
-                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open site logs') }}</a>
-                                    <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Open server logs') }}</a>
+                                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Site logs') }}</a>
+                                    <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Server logs') }}</a>
                                 </div>
                             </div>
 
-                            @include('livewire.sites.settings.partials.engine-http-cache')
-
                             <form wire:submit="saveGit" class="space-y-4">
-                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                    <p class="text-sm font-semibold text-slate-900">{{ __('Repository and branch') }}</p>
-                                    <p class="mt-1 text-sm text-slate-600">{{ __('Choose what Dply checks out for each deploy and keep the legacy post-deploy command with the repo configuration so the pipeline reads from top to bottom.') }}</p>
-                                </div>
                                 @if ($functionsHost)
-                                    <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-                                        <p class="font-medium">{{ __('Serverless deploy target') }}</p>
-                                        <p class="mt-1">{{ __('Serverless deploys clone the repository on the queue worker, run the configured build command, package the build output, and publish the resulting artifact for the selected target.') }}</p>
-                                    </div>
-
                                     <div>
                                         <x-input-label for="functions_repo_source" value="Repository source" />
                                         <select id="functions_repo_source" wire:model.live="functions_repo_source" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
@@ -719,6 +655,12 @@
                                         <p class="mt-1 text-sm text-brand-moss">{{ __('Optional for monorepos.') }}</p>
                                         <x-input-error :messages="$errors->get('functions_repository_subdirectory')" class="mt-1" />
                                     </div>
+                                    <div>
+                                        <x-input-label for="post_deploy_command" value="Deploy command" />
+                                        <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="php artisan migrate --force"></textarea>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Runs in the build environment after dependencies install and the environment is prepared, before the function is packaged — use it for migrations and cache warming. A non-zero exit aborts the deploy.') }}</p>
+                                        <x-input-error :messages="$errors->get('post_deploy_command')" class="mt-1" />
+                                    </div>
                                 @else
                                     <div>
                                         <x-input-label for="post_deploy_command" value="Post-deploy command" />
@@ -728,25 +670,15 @@
 
                                 @if ($functionsHost && $functionsDetection !== [])
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 space-y-3">
-                                        <div class="flex flex-wrap items-start justify-between gap-3">
-                                            <div>
-                                                <p class="text-sm font-semibold text-brand-ink">{{ __('Detected setup') }}</p>
-                                                <p class="mt-1 text-sm text-brand-moss">{{ __('Dply inspected the configured repository and inferred a starting runtime/build setup for this target.') }}</p>
+                                        <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+                                            <div class="flex flex-wrap items-center gap-3">
+                                                <span class="font-semibold text-brand-ink">{{ __('Detected') }}</span>
+                                                <span class="text-brand-moss">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }} · {{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</span>
                                             </div>
                                             <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
                                                 {{ strtoupper((string) ($functionsDetection['confidence'] ?? 'low')) }}
                                             </span>
                                         </div>
-                                        <dl class="grid gap-3 md:grid-cols-2">
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Framework') }}</p>
-                                                <p class="mt-1 text-sm font-medium text-brand-ink">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }}</p>
-                                            </div>
-                                            <div>
-                                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Language') }}</p>
-                                                <p class="mt-1 text-sm font-medium text-brand-ink">{{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</p>
-                                            </div>
-                                        </dl>
                                         @if (count($functionsDetection['warnings'] ?? []) > 0)
                                             <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 space-y-2">
                                                 @foreach (($functionsDetection['warnings'] ?? []) as $warning)
@@ -791,54 +723,188 @@
                                 </div>
                             </form>
 
-                            @if ($functionsHost)
-                                @php
-                                    $functionsConfig = $site->serverlessConfig();
-                                    $serverlessTargetLabel = $server->isAwsLambdaHost() ? __('AWS Lambda') : __('DigitalOcean Functions');
-                                @endphp
-                                <div class="grid gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 md:grid-cols-2">
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Target') }}</p>
-                                        <p class="mt-1 text-sm font-medium text-brand-ink">{{ $serverlessTargetLabel }}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Runtime') }}</p>
-                                        <p class="mt-1 font-mono text-sm text-brand-ink">{{ $functionsConfig['runtime'] ?? $functions_runtime ?? '—' }}</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Entrypoint') }}</p>
-                                        <p class="mt-1 font-mono text-sm text-brand-ink">{{ $functionsConfig['entrypoint'] ?? $functions_entrypoint ?? '—' }}</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Latest managed artifact') }}</p>
-                                        <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['artifact_path'] ?? __('Not built yet') }}</p>
-                                    </div>
-                                    @if (! empty($functionsConfig['function_arn']))
-                                        <div class="md:col-span-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Function ARN') }}</p>
-                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['function_arn'] }}</p>
-                                        </div>
-                                    @endif
-                                    @if (! empty($functionsConfig['function_url']))
-                                        <div class="md:col-span-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Function URL') }}</p>
-                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['function_url'] }}</p>
-                                        </div>
-                                    @endif
-                                    @if (! empty($functionsConfig['action_url']))
-                                        <div class="md:col-span-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Published action URL') }}</p>
-                                            <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $functionsConfig['action_url'] }}</p>
-                                        </div>
-                                    @endif
-                                </div>
-                            @elseif ($site->git_deploy_key_public)
+                            @if (! $functionsHost && $site->git_deploy_key_public)
                                 <div>
                                     <p class="text-sm text-brand-moss">{{ __('Public key (add to your Git provider deploy keys):') }}</p>
                                     <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ $site->git_deploy_key_public }}</pre>
                                 </div>
                             @endif
 
+                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
+                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Lay out the deploy as pre, main, and post stages so custom steps stay visible around the core checkout and activation flow.') }}</p>
+                                </div>
+
+                                <div class="grid gap-4 xl:grid-cols-3">
+                                    <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Pre-deploy script') }}</p>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Ordered pipeline steps run after code is cloned and before the main activation flow completes.') }}</p>
+                                        <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Current steps') }}</p>
+                                        @if ($site->deploySteps->isNotEmpty())
+                                            <ol class="mt-2 space-y-2 text-sm">
+                                                @foreach ($site->deploySteps->sortBy('sort_order') as $step)
+                                                    <li class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
+                                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                                            <span class="flex flex-wrap items-center gap-2">
+                                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $step->phaseBadgeClass() }}">{{ $step->phase ?? 'build' }}</span>
+                                                                <span class="font-mono text-xs text-brand-ink">{{ $step->step_type }}</span>
+                                                                <span class="text-xs text-brand-moss">· {{ (int) ($step->timeout_seconds ?? 900) }}s</span>
+                                                                @if ($step->custom_command)
+                                                                    <span class="text-brand-moss">— {{ \Illuminate\Support\Str::limit($step->custom_command, 60) }}</span>
+                                                                @endif
+                                                            </span>
+                                                            <span class="flex gap-3 text-xs">
+                                                                <button type="button" wire:click="moveDeployStepUp({{ $step->id }})" class="text-brand-moss hover:underline">{{ __('Up') }}</button>
+                                                                <button type="button" wire:click="moveDeployStepDown({{ $step->id }})" class="text-brand-moss hover:underline">{{ __('Down') }}</button>
+                                                                <button type="button" wire:click="deleteDeployPipelineStep({{ $step->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
+                                                            </span>
+                                                        </div>
+                                                    </li>
+                                                @endforeach
+                                            </ol>
+                                        @else
+                                            <p class="mt-2 text-sm text-brand-moss">{{ __('No extra pre-deploy steps yet.') }}</p>
+                                        @endif
+                                    </div>
+
+                                    <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Main deploy script') }}</p>
+                                        <div class="mt-3 space-y-2 text-sm text-brand-moss">
+                                            <p>{{ __('1. Prepare deploy directory / release target') }}</p>
+                                            <p>{{ __('2. Clone or update the configured branch') }}</p>
+                                            <p>{{ __('3. Run ordered pipeline steps') }}</p>
+                                            <p>{{ __('4. Activate the release when atomic deploys are enabled') }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Post-deploy script') }}</p>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Legacy post-deploy command runs after the pipeline. Keep this empty if the ordered steps already express everything.') }}</p>
+                                        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $post_deploy_command !== '' ? $post_deploy_command : __('No post-deploy command configured.') }}</pre>
+                                    </div>
+                                </div>
+
+                                @if (! $functionsHost)
+                                    <details class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                        <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a pipeline step') }}</summary>
+                                        <form wire:submit="addDeployPipelineStep" class="mt-4 flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <label for="new_deploy_step_type" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Step') }}</label>
+                                                <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-slate-300 shadow-sm text-sm">
+                                                    @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
+                                                        <option value="{{ $value }}">{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div class="min-w-[220px] flex-1">
+                                                <label for="new_deploy_step_command" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('npm script / custom command') }}</label>
+                                                <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
+                                                <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <label for="new_deploy_step_timeout" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
+                                                <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                                            </div>
+                                            <x-primary-button type="submit">{{ __('Add step') }}</x-primary-button>
+                                        </form>
+                                    </details>
+                                @endif
+                            </section>
+
+                            @if ($site->usesDockerRuntime())
+                                @php
+                                    $dockerRuntime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
+                                @endphp
+                                <details class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                                    <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Runtime target') }} <span class="font-normal text-brand-moss">— {{ __('Compose / Dockerfile (`docker compose up -d --build` on deploy)') }}</span></summary>
+                                    <div class="mt-4 grid gap-4 xl:grid-cols-2">
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Compose file') }}</p>
+                                            <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Managed Dockerfile') }}</p>
+                                            <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
+                                        </div>
+                                    </div>
+                                </details>
+                            @endif
+
+                            @if ($site->usesKubernetesRuntime())
+                                @php
+                                    $kubernetesRuntime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
+                                @endphp
+                                <details class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                                    <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Runtime target') }} <span class="font-normal text-brand-moss">— {{ __('Manifest for namespace') }} <code>{{ $kubernetesRuntime['namespace'] ?? 'default' }}</code></span></summary>
+                                    <div class="mt-4">
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Manifest') }}</p>
+                                        <pre class="mt-2 max-h-96 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
+                                    </div>
+                                </details>
+                            @endif
+
+                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
+                                    <p class="mt-1 text-sm text-brand-moss">{{ __('before_clone runs in the deploy base directory. after_clone runs in the new release. after_activate runs after the current symlink updates on atomic deploys.') }}</p>
+                                </div>
+
+                                <div class="grid gap-4 xl:grid-cols-3">
+                                    @foreach ($deployHookPhaseLabels as $phase => $phaseLabel)
+                                        <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                            <p class="text-sm font-semibold text-brand-ink">{{ $phaseLabel }}</p>
+                                            <p class="mt-1 text-xs font-medium uppercase tracking-wide text-brand-moss">{{ $phase }}</p>
+                                            @php
+                                                $phaseHooks = $site->deployHooks->where('phase', $phase)->sortBy('sort_order');
+                                            @endphp
+                                            @if ($phaseHooks->isNotEmpty())
+                                                <ul class="mt-3 space-y-3 text-sm">
+                                                    @foreach ($phaseHooks as $hook)
+                                                        <li class="rounded-xl border border-brand-ink/10 bg-white p-3">
+                                                            <div class="mb-2 flex justify-between gap-3">
+                                                                <span class="font-medium text-brand-ink">#{{ $hook->sort_order }} <span class="font-normal text-brand-moss">· {{ (int) ($hook->timeout_seconds ?? config('dply.default_deploy_hook_timeout_seconds', 900)) }}s</span></span>
+                                                                <button type="button" wire:click="deleteDeployHook({{ $hook->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
+                                                            </div>
+                                                            <pre class="overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ \Illuminate\Support\Str::limit($hook->script, 500) }}</pre>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @else
+                                                <p class="mt-3 text-sm text-brand-moss">{{ __('No hooks in this stage yet.') }}</p>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+
+                                <details class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                                    <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a hook') }}</summary>
+                                    <form wire:submit="addDeployHook" class="mt-4 space-y-3">
+                                        <select wire:model="new_hook_phase" class="rounded-md border-slate-300 text-sm">
+                                            <option value="before_clone">before_clone</option>
+                                            <option value="after_clone">after_clone</option>
+                                            <option value="after_activate">after_activate</option>
+                                        </select>
+                                        <div class="flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Sort order') }}</label>
+                                                <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" />
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
+                                                <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                                            </div>
+                                        </div>
+                                        <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
+                                        <x-primary-button type="submit">{{ __('Add hook') }}</x-primary-button>
+                                    </form>
+                                </details>
+                            </section>
+
+                            {{-- Zero downtime + post-activate health check + the broader rollout
+                                 form (releases, env, scheduler, supervisor, extra Nginx) sit
+                                 after Pipeline + Hooks so the page reads chronologically:
+                                 Source → Build → Pipeline → Hooks → Activate → Rollout. --}}
                             @if (! $functionsHost)
                                 <form wire:submit="saveZeroDowntimeDeployment" class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                                     <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
@@ -918,7 +984,7 @@
 
                                     <div>
                                         <h3 class="text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h3>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, PHP-FPM, cron, Supervisor, and extra Nginx directives. Stack-specific options (for example Octane) appear when detection matches.') }}</p>
+                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, scheduler, Supervisor, and extra Nginx directives. Runtime ports and users live on Runtime / Stack / System user.') }}</p>
                                     </div>
 
                                     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -931,50 +997,6 @@
                                             <x-input-label for="deployment_environment" value="Environment group" />
                                             <x-text-input id="deployment_environment" wire:model="deployment_environment" class="mt-1 block w-full text-sm" />
                                             <p class="mt-2 text-sm text-brand-moss">{{ __('Used when resolving key/value environment variables for deploys.') }}</p>
-                                        </div>
-                                        @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowOctaneRuntimeUi())
-                                            <div>
-                                                <x-input-label for="octane_port" value="Octane port" />
-                                                <x-text-input id="octane_port" wire:model="octane_port" placeholder="8000" class="mt-1 block w-full font-mono text-sm" />
-                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Mirrors Runtime settings; used for Supervisor `octane:start` command line.') }}</p>
-                                            </div>
-                                            <div>
-                                                <x-input-label for="octane_server" value="{{ __('Octane application server') }}" />
-                                                <select id="octane_server" wire:model="octane_server" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                                                    @foreach (\App\Models\Site::OCTANE_SERVERS as $server)
-                                                        <option value="{{ $server }}">{{ str($server)->replace('_', ' ')->title() }}</option>
-                                                    @endforeach
-                                                </select>
-                                            </div>
-                                        @endif
-                                        @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowLaravelReverbRuntimeUi())
-                                            <div>
-                                                <x-input-label for="laravel_reverb_port_deploy" value="{{ __('Reverb port') }}" />
-                                                <x-text-input id="laravel_reverb_port_deploy" type="number" wire:model="laravel_reverb_port" placeholder="8080" class="mt-1 block w-full max-w-xs font-mono text-sm" min="1" max="65535" />
-                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Mirrors Laravel stack settings; used for Supervisor and managed web server WebSocket proxies.') }}</p>
-                                            </div>
-                                            <div>
-                                                <x-input-label for="laravel_reverb_ws_path_deploy" value="{{ __('Reverb WebSocket path') }}" />
-                                                <x-text-input id="laravel_reverb_ws_path_deploy" wire:model="laravel_reverb_ws_path" placeholder="/app" class="mt-1 block w-full max-w-xs font-mono text-sm" />
-                                            </div>
-                                        @endif
-                                        @if ($site->shouldShowRailsRuntimeSettings())
-                                            <div class="sm:col-span-2">
-                                                <x-input-label for="rails_env_deploy" value="RAILS_ENV" />
-                                                <x-text-input id="rails_env_deploy" wire:model="rails_env" class="mt-1 block w-full max-w-md font-mono text-sm" placeholder="production" />
-                                                <p class="mt-1 text-xs text-brand-moss">{{ __('Same value as Settings → Runtime. Stored for deploy scripts and operator reference.') }}</p>
-                                                <x-input-error :messages="$errors->get('rails_env')" class="mt-1" />
-                                            </div>
-                                        @endif
-                                        @if (! $this->shouldShowSystemUserPanel())
-                                            <div>
-                                                <x-input-label for="php_fpm_user" value="PHP-FPM pool user" />
-                                                <x-text-input id="php_fpm_user" wire:model="php_fpm_user" class="mt-1 block w-full text-sm" placeholder="www-data" />
-                                            </div>
-                                        @endif
-                                        <div class="lg:col-span-2 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Rollback context') }}</p>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('Deploy history and release rollback stay on the site overview page so operators can launch, inspect, and recover from one place.') }}</p>
                                         </div>
                                     </div>
 
@@ -1002,188 +1024,12 @@
                                 </form>
                             @endif
 
-                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
-                                <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Scripts') }}</h3>
-                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Lay out the deploy as pre, main, and post stages so custom steps stay visible around the core checkout and activation flow.') }}</p>
-                                </div>
-
-                                <div class="grid gap-4 xl:grid-cols-3">
-                                    <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Pre-deploy script') }}</p>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Ordered pipeline steps run after code is cloned and before the main activation flow completes.') }}</p>
-                                        <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Current steps') }}</p>
-                                        @if ($site->deploySteps->isNotEmpty())
-                                            <ol class="mt-2 space-y-2 text-sm">
-                                                @foreach ($site->deploySteps->sortBy('sort_order') as $step)
-                                                    <li class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
-                                                        <div class="flex flex-wrap items-start justify-between gap-3">
-                                                            <span>
-                                                                <span class="font-mono text-xs text-brand-ink">{{ $step->step_type }}</span>
-                                                                <span class="text-xs text-brand-moss">· {{ (int) ($step->timeout_seconds ?? 900) }}s</span>
-                                                                @if ($step->custom_command)
-                                                                    <span class="text-brand-moss">— {{ \Illuminate\Support\Str::limit($step->custom_command, 60) }}</span>
-                                                                @endif
-                                                            </span>
-                                                            <span class="flex gap-3 text-xs">
-                                                                <button type="button" wire:click="moveDeployStepUp({{ $step->id }})" class="text-brand-moss hover:underline">{{ __('Up') }}</button>
-                                                                <button type="button" wire:click="moveDeployStepDown({{ $step->id }})" class="text-brand-moss hover:underline">{{ __('Down') }}</button>
-                                                                <button type="button" wire:click="deleteDeployPipelineStep({{ $step->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
-                                                            </span>
-                                                        </div>
-                                                    </li>
-                                                @endforeach
-                                            </ol>
-                                        @else
-                                            <p class="mt-2 text-sm text-brand-moss">{{ __('No extra pre-deploy steps yet.') }}</p>
-                                        @endif
-                                    </div>
-
-                                    <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Main deploy script') }}</p>
-                                        <div class="mt-3 space-y-2 text-sm text-brand-moss">
-                                            <p>{{ __('1. Prepare deploy directory / release target') }}</p>
-                                            <p>{{ __('2. Clone or update the configured branch') }}</p>
-                                            <p>{{ __('3. Run ordered pipeline steps') }}</p>
-                                            <p>{{ __('4. Activate the release when atomic deploys are enabled') }}</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Post-deploy script') }}</p>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Legacy post-deploy command runs after the pipeline. Keep this empty if the ordered steps already express everything.') }}</p>
-                                        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $post_deploy_command !== '' ? $post_deploy_command : __('No post-deploy command configured.') }}</pre>
-                                    </div>
-                                </div>
-
-                                @if (! $functionsHost)
-                                    <form wire:submit="addDeployPipelineStep" class="flex flex-wrap items-end gap-3">
-                                        <div>
-                                            <label for="new_deploy_step_type" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Step') }}</label>
-                                            <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-slate-300 shadow-sm text-sm">
-                                                @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
-                                                    <option value="{{ $value }}">{{ $label }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="min-w-[220px] flex-1">
-                                            <label for="new_deploy_step_command" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('npm script / custom command') }}</label>
-                                            <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
-                                            <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
-                                        </div>
-                                        <div>
-                                            <label for="new_deploy_step_timeout" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                                            <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
-                                        </div>
-                                        <x-primary-button type="submit">{{ __('Add step') }}</x-primary-button>
-                                    </form>
-                                @endif
-                            </section>
-
-                            @if ($site->usesDockerRuntime())
-                                @php
-                                    $dockerRuntime = is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
-                                @endphp
-                                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                                    <div>
-                                        <p class="text-sm font-semibold text-brand-ink">{{ __('Runtime target') }}</p>
-                                        <p class="mt-1 text-sm text-brand-moss">{{ __('Deploys sync the repository to the Docker host, write these managed files, and run `docker compose up -d --build`.') }}</p>
-                                    </div>
-                                    <div class="grid gap-4 xl:grid-cols-2">
-                                        <div>
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Compose file') }}</p>
-                                            <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Managed Dockerfile') }}</p>
-                                            <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
-
-                            @if ($site->usesKubernetesRuntime())
-                                @php
-                                    $kubernetesRuntime = is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
-                                @endphp
-                                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                                    <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Runtime target') }}</p>
-                                            <p class="mt-1 text-sm text-brand-moss">{{ __('This runtime currently stores the generated manifest and namespace so the cluster apply step stays inspectable while live execution work continues.') }}</p>
-                                        </div>
-                                        <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
-                                            {{ $kubernetesRuntime['namespace'] ?? __('default') }}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Manifest') }}</p>
-                                        <pre class="mt-2 max-h-96 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
-                                    </div>
-                                </div>
-                            @endif
-
-                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
-                                <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
-                                    <p class="mt-1 text-sm text-brand-moss">{{ __('before_clone runs in the deploy base directory. after_clone runs in the new release. after_activate runs after the current symlink updates on atomic deploys.') }}</p>
-                                </div>
-
-                                <div class="grid gap-4 xl:grid-cols-3">
-                                    @foreach ($deployHookPhaseLabels as $phase => $phaseLabel)
-                                        <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $phaseLabel }}</p>
-                                            <p class="mt-1 text-xs font-medium uppercase tracking-wide text-brand-moss">{{ $phase }}</p>
-                                            @php
-                                                $phaseHooks = $site->deployHooks->where('phase', $phase)->sortBy('sort_order');
-                                            @endphp
-                                            @if ($phaseHooks->isNotEmpty())
-                                                <ul class="mt-3 space-y-3 text-sm">
-                                                    @foreach ($phaseHooks as $hook)
-                                                        <li class="rounded-xl border border-brand-ink/10 bg-white p-3">
-                                                            <div class="mb-2 flex justify-between gap-3">
-                                                                <span class="font-medium text-brand-ink">#{{ $hook->sort_order }} <span class="font-normal text-brand-moss">· {{ (int) ($hook->timeout_seconds ?? config('dply.default_deploy_hook_timeout_seconds', 900)) }}s</span></span>
-                                                                <button type="button" wire:click="deleteDeployHook({{ $hook->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
-                                                            </div>
-                                                            <pre class="overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ \Illuminate\Support\Str::limit($hook->script, 500) }}</pre>
-                                                        </li>
-                                                    @endforeach
-                                                </ul>
-                                            @else
-                                                <p class="mt-3 text-sm text-brand-moss">{{ __('No hooks in this stage yet.') }}</p>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-
-                                <form wire:submit="addDeployHook" class="space-y-3">
-                                    <select wire:model="new_hook_phase" class="rounded-md border-slate-300 text-sm">
-                                        <option value="before_clone">before_clone</option>
-                                        <option value="after_clone">after_clone</option>
-                                        <option value="after_activate">after_activate</option>
-                                    </select>
-                                    <div class="flex flex-wrap items-end gap-3">
-                                        <div>
-                                            <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Sort order') }}</label>
-                                            <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" />
-                                        </div>
-                                        <div>
-                                            <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                                            <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
-                                        </div>
-                                    </div>
-                                    <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
-                                    <x-primary-button type="submit">{{ __('Add hook') }}</x-primary-button>
-                                </form>
-                            </section>
-
-                            <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
-                                <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>
-                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Use these placeholders in custom steps, legacy post-deploy commands, and hook scripts when you need deploy context without hard-coding site-specific values.') }}</p>
-                                </div>
-
-                                <dl class="grid gap-3 md:grid-cols-2">
+                            <details class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
+                                <summary class="cursor-pointer list-none">
+                                    <h3 class="inline text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>
+                                    <span class="ml-2 text-sm text-brand-moss">— {{ __('placeholders for custom steps, post-deploy commands, and hook scripts') }}</span>
+                                </summary>
+                                <dl class="mt-4 grid gap-3 md:grid-cols-2">
                                     @foreach ($deployVariableReference as $token => $description)
                                         <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
                                             <dt class="font-mono text-sm text-brand-ink">{{ $token }}</dt>
@@ -1191,20 +1037,49 @@
                                         </div>
                                     @endforeach
                                 </dl>
-                            </section>
+                            </details>
                         </section>
-                    @elseif ($section === 'repository')
-                        @include('livewire.sites.settings.partials.repository')
+
+                        <x-cli-snippet :commands="[
+                            ['label' => __('Trigger deploy'), 'command' => 'dply:site:deploy '.$site->slug],
+                            ['label' => __('Abort running deploy'), 'command' => 'dply:site:abort-deploy '.$site->slug],
+                            ['label' => __('Run a single phase'), 'command' => 'dply:site:run-phase '.$site->slug.' build'],
+                            ['label' => __('Recent deploy history'), 'command' => 'dply:site:deploy-history '.$site->slug],
+                            ['label' => __('Inspect a deploy'), 'command' => 'dply:site:show-deploy DEPLOYMENT_ID --output'],
+                        ]" />
+                    {{-- section=repository is handled above alongside section=deploy
+                         (both render the chronological recipe). The old standalone
+                         partials/repository.blade.php is now orphaned. --}}
                     @elseif ($section === 'runtime')
-                        @include('livewire.sites.settings.partials.runtime')
+                        @if ($site->usesFunctionsRuntime())
+                            @include('livewire.sites.settings.partials.runtime-serverless')
+                        @else
+                            @include('livewire.sites.settings.partials.runtime')
+                        @endif
+                    @elseif ($section === 'runtime-php')
+                        @include('livewire.sites.settings.partials.runtime.php')
+                    @elseif ($section === 'runtime-ruby')
+                        @include('livewire.sites.settings.partials.runtime.ruby')
+                    @elseif ($section === 'runtime-static')
+                        @include('livewire.sites.settings.partials.runtime.static')
                     @elseif ($section === 'system-user')
                         @include('livewire.sites.settings.partials.system-user')
                     @elseif ($section === 'laravel-stack')
                         @include('livewire.sites.settings.partials.laravel-stack')
+                    @elseif ($section === 'rails-stack')
+                        @include('livewire.sites.settings.partials.rails.workspace')
+                    @elseif ($section === 'wordpress')
+                        @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'logs')
-                        @include('livewire.sites.settings.partials.logs')
+                        @if ($site->usesFunctionsRuntime())
+                            @livewire('serverless.logs-panel', ['site' => $site], key('serverless-logs-'.$site->id))
+                        @else
+                            @include('livewire.sites.settings.partials.logs')
+                        @endif
+                    @elseif ($section === 'platform' && $site->usesFunctionsRuntime())
+                        @livewire('serverless.platform-panel', ['site' => $site], key('serverless-platform-'.$site->id))
                     @elseif ($section === 'notifications')
                         @include('livewire.sites.settings.partials.notifications')
                     @elseif ($section === 'basic-auth')
@@ -1318,46 +1193,6 @@
         </x-modal>
 
         <x-modal
-            name="site-system-user-create-modal"
-            :show="false"
-            maxWidth="lg"
-            overlayClass="bg-brand-ink/30"
-            panelClass="dply-modal-panel"
-            focusable
-        >
-            <div class="border-b border-brand-ink/10 px-6 py-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Create system user') }}</h2>
-                <p class="mt-2 text-sm leading-6 text-brand-moss">
-                    {{ __('Creates a Linux account on the server, assigns this site’s files to it, and sets the PHP-FPM pool user. Ensure you have backups; ownership changes affect the site directory tree.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4 px-6 py-6">
-                <div>
-                    <x-input-label for="system_user_new_username" :value="__('System user name')" />
-                    <x-text-input id="system_user_new_username" wire:model="system_user_new_username" class="mt-1 block w-full font-mono text-sm" placeholder="app-user" autocomplete="off" />
-                    <x-input-error :messages="$errors->get('system_user_new_username')" class="mt-1" />
-                </div>
-                <label class="flex items-center gap-2 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="system_user_new_sudo" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
-                    {{ __('Sudo access') }}
-                </label>
-            </div>
-
-            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
-                <x-secondary-button type="button" wire:click="closeSystemUserCreateModal">{{ __('Cancel') }}</x-secondary-button>
-                <x-primary-button type="button" wire:click="queueCreateSystemUser" wire:loading.attr="disabled" wire:target="queueCreateSystemUser">
-                    <span wire:loading.remove wire:target="queueCreateSystemUser">{{ __('Save') }}</span>
-                    <span wire:loading wire:target="queueCreateSystemUser" class="inline-flex items-center gap-2">
-                        <x-spinner variant="cream" />
-                        {{ __('Queueing…') }}
-                    </span>
-                </x-primary-button>
-            </div>
-        </x-modal>
-
-        <x-modal
             name="site-system-user-assign-modal"
             :show="false"
             maxWidth="lg"
@@ -1387,52 +1222,6 @@
                         {{ __('Queueing…') }}
                     </span>
                 </x-primary-button>
-            </div>
-        </x-modal>
-
-        <x-modal
-            name="site-system-user-remove-modal"
-            :show="false"
-            maxWidth="lg"
-            overlayClass="bg-brand-ink/30"
-            panelClass="dply-modal-panel"
-            focusable
-        >
-            <div class="border-b border-brand-ink/10 px-6 py-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('System user') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Remove user from server') }}</h2>
-                <p class="mt-2 text-sm leading-6 text-brand-moss">
-                    {{ __('Deletes the Linux account from the host when policy allows. root, dply, and the deploy user cannot be removed. Type the username to confirm.') }}
-                </p>
-            </div>
-
-            <div class="space-y-4 px-6 py-6">
-                <div>
-                    <x-input-label for="system_user_remove_username" :value="__('User to remove')" />
-                    <select id="system_user_remove_username" wire:model="system_user_remove_username" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
-                        <option value="">{{ __('Choose…') }}</option>
-                        @foreach ($system_user_remote_rows as $row)
-                            <option value="{{ $row['username'] }}">{{ $row['username'] }}</option>
-                        @endforeach
-                    </select>
-                    <x-input-error :messages="$errors->get('system_user_remove_username')" class="mt-1" />
-                </div>
-                <div>
-                    <x-input-label for="system_user_remove_confirm" :value="__('Type the username to confirm')" />
-                    <x-text-input id="system_user_remove_confirm" wire:model="system_user_remove_confirm" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
-                    <x-input-error :messages="$errors->get('system_user_remove_confirm')" class="mt-1" />
-                </div>
-            </div>
-
-            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
-                <x-secondary-button type="button" wire:click="closeSystemUserRemoveModal">{{ __('Cancel') }}</x-secondary-button>
-                <x-danger-button type="button" wire:click="queueRemoveSystemUser" wire:loading.attr="disabled" wire:target="queueRemoveSystemUser">
-                    <span wire:loading.remove wire:target="queueRemoveSystemUser">{{ __('Remove user') }}</span>
-                    <span wire:loading wire:target="queueRemoveSystemUser" class="inline-flex items-center gap-2">
-                        <x-spinner variant="cream" />
-                        {{ __('Queueing…') }}
-                    </span>
-                </x-danger-button>
             </div>
         </x-modal>
 
@@ -1498,6 +1287,14 @@
                 </x-primary-button>
             </div>
         </x-modal>
-        @include('livewire.partials.confirm-action-modal')
     </x-slot>
+
+    {{-- IMPORTANT: keep the confirm-action-modal include OUTSIDE the modals slot.
+         Slot content is captured by the layout on the initial GET only — Livewire
+         AJAX updates re-render only the component (no layout), so anything inside
+         <x-slot name="modals"> never updates after first paint. The confirm modal
+         is Livewire-driven (its visibility flips on $showConfirmActionModal), so
+         it has to live in the component's main render output to actually appear
+         when the operator clicks a "destructive action" trigger. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

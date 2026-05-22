@@ -46,7 +46,7 @@ final class FilterServerProvisionOptionsForCreateForm
 
         $raw = config('server_provision_options', []);
 
-        $keys = ['server_roles', 'cache_services', 'webservers', 'php_versions', 'databases'];
+        $keys = ['server_roles', 'cache_services', 'webservers', 'php_versions', 'ruby_versions', 'node_versions', 'python_versions', 'go_versions', 'databases'];
         $out = [];
         foreach ($keys as $key) {
             $rows = $raw[$key] ?? [];
@@ -73,7 +73,7 @@ final class FilterServerProvisionOptionsForCreateForm
     private function stripMetaFromConfig(): array
     {
         $raw = config('server_provision_options', []);
-        $keys = ['server_roles', 'cache_services', 'webservers', 'php_versions', 'databases'];
+        $keys = ['server_roles', 'cache_services', 'webservers', 'php_versions', 'ruby_versions', 'node_versions', 'python_versions', 'go_versions', 'databases'];
         $out = [];
         foreach ($keys as $key) {
             $rows = is_array($raw[$key] ?? null) ? $raw[$key] : [];

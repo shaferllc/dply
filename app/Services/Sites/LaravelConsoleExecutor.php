@@ -2,10 +2,17 @@
 
 namespace App\Services\Sites;
 
+use App\Models\RemoteCliRun;
 use App\Models\Site;
+use App\Models\SiteAuditEvent;
 use App\Services\Deploy\LocalDockerKubernetesRuntimeManager;
 use App\Services\Deploy\LocalDockerRuntimeManager;
+use App\Services\RemoteCli\Artisan as ArtisanService;
+use App\Services\RemoteCli\Kind;
+use App\Services\RemoteCli\RiskLevel;
+use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\SshConnection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -17,6 +24,8 @@ final class LaravelConsoleExecutor
         private readonly SiteScopedCommandWrapper $commandWrapper,
         private readonly LocalDockerRuntimeManager $localDockerRuntimeManager,
         private readonly LocalDockerKubernetesRuntimeManager $localKubernetesRuntimeManager,
+        private readonly ArtisanService $artisanRiskClassifier,
+        private readonly SiteAuditWriter $auditWriter,
     ) {}
 
     /**
@@ -138,14 +147,109 @@ final class LaravelConsoleExecutor
 
         $profile = $this->executionProfile($site);
 
-        return match ($profile) {
-            'vm_ssh' => $this->runArtisanVmSsh($site, $trim, $timeoutSeconds, $onChunk),
-            'local_docker' => $this->runArtisanLocalDocker($site, $trim, $timeoutSeconds, $onChunk),
-            'local_k8s' => $this->runArtisanLocalKubernetes($site, $trim, $timeoutSeconds, $onChunk),
+        // Capture output as the per-profile execution streams it back,
+        // then fold that into a RemoteCliRun row + SiteAuditEvent so
+        // the existing rich Custom commands tab gains the same audit
+        // trail + run history that the WordPress Console / dply:artisan
+        // umbrella commands have via the Artisan service. Execution
+        // mechanics stay intact — Docker/K8s paths still take their
+        // own routes; we just observe and record.
+        $command = $this->commandVerb($trim);
+        $args = $this->commandArgs($trim);
+        $risk = $this->artisanRiskClassifier->classifyRisk($command);
+
+        $captured = '';
+        $wrappedOnChunk = function (string $chunk) use (&$captured, $onChunk): void {
+            $captured .= $chunk;
+            $onChunk($chunk);
+        };
+
+        $startedAt = now();
+        $exitCode = match ($profile) {
+            'vm_ssh' => $this->runArtisanVmSsh($site, $trim, $timeoutSeconds, $wrappedOnChunk),
+            'local_docker' => $this->runArtisanLocalDocker($site, $trim, $timeoutSeconds, $wrappedOnChunk),
+            'local_k8s' => $this->runArtisanLocalKubernetes($site, $trim, $timeoutSeconds, $wrappedOnChunk),
             default => throw new \RuntimeException(
                 __('Laravel Artisan commands are not available for this runtime from the panel. Use SSH or your container tooling.')
             ),
         };
+
+        $this->recordRun($site, $command, $args, $risk, $exitCode, $captured, $startedAt);
+
+        return $exitCode;
+    }
+
+    /**
+     * Extract the verb half of the artisan call. "migrate:rollback --step=1" → "migrate:rollback".
+     * Mirrors how dply:artisan's umbrella does it so risk classification
+     * is uniform across transports.
+     */
+    private function commandVerb(string $argvTail): string
+    {
+        $parts = preg_split('/\s+/', trim($argvTail), 2);
+
+        return is_array($parts) && isset($parts[0]) ? (string) $parts[0] : '';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function commandArgs(string $argvTail): array
+    {
+        $parts = preg_split('/\s+/', trim($argvTail));
+        if (! is_array($parts) || count($parts) <= 1) {
+            return [];
+        }
+
+        return array_values(array_slice($parts, 1));
+    }
+
+    private function recordRun(Site $site, string $command, array $args, RiskLevel $risk, int $exitCode, string $output, Carbon $startedAt): void
+    {
+        $finishedAt = now();
+        $status = $exitCode === 0 ? RemoteCliRun::STATUS_COMPLETED : RemoteCliRun::STATUS_FAILED;
+
+        $run = RemoteCliRun::query()->create([
+            'site_id' => $site->getKey(),
+            'kind' => Kind::Artisan,
+            'command' => $command,
+            'args' => $args,
+            'risk' => $risk,
+            // The legacy Custom commands tab streams over its own
+            // SSH/Docker/K8s plumbing, NOT the RemoteCli sync path.
+            // From the run-history viewer's perspective this is still
+            // a synchronous interactive run, so 'sync' is the right
+            // mode — both the WP Console + this surface render the
+            // same way.
+            'mode' => RemoteCliRun::MODE_SYNC,
+            'status' => $status,
+            'exit_code' => $exitCode,
+            'stdout' => $output !== '' ? $output : null,
+            'stderr' => null,
+            'queued_by_user_id' => auth()->id(),
+            'started_at' => $startedAt,
+            'finished_at' => $finishedAt,
+        ]);
+
+        // SiteAuditWriter filters Read commands itself, so we always
+        // call it and let it decide whether to persist.
+        $this->auditWriter->record(
+            site: $site,
+            user: auth()->user(),
+            action: 'artisan_run',
+            risk: $risk,
+            transport: SiteAuditEvent::TRANSPORT_WEB,
+            summary: trim('php artisan '.$command.' '.implode(' ', $args)),
+            payload: [
+                'command' => $command,
+                'args' => $args,
+                'exit_code' => $exitCode,
+                'remote_cli_run_id' => $run->id,
+            ],
+            resultStatus: $exitCode === 0
+                ? SiteAuditEvent::RESULT_SUCCESS
+                : SiteAuditEvent::RESULT_FAILURE,
+        );
     }
 
     /**

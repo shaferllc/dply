@@ -2,7 +2,9 @@
 
 namespace App\Services\Sites;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use Illuminate\Support\Str;
 
@@ -20,8 +22,11 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         return 'apache';
     }
 
-    public function provision(Site $site): string
+    public function provision(Site $site, ?ConsoleEmitter $emit = null): string
     {
+        $emit ??= new ConsoleEmitter;
+
+        $emit->step('apache', 'resolving server connection');
         $server = $this->ensureServerReady($site);
         $config = $this->builder->build($site);
         $available = rtrim(config('sites.apache_sites_available'), '/');
@@ -30,10 +35,18 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         $linkFile = $enabled.'/'.$this->configBasename($site).'.conf';
 
         $ssh = $this->systemSsh($site);
-        $this->installPlaceholderPage($site, $ssh);
-        $this->ensureSuspendedPage($site, $ssh);
-        $this->syncBasicAuthHtpasswdFiles($site, $ssh);
-        $this->writeSystemFile($ssh, $confFile, $config);
+        // First-apply only — meta.apache_last_output is written at the end of
+        // the first successful provision, so subsequent applies skip the
+        // placeholder probe entirely.
+        if (! isset(($site->meta ?? [])['apache_last_output'])) {
+            $this->installPlaceholderPage($site, $ssh, $emit);
+        }
+        $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        if ($this->writeSystemFileIfChanged($server, $ssh, $confFile, $config)) {
+            $emit->step('apache', 'writing site config file: '.$confFile);
+        }
+        $emit->step('apache', 'running apachectl configtest and reloading');
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_APACHE_EXIT:%%s" "$?"',
             $this->privilegedCommand(
@@ -45,10 +58,18 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
             )
         ), 120);
 
+        foreach (preg_split('/\r\n|\r|\n/', trim($out)) ?: [] as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $emit($line, ConsoleAction::LEVEL_INFO, 'apache');
+        }
+
         if (! preg_match('/DPLY_APACHE_EXIT:0\s*$/', $out)) {
             throw new \RuntimeException('Apache config test or reload failed. Output: '.Str::limit($out, 2000));
         }
 
+        $emit->success('reload OK', 'apache');
         $this->updateSiteMeta($site, 'apache_last_output', $out);
 
         return $out;

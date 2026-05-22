@@ -24,10 +24,13 @@ class ServerFirewallSnapshotService
             'port' => $r->port,
             'protocol' => $r->protocol,
             'source' => $r->source,
+            'iface' => $r->iface,
+            'iface_direction' => $r->iface_direction,
             'action' => $r->action,
             'enabled' => $r->enabled,
             'sort_order' => $r->sort_order,
             'profile' => $r->profile,
+            'app_profile' => $r->app_profile,
             'tags' => $r->tags,
             'runbook_url' => $r->runbook_url,
             'site_id' => $r->site_id,
@@ -84,17 +87,35 @@ class ServerFirewallSnapshotService
                     $siteId = null;
                 }
 
+                $appProfile = isset($row['app_profile']) && is_string($row['app_profile']) && trim($row['app_profile']) !== ''
+                    ? substr(trim($row['app_profile']), 0, 64)
+                    : null;
+                if ($appProfile !== null) {
+                    $port = null;
+                }
+                $iface = isset($row['iface']) && is_string($row['iface']) && trim($row['iface']) !== ''
+                    ? substr(trim($row['iface']), 0, 32)
+                    : null;
+                $ifaceDirection = null;
+                if ($iface !== null) {
+                    $dir = strtolower(trim((string) ($row['iface_direction'] ?? 'in')));
+                    $ifaceDirection = in_array($dir, ['in', 'out'], true) ? $dir : 'in';
+                }
+
                 ServerFirewallRule::query()->create([
                     'server_id' => $server->id,
                     'site_id' => $siteId,
                     'name' => $row['name'] ?? null,
                     'profile' => isset($row['profile']) && is_string($row['profile']) ? substr($row['profile'], 0, 32) : null,
+                    'app_profile' => $appProfile,
+                    'iface' => $iface,
+                    'iface_direction' => $ifaceDirection,
                     'tags' => is_array($tags) && $tags !== [] ? array_values($tags) : null,
                     'runbook_url' => isset($row['runbook_url']) && is_string($row['runbook_url']) ? $row['runbook_url'] : null,
                     'port' => $port,
                     'protocol' => $proto,
                     'source' => (string) ($row['source'] ?? 'any'),
-                    'action' => in_array($row['action'] ?? 'allow', ['allow', 'deny'], true) ? $row['action'] : 'allow',
+                    'action' => in_array($row['action'] ?? 'allow', ['allow', 'deny', 'limit'], true) ? $row['action'] : 'allow',
                     'enabled' => (bool) ($row['enabled'] ?? true),
                     'sort_order' => (int) ($row['sort_order'] ?? ($i + 1)),
                 ]);

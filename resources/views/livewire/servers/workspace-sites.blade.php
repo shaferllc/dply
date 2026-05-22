@@ -11,42 +11,51 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    @php
+        $isContainerHostExplainer = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    @endphp
+    <x-explainer class="mb-4">
+        @if ($isContainerHostExplainer)
+            <p>{{ __('Container apps deployed onto this host. Each row is a Site rooted at a Git repo: dply builds the image, runs it on the host (Docker container or Kubernetes Deployment), and tracks deploys + env per app.') }}</p>
+            <p>{{ __('Adding a container here inspects the repo, queues the first build + deploy, and surfaces progress on this server\'s overview. Removing a container tears down the running workload and the matching dply records.') }}</p>
+        @else
+            <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
+            <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
+        @endif
+    </x-explainer>
+
+    @php
+        // Q19-D: container-host CTAs use the "container" vocabulary; VM hosts
+        // keep the existing "site" copy. Schema is still `sites` everywhere.
+        $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+        $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
+        $newCardDescription = $isContainerHost
+            ? __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.')
+            : __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.');
+        $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
+    @endphp
     <div class="{{ $card }}">
-        <div class="p-6 sm:p-8">
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('New site') }}</h2>
-            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                {{ __('Enter a primary domain to get started. Stack, paths, and PHP options are available in advanced settings.') }}
-            </p>
-            <form id="quick-site-form" wire:submit="startQuickSite" class="mt-6">
-                <x-input-label for="quick_site_hostname" value="{{ __('Domain') }}" />
-                <input
-                    id="quick_site_hostname"
-                    type="text"
-                    wire:model="quick_site_hostname"
-                    placeholder="{{ __('e.g. app.example.com') }}"
-                    autocomplete="off"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                    @disabled(! $this->canAddSite)
-                />
-                <x-input-error :messages="$errors->get('quick_site_hostname')" class="mt-2" />
-            </form>
-        </div>
-        <div class="flex flex-col-reverse items-stretch justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
-            <a
-                href="{{ route('sites.create', $server) }}"
-                wire:navigate
-                class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-            >
-                {{ __('Advanced settings') }}
-            </a>
+        <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold text-brand-ink">{{ $newCardHeading }}</h2>
+                <p class="mt-1 text-sm text-brand-moss leading-relaxed">
+                    {{ $newCardDescription }}
+                </p>
+                @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
+                    <p class="mt-3 inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
+                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{{ $this->addSiteBlockedReason }}</span>
+                    </p>
+                @endif
+            </div>
             @if ($this->canAddSite)
-                <x-primary-button type="submit" form="quick-site-form" class="justify-center">{{ __('Add site') }}</x-primary-button>
+                <x-primary-button type="button" wire:click="openAddSiteModal" class="justify-center">{{ $addCtaLabel }}</x-primary-button>
             @else
                 <span
                     class="inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-brand-mist/40 px-4 py-2.5 text-sm font-semibold text-brand-moss"
-                    title="{{ __('Requires owner/admin and room under your plan’s site limit—or upgrade.') }}"
+                    title="{{ $this->addSiteBlockedReason }}"
                 >
-                    {{ __('Add site') }}
+                    {{ $addCtaLabel }}
                 </span>
             @endif
         </div>
@@ -58,7 +67,9 @@
             <x-heroicon-o-funnel class="h-4 w-4 text-brand-mist" aria-hidden="true" />
         </div>
         @if ($server->sites->isEmpty())
-            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ __('No sites yet. Add a site to manage web server config, SSL, Git deploys, and environment files.') }}</p>
+            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ $isContainerHost
+                ? __('No container apps yet. Add one to deploy a Git repo onto this host.')
+                : __('No sites yet. Add a site to manage web server config, SSL, Git deploys, and environment files.') }}</p>
         @else
             <ul class="divide-y divide-brand-ink/10">
                 @foreach ($server->sites as $s)
@@ -69,6 +80,14 @@
                         $sslOn = $s->ssl_status === \App\Models\Site::SSL_ACTIVE;
                         $gitRef = $s->git_repository_url;
                         $gitShort = $gitRef ? (preg_match('#([^/:]+/[^/]+?)(?:\.git)?$#', $gitRef, $m) ? $m[1] : \Illuminate\Support\Str::limit($gitRef, 40)) : null;
+
+                        // Waiting-for-host hint: a container Site sits in STATUS_PENDING while
+                        // FinalizeContainerCloudLaunchJob polls for the host to be ready.
+                        // Surface that state inline so the row makes sense on its own (per Q18-B).
+                        $containerLaunchStatus = (string) data_get($server->meta, 'container_launch.status', '');
+                        $isWaitingOnHost = $s->status === \App\Models\Site::STATUS_PENDING
+                            && in_array($containerLaunchStatus, ['waiting_for_server', 'queued'], true)
+                            && (string) data_get($server->meta, 'container_launch.site_id', '') === (string) $s->id;
                     @endphp
                     <li class="relative flex">
                         <span
@@ -86,12 +105,23 @@
                                     href="{{ route('sites.show', [$server, $s]) }}"
                                     wire:navigate
                                     class="text-base font-semibold text-brand-ink hover:text-brand-sage transition-colors"
-                                >{{ $displayHost }}</a>
-                                @if ($sslOn)
+                                >{{ $s->isCustom() ? $s->name : $displayHost }}</a>
+                                @if ($s->isCustom())
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/70 ring-1 ring-brand-ink/10">
+                                        <x-heroicon-m-wrench-screwdriver class="h-3 w-3" />
+                                        {{ __('Custom') }}
+                                    </span>
+                                @elseif ($sslOn)
                                     <x-heroicon-s-lock-closed class="h-4 w-4 text-brand-forest" title="{{ __('SSL active') }}" />
                                 @endif
                                 @if (filter_var($s->meta['debug'] ?? false, FILTER_VALIDATE_BOOLEAN))
                                     <span class="rounded-md bg-brand-sand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-olive">{{ __('Debug mode on') }}</span>
+                                @endif
+                                @if ($isWaitingOnHost)
+                                    <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200">
+                                        <x-heroicon-m-clock class="h-3 w-3" />
+                                        {{ __('Waiting for host setup') }}
+                                    </span>
                                 @endif
                             </div>
                             <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
@@ -103,6 +133,12 @@
                                             <span class="text-brand-mist">({{ $s->git_branch }})</span>
                                         @endif
                                     </span>
+                                @elseif ($s->isCustomNoRepoMode())
+                                    <span class="inline-flex items-center gap-1 font-mono">
+                                        <x-heroicon-o-folder class="h-3.5 w-3.5 opacity-80" />
+                                        {{ $s->repository_path ?: '/home/'.$s->effectiveSystemUser($server).'/'.$s->slug }}
+                                    </span>
+                                    <span class="text-brand-mist">{{ __('no repo') }}</span>
                                 @endif
                                 <span class="inline-flex items-center gap-1">
                                     <x-heroicon-o-user class="h-3.5 w-3.5 opacity-80" />
@@ -126,5 +162,186 @@
             'serverId' => $server->id,
             'deletionSummary' => $deletionSummary,
         ])
+
+        @if ($this->supportsQuickAdd)
+            <x-modal
+                name="add-site-modal"
+                :show="$showAddSiteModal"
+                maxWidth="lg"
+                overlayClass="bg-brand-ink/40"
+                focusable
+            >
+                <form wire:submit="addSite" x-data="{ showAdvanced: false }">
+                    <div class="border-b border-brand-ink/10 px-6 py-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
+                        <p class="mt-2 text-sm leading-6 text-brand-moss">
+                            {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
+                        </p>
+                    </div>
+
+                    <div class="space-y-5 px-6 py-6">
+                        <div>
+                            <x-input-label for="add-site-hostname" :value="__('Primary domain')" />
+                            <x-text-input
+                                id="add-site-hostname"
+                                wire:model.live.debounce.300ms="form.primary_hostname"
+                                type="text"
+                                class="mt-1 block w-full font-mono text-sm"
+                                placeholder="app.example.com"
+                                required
+                                autocomplete="off"
+                            />
+                            <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
+                        </div>
+
+                        <div class="border-t border-brand-ink/10 pt-4">
+                            <button
+                                type="button"
+                                x-on:click="showAdvanced = !showAdvanced"
+                                class="flex w-full items-center justify-between text-sm font-semibold text-brand-ink hover:text-brand-sage"
+                                x-bind:aria-expanded="showAdvanced"
+                            >
+                                <span>{{ __('Advanced settings') }}</span>
+                                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="showAdvanced ? 'rotate-180' : ''" />
+                            </button>
+
+                            <div x-show="showAdvanced" x-collapse class="mt-5 space-y-5">
+                                <div>
+                                    <x-input-label for="add-site-name" :value="__('Site name')" />
+                                    <x-text-input
+                                        id="add-site-name"
+                                        wire:model="form.name"
+                                        type="text"
+                                        class="mt-1 block w-full"
+                                        autocomplete="off"
+                                    />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Used for the slug and deploy path. Auto-derived from the domain.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
+                                </div>
+
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="add-site-doc-root" :value="__('Web directory')" />
+                                        <x-text-input
+                                            id="add-site-doc-root"
+                                            wire:model.blur="form.document_root"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                            required
+                                        />
+                                        <x-input-error :messages="$errors->get('form.document_root')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <x-input-label for="add-site-deploy-path" :value="__('Project directory')" />
+                                        <x-text-input
+                                            id="add-site-deploy-path"
+                                            wire:model.blur="form.repository_path"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono text-sm"
+                                        />
+                                        <x-input-error :messages="$errors->get('form.repository_path')" class="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="add-site-framework" :value="__('Project type')" />
+                                    <select
+                                        id="add-site-framework"
+                                        wire:model.live="form.framework"
+                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    >
+                                        <option value="">{{ __('None (Static HTML or PHP)') }}</option>
+                                        <option value="laravel">Laravel</option>
+                                        <option value="nodejs">NodeJS</option>
+                                        <option value="statamic">Statamic</option>
+                                        <option value="craft">Craft CMS</option>
+                                        <option value="symfony">Symfony</option>
+                                        <option value="wordpress">WordPress</option>
+                                        <option value="october">OctoberCMS</option>
+                                        <option value="cakephp3">CakePHP 3</option>
+                                    </select>
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('PHP version and runtime details are detected from the repository when the first deploy clones the project.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.framework')" class="mt-1" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="add-site-template" :value="__('Webserver template')" />
+                                    <select
+                                        id="add-site-template"
+                                        wire:model="form.webserver_template"
+                                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    >
+                                        <option value="default">{{ __('Default template') }}</option>
+                                    </select>
+                                </div>
+
+                                @if ($form->type === 'node')
+                                    <div>
+                                        <x-input-label for="add-site-port" :value="__('App listens on (localhost)')" />
+                                        <x-text-input
+                                            id="add-site-port"
+                                            type="number"
+                                            wire:model="form.app_port"
+                                            class="mt-1 block w-32"
+                                        />
+                                        <p class="mt-1 text-xs text-brand-mist">{{ __('Nginx will proxy requests to this port.') }}</p>
+                                    </div>
+                                @endif
+
+                                <div class="space-y-3 border-t border-brand-ink/10 pt-4">
+                                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="form.create_system_user"
+                                            class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                                        />
+                                        <span>
+                                            <span class="font-medium">{{ __('Create system user') }}</span>
+                                            <span class="block text-xs text-brand-mist">{{ __('Creates a system user with a random generated name dedicated to this site.') }}</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="form.create_staging_site"
+                                            class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                                        />
+                                        <span>
+                                            <span class="font-medium">{{ __('Create staging site') }}</span>
+                                            <span class="block text-xs text-brand-mist">{{ __('Creates an extra site for development. After development is done you can push the code over to the main site.') }}</span>
+                                        </span>
+                                    </label>
+                                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="form.use_as_redirect_domain"
+                                            class="mt-0.5 rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
+                                        />
+                                        <span>
+                                            <span class="font-medium">{{ __('Use as redirect domain') }}</span>
+                                            <span class="block text-xs text-brand-mist">{{ __('Redirects this whole domain to another domain.') }}</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                        <x-secondary-button type="button" wire:click="closeAddSiteModal">
+                            {{ __('Cancel') }}
+                        </x-secondary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addSite">
+                            <span wire:loading.remove wire:target="addSite">{{ __('Add site') }}</span>
+                            <span wire:loading wire:target="addSite" class="inline-flex items-center gap-2">
+                                <x-spinner variant="cream" />
+                                {{ __('Adding…') }}
+                            </span>
+                        </x-primary-button>
+                    </div>
+                </form>
+            </x-modal>
+        @endif
     </x-slot>
 </x-server-workspace-layout>

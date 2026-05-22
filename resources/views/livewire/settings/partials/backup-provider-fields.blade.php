@@ -157,16 +157,6 @@
         </div>
         @break
 
-    @case(\App\Models\BackupConfiguration::PROVIDER_LOCAL)
-        <div>
-            <x-input-label :for="$formKey.'_local'" :value="__('Path')" />
-            <x-text-input :id="$formKey.'_local'" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off"
-                wire:model="{{ $formKey }}.local.path" />
-            <p class="mt-1 text-xs text-brand-moss">{{ __('Absolute path on the server that runs backups (BYO agents only).') }}</p>
-            <x-input-error :messages="$errors->get($formKey.'.local.path')" class="mt-2" />
-        </div>
-        @break
-
     @case(\App\Models\BackupConfiguration::PROVIDER_RCLONE)
         <div class="space-y-4">
             <div>

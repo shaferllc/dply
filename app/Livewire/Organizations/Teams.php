@@ -225,6 +225,11 @@ class Teams extends Component
         $team->users()->attach($userId, ['role' => 'member']);
         $this->addMemberSelected[$teamId] = '';
 
+        audit_log($this->organization, auth()->user(), 'team.member_added', $team, null, [
+            'team_id' => (string) $team->id,
+            'user_id' => $userId,
+        ]);
+
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Member added to team.');
     }
@@ -252,6 +257,11 @@ class Teams extends Component
         $team = $this->organization->teams()->findOrFail($teamId);
         $this->authorize('update', $team);
         $team->users()->detach($userId);
+
+        audit_log($this->organization, auth()->user(), 'team.member_removed', $team, [
+            'team_id' => (string) $team->id,
+            'user_id' => $userId,
+        ], null);
 
         $this->refreshOrganization();
         $this->dispatch('notify', message: 'Member removed from team.');

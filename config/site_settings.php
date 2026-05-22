@@ -9,18 +9,44 @@ return [
 
     'workspace_tabs' => [
         'general' => ['label' => 'General'],
+        'settings' => ['label' => 'Settings'],
         'routing' => ['label' => 'Routing'],
         'dns' => ['label' => 'DNS'],
         'certificates' => ['label' => 'Certificates'],
         'deploy' => ['label' => 'Deploy'],
         'repository' => ['label' => 'Repository'],
         'runtime' => ['label' => 'Runtime'],
+        'runtime-php' => ['label' => 'PHP runtime'],
+        'runtime-ruby' => ['label' => 'Ruby runtime'],
+        'runtime-static' => ['label' => 'Static runtime'],
         'system-user' => ['label' => 'System user'],
         'laravel-stack' => ['label' => 'Laravel'],
+        'rails-stack' => ['label' => 'Rails'],
+        'wordpress' => ['label' => 'WordPress'],
         'environment' => ['label' => 'Environment'],
         'logs' => ['label' => 'Logs'],
+        'platform' => ['label' => 'Platform'],
         'notifications' => ['label' => 'Notifications'],
         'basic-auth' => ['label' => 'Authentication'],
         'danger' => ['label' => 'Danger zone'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sidebar group labels
+    |--------------------------------------------------------------------------
+    | Display labels for the `group` keys assigned in {@see App\Support\SiteSettingsSidebar}.
+    | The sidebar partial renders a heading whenever the group changes; only groups
+    | that have at least one visible item produce a heading.
+    */
+    'nav_groups' => [
+        'general' => 'General',
+        'networking' => 'Networking',
+        'deploy' => 'Deploy',
+        'runtime' => 'Runtime',
+        'observability' => 'Observability',
+        'background' => 'Background',
+        'access' => 'Access',
+        'danger' => 'Danger',
     ],
 ];

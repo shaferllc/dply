@@ -25,16 +25,18 @@ class Create extends Component
             ],
             [
                 'id' => 'containers',
-                'title' => __('Containers'),
-                'description' => __('Start from a repo-first container lane that covers local Docker, remote Docker, and remote Kubernetes targets.'),
-                'enabled' => false,
+                'title' => __('Run a container app'),
+                'description' => __('Dply provisions a Docker host first, then you point it at your repo. Pick "Managed Kubernetes" inside the wizard to register a DOKS cluster instead.'),
+                'enabled' => true,
+                'href' => route('servers.create', ['host_target' => 'docker']),
                 'icon' => 'cube',
             ],
             [
                 'id' => 'edge',
                 'title' => __('Edge'),
-                'description' => __('Route edge-runtime and static-network deploys through a dedicated edge path.'),
-                'enabled' => false,
+                'description' => __('Deploy a container image straight onto the dply edge platform — DO App Platform or AWS App Runner.'),
+                'enabled' => true,
+                'href' => route('edge.create'),
                 'icon' => 'globe-alt',
             ],
             [
@@ -48,7 +50,8 @@ class Create extends Component
                 'id' => 'serverless',
                 'title' => __('Serverless'),
                 'description' => __('Launch function-based app targets without modeling them as traditional servers.'),
-                'enabled' => false,
+                'enabled' => true,
+                'href' => route('serverless.create'),
                 'icon' => 'sparkles',
             ],
         ];

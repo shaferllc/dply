@@ -120,17 +120,34 @@ class ProviderCredential extends Model
 
     /**
      * Provider keys that can manage DNS for sites (may differ from where servers are hosted).
+     * Delegates to {@see ServerProvider::dnsProviderKeys()} so the canonical capability
+     * taxonomy lives on the enum.
      *
      * @return list<string>
      */
     public static function dnsAutomationProviderKeys(): array
     {
-        return ['digitalocean', 'cloudflare'];
+        return ServerProvider::dnsProviderKeys();
     }
 
     public function supportsDnsAutomation(): bool
     {
-        return in_array($this->provider, self::dnsAutomationProviderKeys(), true);
+        return ServerProvider::tryFrom($this->provider)?->supportsDns() ?? false;
+    }
+
+    public function supportsCompute(): bool
+    {
+        return ServerProvider::tryFrom($this->provider)?->supportsCompute() ?? false;
+    }
+
+    /**
+     * Capability tags for badge rendering on credential rows.
+     *
+     * @return list<string>
+     */
+    public function capabilities(): array
+    {
+        return ServerProvider::tryFrom($this->provider)?->capabilities() ?? [];
     }
 
     public function dnsProviderLabel(): string

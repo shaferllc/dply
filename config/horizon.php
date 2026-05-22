@@ -233,7 +233,10 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            'timeout' => 60,
+            // Worker process kill bound. Must be ≥ the longest-running job's $timeout —
+            // currently ApplyInsightFixJob at 700s (apt-security-updates fix can run for
+            // 10 minutes on busy boxes). Override per-environment via HORIZON_*_JOB_TIMEOUT.
+            'timeout' => (int) env('HORIZON_JOB_TIMEOUT', 720),
             'nice' => 0,
         ],
     ],
@@ -244,6 +247,7 @@ return [
                 'maxProcesses' => 10,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
+                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', 720),
             ],
         ],
 
@@ -256,7 +260,7 @@ return [
                 'maxProcesses' => max(1, (int) env('HORIZON_LOCAL_MAX_PROCESSES', 8)),
                 'memory' => (int) env('HORIZON_LOCAL_WORKER_MEMORY', 128),
                 'tries' => 1,
-                'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 120),
+                'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 720),
                 'nice' => 0,
             ],
         ],

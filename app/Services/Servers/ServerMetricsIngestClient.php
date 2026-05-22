@@ -22,6 +22,19 @@ class ServerMetricsIngestClient
         if (! is_string($url) || $url === '') {
             return;
         }
+        // Guard against unresolved env interpolation (e.g.
+        // "${DPLY_PUBLIC_APP_URL}/api/metrics" or its mangled
+        // "$/api/metrics" form) reaching Guzzle, which otherwise raises
+        // "cURL error 3: URL rejected: Bad hostname". If the operator
+        // hasn't actually configured a usable ingest URL, skip silently.
+        if (str_contains($url, '${') || filter_var($url, FILTER_VALIDATE_URL) === false) {
+            Log::warning('server_metrics.ingest_skipped_invalid_url', [
+                'snapshot_id' => $snapshot->id,
+                'configured_url' => $url,
+            ]);
+
+            return;
+        }
 
         $server = $snapshot->server;
         if ($server === null) {

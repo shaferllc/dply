@@ -1,8 +1,28 @@
+@php
+    $checkKey = $check['key'] ?? '';
+    $opensSshKeyModal = in_array($checkKey, ['user_ssh_keys', 'user_ssh_key_defaults'], true);
+@endphp
 <div class="rounded-xl border px-4 py-3 {{ $preflightItemClasses($check['severity']) }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-            <p class="text-sm font-semibold">{{ $check['label'] }}</p>
-            <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+            @if ($opensSshKeyModal)
+                {{-- Make the entire heading/detail block a click target so
+                     operators can punch into the SSH-key modal from the
+                     preflight row directly, not just from the button
+                     below. The dedicated button stays visible too — this
+                     just removes the "where do I click?" friction. --}}
+                <button
+                    type="button"
+                    x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')"
+                    class="block w-full text-left transition-colors hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 focus-visible:ring-offset-2 rounded-lg"
+                >
+                    <p class="text-sm font-semibold underline-offset-4 hover:underline">{{ $check['label'] }}</p>
+                    <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+                </button>
+            @else
+                <p class="text-sm font-semibold">{{ $check['label'] }}</p>
+                <p class="mt-1 text-sm leading-6">{{ $check['detail'] }}</p>
+            @endif
             @if (($check['key'] ?? '') === 'user_ssh_keys')
                 <div class="mt-3 flex flex-col gap-2 border-t border-rose-200/60 pt-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <button

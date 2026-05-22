@@ -2,24 +2,35 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\DeployGuestMetricsCallbackEnvJob;
 use App\Jobs\RunServerMonitoringProbeJob;
+use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\UpgradeGuestMetricsScriptJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\ConfirmsServerMonitoringInstall;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
+use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
+use App\Models\ServerManageAction;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Insights\InsightCorrelationService;
+use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Services\Servers\ServerMetricsRangeQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -28,6 +39,7 @@ use Livewire\Component;
 class WorkspaceMonitor extends Component
 {
     use ConfirmsServerMonitoringInstall;
+    use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use RunsServerPackageInstalls;
 
@@ -36,11 +48,381 @@ class WorkspaceMonitor extends Component
     /** Tracks poll transitions so we flash once when a background probe finishes. */
     public bool $wasProbePending = false;
 
+    /** Metrics page time range: '1h' | '6h' | '24h' | '7d' | '30d'. Persisted client-side via localStorage on the segmented control. */
+    public string $metricsRange = '1h';
+
+    /** Workspace tab: 'status' (health + current usage) | 'history' (charts) | 'notifications' (alert routing) | 'diagnostics' (repair / inspect tooling). */
+    public string $monitor_workspace_tab = 'status';
+
+    /** Notification subscription form properties */
+    public string $notifAddChannelId = '';
+
+    /** @var list<string> */
+    public array $notifAddEventKeys = [];
+
+    /** Threshold settings (server overrides) - null means use config default */
+    public ?float $thresholdCpu = null;
+
+    public ?float $thresholdMem = null;
+
+    public ?float $thresholdLoad = null;
+
+    /** Threshold input values for the edit form */
+    public float $thresholdCpuInput = 85.0;
+
+    public float $thresholdMemInput = 85.0;
+
+    public float $thresholdLoadInput = 4.0;
+
+    /** Whether threshold inputs are in edit mode */
+    public bool $editingThresholds = false;
+
+    /**
+     * Identifies which Diagnostics action populated the shared $remote_output / $remote_error
+     * slots so the banner can render per-kind copy. Null when no banner should display.
+     * One of: 'repair' | 'diagnostics' | 'inspect'.
+     */
+    public ?string $remote_output_kind = null;
+
+    public function setMonitorWorkspaceTab(string $tab): void
+    {
+        if (! in_array($tab, ['status', 'history', 'notifications', 'diagnostics'], true)) {
+            return;
+        }
+        $this->monitor_workspace_tab = $tab;
+    }
+
+    /**
+     * Banner status derived from the queued cache payload (queued/running/finished/failed)
+     * or the inline-path success/error state. Empty string means "no banner".
+     */
+    public function getDiagnosticsBannerStatusProperty(): string
+    {
+        if ($this->servicesRemoteTaskId !== null && $this->servicesRemoteTaskId !== '') {
+            $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->servicesRemoteTaskId));
+            if (is_array($payload)) {
+                return match ((string) ($payload['status'] ?? '')) {
+                    'queued' => 'queued',
+                    'running' => 'running',
+                    'finished' => 'completed',
+                    'failed' => 'failed',
+                    default => 'running',
+                };
+            }
+
+            return 'running';
+        }
+        if (is_string($this->remote_error) && $this->remote_error !== '') {
+            return 'failed';
+        }
+        if (is_string($this->remote_output) && $this->remote_output !== '') {
+            return 'completed';
+        }
+
+        return '';
+    }
+
+    /**
+     * Splits the shared $remote_output string into the banner's expected list<string> shape.
+     * Empty array when no transcript is available yet.
+     *
+     * @return list<string>
+     */
+    public function getDiagnosticsBannerOutputLinesProperty(): array
+    {
+        if (! is_string($this->remote_output) || $this->remote_output === '') {
+            return [];
+        }
+
+        return explode("\n", $this->remote_output);
+    }
+
+    /**
+     * Clears the diagnostics banner and any queued cache entry so it can dismiss cleanly.
+     * Safe to call when no banner is showing — no-op.
+     */
+    public function dismissDiagnosticsBanner(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if ($this->servicesRemoteTaskId !== null && $this->servicesRemoteTaskId !== '') {
+            Cache::forget(ServerManageRemoteSshJob::cacheKey($this->servicesRemoteTaskId));
+            $this->servicesRemoteTaskId = null;
+        }
+        $this->remote_output = null;
+        $this->remote_error = null;
+        $this->remote_output_kind = null;
+    }
+
+    /* ========================================================================
+     * Notification Subscription Management
+     * ======================================================================== */
+
+    /**
+     * Override from CreatesNotificationChannelInline to scope channels to org.
+     */
+    protected function creatableChannelOwner(): \App\Models\User|\App\Models\Organization|\App\Models\Team
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            throw new \RuntimeException('No authenticated user for channel creation.');
+        }
+
+        $org = $user->currentOrganization();
+        if ($org !== null) {
+            return $org;
+        }
+
+        return $user;
+    }
+
+    /**
+     * After creating a channel inline, auto-select it in the subscription form.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->notifAddChannelId = $channelId;
+    }
+
+    /**
+     * Add notification subscription(s) for this server.
+     */
+    public function addServerNotificationSubscription(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change notification subscriptions.'));
+
+            return;
+        }
+
+        $this->validate([
+            'notifAddChannelId' => ['required', 'string', 'exists:notification_channels,id'],
+            'notifAddEventKeys' => ['required', 'array', 'min:1'],
+            'notifAddEventKeys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring'],
+        ], [], [
+            'notifAddChannelId' => __('channel'),
+            'notifAddEventKeys' => __('notification types'),
+        ]);
+
+        $org = Auth::user()?->currentOrganization();
+        $allowed = AssignableNotificationChannels::forUser(Auth::user(), $org)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        if (! in_array($this->notifAddChannelId, $allowed, true)) {
+            $this->addError('notifAddChannelId', __('Channel is not assignable to this server.'));
+
+            return;
+        }
+
+        $channel = NotificationChannel::query()->findOrFail($this->notifAddChannelId);
+        Gate::authorize('manageNotificationChannels', $channel->owner);
+
+        $created = 0;
+        foreach ($this->notifAddEventKeys as $eventKey) {
+            $row = NotificationSubscription::firstOrCreate([
+                'notification_channel_id' => $channel->id,
+                'subscribable_type' => Server::class,
+                'subscribable_id' => $this->server->id,
+                'event_key' => $eventKey,
+            ]);
+            if ($row->wasRecentlyCreated) {
+                $created++;
+            }
+        }
+
+        $this->notifAddChannelId = '';
+        $this->notifAddEventKeys = [];
+        $this->toastSuccess(__('Added :count subscription(s) routing this server\'s events to :channel.', [
+            'count' => $created,
+            'channel' => $channel->label,
+        ]));
+    }
+
+    /**
+     * Remove a notification subscription from this server.
+     */
+    public function removeServerNotificationSubscription(string $subscriptionId): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change notification subscriptions.'));
+
+            return;
+        }
+
+        $sub = NotificationSubscription::query()
+            ->where('subscribable_type', Server::class)
+            ->where('subscribable_id', $this->server->id)
+            ->whereKey($subscriptionId)
+            ->first();
+
+        if ($sub === null) {
+            return;
+        }
+
+        // Only allow removal when the user can manage the underlying channel
+        $channel = $sub->channel;
+        if ($channel instanceof NotificationChannel) {
+            Gate::authorize('manageNotificationChannels', $channel->owner);
+        }
+
+        $sub->delete();
+        $this->toastSuccess(__('Subscription removed.'));
+    }
+
+    /* ========================================================================
+     * Threshold Configuration
+     * ======================================================================== */
+
+    /**
+     * Load threshold settings from server meta or fallback to config defaults.
+     */
+    protected function syncThresholdSettingsFromServer(): void
+    {
+        $meta = $this->server->meta ?? [];
+        $thresholds = $meta['metric_thresholds'] ?? [];
+
+        $this->thresholdCpu = isset($thresholds['cpu_warn_pct'])
+            ? (float) $thresholds['cpu_warn_pct']
+            : null;
+        $this->thresholdMem = isset($thresholds['mem_warn_pct'])
+            ? (float) $thresholds['mem_warn_pct']
+            : null;
+        $this->thresholdLoad = isset($thresholds['load_warn'])
+            ? (float) $thresholds['load_warn']
+            : null;
+    }
+
+    /**
+     * Get effective thresholds (server override or config default).
+     *
+     * @return array{cpu: float, mem: float, load: float}
+     */
+    protected function effectiveThresholds(): array
+    {
+        return [
+            'cpu' => $this->thresholdCpu ?? (float) config('insights.thresholds.cpu_warn_pct', 85),
+            'mem' => $this->thresholdMem ?? (float) config('insights.thresholds.mem_warn_pct', 85),
+            'load' => $this->thresholdLoad ?? (float) config('insights.thresholds.load_warn', 4.0),
+        ];
+    }
+
+    /**
+     * Enable threshold editing mode.
+     */
+    public function startEditingThresholds(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        // Initialize input values to current effective thresholds
+        $effective = $this->effectiveThresholds();
+        $this->thresholdCpuInput = $effective['cpu'];
+        $this->thresholdMemInput = $effective['mem'];
+        $this->thresholdLoadInput = $effective['load'];
+
+        $this->editingThresholds = true;
+    }
+
+    /**
+     * Cancel threshold editing without saving.
+     */
+    public function cancelEditingThresholds(): void
+    {
+        $this->editingThresholds = false;
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Save threshold settings to server meta.
+     */
+    public function saveThresholdSettings(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $this->validate([
+            'thresholdCpuInput' => ['required', 'numeric', 'min:1', 'max:99'],
+            'thresholdMemInput' => ['required', 'numeric', 'min:1', 'max:99'],
+            'thresholdLoadInput' => ['required', 'numeric', 'min:0.1', 'max:100'],
+        ], [], [
+            'thresholdCpuInput' => __('CPU threshold'),
+            'thresholdMemInput' => __('Memory threshold'),
+            'thresholdLoadInput' => __('Load threshold'),
+        ]);
+
+        $meta = $this->server->meta ?? [];
+        $meta['metric_thresholds'] = [
+            'cpu_warn_pct' => round($this->thresholdCpuInput, 1),
+            'mem_warn_pct' => round($this->thresholdMemInput, 1),
+            'load_warn' => round($this->thresholdLoadInput, 2),
+        ];
+
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+        $this->syncThresholdSettingsFromServer();
+        $this->editingThresholds = false;
+        $this->toastSuccess(__('Metric thresholds saved. KPI warning colors will update on the next sample.'));
+    }
+
+    /**
+     * Clear server-specific thresholds and revert to config defaults.
+     */
+    public function resetThresholdsToDefaults(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server settings.'));
+
+            return;
+        }
+
+        $meta = $this->server->meta ?? [];
+        unset($meta['metric_thresholds']);
+
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+        $this->syncThresholdSettingsFromServer();
+        $this->editingThresholds = false;
+        $this->toastSuccess(__('Reverted to organization defaults.'));
+    }
+
+    public function setMetricsRange(string $range): void
+    {
+        if (! ServerMetricsRangeQuery::isValidRange($range)) {
+            return;
+        }
+        $this->metricsRange = $range;
+    }
+
+    private function floatOrNull(mixed $value): ?float
+    {
+        return $value === null || ! is_numeric($value) ? null : (float) $value;
+    }
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
         $this->server->refresh();
         $this->wasProbePending = $this->probePendingFromMeta($this->server->meta ?? []);
+        $this->syncThresholdSettingsFromServer();
     }
 
     #[On('monitoring-probe-requested')]
@@ -191,6 +573,7 @@ class WorkspaceMonitor extends Component
         $this->authorize('view', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
+        $this->remote_output_kind = 'inspect';
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before inspecting the callback env.');
@@ -283,6 +666,7 @@ BASH);
         $this->authorize('view', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
+        $this->remote_output_kind = 'diagnostics';
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before running callback diagnostics.');
@@ -409,6 +793,7 @@ BASH);
         $this->authorize('update', $this->server);
         $this->remote_output = null;
         $this->remote_error = null;
+        $this->remote_output_kind = 'repair';
 
         if ($this->currentUserIsDeployer()) {
             $msg = __('Deployers cannot repair monitor installs on servers.');
@@ -553,17 +938,45 @@ BASH);
 
         $chartLimit = (int) config('server_metrics.chart.max_points', 96);
 
-        $chartSnapshots = ServerMetricSnapshot::query()
-            ->where('server_id', $this->server->id)
-            ->orderByDesc('captured_at')
-            ->limit($chartLimit)
-            ->get()
-            ->sortBy('captured_at')
-            ->values();
-
-        $chartFrom = $chartSnapshots->first()?->captured_at;
-        $chartTo = $chartSnapshots->last()?->captured_at;
+        // Bucketed series per metric across the operator-chosen range.
+        // ServerMetricsRangeQuery handles min/avg/max bucketing in PHP so the
+        // 30d view stays around ~180 points instead of ~43k raw rows.
+        $rangeData = app(ServerMetricsRangeQuery::class)->fetch($this->server, $this->metricsRange);
+        $chartFrom = $rangeData['from'];
+        $chartTo = $rangeData['to'];
+        $rangeMetricSeries = $rangeData['metrics'];
         $tz = config('app.timezone');
+
+        // Threshold tints for per-panel header icon + KPI. Use server-specific
+        // thresholds if set, otherwise fall back to config defaults.
+        $effectiveThresholds = $this->effectiveThresholds();
+        $thresholdCpu = $effectiveThresholds['cpu'];
+        $thresholdMem = $effectiveThresholds['mem'];
+        $thresholdLoad = $effectiveThresholds['load'];
+        $thresholdDiskWarn = 85.0; // Disk has no insights threshold yet — match cpu/mem default.
+
+        $statusFor = function (?float $value, float $warn, float $critical): string {
+            if ($value === null) {
+                return 'unknown';
+            }
+            if ($value >= $critical) {
+                return 'critical';
+            }
+            if ($value >= $warn) {
+                return 'warning';
+            }
+
+            return 'healthy';
+        };
+
+        $latestPayload = is_array($rangeData['latest_payload']) ? $rangeData['latest_payload'] : [];
+        $metricStatuses = [
+            'cpu' => $statusFor($this->floatOrNull($latestPayload['cpu_pct'] ?? null), $thresholdCpu, 95.0),
+            'mem' => $statusFor($this->floatOrNull($latestPayload['mem_pct'] ?? null), $thresholdMem, 95.0),
+            'disk' => $statusFor($this->floatOrNull($latestPayload['disk_pct'] ?? null), $thresholdDiskWarn, 95.0),
+            'load' => $statusFor($this->floatOrNull($latestPayload['load_1m'] ?? null), $thresholdLoad, $thresholdLoad * 1.5),
+            'network' => 'healthy',
+        ];
 
         $meta = $this->server->meta ?? [];
         $sshReachable = (bool) ($meta['monitoring_ssh_reachable'] ?? false);
@@ -593,6 +1006,52 @@ BASH);
             );
         }
 
+        // Self-heal stale callback env files. Earlier deploys could
+        // bake the literal "${DPLY_PUBLIC_APP_URL}/api/metrics" string
+        // into ~/.dply/metrics-callback.env when the .env file
+        // referenced an undefined-yet-during-load variable, leaving the
+        // guest cron emitting "ValueError: unknown url type" forever.
+        // If the URL stored when we last deployed differs from what
+        // guestPushUrl() resolves to today (or contains an unresolved
+        // "${...}" placeholder), redeploy the env file. Idempotent —
+        // the job is ShouldBeUnique on serverId.
+        if (
+            $guestPush->isEnabled()
+            && $sshReachable
+            && $pythonInstalled
+            && ! empty($this->server->ip_address)
+        ) {
+            $expectedPushUrl = $guestPush->guestPushUrl();
+            $deployedPushUrl = (string) ($meta['monitoring_guest_push_callback_url'] ?? '');
+            // Only redeploy when we have a record of a previous deploy
+            // AND it disagrees with what guestPushUrl() resolves to now
+            // (or carries an unresolved "${...}" placeholder). The
+            // never-deployed case belongs to Install / Repair flows —
+            // dispatching a heal job there would SSH on every render,
+            // which also disturbs feature tests.
+            $needsRedeploy = $deployedPushUrl !== ''
+                && $expectedPushUrl !== ''
+                && (str_contains($deployedPushUrl, '${') || $deployedPushUrl !== $expectedPushUrl);
+            if ($needsRedeploy) {
+                DeployGuestMetricsCallbackEnvJob::dispatch($this->server->id);
+            }
+        }
+
+        // Pick up the latest monitoring-install action so the install
+        // card can show "Installing… started Xm ago" even after the
+        // operator reloads. The cache-only $servicesRemoteTaskId only
+        // survives within the current Livewire instance.
+        $monitoringInstallAction = ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', 'services-install:install_monitoring_prerequisites')
+            ->latest('id')
+            ->first();
+        $monitoringInstallInProgress = $monitoringInstallAction !== null
+            && in_array($monitoringInstallAction->status, [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ], true);
+
         $latestPayloadSummary = $latest !== null
             ? $this->summarizeLatestPayload($latest->payload ?? [])
             : [];
@@ -615,13 +1074,38 @@ BASH);
             'has_project' => $workspace !== null,
         ];
 
+        // Notification subscriptions data (for the Notifications tab)
+        $serverNotifSubscriptions = NotificationSubscription::query()
+            ->where('subscribable_type', Server::class)
+            ->where('subscribable_id', $this->server->id)
+            ->with('channel')
+            ->get();
+
+        $assignableChannels = AssignableNotificationChannels::forUser(
+            Auth::user(),
+            Auth::user()?->currentOrganization()
+        )->sortBy('label')->values();
+
+        // Server-scoped notification event labels
+        $serverEventLabels = config('notification_events.categories.server.events', []);
+
         return view('livewire.servers.workspace-monitor', [
             'latest' => $latest,
-            'chartSnapshots' => $chartSnapshots,
             'chartPointLimit' => $chartLimit,
             'chartFrom' => $chartFrom,
             'chartTo' => $chartTo,
             'chartTimezone' => $tz,
+            'rangeMetricSeries' => $rangeMetricSeries,
+            'rangeBucketSeconds' => $rangeData['bucket_seconds'],
+            'rangeSampleCount' => $rangeData['sample_count'],
+            'metricStatuses' => $metricStatuses,
+            'thresholds' => [
+                'cpu' => $thresholdCpu,
+                'mem' => $thresholdMem,
+                'disk' => $thresholdDiskWarn,
+                'load' => $thresholdLoad,
+            ],
+            'metricsRangeOptions' => array_keys(ServerMetricsRangeQuery::RANGES),
             'storedSnapshotCount' => $storedSnapshotCount,
             'showMetricsPanels' => $pythonInstalled || $storedSnapshotCount > 0,
             'opsReady' => $this->serverOpsReady(),
@@ -638,6 +1122,17 @@ BASH);
             'sampleAgeMinutes' => $sampleAgeMinutes,
             'sampleTimestampInFuture' => $sampleTimestampInFuture,
             'routingSummary' => $routingSummary,
+            'monitoringInstallAction' => $monitoringInstallAction,
+            'monitoringInstallInProgress' => $monitoringInstallInProgress,
+            // Notification subscription data
+            'serverNotifSubscriptions' => $serverNotifSubscriptions,
+            'assignableChannels' => $assignableChannels,
+            'serverEventLabels' => $serverEventLabels,
+            // Threshold editing state
+            'editingThresholds' => $this->editingThresholds,
+            'thresholdCpuInput' => $this->thresholdCpu ?? $thresholdCpu,
+            'thresholdMemInput' => $this->thresholdMem ?? $thresholdMem,
+            'thresholdLoadInput' => $this->thresholdLoad ?? $thresholdLoad,
         ]);
     }
 }

@@ -37,6 +37,7 @@ class SiteDeployment extends Model
         'git_sha',
         'exit_code',
         'log_output',
+        'phase_results',
         'started_at',
         'finished_at',
     ];
@@ -46,7 +47,145 @@ class SiteDeployment extends Model
         return [
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
+            'phase_results' => 'array',
         ];
+    }
+
+    /**
+     * Record one phase's worth of {@see DeployPhaseRunner} step results
+     * into the structured phase_results column. Calling repeatedly for
+     * different phases on the same deployment composes them under their
+     * canonical keys (build / swap / release / restart).
+     *
+     * The runner returns a list of step result arrays per call; each
+     * call to recordPhaseResults stores that list under its phase key.
+     * If the same phase is recorded twice (re-run scenario), the new
+     * list replaces the old — the UI shows the latest attempt.
+     *
+     * @param  list<array<string, mixed>>  $results
+     */
+    public function recordPhaseResults(string $phase, array $results): void
+    {
+        $existing = is_array($this->phase_results) ? $this->phase_results : [];
+        $existing[$phase] = $results;
+        $this->phase_results = $existing;
+        $this->save();
+    }
+
+    /**
+     * Aggregate ok flag across all recorded phases. True when every
+     * recorded step is ok or skipped; false when any step has ok=false.
+     */
+    public function phasesAllOk(): bool
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        if ($results === []) {
+            return false;
+        }
+        foreach ($results as $steps) {
+            if (! is_array($steps)) {
+                continue;
+            }
+            foreach ($steps as $step) {
+                if (($step['ok'] ?? false) !== true) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Total wall-clock duration across all recorded steps.
+     */
+    public function phaseTotalDurationMs(): int
+    {
+        $total = 0;
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        foreach ($results as $steps) {
+            if (! is_array($steps)) {
+                continue;
+            }
+            foreach ($steps as $step) {
+                $total += (int) ($step['duration_ms'] ?? 0);
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Steps recorded for a phase, or an empty list when the phase
+     * isn't in phase_results at all. Drives the dashboard's per-phase
+     * step list without forcing the view into nested @php blocks.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function phaseSteps(string $phase): array
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        $steps = $results[$phase] ?? null;
+
+        return is_array($steps) ? array_values($steps) : [];
+    }
+
+    /**
+     * Whether the phase is recorded AND every step succeeded.
+     */
+    public function phaseOk(string $phase): bool
+    {
+        $steps = $this->phaseSteps($phase);
+        if ($steps === []) {
+            return false;
+        }
+        foreach ($steps as $step) {
+            if (($step['ok'] ?? false) !== true) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function hasPhase(string $phase): bool
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+
+        return is_array($results[$phase] ?? null);
+    }
+
+    /**
+     * Tailwind class string for the per-step status pill in dashboard
+     * partials. Consolidated here so Blade doesn't need a nested
+     * ternary inside @php (the lexer chokes on those).
+     *
+     * @param  array<string, mixed>  $step
+     */
+    public function stepClasses(array $step): string
+    {
+        $skipped = ($step['skipped'] ?? false) === true;
+        $ok = ($step['ok'] ?? false) === true;
+
+        if ($skipped) {
+            return 'bg-amber-100 text-amber-900';
+        }
+
+        return $ok ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900';
+    }
+
+    /**
+     * One-character glyph for the per-step status pill.
+     *
+     * @param  array<string, mixed>  $step
+     */
+    public function stepGlyph(array $step): string
+    {
+        if (($step['skipped'] ?? false) === true) {
+            return '·';
+        }
+
+        return ($step['ok'] ?? false) === true ? '✓' : '✗';
     }
 
     public function site(): BelongsTo

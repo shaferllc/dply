@@ -1,8 +1,13 @@
 <?php
 
+use App\Http\Controllers\CancelServerProvisionController;
+use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\EdgeDeployWebhookController;
+use App\Http\Controllers\FunctionLogIngestController;
+use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Jobs\RunSetupScriptJob;
@@ -13,9 +18,18 @@ use App\Livewire\Billing\Invoices as BillingInvoices;
 use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Edge\Create as EdgeCreate;
+use App\Livewire\Edge\Index as EdgeIndex;
+use App\Livewire\Serverless\Create as ServerlessCreate;
+use App\Livewire\Serverless\Index as ServerlessIndex;
+use App\Livewire\Serverless\Journey as ServerlessJourney;
+use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
+use App\Livewire\Fleet\Deploys as FleetDeploys;
+use App\Livewire\Fleet\Domains as FleetDomains;
+use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
+use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Launches\Create as LaunchesCreate;
-use App\Livewire\Launches\LocalDocker as LaunchesLocalDocker;
 use App\Livewire\Launches\Path as LaunchesPath;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
@@ -41,12 +55,16 @@ use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
+use App\Livewire\Servers\Deploys as ServerDeploys;
+use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
+use App\Livewire\Servers\WorkspaceActivity;
+use App\Livewire\Servers\WorkspaceCaches;
+use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
-use App\Livewire\Servers\WorkspaceDeploy;
 use App\Livewire\Servers\WorkspaceFirewall;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
@@ -54,11 +72,12 @@ use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePhp;
-use App\Livewire\Servers\WorkspaceRecipes;
+use App\Livewire\Servers\WorkspaceRun;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshKeys;
+use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
 use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
@@ -70,8 +89,13 @@ use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
+use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
+use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
+use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
+use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Monitor as SitesMonitor;
+use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
@@ -93,6 +117,46 @@ Broadcast::routes(['middleware' => ['web', 'auth']]);
 Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
+
+Route::match(['post', 'options'], '/hooks/edge/{site}/redeploy', EdgeDeployWebhookController::class)
+    ->middleware(['throttle:site-webhook'])
+    ->name('hooks.edge.redeploy');
+
+Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
+    ->middleware(['throttle:site-webhook'])
+    ->name('hooks.edge.github');
+
+// Per-request log records POSTed by a deployed serverless function's handler
+// — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
+// inside the controller; high throttle since it fires once per app request.
+Route::post('/hooks/functions/{site}/log', FunctionLogIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.functions.log');
+
+// Friendly public URL for a serverless function — dply proxies it through
+// to the function's raw DigitalOcean Functions invocation URL.
+Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
+    ->where('path', '.*')
+    ->name('serverless.proxy');
+
+// Live function hostnames: a deployed function answers at
+// {slug}.{DPLY_TESTING_DOMAINS entry}. Each configured testing domain gets a
+// wildcard-subdomain route that proxies to the function. (Production needs
+// *.{domain} DNS + TLS pointed at the dply app for these to resolve.)
+foreach ((array) config('services.digitalocean.testing_domains', []) as $functionDomain) {
+    $functionDomain = trim((string) $functionDomain);
+    if ($functionDomain === '') {
+        continue;
+    }
+
+    Route::domain('{slug}.'.$functionDomain)
+        ->any('/{path?}', ServerlessFunctionProxyController::class)
+        ->where('path', '.*')
+        ->withoutMiddleware([
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+            \App\Http\Middleware\RedirectGuestsToComingSoon::class,
+        ]);
+}
 
 Route::get('/', function () {
     return view('welcome');
@@ -120,10 +184,18 @@ Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareContro
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
+    Route::middleware('feature:surface.fleet')->group(function (): void {
+        Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
+        Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
+        Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
+        Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
+    });
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.dashboard');
-    Route::livewire('/marketplace', MarketplaceIndex::class)->name('marketplace.index');
+    Route::middleware('feature:surface.marketplace')->group(function (): void {
+        Route::livewire('/marketplace', MarketplaceIndex::class)->name('marketplace.index');
+    });
 
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
@@ -170,29 +242,55 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/backups/databases', BackupsDatabases::class)->name('backups.databases');
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
 
-    Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
-    Route::livewire('scripts/marketplace', ScriptsMarketplace::class)->name('scripts.marketplace');
-    Route::livewire('scripts/create', ScriptsCreate::class)->name('scripts.create');
-    Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
+    Route::middleware('feature:surface.scripts')->group(function (): void {
+        Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
+        Route::livewire('scripts/marketplace', ScriptsMarketplace::class)->name('scripts.marketplace');
+        Route::livewire('scripts/create', ScriptsCreate::class)->name('scripts.create');
+        Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
+    });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
-    Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
-    Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
-    Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');
-    Route::livewire('projects/{workspace}/resources', ProjectsShow::class)->defaults('section', 'resources')->name('projects.resources');
-    Route::livewire('projects/{workspace}/access', ProjectsShow::class)->defaults('section', 'access')->name('projects.access');
-    Route::livewire('projects/{workspace}/operations', ProjectsShow::class)->defaults('section', 'operations')->name('projects.operations');
-    Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
-    Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
-    Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
+    Route::middleware('feature:surface.edge')->group(function (): void {
+        Route::livewire('edge', EdgeIndex::class)->name('edge.index');
+        Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+    });
+    Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
+    Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
+    Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
+    Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
+    Route::livewire('imports/ploi/migrations/{migration}', \App\Livewire\Imports\Ploi\MigrationProgress::class)->name('imports.ploi.migration.progress');
+    Route::livewire('imports/forge', \App\Livewire\Imports\Forge\Inventory::class)->name('imports.forge.inventory');
+    Route::middleware('feature:surface.projects')->group(function (): void {
+        Route::livewire('projects', ProjectsIndex::class)->name('projects.index');
+        Route::livewire('projects/{workspace}', ProjectsShow::class)->defaults('section', 'overview')->name('projects.show');
+        Route::livewire('projects/{workspace}/overview', ProjectsShow::class)->defaults('section', 'overview')->name('projects.overview');
+        Route::livewire('projects/{workspace}/resources', ProjectsShow::class)->defaults('section', 'resources')->name('projects.resources');
+        Route::livewire('projects/{workspace}/access', ProjectsShow::class)->defaults('section', 'access')->name('projects.access');
+        Route::livewire('projects/{workspace}/operations', ProjectsShow::class)->defaults('section', 'operations')->name('projects.operations');
+        Route::livewire('projects/{workspace}/delivery', ProjectsShow::class)->defaults('section', 'delivery')->name('projects.delivery');
+    });
+    Route::middleware('feature:surface.status_pages')->group(function (): void {
+        Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
+        Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
+    });
     Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
-    Route::livewire('launches/containers', LaunchesPath::class)->defaults('path', 'containers')->name('launches.containers');
+    // Container flow inversion (2026-05): the standalone container launcher is gone.
+    // Container apps are now created server-first (host via /servers/create wizard,
+    // container via /servers/{id}/sites/create container mode). This route is kept for
+    // one release as a 302 to the wizard so external bookmarks don't 404.
+    Route::redirect('launches/containers/create', '/servers/create?host_target=docker', 302)->name('launches.containers.create');
     Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
-    Route::livewire('launches/local/docker', LaunchesLocalDocker::class)->name('launches.local-docker');
-    Route::livewire('launches/edge-network', LaunchesPath::class)->defaults('path', 'edge-network')->name('launches.edge-network');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
+    // Cloud Routes
+    Route::livewire('cloud/clusters', \App\Livewire\Cloud\ClusterIndex::class)->name('cloud.clusters.index');
+    Route::livewire('cloud/clusters/create', \App\Livewire\Cloud\ClusterCreate::class)->name('cloud.clusters.create');
+    Route::livewire('cloud/clusters/{cluster}', \App\Livewire\Cloud\ClusterShow::class)->name('cloud.clusters.show');
+    Route::livewire('cloud/clusters/{cluster}/apps/create', \App\Livewire\Cloud\AppCreate::class)->name('cloud.apps.create');
+    Route::livewire('cloud/clusters/{cluster}/apps/{app}', \App\Livewire\Cloud\AppShow::class)->name('cloud.apps.show');
+
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
+    Route::livewire('servers/import/digitalocean', ServersImportFromDigitalOcean::class)->name('servers.import.digitalocean');
     // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft
     // is past step 1, StepType::mount() redirects on to the current step.
     Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
@@ -201,6 +299,33 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
+
+        // Kubernetes hosts have their own dedicated page (cluster lifecycle +
+        // management). Docker / other non-VM hosts still go to the generic
+        // overview.
+        if (($server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES) {
+            return redirect()->route('servers.cluster', $server);
+        }
+
+        // A serverless function is not a server — the DO Functions namespace
+        // is an implementation detail. Send the operator straight to the
+        // function workspace instead of a server-shaped overview.
+        if ($server->isDigitalOceanFunctionsHost()) {
+            $function = $server->sites()->orderBy('created_at')->first();
+            if ($function !== null) {
+                return redirect()->route('sites.show', ['server' => $server, 'site' => $function]);
+            }
+        }
+
+        // Journey page is SSH/VM-shaped — only VM hosts have a provision task
+        // and the InteractsWithServerWorkspace boot rejects non-VM hosts from
+        // routing through it (which previously caused a redirect loop for
+        // freshly-provisioning DOKS clusters). Container hosts always go to
+        // the workspace overview, which surfaces a "cluster is provisioning"
+        // banner when status is PENDING/PROVISIONING.
+        if (! $server->isVmHost()) {
+            return redirect()->route('servers.overview', $server);
+        }
 
         if ($server->status === Server::STATUS_PENDING || $server->status === Server::STATUS_PROVISIONING) {
             return redirect()->route('servers.journey', $server);
@@ -215,21 +340,66 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         return redirect()->route('servers.overview', $server);
     })->name('servers.show');
     Route::livewire('servers/{server}/journey', ServerProvisionJourney::class)->name('servers.journey');
+    Route::post('servers/{server}/cancel-provision', CancelServerProvisionController::class)->name('servers.cancel-provision');
+    Route::middleware('feature:workspace.cluster')->group(function (): void {
+        Route::livewire('servers/{server}/cluster', WorkspaceCluster::class)->name('servers.cluster');
+    });
+    Route::get('servers/{server}/cluster/kubeconfig', function (Server $server) {
+        Gate::authorize('view', $server);
+        $kubeconfig = (string) ($server->meta['kubernetes']['kubeconfig'] ?? '');
+        if ($kubeconfig === '') {
+            abort(404, 'kubeconfig not available yet');
+        }
+
+        $clusterName = (string) ($server->meta['kubernetes']['cluster_name'] ?? 'cluster');
+
+        return response($kubeconfig, 200, [
+            'Content-Type' => 'application/yaml',
+            'Content-Disposition' => 'attachment; filename="'.preg_replace('/[^A-Za-z0-9_.-]/', '_', $clusterName).'-kubeconfig.yaml"',
+        ]);
+    })->name('servers.cluster.kubeconfig');
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
+    Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
+    Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
+    Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');
+    Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
+    Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
     Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
-    Route::get('servers/{server}/sites/{site}/settings/{section?}', function (Server $server, Site $site, ?string $section = null) {
+    Route::livewire('servers/{server}/sites/{site}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->name('sites.queue-workers');
+    // BACKGROUND group for container/serverless workspaces — engine-level
+    // schedule + workers (one minute-cadence tick today, list-of-rules in
+    // future iterations).
+    Route::livewire('servers/{server}/sites/{site}/schedule', \App\Livewire\Sites\Schedule::class)->name('sites.schedule');
+    Route::livewire('servers/{server}/sites/{site}/workers', \App\Livewire\Sites\Workers::class)->name('sites.workers');
+    // NETWORKING group for serverless workspaces — manages the dply edge
+    // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
+    // invocation URLs). Distinct from VM `routing` which edits nginx.
+    Route::livewire('servers/{server}/sites/{site}/routing', \App\Livewire\Sites\ServerlessRouting::class)->name('sites.routing');
+    // DEPLOY group for serverless workspaces — Repository page that
+    // browses the connected repo: overview (commits + README), file
+    // tree, branches, and the connection config (account / repo /
+    // deploy key / webhook). VM sites keep the legacy section partial
+    // at `?section=repository`.
+    Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
+    Route::livewire('servers/{server}/sites/{site}/caching', \App\Livewire\Sites\Caching::class)->name('sites.caching');
+    Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
+    // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
+    // {section} is required — without it the bare /sites/{site}/settings URL collides
+    // with the new "Settings" tab on the wildcard route below, which sends you back to
+    // General. Operators who bookmarked the bare /settings URL now land on the new
+    // Settings tab (Site identity, Web directory, Project, Notes), which is the
+    // intended behavior after the General → Settings IA split.
+    Route::get('servers/{server}/sites/{site}/settings/{section}', function (Server $server, Site $site, string $section) {
         $targetSection = $section;
         $query = request()->query();
 
-        if ($targetSection === null) {
-            $targetSection = 'general';
-        } elseif ($targetSection === 'webhooks') {
+        if ($targetSection === 'webhooks') {
             $targetSection = 'notifications';
         } elseif (in_array($targetSection, ['domains', 'aliases', 'redirects', 'preview', 'tenants'], true)) {
             $query['tab'] = $targetSection;
@@ -243,21 +413,55 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             ...$query,
         ]);
     })->name('sites.settings');
-    Route::livewire('servers/{server}/sites/{site}', SiteSettings::class)->defaults('section', 'general')->name('sites.show');
+    Route::livewire('servers/{server}/sites/{site}/{section?}', SiteSettings::class)
+        ->where('section', '[a-z0-9-]+')
+        ->defaults('section', 'general')
+        ->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
-    Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
+    Route::middleware('feature:workspace.insights')->group(function (): void {
+        Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
+    });
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
+    Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
-    Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
+    Route::middleware('feature:workspace.activity')->group(function (): void {
+        Route::livewire('servers/{server}/activity', WorkspaceActivity::class)->name('servers.activity');
+    });
+    Route::middleware('feature:workspace.services')->group(function (): void {
+        Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
+    });
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
+    Route::livewire('servers/{server}/webserver', \App\Livewire\Servers\WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
+    Route::middleware('feature:workspace.caches')->group(function (): void {
+        Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
+    });
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
+    Route::livewire('servers/{server}/queue-workers', \App\Livewire\Servers\WorkspaceQueueWorkers::class)->middleware('server.service.installed')->name('servers.queue-workers');
+    Route::middleware('feature:workspace.schedule')->group(function (): void {
+        Route::livewire('servers/{server}/schedule', \App\Livewire\Servers\WorkspaceSchedule::class)->name('servers.schedule');
+    });
+    Route::livewire('servers/{server}/backups', \App\Livewire\Servers\WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
-    Route::livewire('servers/{server}/recipes', WorkspaceRecipes::class)->name('servers.recipes');
-    Route::livewire('servers/{server}/deploy', WorkspaceDeploy::class)->name('servers.deploy');
+    Route::middleware('feature:workspace.system_users')->group(function (): void {
+        Route::livewire('servers/{server}/system-users', WorkspaceSystemUsers::class)->name('servers.system-users');
+    });
+    // /run replaces both /recipes and /deploy. The merged page hosts
+    // the saved-command list (CRUD + inline run), an ad-hoc command
+    // runner, and the marketplace import path. Old URLs 404 by
+    // design — clean break, no redirect shim.
+    Route::middleware('feature:workspace.run')->group(function (): void {
+        Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
+    });
+    Route::middleware('feature:workspace.console')->group(function (): void {
+        Route::livewire('servers/{server}/console', \App\Livewire\Servers\WorkspaceConsole::class)->name('servers.console');
+    });
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
+    Route::middleware('feature:workspace.files')->group(function (): void {
+        Route::livewire('servers/{server}/files', \App\Livewire\Servers\WorkspaceFiles::class)->name('servers.files');
+    });
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');

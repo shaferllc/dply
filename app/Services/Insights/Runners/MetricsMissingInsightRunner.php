@@ -28,6 +28,17 @@ class MetricsMissingInsightRunner implements InsightRunnerInterface
         );
 
         if ($latest === null) {
+            // Suppress the "metrics not arriving" warning until the operator
+            // has actually installed monitoring on the server. Without the
+            // guest push token, no pipeline is expected to be running yet —
+            // raising a finding here would just nag fresh installs about a
+            // service they haven't opted into.
+            $meta = is_array($server->meta ?? null) ? $server->meta : [];
+            $monitoringInstalled = ! empty($meta['monitoring_guest_push_token_hash']);
+            if (! $monitoringInstalled) {
+                return [];
+            }
+
             return [
                 new InsightCandidate(
                     insightKey: 'metrics_missing_or_stale',

@@ -3,14 +3,21 @@
     'reached' => 1,
     'mode' => 'provider',
     'hostKind' => 'vm',
+    'providerHostKind' => 'vm',
 ])
 @php
-    $skipsStep3 = $mode === 'custom' && $hostKind === 'docker';
+    $skipsStep3 = ($mode === 'custom' && $hostKind === 'docker')
+        || ($mode === 'provider' && $providerHostKind === 'docker');
     $whereLabel = $mode === 'custom' ? __('Connection') : __('Where it runs');
+    // K8s reuses StepWhat for cluster + namespace selection, so the label
+    // shifts from the stack-template framing to a cluster framing.
+    $whatLabel = ($mode === 'provider' && $providerHostKind === 'kubernetes')
+        ? __('Cluster')
+        : __('What it runs');
     $steps = [
         ['n' => 1, 'label' => __('Type & name'), 'route' => 'servers.create',         'params' => ['edit' => 1]],
         ['n' => 2, 'label' => $whereLabel,       'route' => 'servers.create.where',   'params' => []],
-        ['n' => 3, 'label' => __('What it runs'),'route' => 'servers.create.what',    'params' => []],
+        ['n' => 3, 'label' => $whatLabel,        'route' => 'servers.create.what',    'params' => []],
         ['n' => 4, 'label' => __('Review'),      'route' => 'servers.create.review',  'params' => []],
     ];
 @endphp

@@ -9,11 +9,15 @@ use App\Models\WorkspaceMember;
 use App\Models\WorkspaceView;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'surface.projects';
     use DispatchesToastNotifications;
 
     public string $name = '';

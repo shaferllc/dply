@@ -14,7 +14,10 @@ final class BuildServerProvisionMeta
     use AsObject;
 
     /**
-     * @return array<string, string>
+     * @param  array<string, string>  $runtimeDefaults  Per-language version
+     *                                                  pins (e.g. ['ruby' => '3.3', 'node' => '22']).
+     *                                                  Keys with empty-string values are dropped.
+     * @return array<string, mixed>
      */
     public function handle(
         string $installProfile,
@@ -23,8 +26,9 @@ final class BuildServerProvisionMeta
         string $webserver,
         string $phpVersion,
         string $database,
+        array $runtimeDefaults = [],
     ): array {
-        return [
+        $meta = [
             'install_profile' => $installProfile,
             'server_role' => $serverRole,
             'cache_service' => $cacheService,
@@ -32,5 +36,12 @@ final class BuildServerProvisionMeta
             'php_version' => $phpVersion,
             'database' => $database,
         ];
+
+        $cleaned = array_filter($runtimeDefaults, static fn ($v) => is_string($v) && $v !== '');
+        if ($cleaned !== []) {
+            $meta['runtime_defaults'] = $cleaned;
+        }
+
+        return $meta;
     }
 }

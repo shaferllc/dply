@@ -61,12 +61,34 @@ trait InteractsWithServerCreateDraft
         return $this->currentUser()?->currentOrganization();
     }
 
+    /** @var array{loaded: bool, draft: ?ServerCreateDraft} */
+    protected array $memoCurrentDraft = ['loaded' => false, 'draft' => null];
+
     /**
      * Find the draft for the current (user, organization) pair, or null if none exists.
+     * Memoized per Livewire request — the wizard hits this 3+ times per render
+     * (mount's enforceDraftGate + hydrate, plus render's reachedStep computation)
+     * and there's no reason to query for the same row each time.
      */
     protected function currentDraft(): ?ServerCreateDraft
     {
-        return ServerCreateDraft::forCurrentScope($this->currentUser(), $this->currentOrganization());
+        if ($this->memoCurrentDraft['loaded']) {
+            return $this->memoCurrentDraft['draft'];
+        }
+
+        $draft = ServerCreateDraft::forCurrentScope($this->currentUser(), $this->currentOrganization());
+        $this->memoCurrentDraft = ['loaded' => true, 'draft' => $draft];
+
+        return $draft;
+    }
+
+    /**
+     * Drop the memoized draft after a write so subsequent reads see the new row.
+     * Called by saveDraftFromForm and deleteCurrentDraft.
+     */
+    protected function forgetCurrentDraftMemo(): void
+    {
+        $this->memoCurrentDraft = ['loaded' => false, 'draft' => null];
     }
 
     /**
@@ -140,6 +162,10 @@ trait InteractsWithServerCreateDraft
         $draft->bumpExpiry();
         $draft->save();
 
+        // Refresh the memo so any later currentDraft() call returns the
+        // post-save row (new step / payload) instead of the pre-save snapshot.
+        $this->memoCurrentDraft = ['loaded' => true, 'draft' => $draft];
+
         return $draft;
     }
 
@@ -149,6 +175,7 @@ trait InteractsWithServerCreateDraft
     protected function deleteCurrentDraft(): void
     {
         $this->currentDraft()?->delete();
+        $this->forgetCurrentDraftMemo();
     }
 
     /**

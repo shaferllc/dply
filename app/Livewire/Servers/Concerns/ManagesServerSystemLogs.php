@@ -719,6 +719,7 @@ trait ManagesServerSystemLogs
             'apache' => ['apache'],
             'openlitespeed' => ['openlitespeed'],
             'traefik' => ['traefik'],
+            'haproxy' => ['haproxy'],
             'php' => ['php'],
             'database' => ['mysql', 'postgres'],
             'services' => ['redis'],

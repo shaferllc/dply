@@ -17,10 +17,11 @@ class SiteCloneDestinationValidatorTest extends TestCase
 
     private const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
-    public function test_throws_when_org_at_site_limit(): void
+    public function test_clone_allowed_now_that_site_caps_are_retired(): void
     {
-        Config::set('subscription.limits.sites_free', 1);
-
+        // The legacy "trial site cap" check used to throw here. Under the
+        // Standard pricing model, sites are uncapped — billing is per-server
+        // and trial-state gating handles abuse rather than per-resource caps.
         $user = User::factory()->create();
         $org = Organization::factory()->create();
         $org->users()->attach($user->id, ['role' => 'owner']);
@@ -41,13 +42,8 @@ class SiteCloneDestinationValidatorTest extends TestCase
             'user_id' => $user->id,
             'organization_id' => $org->id,
         ]);
-        $source->load('server');
 
-        $this->assertFalse($org->fresh()->canCreateSite());
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage(__('Your organization has reached the site limit for the current plan.'));
-
-        SiteCloneDestinationValidator::validateOrFail($user, $source, $dest, 'new.example.com');
+        $this->assertTrue($org->fresh()->canCreateSite());
+        $this->assertSame(PHP_INT_MAX, $org->fresh()->maxSites());
     }
 }

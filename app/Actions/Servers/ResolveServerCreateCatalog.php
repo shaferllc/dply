@@ -31,7 +31,8 @@ final class ResolveServerCreateCatalog
      *     regions: list<array{value: string, label: string}>,
      *     sizes: list<array{value: string, label: string, price_monthly?: float|null, price_hourly?: float|null, pricing_source?: string|null, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>,
      *     region_label: string,
-     *     size_label: string
+     *     size_label: string,
+     *     kubernetes_clusters?: list<array<string, mixed>>
      * }
      */
     public function handle(
@@ -53,7 +54,7 @@ final class ResolveServerCreateCatalog
         }
 
         $credentials = GetProviderCredentialsForServerType::run($org, $type);
-        if (in_array($type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_lambda'], true)) {
+        if (in_array($type, ['digitalocean_functions', 'aws_lambda'], true)) {
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
@@ -71,14 +72,15 @@ final class ResolveServerCreateCatalog
 
         if (! $credential) {
             if ($type === 'digitalocean' && filled((string) config('services.digitalocean.token'))) {
-                return $this->catalogDigitalOcean($credentials, null);
+                return $this->catalogDigitalOcean($credentials, null, $selectedRegion);
             }
 
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
         return match ($type) {
-            'digitalocean' => $this->catalogDigitalOcean($credentials, $credential),
+            'digitalocean' => $this->catalogDigitalOcean($credentials, $credential, $selectedRegion),
+            'digitalocean_kubernetes' => $this->catalogDigitalOceanKubernetes($credentials, $credential),
             'hetzner' => $this->catalogHetzner($credentials, $credential),
             'linode' => $this->catalogLinode($credentials, $credential),
             'vultr' => $this->catalogVultr($credentials, $credential),
@@ -98,10 +100,11 @@ final class ResolveServerCreateCatalog
     /**
      * @param  Collection<int, ProviderCredential>  $credentials
      */
-    private function catalogDigitalOcean(Collection $credentials, ?ProviderCredential $credential): array
+    private function catalogDigitalOcean(Collection $credentials, ?ProviderCredential $credential, string $selectedRegion = ''): array
     {
         $regions = [];
         $sizes = [];
+        $selectedRegion = trim($selectedRegion);
         try {
             $token = config('services.digitalocean.token');
             $do = match (true) {
@@ -134,6 +137,15 @@ final class ResolveServerCreateCatalog
                 if ($v === '') {
                     continue;
                 }
+
+                // DO publishes per-size region availability — filter so the
+                // picker never offers a combo that the create-droplet API
+                // will reject with "Size is not available in this region."
+                $sizeRegions = is_array($s['regions'] ?? null) ? array_map('strval', $s['regions']) : [];
+                if ($selectedRegion !== '' && $sizeRegions !== [] && ! in_array($selectedRegion, $sizeRegions, true)) {
+                    continue;
+                }
+
                 $memMb = (int) ($s['memory'] ?? 0);
                 $vcpus = (int) ($s['vcpus'] ?? 0);
                 $diskGb = (int) ($s['disk'] ?? 0);
@@ -160,9 +172,7 @@ final class ResolveServerCreateCatalog
                 ];
             }
 
-            usort($sizes, static function (array $a, array $b): int {
-                return strnatcasecmp($a['value'], $b['value']);
-            });
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -173,6 +183,136 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Droplet size'),
+        ];
+    }
+
+    /**
+     * DOKS catalog: we don't expose region/size pickers (the user picks an
+     * existing cluster), but we DO want droplet pricing in the catalog so
+     * buildCostPreview can sum node_pool sizes into a monthly estimate. The
+     * cluster list comes back with node_pools inline — no second API call.
+     *
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string, price_monthly?: float|null, price_hourly?: float|null, pricing_source?: string|null, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>, region_label: string, size_label: string, kubernetes_clusters: list<array<string, mixed>>}
+     */
+    private function catalogDigitalOceanKubernetes(Collection $credentials, ProviderCredential $credential): array
+    {
+        $clusters = [];
+        $sizes = [];
+        $regions = [];
+        $kubernetesVersions = [];
+        try {
+            $do = new DigitalOceanService($credential);
+
+            $rawClusters = $do->getKubernetesClusters();
+            foreach ($rawClusters as $cluster) {
+                if (! is_array($cluster)) {
+                    continue;
+                }
+                $clusters[] = $cluster;
+            }
+
+            // /kubernetes/options publishes the *DOKS-eligible* subset of
+            // regions, sizes, and versions. Not every droplet/region from the
+            // top-level /sizes /regions catalogs is valid for a node pool;
+            // showing the full list lets the user pick a slug DO will reject
+            // ("invalid droplet size") on create. We use options as the
+            // allow-list and pull the rich spec/pricing from the full catalog.
+            $options = $do->getKubernetesOptions();
+            $allowedSizeSlugs = [];
+            foreach ((array) ($options['sizes'] ?? []) as $sizeOption) {
+                if (is_array($sizeOption) && ($slug = (string) ($sizeOption['slug'] ?? '')) !== '') {
+                    $allowedSizeSlugs[$slug] = true;
+                }
+            }
+            $allowedRegionSlugs = [];
+            foreach ((array) ($options['regions'] ?? []) as $regionOption) {
+                if (is_array($regionOption) && ($slug = (string) ($regionOption['slug'] ?? '')) !== '') {
+                    $allowedRegionSlugs[$slug] = true;
+                }
+            }
+
+            foreach ($do->getRegions() as $r) {
+                if (array_key_exists('available', $r) && $r['available'] === false) {
+                    continue;
+                }
+                $v = (string) ($r['slug'] ?? $r['id'] ?? '');
+                if ($v === '') {
+                    continue;
+                }
+                // Filter against the DOKS allow-list when present; if the
+                // options endpoint returned nothing (older accounts / API
+                // hiccup), fall back to the full list rather than wiping
+                // the picker.
+                if ($allowedRegionSlugs !== [] && ! isset($allowedRegionSlugs[$v])) {
+                    continue;
+                }
+                $regions[] = [
+                    'value' => $v,
+                    'label' => ($r['name'] ?? $r['slug'] ?? $v).' ('.$v.')',
+                ];
+            }
+            usort($regions, static fn (array $a, array $b): int => strcasecmp($a['label'], $b['label']));
+
+            foreach ($do->getSizes() as $s) {
+                if (array_key_exists('available', $s) && $s['available'] === false) {
+                    continue;
+                }
+                $v = (string) ($s['slug'] ?? $s['id'] ?? '');
+                if ($v === '') {
+                    continue;
+                }
+                if ($allowedSizeSlugs !== [] && ! isset($allowedSizeSlugs[$v])) {
+                    continue;
+                }
+                $monthly = $this->extractFloat($s, ['price_monthly']);
+                $memMb = (int) ($s['memory'] ?? 0);
+                $vcpus = (int) ($s['vcpus'] ?? 0);
+                $diskGb = (int) ($s['disk'] ?? 0);
+                $spec = $memMb >= 1024 ? sprintf('%dGB', (int) round($memMb / 1024)) : $memMb.'MB';
+                $spec .= ' / '.$vcpus.' '.__('vCPU');
+                $label = $v.' — '.$spec.($monthly !== null ? ' ($'.number_format($monthly, $monthly < 10 ? 2 : 0).'/mo)' : '');
+                $sizes[] = [
+                    'value' => $v,
+                    'label' => $label,
+                    'price_monthly' => $monthly,
+                    'price_hourly' => $this->extractFloat($s, ['price_hourly']),
+                    'pricing_source' => 'provider_catalog',
+                    'memory_mb' => $memMb > 0 ? $memMb : null,
+                    'vcpus' => $vcpus > 0 ? $vcpus : null,
+                    'disk_gb' => $diskGb > 0 ? $diskGb : null,
+                ];
+            }
+            $this->sortSizesByPriceAscending($sizes);
+
+            // DOKS-specific: published K8s versions (one flagged as default).
+            $rawVersions = is_array($options['versions'] ?? null) ? $options['versions'] : [];
+            foreach ($rawVersions as $version) {
+                if (! is_array($version)) {
+                    continue;
+                }
+                $slug = (string) ($version['slug'] ?? '');
+                $kubeVer = (string) ($version['kubernetes_version'] ?? $slug);
+                if ($slug === '') {
+                    continue;
+                }
+                $kubernetesVersions[] = [
+                    'value' => $slug,
+                    'label' => 'v'.$kubeVer,
+                ];
+            }
+        } catch (\Throwable) {
+            //
+        }
+
+        return [
+            'credentials' => $credentials,
+            'regions' => $regions,
+            'sizes' => $sizes,
+            'region_label' => __('Region'),
+            'size_label' => __('Droplet size'),
+            'kubernetes_clusters' => $clusters,
+            'kubernetes_versions' => $kubernetesVersions,
         ];
     }
 
@@ -214,6 +354,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -284,6 +425,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => ((int) ($t['disk'] ?? 0)) > 0 ? (int) ($t['disk'] ?? 0) : null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -335,6 +477,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => ((int) ($p['disk'] ?? 0)) > 0 ? (int) ($p['disk'] ?? 0) : null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -435,6 +578,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => ((int) ($p['storage_size'] ?? 0)) > 0 ? (int) ($p['storage_size'] ?? 0) : null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -486,6 +630,7 @@ final class ResolveServerCreateCatalog
                     'disk_gb' => null,
                 ];
             }
+            $this->sortSizesByPriceAscending($sizes);
         } catch (\Throwable) {
             //
         }
@@ -646,6 +791,36 @@ final class ResolveServerCreateCatalog
         }
 
         return '';
+    }
+
+    /**
+     * Sort size options by monthly price ascending so the wizard defaults
+     * to the cheapest plan. Sizes without pricing sink to the bottom; ties
+     * break alphabetically by SKU for stability.
+     *
+     * @param  list<array<string, mixed>>  $sizes
+     */
+    private function sortSizesByPriceAscending(array &$sizes): void
+    {
+        usort($sizes, static function (array $a, array $b): int {
+            $priceA = $a['price_monthly'] ?? null;
+            $priceB = $b['price_monthly'] ?? null;
+
+            if ($priceA === null && $priceB === null) {
+                return strnatcasecmp((string) $a['value'], (string) $b['value']);
+            }
+            if ($priceA === null) {
+                return 1;
+            }
+            if ($priceB === null) {
+                return -1;
+            }
+            if ($priceA === $priceB) {
+                return strnatcasecmp((string) $a['value'], (string) $b['value']);
+            }
+
+            return $priceA <=> $priceB;
+        });
     }
 
     private function awsMemoryForInstanceType(string $instanceType): ?int

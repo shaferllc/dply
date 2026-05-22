@@ -211,7 +211,36 @@ return [
         ['id' => '8.1', 'label' => 'PHP 8.1', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => '8.0', 'label' => 'PHP 8.0', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => '7.4', 'label' => 'PHP 7.4 (legacy)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
-        ['id' => 'none', 'label' => 'Not applicable', 'only_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
+        // 'none' is allowed for any role: PHP-less application stacks
+        // (Rails / Next.js / Django) and database / cache / load-balancer
+        // nodes all opt out here.
+        ['id' => 'none', 'label' => 'Not installed'],
+    ],
+    'ruby_versions' => [
+        ['id' => '3.3', 'label' => 'Ruby 3.3'],
+        ['id' => '3.2', 'label' => 'Ruby 3.2'],
+        ['id' => '3.1', 'label' => 'Ruby 3.1'],
+        ['id' => '3.0', 'label' => 'Ruby 3.0 (legacy)'],
+        ['id' => '', 'label' => 'Not installed'],
+    ],
+    'node_versions' => [
+        ['id' => '22', 'label' => 'Node 22 (current LTS)'],
+        ['id' => '20', 'label' => 'Node 20 (LTS)'],
+        ['id' => '18', 'label' => 'Node 18 (legacy)'],
+        ['id' => '', 'label' => 'Not installed'],
+    ],
+    'python_versions' => [
+        ['id' => '3.13', 'label' => 'Python 3.13'],
+        ['id' => '3.12', 'label' => 'Python 3.12'],
+        ['id' => '3.11', 'label' => 'Python 3.11'],
+        ['id' => '3.10', 'label' => 'Python 3.10'],
+        ['id' => '', 'label' => 'Not installed'],
+    ],
+    'go_versions' => [
+        ['id' => '1.23', 'label' => 'Go 1.23'],
+        ['id' => '1.22', 'label' => 'Go 1.22'],
+        ['id' => '1.21', 'label' => 'Go 1.21'],
+        ['id' => '', 'label' => 'Not installed'],
     ],
     'databases' => [
         ['id' => 'mysql84', 'label' => 'MySQL 8.4 (LTS)', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
@@ -226,6 +255,8 @@ return [
         ['id' => 'postgres15', 'label' => 'PostgreSQL 15', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         ['id' => 'postgres14', 'label' => 'PostgreSQL 14', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
         ['id' => 'sqlite3', 'label' => 'SQLite 3', 'exclude_server_roles' => ['load_balancer', 'redis', 'valkey', 'plain']],
-        ['id' => 'none', 'label' => 'None (external or not on this host)', 'only_server_roles' => ['application', 'docker', 'worker', 'load_balancer', 'redis', 'valkey', 'plain']],
+        // Same broadening as php_versions — Static-host preset is role
+        // 'static' with no DB; the role list shouldn't gate that.
+        ['id' => 'none', 'label' => 'None (external or not on this host)'],
     ],
 ];

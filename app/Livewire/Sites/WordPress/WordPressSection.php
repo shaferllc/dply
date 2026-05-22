@@ -1,0 +1,349 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Sites\WordPress;
+
+use App\Models\RemoteCliRun;
+use App\Models\Site;
+use App\Models\Snapshot;
+use App\Services\RemoteCli\Kind;
+use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\RemoteCli\RemoteCliPermissions;
+use App\Services\RemoteCli\WpCli;
+use App\Services\Snapshots\SnapshotDestinationFactory;
+use App\Services\Snapshots\SnapshotService;
+use App\Services\WordPress\Advisories\AdvisoryProvider;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+
+/**
+ * Container for the WordPress Site Settings section (Q14).
+ *
+ * Renders one of five sub-tabs (Console / Plugins / Database / Cron /
+ * Hardening). v1 ships with Console + Cron live; the other three are
+ * placeholders gated on a v2 message until PR 10 fills them in.
+ *
+ * Permission checks delegate to {@see WpCli} via the underlying
+ * {@see RemoteCliPermissions} gate (Q17), so
+ * the same risk classification that drives the API layer also drives
+ * the UI's enable/disable state.
+ */
+class WordPressSection extends Component
+{
+    public Site $site;
+
+    /** Active sub-tab. Persisted as ?wp= in the URL for sharing. */
+    #[Url(as: 'wp')]
+    public string $tab = 'console';
+
+    public string $consoleCommand = 'plugin list';
+
+    public string $consoleArgs = '--format=table';
+
+    /** Most recent run id rendered in the Console output panel. */
+    public ?int $latestRunId = null;
+
+    /**
+     * Plugins-tab cache. Populated by loadPlugins() from
+     * `wp plugin list --format=json`. Each entry is enriched with
+     * any open advisories from the AdvisoryProvider.
+     *
+     * @var list<array{name: string, status: string, version: string, update: string, advisories: list<array<string, mixed>>}>
+     */
+    public array $plugins = [];
+
+    public bool $pluginsLoaded = false;
+
+    public function mount(Site $site): void
+    {
+        $this->authorize('view', $site);
+        $this->site = $site;
+        // Non-WordPress sites get a friendly "not detected" placeholder
+        // (see view), matching how the Laravel section degrades when
+        // Laravel isn't detected. No 404 — the operator may be navigating
+        // around the site dashboard with no specific tab in mind.
+    }
+
+    public function render(): View
+    {
+        return view('livewire.sites.wordpress.wordpress-section', [
+            'history' => $this->history(),
+            'latestRun' => $this->latestRunId !== null ? RemoteCliRun::query()->find($this->latestRunId) : null,
+            'snapshots' => $this->snapshots(),
+        ]);
+    }
+
+    /**
+     * Run a wp-cli command from the Console sub-tab. The args field is
+     * a single-line string split on whitespace; for v1 that's enough
+     * (operators who need quoted args use the CLI surface from PR 12).
+     */
+    public function runConsoleCommand(WpCli $wpcli): void
+    {
+        $command = trim($this->consoleCommand);
+        if ($command === '') {
+            $this->addError('consoleCommand', __('Enter a wp-cli command.'));
+
+            return;
+        }
+
+        $args = $this->consoleArgs !== '' ? preg_split('/\s+/', trim($this->consoleArgs)) : [];
+
+        try {
+            $result = $wpcli->run(
+                site: $this->site,
+                command: $command,
+                args: array_values(array_filter($args ?: [], fn ($a) => is_string($a) && $a !== '')),
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('consoleCommand', __('Your role can\'t run :risk commands. Ask an admin or owner.', [
+                'risk' => $e->risk->value,
+            ]));
+
+            return;
+        }
+
+        $this->latestRunId = $result->run->id;
+    }
+
+    /**
+     * Cron sub-tab "switch to system cron" action. Adds the
+     * DISABLE_WP_CRON constant to wp-config.php (idempotent — wp config
+     * set short-circuits if already present) and inserts a crontab
+     * entry that runs `wp cron event run --due-now` every minute.
+     *
+     * Surfacing the inverse switch (back to wp-cron-via-HTTP) is the
+     * delete-the-crontab + wp config delete; left to PR 10's hardening
+     * tab to expose as a toggle.
+     */
+    public function switchToSystemCron(WpCli $wpcli): void
+    {
+        try {
+            $wpcli->run(
+                site: $this->site,
+                command: 'config set',
+                args: ['DISABLE_WP_CRON', 'true', '--raw', '--type=constant'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('cron', __('Admin or owner role required to switch cron handler.'));
+
+            return;
+        }
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['wp_cron'] = ['handler' => 'system_cron', 'switched_at' => now()->toISOString()];
+        $this->site->meta = $meta;
+        $this->site->save();
+    }
+
+    /**
+     * Plugins sub-tab loader — runs `wp plugin list --format=json`
+     * synchronously (the command is on the INSTANT allowlist) and
+     * decorates each entry with any open advisories from the
+     * AdvisoryProvider.
+     */
+    public function loadPlugins(WpCli $wpcli, AdvisoryProvider $advisories): void
+    {
+        try {
+            $result = $wpcli->run(
+                site: $this->site,
+                command: 'plugin list',
+                args: ['--format=json'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('plugins', __('Your role can\'t inspect plugins on this site.'));
+
+            return;
+        }
+
+        $stdout = trim($result->stdout());
+        $rows = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+        if (! is_array($rows)) {
+            $this->addError('plugins', __('wp plugin list returned non-JSON output.'));
+            $this->plugins = [];
+            $this->pluginsLoaded = true;
+
+            return;
+        }
+
+        $this->plugins = array_values(array_map(function (array $row) use ($advisories): array {
+            $name = (string) ($row['name'] ?? '');
+            $version = (string) ($row['version'] ?? '');
+            $advisoryList = $name !== '' && $version !== ''
+                ? $advisories->forPlugin($name, $version)
+                : [];
+
+            return [
+                'name' => $name,
+                'status' => (string) ($row['status'] ?? ''),
+                'version' => $version,
+                'update' => (string) ($row['update'] ?? 'none'),
+                'advisories' => array_map(fn ($a) => [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'severity' => $a->severity,
+                    'cve' => $a->cve,
+                    'patched' => $a->patchedVersion,
+                    'url' => $a->url,
+                ], $advisoryList),
+            ];
+        }, array_filter($rows, 'is_array')));
+
+        $this->pluginsLoaded = true;
+    }
+
+    /**
+     * Bulk update everything reporting "available" — single
+     * `wp plugin update --all` async dispatch (Q14 plugins sub-tab).
+     */
+    public function updateAllPlugins(WpCli $wpcli): void
+    {
+        try {
+            $wpcli->run(
+                site: $this->site,
+                command: 'plugin update',
+                args: ['--all'],
+                queuedBy: auth()->user(),
+            );
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('plugins', __('Updates require admin or owner role.'));
+        }
+    }
+
+    /**
+     * Database sub-tab — take a fresh snapshot. Routes to the
+     * preferred destination (S3 archive if configured, local-disk
+     * fallback otherwise) so operators who set up an S3 bucket get
+     * durable backups automatically without changing their click
+     * pattern. Admin/owner only.
+     */
+    public function takeSnapshot(SnapshotService $snapshots, SnapshotDestinationFactory $destinations): void
+    {
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('snapshots', __('Admin or owner role required to take snapshots.'));
+
+            return;
+        }
+
+        try {
+            $snapshots->take(
+                site: $this->site,
+                destination: $destinations->preferred(),
+                reason: Snapshot::REASON_MANUAL,
+                userId: auth()->id(),
+            );
+        } catch (\Throwable $e) {
+            $this->addError('snapshots', __('Snapshot failed: :err', ['err' => $e->getMessage()]));
+        }
+    }
+
+    /**
+     * Hardening sub-tab — flip a Q18 opinion on or off.
+     *
+     * Each opinion maps to a wp-cli call + a meta.scaffold.hardening
+     * entry update. The meta is the single source of truth for the
+     * UI; the wp-cli call is the side effect that makes the live site
+     * actually match.
+     */
+    public function toggleHardening(string $opinionKey, WpCli $wpcli): void
+    {
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('hardening', __('Admin or owner role required to change hardening defaults.'));
+
+            return;
+        }
+
+        $allowed = ['disallow_file_edit', 'force_ssl_admin', 'disable_wp_cron'];
+        if (! in_array($opinionKey, $allowed, true)) {
+            $this->addError('hardening', __('Unknown hardening opinion.'));
+
+            return;
+        }
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $opinions = $meta['scaffold']['hardening'] ?? [];
+        $current = collect($opinions)->firstWhere('key', $opinionKey);
+        $newEnabled = ! ($current['enabled'] ?? false);
+
+        $constant = match ($opinionKey) {
+            'disallow_file_edit' => 'DISALLOW_FILE_EDIT',
+            'force_ssl_admin' => 'FORCE_SSL_ADMIN',
+            'disable_wp_cron' => 'DISABLE_WP_CRON',
+        };
+
+        try {
+            if ($newEnabled) {
+                $wpcli->run(
+                    site: $this->site,
+                    command: 'config set',
+                    args: [$constant, 'true', '--raw', '--type=constant'],
+                    queuedBy: auth()->user(),
+                );
+            } else {
+                $wpcli->run(
+                    site: $this->site,
+                    command: 'config delete',
+                    args: [$constant, '--type=constant'],
+                    queuedBy: auth()->user(),
+                );
+            }
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('hardening', __('Permission denied: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        // Upsert the opinion row in meta — set enabled flag, leave
+        // unrelated keys untouched so PR 6's full set persists.
+        $found = false;
+        foreach ($opinions as &$row) {
+            if (($row['key'] ?? null) === $opinionKey) {
+                $row['enabled'] = $newEnabled;
+                $found = true;
+                break;
+            }
+        }
+        unset($row);
+        if (! $found) {
+            $opinions[] = ['key' => $opinionKey, 'enabled' => $newEnabled];
+        }
+        $meta['scaffold']['hardening'] = $opinions;
+        $this->site->meta = $meta;
+        $this->site->save();
+    }
+
+    /**
+     * @return Collection<int, Snapshot>
+     */
+    public function snapshots(): Collection
+    {
+        return Snapshot::query()
+            ->where('site_id', $this->site->id)
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+    }
+
+    /**
+     * Last 25 wp-cli runs against this site, regardless of transport.
+     *
+     * @return Collection<int, RemoteCliRun>
+     */
+    private function history(): Collection
+    {
+        return RemoteCliRun::query()
+            ->where('site_id', $this->site->id)
+            ->where('kind', Kind::Wp)
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+    }
+}

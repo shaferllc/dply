@@ -23,6 +23,8 @@ class Organization extends Model
         'slug',
         'email',
         'deploy_email_notifications_enabled',
+        'email_server_credentials_enabled',
+        'email_database_credentials_enabled',
         'server_site_preferences',
         'default_site_script_id',
         'cron_maintenance_until',
@@ -38,6 +40,8 @@ class Organization extends Model
         return [
             'trial_ends_at' => 'datetime',
             'deploy_email_notifications_enabled' => 'boolean',
+            'email_server_credentials_enabled' => 'boolean',
+            'email_database_credentials_enabled' => 'boolean',
             'server_site_preferences' => 'array',
             'cron_maintenance_until' => 'datetime',
             'firewall_settings' => 'array',
@@ -49,9 +53,165 @@ class Organization extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (Organization $organization): void {
+            // 14-day no-card trial — committed pricing model. Skip if explicitly
+            // set by the caller (factories, imports, fixtures) so they keep control.
+            if ($organization->trial_ends_at === null) {
+                $days = (int) config('subscription.standard.trial_days', 14);
+                $organization->trial_ends_at = now()->addDays($days);
+            }
+        });
+
         static::created(function (Organization $organization): void {
             $organization->createDefaultTeamIfMissing();
         });
+    }
+
+    /**
+     * True while the org is in its 14-day no-card trial window. Distinct from
+     * Cashier's onTrial() (which only knows about Stripe-tracked trials) —
+     * dply trials exist *before* a Stripe subscription is created.
+     */
+    public function onDplyTrial(): bool
+    {
+        return $this->trialState() === \App\Enums\TrialState::ActiveTrial;
+    }
+
+    /**
+     * Resolve the org's current subscription-lifecycle state. The single
+     * source of truth for "what can this org do right now?" — see
+     * App\Enums\TrialState for the full state machine.
+     */
+    public function trialState(): \App\Enums\TrialState
+    {
+        // Includes the cancel grace period — Cashier's valid() stays true
+        // until ends_at, so a just-canceled org keeps full access.
+        if ($this->onAnyPaidPlan()) {
+            return \App\Enums\TrialState::Subscribed;
+        }
+
+        $reference = $this->pauseLadderReference();
+        if ($reference !== null) {
+            $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
+
+            return $reference->copy()->addDays($softPauseDays)->isPast()
+                ? \App\Enums\TrialState::ExpiredHard
+                : \App\Enums\TrialState::ExpiredSoft;
+        }
+
+        if ($this->trial_ends_at === null) {
+            return \App\Enums\TrialState::NoTrial;
+        }
+
+        return \App\Enums\TrialState::ActiveTrial;
+    }
+
+    /**
+     * The date the soft → hard pause ladder is measured from, or null when the
+     * org isn't on a pause track. Two sources, in priority order:
+     *
+     *  1. A subscription that has fully ended (canceled, past its grace period)
+     *     — the org lapsed from a paid plan; measure from the subscription's
+     *     end date.
+     *  2. A trial that's already expired — measure from trial_ends_at.
+     *
+     * A future-dated trial returns null (still an active trial, not paused).
+     */
+    private function pauseLadderReference(): ?\Carbon\CarbonInterface
+    {
+        $subscription = $this->subscription('default');
+        if ($subscription && $subscription->ended() && $subscription->ends_at !== null) {
+            return $subscription->ends_at;
+        }
+
+        if ($this->trial_ends_at !== null && $this->trial_ends_at->isPast()) {
+            return $this->trial_ends_at;
+        }
+
+        return null;
+    }
+
+    /**
+     * True when the org's current pause state stems from a canceled/ended
+     * subscription rather than an expired trial — drives banner copy.
+     */
+    public function lapsedFromSubscription(): bool
+    {
+        $subscription = $this->subscription('default');
+
+        return $subscription !== null && $subscription->ended();
+    }
+
+    /**
+     * True when the subscription is canceled but still inside the period the
+     * customer already paid for — full access continues, billing stops at
+     * {@see subscriptionEndsAt}.
+     */
+    public function onSubscriptionGracePeriod(): bool
+    {
+        $subscription = $this->subscription('default');
+
+        return $subscription !== null && $subscription->onGracePeriod();
+    }
+
+    /**
+     * The date a canceled subscription's access ends. Null when not canceled.
+     */
+    public function subscriptionEndsAt(): ?\Carbon\CarbonInterface
+    {
+        return $this->subscription('default')?->ends_at;
+    }
+
+    /**
+     * When the soft-pause window flips to hard-pause. Null when not on a pause
+     * track (subscribed, active trial, no trial recorded). Useful for "agent
+     * disconnects on {date}" UI copy.
+     */
+    public function hardPauseStartsAt(): ?\Carbon\CarbonImmutable
+    {
+        if ($this->onAnyPaidPlan()) {
+            return null;
+        }
+
+        $reference = $this->pauseLadderReference();
+        if ($reference === null) {
+            return null;
+        }
+
+        $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
+
+        return $reference->copy()->addDays($softPauseDays)->toImmutable();
+    }
+
+    /**
+     * Gate for cash-burning deploy operations. False when in either expired-
+     * trial state; true while on any active subscription or live trial.
+     */
+    public function canDeploy(): bool
+    {
+        return $this->trialState()->permitsBilledWork();
+    }
+
+    /**
+     * Gate for the Run-Now scheduler button. Same policy as deploys: paused
+     * accounts can't trigger fresh runs, but the cron-driven scheduler that
+     * lives on the customer's own server continues independently of dply.
+     */
+    public function canSchedulerRun(): bool
+    {
+        return $this->trialState()->permitsBilledWork();
+    }
+
+    /**
+     * Gate for incoming agent metrics. Day-45 hard-pause behavior — dply
+     * stops accepting telemetry from the org's servers, which is where the
+     * ongoing cost lives. Soft-paused orgs keep reporting so dashboards and
+     * the billing page stay accurate while the customer is being prompted
+     * to add a card.
+     */
+    public function acceptsMetrics(): bool
+    {
+        return $this->trialState() !== \App\Enums\TrialState::ExpiredHard;
     }
 
     /**
@@ -280,6 +440,11 @@ class Organization extends Model
         return $this->hasMany(ProviderCredential::class);
     }
 
+    public function backupConfigurations(): HasMany
+    {
+        return $this->hasMany(BackupConfiguration::class);
+    }
+
     public function invitations(): HasMany
     {
         return $this->hasMany(OrganizationInvitation::class, 'organization_id');
@@ -305,70 +470,90 @@ class Organization extends Model
         return $this->morphMany(NotificationChannel::class, 'owner');
     }
 
+    /**
+     * Per-request memo for the current user's pivot role on this org.
+     * Without this, hasMember / hasAdminAccess / userIsDeployer each
+     * fire their own join against organization_user on every gate call —
+     * the debug bar showed the same row queried back-to-back from
+     * Organization.php#314, #319, #326 on a single page render.
+     *
+     * Keyed by user id so the cache works across users (e.g. when an
+     * admin views a teammate's permissions on the same org instance).
+     *
+     * @var array<string, ?string> user-id => role (or null when not a member)
+     */
+    private array $memberRoleMemo = [];
+
+    /**
+     * Class-level cache keyed by `{organization_id}:{user_id}` so two different
+     * Organization instances representing the same row (e.g. one from
+     * $user->currentOrganization(), one from $server->organization) share a
+     * single pivot lookup. The previous instance-level memo only saved
+     * repeated calls on the same instance, which left ~3 duplicate queries
+     * per page render.
+     *
+     * @var array<string, ?string>
+     */
+    private static array $memberRoleStaticMemo = [];
+
+    private function memberRole(User $user): ?string
+    {
+        $userId = (string) $user->id;
+        if (array_key_exists($userId, $this->memberRoleMemo)) {
+            return $this->memberRoleMemo[$userId];
+        }
+
+        $staticKey = (string) $this->id.':'.$userId;
+        if (array_key_exists($staticKey, self::$memberRoleStaticMemo)) {
+            return $this->memberRoleMemo[$userId] = self::$memberRoleStaticMemo[$staticKey];
+        }
+
+        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
+        $role = $pivot ? (string) $pivot->role : null;
+
+        self::$memberRoleStaticMemo[$staticKey] = $role;
+
+        return $this->memberRoleMemo[$userId] = $role;
+    }
+
+    /** Drop the cross-instance member-role cache (between requests in long-running processes / tests). */
+    public static function flushMemberRoleCache(): void
+    {
+        self::$memberRoleStaticMemo = [];
+    }
+
     public function hasMember(User $user): bool
     {
-        return $this->users()->where('user_id', $user->id)->exists();
+        return $this->memberRole($user) !== null;
     }
 
     public function hasAdminAccess(User $user): bool
     {
-        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
-
-        return $pivot && in_array($pivot->role, ['owner', 'admin'], true);
+        return in_array($this->memberRole($user), ['owner', 'admin'], true);
     }
 
     public function userIsDeployer(User $user): bool
     {
-        $pivot = $this->users()->where('user_id', $user->id)->first()?->pivot;
-
-        return $pivot && $pivot->role === 'deployer';
+        return $this->memberRole($user) === 'deployer';
     }
 
     /**
-     * Maximum number of servers allowed for this organization based on subscription.
-     * Trial / non-Pro (no active subscription or non-Pro plan): config subscription.limits.servers_free (default 3).
-     * Pro (pro_monthly or pro_yearly): unlimited.
+     * Maximum number of servers allowed. Always unlimited under the Standard
+     * model — trial-state gating (see canDeploy / acceptsMetrics) handles the
+     * cash-burning abuse case, so there's no need for an arbitrary server cap.
      */
     public function maxServers(): int
     {
-        $subscription = $this->subscription('default');
-        if ($subscription && $subscription->valid()) {
-            $plans = config('subscription.plans', []);
-            $proPriceIds = array_filter([
-                $plans['pro_monthly']['price_id'] ?? null,
-                $plans['pro_yearly']['price_id'] ?? null,
-            ]);
-            foreach ($proPriceIds as $priceId) {
-                if ($priceId && $subscription->hasPrice($priceId)) {
-                    return PHP_INT_MAX;
-                }
-            }
-        }
-
-        return config('subscription.limits.servers_free', 3);
+        return PHP_INT_MAX;
     }
 
     /**
-     * Maximum sites allowed for this organization (count includes all servers).
-     * Pro: unlimited. Otherwise {@see config('subscription.limits.sites_free')}.
+     * Maximum sites allowed. Always unlimited; the marketing page commits to
+     * "no per-site billing" and that's enforced here.
      */
     public function maxSites(): int
     {
-        $subscription = $this->subscription('default');
-        if ($subscription && $subscription->valid()) {
-            $plans = config('subscription.plans', []);
-            $proPriceIds = array_filter([
-                $plans['pro_monthly']['price_id'] ?? null,
-                $plans['pro_yearly']['price_id'] ?? null,
-            ]);
-            foreach ($proPriceIds as $priceId) {
-                if ($priceId && $subscription->hasPrice($priceId)) {
-                    return PHP_INT_MAX;
-                }
-            }
-        }
-
-        return max(0, config('subscription.limits.sites_free', 10));
+        return PHP_INT_MAX;
     }
 
     /**
@@ -409,22 +594,58 @@ class Organization extends Model
 
     public function planTierLabel(): string
     {
-        return $this->onProSubscription() ? 'Pro' : 'Trial';
+        if ($this->onEnterpriseSubscription()) {
+            return 'Enterprise';
+        }
+        if ($this->onStandardSubscription()) {
+            return 'Standard';
+        }
+
+        return 'Trial';
     }
 
-    public function onProSubscription(): bool
+    /**
+     * True when this org has any active paid subscription — Standard or Enterprise.
+     * Used as the "paying customer" gate by feature flags, API token creation, etc.
+     */
+    public function onAnyPaidPlan(): bool
+    {
+        return $this->onStandardSubscription() || $this->onEnterpriseSubscription();
+    }
+
+    /**
+     * True when the org is on the Standard plan (base price + per-server tiers).
+     */
+    public function onStandardSubscription(): bool
+    {
+        return $this->subscriptionMatchesAnyPrice([
+            config('subscription.standard.stripe.base_monthly'),
+            config('subscription.standard.stripe.base_yearly'),
+        ]);
+    }
+
+    /**
+     * True when the org has a sales-led Enterprise subscription.
+     */
+    public function onEnterpriseSubscription(): bool
+    {
+        return $this->subscriptionMatchesAnyPrice([
+            config('subscription.enterprise.stripe_price_id'),
+        ]);
+    }
+
+    /**
+     * @param  list<?string>  $priceIds
+     */
+    private function subscriptionMatchesAnyPrice(array $priceIds): bool
     {
         $subscription = $this->subscription('default');
         if (! $subscription || ! $subscription->valid()) {
             return false;
         }
-        $plans = config('subscription.plans', []);
-        $proPriceIds = array_filter([
-            $plans['pro_monthly']['price_id'] ?? null,
-            $plans['pro_yearly']['price_id'] ?? null,
-        ]);
-        foreach ($proPriceIds as $priceId) {
-            if ($priceId && $subscription->hasPrice($priceId)) {
+
+        foreach ($priceIds as $priceId) {
+            if (is_string($priceId) && $priceId !== '' && $subscription->hasPrice($priceId)) {
                 return true;
             }
         }
@@ -433,40 +654,12 @@ class Organization extends Model
     }
 
     /**
-     * Seat count from Stripe when seat billing is configured; null if not on Pro / not applicable.
-     * This remains an internal safeguard and is not part of the current public pricing story.
+     * Seat cap from Stripe is not part of the Standard pricing story — every
+     * paid plan gets unlimited team members. Kept as a stub returning null so
+     * {@see effectiveMemberSeatCap} can fall through to the env-level cap.
      */
     public function seatCapFromSubscription(): ?int
     {
-        if (! $this->onProSubscription()) {
-            return null;
-        }
-        $sub = $this->subscription('default');
-        if (! $sub) {
-            return null;
-        }
-        $seatPriceId = trim((string) (config('subscription.plans.seat.price_id') ?? ''));
-        if ($seatPriceId !== '' && $sub->hasPrice($seatPriceId)) {
-            try {
-                return max(1, (int) $sub->findItemOrFail($seatPriceId)->quantity);
-            } catch (\Throwable) {
-                return 1;
-            }
-        }
-        foreach (['pro_monthly', 'pro_yearly'] as $key) {
-            $pid = config("subscription.plans.{$key}.price_id");
-            if (! $pid || ! $sub->hasPrice($pid)) {
-                continue;
-            }
-            if ($sub->hasMultiplePrices()) {
-                $item = $sub->items->firstWhere('stripe_price', $pid);
-
-                return max(1, (int) ($item?->quantity ?? 1));
-            }
-
-            return max(1, (int) ($sub->quantity ?? 1));
-        }
-
         return null;
     }
 

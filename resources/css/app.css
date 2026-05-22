@@ -86,6 +86,45 @@ html.dark {
         @apply rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm sm:p-5;
     }
 
+    /* Global "this button is talking to the server" affordance, toggled by
+       the click handler in app.js for any wire:click element.
+       Approach: hide the button's contents during the round-trip (so the
+       spinner isn't fighting the label text) and centre a spinner on top.
+       The button keeps its original width — `visibility: hidden` collapses
+       the content visually without removing it from layout, and a
+       `color: transparent` fallback hides any raw text nodes that aren't
+       wrapped in a child element. The spinner's border colour is read at
+       click time and stashed on the element as a CSS variable so a
+       rose-tinted button gets a rose spinner, a forest button gets a
+       forest spinner, etc. */
+    .dply-btn-busy {
+        position: relative;
+        cursor: progress;
+        color: transparent !important;
+        text-shadow: none !important;
+        user-select: none;
+    }
+    .dply-btn-busy > * {
+        visibility: hidden;
+    }
+    .dply-btn-busy::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        border: 2px solid var(--dply-btn-spinner-color, #1f2937);
+        border-right-color: transparent;
+        border-radius: 9999px;
+        animation: dply-btn-spin 0.6s linear infinite;
+        pointer-events: none;
+    }
+    @keyframes dply-btn-spin {
+        to { transform: rotate(360deg); }
+    }
+
     /** Same horizontal bounds as the dashboard (`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8`). */
     .dply-page-shell {
         @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;

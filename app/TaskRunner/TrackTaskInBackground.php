@@ -341,9 +341,13 @@ class TrackTaskInBackground extends Task implements HasCallbacks
             $errors['script_size'] = 'Script is too large (max 1024KB).';
         }
 
+        // Word-boundary match (see Task::validateScript for why) — the
+        // old stripos() flagged any 'rm -rf /...' since 'rm -rf /' is a
+        // substring of every absolute-path removal.
         $forbiddenCommands = config('task-runner.security.forbidden_commands', []);
         foreach ($forbiddenCommands as $command) {
-            if (stripos($script, $command) !== false) {
+            $pattern = '/(?:^|\s)'.preg_quote($command, '/').'(?![\w\/.\-])/i';
+            if (preg_match($pattern, $script)) {
                 $errors['forbidden_command'] = "Script contains forbidden command: {$command}";
                 break;
             }

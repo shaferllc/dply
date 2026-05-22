@@ -9,6 +9,8 @@ use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
 use App\Services\HetznerService;
+use App\Services\Imports\Forge\ForgeImportDriver;
+use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
@@ -117,6 +119,42 @@ trait ManagesProviderCredentials
 
     public string $oracle_api_token = '';
 
+    public string $do_app_platform_name = '';
+
+    public string $do_app_platform_api_token = '';
+
+    public string $aws_app_runner_name = '';
+
+    public string $aws_app_runner_access_key_id = '';
+
+    public string $aws_app_runner_secret_access_key = '';
+
+    public string $aws_app_runner_region = 'us-east-1';
+
+    public string $ploi_name = '';
+
+    public string $ploi_api_token = '';
+
+    public string $forge_name = '';
+
+    public string $forge_api_token = '';
+
+    public string $gandi_name = '';
+
+    public string $gandi_api_token = '';
+
+    public string $namecheap_name = '';
+
+    public string $namecheap_api_user = '';
+
+    public string $namecheap_api_key = '';
+
+    public string $vercel_dns_name = '';
+
+    public string $vercel_dns_api_token = '';
+
+    public string $vercel_dns_team_id = '';
+
     public function storeDigitalOcean(): void
     {
         if (! $this->ensureProviderEnabled('digitalocean')) {
@@ -156,6 +194,34 @@ trait ManagesProviderCredentials
         ], [], ['hetzner_api_token' => 'API token']);
         if ($this->storeProviderCredential('hetzner', $this->hetzner_name, $this->hetzner_api_token, 'hetzner_api_token')) {
             $this->reset('hetzner_name', 'hetzner_api_token');
+        }
+    }
+
+    public function storePloi(): void
+    {
+        if (! $this->ensureProviderEnabled('ploi')) {
+            return;
+        }
+        $this->validate([
+            'ploi_name' => 'nullable|string|max:255',
+            'ploi_api_token' => 'required|string',
+        ], [], ['ploi_api_token' => 'API token']);
+        if ($this->storeProviderCredential('ploi', $this->ploi_name, $this->ploi_api_token, 'ploi_api_token')) {
+            $this->reset('ploi_name', 'ploi_api_token');
+        }
+    }
+
+    public function storeForge(): void
+    {
+        if (! $this->ensureProviderEnabled('forge')) {
+            return;
+        }
+        $this->validate([
+            'forge_name' => 'nullable|string|max:255',
+            'forge_api_token' => 'required|string',
+        ], [], ['forge_api_token' => 'API token']);
+        if ($this->storeProviderCredential('forge', $this->forge_name, $this->forge_api_token, 'forge_api_token')) {
+            $this->reset('forge_name', 'forge_api_token');
         }
     }
 
@@ -409,6 +475,66 @@ trait ManagesProviderCredentials
         $this->notifyProviderCredentialStored('fly_io');
     }
 
+    public function storeDigitalOceanAppPlatform(): void
+    {
+        if (! $this->ensureProviderEnabled('digitalocean_app_platform')) {
+            return;
+        }
+        $this->validate([
+            'do_app_platform_name' => 'nullable|string|max:255',
+            'do_app_platform_api_token' => 'required|string',
+        ], [], ['do_app_platform_api_token' => 'API token']);
+        if ($this->storeProviderCredential(
+            'digitalocean_app_platform',
+            $this->do_app_platform_name,
+            $this->do_app_platform_api_token,
+            'do_app_platform_api_token',
+        )) {
+            $this->reset('do_app_platform_name', 'do_app_platform_api_token');
+        }
+    }
+
+    public function storeAwsAppRunner(): void
+    {
+        if (! $this->ensureProviderEnabled('aws_app_runner')) {
+            return;
+        }
+        $this->validate([
+            'aws_app_runner_name' => 'nullable|string|max:255',
+            'aws_app_runner_access_key_id' => 'required|string|max:255',
+            'aws_app_runner_secret_access_key' => 'required|string|max:255',
+            'aws_app_runner_region' => 'required|string|max:50',
+        ], [], [
+            'aws_app_runner_access_key_id' => 'Access key ID',
+            'aws_app_runner_secret_access_key' => 'Secret access key',
+            'aws_app_runner_region' => 'Region',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'aws_app_runner',
+            'name' => trim($this->aws_app_runner_name) ?: 'AWS App Runner',
+            'credentials' => [
+                'access_key_id' => $this->aws_app_runner_access_key_id,
+                'secret_access_key' => $this->aws_app_runner_secret_access_key,
+                'region' => $this->aws_app_runner_region,
+            ],
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset(
+            'aws_app_runner_name',
+            'aws_app_runner_access_key_id',
+            'aws_app_runner_secret_access_key',
+        );
+        $this->notifyProviderCredentialStored('aws_app_runner');
+    }
+
     public function storeRender(): void
     {
         if (! $this->ensureProviderEnabled('render')) {
@@ -559,6 +685,86 @@ trait ManagesProviderCredentials
         }
     }
 
+    public function storeGandi(): void
+    {
+        if (! $this->ensureProviderEnabled('gandi')) {
+            return;
+        }
+        $this->validate([
+            'gandi_name' => 'nullable|string|max:255',
+            'gandi_api_token' => 'required|string',
+        ], [], ['gandi_api_token' => 'API token']);
+        if ($this->storeProviderCredential('gandi', $this->gandi_name, $this->gandi_api_token, 'gandi_api_token')) {
+            $this->reset('gandi_name', 'gandi_api_token');
+        }
+    }
+
+    public function storeNamecheap(): void
+    {
+        if (! $this->ensureProviderEnabled('namecheap')) {
+            return;
+        }
+        $this->validate([
+            'namecheap_name' => 'nullable|string|max:255',
+            'namecheap_api_user' => 'required|string|max:255',
+            'namecheap_api_key' => 'required|string',
+        ], [], [
+            'namecheap_api_user' => 'API user',
+            'namecheap_api_key' => 'API key',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'namecheap',
+            'name' => trim($this->namecheap_name) ?: 'Namecheap',
+            'credentials' => [
+                'api_user' => trim($this->namecheap_api_user),
+                'api_key' => $this->namecheap_api_key,
+            ],
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset('namecheap_name', 'namecheap_api_user', 'namecheap_api_key');
+        $this->notifyProviderCredentialStored('namecheap');
+    }
+
+    public function storeVercelDns(): void
+    {
+        if (! $this->ensureProviderEnabled('vercel_dns')) {
+            return;
+        }
+        $this->validate([
+            'vercel_dns_name' => 'nullable|string|max:255',
+            'vercel_dns_api_token' => 'required|string',
+            'vercel_dns_team_id' => 'nullable|string|max:255',
+        ], [], ['vercel_dns_api_token' => 'API token']);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        $credentials = ['api_token' => $this->vercel_dns_api_token];
+        if (trim($this->vercel_dns_team_id) !== '') {
+            $credentials['team_id'] = trim($this->vercel_dns_team_id);
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'vercel_dns',
+            'name' => trim($this->vercel_dns_name) ?: 'Vercel DNS',
+            'credentials' => $credentials,
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset('vercel_dns_name', 'vercel_dns_api_token', 'vercel_dns_team_id');
+        $this->notifyProviderCredentialStored('vercel_dns');
+    }
+
     protected function ensureProviderEnabled(string $provider): bool
     {
         if (ServerProviderGate::enabled($provider)) {
@@ -584,7 +790,8 @@ trait ManagesProviderCredentials
         $defaultNames = [
             'digitalocean' => 'DigitalOcean', 'cloudflare' => 'Cloudflare', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
             'akamai' => 'Akamai', 'ovh' => 'OVH', 'rackspace' => 'Rackspace', 'render' => 'Render', 'railway' => 'Railway',
-            'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud',
+            'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud', 'ploi' => 'Ploi', 'forge' => 'Laravel Forge',
+            'gandi' => 'Gandi',
         ];
         $credential = auth()->user()->providerCredentials()->create([
             'organization_id' => $org->id,
@@ -608,7 +815,11 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle'], true)) {
+            } elseif ($provider === 'ploi') {
+                PloiImportDriver::for($credential)->validateConnection();
+            } elseif ($provider === 'forge') {
+                ForgeImportDriver::for($credential)->validateConnection();
+            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform', 'gandi'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");
@@ -639,7 +850,7 @@ trait ManagesProviderCredentials
     {
         return in_array($provider, [
             'digitalocean', 'cloudflare', 'hetzner', 'linode', 'akamai', 'vultr',
-            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws',
+            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws', 'ploi', 'forge',
         ], true);
     }
 
@@ -669,6 +880,8 @@ trait ManagesProviderCredentials
                 'scaleway' => (new ScalewayService($credential))->validateToken(),
                 'fly_io' => (new FlyIoService($credential))->validateToken($credential->credentials['org_slug'] ?? 'personal'),
                 'aws' => (new AwsEc2Service($credential))->validateCredentials(),
+                'ploi' => PloiImportDriver::for($credential)->validateConnection(),
+                'forge' => ForgeImportDriver::for($credential)->validateConnection(),
                 default => throw new \RuntimeException(__('Unknown provider.')),
             };
 

@@ -37,13 +37,21 @@ class AssignableNotificationChannels
                 ->where('teams.organization_id', $org->id)
                 ->pluck('teams.id');
 
-            foreach ($teamIds as $tid) {
-                $team = Team::query()->find($tid);
-                if ($team && Gate::allows('manageNotificationChannels', $team)) {
+            // Batch the team fetch and pre-attach the organization relation we already
+            // have in scope — Team::userCanManageSshKeys checks $this->organization,
+            // and without this the gate check lazy-loads the same Organization once
+            // per team.
+            $teams = $teamIds->isEmpty()
+                ? collect()
+                : Team::query()->whereIn('id', $teamIds)->get()
+                    ->each(fn (Team $team) => $team->setRelation('organization', $org));
+
+            foreach ($teams as $team) {
+                if (Gate::allows('manageNotificationChannels', $team)) {
                     $ids = $ids->merge(
                         NotificationChannel::query()
                             ->where('owner_type', Team::class)
-                            ->where('owner_id', $tid)
+                            ->where('owner_id', $team->id)
                             ->pluck('id')
                     );
                 }

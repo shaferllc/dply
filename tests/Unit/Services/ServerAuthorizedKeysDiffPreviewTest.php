@@ -61,9 +61,17 @@ class ServerAuthorizedKeysDiffPreviewTest extends TestCase
         $diff = $preview->diffPerUser($server->fresh(['authorizedKeys']));
 
         $this->assertArrayHasKey('root', $diff);
-        $this->assertSame([$kPanel], $diff['root']['desired']);
+        // The service auto-injects the recovery public key (derived from
+        // ssh_private_key) into root's desired list — see
+        // ServerAuthorizedKeysDiffPreview::diffPerUser lines 46-56. So
+        // the desired/added arrays carry the panel key + recovery key,
+        // and the test asserts the panel key's presence rather than
+        // exact-equals the whole list.
+        $this->assertContains($kPanel, $diff['root']['desired']);
+        $this->assertCount(2, $diff['root']['desired']);
         $this->assertSame([$kRemoteOld], $diff['root']['remote']);
-        $this->assertSame([$kPanel], $diff['root']['added']);
+        $this->assertContains($kPanel, $diff['root']['added']);
+        $this->assertCount(2, $diff['root']['added']);
         $this->assertSame([$kRemoteOld], $diff['root']['removed']);
     }
 }

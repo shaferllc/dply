@@ -4,7 +4,6 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\SyncServerSystemdServicesJob;
-use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\ServerSystemdServiceAuditEvent;
@@ -19,6 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -43,8 +43,9 @@ trait ManagesServerSystemdServices
 
     /**
      * When a queued systemd SSH task finishes, whether to dispatch {@see SyncServerSystemdServicesJob} (false for read-only status).
+     * Public so it survives wire:poll round-trips — protected Livewire properties are reset on every request.
      */
-    protected ?bool $systemdQueueInventoryAfterRemoteTask = null;
+    public ?bool $systemdQueueInventoryAfterRemoteTask = null;
 
     /**
      * @var list<array{unit: string, label: string, active: string, sub: string, ts: string, version: string, custom: bool, can_manage: bool}>
@@ -86,22 +87,140 @@ trait ManagesServerSystemdServices
 
     public ?string $systemdStatusModalError = null;
 
+    /** Which body the status modal is showing: 'status' (systemctl) or 'logs' (journalctl). */
+    public string $systemdStatusModalView = 'status';
+
+    public bool $showSystemdActionConfirm = false;
+
+    /**
+     * Kind drives icon, tone, copy. One of: 'start', 'restart', 'stop', 'reload', 'enable',
+     * 'disable', 'bulk-restart', 'bulk-stop', 'remove-custom'.
+     */
+    public string $systemdActionConfirmKind = '';
+
+    public string $systemdActionConfirmUnit = '';
+
+    public function openSystemdActionConfirm(string $kind, ?string $unit = null): void
+    {
+        if (! in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable', 'bulk-restart', 'bulk-stop', 'remove-custom'], true)) {
+            return;
+        }
+        $this->systemdActionConfirmKind = $kind;
+        $this->systemdActionConfirmUnit = (string) $unit;
+        $this->showSystemdActionConfirm = true;
+    }
+
+    public function closeSystemdActionConfirm(): void
+    {
+        $this->showSystemdActionConfirm = false;
+        $this->systemdActionConfirmKind = '';
+        $this->systemdActionConfirmUnit = '';
+    }
+
+    public function confirmSystemdAction(): void
+    {
+        $kind = $this->systemdActionConfirmKind;
+        $unit = $this->systemdActionConfirmUnit;
+        $this->closeSystemdActionConfirm();
+
+        match (true) {
+            $kind === 'bulk-restart' => $this->bulkSystemdRestart(),
+            $kind === 'bulk-stop' => $this->bulkSystemdStop(),
+            $kind === 'remove-custom' && $unit !== '' => $this->removeCustomSystemdUnit($unit),
+            in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable'], true) && $unit !== ''
+                => $this->runSystemdServiceAction($unit, $kind),
+            default => null,
+        };
+    }
+
+    /**
+     * Locate the current inventory row for the unit being confirmed so the modal can render
+     * its active state, PID, boot state, etc. Returns null when the modal is bulk or the unit
+     * isn't in the cached inventory (e.g. fresh server with no sync yet).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function systemdActionConfirmRow(): ?array
+    {
+        $unit = $this->systemdActionConfirmUnit;
+        $kind = $this->systemdActionConfirmKind;
+        if ($unit === '' || str_starts_with($kind, 'bulk-') || $kind === 'remove-custom') {
+            return null;
+        }
+
+        foreach ($this->systemdInventory as $row) {
+            if (($row['unit'] ?? '') === $unit) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The exact bash command the action will run over SSH — surfaced in the modal so the
+     * operator sees what's about to happen before they confirm. Bulk returns a short preview
+     * (first selected unit). Remove-custom is not an SSH action and returns null.
+     */
+    public function systemdActionConfirmCommand(): ?string
+    {
+        $kind = $this->systemdActionConfirmKind;
+        $unit = $this->systemdActionConfirmUnit;
+
+        if ($kind === '' || $kind === 'remove-custom') {
+            return null;
+        }
+
+        if (in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable'], true) && $unit !== '') {
+            return $this->systemdActionBash($unit, $kind);
+        }
+
+        if ($kind === 'bulk-restart' || $kind === 'bulk-stop') {
+            $action = $kind === 'bulk-restart' ? 'restart' : 'stop';
+            $first = $this->systemdSelectedList[0] ?? null;
+            if (! is_string($first) || $first === '') {
+                return null;
+            }
+            $count = count($this->systemdSelectedList);
+            $preview = $this->systemdActionBash($first, $action);
+            if ($count > 1) {
+                $preview .= "\n# … and ".($count - 1).' more';
+            }
+
+            return $preview;
+        }
+
+        return null;
+    }
+
+    public bool $showSystemdNotifyModal = false;
+
+    public string $systemdNotifyUnit = '';
+
+    protected ?string $systemdNotifyUnitNormalized = null;
+
     /**
      * Channel id => which inventory-driven events notify that channel for the open unit.
      *
      * @var array<string, array{stopped: bool, started: bool, restarted: bool, state_changed: bool}>
      */
-    public array $systemdStatusModalAlertMatrix = [];
+    public array $systemdNotifyMatrix = [];
 
     /**
      * @var list<array{id: string, label: string}>
      */
-    public array $systemdStatusModalChannelRows = [];
+    public array $systemdNotifyChannelRows = [];
 
-    /** @var null|'action'|'status_modal' */
-    protected ?string $systemdPendingKind = null;
+    /**
+     * @var null|'action'|'status_modal'
+     *
+     * Public so it survives wire:poll — the cache-poll completion handler reads this to decide
+     * whether to fire {@see finishSystemdActionBanner}. Protected would reset to null on every
+     * Livewire request, leaving the action banner stuck on `queued`.
+     */
+    public ?string $systemdPendingKind = null;
 
-    protected ?string $systemdPendingActionUnit = null;
+    public ?string $systemdPendingActionUnit = null;
 
     public ?string $systemdRowBusyUnit = null;
 
@@ -113,21 +232,123 @@ trait ManagesServerSystemdServices
 
     public string $systemdFilterCustom = 'all';
 
-    public string $systemdFilterNotify = 'all';
+    /**
+     * When false, the services table hides background units the operator can't manage
+     * (getty@tty1, ModemManager, multipathd, dbus, …). Failed units always render.
+     * Toggled by the table footer "Show all services" button.
+     */
+    public bool $systemdShowSystem = false;
 
-    public bool $showSystemdBulkNotifyModal = false;
+    public function toggleSystemdShowSystem(): void
+    {
+        $this->systemdShowSystem = ! $this->systemdShowSystem;
+    }
 
-    public string $systemdBulkNotifyChannelId = '';
+    public string $services_workspace_tab = 'inventory';
 
-    /** @var array<string, bool> */
-    public array $systemdBulkNotifyKinds = [
-        'stopped' => true,
-        'started' => false,
-        'restarted' => false,
-        'state_changed' => true,
-    ];
+    /**
+     * Latest sync.at timestamp the operator dismissed; the inventory-sync banner stays hidden
+     * for that exact run and re-arms automatically on the next sync (different `at`). Persisted
+     * in the session so dismissal survives a full page reload — Livewire properties otherwise
+     * reset on remount.
+     */
+    public ?string $systemdSyncBannerDismissedAt = null;
 
-    public ?string $systemdEntrySnippet = null;
+    public function dismissSystemdSyncBanner(): void
+    {
+        $at = (string) ($this->systemdInventorySyncMeta()['at'] ?? '');
+        $this->systemdSyncBannerDismissedAt = $at;
+        session([$this->systemdSyncBannerDismissSessionKey() => $at]);
+    }
+
+    public function hydrateSystemdSyncBannerDismissalFromSession(): void
+    {
+        $at = session($this->systemdSyncBannerDismissSessionKey());
+        $this->systemdSyncBannerDismissedAt = is_string($at) && $at !== '' ? $at : null;
+    }
+
+    protected function systemdSyncBannerDismissSessionKey(): string
+    {
+        return 'systemd_sync_banner_dismissed_at:server:'.$this->server->id;
+    }
+
+    /**
+     * Action banner: surfaces the most recent (or in-flight) systemctl action over SSH so the
+     * operator can see queued/running/completed/failed status and the SSH transcript without
+     * waiting for an inventory poll.
+     */
+    public string $systemdActionBannerKind = '';
+
+    public string $systemdActionBannerUnit = '';
+
+    public string $systemdActionBannerStatus = '';
+
+    /**
+     * @var list<string>
+     */
+    public array $systemdActionBannerLines = [];
+
+    public ?string $systemdActionBannerError = null;
+
+    public ?string $systemdActionBannerStartedAt = null;
+
+    public ?string $systemdActionBannerFinishedAt = null;
+
+    public function dismissSystemdActionBanner(): void
+    {
+        if (in_array($this->systemdActionBannerStatus, ['queued', 'running'], true)) {
+            return;
+        }
+        $this->resetSystemdActionBanner();
+    }
+
+    protected function resetSystemdActionBanner(): void
+    {
+        $this->systemdActionBannerKind = '';
+        $this->systemdActionBannerUnit = '';
+        $this->systemdActionBannerStatus = '';
+        $this->systemdActionBannerLines = [];
+        $this->systemdActionBannerError = null;
+        $this->systemdActionBannerStartedAt = null;
+        $this->systemdActionBannerFinishedAt = null;
+    }
+
+    protected function startSystemdActionBanner(string $kind, string $unitLabel): void
+    {
+        $this->systemdActionBannerKind = $kind;
+        $this->systemdActionBannerUnit = $unitLabel;
+        $this->systemdActionBannerStatus = 'running';
+        $this->systemdActionBannerLines = [];
+        $this->systemdActionBannerError = null;
+        $this->systemdActionBannerStartedAt = now()->toIso8601String();
+        $this->systemdActionBannerFinishedAt = null;
+    }
+
+    protected function appendSystemdActionBannerOutput(string $buffer): void
+    {
+        if ($this->systemdActionBannerStatus === '') {
+            return;
+        }
+        foreach (preg_split('/\r?\n/', rtrim($buffer, "\r\n")) ?: [] as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $this->systemdActionBannerLines[] = $line;
+        }
+        if (count($this->systemdActionBannerLines) > 200) {
+            $this->systemdActionBannerLines = array_slice($this->systemdActionBannerLines, -200);
+        }
+    }
+
+    protected function finishSystemdActionBanner(string $status, ?string $error = null): void
+    {
+        if ($this->systemdActionBannerStatus === '') {
+            return;
+        }
+        $this->systemdActionBannerStatus = $status;
+        $this->systemdActionBannerError = $error;
+        $this->systemdActionBannerFinishedAt = now()->toIso8601String();
+    }
 
     protected function systemdDeployerWorkspaceBlocked(): bool
     {
@@ -157,16 +378,25 @@ trait ManagesServerSystemdServices
     }
 
     /**
-     * Status button entrypoint (separate from {@see openSystemdAlertsModalForService} so wire:loading does not cross wires).
+     * Open the Status + Logs modal for a unit and immediately fetch systemctl output over SSH.
      */
     public function openSystemdStatusModalForService(string $unit): void
     {
-        $this->openSystemdServiceModal($unit, true);
-    }
+        $normalized = $this->validateUnitForModal($unit);
+        if ($normalized === null) {
+            return;
+        }
 
-    public function openSystemdAlertsModalForService(string $unit): void
-    {
-        $this->openSystemdServiceModal($unit, false);
+        $this->showSystemdStatusModal = true;
+        $this->systemdStatusModalUnit = $normalized;
+        $this->systemdStatusModalUnitNormalized = $normalized;
+        $this->systemdStatusModalError = null;
+
+        // Inline SSH in this request (same as Refresh). Avoid $this->js() deferred calls — Livewire xjs scope
+        // does not bind $wire, so deferred fetch often never ran and the modal stuck on “Fetching…”.
+        $this->systemdStatusModalLoading = true;
+        $this->systemdStatusModalOutput = '';
+        $this->fillSystemdModalStatusFromRemoteSsh($normalized);
     }
 
     public function closeSystemdStatusModal(): void
@@ -175,17 +405,41 @@ trait ManagesServerSystemdServices
         $this->systemdStatusModalUnit = '';
         $this->systemdStatusModalUnitNormalized = null;
         $this->systemdStatusModalOutput = '';
-        $this->systemdStatusModalAlertMatrix = [];
-        $this->systemdStatusModalChannelRows = [];
         $this->systemdStatusModalLoading = false;
         $this->systemdStatusModalError = null;
-        $this->systemdEntrySnippet = null;
+        $this->systemdStatusModalView = 'status';
     }
 
     /**
-     * @param  bool  $fetchStatus  When false, only configure notification routing (no SSH).
+     * Open the dedicated Notify modal (channels × event-kinds matrix) for a unit. No SSH fetch.
      */
-    public function openSystemdServiceModal(string $unit, bool $fetchStatus = true): void
+    public function openSystemdNotifyModalForService(string $unit): void
+    {
+        $normalized = $this->validateUnitForModal($unit);
+        if ($normalized === null) {
+            return;
+        }
+
+        $this->showSystemdNotifyModal = true;
+        $this->systemdNotifyUnit = $normalized;
+        $this->systemdNotifyUnitNormalized = $normalized;
+        $this->loadSystemdNotifyMatrix();
+    }
+
+    public function closeSystemdNotifyModal(): void
+    {
+        $this->showSystemdNotifyModal = false;
+        $this->systemdNotifyUnit = '';
+        $this->systemdNotifyUnitNormalized = null;
+        $this->systemdNotifyMatrix = [];
+        $this->systemdNotifyChannelRows = [];
+    }
+
+    /**
+     * Shared validation/authorization for both modal openers; returns the normalized unit name or
+     * null when the modal should not open (an error has been surfaced as a toast).
+     */
+    protected function validateUnitForModal(string $unit): ?string
     {
         $this->authorize('update', $this->server);
         $this->remote_error = null;
@@ -193,42 +447,43 @@ trait ManagesServerSystemdServices
         if ($this->systemdDeployerWorkspaceBlocked()) {
             $this->setSystemdRemoteError(__('Deployers cannot control services on servers.'));
 
-            return;
+            return null;
         }
 
         if (! $this->serverOpsReady()) {
             $this->setSystemdRemoteError(__('Provisioning and SSH must be ready before running actions.'));
 
-            return;
+            return null;
         }
 
         try {
-            $normalized = app(ServerSystemdServicesCatalog::class)->assertSafeUnitNameForStatus($unit);
+            return app(ServerSystemdServicesCatalog::class)->assertSafeUnitNameForStatus($unit);
         } catch (\InvalidArgumentException $e) {
             $this->setSystemdRemoteError($e->getMessage());
 
+            return null;
+        }
+    }
+
+    /**
+     * Open the Status modal in "Logs" mode (journalctl).
+     */
+    public function openSystemdLogsModalForService(string $unit): void
+    {
+        $this->systemdStatusModalView = 'logs';
+        $this->openSystemdStatusModalForService($unit);
+    }
+
+    /**
+     * Toggle between Status and Logs without closing the modal.
+     */
+    public function setSystemdStatusModalView(string $view): void
+    {
+        if (! in_array($view, ['status', 'logs'], true)) {
             return;
         }
-
-        $this->showSystemdStatusModal = true;
-        $this->systemdStatusModalUnit = $normalized;
-        $this->systemdStatusModalUnitNormalized = $normalized;
-        $this->systemdStatusModalError = null;
-        $this->loadSystemdStatusModalAlertMatrix();
-
-        if (! $fetchStatus) {
-            $this->systemdStatusModalLoading = false;
-            $this->systemdStatusModalOutput = '';
-
-            return;
-        }
-
-        // Inline SSH in this request (same as Refresh). Avoid $this->js() deferred calls — Livewire xjs scope
-        // does not bind $wire, so deferred fetch often never ran and the modal stuck on “Fetching…”.
-        $this->systemdStatusModalLoading = true;
-        $this->systemdStatusModalError = null;
-        $this->systemdStatusModalOutput = '';
-        $this->fillSystemdModalStatusFromRemoteSsh($normalized);
+        $this->systemdStatusModalView = $view;
+        $this->fetchSystemdModalStatus();
     }
 
     /**
@@ -281,7 +536,8 @@ trait ManagesServerSystemdServices
      */
     protected function fillSystemdModalStatusFromRemoteSsh(string $normalized): void
     {
-        $script = $this->systemdActionBash($normalized, 'status');
+        $view = $this->systemdStatusModalView === 'logs' ? 'logs' : 'status';
+        $script = $this->systemdActionBash($normalized, $view);
 
         set_time_limit((int) config('server_services.systemd_action_timeout', 180) + 30);
         $timeout = (int) config('server_services.systemd_action_timeout', 180);
@@ -290,7 +546,7 @@ trait ManagesServerSystemdServices
             $server = $this->server->fresh();
             $out = $this->runManageInlineBash(
                 $server,
-                'services-systemd:'.$normalized.':status',
+                'services-systemd:'.$normalized.':'.$view,
                 $script,
                 static function (string $type, string $buffer): void {},
                 $timeout,
@@ -311,7 +567,7 @@ trait ManagesServerSystemdServices
         }
     }
 
-    public function saveSystemdStatusModalAlertPreferences(): void
+    public function saveSystemdNotifyPreferences(): void
     {
         $this->authorize('update', $this->server);
         if ($this->currentUserIsDeployer()) {
@@ -320,7 +576,7 @@ trait ManagesServerSystemdServices
             return;
         }
 
-        $unit = $this->systemdStatusModalUnitNormalized;
+        $unit = $this->systemdNotifyUnitNormalized;
         if ($unit === null || $unit === '') {
             return;
         }
@@ -342,7 +598,7 @@ trait ManagesServerSystemdServices
                 if (! Gate::allows('manageNotificationChannels', $channel->owner)) {
                     continue;
                 }
-                $row = $this->systemdStatusModalAlertMatrix[$cid] ?? [];
+                $row = $this->systemdNotifyMatrix[$cid] ?? [];
                 foreach (ServerSystemdServiceNotificationKeys::KINDS as $kind) {
                     $wanted = (bool) ($row[$kind] ?? false);
                     $eventKey = ServerSystemdServiceNotificationKeys::eventKey($unit, $kind);
@@ -366,15 +622,15 @@ trait ManagesServerSystemdServices
         });
 
         $this->toastSuccess(__('Alert preferences saved.'));
-        $this->loadSystemdStatusModalAlertMatrix();
+        $this->loadSystemdNotifyMatrix();
         $this->hydrateSystemdInventoryFromDatabase();
     }
 
-    protected function loadSystemdStatusModalAlertMatrix(): void
+    protected function loadSystemdNotifyMatrix(): void
     {
-        $unit = $this->systemdStatusModalUnitNormalized;
-        $this->systemdStatusModalAlertMatrix = [];
-        $this->systemdStatusModalChannelRows = [];
+        $unit = $this->systemdNotifyUnitNormalized;
+        $this->systemdNotifyMatrix = [];
+        $this->systemdNotifyChannelRows = [];
         if ($unit === null || $unit === '') {
             return;
         }
@@ -411,10 +667,10 @@ trait ManagesServerSystemdServices
                 $entry['started'] = false;
                 $entry['restarted'] = false;
             }
-            $this->systemdStatusModalAlertMatrix[$cid] = $entry;
+            $this->systemdNotifyMatrix[$cid] = $entry;
         }
 
-        $this->systemdStatusModalChannelRows = $channels
+        $this->systemdNotifyChannelRows = $channels
             ->map(fn ($c) => ['id' => (string) $c->id, 'label' => (string) $c->label])
             ->values()
             ->all();
@@ -476,6 +732,15 @@ trait ManagesServerSystemdServices
             $statusOnly = $catalog->isUnitStatusOnlyForServer($this->server, $s->unit);
             $isFailed = $s->active_state === 'failed' || $s->sub_state === 'failed';
 
+            // Pending action expires after ~3 min so a stuck row clears
+            // even if the inventory sync never lands. Anything fresher
+            // is surfaced to the blade so it can render "Starting…"
+            // / "Stopping…" / etc. instead of stale active_state.
+            $pendingAction = (string) ($s->pending_action ?? '');
+            $pendingFresh = $pendingAction !== ''
+                && $s->pending_action_at !== null
+                && $s->pending_action_at->isAfter(now()->subMinutes(3));
+
             return [
                 'unit' => $s->unit,
                 'label' => $s->label,
@@ -490,6 +755,7 @@ trait ManagesServerSystemdServices
                 'is_failed' => $isFailed,
                 'boot_state' => (string) ($s->unit_file_state ?? ''),
                 'main_pid' => (string) ($s->main_pid ?? ''),
+                'pending_action' => $pendingFresh ? $pendingAction : null,
                 'boot_likely_enabled' => $catalog->bootStateLikelyEnabled($s->unit_file_state),
                 'boot_likely_disabled' => $catalog->bootStateLikelyDisabled($s->unit_file_state),
                 'boot_menu_show_enable' => $catalog->bootMenuShowEnableAtBoot($s->unit_file_state),
@@ -538,6 +804,10 @@ trait ManagesServerSystemdServices
 
     /**
      * Queue SSH inventory; workers persist to the database.
+     *
+     * @param  bool  $silent  When true (auto-refresh on load), skip the toast and the banner; the
+     *                       page already shows the cached inventory and we don't want to surprise
+     *                       the operator with a banner they didn't trigger.
      */
     protected function queueSystemdInventorySync(bool $silent): void
     {
@@ -562,10 +832,60 @@ trait ManagesServerSystemdServices
             return;
         }
 
-        SyncServerSystemdServicesJob::dispatch($this->server->id);
-        if (! $silent) {
-            $this->toastSuccess(__('Service sync queued. This page refreshes from the database every few seconds while you stay here—ensure a queue worker is running.'));
+        if ($silent) {
+            // Auto-load path: dispatch with no banner state, no cache, no broadcast. Explicit
+            // dedupeKey so rapid page reloads/back-button visits coalesce to one job. The poll-
+            // based meta banner picks up the result after completion.
+            SyncServerSystemdServicesJob::dispatch(
+                $this->server->id,
+                null,
+                null,
+                'server-systemd-inventory:auto:'.$this->server->id,
+            );
+
+            return;
         }
+
+        // Reject double-clicks: if the action banner is already showing an in-flight inventory
+        // sync, do nothing. Without this, a second click would write a fresh `queued` entry but
+        // the dispatched job's writeBannerCache would target the new key — UX-confusing.
+        if (
+            $this->systemdActionBannerKind === 'inventory-sync'
+            && in_array($this->systemdActionBannerStatus, ['queued', 'running'], true)
+        ) {
+            $this->toastError(__('An inventory sync is already running. Wait for it to finish.'));
+
+            return;
+        }
+
+        // Operator-initiated "Sync now": route through the same cache-tracked + broadcasted
+        // banner machinery as Restart/Stop/etc. so the operator sees a persistent banner with
+        // streaming SSH output instead of a dispatch-blip spinner.
+        $id = (string) Str::uuid();
+        $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);
+
+        Cache::put(ServerManageRemoteSshJob::cacheKey($id), [
+            'status' => 'queued',
+            'output' => '',
+            'error' => null,
+            'flash_success' => null,
+            'queued_at' => time(),
+        ], now()->addSeconds(max(120, $ttl)));
+
+        $this->systemdPendingKind = 'action';
+        $this->systemdQueueInventoryAfterRemoteTask = false;
+        $this->systemdRemoteTaskId = $id;
+        $this->startSystemdActionBanner('inventory-sync', __('inventory'));
+        $this->systemdActionBannerStatus = 'queued';
+
+        SyncServerSystemdServicesJob::dispatch(
+            $this->server->id,
+            $id,
+            \App\Events\Servers\ServerSystemdActionCompletedBroadcast::class,
+        );
+
+        $this->js('window.__dplySystemdActionActiveId = '.json_encode($id).';');
+        $this->toastSuccess(__('Service sync queued. The list will refresh automatically while you stay on this page.'));
     }
 
     public function refreshSystemdInventory(): void
@@ -653,6 +973,20 @@ trait ManagesServerSystemdServices
         $this->systemdPendingKind = 'action';
         $this->systemdRowBusyUnit = $normalized;
         $this->systemdPendingActionUnit = $normalized;
+        $this->startSystemdActionBanner($action, $normalized);
+
+        // Record the operator's intent on the state row so the table can
+        // immediately render "Starting…" / "Stopping…" / etc. The next
+        // inventory sync will clear this when it confirms the actual
+        // active_state. A safety expiry inside the renderer auto-clears
+        // stale rows (~3 min) if SSH fails to re-sync for any reason.
+        ServerSystemdServiceState::query()
+            ->where('server_id', $this->server->id)
+            ->where('unit', $normalized)
+            ->update([
+                'pending_action' => $action,
+                'pending_action_at' => now(),
+            ]);
 
         set_time_limit((int) config('server_services.systemd_action_timeout', 180) + 30);
         $timeout = (int) config('server_services.systemd_action_timeout', 180);
@@ -676,24 +1010,50 @@ trait ManagesServerSystemdServices
                     $flash,
                     $syncInventoryAfter,
                 );
+                $this->systemdActionBannerStatus = 'queued';
+
+                if ($server->organization) {
+                    audit_log($server->organization, auth()->user(), 'server.service.'.$action, $server, null, [
+                        'unit' => $normalized,
+                        'queued' => true,
+                    ]);
+                }
 
                 return;
             }
 
-            $this->runManageInlineBash(
+            $out = $this->runManageInlineBash(
                 $server,
                 'services-systemd:'.$normalized.':'.$action,
                 $script,
                 static function (string $type, string $buffer): void {},
                 $timeout,
             );
+            $this->appendSystemdActionBannerOutput(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
+            $this->finishSystemdActionBanner('completed');
             $this->toastSuccess($flash);
             $this->remote_error = null;
+            $this->clearPendingActionAndRehydrate();
+            if ($server->organization) {
+                audit_log($server->organization, auth()->user(), 'server.service.'.$action, $server, null, [
+                    'unit' => $normalized,
+                    'result' => 'success',
+                ]);
+            }
             if ($syncInventoryAfter && (bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } catch (\Throwable $e) {
+            $this->finishSystemdActionBanner('failed', $e->getMessage());
             $this->setSystemdRemoteError($e->getMessage());
+            $this->clearPendingActionAndRehydrate();
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.service.'.$action, $this->server, null, [
+                    'unit' => $normalized,
+                    'result' => 'failed',
+                    'error' => mb_strimwidth($e->getMessage(), 0, 500),
+                ]);
+            }
         } finally {
             if (! $this->shouldQueueManageRemoteTasks()) {
                 $this->clearSystemdActionBusyState();
@@ -763,6 +1123,8 @@ trait ManagesServerSystemdServices
 
         $this->systemdPendingKind = 'action';
         $this->systemdBulkBusy = true;
+        $bulkLabel = trans_choice(':count selected unit|:count selected units', count($normalized), ['count' => count($normalized)]);
+        $this->startSystemdActionBanner('bulk-'.$action, (string) $bulkLabel);
         $timeout = max(60, count($normalized) * (int) config('server_services.systemd_action_timeout', 180));
 
         try {
@@ -778,23 +1140,44 @@ trait ManagesServerSystemdServices
                     $flash,
                     true,
                 );
+                $this->systemdActionBannerStatus = 'queued';
 
                 return;
             }
 
-            $this->runManageInlineBash(
+            $out = $this->runManageInlineBash(
                 $server,
                 'services-systemd-bulk:'.$action,
                 $script,
                 static function (string $type, string $buffer): void {},
                 $timeout,
             );
+            $this->appendSystemdActionBannerOutput(ServerManageSshExecutor::stripSshClientNoise($out->getBuffer()));
+            $this->finishSystemdActionBanner('completed');
             $this->toastSuccess($flash);
+            $this->clearPendingActionAndRehydrate();
+            if ($server->organization) {
+                audit_log($server->organization, auth()->user(), 'server.service.bulk_'.$action, $server, null, [
+                    'units' => $normalized,
+                    'count' => count($normalized),
+                    'result' => 'success',
+                ]);
+            }
             if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } catch (\Throwable $e) {
+            $this->finishSystemdActionBanner('failed', $e->getMessage());
             $this->setSystemdRemoteError($e->getMessage());
+            $this->clearPendingActionAndRehydrate();
+            if ($this->server->organization) {
+                audit_log($this->server->organization, auth()->user(), 'server.service.bulk_'.$action, $this->server, null, [
+                    'units' => $normalized,
+                    'count' => count($normalized),
+                    'result' => 'failed',
+                    'error' => mb_strimwidth($e->getMessage(), 0, 500),
+                ]);
+            }
         } finally {
             if (! $this->shouldQueueManageRemoteTasks()) {
                 $this->clearSystemdActionBusyState();
@@ -902,6 +1285,31 @@ trait ManagesServerSystemdServices
         return false;
     }
 
+    /**
+     * Reverb-driven fast path: the bootstrap.js Echo binder dispatches this Livewire event when a
+     * `.server.systemd.action.completed` broadcast arrives for the active task id. We just call
+     * the existing cache-poll path — the broadcast fires *after* the cache write, so the cache
+     * already says finished/failed. Variadic payload mirrors {@see WorkspaceCron::onCronRunFinished}
+     * so we accept both `(array)` and `(runId, success, ...)` Livewire dispatch shapes.
+     */
+    #[On('systemd-action-completed')]
+    public function onSystemdActionCompletedBroadcast(mixed ...$payload): void
+    {
+        $runId = '';
+        $first = $payload[0] ?? null;
+        if (is_array($first)) {
+            $runId = (string) ($first['runId'] ?? $first['run_id'] ?? '');
+        } elseif (is_string($first)) {
+            $runId = $first;
+        }
+
+        if ($runId === '' || $runId !== (string) ($this->systemdRemoteTaskId ?? '')) {
+            return;
+        }
+
+        $this->syncSystemdRemoteTaskFromCache();
+    }
+
     public function syncSystemdRemoteTaskFromCache(): void
     {
         if ($this->systemdRemoteTaskId === null || $this->systemdRemoteTaskId === '') {
@@ -925,7 +1333,7 @@ trait ManagesServerSystemdServices
 
         $statusHint = match ($status) {
             'queued' => $stalledQueued
-                ? __('Task still queued. Ensure a queue worker is running (e.g. php artisan queue:work) and that CACHE_DRIVER is shared with the worker (not "array").')
+                ? __('Still preparing this task. If it stays stuck, contact your administrator.')
                 : __('Task queued…'),
             'running' => __('Running on server…'),
             default => '',
@@ -945,11 +1353,21 @@ trait ManagesServerSystemdServices
             }
         }
 
-        if (! in_array($status, ['finished', 'failed'], true)) {
-            if ($pendingKind === 'action' && $statusHint !== '') {
-                $this->toastSuccess($statusHint);
+        if ($pendingKind === 'action' && $this->systemdActionBannerStatus !== '') {
+            // Mirror the queued/running cache state into the action banner so the operator
+            // sees live progress without an inventory poll.
+            $this->systemdActionBannerStatus = match ($status) {
+                'queued' => 'queued',
+                'running' => 'running',
+                default => $this->systemdActionBannerStatus,
+            };
+            if ($out !== '') {
+                $this->systemdActionBannerLines = [];
+                $this->appendSystemdActionBannerOutput($out);
             }
+        }
 
+        if (! in_array($status, ['finished', 'failed'], true)) {
             return;
         }
 
@@ -976,15 +1394,26 @@ trait ManagesServerSystemdServices
 
         if ($status === 'finished' && $pendingKind === 'action') {
             $flash = $payload['flash_success'] ?? null;
+            if ($out !== '' && $this->systemdActionBannerStatus !== '') {
+                $this->systemdActionBannerLines = [];
+                $this->appendSystemdActionBannerOutput($out);
+            }
+            $this->finishSystemdActionBanner('completed');
             $this->toastSuccess(is_string($flash) && $flash !== ''
                 ? $flash
                 : __('Service action finished.'));
             $this->remote_error = null;
+            $this->clearPendingActionAndRehydrate();
             if ($shouldSyncInventory && (bool) config('server_services.systemd_inventory_job_enabled', true)) {
                 SyncServerSystemdServicesJob::dispatch($this->server->id);
             }
         } elseif ($status === 'failed' && $pendingKind === 'action') {
-        } else {
+            if ($out !== '' && $this->systemdActionBannerStatus !== '') {
+                $this->systemdActionBannerLines = [];
+                $this->appendSystemdActionBannerOutput($out);
+            }
+            $this->finishSystemdActionBanner('failed', is_string($err) && $err !== '' ? $err : null);
+            $this->clearPendingActionAndRehydrate();
         }
 
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->systemdRemoteTaskId));
@@ -992,6 +1421,50 @@ trait ManagesServerSystemdServices
         $this->systemdPendingKind = null;
         $this->systemdQueueInventoryAfterRemoteTask = null;
         $this->clearSystemdActionBusyState();
+    }
+
+    /**
+     * Defense-in-depth: clear the `pending_action` flag on the unit row(s) the operator just
+     * acted on and re-hydrate the in-memory inventory in the same Livewire request. Without
+     * this, the row stays stuck on "Restarting…" / "Stopping…" until the post-action
+     * SyncServerSystemdServicesJob runs and the wire:poll.5s picks up the fresh state — a
+     * window of several seconds, longer if the queue worker is slow.
+     */
+    protected function clearPendingActionAndRehydrate(): void
+    {
+        $unit = $this->systemdPendingActionUnit;
+
+        $q = ServerSystemdServiceState::query()->where('server_id', $this->server->id);
+        if ($unit !== null && $unit !== '') {
+            $q->where('unit', $unit);
+        } else {
+            // Bulk path: we don't track a single unit; clear pending state for everything we
+            // marked when starting the bulk action. Cheap on a per-server table.
+            $q->whereNotNull('pending_action');
+        }
+
+        $q->update([
+            'pending_action' => null,
+            'pending_action_at' => null,
+        ]);
+
+        $this->hydrateSystemdInventoryFromDatabase();
+    }
+
+    /**
+     * Count of system rows hidden by the "Show all services" toggle. Used by the
+     * services table footer to label the "Show N system services" disclosure.
+     */
+    public function systemdHiddenSystemCount(): int
+    {
+        if ($this->systemdShowSystem) {
+            return 0;
+        }
+
+        return count(array_filter(
+            $this->systemdInventory,
+            fn (array $r): bool => empty($r['can_manage']) && empty($r['is_failed']),
+        ));
     }
 
     /**
@@ -1026,11 +1499,11 @@ trait ManagesServerSystemdServices
             $rows = array_values(array_filter($rows, fn (array $r): bool => empty($r['custom'])));
         }
 
-        $n = $this->systemdFilterNotify;
-        if ($n === 'subscribed') {
-            $rows = array_values(array_filter($rows, fn (array $r): bool => ((int) ($r['alert_subscription_count'] ?? 0)) > 0));
-        } elseif ($n === 'none') {
-            $rows = array_values(array_filter($rows, fn (array $r): bool => ((int) ($r['alert_subscription_count'] ?? 0)) === 0));
+        if (! $this->systemdShowSystem) {
+            $rows = array_values(array_filter(
+                $rows,
+                fn (array $r): bool => ! empty($r['can_manage']) || ! empty($r['is_failed']),
+            ));
         }
 
         usort($rows, function (array $a, array $b): int {
@@ -1074,122 +1547,13 @@ trait ManagesServerSystemdServices
         $this->queueSystemdInventorySync(false);
     }
 
-    public function openSystemdBulkNotifyModal(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->currentUserIsDeployer()) {
-            $this->toastError(__('Deployers cannot configure service notifications.'));
-
-            return;
-        }
-
-        $units = array_values(array_unique($this->systemdSelectedList));
-        if ($units === []) {
-            $this->toastError(__('Select at least one service.'));
-
-            return;
-        }
-
-        $user = auth()->user();
-        if ($user === null) {
-            return;
-        }
-
-        $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
-        if ($channels->isEmpty()) {
-            $this->toastError(__('No notification channels are available for your account.'));
-
-            return;
-        }
-
-        if ($this->systemdBulkNotifyChannelId === '' || ! $channels->pluck('id')->map(fn ($id) => (string) $id)->contains($this->systemdBulkNotifyChannelId)) {
-            $this->systemdBulkNotifyChannelId = (string) $channels->first()->id;
-        }
-
-        $this->showSystemdBulkNotifyModal = true;
-    }
-
-    public function closeSystemdBulkNotifyModal(): void
-    {
-        $this->showSystemdBulkNotifyModal = false;
-    }
-
-    public function saveSystemdBulkNotifySubscriptions(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->currentUserIsDeployer()) {
-            $this->toastError(__('Deployers cannot configure service notifications.'));
-
-            return;
-        }
-
-        $channelId = $this->systemdBulkNotifyChannelId;
-        if ($channelId === '') {
-            return;
-        }
-
-        $user = auth()->user();
-        if ($user === null) {
-            return;
-        }
-
-        $channels = AssignableNotificationChannels::forUser($user, $user->currentOrganization());
-        $channel = $channels->first(fn (NotificationChannel $c): bool => (string) $c->id === $channelId);
-        if ($channel === null) {
-            return;
-        }
-
-        if (! Gate::allows('manageNotificationChannels', $channel->owner)) {
-            $this->toastError(__('You cannot manage that notification channel.'));
-
-            return;
-        }
-
-        $kinds = [];
-        foreach (ServerSystemdServiceNotificationKeys::KINDS as $kind) {
-            if (! empty($this->systemdBulkNotifyKinds[$kind])) {
-                $kinds[] = $kind;
-            }
-        }
-        if ($kinds === []) {
-            $this->toastError(__('Choose at least one event type.'));
-
-            return;
-        }
-
-        $units = array_values(array_unique($this->systemdSelectedList));
-        $catalog = app(ServerSystemdServicesCatalog::class);
-
-        DB::transaction(function () use ($units, $channel, $kinds, $catalog): void {
-            foreach ($units as $rawUnit) {
-                try {
-                    $u = $catalog->assertSafeUnitNameForStatus((string) $rawUnit);
-                } catch (\InvalidArgumentException) {
-                    continue;
-                }
-                foreach ($kinds as $kind) {
-                    $eventKey = ServerSystemdServiceNotificationKeys::eventKey($u, $kind);
-                    NotificationSubscription::query()->firstOrCreate([
-                        'notification_channel_id' => $channel->id,
-                        'subscribable_type' => Server::class,
-                        'subscribable_id' => $this->server->id,
-                        'event_key' => $eventKey,
-                    ]);
-                }
-            }
-        });
-
-        $this->toastSuccess(__('Notification subscriptions saved for the selected services.'));
-        $this->showSystemdBulkNotifyModal = false;
-        $this->hydrateSystemdInventoryFromDatabase();
-    }
-
     protected function systemdActionBash(string $normalizedUnit, string $action): string
     {
         $u = escapeshellarg($normalizedUnit);
 
         return match ($action) {
             'status' => '(systemctl status '.$u.' --no-pager -l 2>&1); exit 0',
+            'logs' => '(journalctl --no-pager --output=short-iso -u '.$u.' -n 200 2>&1); exit 0',
             'start', 'stop', 'restart', 'reload', 'disable', 'enable' => '(sudo -n systemctl '.$action.' '.$u.' || systemctl '.$action.' '.$u.') 2>&1',
             default => throw new \InvalidArgumentException,
         };
@@ -1232,11 +1596,17 @@ trait ManagesServerSystemdServices
             $inlineBash,
             $timeoutSeconds ?? (int) config('task-runner.default_timeout', 60),
             $flashSuccess,
+            null,
+            \App\Events\Servers\ServerSystemdActionCompletedBroadcast::class,
         );
 
         $this->systemdRemoteTaskId = $id;
         $this->remote_error = null;
         $this->toastSuccess(__('SSH task queued. The list will refresh automatically while you stay on this page.'));
+
+        // Tell the front-end Echo binder which task id the operator is currently watching, so
+        // the .server.systemd.action.completed broadcast filter accepts only the active run.
+        $this->js('window.__dplySystemdActionActiveId = '.json_encode($id).';');
     }
 
     protected function normalizeUnitStatic(string $name): string

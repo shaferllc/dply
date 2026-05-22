@@ -198,15 +198,127 @@ class ServerProvisionCommandBuilderTest extends TestCase
         $this->assertStringContainsString('[dply] nginx already installed; skipping package install.', $joined);
         $this->assertStringContainsString('[dply] mysql-server already installed; skipping package install.', $joined);
         $this->assertStringContainsString('[dply] redis-server already installed; skipping package install.', $joined);
+        // The "already installed" guard now greps both upstreams
+        // (sury.org primary, Launchpad fallback) and verifies an
+        // InRelease file actually fetched — not just that the source
+        // is configured.
         $this->assertStringContainsString('grep -RqsE', $joined);
-        $this->assertStringContainsString('ondrej-ubuntu-php|ppa\\.launchpadcontent\\.net/ondrej/php', $joined);
-        $this->assertStringContainsString('[dply] ondrej/php repository already installed; skipping repository setup.', $joined);
+        $this->assertStringContainsString('packages\\.sury\\.org/php|ppa\\.launchpadcontent\\.net/ondrej/php', $joined);
+        $this->assertStringContainsString('[dply] ondrej/php repository already installed and indexed; skipping repository setup.', $joined);
+        // Both keyring paths are emitted (case branch picks one at runtime).
+        $this->assertStringContainsString('/etc/apt/keyrings/sury-php.gpg', $joined);
         $this->assertStringContainsString('/etc/apt/keyrings/ondrej-php.gpg', $joined);
+        // Both upstream URLs appear in the source-list emit lines.
+        $this->assertStringContainsString('https://packages.sury.org/php/', $joined);
         $this->assertStringContainsString('https://ppa.launchpadcontent.net/ondrej/php/ubuntu', $joined);
         $this->assertStringContainsString('timeout 300s apt-get update -y', $joined);
         $this->assertStringNotContainsString('rg -l "ondrej-ubuntu-php|ppa.launchpadcontent.net/ondrej/php"', $joined);
         $this->assertStringContainsString('command -v composer >/dev/null 2>&1', $joined);
         $this->assertStringContainsString('[dply] composer already installed; skipping installer.', $joined);
+    }
+
+    public function test_build_application_stack_installs_mise_for_non_php_runtimes(): void
+    {
+        config(['server_provision.install_mise_on_provision' => true]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringContainsString('Installing mise', $joined);
+        $this->assertStringContainsString('mise.jdx.dev/gpg-key.pub', $joined);
+        $this->assertStringContainsString('apt-get install -y --no-install-recommends mise', $joined);
+        $this->assertStringContainsString('# dply: mise activation', $joined);
+    }
+
+    public function test_build_application_stack_pins_runtime_defaults_via_mise_use_global(): void
+    {
+        config(['server_provision.install_mise_on_provision' => true]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+                'runtime_defaults' => [
+                    'node' => '22',
+                    'python' => '3.12',
+                    'ruby' => '3.3',
+                    'go' => '1.22',
+                ],
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringContainsString('mise use --global node@22', $joined);
+        $this->assertStringContainsString('mise use --global python@3.12', $joined);
+        $this->assertStringContainsString('mise use --global ruby@3.3', $joined);
+        $this->assertStringContainsString('mise use --global go@1.22', $joined);
+    }
+
+    public function test_build_application_stack_skips_unknown_runtime_defaults(): void
+    {
+        config(['server_provision.install_mise_on_provision' => true]);
+
+        // PHP and unknown runtimes silently no-op via MiseInstallScriptBuilder's
+        // SUPPORTED_RUNTIMES guard — bootstrap script must not try to mise-install
+        // PHP (ondrej/php handles that path) or invent commands for runtimes we
+        // don't know.
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+                'runtime_defaults' => [
+                    'php' => '8.3',
+                    'erlang' => '27',
+                    'node' => '22',
+                ],
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringContainsString('mise use --global node@22', $joined);
+        $this->assertStringNotContainsString('mise use --global php@', $joined);
+        $this->assertStringNotContainsString('mise use --global erlang@', $joined);
+    }
+
+    public function test_build_application_stack_skips_mise_when_disabled_via_config(): void
+    {
+        config(['server_provision.install_mise_on_provision' => false]);
+
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => 'mysql84',
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+        $this->assertStringNotContainsString('Installing mise', $joined);
+        $this->assertStringNotContainsString('mise.jdx.dev', $joined);
     }
 
     public function test_build_can_force_reinstall_via_config(): void

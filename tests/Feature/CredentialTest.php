@@ -9,11 +9,15 @@ use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\WithFeatures;
 use Tests\TestCase;
 
 class CredentialTest extends TestCase
 {
     use RefreshDatabase;
+    use WithFeatures;
+
+    protected array $features = ['provider.fly_io', 'provider.linode', 'provider.vultr', 'provider.upcloud', 'provider.scaleway', 'provider.aws', 'provider.equinix_metal'];
 
     protected function userWithOrganization(): User
     {
@@ -52,6 +56,21 @@ class CredentialTest extends TestCase
         $response->assertOk();
         $response->assertSee('Provider credentials');
         $response->assertSee('Server providers');
+    }
+
+    public function test_organization_credentials_fly_io_panel_shows_value_prop(): void
+    {
+        config(['server_providers.enabled.fly_io' => true]);
+
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        $response = $this->actingAs($user)->get(route('organizations.credentials', ['organization' => $org, 'provider' => 'fly_io']));
+
+        $response->assertOk()
+            ->assertSee('What Fly.io adds to Dply')
+            ->assertSee('Node and static sites')
+            ->assertSee('Connect Fly.io');
     }
 
     public function test_credentials_index_forbidden_for_deployer(): void
@@ -128,5 +147,86 @@ class CredentialTest extends TestCase
         }
 
         $this->assertDatabaseHas('provider_credentials', ['id' => $cred->id]);
+    }
+
+    public function test_gandi_credential_can_be_connected(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('gandi_api_token', 'pat-gandi-secret')
+            ->call('storeGandi')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('provider_credentials', [
+            'organization_id' => $org->id,
+            'provider' => 'gandi',
+            'name' => 'Gandi',
+        ]);
+    }
+
+    public function test_gandi_credential_requires_a_token(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('gandi_api_token', '')
+            ->call('storeGandi')
+            ->assertHasErrors('gandi_api_token');
+
+        $this->assertDatabaseCount('provider_credentials', 0);
+    }
+
+    public function test_namecheap_credential_can_be_connected(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('namecheap_name', 'Agency DNS')
+            ->set('namecheap_api_user', 'acme')
+            ->set('namecheap_api_key', 'nc-secret-key')
+            ->call('storeNamecheap')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('provider_credentials', [
+            'organization_id' => $org->id,
+            'provider' => 'namecheap',
+            'name' => 'Agency DNS',
+        ]);
+    }
+
+    public function test_vercel_dns_credential_stores_optional_team_id(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('vercel_dns_api_token', 'vc-secret')
+            ->set('vercel_dns_team_id', 'team_abc123')
+            ->call('storeVercelDns')
+            ->assertHasNoErrors();
+
+        $credential = ProviderCredential::query()
+            ->where('organization_id', $org->id)
+            ->where('provider', 'vercel_dns')
+            ->firstOrFail();
+
+        $this->assertSame('team_abc123', $credential->credentials['team_id']);
+    }
+
+    public function test_cdn_tab_lists_only_cdn_capable_providers(): void
+    {
+        $ids = CredentialsIndex::credentialProviderIds('cdn');
+
+        $this->assertContains('cloudflare', $ids);
+        $this->assertContains('vercel_dns', $ids);
+        $this->assertNotContains('namecheap', $ids);
+        $this->assertNotContains('digitalocean', $ids);
     }
 }

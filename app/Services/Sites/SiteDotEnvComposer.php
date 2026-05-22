@@ -9,6 +9,7 @@ class SiteDotEnvComposer
 {
     public function __construct(
         private readonly DeploymentContractBuilder $contractBuilder,
+        private readonly DotEnvFileWriter $writer,
     ) {}
 
     /**
@@ -21,27 +22,6 @@ class SiteDotEnvComposer
 
     public function compose(Site $site): string
     {
-        $map = $this->composeMap($site);
-
-        ksort($map);
-
-        $lines = [];
-        foreach ($map as $key => $value) {
-            $lines[] = $key.'='.$this->escapeValue($value);
-        }
-
-        return implode("\n", $lines);
-    }
-
-    protected function escapeValue(string $value): string
-    {
-        if ($value === '') {
-            return '""';
-        }
-        if (preg_match('/[\s"#$\\\\]/', $value)) {
-            return '"'.str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $value).'"';
-        }
-
-        return $value;
+        return $this->writer->render($this->composeMap($site));
     }
 }

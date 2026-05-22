@@ -31,6 +31,8 @@ class NotificationEvent extends Model
         'supports_webhook',
         'metadata',
         'occurred_at',
+        'cleared_at',
+        'cleared_by_user_id',
     ];
 
     protected function casts(): array
@@ -41,6 +43,7 @@ class NotificationEvent extends Model
             'supports_webhook' => 'boolean',
             'metadata' => 'array',
             'occurred_at' => 'datetime',
+            'cleared_at' => 'datetime',
         ];
     }
 

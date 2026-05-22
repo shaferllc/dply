@@ -15,8 +15,11 @@ use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
+use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
+use App\Services\Servers\FirewallRuleTemplateApplicator;
+use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -68,6 +71,165 @@ class RunSetupScriptJob implements ShouldQueue
             $updates['meta'] = $meta;
             $server->update($updates);
 
+            // Email server credentials to the creator IF the org has the
+            // toggle on. Opt-in only: most operators don't want
+            // connection blocks landing in mailboxes by default. The
+            // email itself only carries host/port/user — the SSH key
+            // download stays gated behind an authenticated dashboard
+            // session (see ServerProvisionedCredentialsNotification).
+            $organization = $server->organization;
+            $creator = $server->user;
+            if ($organization
+                && $organization->email_server_credentials_enabled
+                && $creator
+                && filled($creator->email)
+            ) {
+                $creator->notify(new ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
+            }
+
+            // Kick off insights immediately so the workspace lands with a
+            // populated heartbeat / metrics-missing baseline instead of an
+            // empty state that requires the operator to hit "Refresh"
+            // before anything appears. Job no-ops if the server isn't
+            // ready yet, so the dispatch is safe even on edge timing.
+            if (config('insights.queue_after_install', true) && $server->isVmHost()) {
+                RunServerInsightsJob::dispatch($server->id);
+            }
+
+            // Fire an immediate health check so the workspace Overview's
+            // Health tile flips from "Not checked yet" to a real result
+            // within seconds of provisioning finishing, instead of
+            // waiting up to 5 minutes for the recurring scheduler at
+            // bootstrap/app.php to catch up. The job is idempotent —
+            // worst case the scheduler re-checks 5 minutes later
+            // anyway and overwrites with fresh data.
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                CheckServerHealthJob::dispatch($server);
+            }
+
+            // Wire up the metrics push pipeline. Two paths converge here
+            // depending on whether the inline metrics step ran during
+            // the bash provision:
+            //   - inline=true  → bash already installed Python + the
+            //     snapshot script. syncPushArtifactsAfterInstall just
+            //     writes the env file + crontab block.
+            //   - inline=false (default) → bash skipped the agent.
+            //     Dispatch InstallMetricsAgentJob to SSH the install
+            //     bash on a separate connection AFTER the journey reads
+            //     "ready". That job dispatches the env/cron deploy on
+            //     success, so the post-install state ends up identical
+            //     either way; the user just gets ~30–60s back on the
+            //     wall-clock.
+            if ((bool) config('server_provision.install_metrics_agent', true)
+                && ! empty($server->ip_address)
+                && $server->isVmHost()
+            ) {
+                if ((bool) config('server_provision.install_metrics_agent_inline', false)) {
+                    app(ServerMetricsGuestPushService::class)->syncPushArtifactsAfterInstall($server);
+                } else {
+                    InstallMetricsAgentJob::dispatch((string) $server->id)
+                        ->delay(now()->addSeconds(15));
+                }
+            }
+
+            // Mirror the bash provision script's UFW defaults (SSH on
+            // the server's ssh_port + HTTP/HTTPS for VM hosts) into
+            // server_firewall_rules so the dashboard reflects what's
+            // actually on the host. Idempotent — the applicator dedupes
+            // by (port, protocol, source, action) so reruns are no-ops.
+            try {
+                app(FirewallRuleTemplateApplicator::class)
+                    ->seedDefaultsForServer($server->fresh() ?? $server, $server->user);
+            } catch (\Throwable $e) {
+                // Seeding is best-effort: a failure here shouldn't fail
+                // the whole provision job. Log and move on; the
+                // workspace's "Apply" button can recreate rules later.
+                ProvisionPipelineLog::warning('server.provision.firewall_seed_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Populate the System services list on first connect.
+            // Without this, operators land on Settings → Services to
+            // a completely empty card and have to click Sync now to
+            // see anything. Delay 30s so it doesn't compete with the
+            // metrics install + insights run for SSH bandwidth.
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                SyncServerSystemdServicesJob::dispatch((string) $server->id)
+                    ->delay(now()->addSeconds(30));
+            }
+
+            // Same idea for System users — without this seed, the
+            // Settings → System users page is empty after provision
+            // (no rows in server_system_users) and the operator has to
+            // click "Sync now" before the deploy user (`dply`) even
+            // appears. Sync is unique-keyed against create/remove, so
+            // a manual click later is still safe. Stagger 35s after the
+            // services sync (lighter SSH, lone `getent passwd` exec).
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                SyncServerSystemUsersJob::dispatch((string) $server->id)
+                    ->delay(now()->addSeconds(35));
+            }
+
+            // The provision command builder writes the creator's
+            // provision-flagged profile keys directly into
+            // /home/<deploy>/.ssh/authorized_keys at bootstrap time
+            // (see ServerProvisionCommandBuilder::dplyDeployUserBootstrap).
+            // Mirror them into the panel here so the workspace SSH Keys
+            // page reflects reality from day zero — without this, the
+            // first user-initiated Sync would treat the bootstrap-installed
+            // keys as drift and remove them on the next push.
+            try {
+                static::hydrateAuthorizedKeyPanelRowsFromCreator($server);
+            } catch (\Throwable $e) {
+                ProvisionPipelineLog::warning('server.provision.authorized_key_panel_hydration_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Capture the full inventory/manage snapshot (package versions,
+            // service state, kernel reboot-required, unattended-upgrades
+            // status, etc.) so the Manage tab lands populated instead of
+            // showing "No state data yet · Never refreshed". Delay 45s so
+            // it runs after the metrics agent install (15s) and systemd
+            // sync (30s) — they share SSH bandwidth.
+            if (! empty($server->ip_address) && $server->isVmHost()) {
+                RefreshServerInventoryJob::dispatch((string) $server->id)
+                    ->delay(now()->addSeconds(45));
+            }
+
+            // Mirror meta['cache_service'] and meta['database'] into the
+            // workspace tables so the Caches / Databases pages have a row
+            // to render. The provision shell scripts already installed the
+            // packages and started the services; this is the missing data
+            // bridge. Idempotent — only inserts when the row is absent.
+            try {
+                app(\App\Actions\Servers\SeedProvisionedEnginesForServer::class)
+                    ->execute($server->fresh() ?? $server);
+            } catch (\Throwable $e) {
+                ProvisionPipelineLog::warning('server.provision.engine_seed_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Fan out provision-success to the org's configured operational
+            // channels (Slack/Discord/Teams/etc) plus publish to the in-app
+            // inbox. Always-send on the channel path — success fan-outs of
+            // "<server> is ready" aren't noisy enough to warrant per-server
+            // opt-in subscriptions. The creator email stays on its existing
+            // `email_server_credentials_enabled` opt-in (handled above) so the
+            // SSH credentials block is still gated.
+            static::dispatchProvisionEvent(
+                $server->fresh() ?? $server,
+                eventKey: 'server.provisioned',
+                channelSubject: sprintf('[dply] Server is ready: %s', $server->name ?: $server->id),
+                inboxTitle: sprintf('Server "%s" is ready', $server->name ?: $server->id),
+                inboxBody: 'Provisioning finished. Open the server overview to start adding sites or connect via SSH.',
+                actionUrl: \Illuminate\Support\Facades\URL::route('servers.overview', $server),
+                actionLabel: 'Open server',
+                bodyLines: static::successBodyLines($server),
+            );
+
             return;
         }
 
@@ -81,15 +243,277 @@ class RunSetupScriptJob implements ShouldQueue
             'setup_status' => Server::SETUP_STATUS_FAILED,
             'meta' => $meta,
         ]);
+
+        // Always alert the creator — silent failures are worse than a few extra
+        // emails. The UI also shows a "Setup failed" chip on the index card
+        // (see resources/views/livewire/servers/index.blade.php), but operators
+        // not actively watching the dashboard need a push.
+        $creator = $server->user;
+        $excerpt = static::extractLastProvisionError($server);
+        if ($creator && filled($creator->email)) {
+            try {
+                $creator->notify(new \App\Notifications\ServerProvisionFailedNotification($server->fresh() ?? $server, $excerpt));
+            } catch (\Throwable $e) {
+                ProvisionPipelineLog::warning('server.provision.failure_email_send_failed', $server, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $failureBodyLines = [
+            sprintf('Provider: %s', $server->provider?->label() ?? '—'),
+            sprintf('Address: %s', $server->ip_address ?: '—'),
+        ];
+        if (is_string($excerpt) && trim($excerpt) !== '') {
+            $failureBodyLines[] = 'Last error: '.\Illuminate\Support\Str::limit(trim($excerpt), 400);
+        }
+
+        static::dispatchProvisionEvent(
+            $server->fresh() ?? $server,
+            eventKey: 'server.provision_failed',
+            channelSubject: sprintf('[dply] Server provisioning failed: %s', $server->name ?: $server->id),
+            inboxTitle: sprintf('Server "%s" failed to provision', $server->name ?: $server->id),
+            inboxBody: 'Provisioning stopped before finishing. Open the journey to see the failing step and retry.',
+            actionUrl: \Illuminate\Support\Facades\URL::route('servers.journey', $server),
+            actionLabel: 'Open journey',
+            bodyLines: $failureBodyLines,
+        );
+    }
+
+    /**
+     * Common path for provision-{success,failure} fan-out. Sends an operational
+     * message to every NotificationChannel attached to the server's organization
+     * (always-on; subscriptions are intentionally bypassed) then publishes a
+     * NotificationEvent so the in-app inbox + any subscribed Slack/Discord
+     * channels also see it. The publisher call passes the just-dispatched channel
+     * IDs as `excludeChannelIds` so subscribed channels don't receive a second
+     * copy via the routing pipe.
+     *
+     * @param  list<string>  $bodyLines  Pre-formatted lines for the chat-channel
+     *                                   body (joined with \n). Inbox uses the
+     *                                   shorter `$inboxBody`.
+     */
+    private static function dispatchProvisionEvent(
+        Server $server,
+        string $eventKey,
+        string $channelSubject,
+        string $inboxTitle,
+        string $inboxBody,
+        string $actionUrl,
+        string $actionLabel,
+        array $bodyLines,
+    ): void {
+        $sentChannelIds = [];
+        try {
+            $organization = $server->organization;
+            if ($organization !== null) {
+                $organization->loadMissing('notificationChannels');
+                $body = implode("\n", $bodyLines);
+                foreach ($organization->notificationChannels as $channel) {
+                    $channel->sendOperationalMessage($channelSubject, $body, $actionUrl, $actionLabel);
+                    $sentChannelIds[] = (string) $channel->id;
+                }
+            }
+        } catch (\Throwable $e) {
+            ProvisionPipelineLog::warning('server.provision.channel_dispatch_failed', $server, [
+                'event_key' => $eventKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            app(\App\Services\Notifications\NotificationPublisher::class)->publish(
+                eventKey: $eventKey,
+                subject: $server,
+                title: $inboxTitle,
+                body: $inboxBody,
+                url: $actionUrl,
+                metadata: [
+                    'server_name' => $server->name,
+                    'ip' => $server->ip_address,
+                ],
+                excludeChannelIds: $sentChannelIds,
+            );
+        } catch (\Throwable $e) {
+            ProvisionPipelineLog::warning('server.provision.event_publish_failed', $server, [
+                'event_key' => $eventKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Format the wizard's stack choices (php_version, database, cache_service,
+     * webserver) into a short list of "Label: value" lines for the success
+     * channel body. Skips slots the operator left empty or set to 'none'.
+     *
+     * @return list<string>
+     */
+    private static function successBodyLines(Server $server): array
+    {
+        $lines = [
+            sprintf('Provider: %s', $server->provider?->label() ?? '—'),
+            sprintf('Address: %s', $server->ip_address ?: '—'),
+        ];
+
+        $meta = $server->meta ?? [];
+        $stackBits = [];
+        $php = trim((string) ($meta['php_version'] ?? ''));
+        if ($php !== '' && $php !== 'none') {
+            $stackBits[] = 'PHP '.$php;
+        }
+        $db = trim((string) ($meta['database'] ?? ''));
+        if ($db !== '' && $db !== 'none') {
+            $stackBits[] = self::humanizeDatabase($db);
+        }
+        $cache = trim((string) ($meta['cache_service'] ?? ''));
+        if ($cache !== '' && $cache !== 'none') {
+            $stackBits[] = ucfirst($cache);
+        }
+        $webserver = trim((string) ($meta['webserver'] ?? ''));
+        if ($webserver !== '' && $webserver !== 'none') {
+            $stackBits[] = ucfirst($webserver);
+        }
+
+        if ($stackBits !== []) {
+            $lines[] = 'Stack: '.implode(' · ', $stackBits);
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Map raw database meta values (postgres18, mariadb1011, sqlite3, ...) to
+     * a more chat-friendly label. Falls back to ucfirst when the pattern isn't
+     * recognised so new engines render legibly without code changes here.
+     */
+    private static function humanizeDatabase(string $engine): string
+    {
+        if (preg_match('/^postgres(\d+)$/', $engine, $m)) {
+            return 'PostgreSQL '.$m[1];
+        }
+        if (preg_match('/^mysql(\d)(\d)$/', $engine, $m)) {
+            return 'MySQL '.$m[1].'.'.$m[2];
+        }
+        if (preg_match('/^mariadb(\d{2,4})$/', $engine, $m)) {
+            $v = $m[1];
+            if (strlen($v) === 2) {
+                return 'MariaDB '.$v[0].'.'.$v[1];
+            }
+            if (strlen($v) === 4) {
+                return 'MariaDB '.substr($v, 0, 2).'.'.substr($v, 2);
+            }
+
+            return 'MariaDB '.$v;
+        }
+        if (preg_match('/^sqlite(\d+)$/', $engine, $m)) {
+            return 'SQLite '.$m[1];
+        }
+
+        return ucfirst($engine);
+    }
+
+    /**
+     * Pull a short snippet of the most recent failure from the provision
+     * step snapshots stored in meta so the failure email can carry context
+     * without making the recipient open the journey to know what broke.
+     * Returns null when no usable error string is available.
+     */
+    private static function extractLastProvisionError(Server $server): ?string
+    {
+        $meta = $server->meta ?? [];
+        $snapshots = $meta['provision_step_snapshots'] ?? null;
+        if (! is_array($snapshots) || $snapshots === []) {
+            return null;
+        }
+
+        // Walk the snapshots in insertion order and keep the last non-empty
+        // output we see — the failing step is normally the most recent one
+        // recorded, and its output contains the apt/ssh error message.
+        $lastOutput = null;
+        foreach ($snapshots as $snap) {
+            if (! is_array($snap)) {
+                continue;
+            }
+            $output = trim((string) ($snap['output'] ?? ''));
+            if ($output !== '') {
+                $lastOutput = $output;
+            }
+        }
+
+        return $lastOutput;
+    }
+
+    /**
+     * Pre-populate ServerAuthorizedKey panel rows for the creator's profile
+     * keys that opted into new-server provisioning. These keys are written
+     * directly into the deploy user's authorized_keys by the bootstrap script
+     * (see {@see \App\Services\Servers\ServerProvisionCommandBuilder::dplyDeployUserBootstrap()});
+     * mirroring them as panel rows here keeps the workspace SSH Keys page
+     * truthful and prevents the next user-initiated Sync from treating the
+     * bootstrap-installed keys as drift and removing them.
+     *
+     * Idempotent via updateOrCreate — re-applying a provision outcome (manual
+     * retry, etc.) won't duplicate rows.
+     */
+    private static function hydrateAuthorizedKeyPanelRowsFromCreator(Server $server): void
+    {
+        $creator = $server->user;
+        if ($creator === null) {
+            return;
+        }
+
+        $rows = $creator->sshKeys()
+            ->where('provision_on_new_servers', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'public_key']);
+
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        foreach ($rows as $userKey) {
+            $pk = trim((string) $userKey->public_key);
+            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+                continue;
+            }
+
+            // target_linux_user = '' means "the server's login user" by the
+            // synchronizer's convention (see ServerAuthorizedKeysSynchronizer).
+            // The deploy user is ssh_user at this point because
+            // applyProvisionOutcomeToServer already flipped it.
+            \App\Models\ServerAuthorizedKey::query()->updateOrCreate(
+                [
+                    'server_id' => $server->id,
+                    'managed_key_type' => \App\Models\UserSshKey::class,
+                    'managed_key_id' => $userKey->id,
+                    'target_linux_user' => '',
+                ],
+                [
+                    'name' => (string) $userKey->name,
+                    'public_key' => $pk,
+                    'synced_at' => now(),
+                ]
+            );
+        }
     }
 
     /**
      * If the most recent run failed for a transient reason (apt fetch timeout, network blip,
      * connection reset) and we're under the attempt cap, queue a delayed retry rather than
      * leaving the user staring at a failure card.
+     *
+     * Disabled by default — set DPLY_AUTO_RETRY_ENABLED=true to opt in. Operators iterating
+     * on the bash script generally want a failed run to stay visible so they can inspect
+     * the output and choose when to re-run, instead of dply silently kicking off attempt
+     * #2 after 30s and overwriting the in-flight diagnostic state.
      */
     protected static function tryScheduleAutoRetry(Server $server): bool
     {
+        if (! (bool) config('dply.auto_retry_enabled', false)) {
+            return false;
+        }
+
         $latestRun = ServerProvisionRun::query()
             ->where('server_id', $server->getKey())
             ->latest('created_at')
@@ -120,6 +544,14 @@ class RunSetupScriptJob implements ShouldQueue
         $meta['auto_retry_max'] = self::MAX_AUTO_RETRY_ATTEMPTS;
         // Clear stale provision_task_id so the journey UI doesn't keep polling the dead task.
         unset($meta['provision_task_id']);
+        // Clear step snapshots from the previous failed run. Without
+        // this, the journey page treats every prior-run script_* key
+        // as "completed" via stepHasPersistedSnapshot during the new
+        // run's cloud phase — so the moment cloud hits 100%, setup
+        // shows 100% too, before the new setup script has even
+        // dispatched. Manual rerun already clears these (see
+        // ProvisionJourney::resumeInstall).
+        unset($meta['provision_step_snapshots']);
 
         $server->update([
             'setup_status' => Server::SETUP_STATUS_PENDING,
@@ -442,7 +874,252 @@ dply_write_file() {
   echo "[dply-rollback] \${rel} :: checkpoint :: Backup recorded"
 }
 
-trap 'status=\$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_restore_backups || true; exit \$status' ERR
+trap 'status=\$?; echo "[dply-rollback] automatic :: started :: Provision failed, attempting safe rollback"; dply_dump_dpkg_diagnostics 2>&1 || true; dply_restore_backups || true; exit \$status' ERR
+
+# Two-phase apt-lock waiter. Cloud-init's first-boot
+# unattended-upgrades commonly holds the apt lock for 5-10+ minutes
+# on fresh DigitalOcean droplets, which is unacceptable wait latency
+# during interactive provisioning. Strategy:
+#
+#   Phase 1 (0-90s): passive wait. Politely block on cloud-init and
+#                    apt locks. Most well-behaved droplets clear in
+#                    this window.
+#   Phase 2 (>90s):  active eviction. Stop the unattended-upgrades
+#                    service/timer, kill any apt-get / unattended-upgr
+#                    processes still running, run dpkg --configure -a
+#                    to recover any half-installed packages, then
+#                    proceed. Faster than waiting 5-10 minutes for
+#                    the OS to finish a background task we never
+#                    asked for.
+#
+# Hard fail at 180s — at that point something is genuinely wedged and
+# silent waiting just hides the problem.
+dply_apt_locks_held() {
+  fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 \
+    || fuser /var/lib/dpkg/lock >/dev/null 2>&1 \
+    || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 \
+    || pgrep -x apt-get >/dev/null 2>&1 \
+    || pgrep -x unattended-upgr >/dev/null 2>&1
+}
+
+dply_wait_for_apt_locks() {
+  # Fast-path: if our pre-empt block at script start already disabled
+  # cloud-init + the auto-upgrade timers AND the locks aren't held by
+  # anything else, we're good — skip the cloud-init status --wait
+  # (which can sit there for 60s on droplets that booted recently).
+  if ! dply_apt_locks_held; then
+    return 0
+  fi
+
+  # cloud-init may still be honouring an in-flight `apt-get` from before
+  # our pre-empt killed it. Try a short status wait so we don't race
+  # cloud-init's last-gasp cleanup, but cap it tight (5s, not 60s).
+  if command -v cloud-init >/dev/null 2>&1; then
+    timeout 5 cloud-init status --wait >/dev/null 2>&1 || true
+  fi
+
+  local waited=0
+  # Polite wait window before forcible eviction. Tighter than the old
+  # 90s because the pre-empt block at script start should have already
+  # cleared everything — if locks are still held this far in, the
+  # blocking process is stuck rather than legitimately upgrading.
+  local polite=15
+
+  while dply_apt_locks_held; do
+    if [ "\${waited}" -lt "\${polite}" ]; then
+      echo "[dply] apt is busy (waited \${waited}s — likely cloud-init unattended-upgrades); polite wait, retry in 5s..."
+      sleep 5
+      waited=\$((waited + 5))
+      continue
+    fi
+
+    if [ "\${waited}" -eq "\${polite}" ]; then
+      echo "[dply] apt still busy after \${polite}s — evicting unattended-upgrades to unblock provisioning."
+      # Cloud-init too — its modules can re-spawn apt children that
+      # the pre-empt block at script start may have missed.
+      systemctl stop cloud-init.target cloud-config.service cloud-final.service cloud-init.service cloud-init-local.service >/dev/null 2>&1 || true
+      systemctl stop unattended-upgrades.service >/dev/null 2>&1 || true
+      systemctl disable unattended-upgrades.service >/dev/null 2>&1 || true
+      systemctl stop apt-daily.timer apt-daily.service >/dev/null 2>&1 || true
+      systemctl stop apt-daily-upgrade.timer apt-daily-upgrade.service >/dev/null 2>&1 || true
+      pkill -TERM -x unattended-upgr >/dev/null 2>&1 || true
+      pkill -TERM -x apt-get >/dev/null 2>&1 || true
+      pkill -TERM -x apt >/dev/null 2>&1 || true
+      sleep 2
+      pkill -KILL -x unattended-upgr >/dev/null 2>&1 || true
+      pkill -KILL -x apt-get >/dev/null 2>&1 || true
+      pkill -KILL -x apt >/dev/null 2>&1 || true
+      # Drop dpkg lock files left behind by SIGKILL.
+      rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1 || true
+      # Half-installed package recovery after a kill -9.
+      dpkg --configure -a >/dev/null 2>&1 || true
+      waited=\$((waited + 5))
+      sleep 2
+      continue
+    fi
+
+    if [ "\${waited}" -ge 180 ]; then
+      echo "[dply] ERROR: apt lock still held 90s after eviction — something is wedged." >&2
+      echo "[dply] Diagnose on the host:" >&2
+      echo "[dply]   ps auxf | grep -E 'apt|unattended|dpkg'" >&2
+      echo "[dply]   lsof /var/lib/dpkg/lock-frontend" >&2
+      return 1
+    fi
+
+    echo "[dply] post-eviction wait (\${waited}s); retry in 5s..."
+    sleep 5
+    waited=\$((waited + 5))
+  done
+}
+
+# Heal any half-configured dpkg state left behind by a prior failed
+# install, an OOM kill, an apt eviction, or cloud-init's unattended-
+# upgrades being interrupted mid-flight. Symptom that drives this:
+#
+#   E: Sub-process /usr/bin/dpkg returned an error code (1)
+#   N not fully installed or removed
+#
+# Three-level recovery, escalating only when the gentler step fails:
+#   1. dpkg --configure -a
+#      Re-runs postinst for every half-configured package. Fixes the
+#      common case where postinst was killed (OOM, our eviction).
+#   2. apt-get install -f
+#      Repairs unmet dependencies that were left behind. Catches the
+#      case where the package is fine but a missing dep blocks
+#      reconfiguration.
+#   3. dpkg --purge --force-all <broken pkg>
+#      The escape hatch. If postinst itself is the bug (mysql-server
+#      8.4 + missing locale + missing /var/run/mysqld), levels 1-2
+#      will keep failing forever in a loop. Purge the broken package
+#      so the normal install flow downstream gets a clean slate.
+#      The package's own install step will reinstall it from a known-
+#      working state.
+dply_dump_dpkg_diagnostics() {
+  echo "[dply-diag] ===== dpkg failure diagnostics =====" >&2
+  echo "[dply-diag] non-ok packages (status != ii/rc/un):" >&2
+  local broken_list
+  broken_list=\$(dpkg -l 2>/dev/null \\
+    | awk '/^[a-zA-Z]{2}[ \\t]/ && \$1 !~ /^(ii|rc|un)\$/ { print "  "\$1, \$2, \$3 }')
+  if [ -n "\${broken_list}" ]; then
+    echo "\${broken_list}" >&2
+  else
+    echo "  (none flagged — failure may be a postinst that exited 1 without leaving status state)" >&2
+  fi
+
+  echo "[dply-diag] last 50 lines of /var/log/apt/term.log:" >&2
+  tail -n 50 /var/log/apt/term.log 2>/dev/null | sed 's/^/  /' >&2 \\
+    || echo "  (term.log unavailable)" >&2
+
+  echo "[dply-diag] last 30 lines of /var/log/dpkg.log:" >&2
+  tail -n 30 /var/log/dpkg.log 2>/dev/null | sed 's/^/  /' >&2 \\
+    || echo "  (dpkg.log unavailable)" >&2
+
+  # MySQL-specific deep diagnostics. The postinst calls
+  # systemctl start mysql, and the daemon's actual startup error
+  # only lands in the systemd journal — neither apt's term.log
+  # nor dpkg.log capture mysqld's stderr. Without these blocks
+  # we keep seeing "configure → half-configured in <1s" without
+  # any root-cause signal. Only emit when mysql-server is in the
+  # broken list (or installed at all) so non-mysql failures aren't
+  # noisy.
+  if echo "\${broken_list}" | grep -qE 'mysql-server|mariadb-server' \\
+     || dpkg -l mysql-server-* mariadb-server-* 2>/dev/null | grep -qE '^[a-zA-Z]{2}[ \\t]'; then
+    echo "[dply-diag] mysql/mariadb appears in package state — pulling daemon diagnostics:" >&2
+
+    echo "[dply-diag]   journalctl -u mysql (last 80 lines):" >&2
+    journalctl -u mysql --no-pager -n 80 2>/dev/null | sed 's/^/    /' >&2 \\
+      || echo "    (journalctl -u mysql unavailable)" >&2
+
+    echo "[dply-diag]   journalctl -u mariadb (last 40 lines):" >&2
+    journalctl -u mariadb --no-pager -n 40 2>/dev/null | sed 's/^/    /' >&2 \\
+      || echo "    (no mariadb journal)" >&2
+
+    echo "[dply-diag]   /var/log/mysql/error.log tail (last 50 lines):" >&2
+    tail -n 50 /var/log/mysql/error.log 2>/dev/null | sed 's/^/    /' >&2 \\
+      || echo "    (no /var/log/mysql/error.log yet)" >&2
+
+    echo "[dply-diag]   filesystem state:" >&2
+    ls -lad /var/lib/mysql /var/log/mysql /var/run/mysqld /etc/mysql 2>&1 | sed 's/^/    /' >&2
+
+    echo "[dply-diag]   mysqld --validate-config:" >&2
+    if command -v mysqld >/dev/null 2>&1; then
+      sudo -u mysql mysqld --validate-config 2>&1 | head -n 30 | sed 's/^/    /' >&2 \\
+        || mysqld --validate-config 2>&1 | head -n 30 | sed 's/^/    /' >&2 \\
+        || true
+    else
+      echo "    (mysqld binary not present — package failed before unpack completed)" >&2
+    fi
+
+    echo "[dply-diag]   AppArmor status for mysqld:" >&2
+    aa-status 2>/dev/null | grep -i mysql | sed 's/^/    /' >&2 \\
+      || echo "    (apparmor not active or no mysql profile)" >&2
+
+    echo "[dply-diag]   memory snapshot (mysql 8.0 needs ~512MB to initialise):" >&2
+    free -h 2>/dev/null | sed 's/^/    /' >&2
+
+    echo "[dply-diag]   processes still holding mysql files:" >&2
+    fuser -v /var/lib/mysql 2>&1 | sed 's/^/    /' >&2 || true
+  fi
+
+  echo "[dply-diag] ===== end diagnostics =====" >&2
+}
+
+dply_repair_dpkg_state() {
+  dply_wait_for_apt_locks || return 1
+
+  # /^[a-zA-Z]{2}[ \\t]/  — exactly two status chars + whitespace.
+  # Without the {2} bound, the dpkg -l header line "Desired=Unknown..."
+  # also matched and fed garbage into the broken-list. Tightening to
+  # exactly two characters skips the header cleanly.
+  local broken
+  broken=\$(dpkg -l 2>/dev/null | awk '/^[a-zA-Z]{2}[ \\t]/ && \$1 !~ /^(ii|rc|un)\$/ { print \$2 }')
+
+  if [ -z "\${broken}" ]; then
+    return 0
+  fi
+
+  echo "[dply] detected half-configured packages, running dpkg --configure -a to heal:"
+  echo "\${broken}" | sed 's/^/[dply]   /'
+
+  if dpkg --configure -a; then
+    DEBIAN_FRONTEND=noninteractive apt-get install -f -y \\
+      || echo "[dply] WARNING: apt-get install -f could not auto-fix dependencies."
+  else
+    echo "[dply] dpkg --configure -a failed; trying apt-get install -f..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -f -y || true
+  fi
+
+  # Re-check; if any package is STILL half-configured after both
+  # repair attempts, the postinst itself is broken. Purge with
+  # --force-all so the normal install flow reinstalls it cleanly.
+  local still_broken
+  still_broken=\$(dpkg -l 2>/dev/null | awk '/^[a-zA-Z]{2}[ \\t]/ && \$1 !~ /^(ii|rc|un)\$/ { print \$2 }')
+
+  if [ -n "\${still_broken}" ]; then
+    echo "[dply] gentle repair failed; purging stuck packages (will be reinstalled by their own install step):"
+    echo "\${still_broken}" | sed 's/^/[dply]   /'
+
+    # mysql-server's postinst calls mysql_install_db, which refuses to
+    # initialise into a non-empty /var/lib/mysql. A previous failed
+    # install left files there, so even after dpkg --purge clears the
+    # package the data directory survives — and the very next reinstall
+    # bombs identically: "data directory not empty". Symptom in
+    # /var/log/dpkg.log: configure → half-configured in <1 second,
+    # repeating every retry. Same logic applies to mariadb. Stop the
+    # service and nuke the data + log directories so the next install
+    # gets a clean slate.
+    if echo "\${still_broken}" | grep -qE '^(mysql-server|mariadb-server)'; then
+      echo "[dply] mysql/mariadb among broken packages — wiping stale data dirs so reinstall can initialise cleanly."
+      systemctl stop mysql mariadb >/dev/null 2>&1 || true
+      rm -rf /var/lib/mysql /var/log/mysql /etc/mysql
+    fi
+
+    # shellcheck disable=SC2086
+    DEBIAN_FRONTEND=noninteractive dpkg --purge --force-all \${still_broken} \\
+      || { echo "[dply] ERROR: even --force-all purge failed; manual intervention required." >&2; return 1; }
+    echo "[dply] purge complete; downstream install steps will reinstall."
+  fi
+}
 
 BASH;
     }

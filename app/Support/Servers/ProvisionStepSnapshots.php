@@ -8,9 +8,33 @@ class ProvisionStepSnapshots
 {
     public const SCRIPT_STEP_PREFIX = '[dply-step] ';
 
+    /**
+     * Suffix appended by ServerProvisionCommandBuilder::withStep() when a
+     * marker file already exists from a prior run. The bash script emits
+     * BOTH the original marker AND the resumed-skip marker, so naive
+     * extraction sees each step twice ("Installing MySQL" AND "Installing
+     * MySQL (resumed: already done)") in the Up-next list. Stripping
+     * this suffix collapses them to one logical step.
+     */
+    private const RESUMED_SKIP_SUFFIX = ' (resumed: already done)';
+
     public static function keyForLabel(string $label): string
     {
-        return 'script_'.md5($label);
+        return 'script_'.md5(self::normalizeLabel($label));
+    }
+
+    /**
+     * Strip the resumed-skip suffix so re-run output (which emits the
+     * skip marker) maps to the same logical step as the first-run output
+     * (which emits the plain marker).
+     */
+    public static function normalizeLabel(string $label): string
+    {
+        if (str_ends_with($label, self::RESUMED_SKIP_SUFFIX)) {
+            return rtrim(substr($label, 0, -strlen(self::RESUMED_SKIP_SUFFIX)));
+        }
+
+        return $label;
     }
 
     /**
@@ -60,7 +84,7 @@ class ProvisionStepSnapshots
 
             $label = trim(str_replace(["echo '", 'echo "', "'", '"'], '', strstr($line, self::SCRIPT_STEP_PREFIX) ?: ''));
             $label = preg_replace('/^\[dply-step\]\s*/', '', $label ?? '');
-            $label = trim((string) $label);
+            $label = self::normalizeLabel(trim((string) $label));
 
             if ($label !== '' && ! in_array($label, $labels, true)) {
                 $labels[] = $label;
@@ -82,6 +106,7 @@ class ProvisionStepSnapshots
         foreach ($lines as $line) {
             if (str_contains($line, self::SCRIPT_STEP_PREFIX)) {
                 $label = trim(str_replace(self::SCRIPT_STEP_PREFIX, '', strstr($line, self::SCRIPT_STEP_PREFIX) ?: ''));
+                $label = self::normalizeLabel($label);
                 $activeLabel = $label !== '' ? $label : null;
 
                 if ($activeLabel !== null) {

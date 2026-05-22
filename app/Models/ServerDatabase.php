@@ -56,6 +56,7 @@ class ServerDatabase extends Model
     {
         return match ($this->engine) {
             'postgres' => 5432,
+            'sqlite' => 0, // file-based, no port
             default => 3306,
         };
     }
@@ -65,6 +66,13 @@ class ServerDatabase extends Model
      */
     public function connectionUrl(): string
     {
+        if ($this->engine === 'sqlite') {
+            // For SQLite, `host` stores the absolute file path on the
+            // server. PDO's connection string for SQLite is
+            // "sqlite:/path/to/file.db".
+            return 'sqlite:'.($this->host ?: '/var/lib/dply/sqlite/'.$this->name.'.db');
+        }
+
         $user = rawurlencode((string) $this->username);
         $pass = rawurlencode((string) $this->password);
         $host = $this->host ?: '127.0.0.1';

@@ -49,4 +49,37 @@ class ServerDatabaseConnectionUrlTest extends TestCase
         $this->assertStringStartsWith('postgresql://', $db->connectionUrl());
         $this->assertStringContainsString('10.0.0.1:5432', $db->connectionUrl());
     }
+
+    public function test_sqlite_connection_url_uses_file_path_from_host_column(): void
+    {
+        $server = Server::factory()->create();
+
+        $db = new ServerDatabase([
+            'server_id' => $server->id,
+            'name' => 'app_db',
+            'engine' => 'sqlite',
+            'username' => '',
+            'password' => '',
+            'host' => '/var/lib/dply/sqlite/app_db.db',
+        ]);
+
+        $this->assertSame('sqlite:/var/lib/dply/sqlite/app_db.db', $db->connectionUrl());
+        $this->assertSame(0, $db->defaultPort());
+    }
+
+    public function test_sqlite_connection_url_falls_back_to_default_root_when_host_missing(): void
+    {
+        $server = Server::factory()->create();
+
+        $db = new ServerDatabase([
+            'server_id' => $server->id,
+            'name' => 'fallback_db',
+            'engine' => 'sqlite',
+            'username' => '',
+            'password' => '',
+            'host' => '',
+        ]);
+
+        $this->assertSame('sqlite:/var/lib/dply/sqlite/fallback_db.db', $db->connectionUrl());
+    }
 }

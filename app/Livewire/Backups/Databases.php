@@ -33,9 +33,9 @@ class Databases extends Component
             ->orderBy('name')
             ->get();
 
-        $storageDestinations = $user->backupConfigurations()
-            ->orderBy('name')
-            ->get(['id', 'name', 'provider']);
+        $storageDestinations = $org
+            ? $org->backupConfigurations()->orderBy('name')->get(['id', 'name', 'provider'])
+            : collect();
 
         $databaseCounts = ServerDatabase::query()
             ->whereIn('server_id', $serverIds)

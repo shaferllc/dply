@@ -12,21 +12,19 @@ use App\Services\Sites\ApacheSiteConfigBuilder;
 use App\Services\Sites\SiteApacheProvisioner;
 use Illuminate\Support\Collection;
 use Mockery;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class SiteApacheProvisionerTest extends TestCase
 {
     #[Test]
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function provision_writes_apache_vhost_and_placeholder_page(): void
     {
-        $server = new class([
-            'name' => 'Apache Box',
-            'ip_address' => '203.0.113.20',
-            'ssh_user' => 'root',
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'status' => Server::STATUS_READY,
-        ]) extends Server
+        $server = new class(['name' => 'Apache Box', 'ip_address' => '203.0.113.20', 'ssh_user' => 'root', 'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----", 'status' => Server::STATUS_READY]) extends Server
         {
             public function recoverySshPrivateKey(): ?string
             {
@@ -42,7 +40,7 @@ class SiteApacheProvisionerTest extends TestCase
             'repository_path' => '/var/www/docs',
             'php_version' => '8.3',
         ]);
-        $site->id = '01HZYTESTAPACHE000000000001';
+        $site->id = '01HZYTESTAPACHE00000000001';
         $site->setRelation('server', $server);
         $site->setRelation('domains', new Collection([
             new SiteDomain(['hostname' => 'docs.example.com', 'is_primary' => true]),
@@ -58,10 +56,17 @@ class SiteApacheProvisionerTest extends TestCase
                 $writtenFiles[$remotePath] = $contents;
             });
         $ssh->shouldReceive('exec')
-            ->times(2)
+            ->zeroOrMoreTimes()
             ->andReturnUsing(function (string $command): string {
                 if (str_contains($command, 'DPLY_INDEX_PLACEHOLDER_EXIT')) {
                     return "missing\nDPLY_INDEX_PLACEHOLDER_EXIT:0";
+                }
+                // The shared AbstractSiteWebserverProvisioner runs `mkdir -p <root>` for the
+                // placeholder web root with its own exit marker — the test stub must answer it
+                // before the apache-specific marker below, otherwise the mkdir guard rejects
+                // the response and the provisioner throws.
+                if (str_contains($command, 'DPLY_PLACEHOLDER_MKDIR')) {
+                    return "\nDPLY_PLACEHOLDER_MKDIR:0";
                 }
 
                 return "\nDPLY_APACHE_EXIT:0";
