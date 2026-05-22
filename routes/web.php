@@ -282,6 +282,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
+    // Cloud Routes
+    Route::livewire('cloud/clusters', \App\Livewire\Cloud\ClusterIndex::class)->name('cloud.clusters.index');
+    Route::livewire('cloud/clusters/create', \App\Livewire\Cloud\ClusterCreate::class)->name('cloud.clusters.create');
+    Route::livewire('cloud/clusters/{cluster}', \App\Livewire\Cloud\ClusterShow::class)->name('cloud.clusters.show');
+    Route::livewire('cloud/clusters/{cluster}/apps/create', \App\Livewire\Cloud\AppCreate::class)->name('cloud.apps.create');
+    Route::livewire('cloud/clusters/{cluster}/apps/{app}', \App\Livewire\Cloud\AppShow::class)->name('cloud.apps.show');
+
     Route::livewire('servers', ServersIndex::class)->name('servers.index');
     Route::livewire('servers/import/digitalocean', ServersImportFromDigitalOcean::class)->name('servers.import.digitalocean');
     // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft

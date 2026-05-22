@@ -164,6 +164,9 @@ class ScaffoldWordPressPipeline
                 'is_primary' => $site->domains()->where('is_primary', true)->doesntExist(),
                 'www_redirect' => false,
             ]);
+            // wp_install reads primaryDomain() in a later step — drop any
+            // memoized (null) result so it re-resolves to this new domain.
+            $site->flushPrimaryDomainCache();
         }
     }
 

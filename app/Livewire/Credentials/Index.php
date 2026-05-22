@@ -19,7 +19,7 @@ class Index extends Component
      *
      * @var list<string>
      */
-    private const TABS = ['all', 'server', 'dns', 'imports'];
+    private const TABS = ['all', 'server', 'dns', 'cdn', 'imports'];
 
     public ?Organization $organization = null;
 
@@ -86,6 +86,7 @@ class Index extends Component
         return match ($this->tab) {
             'server' => 'compute',
             'dns' => 'dns',
+            'cdn' => 'cdn',
             'imports' => 'import',
             default => null,
         };
@@ -174,6 +175,7 @@ class Index extends Component
                     }
                     $matches = match ($capability) {
                         'dns' => $enum->supportsDns(),
+                        'cdn' => $enum->supportsCdn(),
                         'import' => $enum->supportsImport(),
                         default => $enum->supportsCompute(),
                     };

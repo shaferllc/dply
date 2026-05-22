@@ -51,22 +51,25 @@
                             <p class="mt-1">{{ __('App Runner can only build from a GitHub repo when an authorized connection ARN is attached to the credential. Set up the connection in the AWS console, then store the ARN as github_connection_arn on this credential.') }}</p>
                         </div>
                     @endif
-                    @if ($linkedSourceControlAccounts !== [])
-                        <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
-                            <button type="button" role="radio" aria-checked="{{ $repo_source === 'connected' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'connected')"
-                                @class([
-                                    'rounded-md px-2.5 py-1 font-medium transition',
-                                    'bg-white text-slate-900 shadow-sm' => $repo_source === 'connected',
-                                    'text-slate-600 hover:text-slate-900' => $repo_source !== 'connected',
-                                ])>{{ __('Pick from connected account') }}</button>
-                            <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
-                                @class([
-                                    'rounded-md px-2.5 py-1 font-medium transition',
-                                    'bg-white text-slate-900 shadow-sm' => $repo_source === 'manual',
-                                    'text-slate-600 hover:text-slate-900' => $repo_source !== 'manual',
-                                ])>{{ __('Enter manually') }}</button>
-                        </div>
-                    @endif
+                    <div class="flex flex-wrap items-center gap-3">
+                        @if ($linkedSourceControlAccounts !== [])
+                            <div role="radiogroup" aria-label="{{ __('Where to find the repo') }}" class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
+                                <button type="button" role="radio" aria-checked="{{ $repo_source === 'connected' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'connected')"
+                                    @class([
+                                        'rounded-md px-2.5 py-1 font-medium transition',
+                                        'bg-white text-slate-900 shadow-sm' => $repo_source === 'connected',
+                                        'text-slate-600 hover:text-slate-900' => $repo_source !== 'connected',
+                                    ])>{{ __('Pick from connected account') }}</button>
+                                <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
+                                    @class([
+                                        'rounded-md px-2.5 py-1 font-medium transition',
+                                        'bg-white text-slate-900 shadow-sm' => $repo_source === 'manual',
+                                        'text-slate-600 hover:text-slate-900' => $repo_source !== 'manual',
+                                    ])>{{ __('Enter manually') }}</button>
+                            </div>
+                        @endif
+                        <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                    </div>
 
                     @if ($repo_source === 'connected' && $linkedSourceControlAccounts !== [])
                         <div class="grid gap-4 sm:grid-cols-2">
@@ -194,4 +197,6 @@
             </x-primary-button>
         </div>
     </form>
+
+    <x-connect-provider-modal />
 </div>

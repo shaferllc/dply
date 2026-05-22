@@ -26,8 +26,11 @@ return [
         'coolify' => env('DPLY_SERVER_PROVIDER_COOLIFY', false), // https://coolify.io/
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', false), // https://aws.amazon.com/ec2/
         'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
-        /** DNS / API token only (not a compute host in v1). */
+        /** DNS / CDN — API token only (not a compute host in v1). */
         'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/
+        'gandi' => env('DPLY_SERVER_PROVIDER_GANDI', true), // https://www.gandi.net/
+        'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', true), // https://www.namecheap.com/
+        'vercel_dns' => env('DPLY_SERVER_PROVIDER_VERCEL_DNS', true), // https://vercel.com/docs/projects/domains
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
         'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/
         'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // https://cloud.google.com/compute

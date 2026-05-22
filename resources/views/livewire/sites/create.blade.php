@@ -214,7 +214,10 @@
                     <h2 id="repo-build-heading" class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ __('3. Repository and build') }}</h2>
                     <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-5">
                         <div>
-                            <x-input-label for="functions_repo_source" :value="__('Repository source')" />
+                            <div class="flex items-center justify-between gap-2">
+                                <x-input-label for="functions_repo_source" :value="__('Repository source')" />
+                                <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                            </div>
                             <select id="functions_repo_source" wire:model.live="form.functions_repo_source" class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 @if (count($linkedSourceControlAccounts) > 0)
                                     <option value="provider">{{ __('Connected Git provider') }}</option>
@@ -413,4 +416,6 @@
             @endif {{-- @if ($isContainerMode) ... @else ... --}}
         </div>
     </div>
+
+    <x-connect-provider-modal />
 </div>

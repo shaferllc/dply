@@ -148,4 +148,85 @@ class CredentialTest extends TestCase
 
         $this->assertDatabaseHas('provider_credentials', ['id' => $cred->id]);
     }
+
+    public function test_gandi_credential_can_be_connected(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('gandi_api_token', 'pat-gandi-secret')
+            ->call('storeGandi')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('provider_credentials', [
+            'organization_id' => $org->id,
+            'provider' => 'gandi',
+            'name' => 'Gandi',
+        ]);
+    }
+
+    public function test_gandi_credential_requires_a_token(): void
+    {
+        $user = $this->userWithOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('gandi_api_token', '')
+            ->call('storeGandi')
+            ->assertHasErrors('gandi_api_token');
+
+        $this->assertDatabaseCount('provider_credentials', 0);
+    }
+
+    public function test_namecheap_credential_can_be_connected(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('namecheap_name', 'Agency DNS')
+            ->set('namecheap_api_user', 'acme')
+            ->set('namecheap_api_key', 'nc-secret-key')
+            ->call('storeNamecheap')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('provider_credentials', [
+            'organization_id' => $org->id,
+            'provider' => 'namecheap',
+            'name' => 'Agency DNS',
+        ]);
+    }
+
+    public function test_vercel_dns_credential_stores_optional_team_id(): void
+    {
+        $user = $this->userWithOrganization();
+        $org = $user->currentOrganization();
+
+        Livewire::actingAs($user)
+            ->test(CredentialsIndex::class)
+            ->set('vercel_dns_api_token', 'vc-secret')
+            ->set('vercel_dns_team_id', 'team_abc123')
+            ->call('storeVercelDns')
+            ->assertHasNoErrors();
+
+        $credential = ProviderCredential::query()
+            ->where('organization_id', $org->id)
+            ->where('provider', 'vercel_dns')
+            ->firstOrFail();
+
+        $this->assertSame('team_abc123', $credential->credentials['team_id']);
+    }
+
+    public function test_cdn_tab_lists_only_cdn_capable_providers(): void
+    {
+        $ids = CredentialsIndex::credentialProviderIds('cdn');
+
+        $this->assertContains('cloudflare', $ids);
+        $this->assertContains('vercel_dns', $ids);
+        $this->assertNotContains('namecheap', $ids);
+        $this->assertNotContains('digitalocean', $ids);
+    }
 }

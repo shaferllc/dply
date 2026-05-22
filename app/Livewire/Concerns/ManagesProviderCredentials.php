@@ -139,6 +139,22 @@ trait ManagesProviderCredentials
 
     public string $forge_api_token = '';
 
+    public string $gandi_name = '';
+
+    public string $gandi_api_token = '';
+
+    public string $namecheap_name = '';
+
+    public string $namecheap_api_user = '';
+
+    public string $namecheap_api_key = '';
+
+    public string $vercel_dns_name = '';
+
+    public string $vercel_dns_api_token = '';
+
+    public string $vercel_dns_team_id = '';
+
     public function storeDigitalOcean(): void
     {
         if (! $this->ensureProviderEnabled('digitalocean')) {
@@ -669,6 +685,86 @@ trait ManagesProviderCredentials
         }
     }
 
+    public function storeGandi(): void
+    {
+        if (! $this->ensureProviderEnabled('gandi')) {
+            return;
+        }
+        $this->validate([
+            'gandi_name' => 'nullable|string|max:255',
+            'gandi_api_token' => 'required|string',
+        ], [], ['gandi_api_token' => 'API token']);
+        if ($this->storeProviderCredential('gandi', $this->gandi_name, $this->gandi_api_token, 'gandi_api_token')) {
+            $this->reset('gandi_name', 'gandi_api_token');
+        }
+    }
+
+    public function storeNamecheap(): void
+    {
+        if (! $this->ensureProviderEnabled('namecheap')) {
+            return;
+        }
+        $this->validate([
+            'namecheap_name' => 'nullable|string|max:255',
+            'namecheap_api_user' => 'required|string|max:255',
+            'namecheap_api_key' => 'required|string',
+        ], [], [
+            'namecheap_api_user' => 'API user',
+            'namecheap_api_key' => 'API key',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'namecheap',
+            'name' => trim($this->namecheap_name) ?: 'Namecheap',
+            'credentials' => [
+                'api_user' => trim($this->namecheap_api_user),
+                'api_key' => $this->namecheap_api_key,
+            ],
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset('namecheap_name', 'namecheap_api_user', 'namecheap_api_key');
+        $this->notifyProviderCredentialStored('namecheap');
+    }
+
+    public function storeVercelDns(): void
+    {
+        if (! $this->ensureProviderEnabled('vercel_dns')) {
+            return;
+        }
+        $this->validate([
+            'vercel_dns_name' => 'nullable|string|max:255',
+            'vercel_dns_api_token' => 'required|string',
+            'vercel_dns_team_id' => 'nullable|string|max:255',
+        ], [], ['vercel_dns_api_token' => 'API token']);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        $credentials = ['api_token' => $this->vercel_dns_api_token];
+        if (trim($this->vercel_dns_team_id) !== '') {
+            $credentials['team_id'] = trim($this->vercel_dns_team_id);
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'vercel_dns',
+            'name' => trim($this->vercel_dns_name) ?: 'Vercel DNS',
+            'credentials' => $credentials,
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset('vercel_dns_name', 'vercel_dns_api_token', 'vercel_dns_team_id');
+        $this->notifyProviderCredentialStored('vercel_dns');
+    }
+
     protected function ensureProviderEnabled(string $provider): bool
     {
         if (ServerProviderGate::enabled($provider)) {
@@ -695,6 +791,7 @@ trait ManagesProviderCredentials
             'digitalocean' => 'DigitalOcean', 'cloudflare' => 'Cloudflare', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
             'akamai' => 'Akamai', 'ovh' => 'OVH', 'rackspace' => 'Rackspace', 'render' => 'Render', 'railway' => 'Railway',
             'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud', 'ploi' => 'Ploi', 'forge' => 'Laravel Forge',
+            'gandi' => 'Gandi',
         ];
         $credential = auth()->user()->providerCredentials()->create([
             'organization_id' => $org->id,
@@ -722,7 +819,7 @@ trait ManagesProviderCredentials
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
                 ForgeImportDriver::for($credential)->validateConnection();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform'], true)) {
+            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform', 'gandi'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");

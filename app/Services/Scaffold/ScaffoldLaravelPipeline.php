@@ -181,6 +181,9 @@ class ScaffoldLaravelPipeline
                 'is_primary' => $site->domains()->where('is_primary', true)->doesntExist(),
                 'www_redirect' => false,
             ]);
+            // Downstream steps read primaryDomain() — drop any memoized (null)
+            // result so it re-resolves to this new domain.
+            $site->flushPrimaryDomainCache();
         }
     }
 

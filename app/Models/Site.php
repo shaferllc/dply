@@ -559,6 +559,11 @@ class Site extends Model
             && $server->hasAnySshPrivateKey();
     }
 
+    /** Memoized result of the lazy-load path in primaryDomain(). */
+    private ?SiteDomain $primaryDomainCache = null;
+
+    private bool $primaryDomainResolved = false;
+
     public function primaryDomain(): ?SiteDomain
     {
         // Avoid re-querying when callers have already eager-loaded `domains`
@@ -568,8 +573,31 @@ class Site extends Model
             return $this->domains->firstWhere('is_primary', true) ?? $this->domains->first();
         }
 
-        return $this->domains()->where('is_primary', true)->first()
-            ?? $this->domains()->first();
+        // primaryDomain() is hit repeatedly per request (blade views, Site::url(),
+        // service classes). Memoize so the lazy path queries at most once.
+        if ($this->primaryDomainResolved) {
+            return $this->primaryDomainCache;
+        }
+
+        $this->primaryDomainResolved = true;
+
+        // Order is_primary descending so the primary domain wins, falling back
+        // to any domain — one query instead of a where + a separate fallback.
+        return $this->primaryDomainCache = $this->domains()
+            ->orderByDesc('is_primary')
+            ->first();
+    }
+
+    /**
+     * Drop the memoized primaryDomain() result. Call this after creating or
+     * re-prioritising a SiteDomain on an in-memory Site instance that may have
+     * already resolved primaryDomain() — e.g. the scaffold pipelines, which
+     * read primaryDomain() in a later step than the one that creates it.
+     */
+    public function flushPrimaryDomainCache(): void
+    {
+        $this->primaryDomainCache = null;
+        $this->primaryDomainResolved = false;
     }
 
     public function testingHostname(): string

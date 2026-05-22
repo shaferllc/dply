@@ -53,7 +53,9 @@ class ConsoleDrawer extends Component
         // Route-bound server (we're on /servers/{id}/…) — preferred.
         if ($server instanceof Server) {
             $this->setActiveServer($server);
-            $this->verifyActiveServer();
+            // Route-model binding just loaded the row — verify it as-is
+            // rather than re-fetching the same record.
+            $this->verifyActiveServer(refresh: false);
 
             return;
         }
@@ -65,7 +67,8 @@ class ConsoleDrawer extends Component
             $s = $this->loadServerForOrg($remembered);
             if ($s) {
                 $this->server = $s;
-                $this->verifyActiveServer();
+                // loadServerForOrg() just queried this row — no refresh needed.
+                $this->verifyActiveServer(refresh: false);
             }
         }
     }
@@ -108,14 +111,18 @@ class ConsoleDrawer extends Component
      * Verify that the currently selected server is still available.
      * Called on mount and can be triggered manually or on error recovery.
      */
-    public function verifyActiveServer(): void
+    public function verifyActiveServer(bool $refresh = true): void
     {
         if ($this->server === null) {
             return;
         }
 
-        // Refresh from DB to check current status
-        $this->server->refresh();
+        // Refresh from DB to check current status. Skipped when the caller
+        // just loaded the row (route binding / loadServerForOrg) so we don't
+        // fire a redundant `select * from servers` for the same record.
+        if ($refresh) {
+            $this->server->refresh();
+        }
 
         if ($this->server->status !== Server::STATUS_READY) {
             $this->serverVerified = false;
