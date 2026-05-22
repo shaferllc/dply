@@ -1078,6 +1078,8 @@
                         @else
                             @include('livewire.sites.settings.partials.logs')
                         @endif
+                    @elseif ($section === 'platform' && $site->usesFunctionsRuntime())
+                        @livewire('serverless.platform-panel', ['site' => $site], key('serverless-platform-'.$site->id))
                     @elseif ($section === 'notifications')
                         @include('livewire.sites.settings.partials.notifications')
                     @elseif ($section === 'basic-auth')

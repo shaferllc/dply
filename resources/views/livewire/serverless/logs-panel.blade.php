@@ -11,6 +11,12 @@
         'runtime' => count($runtimeLines),
         'deploy' => $deployments->count(),
     ];
+    $tabIcons = [
+        'activations' => 'heroicon-o-bolt',
+        'visits' => 'heroicon-o-globe-alt',
+        'runtime' => 'heroicon-o-command-line',
+        'deploy' => 'heroicon-o-rocket-launch',
+    ];
 @endphp
 <div class="dply-card p-6 sm:p-8 space-y-5">
     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -40,18 +46,19 @@
     </div>
 
     {{-- Tab bar — every log source a DigitalOcean Functions host exposes. --}}
-    <div class="flex flex-wrap gap-1 rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-1">
+    <x-server-workspace-tablist :aria-label="__('Log sources')" class="!mb-0">
         @foreach ($tabs as $key => $label)
-            <button type="button" wire:click="setTab('{{ $key }}')" @class([
-                'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-                'bg-white text-brand-ink shadow-sm' => $tab === $key,
-                'text-brand-moss hover:text-brand-ink' => $tab !== $key,
-            ])>
+            <x-server-workspace-tab
+                id="logs-tab-{{ $key }}"
+                :active="$tab === $key"
+                :icon="$tabIcons[$key]"
+                wire:click="setTab('{{ $key }}')"
+            >
                 {{ $label }}
                 <span class="ml-1 text-[10px] text-brand-moss/60">{{ $tabCounts[$key] }}</span>
-            </button>
+            </x-server-workspace-tab>
         @endforeach
-    </div>
+    </x-server-workspace-tablist>
 
     {{-- ── Activations ─────────────────────────────────────────────────── --}}
     @if ($tab === 'activations')

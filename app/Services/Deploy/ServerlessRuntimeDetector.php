@@ -92,6 +92,11 @@ final class ServerlessRuntimeDetector
             return $nodeFramework;
         }
 
+        $goFramework = $this->detectGoStack($workingDirectory, $capabilities);
+        if ($goFramework !== null) {
+            return $goFramework;
+        }
+
         if ($composerJson !== null && $this->looksLikeSymfony($composerJson)) {
             return $this->phpResult('symfony', 'medium', 'public/build', [
                 'Detected Symfony via symfony/framework-bundle or symfony/symfony in composer.json.',
@@ -411,6 +416,13 @@ final class ServerlessRuntimeDetector
             'unsupported_for_target' => false,
         ];
 
+        if (in_array('express', $dependencies, true)) {
+            return $node('express', 'framework', '.', 'high',
+                ['Detected the express dependency in package.json.'],
+                [],
+            );
+        }
+
         if (in_array('next', $dependencies, true)) {
             return $node('nextjs', 'framework', 'out', 'medium',
                 ['Detected next dependency in package.json.'],
@@ -439,6 +451,43 @@ final class ServerlessRuntimeDetector
         }
 
         return null;
+    }
+
+    /**
+     * Detect a Go web framework from go.mod. Currently recognises Gin; a
+     * generic Go module falls through to raw-action detection.
+     *
+     * @param  array<string, mixed>  $capabilities
+     * @return array<string, mixed>|null
+     */
+    private function detectGoStack(string $workingDirectory, array $capabilities): ?array
+    {
+        if (! is_file($workingDirectory.'/go.mod')) {
+            return null;
+        }
+
+        $goMod = (string) file_get_contents($workingDirectory.'/go.mod');
+        if (! str_contains($goMod, 'github.com/gin-gonic/gin')) {
+            return null;
+        }
+
+        $supported = (bool) ($capabilities['supports_go_runtime'] ?? false);
+
+        return [
+            'framework' => 'gin',
+            'deploy_kind' => 'framework',
+            'language' => 'go',
+            'runtime' => $supported ? (self::RAW_RUNTIME_DEFAULTS['go'] ?? 'go:1.22') : '',
+            'entrypoint' => 'main',
+            'entry_file' => '',
+            'build_command' => '',
+            'artifact_output_path' => '.',
+            'package' => (string) ($capabilities['default_package'] ?? 'default'),
+            'confidence' => 'high',
+            'reasons' => ['Detected the gin-gonic/gin dependency in go.mod.'],
+            'warnings' => $supported ? [] : ['This repository looks like Gin/Go, but the selected serverless target does not advertise a Go runtime.'],
+            'unsupported_for_target' => ! $supported,
+        ];
     }
 
     /**

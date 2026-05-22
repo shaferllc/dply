@@ -9,6 +9,7 @@ use App\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
+use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
@@ -17,9 +18,6 @@ use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Services\Deploy\LocalRepositoryInspector;
 use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
@@ -36,6 +34,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Create extends Component
 {
+    use DetectsRepositoryRuntime;
+
     public Server $server;
 
     public SiteCreateForm $form;
@@ -63,37 +63,18 @@ class Create extends Component
     public bool $functionsOverridesTouched = false;
 
     /**
-     * Surfaces the merged manifest+detection plan for the URL-first flow.
-     * Empty array when no detection has run; an associative array of plan
-     * fields (runtime, version, framework, build_command, start_command,
-     * app_port, confidence, sources, processes, reasons, warnings,
-     * has_manifest, error?) once it has.
-     *
-     * Mirrors the JSON shape produced by the dply:detect-runtime CLI so
-     * the Blade panel can render the same structure the CLI prints.
-     *
-     * @var array<string, mixed>
-     */
-    public array $detectedPlan = [];
-
-    /**
      * Suggested non-web processes carried forward from the last detection
      * run. The Site::created hook already creates a `web` SiteProcess
      * (with command=null); after store() persists the site, we create
      * one row per entry here so workers/schedulers/etc. land alongside.
      *
+     * The {@see DetectsRepositoryRuntime} concern owns `$detectedPlan` and
+     * `$runtimeOverridesTouched`; this list is populated from the plan by
+     * {@see applyDetectedRuntimePrefills()}.
+     *
      * @var list<array{type: string, name: string, command: string, reason: string}>
      */
     public array $detectedProcesses = [];
-
-    /**
-     * Suppress detection-driven form pre-fills when the user has manually
-     * edited any of the managed fields (runtime / runtime_version /
-     * build_command / start_command). Mirrors the
-     * {@see $functionsOverridesTouched} pattern so a re-detect doesn't
-     * stomp manual edits.
-     */
-    public bool $runtimeOverridesTouched = false;
 
     /**
      * Surfaces the result of the most recent "install runtime on server"
@@ -719,80 +700,51 @@ class Create extends Component
 
     /**
      * Run URL-first runtime detection against the form's git URL + branch.
-     *
-     * Pulls the merged dply.yaml + detector plan via {@see RepositoryRuntimePreview}
-     * and pre-fills runtime / runtime_version / build_command / start_command on
-     * the form when the user hasn't manually edited any of those fields.
-     * Suggested non-web processes are stashed in {@see $detectedProcesses} for
-     * {@see store()} to materialize after the Site row is created.
-     *
-     * Errors (clone failures, missing branch, etc.) land in
-     * `$detectedPlan['error']` so the Blade panel can render them inline
-     * without aborting the form.
+     * Thin wrapper over {@see DetectsRepositoryRuntime::runDetection()}; the
+     * concern populates `$detectedPlan` and then calls
+     * {@see applyDetectedRuntimePrefills()} to pre-fill the form.
      */
-    public function detectFromRepository(RepositoryRuntimePreview $preview): void
+    public function detectFromRepository(): void
     {
-        $url = trim($this->form->git_repository_url);
-        $branch = trim($this->form->git_branch) !== '' ? trim($this->form->git_branch) : 'main';
-
-        if ($url === '') {
-            $this->detectedPlan = [];
-            $this->detectedProcesses = [];
-
-            return;
-        }
-
-        try {
-            $plan = $preview->fromUrl($url, $branch);
-        } catch (GitCloneException $e) {
-            $this->detectedPlan = [
-                'error' => $e->getMessage(),
-                'url' => $url,
-                'branch' => $branch,
-            ];
-            $this->detectedProcesses = [];
-
-            return;
-        }
-
-        if ($plan === null) {
-            $this->detectedPlan = [
-                'url' => $url,
-                'branch' => $branch,
-                'no_match' => true,
-            ];
-            $this->detectedProcesses = [];
-
-            return;
-        }
-
-        $this->detectedPlan = $this->planToArray($plan, $url, $branch);
-        $this->detectedProcesses = array_map(
-            fn ($p) => [
-                'type' => $p->type,
-                'name' => $p->name,
-                'command' => $p->command,
-                'reason' => $p->reason,
-            ],
-            $plan->processes,
+        $this->runDetection(
+            $this->form->git_repository_url,
+            $this->form->git_branch,
         );
+    }
 
-        if (! $this->runtimeOverridesTouched) {
-            $this->form->runtime = $plan->runtime;
-            $this->form->runtime_version = $plan->version ?? '';
-            $this->form->build_command = $plan->buildCommand ?? '';
-            $this->form->start_command = $plan->startCommand ?? '';
-            // Sync the legacy `type` enum + php_version + app_port so the
-            // existing UI sections (which still bind on those) reflect the
-            // detected runtime instead of staying on the previous default.
-            $this->form->type = $this->mapRuntimeToLegacyType($plan->runtime);
-            $this->form->applyPathDefaults();
-            if ($plan->runtime === 'php' && $plan->version !== null) {
-                $this->form->php_version = $plan->version;
-            }
-            if ($plan->runtime === 'node' && $plan->appPort !== null) {
-                $this->form->app_port = $plan->appPort;
-            }
+    /**
+     * Copy the detected plan onto the form. Suggested non-web processes are
+     * stashed in {@see $detectedProcesses} for {@see store()} to materialize
+     * after the Site row is created; runtime / version / build / start are
+     * pre-filled only when the user hasn't manually edited them.
+     */
+    protected function applyDetectedRuntimePrefills(): void
+    {
+        $plan = $this->detectedPlan;
+
+        $this->detectedProcesses = is_array($plan['processes'] ?? null)
+            ? array_values($plan['processes'])
+            : [];
+
+        $runtime = (string) ($plan['runtime'] ?? '');
+        if ($runtime === '' || $this->runtimeOverridesTouched) {
+            return;
+        }
+
+        $this->form->runtime = $runtime;
+        $this->form->runtime_version = (string) ($plan['version'] ?? '');
+        $this->form->build_command = (string) ($plan['build_command'] ?? '');
+        $this->form->start_command = (string) ($plan['start_command'] ?? '');
+        // Sync the legacy `type` enum + php_version + app_port so the
+        // existing UI sections (which still bind on those) reflect the
+        // detected runtime instead of staying on the previous default.
+        $this->form->type = $this->mapRuntimeToLegacyType($runtime);
+        $this->form->applyPathDefaults();
+        if ($runtime === 'php' && ! empty($plan['version'])) {
+            $this->form->php_version = (string) $plan['version'];
+        }
+        if ($runtime === 'node' && ! empty($plan['app_port'])) {
+            $this->form->app_port = (int) $plan['app_port'];
         }
     }
 
@@ -885,40 +837,6 @@ class Create extends Component
             'message' => $result['installed']
                 ? __('Installed :runtime :version on this server.', ['runtime' => $runtime, 'version' => $version])
                 : __('Skipped — runtime not eligible for mise-managed install.'),
-        ];
-    }
-
-    /**
-     * Pure-PHP renderer for the plan into the array shape the Blade panel
-     * and any tests assert against.
-     *
-     * @return array<string, mixed>
-     */
-    private function planToArray(RepositoryRuntimePlan $plan, string $url, string $branch): array
-    {
-        return [
-            'url' => $url,
-            'branch' => $branch,
-            'runtime' => $plan->runtime,
-            'version' => $plan->version,
-            'framework' => $plan->framework,
-            'build_command' => $plan->buildCommand,
-            'start_command' => $plan->startCommand,
-            'app_port' => $plan->appPort,
-            'confidence' => $plan->confidence,
-            'sources' => $plan->sources,
-            'reasons' => $plan->reasons,
-            'warnings' => $plan->warnings,
-            'has_manifest' => $plan->hasManifest(),
-            'processes' => array_map(
-                fn ($p) => [
-                    'type' => $p->type,
-                    'name' => $p->name,
-                    'command' => $p->command,
-                    'reason' => $p->reason,
-                ],
-                $plan->processes,
-            ),
         ];
     }
 

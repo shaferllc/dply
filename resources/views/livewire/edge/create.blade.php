@@ -116,6 +116,17 @@
                         <input type="checkbox" wire:model="deploy_on_push" class="rounded border-slate-300">
                         {{ __('Auto-deploy on push to this branch') }}
                     </label>
+
+                    <div class="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <p class="text-sm text-slate-600">{{ __('Preview what dply detects in this repo before you deploy. The backend builds it with a buildpack when no Dockerfile path is given.') }}</p>
+                            <button type="button" wire:click="detectFromRepository" wire:loading.attr="disabled" wire:target="detectFromRepository" class="inline-flex shrink-0 items-center justify-center rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-ink/90 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="detectFromRepository">{{ __('Detect runtime') }}</span>
+                                <span wire:loading wire:target="detectFromRepository">{{ __('Detecting…') }}</span>
+                            </button>
+                        </div>
+                        @include('livewire.partials._runtime-detection-panel')
+                    </div>
                 @else
                     <div>
                         <x-input-label for="image" :value="__('Container image')" />

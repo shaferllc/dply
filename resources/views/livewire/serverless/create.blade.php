@@ -62,6 +62,18 @@
                         </div>
                     </div>
 
+                    <div class="space-y-3 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-4 py-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <p class="text-xs text-brand-moss">{{ __('Preview the runtime dply detects in this repo before you deploy.') }}</p>
+                            <button type="button" wire:click="detectFromRepository" wire:loading.attr="disabled" wire:target="detectFromRepository"
+                                    class="inline-flex shrink-0 items-center rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-70">
+                                <span wire:loading.remove wire:target="detectFromRepository">{{ __('Detect runtime') }}</span>
+                                <span wire:loading wire:target="detectFromRepository">{{ __('Detecting…') }}</span>
+                            </button>
+                        </div>
+                        @include('livewire.partials._runtime-detection-panel')
+                    </div>
+
                     <div class="grid sm:grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-brand-ink">{{ __('Runtime') }}</label>

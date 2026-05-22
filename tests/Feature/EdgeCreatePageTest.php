@@ -11,6 +11,9 @@ use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Services\Deploy\RuntimeDetection\GitCloneException;
+use App\Services\Deploy\RuntimeDetection\GitCloner;
+use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -306,6 +309,113 @@ class EdgeCreatePageTest extends TestCase
         $site = Site::query()->where('name', 'Acme API')->firstOrFail();
         $this->assertNull($site->container_image);
         $this->assertSame('acme/api', $site->meta['container']['source']['repo']);
+    }
+
+    public function test_source_mode_detection_renders_runtime_panel(): void
+    {
+        $user = $this->ownerWithOrg();
+        $this->fakeClonerProducingNodeRepo('node server.js');
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSee('node')
+            ->assertSee('confidence');
+    }
+
+    public function test_source_mode_detection_prefills_container_port(): void
+    {
+        $user = $this->ownerWithOrg();
+        $this->fakeClonerProducingNodeRepo('node server.js --port 4321');
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSet('port', 4321);
+    }
+
+    public function test_source_mode_detection_does_not_overwrite_typed_port(): void
+    {
+        $user = $this->ownerWithOrg();
+        $this->fakeClonerProducingNodeRepo('node server.js --port 4321');
+
+        Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            // Typing a port marks it touched — detection must not stomp it.
+            ->set('port', 9000)
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->call('detectFromRepository')
+            ->assertSet('port', 9000);
+    }
+
+    public function test_source_mode_detection_failure_does_not_block_deploy(): void
+    {
+        Queue::fake();
+        $user = $this->ownerWithOrg();
+        ProviderCredential::query()->create([
+            'user_id' => $user->id,
+            'organization_id' => $user->currentOrganization()->id,
+            'provider' => 'digitalocean_app_platform',
+            'name' => 'DO',
+            'credentials' => ['api_token' => 't'],
+        ]);
+        $this->app->instance(GitCloner::class, new class implements GitCloner
+        {
+            public function shallowClone(string $url, string $branch, string $destination): void
+            {
+                throw new GitCloneException('Repository not found.');
+            }
+        });
+        unset($this->app[RepositoryRuntimePreview::class]);
+
+        $component = Livewire::actingAs($user)
+            ->test(EdgeCreate::class)
+            ->set('mode', 'source')
+            ->set('name', 'Acme API')
+            ->set('repo', 'acme/api')
+            ->set('branch', 'main')
+            ->set('port', 8080)
+            ->set('region', 'nyc')
+            ->set('backend', 'digitalocean_app_platform')
+            ->call('detectFromRepository');
+
+        $this->assertSame('Repository not found.', $component->get('detectedPlan')['error']);
+
+        $component->call('deploy')->assertHasNoErrors();
+        Queue::assertPushed(ProvisionEdgeSiteJob::class);
+    }
+
+    private function fakeClonerProducingNodeRepo(string $startScript): void
+    {
+        $this->app->instance(GitCloner::class, new class($startScript) implements GitCloner
+        {
+            public function __construct(private string $startScript) {}
+
+            public function shallowClone(string $url, string $branch, string $destination): void
+            {
+                mkdir($destination, 0o755, true);
+                file_put_contents(
+                    $destination.'/package.json',
+                    json_encode([
+                        'name' => 'acme-api',
+                        'dependencies' => ['express' => '^4.0'],
+                        'scripts' => ['start' => $this->startScript],
+                    ]),
+                );
+            }
+        });
+
+        // RepositoryRuntimePreview is constructed per-request; rebinding the
+        // GitCloner is enough — the concern resolves the preview fresh.
+        unset($this->app[RepositoryRuntimePreview::class]);
     }
 
     private function ownerWithOrg(): User

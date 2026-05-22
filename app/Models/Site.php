@@ -1678,6 +1678,33 @@ class Site extends Model
     }
 
     /**
+     * The stable secret dply signs background ticks (scheduler / queue) with.
+     *
+     * Deliberately separate from {@see webhook_secret}: that one is operator-
+     * rotatable, and rotating it must never silently break the function's
+     * scheduler. This secret is minted once, persisted in `meta.serverless`,
+     * and reused — the deploy bakes it into the function's env and every tick
+     * signs with the same value, so the two can never drift apart.
+     */
+    public function ensureServerlessCommandSecret(): string
+    {
+        $existing = trim((string) ($this->serverlessConfig()['command_secret'] ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $secret = \Illuminate\Support\Str::random(48);
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $serverless = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
+        $serverless['command_secret'] = $secret;
+        $meta['serverless'] = $serverless;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $secret;
+    }
+
+    /**
      * The function's live hostname — its proxy slug under a deterministically
      * chosen DPLY_TESTING_DOMAINS entry (e.g. orders-api.dply.cc), matching
      * how VM sites get a testing hostname. Null when no testing domains are

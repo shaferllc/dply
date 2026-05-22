@@ -20,6 +20,10 @@ class DigitalOceanFunctionsArtifactBuilder
         private readonly ServerlessDeploymentConfigResolver $deploymentConfigResolver,
         private readonly BrefInjector $brefInjector,
         private readonly DigitalOceanFunctionsLaravelAdapter $laravelAdapter,
+        private readonly ServerlessExpressAdapter $expressAdapter,
+        private readonly ServerlessFlaskAdapter $flaskAdapter,
+        private readonly ServerlessDjangoAdapter $djangoAdapter,
+        private readonly ServerlessGinAdapter $ginAdapter,
         private readonly ServerlessLoggingShimInjector $shimInjector,
         private readonly ServerlessDeployProgress $progress,
         private readonly ServerlessEnvironmentPreparer $environmentPreparer,
@@ -113,6 +117,63 @@ class DigitalOceanFunctionsArtifactBuilder
             $this->progress->done($site, 'adapter', 'Injected Laravel adapter');
         }
 
+        // DigitalOcean Functions runs Node natively but cannot serve an
+        // Express app directly — inject the OpenWhisk↔Express adapter so the
+        // zipped repo exposes the main() web action the runtime invokes.
+        $expressAdapterLog = [];
+        if ($detected['framework'] === 'express' && $site->server?->isDigitalOceanFunctionsHost()) {
+            $this->progress->active($site, 'adapter', 'Injecting Express adapter', 'DigitalOcean Functions ↔ Express bridge');
+            $injection = $this->expressAdapter->inject($checkout['working_directory']);
+            if ($injection['ran']) {
+                $expressAdapterLog[] = $injection['output'];
+                $entrypoint = ServerlessExpressAdapter::HANDLER_FUNCTION;
+                if (! str_starts_with($runtime, 'node')) {
+                    $runtime = (string) ($this->capabilityResolver->forSite($site)['default_runtime'] ?: 'nodejs:18');
+                }
+            }
+            $this->progress->done($site, 'adapter', 'Injected Express adapter');
+        }
+
+        // DigitalOcean Functions runs Python natively but cannot serve a
+        // Flask app directly — inject the OpenWhisk↔Flask WSGI adapter so the
+        // zipped repo exposes the main() web action the runtime invokes.
+        $flaskAdapterLog = [];
+        if ($detected['framework'] === 'flask' && $site->server?->isDigitalOceanFunctionsHost()) {
+            $this->progress->active($site, 'adapter', 'Injecting Flask adapter', 'DigitalOcean Functions ↔ Flask bridge');
+            $injection = $this->flaskAdapter->inject($checkout['working_directory']);
+            if ($injection['ran']) {
+                $flaskAdapterLog[] = $injection['output'];
+                $entrypoint = ServerlessFlaskAdapter::HANDLER_FUNCTION;
+            }
+            $this->progress->done($site, 'adapter', 'Injected Flask adapter');
+        }
+
+        // Django ships its own WSGI entrypoint — inject the OpenWhisk↔WSGI
+        // adapter pointed at the project's wsgi.py.
+        $djangoAdapterLog = [];
+        if ($detected['framework'] === 'django' && $site->server?->isDigitalOceanFunctionsHost()) {
+            $this->progress->active($site, 'adapter', 'Injecting Django adapter', 'DigitalOcean Functions ↔ Django bridge');
+            $injection = $this->djangoAdapter->inject($checkout['working_directory']);
+            if ($injection['ran']) {
+                $djangoAdapterLog[] = $injection['output'];
+                $entrypoint = ServerlessDjangoAdapter::HANDLER_FUNCTION;
+            }
+            $this->progress->done($site, 'adapter', 'Injected Django adapter');
+        }
+
+        // A Gin app deploys as a Go action — inject the OpenWhisk↔Gin
+        // adapter, which drives the repo's exported Router().
+        $ginAdapterLog = [];
+        if ($detected['framework'] === 'gin' && $site->server?->isDigitalOceanFunctionsHost()) {
+            $this->progress->active($site, 'adapter', 'Injecting Gin adapter', 'DigitalOcean Functions ↔ Gin bridge');
+            $injection = $this->ginAdapter->inject($checkout['working_directory']);
+            if ($injection['ran']) {
+                $ginAdapterLog[] = $injection['output'];
+                $entrypoint = ServerlessGinAdapter::HANDLER_FUNCTION;
+            }
+            $this->progress->done($site, 'adapter', 'Injected Gin adapter');
+        }
+
         // A raw action has no dply-injected handler, so organic invocations
         // would be invisible (the DO activations list API is empty). Inject
         // the per-language logging shim: it becomes the OpenWhisk entry,
@@ -159,7 +220,7 @@ class DigitalOceanFunctionsArtifactBuilder
             'artifact_output_path' => $artifactOutputPath,
         ]);
 
-        $log = array_filter([$checkout['output'], $beforeBuildHookLog, ...$brefLog, ...$laravelAdapterLog, ...$shimLog, $envLog]);
+        $log = array_filter([$checkout['output'], $beforeBuildHookLog, ...$brefLog, ...$laravelAdapterLog, ...$expressAdapterLog, ...$flaskAdapterLog, ...$djangoAdapterLog, ...$ginAdapterLog, ...$shimLog, $envLog]);
 
         if ($buildCommand !== '') {
             $this->progress->active($site, 'dependencies', 'Installing dependencies', $buildCommand);

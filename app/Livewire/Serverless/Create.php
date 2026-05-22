@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Serverless;
 
 use App\Actions\Serverless\CreateServerlessFunction;
+use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
+use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -21,6 +23,7 @@ use Throwable;
 #[Layout('layouts.app')]
 class Create extends Component
 {
+    use DetectsRepositoryRuntime;
     use DispatchesToastNotifications;
 
     public string $provider_credential_id = '';
@@ -84,6 +87,9 @@ class Create extends Component
         $this->repo = self::PHP_DEMO_REPO;
         $this->branch = self::PHP_DEMO_BRANCH;
         $this->runtime = 'php:8.3';
+        // The demo pins a deliberate runtime — don't let a later Detect run
+        // stomp it.
+        $this->runtimeOverridesTouched = true;
     }
 
     /**
@@ -100,6 +106,45 @@ class Create extends Component
         // Laravel 13 requires PHP >= 8.4 — running it on php:8.3 trips
         // composer's platform check before the app can even autoload.
         $this->runtime = 'php:8.4';
+        $this->runtimeOverridesTouched = true;
+    }
+
+    /**
+     * URL-first detection — clone the repo and surface the detected
+     * framework / runtime in the shared panel. Non-blocking: a clone failure
+     * lands in `$detectedPlan['error']` and never blocks {@see create()}.
+     */
+    public function detectFromRepository(): void
+    {
+        $this->runServerlessDetection(
+            $this->normalizeToCloneUrl($this->repo),
+            $this->branch,
+            '',
+            app(ServerlessTargetCapabilityResolver::class)->forDigitalOceanFunctions(),
+        );
+    }
+
+    public function updatedRuntime(): void
+    {
+        $this->runtimeOverridesTouched = true;
+    }
+
+    /**
+     * Pre-fill the runtime dropdown from the detected runtime — but only when
+     * the detected value is a known dropdown option and the user hasn't
+     * already picked one. Anything else leaves the dropdown on `auto`, which
+     * defers to the deploy-time detector.
+     */
+    protected function applyDetectedRuntimePrefills(): void
+    {
+        if ($this->runtimeOverridesTouched) {
+            return;
+        }
+
+        $detected = (string) ($this->detectedPlan['runtime'] ?? '');
+        if ($detected !== '' && array_key_exists($detected, $this->runtimeOptions())) {
+            $this->runtime = $detected;
+        }
     }
 
     public function create(CreateServerlessFunction $action): mixed

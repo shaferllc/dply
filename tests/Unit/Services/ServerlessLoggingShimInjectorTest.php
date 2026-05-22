@@ -29,7 +29,7 @@ class ServerlessLoggingShimInjectorTest extends TestCase
         $this->assertSame('index.js', $injector->plan('node', 'main.js')['shim_file']);
         $this->assertSame('__main__.py', $injector->plan('python', 'main.py')['shim_file']);
         $this->assertSame('index.php', $injector->plan('php', 'main.php')['shim_file']);
-        $this->assertSame('__dply_shim.go', $injector->plan('go', '')['shim_file']);
+        $this->assertSame('dply_shim.go', $injector->plan('go', '')['shim_file']);
 
         $this->assertFalse($injector->supports('ruby'));
         $this->assertFalse($injector->plan('ruby', 'main')['supported']);
@@ -94,7 +94,7 @@ class ServerlessLoggingShimInjectorTest extends TestCase
 
             $this->assertTrue($result['ran']);
             $this->assertSame('DplyMain', $result['function']);
-            $this->assertStringContainsString('func DplyMain(', File::get($dir.'/__dply_shim.go'));
+            $this->assertStringContainsString('func DplyMain(', File::get($dir.'/dply_shim.go'));
         } finally {
             File::deleteDirectory($dir);
         }

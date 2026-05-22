@@ -119,6 +119,10 @@ class CreateServerlessFunction
         // Give the function a friendly, dply-hosted URL straight away.
         $site->ensureServerlessProxySlug();
 
+        // Mint the stable secret that authenticates background ticks, so it
+        // exists before the first deploy bakes it into the function's env.
+        $site->ensureServerlessCommandSecret();
+
         // Provision the namespace, then the job chains to the function deploy.
         ProvisionServerlessHostJob::dispatch($server->id);
 
