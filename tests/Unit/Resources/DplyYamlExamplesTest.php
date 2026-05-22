@@ -31,7 +31,7 @@ test('example parses cleanly', function (string $slug, string $path) {
 test('example runtime is in the canonical set', function (string $slug, string $path) {
     $manifest = (new DplyManifestParser)->parseFile($path);
 
-    expect(['php', 'node', 'python', 'ruby', 'go', 'static'])->toContain($manifest->runtime, "Example {$slug} runtime ({$manifest->runtime}) is outside the canonical set.");
+    expect(['php', 'node', 'python', 'ruby', 'go', 'static'])->toContain($manifest->runtime);
 })->with('exampleFiles');
 test('example processes have command strings', function (string $slug, string $path) {
     $manifest = (new DplyManifestParser)->parseFile($path);

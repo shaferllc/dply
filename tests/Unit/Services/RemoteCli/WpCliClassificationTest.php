@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\RemoteCli\WpCliClassificationTest;
+use Mockery;
+
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RemoteCliPermissions;
 use App\Services\RemoteCli\RiskLevel;

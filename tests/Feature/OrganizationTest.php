@@ -1,155 +1,140 @@
 <?php
 
-namespace Tests\Feature;
 
+namespace Tests\Feature\OrganizationTest;
 use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Tests\TestCase;
 
-class OrganizationTest extends TestCase
-{
-    use RefreshDatabase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-    public function test_organizations_index_is_displayed(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+test('organizations index is displayed', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        $response = $this->actingAs($user)->get(route('organizations.index'));
+    $response = $this->actingAs($user)->get(route('organizations.index'));
 
-        $response->assertOk();
-        $response->assertSee($org->name);
-    }
+    $response->assertOk();
+    $response->assertSee($org->name);
+});
 
-    public function test_organizations_index_prompts_create_when_empty(): void
-    {
-        $user = User::factory()->create();
+test('organizations index prompts create when empty', function () {
+    $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('organizations.index'));
+    $response = $this->actingAs($user)->get(route('organizations.index'));
 
-        $response->assertOk();
-        $response->assertSee('Create your first organization');
-    }
+    $response->assertOk();
+    $response->assertSee('Create your first organization');
+});
 
-    public function test_organization_create_page_is_displayed(): void
-    {
-        $user = User::factory()->create();
+test('organization create page is displayed', function () {
+    $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('organizations.create'));
+    $response = $this->actingAs($user)->get(route('organizations.create'));
 
-        $response->assertOk();
-        $response->assertSee('New organization');
-    }
+    $response->assertOk();
+    $response->assertSee('New organization');
+});
 
-    public function test_organization_can_be_created(): void
-    {
-        $user = User::factory()->create();
+test('organization can be created', function () {
+    $user = User::factory()->create();
 
-        Livewire::actingAs($user)
-            ->test(OrganizationsCreate::class)
-            ->set('name', 'Acme Corp')
-            ->call('store')
-            ->assertRedirect();
+    Livewire::actingAs($user)
+        ->test(OrganizationsCreate::class)
+        ->set('name', 'Acme Corp')
+        ->call('store')
+        ->assertRedirect();
 
-        $this->assertDatabaseHas('organizations', ['name' => 'Acme Corp']);
-        $org = Organization::where('name', 'Acme Corp')->first();
-        $this->assertTrue($org->hasMember($user));
-        $this->assertSame('owner', $org->users()->where('user_id', $user->id)->first()->pivot->role);
-    }
+    $this->assertDatabaseHas('organizations', ['name' => 'Acme Corp']);
+    $org = Organization::where('name', 'Acme Corp')->first();
+    expect($org->hasMember($user))->toBeTrue();
+    expect($org->users()->where('user_id', $user->id)->first()->pivot->role)->toBe('owner');
+});
 
-    public function test_organization_show_is_displayed_for_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'member']);
+test('organization show is displayed for member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'member']);
 
-        $response = $this->actingAs($user)->get(route('organizations.show', $org));
+    $response = $this->actingAs($user)->get(route('organizations.show', $org));
 
-        $response->assertOk();
-        $response->assertSee($org->name);
-        $response->assertSee('Quick links');
-    }
+    $response->assertOk();
+    $response->assertSee($org->name);
+    $response->assertSee('Quick links');
+});
 
-    public function test_organization_automation_page_shows_webhook_and_deploy_controls_for_admins(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+test('organization automation page shows webhook and deploy controls for admins', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        $response = $this->actingAs($user)->get(route('organizations.automation', $org));
+    $response = $this->actingAs($user)->get(route('organizations.automation', $org));
 
-        $response->assertOk();
-        $response->assertSee('Deploy emails');
-        $response->assertSee('Webhook destinations');
-        $response->assertSee('API tokens');
-    }
+    $response->assertOk();
+    $response->assertSee('Deploy emails');
+    $response->assertSee('Webhook destinations');
+    $response->assertSee('API tokens');
+});
 
-    public function test_organization_automation_prompt_revoke_api_token_opens_confirm_modal(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+test('organization automation prompt revoke api token opens confirm modal', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        ['token' => $token] = ApiToken::createToken($user, $org, 'CI token', null, ['*'], null);
+    ['token' => $token] = ApiToken::createToken($user, $org, 'CI token', null, ['*'], null);
 
-        Livewire::actingAs($user)
-            ->test(OrganizationsAutomation::class, ['organization' => $org])
-            ->call('promptRevokeApiToken', (string) $token->id)
-            ->assertSet('showConfirmActionModal', true)
-            ->assertSet('confirmActionModalMethod', 'revokeApiToken');
+    Livewire::actingAs($user)
+        ->test(OrganizationsAutomation::class, ['organization' => $org])
+        ->call('promptRevokeApiToken', (string) $token->id)
+        ->assertSet('showConfirmActionModal', true)
+        ->assertSet('confirmActionModalMethod', 'revokeApiToken');
 
-        $this->assertDatabaseHas('api_tokens', ['id' => $token->id]);
-    }
+    $this->assertDatabaseHas('api_tokens', ['id' => $token->id]);
+});
 
-    public function test_organization_show_returns_403_for_non_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
+test('organization show returns 403 for non member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
 
-        $response = $this->actingAs($user)->get(route('organizations.show', $org));
+    $response = $this->actingAs($user)->get(route('organizations.show', $org));
 
-        $response->assertForbidden();
-    }
+    $response->assertForbidden();
+});
 
-    public function test_organization_switch_updates_session(): void
-    {
-        $user = User::factory()->create();
-        $org1 = Organization::factory()->create();
-        $org2 = Organization::factory()->create();
-        $org1->users()->attach($user->id, ['role' => 'owner']);
-        $org2->users()->attach($user->id, ['role' => 'member']);
+test('organization switch updates session', function () {
+    $user = User::factory()->create();
+    $org1 = Organization::factory()->create();
+    $org2 = Organization::factory()->create();
+    $org1->users()->attach($user->id, ['role' => 'owner']);
+    $org2->users()->attach($user->id, ['role' => 'member']);
 
+    Livewire::actingAs($user)
+        ->test(OrganizationsIndex::class)
+        ->call('switchOrganization', $org2->id)
+        ->assertRedirect();
+
+    expect(session('current_organization_id'))->toEqual((string) $org2->id);
+});
+
+test('organization switch returns 403 for non member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    session()->forget('current_organization_id');
+
+    try {
         Livewire::actingAs($user)
             ->test(OrganizationsIndex::class)
-            ->call('switchOrganization', $org2->id)
-            ->assertRedirect();
+            ->call('switchOrganization', $org->id);
+    } catch (HttpException $e) {
+        expect($e->getStatusCode())->toBe(403);
 
-        $this->assertEquals((string) $org2->id, session('current_organization_id'));
+        return;
     }
-
-    public function test_organization_switch_returns_403_for_non_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        session()->forget('current_organization_id');
-
-        try {
-            Livewire::actingAs($user)
-                ->test(OrganizationsIndex::class)
-                ->call('switchOrganization', $org->id);
-        } catch (HttpException $e) {
-            $this->assertSame(403, $e->getStatusCode());
-
-            return;
-        }
-        $this->assertNotEquals((string) $org->id, session('current_organization_id'), 'Non-member must not be able to switch to organization.');
-    }
-}
+    $this->assertNotEquals((string) $org->id, session('current_organization_id'), 'Non-member must not be able to switch to organization.');
+});

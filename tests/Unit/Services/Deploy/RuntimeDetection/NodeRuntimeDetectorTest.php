@@ -25,7 +25,7 @@ test('returns null when package json is invalid json', function () {
     expect($result)->toBeNull();
 });
 test('minimal package json yields node runtime with medium confidence', function () {
-    writePackageJson(['name' => 'tiny']);
+    writePackageJson($this->tempDir, ['name' => 'tiny']);
 
     $result = (new NodeRuntimeDetector)->detect($this->tempDir);
 
@@ -40,7 +40,7 @@ test('minimal package json yields node runtime with medium confidence', function
     expect($result->detectedFiles)->toContain('package.json');
 });
 test('pins version from tool versions first', function () {
-    writePackageJson(['engines' => ['node' => '>=18']]);
+    writePackageJson($this->tempDir, ['engines' => ['node' => '>=18']]);
     file_put_contents($this->tempDir.'/.tool-versions', "node 22.7.0\npython 3.13.0\n");
     file_put_contents($this->tempDir.'/.nvmrc', "20\n");
 
@@ -52,7 +52,7 @@ test('pins version from tool versions first', function () {
     expect($result->detectedFiles)->not->toContain('.nvmrc');
 });
 test('falls back to nvmrc when no tool versions', function () {
-    writePackageJson(['engines' => ['node' => '>=18']]);
+    writePackageJson($this->tempDir, ['engines' => ['node' => '>=18']]);
     file_put_contents($this->tempDir.'/.nvmrc', "v20.10.0\n");
 
     $result = (new NodeRuntimeDetector)->detect($this->tempDir);
@@ -61,7 +61,7 @@ test('falls back to nvmrc when no tool versions', function () {
     expect($result->version)->toBe('20.10.0', 'leading v should be stripped');
 });
 test('falls back to engines node when no pin files', function () {
-    writePackageJson(['engines' => ['node' => '^22.0.0']]);
+    writePackageJson($this->tempDir, ['engines' => ['node' => '^22.0.0']]);
 
     $result = (new NodeRuntimeDetector)->detect($this->tempDir);
 
@@ -69,7 +69,7 @@ test('falls back to engines node when no pin files', function () {
     expect($result->version)->toBe('^22.0.0');
 });
 test('detects next framework with high confidence', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'dependencies' => ['next' => '^14.0.0', 'react' => '^18.0.0'],
         'scripts' => ['build' => 'next build', 'start' => 'next start'],
     ]);
@@ -83,7 +83,7 @@ test('detects next framework with high confidence', function () {
     expect($result->startCommand)->toBe('npm start');
 });
 test('detects nuxt framework', function () {
-    writePackageJson(['dependencies' => ['nuxt' => '^3.0.0']]);
+    writePackageJson($this->tempDir, ['dependencies' => ['nuxt' => '^3.0.0']]);
 
     $result = (new NodeRuntimeDetector)->detect($this->tempDir);
 
@@ -91,7 +91,7 @@ test('detects nuxt framework', function () {
     expect($result->framework)->toBe('nuxt');
 });
 test('detects nest framework from nestjs core', function () {
-    writePackageJson(['dependencies' => ['@nestjs/core' => '^10.0.0']]);
+    writePackageJson($this->tempDir, ['dependencies' => ['@nestjs/core' => '^10.0.0']]);
 
     $result = (new NodeRuntimeDetector)->detect($this->tempDir);
 
@@ -99,7 +99,7 @@ test('detects nest framework from nestjs core', function () {
     expect($result->framework)->toBe('nest');
 });
 test('uses main when no start script', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'main' => 'server.js',
     ]);
 
@@ -109,7 +109,7 @@ test('uses main when no start script', function () {
     expect($result->startCommand)->toBe('node server.js');
 });
 test('extracts explicit port from start script', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'scripts' => ['start' => 'node server.js --port=4000'],
     ]);
 
@@ -119,7 +119,7 @@ test('extracts explicit port from start script', function () {
     expect($result->appPort)->toBe(4000);
 });
 test('extracts port from env var in dev script', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'scripts' => ['dev' => 'PORT=4321 next dev'],
     ]);
 
@@ -129,7 +129,7 @@ test('extracts port from env var in dev script', function () {
     expect($result->appPort)->toBe(4321);
 });
 test('suggests bullmq worker process', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'dependencies' => ['bullmq' => '^5.0.0'],
         'scripts' => ['start' => 'node server.js', 'worker' => 'node worker.js'],
     ]);
@@ -145,7 +145,7 @@ test('suggests bullmq worker process', function () {
     $this->assertStringContainsString('BullMQ', $process->reason);
 });
 test('does not suggest worker when only bullmq dep', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'dependencies' => ['bullmq' => '^5.0.0'],
         'scripts' => ['start' => 'node server.js'],
     ]);
@@ -156,7 +156,7 @@ test('does not suggest worker when only bullmq dep', function () {
     expect($result->processes)->toBe([]);
 });
 test('does not suggest worker when only worker script', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'scripts' => ['start' => 'node server.js', 'worker' => 'node worker.js'],
     ]);
 
@@ -169,7 +169,7 @@ test('runtime method returns node', function () {
     expect((new NodeRuntimeDetector)->runtime())->toBe('node');
 });
 test('reasons describe each inference', function () {
-    writePackageJson([
+    writePackageJson($this->tempDir, [
         'engines' => ['node' => '20'],
         'dependencies' => ['next' => '^14.0.0'],
         'scripts' => ['build' => 'next build', 'start' => 'next start'],
@@ -188,10 +188,10 @@ test('reasons describe each inference', function () {
 /**
  * @param  array<string, mixed>  $contents
  */
-function writePackageJson(array $contents): void
+function writePackageJson(string $dir, array $contents): void
 {
     file_put_contents(
-        $this->tempDir.'/package.json',
+        $dir.'/package.json',
         json_encode($contents, JSON_PRETTY_PRINT),
     );
 }

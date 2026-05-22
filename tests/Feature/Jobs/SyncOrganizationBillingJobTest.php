@@ -1,131 +1,112 @@
 <?php
 
-namespace Tests\Feature\Jobs;
 
+namespace Tests\Feature\Jobs\SyncOrganizationBillingJobTest;
 use App\Jobs\SyncOrganizationBillingJob;
+use \App\Services\Billing\StripeSubscriptionSyncer;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
-use App\Services\Billing\StripeSubscriptionSyncer;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
-use Tests\TestCase;
 
-class SyncOrganizationBillingJobTest extends TestCase
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+
+beforeEach(function () {
+    Config::set('subscription.standard.stripe.base_monthly', $this->basePriceId);
+});
+
+test('handle is a no op when organization does not exist', function () {
+    $fake = bindFakeSyncer();
+
+    (new SyncOrganizationBillingJob('01nonexistentorganizationid'))->handle(
+        app(OrganizationBillingStateComputer::class),
+        $fake,
+    );
+
+    expect($fake->calls)->toBeEmpty();
+});
+
+test('handle is a no op when organization has no standard subscription', function () {
+    $org = Organization::factory()->create();
+    $fake = bindFakeSyncer();
+
+    (new SyncOrganizationBillingJob($org->id))->handle(
+        app(OrganizationBillingStateComputer::class),
+        $fake,
+    );
+
+    expect($fake->calls)->toBeEmpty();
+});
+
+test('invokes syncer when organization has active standard subscription', function () {
+    $org = Organization::factory()->create();
+    Subscription::factory()
+        ->withPrice($this->basePriceId)
+        ->active()
+        ->create(['organization_id' => $org->id]);
+
+    $fake = bindFakeSyncer();
+
+    (new SyncOrganizationBillingJob($org->id))->handle(
+        app(OrganizationBillingStateComputer::class),
+        $fake,
+    );
+
+    expect($fake->calls)->toHaveCount(1);
+    expect($fake->calls[0]['organization']->id)->toBe($org->id);
+    expect($fake->calls[0]['desired'])->toBeInstanceOf(DesiredBillingState::class);
+});
+
+test('skips when subscription is canceled', function () {
+    $org = Organization::factory()->create();
+    Subscription::factory()
+        ->withPrice($this->basePriceId)
+        ->canceled()
+        ->create(['organization_id' => $org->id]);
+
+    $fake = bindFakeSyncer();
+
+    (new SyncOrganizationBillingJob($org->id))->handle(
+        app(OrganizationBillingStateComputer::class),
+        $fake,
+    );
+
+    expect($fake->calls)->toBeEmpty();
+});
+
+test('job is unique by organization id', function () {
+    $org = Organization::factory()->create();
+    $job = new SyncOrganizationBillingJob($org->id);
+
+    expect($job->uniqueId())->toBe($org->id);
+});
+
+test('job can be dispatched', function () {
+    Bus::fake();
+    $org = Organization::factory()->create();
+
+    SyncOrganizationBillingJob::dispatch($org->id);
+
+    Bus::assertDispatched(
+        SyncOrganizationBillingJob::class,
+        fn (SyncOrganizationBillingJob $j) => $j->organizationId === $org->id,
+    );
+});
+
+function bindFakeSyncer(): object
 {
-    use RefreshDatabase;
-
-    private string $basePriceId = 'price_test_standard_base';
-
-    protected function setUp(): void
+    $fake = new class extends StripeSubscriptionSyncer
     {
-        parent::setUp();
-        Config::set('subscription.standard.stripe.base_monthly', $this->basePriceId);
-    }
-
-    public function test_handle_is_a_no_op_when_organization_does_not_exist(): void
-    {
-        $fake = $this->bindFakeSyncer();
-
-        (new SyncOrganizationBillingJob('01nonexistentorganizationid'))->handle(
-            app(OrganizationBillingStateComputer::class),
-            $fake,
-        );
-
-        $this->assertEmpty($fake->calls);
-    }
-
-    public function test_handle_is_a_no_op_when_organization_has_no_standard_subscription(): void
-    {
-        $org = Organization::factory()->create();
-        $fake = $this->bindFakeSyncer();
-
-        (new SyncOrganizationBillingJob($org->id))->handle(
-            app(OrganizationBillingStateComputer::class),
-            $fake,
-        );
-
-        $this->assertEmpty($fake->calls);
-    }
-
-    public function test_invokes_syncer_when_organization_has_active_standard_subscription(): void
-    {
-        $org = Organization::factory()->create();
-        Subscription::factory()
-            ->withPrice($this->basePriceId)
-            ->active()
-            ->create(['organization_id' => $org->id]);
-
-        $fake = $this->bindFakeSyncer();
-
-        (new SyncOrganizationBillingJob($org->id))->handle(
-            app(OrganizationBillingStateComputer::class),
-            $fake,
-        );
-
-        $this->assertCount(1, $fake->calls);
-        $this->assertSame($org->id, $fake->calls[0]['organization']->id);
-        $this->assertInstanceOf(DesiredBillingState::class, $fake->calls[0]['desired']);
-    }
-
-    public function test_skips_when_subscription_is_canceled(): void
-    {
-        $org = Organization::factory()->create();
-        Subscription::factory()
-            ->withPrice($this->basePriceId)
-            ->canceled()
-            ->create(['organization_id' => $org->id]);
-
-        $fake = $this->bindFakeSyncer();
-
-        (new SyncOrganizationBillingJob($org->id))->handle(
-            app(OrganizationBillingStateComputer::class),
-            $fake,
-        );
-
-        $this->assertEmpty($fake->calls);
-    }
-
-    public function test_job_is_unique_by_organization_id(): void
-    {
-        $org = Organization::factory()->create();
-        $job = new SyncOrganizationBillingJob($org->id);
-
-        $this->assertSame($org->id, $job->uniqueId());
-    }
-
-    public function test_job_can_be_dispatched(): void
-    {
-        Bus::fake();
-        $org = Organization::factory()->create();
-
-        SyncOrganizationBillingJob::dispatch($org->id);
-
-        Bus::assertDispatched(
-            SyncOrganizationBillingJob::class,
-            fn (SyncOrganizationBillingJob $j) => $j->organizationId === $org->id,
-        );
-    }
-
-    private function bindFakeSyncer(): object
-    {
-        $fake = new class extends StripeSubscriptionSyncer
+        function reconcile(Organization $organization, DesiredBillingState $desired): array
         {
-            /** @var array<int, array{organization: Organization, desired: DesiredBillingState}> */
-            public array $calls = [];
+            $this->calls[] = ['organization' => $organization, 'desired' => $desired];
 
-            public function reconcile(Organization $organization, DesiredBillingState $desired): array
-            {
-                $this->calls[] = ['organization' => $organization, 'desired' => $desired];
+            return [];
+        }
+    };
+    $this->app->instance(StripeSubscriptionSyncer::class, $fake);
 
-                return [];
-            }
-        };
-
-        $this->app->instance(StripeSubscriptionSyncer::class, $fake);
-
-        return $fake;
-    }
+    return $fake;
 }

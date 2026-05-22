@@ -14,13 +14,13 @@ afterEach(function () {
     @rmdir($this->dir);
 });
 
-function writeComposer(array $composer): void
+function writeComposer(string $dir, array $composer): void
 {
-    file_put_contents($this->dir.'/composer.json', json_encode($composer));
+    file_put_contents($dir.'/composer.json', json_encode($composer));
 }
 
 test('laravel app plans bref and the laravel bridge', function () {
-    writeComposer(['require' => ['laravel/framework' => '^12.0', 'php' => '^8.3']]);
+    writeComposer($this->dir, ['require' =>['laravel/framework' => '^12.0', 'php' => '^8.3']]);
 
     $plan = (new BrefInjector)->plan($this->dir);
 
@@ -31,7 +31,7 @@ test('laravel app plans bref and the laravel bridge', function () {
 });
 
 test('plain php app plans only bref', function () {
-    writeComposer(['require' => ['php' => '^8.3', 'guzzlehttp/guzzle' => '^7.0']]);
+    writeComposer($this->dir, ['require' =>['php' => '^8.3', 'guzzlehttp/guzzle' => '^7.0']]);
 
     $plan = (new BrefInjector)->plan($this->dir);
 
@@ -47,7 +47,7 @@ test('directory without composer json is not php', function () {
 });
 
 test('already present bref packages are not re added', function () {
-    writeComposer(['require' => [
+    writeComposer($this->dir, ['require' =>[
         'laravel/framework' => '^12.0',
         'bref/bref' => '^2.1',
         'bref/laravel-bridge' => '^2.0',
@@ -59,7 +59,7 @@ test('already present bref packages are not re added', function () {
 });
 
 test('laravel app already carrying base bref still gets the bridge', function () {
-    writeComposer(['require' => [
+    writeComposer($this->dir, ['require' =>[
         'laravel/framework' => '^12.0',
         'bref/bref' => '^2.1',
     ]]);
@@ -70,7 +70,7 @@ test('laravel app already carrying base bref still gets the bridge', function ()
 });
 
 test('inject is a no op when nothing to add', function () {
-    writeComposer(['require' => [
+    writeComposer($this->dir, ['require' =>[
         'laravel/framework' => '^12.0',
         'bref/bref' => '^2.1',
         'bref/laravel-bridge' => '^2.0',

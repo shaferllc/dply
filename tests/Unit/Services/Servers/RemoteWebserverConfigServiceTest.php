@@ -10,7 +10,7 @@ function service(): RemoteWebserverConfigService
 {
     // The executor would attempt real SSH if invoked; tests below all hit
     // paths that throw before reaching it.
-    $executor = $this->createMock(ServerManageSshExecutor::class);
+    $executor = \Mockery::mock(ServerManageSshExecutor::class);
 
     return new RemoteWebserverConfigService($executor);
 }

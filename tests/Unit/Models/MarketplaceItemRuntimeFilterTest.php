@@ -18,7 +18,7 @@ test('universal item appears for any runtime', function () {
             ->pluck('id')
             ->all();
 
-        expect($matched)->toContain($universal->id, "universal item should match runtime `{$runtime}`");
+        expect($matched)->toContain($universal->id);
     }
 });
 test('empty array runtimes treated as universal', function () {

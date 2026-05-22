@@ -2,98 +2,72 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\CloudWorkerModelTest;
 use App\Models\CloudWorker;
 use App\Models\Site;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-class CloudWorkerModelTest extends TestCase
-{
-    use RefreshDatabase;
+test('factory creates a provisioning queue worker', function () {
+    $worker = CloudWorker::factory()->create();
 
-    public function test_factory_creates_a_provisioning_queue_worker(): void
-    {
-        $worker = CloudWorker::factory()->create();
+    expect($worker->type)->toBe(CloudWorker::TYPE_WORKER);
+    expect($worker->status)->toBe(CloudWorker::STATUS_PROVISIONING);
+    expect($worker->isScheduler())->toBeFalse();
+    expect($worker->isActive())->toBeFalse();
+});
+test('scheduler factory state', function () {
+    $worker = CloudWorker::factory()->scheduler()->create();
 
-        $this->assertSame(CloudWorker::TYPE_WORKER, $worker->type);
-        $this->assertSame(CloudWorker::STATUS_PROVISIONING, $worker->status);
-        $this->assertFalse($worker->isScheduler());
-        $this->assertFalse($worker->isActive());
-    }
+    expect($worker->type)->toBe(CloudWorker::TYPE_SCHEDULER);
+    expect($worker->isScheduler())->toBeTrue();
+});
+test('worker effective command uses stored command', function () {
+    $worker = CloudWorker::factory()->make(['command' => 'php artisan horizon']);
 
-    public function test_scheduler_factory_state(): void
-    {
-        $worker = CloudWorker::factory()->scheduler()->create();
+    expect($worker->effectiveCommand())->toBe('php artisan horizon');
+});
+test('worker effective command falls back to default', function () {
+    $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'command' => '']);
 
-        $this->assertSame(CloudWorker::TYPE_SCHEDULER, $worker->type);
-        $this->assertTrue($worker->isScheduler());
-    }
+    expect($worker->effectiveCommand())->toBe('php artisan queue:work');
+});
+test('scheduler effective command is always schedule work', function () {
+    // Even with a bogus stored command, the scheduler runs schedule:work.
+    $worker = CloudWorker::factory()->make([
+        'type' => CloudWorker::TYPE_SCHEDULER,
+        'command' => 'php artisan queue:work',
+    ]);
 
-    public function test_worker_effective_command_uses_stored_command(): void
-    {
-        $worker = CloudWorker::factory()->make(['command' => 'php artisan horizon']);
+    expect($worker->effectiveCommand())->toBe('php artisan schedule:work');
+});
+test('scheduler effective instance count is always one', function () {
+    $worker = CloudWorker::factory()->make([
+        'type' => CloudWorker::TYPE_SCHEDULER,
+        'instance_count' => 5,
+    ]);
 
-        $this->assertSame('php artisan horizon', $worker->effectiveCommand());
-    }
+    expect($worker->effectiveInstanceCount())->toBe(1);
+});
+test('worker effective instance count respects stored value', function () {
+    $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'instance_count' => 4]);
 
-    public function test_worker_effective_command_falls_back_to_default(): void
-    {
-        $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'command' => '']);
+    expect($worker->effectiveInstanceCount())->toBe(4);
+});
+test('worker effective instance count floors at one', function () {
+    $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'instance_count' => 0]);
 
-        $this->assertSame('php artisan queue:work', $worker->effectiveCommand());
-    }
+    expect($worker->effectiveInstanceCount())->toBe(1);
+});
+test('size tier maps to do size slug', function () {
+    expect(CloudWorker::factory()->make(['size' => 'small'])->backendSizeSlug())->toBe('basic-xxs');
+    expect(CloudWorker::factory()->make(['size' => 'medium'])->backendSizeSlug())->toBe('basic-xs');
+    expect(CloudWorker::factory()->make(['size' => 'large'])->backendSizeSlug())->toBe('basic-s');
+    expect(CloudWorker::factory()->make(['size' => 'xlarge'])->backendSizeSlug())->toBe('basic-m');
+    expect(CloudWorker::factory()->make(['size' => 'bogus'])->backendSizeSlug())->toBe('basic-xxs');
+});
+test('site relation', function () {
+    $site = Site::factory()->create();
+    $worker = CloudWorker::factory()->create(['site_id' => $site->id]);
 
-    public function test_scheduler_effective_command_is_always_schedule_work(): void
-    {
-        // Even with a bogus stored command, the scheduler runs schedule:work.
-        $worker = CloudWorker::factory()->make([
-            'type' => CloudWorker::TYPE_SCHEDULER,
-            'command' => 'php artisan queue:work',
-        ]);
-
-        $this->assertSame('php artisan schedule:work', $worker->effectiveCommand());
-    }
-
-    public function test_scheduler_effective_instance_count_is_always_one(): void
-    {
-        $worker = CloudWorker::factory()->make([
-            'type' => CloudWorker::TYPE_SCHEDULER,
-            'instance_count' => 5,
-        ]);
-
-        $this->assertSame(1, $worker->effectiveInstanceCount());
-    }
-
-    public function test_worker_effective_instance_count_respects_stored_value(): void
-    {
-        $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'instance_count' => 4]);
-
-        $this->assertSame(4, $worker->effectiveInstanceCount());
-    }
-
-    public function test_worker_effective_instance_count_floors_at_one(): void
-    {
-        $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'instance_count' => 0]);
-
-        $this->assertSame(1, $worker->effectiveInstanceCount());
-    }
-
-    public function test_size_tier_maps_to_do_size_slug(): void
-    {
-        $this->assertSame('basic-xxs', CloudWorker::factory()->make(['size' => 'small'])->backendSizeSlug());
-        $this->assertSame('basic-xs', CloudWorker::factory()->make(['size' => 'medium'])->backendSizeSlug());
-        $this->assertSame('basic-s', CloudWorker::factory()->make(['size' => 'large'])->backendSizeSlug());
-        $this->assertSame('basic-m', CloudWorker::factory()->make(['size' => 'xlarge'])->backendSizeSlug());
-        $this->assertSame('basic-xxs', CloudWorker::factory()->make(['size' => 'bogus'])->backendSizeSlug());
-    }
-
-    public function test_site_relation(): void
-    {
-        $site = Site::factory()->create();
-        $worker = CloudWorker::factory()->create(['site_id' => $site->id]);
-
-        $this->assertTrue($worker->site->is($site));
-    }
-}
+    expect($worker->site->is($site))->toBeTrue();
+});

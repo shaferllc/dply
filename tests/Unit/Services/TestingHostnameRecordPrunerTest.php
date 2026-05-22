@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\TestingHostnameRecordPrunerTest;
+use Mockery;
+
 use \App\Services\Sites\TestingHostnameRecordPruner;
 use App\Services\DigitalOceanService;
 use App\Services\Sites\TestingHostnameProvisioner;

@@ -2,52 +2,35 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Serverless;
-
+namespace Tests\Feature\Serverless\ServerlessCommandSecretTest;
 use App\Models\Site;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-/**
- * The serverless command secret signs dply's background ticks. It is
- * deliberately decoupled from the operator-rotatable webhook_secret so that
- * regenerating that secret can never silently break a function's scheduler.
- */
-class ServerlessCommandSecretTest extends TestCase
-{
-    use RefreshDatabase;
+test('it mints and persists a command secret', function () {
+    $site = Site::factory()->create();
 
-    public function test_it_mints_and_persists_a_command_secret(): void
-    {
-        $site = Site::factory()->create();
+    $secret = $site->ensureServerlessCommandSecret();
 
-        $secret = $site->ensureServerlessCommandSecret();
+    $this->assertNotSame('', $secret);
+    expect($site->fresh()->serverlessConfig()['command_secret'])->toBe($secret);
+});
+test('repeated calls return the same secret', function () {
+    $site = Site::factory()->create();
 
-        $this->assertNotSame('', $secret);
-        $this->assertSame($secret, $site->fresh()->serverlessConfig()['command_secret']);
-    }
+    $first = $site->ensureServerlessCommandSecret();
+    $second = $site->fresh()->ensureServerlessCommandSecret();
 
-    public function test_repeated_calls_return_the_same_secret(): void
-    {
-        $site = Site::factory()->create();
+    expect($second)->toBe($first);
+});
+test('the command secret is independent of the webhook secret', function () {
+    $site = Site::factory()->create();
+    $commandSecret = $site->ensureServerlessCommandSecret();
 
-        $first = $site->ensureServerlessCommandSecret();
-        $second = $site->fresh()->ensureServerlessCommandSecret();
+    $this->assertNotSame($site->webhook_secret, $commandSecret);
 
-        $this->assertSame($first, $second);
-    }
+    // Rotating the webhook secret leaves the command secret untouched —
+    // the scheduler keeps working without a redeploy-secret mismatch.
+    $site->update(['webhook_secret' => 'rotated-webhook-secret']);
 
-    public function test_the_command_secret_is_independent_of_the_webhook_secret(): void
-    {
-        $site = Site::factory()->create();
-        $commandSecret = $site->ensureServerlessCommandSecret();
-
-        $this->assertNotSame($site->webhook_secret, $commandSecret);
-
-        // Rotating the webhook secret leaves the command secret untouched —
-        // the scheduler keeps working without a redeploy-secret mismatch.
-        $site->update(['webhook_secret' => 'rotated-webhook-secret']);
-
-        $this->assertSame($commandSecret, $site->fresh()->ensureServerlessCommandSecret());
-    }
-}
+    expect($site->fresh()->ensureServerlessCommandSecret())->toBe($commandSecret);
+});

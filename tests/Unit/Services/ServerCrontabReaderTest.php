@@ -38,7 +38,7 @@ it('uses root before the server ssh user when fallback is enabled', function () 
         }
     };
 
-    expect(exposedSshLoginCandidates($server))->toBe(['root', 'deploy']);
+    expect($reader->exposedSshLoginCandidates($server))->toBe(['root', 'deploy']);
 });
 
 it('uses recovery role for root attempts and operational role for deploy attempts', function () {

@@ -1,7 +1,7 @@
 <?php
 
-namespace Tests\Feature;
 
+namespace Tests\Feature\FakeCloudProvisionTest;
 use App\Jobs\PollDropletIpJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\WaitForServerSshReadyJob;
@@ -10,118 +10,105 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\Servers\FakeCloudProvision;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
-use Tests\TestCase;
 
-class FakeCloudProvisionTest extends TestCase
-{
-    use RefreshDatabase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+beforeEach(function () {
+    config([
+        'server_provision_fake.env_flag' => true,
+        'server_provision_fake.allowed_environments' => ['testing'],
+    ]);
+});
 
-        config([
-            'server_provision_fake.env_flag' => true,
-            'server_provision_fake.allowed_environments' => ['testing'],
-        ]);
-    }
+test('fake cloud disabled when env flag off', function () {
+    config(['server_provision_fake.env_flag' => false]);
 
-    public function test_fake_cloud_disabled_when_env_flag_off(): void
-    {
-        config(['server_provision_fake.env_flag' => false]);
+    expect(FakeCloudProvision::enabled())->toBeFalse();
+});
 
-        $this->assertFalse(FakeCloudProvision::enabled());
-    }
+test('fake cloud disabled when environment not allowed', function () {
+    config([
+        'server_provision_fake.env_flag' => true,
+        'server_provision_fake.allowed_environments' => ['local'],
+    ]);
 
-    public function test_fake_cloud_disabled_when_environment_not_allowed(): void
-    {
-        config([
-            'server_provision_fake.env_flag' => true,
-            'server_provision_fake.allowed_environments' => ['local'],
-        ]);
+    expect(FakeCloudProvision::enabled())->toBeFalse();
+});
 
-        $this->assertFalse(FakeCloudProvision::enabled());
-    }
+test('fake cloud enabled in testing when configured', function () {
+    expect(FakeCloudProvision::enabled())->toBeTrue();
+});
 
-    public function test_fake_cloud_enabled_in_testing_when_configured(): void
-    {
-        $this->assertTrue(FakeCloudProvision::enabled());
-    }
+test('provision digital ocean job skips cloud api and queues ssh ready', function () {
+    Queue::fake();
 
-    public function test_provision_digital_ocean_job_skips_cloud_api_and_queues_ssh_ready(): void
-    {
-        Queue::fake();
+    config([
+        'server_provision_fake.ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
 
-        config([
-            'server_provision_fake.ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----",
-        ]);
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'credentials' => ['api_token' => 'token'],
+    ]);
 
-        $credential = ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'credentials' => ['api_token' => 'token'],
-        ]);
+    $server = Server::factory()->digitalOcean()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider_credential_id' => $credential->id,
+        'status' => Server::STATUS_PENDING,
+        'meta' => [
+            'server_role' => 'application',
+            'install_profile' => 'laravel_app',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'mysql84',
+            'cache_service' => 'redis',
+        ],
+    ]);
 
-        $server = Server::factory()->digitalOcean()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider_credential_id' => $credential->id,
-            'status' => Server::STATUS_PENDING,
-            'meta' => [
-                'server_role' => 'application',
-                'install_profile' => 'laravel_app',
-                'webserver' => 'nginx',
-                'php_version' => '8.3',
-                'database' => 'mysql84',
-                'cache_service' => 'redis',
-            ],
-        ]);
+    (new ProvisionDigitalOceanDropletJob($server))->handle();
 
-        (new ProvisionDigitalOceanDropletJob($server))->handle();
+    $server->refresh();
 
-        $server->refresh();
+    expect($server->provider_id)->toBe(FakeCloudProvision::sentinelProviderId());
+    expect($server->status)->toBe(Server::STATUS_READY);
+    $this->assertNotSame('', (string) $server->ssh_private_key);
 
-        $this->assertSame(FakeCloudProvision::sentinelProviderId(), $server->provider_id);
-        $this->assertSame(Server::STATUS_READY, $server->status);
-        $this->assertNotSame('', (string) $server->ssh_private_key);
+    Queue::assertPushed(WaitForServerSshReadyJob::class);
+});
 
-        Queue::assertPushed(WaitForServerSshReadyJob::class);
-    }
+test('poll droplet job noops for fake server without double dispatch', function () {
+    Queue::fake();
 
-    public function test_poll_droplet_job_noops_for_fake_server_without_double_dispatch(): void
-    {
-        Queue::fake();
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'credentials' => ['api_token' => 'token'],
+    ]);
 
-        $credential = ProviderCredential::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'credentials' => ['api_token' => 'token'],
-        ]);
+    $server = Server::factory()->digitalOcean()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider_credential_id' => $credential->id,
+        'provider_id' => FakeCloudProvision::sentinelProviderId(),
+        'ip_address' => '127.0.0.1',
+        'status' => Server::STATUS_READY,
+        'meta' => ['server_role' => 'application'],
+    ]);
 
-        $server = Server::factory()->digitalOcean()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider_credential_id' => $credential->id,
-            'provider_id' => FakeCloudProvision::sentinelProviderId(),
-            'ip_address' => '127.0.0.1',
-            'status' => Server::STATUS_READY,
-            'meta' => ['server_role' => 'application'],
-        ]);
+    (new PollDropletIpJob($server))->handle();
 
-        (new PollDropletIpJob($server))->handle();
-
-        Queue::assertNotPushed(WaitForServerSshReadyJob::class);
-    }
-}
+    Queue::assertNotPushed(WaitForServerSshReadyJob::class);
+});

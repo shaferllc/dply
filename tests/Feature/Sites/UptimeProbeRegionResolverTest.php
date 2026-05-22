@@ -2,33 +2,24 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Sites;
-
+namespace Tests\Feature\Sites\UptimeProbeRegionResolverTest;
 use App\Services\Sites\UptimeProbeRegionResolver;
-use Tests\TestCase;
+test('it maps digitalocean regions to the nearest probe', function () {
+    $resolver = new UptimeProbeRegionResolver;
 
-class UptimeProbeRegionResolverTest extends TestCase
-{
-    public function test_it_maps_digitalocean_regions_to_the_nearest_probe(): void
-    {
-        $resolver = new UptimeProbeRegionResolver;
+    expect($resolver->resolve('nyc1'))->toBe('us-east');
+    expect($resolver->resolve('nyc3'))->toBe('us-east');
+    expect($resolver->resolve('tor1'))->toBe('us-east');
+    expect($resolver->resolve('sfo3'))->toBe('us-west');
+    expect($resolver->resolve('ams3'))->toBe('eu-amsterdam');
+    expect($resolver->resolve('fra1'))->toBe('eu-frankfurt');
+    expect($resolver->resolve('syd1'))->toBe('ap-sydney');
+});
+test('an unknown or empty region falls back to the first configured', function () {
+    $resolver = new UptimeProbeRegionResolver;
+    $first = (string) array_key_first(config('site_uptime.probe_regions'));
 
-        $this->assertSame('us-east', $resolver->resolve('nyc1'));
-        $this->assertSame('us-east', $resolver->resolve('nyc3'));
-        $this->assertSame('us-east', $resolver->resolve('tor1'));
-        $this->assertSame('us-west', $resolver->resolve('sfo3'));
-        $this->assertSame('eu-amsterdam', $resolver->resolve('ams3'));
-        $this->assertSame('eu-frankfurt', $resolver->resolve('fra1'));
-        $this->assertSame('ap-sydney', $resolver->resolve('syd1'));
-    }
-
-    public function test_an_unknown_or_empty_region_falls_back_to_the_first_configured(): void
-    {
-        $resolver = new UptimeProbeRegionResolver;
-        $first = (string) array_key_first(config('site_uptime.probe_regions'));
-
-        $this->assertSame($first, $resolver->resolve('mars1'));
-        $this->assertSame($first, $resolver->resolve(''));
-        $this->assertSame($first, $resolver->resolve(null));
-    }
-}
+    expect($resolver->resolve('mars1'))->toBe($first);
+    expect($resolver->resolve(''))->toBe($first);
+    expect($resolver->resolve(null))->toBe($first);
+});

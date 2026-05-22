@@ -2,108 +2,89 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\CreateCloudDatabaseTest;
 use App\Actions\Cloud\CreateCloudDatabase;
 use App\Jobs\ProvisionCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-class CreateCloudDatabaseTest extends TestCase
+function orgWithDoCredential(string $provider = 'digitalocean'): Organization
 {
-    use RefreshDatabase;
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    ProviderCredential::query()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => $provider,
+        'name' => 'DO',
+        'credentials' => ['api_token' => 'tok'],
+    ]);
 
-    private function orgWithDoCredential(string $provider = 'digitalocean'): Organization
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => $provider,
-            'name' => 'DO',
-            'credentials' => ['api_token' => 'tok'],
-        ]);
-
-        return $org;
-    }
-
-    public function test_creates_provisioning_row_and_dispatches_job(): void
-    {
-        Bus::fake();
-        $org = $this->orgWithDoCredential();
-
-        $db = (new CreateCloudDatabase)->handle($org, [
-            'name' => 'acme-db',
-            'engine' => 'postgres',
-            'version' => '16',
-            'size' => 'medium',
-            'region' => 'nyc1',
-        ]);
-
-        $this->assertSame('acme-db', $db->name);
-        $this->assertSame(CloudDatabase::STATUS_PROVISIONING, $db->status);
-        $this->assertSame('medium', $db->size);
-        $this->assertSame(CloudDatabase::BACKEND_DIGITALOCEAN, $db->backend);
-        $this->assertNotNull($db->provider_credential_id);
-
-        Bus::assertDispatched(ProvisionCloudDatabaseJob::class, fn ($j) => $j->cloudDatabaseId === $db->id);
-    }
-
-    public function test_accepts_app_platform_credential_as_fallback(): void
-    {
-        Bus::fake();
-        $org = $this->orgWithDoCredential('digitalocean_app_platform');
-
-        $db = (new CreateCloudDatabase)->handle($org, [
-            'name' => 'fallback-db',
-            'engine' => 'mysql',
-        ]);
-
-        $this->assertNotNull($db->provider_credential_id);
-    }
-
-    public function test_rejects_unknown_engine(): void
-    {
-        $org = $this->orgWithDoCredential();
-
-        $this->expectException(\InvalidArgumentException::class);
-        (new CreateCloudDatabase)->handle($org, ['name' => 'x', 'engine' => 'oracle']);
-    }
-
-    public function test_rejects_missing_name(): void
-    {
-        $org = $this->orgWithDoCredential();
-
-        $this->expectException(\InvalidArgumentException::class);
-        (new CreateCloudDatabase)->handle($org, ['name' => '', 'engine' => 'postgres']);
-    }
-
-    public function test_fails_without_a_do_credential(): void
-    {
-        $org = Organization::factory()->create();
-
-        $this->expectException(\RuntimeException::class);
-        (new CreateCloudDatabase)->handle($org, ['name' => 'x', 'engine' => 'postgres']);
-    }
-
-    public function test_unknown_size_falls_back_to_small(): void
-    {
-        Bus::fake();
-        $org = $this->orgWithDoCredential();
-
-        $db = (new CreateCloudDatabase)->handle($org, [
-            'name' => 'x',
-            'engine' => 'postgres',
-            'size' => 'enormous',
-        ]);
-
-        $this->assertSame('small', $db->size);
-    }
+    return $org;
 }
+test('creates provisioning row and dispatches job', function () {
+    Bus::fake();
+    $org = orgWithDoCredential();
+
+    $db = (new CreateCloudDatabase)->handle($org, [
+        'name' => 'acme-db',
+        'engine' => 'postgres',
+        'version' => '16',
+        'size' => 'medium',
+        'region' => 'nyc1',
+    ]);
+
+    expect($db->name)->toBe('acme-db');
+    expect($db->status)->toBe(CloudDatabase::STATUS_PROVISIONING);
+    expect($db->size)->toBe('medium');
+    expect($db->backend)->toBe(CloudDatabase::BACKEND_DIGITALOCEAN);
+    expect($db->provider_credential_id)->not->toBeNull();
+
+    Bus::assertDispatched(ProvisionCloudDatabaseJob::class, fn ($j) => $j->cloudDatabaseId === $db->id);
+});
+test('accepts app platform credential as fallback', function () {
+    Bus::fake();
+    $org = orgWithDoCredential('digitalocean_app_platform');
+
+    $db = (new CreateCloudDatabase)->handle($org, [
+        'name' => 'fallback-db',
+        'engine' => 'mysql',
+    ]);
+
+    expect($db->provider_credential_id)->not->toBeNull();
+});
+test('rejects unknown engine', function () {
+    $org = orgWithDoCredential();
+
+    $this->expectException(\InvalidArgumentException::class);
+    (new CreateCloudDatabase)->handle($org, ['name' => 'x', 'engine' => 'oracle']);
+});
+test('rejects missing name', function () {
+    $org = orgWithDoCredential();
+
+    $this->expectException(\InvalidArgumentException::class);
+    (new CreateCloudDatabase)->handle($org, ['name' => '', 'engine' => 'postgres']);
+});
+test('fails without a do credential', function () {
+    $org = Organization::factory()->create();
+
+    $this->expectException(\RuntimeException::class);
+    (new CreateCloudDatabase)->handle($org, ['name' => 'x', 'engine' => 'postgres']);
+});
+test('unknown size falls back to small', function () {
+    Bus::fake();
+    $org = orgWithDoCredential();
+
+    $db = (new CreateCloudDatabase)->handle($org, [
+        'name' => 'x',
+        'engine' => 'postgres',
+        'size' => 'enormous',
+    ]);
+
+    expect($db->size)->toBe('small');
+});

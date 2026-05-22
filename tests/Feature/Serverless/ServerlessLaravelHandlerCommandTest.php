@@ -2,77 +2,50 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Serverless;
-
+namespace Tests\Feature\Serverless\ServerlessLaravelHandlerCommandTest;
 use RuntimeException;
-use Tests\TestCase;
 
-/**
- * Verifies the Laravel adapter's background-tick command authorisation by
- * loading the real handler file and calling dply_do_functions_command().
- *
- * Regression guard for the production bug where every Laravel tick failed
- * with "invalid command secret": the secret is delivered in the bundled
- * .env, but DigitalOcean Functions does not promote .env keys to real
- * environment variables — so a getenv()-only lookup always saw an empty
- * secret. The command must resolve it from the parsed .env.
- */
-class ServerlessLaravelHandlerCommandTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
-        // The handler file only declares functions (function_exists-guarded);
-        // requiring it has no side effects.
-        require_once resource_path('serverless/digitalocean-functions-laravel-handler.php');
-    }
+beforeEach(function () {
+    // The handler file only declares functions (function_exists-guarded);
+    // requiring it has no side effects.
+    require_once resource_path('serverless/digitalocean-functions-laravel-handler.php');
+});
+test('a tick authorises when the secret is in the bundled env', function () {
+    // The exact production scenario: the secret lives only in .env, never
+    // as a real environment variable.
+    $task = dply_do_functions_command(
+        ['__ow_headers' => ['x-dply-run' => 'schedule', 'x-dply-secret' => 's3cret']],
+        ['DPLY_COMMAND_SECRET' => 's3cret'],
+    );
 
-    public function test_a_tick_authorises_when_the_secret_is_in_the_bundled_env(): void
-    {
-        // The exact production scenario: the secret lives only in .env, never
-        // as a real environment variable.
-        $task = dply_do_functions_command(
-            ['__ow_headers' => ['x-dply-run' => 'schedule', 'x-dply-secret' => 's3cret']],
-            ['DPLY_COMMAND_SECRET' => 's3cret'],
-        );
+    expect($task)->toBe(['schedule:run', []]);
+});
+test('a queue tick returns the queue worker command', function () {
+    $task = dply_do_functions_command(
+        ['__ow_headers' => ['x-dply-run' => 'queue', 'x-dply-secret' => 's3cret']],
+        ['DPLY_COMMAND_SECRET' => 's3cret'],
+    );
 
-        $this->assertSame(['schedule:run', []], $task);
-    }
+    expect($task[0])->toBe('queue:work');
+});
+test('a mismatched secret is rejected', function () {
+    $this->expectException(RuntimeException::class);
+    $this->expectExceptionMessage('invalid command secret');
 
-    public function test_a_queue_tick_returns_the_queue_worker_command(): void
-    {
-        $task = dply_do_functions_command(
-            ['__ow_headers' => ['x-dply-run' => 'queue', 'x-dply-secret' => 's3cret']],
-            ['DPLY_COMMAND_SECRET' => 's3cret'],
-        );
+    dply_do_functions_command(
+        ['__ow_headers' => ['x-dply-run' => 'schedule', 'x-dply-secret' => 'wrong']],
+        ['DPLY_COMMAND_SECRET' => 's3cret'],
+    );
+});
+test('an absent secret is rejected', function () {
+    $this->expectException(RuntimeException::class);
 
-        $this->assertSame('queue:work', $task[0]);
-    }
-
-    public function test_a_mismatched_secret_is_rejected(): void
-    {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('invalid command secret');
-
-        dply_do_functions_command(
-            ['__ow_headers' => ['x-dply-run' => 'schedule', 'x-dply-secret' => 'wrong']],
-            ['DPLY_COMMAND_SECRET' => 's3cret'],
-        );
-    }
-
-    public function test_an_absent_secret_is_rejected(): void
-    {
-        $this->expectException(RuntimeException::class);
-
-        dply_do_functions_command(
-            ['__ow_headers' => ['x-dply-run' => 'schedule', 'x-dply-secret' => 'anything']],
-            [],
-        );
-    }
-
-    public function test_a_normal_request_is_not_a_command(): void
-    {
-        $this->assertNull(dply_do_functions_command(['__ow_headers' => ['x-dply-path' => '/']], []));
-        $this->assertNull(dply_do_functions_command([], []));
-    }
-}
+    dply_do_functions_command(
+        ['__ow_headers' => ['x-dply-run' => 'schedule', 'x-dply-secret' => 'anything']],
+        [],
+    );
+});
+test('a normal request is not a command', function () {
+    expect(dply_do_functions_command(['__ow_headers' => ['x-dply-path' => '/']], []))->toBeNull();
+    expect(dply_do_functions_command([], []))->toBeNull();
+});

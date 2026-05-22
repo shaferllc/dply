@@ -21,7 +21,7 @@ test('operational role prefers operational private key', function () {
         }
     };
 
-    expect(exposedPrivateKey())->toBe(validPrivateKey());
+    expect($connection->exposedPrivateKey())->toBe(validPrivateKey());
 });
 
 test('recovery role prefers recovery private key', function () {
@@ -33,7 +33,7 @@ test('recovery role prefers recovery private key', function () {
         }
     };
 
-    expect(exposedPrivateKey())->toBe(validPrivateKey());
+    expect($connection->exposedPrivateKey())->toBe(validPrivateKey());
 });
 
 test('recovery role falls back to legacy private key during rollout', function () {
@@ -45,7 +45,7 @@ test('recovery role falls back to legacy private key during rollout', function (
         }
     };
 
-    expect(exposedPrivateKey())->toBe(validPrivateKey());
+    expect($connection->exposedPrivateKey())->toBe(validPrivateKey());
 });
 
 test('local runtime password is available for orbstack fallback', function () {
@@ -57,5 +57,5 @@ test('local runtime password is available for orbstack fallback', function () {
         }
     };
 
-    expect(exposedPassword())->toBe('dplylocal');
+    expect($connection->exposedPassword())->toBe('dplylocal');
 });

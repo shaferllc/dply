@@ -2,6 +2,8 @@
 
 
 namespace Tests\Unit\Services\ConsoleCatalogTest;
+use Mockery;
+
 use App\Models\Server;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;

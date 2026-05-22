@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Livewire\Forms\SiteCreateFormScaffoldFieldsTest;
+use ReflectionClass;
+
 use App\Livewire\Forms\SiteCreateForm;
 function defaultFor(string $property): mixed
 {

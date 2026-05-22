@@ -93,7 +93,7 @@ test('manifest only yaml with no repo signals', function () {
 test('partial manifest fills gaps from detection', function () {
     // Manifest pins runtime + version only. Build/start/processes inherit
     // from detection.
-    writeNodeRepoWithBullmq();
+    writeNodeRepoWithBullmq($this->tempDir);
     file_put_contents(
         $this->tempDir.'/dply.yaml',
         "runtime: node\nversion: \"22.7.0\"\n",
@@ -156,7 +156,7 @@ test('static runtime drops start and app port', function () {
 test('manifest processes win over detector suggestions with same name', function () {
     // Detector wants to suggest `worker` (BullMQ); manifest already
     // defines `worker` — the manifest's command wins, no duplicate row.
-    writeNodeRepoWithBullmq();
+    writeNodeRepoWithBullmq($this->tempDir);
     file_put_contents(
         $this->tempDir.'/dply.yaml',
         <<<'YAML'
@@ -240,7 +240,7 @@ test('manifest warnings propagate to plan', function () {
     $this->assertStringContainsString('database', implode("\n", $plan->warnings));
 });
 test('reasons combine manifest and detection signals', function () {
-    writeNodeRepoWithBullmq();
+    writeNodeRepoWithBullmq($this->tempDir);
     file_put_contents(
         $this->tempDir.'/dply.yaml',
         "runtime: node\nversion: \"22.7.0\"\n",
@@ -267,10 +267,10 @@ function makeComposer(): RepositoryRuntimePlanComposer
         new DplyManifestParser,
     );
 }
-function writeNodeRepoWithBullmq(): void
+function writeNodeRepoWithBullmq(string $dir): void
 {
     file_put_contents(
-        $this->tempDir.'/package.json',
+        $dir.'/package.json',
         json_encode([
             'name' => 'jobs-app',
             'dependencies' => ['bullmq' => '^5.0'],

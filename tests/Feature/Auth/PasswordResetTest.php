@@ -1,81 +1,72 @@
 <?php
 
-namespace Tests\Feature\Auth;
 
+namespace Tests\Feature\Auth\PasswordResetTest;
 use App\Livewire\Auth\ForgotPassword;
 use App\Livewire\Auth\ResetPassword as ResetPasswordPage;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
-use Tests\TestCase;
 
-class PasswordResetTest extends TestCase
-{
-    use RefreshDatabase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-    public function test_reset_password_link_screen_can_be_rendered(): void
-    {
-        $response = $this->get('/forgot-password');
+test('reset password link screen can be rendered', function () {
+    $response = $this->get('/forgot-password');
+
+    $response->assertStatus(200);
+});
+
+test('reset password link can be requested', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    Livewire::test(ForgotPassword::class)
+        ->set('email', $user->email)
+        ->call('submit');
+
+    Notification::assertSentTo($user, ResetPassword::class);
+});
+
+test('reset password screen can be rendered', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    Livewire::test(ForgotPassword::class)
+        ->set('email', $user->email)
+        ->call('submit');
+
+    Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
+        $response = $this->get('/reset-password/'.$notification->token);
 
         $response->assertStatus(200);
-    }
 
-    public function test_reset_password_link_can_be_requested(): void
-    {
-        Notification::fake();
+        return true;
+    });
+});
 
-        $user = User::factory()->create();
+test('password can be reset with valid token', function () {
+    Notification::fake();
 
-        Livewire::test(ForgotPassword::class)
-            ->set('email', $user->email)
-            ->call('submit');
+    $user = User::factory()->create();
 
-        Notification::assertSentTo($user, ResetPassword::class);
-    }
+    Livewire::test(ForgotPassword::class)
+        ->set('email', $user->email)
+        ->call('submit');
 
-    public function test_reset_password_screen_can_be_rendered(): void
-    {
-        Notification::fake();
+    $token = null;
+    Notification::assertSentTo($user, ResetPassword::class, function ($notification) use (&$token) {
+        $token = $notification->token;
 
-        $user = User::factory()->create();
+        return true;
+    });
 
-        Livewire::test(ForgotPassword::class)
-            ->set('email', $user->email)
-            ->call('submit');
-
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-            $response = $this->get('/reset-password/'.$notification->token);
-
-            $response->assertStatus(200);
-
-            return true;
-        });
-    }
-
-    public function test_password_can_be_reset_with_valid_token(): void
-    {
-        Notification::fake();
-
-        $user = User::factory()->create();
-
-        Livewire::test(ForgotPassword::class)
-            ->set('email', $user->email)
-            ->call('submit');
-
-        $token = null;
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use (&$token) {
-            $token = $notification->token;
-
-            return true;
-        });
-
-        Livewire::test(ResetPasswordPage::class, ['token' => $token])
-            ->set('email', $user->email)
-            ->set('password', 'password')
-            ->set('password_confirmation', 'password')
-            ->call('submit')
-            ->assertRedirect(route('login'));
-    }
-}
+    Livewire::test(ResetPasswordPage::class, ['token' => $token])
+        ->set('email', $user->email)
+        ->set('password', 'password')
+        ->set('password_confirmation', 'password')
+        ->call('submit')
+        ->assertRedirect(route('login'));
+});

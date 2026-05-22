@@ -130,7 +130,7 @@ test('imported certificate can be stored without ssh install', function () {
         'status' => SiteCertificate::STATUS_PENDING,
     ]);
 
-    $stored = execute($certificate);
+    $stored = service()->execute($certificate);
 
     expect($stored->status)->toBe(SiteCertificate::STATUS_ACTIVE);
     $this->assertStringContainsString('without host installation', (string) $stored->last_output);
@@ -147,7 +147,7 @@ test('csr generation stores key material', function () {
         'status' => SiteCertificate::STATUS_PENDING,
     ]);
 
-    $generated = execute($certificate);
+    $generated = service()->execute($certificate);
 
     expect($generated->status)->toBe(SiteCertificate::STATUS_ISSUED);
     $this->assertStringContainsString('BEGIN CERTIFICATE REQUEST', (string) $generated->csr_pem);

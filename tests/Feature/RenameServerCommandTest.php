@@ -2,95 +2,77 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\RenameServerCommandTest;
 use App\Models\Server;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-class RenameServerCommandTest extends TestCase
-{
-    use RefreshDatabase;
+test('renames server', function () {
+    $server = Server::factory()->create(['name' => 'web-1']);
 
-    public function test_renames_server(): void
-    {
-        $server = Server::factory()->create(['name' => 'web-1']);
+    $exit = Artisan::call('dply:server:rename', [
+        'server' => $server->id,
+        'new-name' => 'db-1',
+    ]);
 
-        $exit = Artisan::call('dply:server:rename', [
-            'server' => $server->id,
-            'new-name' => 'db-1',
-        ]);
+    expect($exit)->toBe(0);
+    expect($server->fresh()->name)->toBe('db-1');
+});
+test('dry run does not persist', function () {
+    $server = Server::factory()->create(['name' => 'web-1']);
 
-        $this->assertSame(0, $exit);
-        $this->assertSame('db-1', $server->fresh()->name);
-    }
+    Artisan::call('dply:server:rename', [
+        'server' => $server->id,
+        'new-name' => 'db-1',
+        '--dry-run' => true,
+        '--json' => true,
+    ]);
+    $decoded = json_decode(Artisan::output(), true);
 
-    public function test_dry_run_does_not_persist(): void
-    {
-        $server = Server::factory()->create(['name' => 'web-1']);
+    expect($decoded['dry_run'])->toBeTrue();
+    expect($server->fresh()->name)->toBe('web-1');
+});
+test('no op when already named correctly', function () {
+    $server = Server::factory()->create(['name' => 'web-1']);
 
-        Artisan::call('dply:server:rename', [
-            'server' => $server->id,
-            'new-name' => 'db-1',
-            '--dry-run' => true,
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
+    $exit = Artisan::call('dply:server:rename', [
+        'server' => $server->id,
+        'new-name' => 'web-1',
+    ]);
+    $output = Artisan::output();
 
-        $this->assertTrue($decoded['dry_run']);
-        $this->assertSame('web-1', $server->fresh()->name);
-    }
+    expect($exit)->toBe(0);
+    $this->assertStringContainsString('already has that name', $output);
+});
+test('resolves server by name', function () {
+    $server = Server::factory()->create(['name' => 'web-1']);
 
-    public function test_no_op_when_already_named_correctly(): void
-    {
-        $server = Server::factory()->create(['name' => 'web-1']);
+    Artisan::call('dply:server:rename', [
+        'server' => 'web-1',
+        'new-name' => 'web-2',
+    ]);
 
-        $exit = Artisan::call('dply:server:rename', [
-            'server' => $server->id,
-            'new-name' => 'web-1',
-        ]);
-        $output = Artisan::output();
+    expect($server->fresh()->name)->toBe('web-2');
+});
+test('fails when server not found', function () {
+    $exit = Artisan::call('dply:server:rename', [
+        'server' => 'nope',
+        'new-name' => 'foo',
+    ]);
+    $output = Artisan::output();
 
-        $this->assertSame(0, $exit);
-        $this->assertStringContainsString('already has that name', $output);
-    }
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('Server not found', $output);
+});
+test('rejects empty new name', function () {
+    $server = Server::factory()->create(['name' => 'web-1']);
 
-    public function test_resolves_server_by_name(): void
-    {
-        $server = Server::factory()->create(['name' => 'web-1']);
+    $exit = Artisan::call('dply:server:rename', [
+        'server' => $server->id,
+        'new-name' => '   ',
+    ]);
+    $output = Artisan::output();
 
-        Artisan::call('dply:server:rename', [
-            'server' => 'web-1',
-            'new-name' => 'web-2',
-        ]);
-
-        $this->assertSame('web-2', $server->fresh()->name);
-    }
-
-    public function test_fails_when_server_not_found(): void
-    {
-        $exit = Artisan::call('dply:server:rename', [
-            'server' => 'nope',
-            'new-name' => 'foo',
-        ]);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('Server not found', $output);
-    }
-
-    public function test_rejects_empty_new_name(): void
-    {
-        $server = Server::factory()->create(['name' => 'web-1']);
-
-        $exit = Artisan::call('dply:server:rename', [
-            'server' => $server->id,
-            'new-name' => '   ',
-        ]);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('cannot be empty', $output);
-    }
-}
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('cannot be empty', $output);
+});

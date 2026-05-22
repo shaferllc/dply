@@ -20,7 +20,7 @@ test('wrapper timeout stays within validation limit', function () {
         'https://example.com/timeout',
     );
 
-    expect(getTimeout())->toBe(3600);
+    expect($task->getTimeout())->toBe(3600);
 
     try {
         $task->validate();

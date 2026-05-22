@@ -34,7 +34,7 @@ test('resolves artisan install steps', function (string $type, string $expected)
         }
     };
 
-    expect(publicResolve($step))->toBe($expected);
+    expect($runner->publicResolve($step))->toBe($expected);
 })->with('artisanInstallSteps');
 
 test('artisan optimize includes no interaction flag', function () {

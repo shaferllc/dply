@@ -82,7 +82,7 @@ test('container site background group has engine level schedule and workers', fu
 
     // The VM-host items must NOT leak into a container/serverless sidebar.
     foreach (['cron', 'daemons', 'queue-workers', 'backups'] as $vmOnly) {
-        expect($items->pluck('id')->all())->not->toContain($vmOnly, $vmOnly.' is VM-only and should be absent from container workspaces');
+        expect($items->pluck('id')->all())->not->toContain($vmOnly);
     }
 });
 test('container background items point to dedicated site routes', function () {
@@ -101,7 +101,7 @@ test('every item has a group key', function () {
     $items = SiteSettingsSidebar::items($site, $server);
 
     foreach ($items as $item) {
-        expect($item)->toHaveKey('group', "Item {$item['id']} is missing a group key");
+        expect($item)->toHaveKey('group');
         expect($item['group'])->not->toBeEmpty();
     }
 });
@@ -170,12 +170,12 @@ test('serverless function drops host only sections', function () {
     // however, was reintroduced as the edge-proxy management surface
     // (custom domains, redirects, headers + CORS).
     foreach (['dns', 'system-user', 'basic-auth'] as $excluded) {
-        expect($ids)->not->toContain($excluded, $excluded.' should not appear for a serverless function');
+        expect($ids)->not->toContain($excluded);
     }
     expect($ids)->toContain('environment');
     expect($ids)->toContain('deploy');
     expect($ids)->toContain('repository');
-    expect($ids)->toContain('routing', 'serverless workspaces expose the edge-proxy routing page');
+    expect($ids)->toContain('routing');
 });
 test('docker workspace drops host only sections', function () {
     // Container apps (docker, kubernetes, serverless) run behind the dply
@@ -190,7 +190,7 @@ test('docker workspace drops host only sections', function () {
     $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
 
     foreach (['dns', 'certificates', 'system-user', 'basic-auth', 'laravel-stack', 'rails-stack', 'wordpress', 'webserver-config', 'caching'] as $excluded) {
-        expect($ids)->not->toContain($excluded, $excluded.' should not appear for a container workspace');
+        expect($ids)->not->toContain($excluded);
     }
     expect($ids)->toContain('environment');
     expect($ids)->toContain('deploy');
@@ -206,7 +206,7 @@ test('container workspace has no runtime subtab', function () {
     foreach (['php', 'ruby', 'static'] as $runtime) {
         $site = makeSite($server, $runtime);
         $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
-        expect($ids)->not->toContain('runtime-'.$runtime, 'runtime-'.$runtime.' should not appear for a container workspace');
+        expect($ids)->not->toContain('runtime-'.$runtime);
     }
 });
 test('container workspace group order', function () {

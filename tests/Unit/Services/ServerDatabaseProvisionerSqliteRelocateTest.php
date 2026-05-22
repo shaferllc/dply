@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerDatabaseProvisionerSqliteRelocateTest;
+use Mockery;
+
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Services\Servers\ServerDatabaseProvisioner;

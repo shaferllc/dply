@@ -24,7 +24,7 @@ test('returns null when composer json invalid', function () {
     expect((new PhpRuntimeDetector)->detect($this->tempDir))->toBeNull();
 });
 test('minimal composer json yields php runtime with medium confidence', function () {
-    writeComposerJson(['name' => 'me/app']);
+    writeComposerJson($this->tempDir, ['name' => 'me/app']);
 
     $result = (new PhpRuntimeDetector)->detect($this->tempDir);
 
@@ -37,7 +37,7 @@ test('minimal composer json yields php runtime with medium confidence', function
     expect($result->appPort)->toBeNull();
 });
 test('pins version from tool versions first', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'config' => ['platform' => ['php' => '8.2']],
         'require' => ['php' => '^8.1'],
     ]);
@@ -50,7 +50,7 @@ test('pins version from tool versions first', function () {
     expect($result->detectedFiles)->toContain('.tool-versions');
 });
 test('falls back to config platform php', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'config' => ['platform' => ['php' => '8.3']],
         'require' => ['php' => '^8.1'],
     ]);
@@ -61,7 +61,7 @@ test('falls back to config platform php', function () {
     expect($result->version)->toBe('8.3');
 });
 test('falls back to require php', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => ['php' => '^8.3'],
     ]);
 
@@ -71,7 +71,7 @@ test('falls back to require php', function () {
     expect($result->version)->toBe('^8.3');
 });
 test('detects laravel framework with high confidence', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => [
             'php' => '^8.3',
             'laravel/framework' => '^11.0',
@@ -85,7 +85,7 @@ test('detects laravel framework with high confidence', function () {
     expect($result->confidence)->toBe('high');
 });
 test('detects symfony framework', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => [
             'php' => '^8.2',
             'symfony/framework-bundle' => '^7.0',
@@ -98,7 +98,7 @@ test('detects symfony framework', function () {
     expect($result->framework)->toBe('symfony');
 });
 test('detects wordpress from bedrock composer dep', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => [
             'php' => '^8.2',
             'roots/wordpress' => '^6.4',
@@ -111,7 +111,7 @@ test('detects wordpress from bedrock composer dep', function () {
     expect($result->framework)->toBe('wordpress');
 });
 test('detects wordpress from wp config when composer silent', function () {
-    writeComposerJson(['require' => ['php' => '^8.2']]);
+    writeComposerJson($this->tempDir, ['require' => ['php' => '^8.2']]);
     file_put_contents($this->tempDir.'/wp-config.php', "<?php\n");
 
     $result = (new PhpRuntimeDetector)->detect($this->tempDir);
@@ -121,7 +121,7 @@ test('detects wordpress from wp config when composer silent', function () {
     expect($result->detectedFiles)->toContain('wp-config.php');
 });
 test('suggests horizon worker when dep and config present', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => [
             'laravel/framework' => '^11.0',
             'laravel/horizon' => '^5.0',
@@ -141,7 +141,7 @@ test('suggests horizon worker when dep and config present', function () {
     expect($result->detectedFiles)->toContain('config/horizon.php');
 });
 test('does not suggest horizon worker with only dep', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => [
             'laravel/framework' => '^11.0',
             'laravel/horizon' => '^5.0',
@@ -154,7 +154,7 @@ test('does not suggest horizon worker with only dep', function () {
     expect($result->processes)->toBe([]);
 });
 test('does not suggest horizon worker with only config', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'require' => ['laravel/framework' => '^11.0'],
     ]);
     mkdir($this->tempDir.'/config');
@@ -166,7 +166,7 @@ test('does not suggest horizon worker with only config', function () {
     expect($result->processes)->toBe([]);
 });
 test('reasons describe each inference', function () {
-    writeComposerJson([
+    writeComposerJson($this->tempDir, [
         'config' => ['platform' => ['php' => '8.3']],
         'require' => [
             'laravel/framework' => '^11.0',
@@ -188,10 +188,10 @@ test('reasons describe each inference', function () {
 /**
  * @param  array<string, mixed>  $contents
  */
-function writeComposerJson(array $contents): void
+function writeComposerJson(string $dir, array $contents): void
 {
     file_put_contents(
-        $this->tempDir.'/composer.json',
+        $dir.'/composer.json',
         json_encode($contents, JSON_PRETTY_PRINT),
     );
 }

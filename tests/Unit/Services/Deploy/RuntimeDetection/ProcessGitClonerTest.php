@@ -26,7 +26,7 @@ test('throws when branch is empty', function () {
     (new ProcessGitCloner)->shallowClone('https://example.com/x.git', '', $this->workDir.'/dest');
 });
 test('clones local bare repo', function () {
-    $bare = makeLocalBareRepo();
+    $bare = makeLocalBareRepo($this->workDir);
     $dest = $this->workDir.'/dest';
 
     (new ProcessGitCloner)->shallowClone($bare, 'main', $dest);
@@ -35,7 +35,7 @@ test('clones local bare repo', function () {
     expect($dest.'/README.md')->toBeFile();
 });
 test('throws with nonexistent branch', function () {
-    $bare = makeLocalBareRepo();
+    $bare = makeLocalBareRepo($this->workDir);
     $dest = $this->workDir.'/dest';
 
     $this->expectException(GitCloneException::class);
@@ -59,10 +59,10 @@ test('redacts credentials from error message', function () {
  * Build a bare local git repository with a single `main` branch and a
  * README, so we can test cloning without hitting the network.
  */
-function makeLocalBareRepo(): string
+function makeLocalBareRepo(string $workDir): string
 {
-    $work = $this->workDir.'/source-work';
-    $bare = $this->workDir.'/source.git';
+    $work = $workDir.'/source-work';
+    $bare = $workDir.'/source.git';
     mkdir($work);
 
     git(['git', 'init', '-q', '-b', 'main', $work]);

@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\CloudPreviewFlowTest;
 use App\Actions\Cloud\CreateCloudPreviewSite;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
@@ -13,318 +12,278 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-/**
- * End-to-end coverage for the per-branch preview-deploy flow:
- *  - CreateCloudPreviewSite spawns a child Site, copies env / port /
- *    backend / region, links via meta.container.preview_parent_site_id,
- *    and is idempotent on re-call (no duplicates per parent + branch).
- *  - dply:cloud:preview:create / :teardown / :list cover the CI surface.
- *  - The container-dashboard partial renders a "Preview deployments"
- *    list on the parent site when previews exist.
- */
-class CloudPreviewFlowTest extends TestCase
-{
-    use RefreshDatabase;
-    use WithFeatures;
+uses(\Tests\Concerns\WithFeatures::class);
 
-    protected array $features = ['surface.cloud'];
+test('action spawns preview with parent metadata', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-    public function test_action_spawns_preview_with_parent_metadata(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
+    $preview = (new CreateCloudPreviewSite)->handle($parent, 'feature/login', prNumber: 42);
 
-        $preview = (new CreateCloudPreviewSite)->handle($parent, 'feature/login', prNumber: 42);
+    $this->assertNotSame($parent->id, $preview->id);
+    expect($preview->meta['container']['preview_parent_site_id'])->toBe($parent->id);
+    expect($preview->meta['container']['preview_branch'])->toBe('feature/login');
+    expect($preview->meta['container']['preview_pr_number'])->toBe(42);
+    expect($preview->meta['container']['source']['repo'])->toBe('acme/api');
+    expect($preview->meta['container']['source']['branch'])->toBe('feature/login');
+    expect($preview->container_backend)->toBe($parent->container_backend);
+    expect($preview->container_region)->toBe($parent->container_region);
+    expect($preview->container_port)->toBe($parent->container_port);
+    expect($preview->env_file_content)->toBe($parent->env_file_content);
+    expect($preview->type)->toBe(SiteType::Container);
+    expect($preview->container_image)->toBeNull();
+    expect($preview->slug)->toStartWith('pr-42-');
 
-        $this->assertNotSame($parent->id, $preview->id);
-        $this->assertSame($parent->id, $preview->meta['container']['preview_parent_site_id']);
-        $this->assertSame('feature/login', $preview->meta['container']['preview_branch']);
-        $this->assertSame(42, $preview->meta['container']['preview_pr_number']);
-        $this->assertSame('acme/api', $preview->meta['container']['source']['repo']);
-        $this->assertSame('feature/login', $preview->meta['container']['source']['branch']);
-        $this->assertSame($parent->container_backend, $preview->container_backend);
-        $this->assertSame($parent->container_region, $preview->container_region);
-        $this->assertSame($parent->container_port, $preview->container_port);
-        $this->assertSame($parent->env_file_content, $preview->env_file_content);
-        $this->assertSame(SiteType::Container, $preview->type);
-        $this->assertNull($preview->container_image);
-        $this->assertStringStartsWith('pr-42-', $preview->slug);
+    Queue::assertPushed(ProvisionCloudSiteJob::class);
+});
+test('action is idempotent on repeat branch', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-        Queue::assertPushed(ProvisionCloudSiteJob::class);
-    }
+    $first = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
+    $second = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
 
-    public function test_action_is_idempotent_on_repeat_branch(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
+    expect($second->id)->toBe($first->id);
+    expect(Site::query()
+        ->whereJsonContains('meta->container->preview_parent_site_id', $parent->id)
+        ->count())->toBe(1);
 
-        $first = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
-        $second = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
+    // Only the first call dispatches a provision job; the second
+    // returns the existing preview without re-queueing.
+    Queue::assertPushed(ProvisionCloudSiteJob::class, 1);
+});
+test('action rejects non source parent', function () {
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
+    $parent->update(['meta' => ['container' => []]]);
 
-        $this->assertSame($first->id, $second->id);
-        $this->assertSame(1, Site::query()
-            ->whereJsonContains('meta->container->preview_parent_site_id', $parent->id)
-            ->count());
-        // Only the first call dispatches a provision job; the second
-        // returns the existing preview without re-queueing.
-        Queue::assertPushed(ProvisionCloudSiteJob::class, 1);
-    }
+    // strip source spec
+    $this->expectException(\RuntimeException::class);
+    (new CreateCloudPreviewSite)->handle($parent->fresh(), 'feature/x');
+});
+test('torn down preview does not block new create', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-    public function test_action_rejects_non_source_parent(): void
-    {
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-        $parent->update(['meta' => ['container' => []]]); // strip source spec
+    $first = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
 
-        $this->expectException(\RuntimeException::class);
-        (new CreateCloudPreviewSite)->handle($parent->fresh(), 'feature/x');
-    }
-
-    public function test_torn_down_preview_does_not_block_new_create(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-
-        $first = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
-        // Simulate the teardown job marking it dead.
-        $first->update([
-            'meta' => array_merge($first->meta, [
-                'container' => array_merge($first->meta['container'] ?? [], [
-                    'torn_down_at' => now()->toIso8601String(),
-                ]),
+    // Simulate the teardown job marking it dead.
+    $first->update([
+        'meta' => array_merge($first->meta, [
+            'container' => array_merge($first->meta['container'] ?? [], [
+                'torn_down_at' => now()->toIso8601String(),
             ]),
-        ]);
+        ]),
+    ]);
 
-        $second = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
+    $second = (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
 
-        // The new site is fresh, not the torn-down one.
-        $this->assertNotSame($first->id, $second->id);
-        // findExisting returns the live preview, not the torn-down one.
-        $this->assertSame($second->id, CreateCloudPreviewSite::findExisting($parent, 'feature/x')?->id);
-        // listForParent only counts live previews.
-        $this->assertCount(1, CreateCloudPreviewSite::listForParent($parent));
-    }
+    // The new site is fresh, not the torn-down one.
+    $this->assertNotSame($first->id, $second->id);
 
-    public function test_action_uses_branch_slug_when_no_pr_number(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
+    // findExisting returns the live preview, not the torn-down one.
+    expect(CreateCloudPreviewSite::findExisting($parent, 'feature/x')?->id)->toBe($second->id);
 
-        $preview = (new CreateCloudPreviewSite)->handle($parent, 'feature/login-form');
+    // listForParent only counts live previews.
+    expect(CreateCloudPreviewSite::listForParent($parent))->toHaveCount(1);
+});
+test('action uses branch slug when no pr number', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-        $this->assertStringStartsWith('preview-feature-login-form-', $preview->slug);
-        $this->assertNull($preview->meta['container']['preview_pr_number']);
-    }
+    $preview = (new CreateCloudPreviewSite)->handle($parent, 'feature/login-form');
 
-    public function test_create_command_spawns_and_reports(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
+    expect($preview->slug)->toStartWith('preview-feature-login-form-');
+    expect($preview->meta['container']['preview_pr_number'])->toBeNull();
+});
+test('create command spawns and reports', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-        $exit = Artisan::call('dply:cloud:preview:create', [
-            'parent' => $parent->name,
-            '--branch' => 'feature/x',
-            '--pr' => '7',
-        ]);
+    $exit = Artisan::call('dply:cloud:preview:create', [
+        'parent' => $parent->name,
+        '--branch' => 'feature/x',
+        '--pr' => '7',
+    ]);
 
-        $this->assertSame(0, $exit);
-        $this->assertStringContainsString('Preview ready', Artisan::output());
-        Queue::assertPushed(ProvisionCloudSiteJob::class);
-    }
+    expect($exit)->toBe(0);
+    $this->assertStringContainsString('Preview ready', Artisan::output());
+    Queue::assertPushed(ProvisionCloudSiteJob::class);
+});
+test('create command requires branch', function () {
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-    public function test_create_command_requires_branch(): void
-    {
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
+    $exit = Artisan::call('dply:cloud:preview:create', ['parent' => $parent->name]);
 
-        $exit = Artisan::call('dply:cloud:preview:create', ['parent' => $parent->name]);
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('--branch is required', Artisan::output());
+});
+test('teardown command queues teardown for existing preview', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
+    (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
 
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('--branch is required', Artisan::output());
-    }
+    $exit = Artisan::call('dply:cloud:preview:teardown', [
+        'parent' => $parent->name,
+        '--branch' => 'feature/x',
+    ]);
 
-    public function test_teardown_command_queues_teardown_for_existing_preview(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-        (new CreateCloudPreviewSite)->handle($parent, 'feature/x');
+    expect($exit)->toBe(0);
+    $this->assertStringContainsString('teardown queued', Artisan::output());
+    Queue::assertPushed(TeardownCloudSiteJob::class);
+});
+test('teardown command is idempotent when branch unknown', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-        $exit = Artisan::call('dply:cloud:preview:teardown', [
-            'parent' => $parent->name,
-            '--branch' => 'feature/x',
-        ]);
+    $exit = Artisan::call('dply:cloud:preview:teardown', [
+        'parent' => $parent->name,
+        '--branch' => 'never-existed',
+    ]);
 
-        $this->assertSame(0, $exit);
-        $this->assertStringContainsString('teardown queued', Artisan::output());
-        Queue::assertPushed(TeardownCloudSiteJob::class);
-    }
+    expect($exit)->toBe(0);
+    $this->assertStringContainsString('already torn down', Artisan::output());
+    Queue::assertNotPushed(TeardownCloudSiteJob::class);
+});
+test('list command emits branch and pr in json', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
+    (new CreateCloudPreviewSite)->handle($parent, 'feature/login', prNumber: 42);
+    (new CreateCloudPreviewSite)->handle($parent, 'feature/signup', prNumber: 43);
 
-    public function test_teardown_command_is_idempotent_when_branch_unknown(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
+    Artisan::call('dply:cloud:preview:list', [
+        'parent' => $parent->name,
+        '--json' => true,
+    ]);
+    $payload = json_decode(Artisan::output(), true);
 
-        $exit = Artisan::call('dply:cloud:preview:teardown', [
-            'parent' => $parent->name,
-            '--branch' => 'never-existed',
-        ]);
+    expect($payload['total'])->toBe(2);
+    $branches = array_column($payload['previews'], 'branch');
+    expect($branches)->toContain('feature/login');
+    expect($branches)->toContain('feature/signup');
+});
+test('dashboard teardown button dispatches teardown job', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
+    $preview = (new CreateCloudPreviewSite)->handle($parent, 'feature/x', prNumber: 7);
 
-        $this->assertSame(0, $exit);
-        $this->assertStringContainsString('already torn down', Artisan::output());
-        Queue::assertNotPushed(TeardownCloudSiteJob::class);
-    }
-
-    public function test_list_command_emits_branch_and_pr_in_json(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-        (new CreateCloudPreviewSite)->handle($parent, 'feature/login', prNumber: 42);
-        (new CreateCloudPreviewSite)->handle($parent, 'feature/signup', prNumber: 43);
-
-        Artisan::call('dply:cloud:preview:list', [
-            'parent' => $parent->name,
-            '--json' => true,
-        ]);
-        $payload = json_decode(Artisan::output(), true);
-
-        $this->assertSame(2, $payload['total']);
-        $branches = array_column($payload['previews'], 'branch');
-        $this->assertContains('feature/login', $branches);
-        $this->assertContains('feature/signup', $branches);
-    }
-
-    public function test_dashboard_teardown_button_dispatches_teardown_job(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-        $preview = (new CreateCloudPreviewSite)->handle($parent, 'feature/x', prNumber: 7);
-
-        Livewire::actingAs($user)
-            ->test(Settings::class, [
-                'server' => $parent->server,
-                'site' => $parent,
-                'section' => 'general',
-            ])
-            ->call('tearDownContainerPreview', $preview->id)
-            ->assertHasNoErrors();
-
-        Queue::assertPushed(TeardownCloudSiteJob::class, fn ($j) => $j->siteId === $preview->id);
-    }
-
-    public function test_dashboard_teardown_rejects_unrelated_site(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-        $orphan = $this->makeSourceParent($user, $org); // different parent — not a child of $parent
-
-        Livewire::actingAs($user)
-            ->test(Settings::class, [
-                'server' => $parent->server,
-                'site' => $parent,
-                'section' => 'general',
-            ])
-            ->call('tearDownContainerPreview', $orphan->id);
-
-        Queue::assertNotPushed(TeardownCloudSiteJob::class);
-    }
-
-    public function test_dashboard_renders_github_webhook_section_for_source_sites(): void
-    {
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-
-        $response = $this->actingAs($user)->get(route('sites.show', [
+    Livewire::actingAs($user)
+        ->test(Settings::class, [
             'server' => $parent->server,
             'site' => $parent,
-        ]));
+            'section' => 'general',
+        ])
+        ->call('tearDownContainerPreview', $preview->id)
+        ->assertHasNoErrors();
 
-        $response->assertOk()
-            ->assertSee('GitHub webhook')
-            ->assertSee(route('hooks.cloud.github', $parent), false)
-            ->assertSee('Pull requests');
-    }
+    Queue::assertPushed(TeardownCloudSiteJob::class, fn ($j) => $j->siteId === $preview->id);
+});
+test('dashboard teardown rejects unrelated site', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
+    $orphan = makeSourceParent($user, $org);
 
-    public function test_dashboard_renders_preview_deployments_panel(): void
-    {
-        Queue::fake();
-        [$user, $org] = $this->scaffold();
-        $parent = $this->makeSourceParent($user, $org);
-        (new CreateCloudPreviewSite)->handle($parent, 'feature/dashboard', prNumber: 99);
-
-        $response = $this->actingAs($user)->get(route('sites.show', [
+    // different parent — not a child of $parent
+    Livewire::actingAs($user)
+        ->test(Settings::class, [
             'server' => $parent->server,
             'site' => $parent,
-        ]));
+            'section' => 'general',
+        ])
+        ->call('tearDownContainerPreview', $orphan->id);
 
-        $response->assertOk()
-            ->assertSee('Preview deployments')
-            ->assertSee('PR #99')
-            ->assertSee('feature/dashboard');
-    }
+    Queue::assertNotPushed(TeardownCloudSiteJob::class);
+});
+test('dashboard renders github webhook section for source sites', function () {
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
 
-    /**
-     * @return array{0: User, 1: Organization}
-     */
-    private function scaffold(): array
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        session(['current_organization_id' => $org->id]);
+    $response = $this->actingAs($user)->get(route('sites.show', [
+        'server' => $parent->server,
+        'site' => $parent,
+    ]));
 
-        return [$user, $org];
-    }
+    $response->assertOk()
+        ->assertSee('GitHub webhook')
+        ->assertSee(route('hooks.cloud.github', $parent), false)
+        ->assertSee('Pull requests');
+});
+test('dashboard renders preview deployments panel', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+    $parent = makeSourceParent($user, $org);
+    (new CreateCloudPreviewSite)->handle($parent, 'feature/dashboard', prNumber: 99);
 
-    private function makeSourceParent(User $user, Organization $org): Site
-    {
-        $server = Server::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
-        ]);
+    $response = $this->actingAs($user)->get(route('sites.show', [
+        'server' => $parent->server,
+        'site' => $parent,
+    ]));
 
-        return Site::factory()->create([
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'name' => 'API service',
-            'slug' => 'api-service',
-            'type' => SiteType::Container,
-            'runtime' => null,
-            'document_root' => null,
-            'repository_path' => null,
-            'container_image' => null,
-            'container_port' => 8080,
-            'container_backend' => 'digitalocean_app_platform',
-            'container_region' => 'nyc',
-            'env_file_content' => "APP_ENV=production\n",
-            'status' => Site::STATUS_CONTAINER_ACTIVE,
-            'meta' => [
-                'container' => [
-                    'source' => [
-                        'repo' => 'acme/api',
-                        'branch' => 'main',
-                        'deploy_on_push' => true,
-                    ],
+    $response->assertOk()
+        ->assertSee('Preview deployments')
+        ->assertSee('PR #99')
+        ->assertSee('feature/dashboard');
+});
+/**
+ * @return array{0: User, 1: Organization}
+ */
+function scaffold(): array
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    return [$user, $org];
+}
+function makeSourceParent(User $user, Organization $org): Site
+{
+    $server = Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
+    ]);
+
+    return Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'name' => 'API service',
+        'slug' => 'api-service',
+        'type' => SiteType::Container,
+        'runtime' => null,
+        'document_root' => null,
+        'repository_path' => null,
+        'container_image' => null,
+        'container_port' => 8080,
+        'container_backend' => 'digitalocean_app_platform',
+        'container_region' => 'nyc',
+        'env_file_content' => "APP_ENV=production\n",
+        'status' => Site::STATUS_CONTAINER_ACTIVE,
+        'meta' => [
+            'container' => [
+                'source' => [
+                    'repo' => 'acme/api',
+                    'branch' => 'main',
+                    'deploy_on_push' => true,
                 ],
             ],
-        ]);
-    }
+        ],
+    ]);
 }

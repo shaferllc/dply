@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\RemoteCli\ArtisanClassificationTest;
+use Mockery;
+
 use App\Services\RemoteCli\Artisan;
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RemoteCliPermissions;

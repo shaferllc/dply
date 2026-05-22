@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\NginxConfigSyntaxTesterTest;
+use ReflectionMethod;
+
 use App\Services\Webserver\NginxConfigSyntaxTester;
 use PHPUnit\Framework\Attributes\Test;
 test('strip log directives removes access and error log lines', function () {

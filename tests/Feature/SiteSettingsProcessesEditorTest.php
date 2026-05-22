@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\SiteSettingsProcessesEditorTest;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Sites\Settings as SitesSettings;
@@ -13,341 +12,303 @@ use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
 use App\Services\Sites\SiteSystemdProvisioner;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-class SiteSettingsProcessesEditorTest extends TestCase
+test('add site process creates worker row and dispatches systemd job', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->set('new_site_process_type', SiteProcess::TYPE_WORKER)
+        ->set('new_site_process_name', 'sidekiq')
+        ->set('new_site_process_command', 'bundle exec sidekiq')
+        ->call('addSiteProcess')
+        ->assertSet('new_site_process_name', '')
+        ->assertSet('new_site_process_command', '');
+
+    $proc = $site->processes()->where('name', 'sidekiq')->first();
+    expect($proc)->not->toBeNull();
+    expect($proc->type)->toBe(SiteProcess::TYPE_WORKER);
+    expect($proc->command)->toBe('bundle exec sidekiq');
+    expect($proc->is_active)->toBeTrue();
+
+    Queue::assertPushed(ProvisionSiteSystemdUnitsJob::class, fn ($j) => $j->siteId === $site->id);
+});
+test('add site process rejects reserved web name', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->set('new_site_process_name', 'web')
+        ->set('new_site_process_command', 'something else')
+        ->call('addSiteProcess')
+        ->assertHasErrors(['new_site_process_name']);
+
+    expect($site->processes()->where('name', 'web')->where('type', SiteProcess::TYPE_WORKER)->count())->toBe(0);
+});
+test('add site process rejects duplicate name', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'worker',
+        'command' => 'npm run worker',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->set('new_site_process_name', 'worker')
+        ->set('new_site_process_command', 'something different')
+        ->call('addSiteProcess')
+        ->assertHasErrors(['new_site_process_name']);
+
+    expect($site->processes()->where('name', 'worker')->count())->toBe(1);
+});
+test('add site process validates name pattern', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->set('new_site_process_name', 'bad name with spaces')
+        ->set('new_site_process_command', 'echo hi')
+        ->call('addSiteProcess')
+        ->assertHasErrors(['new_site_process_name']);
+});
+test('remove site process deletes a worker', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'celery',
+        'command' => 'celery -A app worker',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('removeSiteProcess', $process->id);
+
+    expect($site->processes()->where('name', 'celery')->count())->toBe(0);
+
+    Queue::assertPushed(TearDownSiteSystemdUnitJob::class, function ($job) use ($site) {
+        return $job->siteId === $site->id
+            && str_contains($job->unitName, 'celery.service');
+    });
+});
+test('remove site process skips teardown job for php site', function () {
+    Queue::fake();
+    [$user, $server, $site] = makePhpSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'horizon',
+        'command' => 'php artisan horizon',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('removeSiteProcess', $process->id);
+
+    Queue::assertNotPushed(TearDownSiteSystemdUnitJob::class);
+});
+test('remove site process refuses to delete web row', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
+    expect($web)->not->toBeNull('Site::created hook should have made a web row');
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('removeSiteProcess', $web->id);
+
+    expect($site->processes()->where('id', $web->id)->first())->not->toBeNull();
+});
+test('toggle active flips inactive to active', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'sidekiq',
+        'command' => 'bundle exec sidekiq',
+        'is_active' => false,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('toggleSiteProcessActive', $process->id);
+
+    expect((bool) $process->refresh()->is_active)->toBeTrue();
+});
+test('toggle active refuses to deactivate web row', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
+    expect($web)->not->toBeNull();
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('toggleSiteProcessActive', $web->id);
+
+    expect((bool) $web->refresh()->is_active)->toBeTrue();
+});
+test('set scale updates process and dispatches systemd job', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'worker',
+        'command' => 'npm run worker',
+        'scale' => 1,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('setSiteProcessScale', $process->id, 3);
+
+    expect((int) $process->refresh()->scale)->toBe(3);
+    Queue::assertPushed(ProvisionSiteSystemdUnitsJob::class);
+});
+test('set scale rejects out of bounds values', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'worker',
+        'command' => 'npm run worker',
+        'scale' => 1,
+    ]);
+
+    // Below minimum.
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('setSiteProcessScale', $process->id, 0);
+    expect((int) $process->refresh()->scale)->toBe(1);
+
+    // Above maximum.
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('setSiteProcessScale', $process->id, 100);
+    expect((int) $process->refresh()->scale)->toBe(1);
+});
+test('restart site process calls provisioner', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'sidekiq',
+        'command' => 'bundle exec sidekiq',
+    ]);
+
+    $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
+    $provisioner->shouldReceive('restartUnit')->once()->andReturn('');
+    $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('restartSiteProcess', $process->id)
+        ->assertHasNoErrors();
+});
+test('restart refuses web process', function () {
+    Queue::fake();
+    [$user, $server, $site] = makeNodeSite();
+    $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
+
+    $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
+    $provisioner->shouldNotReceive('restartUnit');
+    $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('restartSiteProcess', $web->id);
+});
+test('restart refuses php site', function () {
+    Queue::fake();
+    [$user, $server, $site] = makePhpSite();
+    $process = $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'horizon',
+        'command' => 'php artisan horizon',
+    ]);
+
+    $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
+    $provisioner->shouldNotReceive('restartUnit');
+    $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->call('restartSiteProcess', $process->id);
+});
+test('does not dispatch systemd job for php site', function () {
+    Queue::fake();
+    [$user, $server, $site] = makePhpSite();
+
+    Livewire::actingAs($user)
+        ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->set('new_site_process_type', SiteProcess::TYPE_WORKER)
+        ->set('new_site_process_name', 'horizon')
+        ->set('new_site_process_command', 'php artisan horizon')
+        ->call('addSiteProcess');
+
+    Queue::assertNotPushed(ProvisionSiteSystemdUnitsJob::class);
+});
+/**
+ * @return array{0: User, 1: Server, 2: Site}
+ */
+function makeNodeSite(): array
 {
-    use RefreshDatabase;
+    $user = seedUser();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+        'meta' => ['webserver' => 'nginx'],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'runtime' => 'node',
+        'start_command' => 'npm start',
+        'internal_port' => 30001,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
 
-    public function test_add_site_process_creates_worker_row_and_dispatches_systemd_job(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
+    return [$user, $server, $site];
+}
+/**
+ * @return array{0: User, 1: Server, 2: Site}
+ */
+function makePhpSite(): array
+{
+    $user = seedUser();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+        'meta' => ['webserver' => 'nginx'],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'runtime' => 'php',
+        'runtime_version' => '8.4',
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
 
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->set('new_site_process_type', SiteProcess::TYPE_WORKER)
-            ->set('new_site_process_name', 'sidekiq')
-            ->set('new_site_process_command', 'bundle exec sidekiq')
-            ->call('addSiteProcess')
-            ->assertSet('new_site_process_name', '')
-            ->assertSet('new_site_process_command', '');
+    return [$user, $server, $site];
+}
+function seedUser(): User
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
-        $proc = $site->processes()->where('name', 'sidekiq')->first();
-        $this->assertNotNull($proc);
-        $this->assertSame(SiteProcess::TYPE_WORKER, $proc->type);
-        $this->assertSame('bundle exec sidekiq', $proc->command);
-        $this->assertTrue($proc->is_active);
-
-        Queue::assertPushed(ProvisionSiteSystemdUnitsJob::class, fn ($j) => $j->siteId === $site->id);
-    }
-
-    public function test_add_site_process_rejects_reserved_web_name(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->set('new_site_process_name', 'web')
-            ->set('new_site_process_command', 'something else')
-            ->call('addSiteProcess')
-            ->assertHasErrors(['new_site_process_name']);
-
-        $this->assertSame(0, $site->processes()->where('name', 'web')->where('type', SiteProcess::TYPE_WORKER)->count());
-    }
-
-    public function test_add_site_process_rejects_duplicate_name(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'worker',
-            'command' => 'npm run worker',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->set('new_site_process_name', 'worker')
-            ->set('new_site_process_command', 'something different')
-            ->call('addSiteProcess')
-            ->assertHasErrors(['new_site_process_name']);
-
-        $this->assertSame(1, $site->processes()->where('name', 'worker')->count());
-    }
-
-    public function test_add_site_process_validates_name_pattern(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->set('new_site_process_name', 'bad name with spaces')
-            ->set('new_site_process_command', 'echo hi')
-            ->call('addSiteProcess')
-            ->assertHasErrors(['new_site_process_name']);
-    }
-
-    public function test_remove_site_process_deletes_a_worker(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'celery',
-            'command' => 'celery -A app worker',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('removeSiteProcess', $process->id);
-
-        $this->assertSame(0, $site->processes()->where('name', 'celery')->count());
-
-        Queue::assertPushed(TearDownSiteSystemdUnitJob::class, function ($job) use ($site) {
-            return $job->siteId === $site->id
-                && str_contains($job->unitName, 'celery.service');
-        });
-    }
-
-    public function test_remove_site_process_skips_teardown_job_for_php_site(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makePhpSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'horizon',
-            'command' => 'php artisan horizon',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('removeSiteProcess', $process->id);
-
-        Queue::assertNotPushed(TearDownSiteSystemdUnitJob::class);
-    }
-
-    public function test_remove_site_process_refuses_to_delete_web_row(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
-        $this->assertNotNull($web, 'Site::created hook should have made a web row');
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('removeSiteProcess', $web->id);
-
-        $this->assertNotNull($site->processes()->where('id', $web->id)->first());
-    }
-
-    public function test_toggle_active_flips_inactive_to_active(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'sidekiq',
-            'command' => 'bundle exec sidekiq',
-            'is_active' => false,
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('toggleSiteProcessActive', $process->id);
-
-        $this->assertTrue((bool) $process->refresh()->is_active);
-    }
-
-    public function test_toggle_active_refuses_to_deactivate_web_row(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
-        $this->assertNotNull($web);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('toggleSiteProcessActive', $web->id);
-
-        $this->assertTrue((bool) $web->refresh()->is_active);
-    }
-
-    public function test_set_scale_updates_process_and_dispatches_systemd_job(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'worker',
-            'command' => 'npm run worker',
-            'scale' => 1,
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('setSiteProcessScale', $process->id, 3);
-
-        $this->assertSame(3, (int) $process->refresh()->scale);
-        Queue::assertPushed(ProvisionSiteSystemdUnitsJob::class);
-    }
-
-    public function test_set_scale_rejects_out_of_bounds_values(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'worker',
-            'command' => 'npm run worker',
-            'scale' => 1,
-        ]);
-
-        // Below minimum.
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('setSiteProcessScale', $process->id, 0);
-        $this->assertSame(1, (int) $process->refresh()->scale);
-
-        // Above maximum.
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('setSiteProcessScale', $process->id, 100);
-        $this->assertSame(1, (int) $process->refresh()->scale);
-    }
-
-    public function test_restart_site_process_calls_provisioner(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'sidekiq',
-            'command' => 'bundle exec sidekiq',
-        ]);
-
-        $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
-        $provisioner->shouldReceive('restartUnit')->once()->andReturn('');
-        $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('restartSiteProcess', $process->id)
-            ->assertHasNoErrors();
-    }
-
-    public function test_restart_refuses_web_process(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makeNodeSite();
-        $web = $site->processes()->where('type', SiteProcess::TYPE_WEB)->first();
-
-        $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
-        $provisioner->shouldNotReceive('restartUnit');
-        $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('restartSiteProcess', $web->id);
-    }
-
-    public function test_restart_refuses_php_site(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makePhpSite();
-        $process = $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'horizon',
-            'command' => 'php artisan horizon',
-        ]);
-
-        $provisioner = \Mockery::mock(SiteSystemdProvisioner::class);
-        $provisioner->shouldNotReceive('restartUnit');
-        $this->app->instance(SiteSystemdProvisioner::class, $provisioner);
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->call('restartSiteProcess', $process->id);
-    }
-
-    public function test_does_not_dispatch_systemd_job_for_php_site(): void
-    {
-        Queue::fake();
-        [$user, $server, $site] = $this->makePhpSite();
-
-        Livewire::actingAs($user)
-            ->test(SitesSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-            ->set('new_site_process_type', SiteProcess::TYPE_WORKER)
-            ->set('new_site_process_name', 'horizon')
-            ->set('new_site_process_command', 'php artisan horizon')
-            ->call('addSiteProcess');
-
-        Queue::assertNotPushed(ProvisionSiteSystemdUnitsJob::class);
-    }
-
-    /**
-     * @return array{0: User, 1: Server, 2: Site}
-     */
-    private function makeNodeSite(): array
-    {
-        $user = $this->seedUser();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'setup_status' => Server::SETUP_STATUS_DONE,
-            'meta' => ['webserver' => 'nginx'],
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'runtime' => 'node',
-            'start_command' => 'npm start',
-            'internal_port' => 30001,
-            'status' => Site::STATUS_NGINX_ACTIVE,
-        ]);
-
-        return [$user, $server, $site];
-    }
-
-    /**
-     * @return array{0: User, 1: Server, 2: Site}
-     */
-    private function makePhpSite(): array
-    {
-        $user = $this->seedUser();
-        $org = $user->currentOrganization();
-        $server = Server::factory()->ready()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'setup_status' => Server::SETUP_STATUS_DONE,
-            'meta' => ['webserver' => 'nginx'],
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'runtime' => 'php',
-            'runtime_version' => '8.4',
-            'status' => Site::STATUS_NGINX_ACTIVE,
-        ]);
-
-        return [$user, $server, $site];
-    }
-
-    private function seedUser(): User
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        session(['current_organization_id' => $org->id]);
-
-        return $user;
-    }
+    return $user;
 }

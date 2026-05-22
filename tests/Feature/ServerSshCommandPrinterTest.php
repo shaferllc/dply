@@ -2,99 +2,81 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\ServerSshCommandPrinterTest;
 use App\Models\Server;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-class ServerSshCommandPrinterTest extends TestCase
-{
-    use RefreshDatabase;
+test('prints ssh command with default user', function () {
+    $server = Server::factory()->create([
+        'ip_address' => '203.0.113.10',
+        'ssh_port' => 22,
+    ]);
 
-    public function test_prints_ssh_command_with_default_user(): void
-    {
-        $server = Server::factory()->create([
-            'ip_address' => '203.0.113.10',
-            'ssh_port' => 22,
-        ]);
+    $exit = Artisan::call('dply:server:ssh', ['server' => $server->id]);
+    $output = trim(Artisan::output());
 
-        $exit = Artisan::call('dply:server:ssh', ['server' => $server->id]);
-        $output = trim(Artisan::output());
+    expect($exit)->toBe(0);
+    $user = config('server_provision.deploy_ssh_user');
+    expect($output)->toBe("ssh {$user}@203.0.113.10");
+});
+test('prints with root user when root flag', function () {
+    $server = Server::factory()->create([
+        'ip_address' => '203.0.113.10',
+        'ssh_port' => 22,
+    ]);
 
-        $this->assertSame(0, $exit);
-        $user = config('server_provision.deploy_ssh_user');
-        $this->assertSame("ssh {$user}@203.0.113.10", $output);
-    }
+    Artisan::call('dply:server:ssh', [
+        'server' => $server->id,
+        '--root' => true,
+    ]);
+    $output = trim(Artisan::output());
 
-    public function test_prints_with_root_user_when_root_flag(): void
-    {
-        $server = Server::factory()->create([
-            'ip_address' => '203.0.113.10',
-            'ssh_port' => 22,
-        ]);
+    expect($output)->toBe('ssh root@203.0.113.10');
+});
+test('includes port when non default', function () {
+    $server = Server::factory()->create([
+        'ip_address' => '203.0.113.10',
+        'ssh_port' => 2222,
+    ]);
 
-        Artisan::call('dply:server:ssh', [
-            'server' => $server->id,
-            '--root' => true,
-        ]);
-        $output = trim(Artisan::output());
+    Artisan::call('dply:server:ssh', ['server' => $server->id]);
+    $output = trim(Artisan::output());
 
-        $this->assertSame('ssh root@203.0.113.10', $output);
-    }
+    $this->assertStringContainsString('-p 2222', $output);
+    $this->assertStringContainsString('@203.0.113.10', $output);
+});
+test('json output includes components', function () {
+    $server = Server::factory()->create([
+        'ip_address' => '203.0.113.10',
+        'ssh_port' => 2222,
+    ]);
 
-    public function test_includes_port_when_non_default(): void
-    {
-        $server = Server::factory()->create([
-            'ip_address' => '203.0.113.10',
-            'ssh_port' => 2222,
-        ]);
+    Artisan::call('dply:server:ssh', [
+        'server' => $server->id,
+        '--root' => true,
+        '--json' => true,
+    ]);
+    $decoded = json_decode(Artisan::output(), true);
 
-        Artisan::call('dply:server:ssh', ['server' => $server->id]);
-        $output = trim(Artisan::output());
+    expect($decoded['host'])->toBe('203.0.113.10');
+    expect($decoded['port'])->toBe(2222);
+    expect($decoded['user'])->toBe('root');
+    $this->assertStringContainsString('-p 2222', $decoded['command']);
+});
+test('fails when server has no ip', function () {
+    $server = Server::factory()->create(['ip_address' => null]);
 
-        $this->assertStringContainsString('-p 2222', $output);
-        $this->assertStringContainsString('@203.0.113.10', $output);
-    }
+    $exit = Artisan::call('dply:server:ssh', ['server' => $server->id]);
+    $output = Artisan::output();
 
-    public function test_json_output_includes_components(): void
-    {
-        $server = Server::factory()->create([
-            'ip_address' => '203.0.113.10',
-            'ssh_port' => 2222,
-        ]);
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('no IP address', $output);
+});
+test('fails when server not found', function () {
+    $exit = Artisan::call('dply:server:ssh', ['server' => 'nope']);
+    $output = Artisan::output();
 
-        Artisan::call('dply:server:ssh', [
-            'server' => $server->id,
-            '--root' => true,
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
-
-        $this->assertSame('203.0.113.10', $decoded['host']);
-        $this->assertSame(2222, $decoded['port']);
-        $this->assertSame('root', $decoded['user']);
-        $this->assertStringContainsString('-p 2222', $decoded['command']);
-    }
-
-    public function test_fails_when_server_has_no_ip(): void
-    {
-        $server = Server::factory()->create(['ip_address' => null]);
-
-        $exit = Artisan::call('dply:server:ssh', ['server' => $server->id]);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('no IP address', $output);
-    }
-
-    public function test_fails_when_server_not_found(): void
-    {
-        $exit = Artisan::call('dply:server:ssh', ['server' => 'nope']);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('Server not found', $output);
-    }
-}
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('Server not found', $output);
+});

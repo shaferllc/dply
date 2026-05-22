@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\EventBridgeCronExpressionTest;
+use InvalidArgumentException;
+
 use App\Services\Serverless\Aws\EventBridgeCronExpression;
 test('an every day schedule gets a question mark day of week', function () {
     // Both day fields wildcard → EventBridge needs `?` in one of them.

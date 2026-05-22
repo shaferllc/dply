@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Jobs\Imports\SyncPloiInventoryJobTest;
+use Mockery;
+
 use App\Jobs\Imports\SyncPloiInventoryJob;
 use App\Models\ProviderCredential;
 use App\Services\Imports\Ploi\PloiInventorySync;

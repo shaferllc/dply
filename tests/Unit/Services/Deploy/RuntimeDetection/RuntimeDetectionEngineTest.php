@@ -22,7 +22,7 @@ afterEach(function () {
 test('returns empty result when no detector matches', function () {
     $engine = makeEngineWithRealDetectors();
 
-    $result = detect($this->tempDir);
+    $result = $engine->detect($this->tempDir);
 
     expect($result->best)->toBeNull();
     expect($result->all)->toBe([]);
@@ -31,7 +31,7 @@ test('picks the only non null detection', function () {
     file_put_contents($this->tempDir.'/go.mod', "module example.com/x\ngo 1.22\n");
     file_put_contents($this->tempDir.'/main.go', '');
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('go');
@@ -45,7 +45,7 @@ test('high confidence beats medium confidence', function () {
     );
     file_put_contents($this->tempDir.'/index.html', '<html></html>');
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('php');
@@ -61,7 +61,7 @@ test('php wins over node on confidence tie', function () {
     file_put_contents($this->tempDir.'/composer.json', json_encode(['name' => 'me/app']));
     file_put_contents($this->tempDir.'/package.json', json_encode(['name' => 'tiny']));
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('php');
@@ -76,7 +76,7 @@ test('node wins over static on medium tie for vite shaped repo', function () {
     ]));
     file_put_contents($this->tempDir.'/index.html', '<div id="app"></div>');
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('node');
@@ -89,7 +89,7 @@ test('high confidence static beats medium confidence node', function () {
     file_put_contents($this->tempDir.'/package.json', json_encode(['name' => 'tiny']));
     file_put_contents($this->tempDir.'/hugo.toml', "baseURL = \"https://x\"\n");
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('static');
@@ -104,7 +104,7 @@ test('jekyll repo with gemfile resolves to static', function () {
     file_put_contents($this->tempDir.'/Gemfile', "source 'https://rubygems.org'\ngem 'jekyll'\n");
     file_put_contents($this->tempDir.'/_config.yml', "title: My Blog\n");
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('static');
@@ -115,7 +115,7 @@ test('returns all detections in order they fired', function () {
     file_put_contents($this->tempDir.'/package.json', json_encode(['name' => 'tiny']));
     file_put_contents($this->tempDir.'/index.html', '<html></html>');
 
-    $result = detect($this->tempDir);
+    $result = makeEngineWithRealDetectors()->detect($this->tempDir);
 
     $runtimes = array_map(fn ($d) => $d->runtime, $result->all);
     expect($runtimes)->toBe(['php', 'node', 'static']);
@@ -160,7 +160,7 @@ test('skips detectors that return null', function () {
 
     $engine = new RuntimeDetectionEngine([$alwaysNull, $alwaysHits, $alwaysNull]);
 
-    $result = detect($this->tempDir);
+    $result = $engine->detect($this->tempDir);
 
     expect($result->best)->not->toBeNull();
     expect($result->best->runtime)->toBe('fake');

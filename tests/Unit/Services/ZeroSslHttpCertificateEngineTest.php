@@ -2,6 +2,8 @@
 
 
 namespace Tests\Unit\Services\ZeroSslHttpCertificateEngineTest;
+use Mockery;
+
 use App\Models\Organization;
 use \App\Services\Certificates\ZeroSslHttpCertificateEngine;
 use App\Models\Server;
@@ -108,7 +110,7 @@ test('it issues and installs a zerossl http certificate', function () {
     {
         function __construct(ImportedCertificateInstaller $installer, private array &$publishedFiles, private array &$commands)
         {
-            __construct($installer);
+            parent::__construct($installer);
         }
 
         function runRemoteCommand(Server $server, string $command, int $timeout): string

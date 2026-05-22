@@ -155,7 +155,7 @@ test('smoke test success publishes cutover complete', function () {
         'status' => ImportMigrationStep::STATUS_RUNNING,
     ]);
 
-    execute($step);
+    (new CutoverSmokeTestHandler($this->app->make(NotificationPublisher::class)))->execute($step);
 
     expect($child->fresh()->status)->toBe(ImportSiteMigration::STATUS_COMPLETED);
     $this->assertDatabaseHas('notification_events', [

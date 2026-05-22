@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanFunctionsArtifactBuilderTest;
+use ZipArchive;
+
 use App\Models\Site;
 use App\Services\Deploy\DigitalOceanFunctionsArtifactBuilder;
 use Illuminate\Support\Facades\File;

@@ -5,6 +5,7 @@ namespace Tests\Unit\ApiTokenStorageValidationTest;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
+use InvalidArgumentException;
 
 uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 

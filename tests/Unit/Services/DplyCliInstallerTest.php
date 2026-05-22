@@ -2,6 +2,8 @@
 
 
 namespace Tests\Unit\Services\DplyCliInstallerTest;
+use Mockery;
+
 use App\Models\Server;
 use \Mockery\MockInterface;
 use App\Services\Servers\DplyCliInstaller;

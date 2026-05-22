@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
-
+namespace Tests\Feature\FakeCloudBackendTest;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
 use App\Models\Organization;
@@ -14,136 +13,104 @@ use App\Models\User;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\FakeCloudBackend;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
+beforeEach(function () {
+    config(['server_provision_fake.env_flag' => true]);
+});
+test('router returns fake backend when no real credential', function () {
+    [$user, $org, $server] = scaffold();
+    $site = makeContainerSite($user, $org, $server, 'digitalocean_app_platform');
+
+    $backend = CloudRouter::backendFor($site);
+
+    expect($backend)->toBeInstanceOf(FakeCloudBackend::class);
+});
+test('router returns real backend when credential exists', function () {
+    [$user, $org, $server] = scaffold();
+    ProviderCredential::query()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean_app_platform',
+        'name' => 'DO',
+        'credentials' => ['api_token' => 't'],
+    ]);
+    $site = makeContainerSite($user, $org, $server, 'digitalocean_app_platform');
+
+    $backend = CloudRouter::backendFor($site);
+
+    expect($backend)->toBeInstanceOf(DigitalOceanAppPlatformBackend::class);
+});
+test('aws routes to fake backend when no real credential', function () {
+    [$user, $org, $server] = scaffold();
+    $site = makeContainerSite($user, $org, $server, 'aws_app_runner');
+
+    $backend = CloudRouter::backendFor($site);
+
+    expect($backend)->toBeInstanceOf(FakeCloudBackend::class);
+});
+test('credential for synthesizes placeholder in fake mode', function () {
+    [$user, $org, $server] = scaffold();
+    $site = makeContainerSite($user, $org, $server, 'digitalocean_app_platform');
+
+    $credential = CloudRouter::credentialFor($site);
+
+    expect($credential)->not->toBeNull();
+    expect($credential->organization_id)->toBe($org->id);
+    expect($credential->provider)->toBe('digitalocean_app_platform');
+
+    // Placeholder is not persisted — id will be null/empty.
+    expect($credential->id)->toBeNull();
+});
+test('pick auto backend returns default in fake mode', function () {
+    $org = Organization::factory()->create();
+
+    expect(CloudRouter::pickAutoBackend($org->id))->toBe('digitalocean_app_platform');
+});
+test('provision job brings site active via fake backend', function () {
+    [$user, $org, $server] = scaffold();
+    $site = makeContainerSite($user, $org, $server, 'digitalocean_app_platform', 'fake-app');
+
+    (new ProvisionCloudSiteJob($site->id))->handle();
+
+    $fresh = $site->fresh();
+    expect($fresh->status)->toBe(Site::STATUS_CONTAINER_ACTIVE);
+    expect($fresh->container_backend_id)->not->toBeEmpty();
+    expect((string) $fresh->container_backend_id)->toStartWith('fake-app-');
+    $this->assertStringContainsString('.fake-edge.dply.local', (string) $fresh->meta['container']['live_url']);
+});
 /**
- * Coverage for the fake-cloud backend fallback. With
- * DPLY_FAKE_CLOUD_PROVISION=true and no real ProviderCredential
- * connected for the chosen backend, CloudRouter swaps the real
- * backend for FakeCloudBackend so the dev install can drive the
- * full /cloud/create flow without DO/AWS keys.
- *
- * Tests run with the fake flag explicitly enabled — phpunit.xml
- * picks up DPLY_FAKE_CLOUD_PROVISION from .env, but other tests
- * disable it; pin it here so this file works on its own.
+ * @return array{0: User, 1: Organization, 2: Server}
  */
-class FakeCloudBackendTest extends TestCase
+function scaffold(): array
 {
-    use RefreshDatabase;
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    $server = Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
+    ]);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        config(['server_provision_fake.env_flag' => true]);
-    }
-
-    public function test_router_returns_fake_backend_when_no_real_credential(): void
-    {
-        [$user, $org, $server] = $this->scaffold();
-        $site = $this->makeContainerSite($user, $org, $server, 'digitalocean_app_platform');
-
-        $backend = CloudRouter::backendFor($site);
-
-        $this->assertInstanceOf(FakeCloudBackend::class, $backend);
-    }
-
-    public function test_router_returns_real_backend_when_credential_exists(): void
-    {
-        [$user, $org, $server] = $this->scaffold();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean_app_platform',
-            'name' => 'DO',
-            'credentials' => ['api_token' => 't'],
-        ]);
-        $site = $this->makeContainerSite($user, $org, $server, 'digitalocean_app_platform');
-
-        $backend = CloudRouter::backendFor($site);
-
-        $this->assertInstanceOf(DigitalOceanAppPlatformBackend::class, $backend);
-    }
-
-    public function test_aws_routes_to_fake_backend_when_no_real_credential(): void
-    {
-        [$user, $org, $server] = $this->scaffold();
-        $site = $this->makeContainerSite($user, $org, $server, 'aws_app_runner');
-
-        $backend = CloudRouter::backendFor($site);
-
-        $this->assertInstanceOf(FakeCloudBackend::class, $backend);
-    }
-
-    public function test_credential_for_synthesizes_placeholder_in_fake_mode(): void
-    {
-        [$user, $org, $server] = $this->scaffold();
-        $site = $this->makeContainerSite($user, $org, $server, 'digitalocean_app_platform');
-
-        $credential = CloudRouter::credentialFor($site);
-
-        $this->assertNotNull($credential);
-        $this->assertSame($org->id, $credential->organization_id);
-        $this->assertSame('digitalocean_app_platform', $credential->provider);
-        // Placeholder is not persisted — id will be null/empty.
-        $this->assertNull($credential->id);
-    }
-
-    public function test_pick_auto_backend_returns_default_in_fake_mode(): void
-    {
-        $org = Organization::factory()->create();
-
-        $this->assertSame('digitalocean_app_platform', CloudRouter::pickAutoBackend($org->id));
-    }
-
-    public function test_provision_job_brings_site_active_via_fake_backend(): void
-    {
-        [$user, $org, $server] = $this->scaffold();
-        $site = $this->makeContainerSite($user, $org, $server, 'digitalocean_app_platform', 'fake-app');
-
-        (new ProvisionCloudSiteJob($site->id))->handle();
-
-        $fresh = $site->fresh();
-        $this->assertSame(Site::STATUS_CONTAINER_ACTIVE, $fresh->status);
-        $this->assertNotEmpty($fresh->container_backend_id);
-        $this->assertStringStartsWith('fake-app-', (string) $fresh->container_backend_id);
-        $this->assertStringContainsString('.fake-edge.dply.local', (string) $fresh->meta['container']['live_url']);
-    }
-
-    /**
-     * @return array{0: User, 1: Organization, 2: Server}
-     */
-    private function scaffold(): array
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        $server = Server::factory()->create([
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
-        ]);
-
-        return [$user, $org, $server];
-    }
-
-    private function makeContainerSite(User $user, Organization $org, Server $server, string $backend, ?string $name = null): Site
-    {
-        return Site::factory()->create([
-            'server_id' => $server->id,
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'name' => $name ?? 'fake-app',
-            'slug' => $name ?? 'fake-app',
-            'type' => SiteType::Container,
-            'runtime' => null,
-            'document_root' => null,
-            'repository_path' => null,
-            'container_image' => 'nginx:1',
-            'container_port' => 80,
-            'container_backend' => $backend,
-            'container_region' => 'nyc',
-            'status' => Site::STATUS_PENDING,
-        ]);
-    }
+    return [$user, $org, $server];
+}
+function makeContainerSite(User $user, Organization $org, Server $server, string $backend, ?string $name = null): Site
+{
+    return Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'name' => $name ?? 'fake-app',
+        'slug' => $name ?? 'fake-app',
+        'type' => SiteType::Container,
+        'runtime' => null,
+        'document_root' => null,
+        'repository_path' => null,
+        'container_image' => 'nginx:1',
+        'container_port' => 80,
+        'container_backend' => $backend,
+        'container_region' => 'nyc',
+        'status' => Site::STATUS_PENDING,
+    ]);
 }

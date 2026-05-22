@@ -2,6 +2,8 @@
 
 
 namespace Tests\Unit\Services\ServerPhpManagerTest;
+use Mockery;
+
 use App\Models\Organization;
 use \App\Services\Servers\ServerPhpManager;
 use App\Models\Server;
@@ -453,7 +455,7 @@ test('the remote inventory script counts fpm packages as installed versions', fu
         }
     };
 
-    $script = inventoryScript($server, "'8.3' '8.4'");
+    $script = $manager->inventoryScript($server, "'8.3' '8.4'");
 
     $this->assertStringContainsString('"php${version}-cli"', $script);
     $this->assertStringContainsString('"php${version}-fpm"', $script);

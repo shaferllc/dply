@@ -32,21 +32,18 @@ test('resolver returns kubernetes strategy for kubernetes hosts', function () {
 
 function makeResolver(): ServerBootstrapStrategyResolver
 {
-    /** @var VmServerBootstrapStrategy&MockObject $vm */
-    $vm = $this->createMock(VmServerBootstrapStrategy::class);
-    $vm->method('supports')->willReturnCallback(
+    $vm = \Mockery::mock(VmServerBootstrapStrategy::class);
+    $vm->shouldReceive('supports')->andReturnUsing(
         fn (Server $server): bool => $server->isVmHost()
     );
 
-    /** @var DockerHostBootstrapStrategy&MockObject $docker */
-    $docker = $this->createMock(DockerHostBootstrapStrategy::class);
-    $docker->method('supports')->willReturnCallback(
+    $docker = \Mockery::mock(DockerHostBootstrapStrategy::class);
+    $docker->shouldReceive('supports')->andReturnUsing(
         fn (Server $server): bool => $server->isDockerHost()
     );
 
-    /** @var KubernetesClusterBootstrapStrategy&MockObject $kubernetes */
-    $kubernetes = $this->createMock(KubernetesClusterBootstrapStrategy::class);
-    $kubernetes->method('supports')->willReturnCallback(
+    $kubernetes = \Mockery::mock(KubernetesClusterBootstrapStrategy::class);
+    $kubernetes->shouldReceive('supports')->andReturnUsing(
         fn (Server $server): bool => $server->isKubernetesCluster()
     );
 

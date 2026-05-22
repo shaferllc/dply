@@ -2,9 +2,14 @@
 
 namespace Tests\Support;
 
-use App\Contracts\RemoteShell;
+use App\Services\SshConnection;
 
-class FakeRemoteShell implements RemoteShell
+/**
+ * Extends the concrete SshConnection (rather than just implementing
+ * RemoteShell) so it satisfies SshConnectionFactory::forServer(), which is
+ * typed against the concrete connection.
+ */
+class FakeRemoteShell extends SshConnection
 {
     /** @var list<array{0: string, 1: int}> */
     public array $execCalls = [];

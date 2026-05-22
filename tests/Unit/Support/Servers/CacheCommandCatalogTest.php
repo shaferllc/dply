@@ -20,7 +20,7 @@ test('catalog includes core commands operators expect', function () {
     // If any of these go missing the autocomplete becomes useless — they're the verbs an
     // operator types within the first thirty seconds of opening the REPL.
     foreach (['GET', 'SET', 'DEL', 'KEYS', 'SCAN', 'INFO', 'PING', 'TTL', 'EXPIRE', 'CONFIG GET', 'CLIENT LIST'] as $expected) {
-        expect($names)->toContain($expected, "Catalog is missing the {$expected} command.");
+        expect($names)->toContain($expected);
     }
 });
 test('mutating flag is correct for known commands', function () {

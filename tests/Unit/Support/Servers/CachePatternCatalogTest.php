@@ -18,7 +18,7 @@ test('catalog includes essential starters', function () {
     // These are the patterns operators reach for first — losing them would defeat the
     // point of the autocomplete.
     foreach (['*', 'session:*', 'cache:*'] as $essential) {
-        expect($patterns)->toContain($essential, "Catalog is missing the {$essential} pattern.");
+        expect($patterns)->toContain($essential);
     }
 });
 test('grouped view partitions the full catalog', function () {

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\LiveState\OlsLiveStateProbeParsersTest;
+use ReflectionClass;
+
 use App\Services\Servers\LiveState\OlsLiveStateProbe;
 function invoke(string $method, array $args): mixed
 {

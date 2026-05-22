@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Sites;
-
+namespace Tests\Feature\Sites\CreateCustomTest;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCustomSiteJob;
 use App\Livewire\Sites\Create as SiteCreate;
@@ -13,123 +12,105 @@ use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-use Tests\TestCase;
+uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
 
-final class CreateCustomTest extends TestCase
+test('vm host shows custom entry point on create page', function () {
+    $user = userWithOrganization();
+    $server = vmServer($user);
+
+    Livewire::actingAs($user)
+        ->test(SiteCreate::class, ['server' => $server])
+        ->assertSee('Create a Custom site');
+});
+test('docker host hides custom entry point', function () {
+    $user = userWithOrganization();
+    $server = dockerServer($user);
+
+    Livewire::actingAs($user)
+        ->test(SiteCreate::class, ['server' => $server])
+        ->assertDontSee('Create a Custom site');
+});
+test('creating custom site with repo persists git mode', function () {
+    Bus::fake();
+    $user = userWithOrganization();
+    $server = vmServer($user);
+
+    Livewire::actingAs($user)
+        ->test(CreateCustom::class, ['server' => $server])
+        ->set('name', 'worker-queue')
+        ->set('git_repository_url', 'git@github.com:me/worker.git')
+        ->set('git_branch', 'main')
+        ->call('store')
+        ->assertHasNoErrors();
+
+    $site = Site::query()->where('server_id', $server->id)->firstOrFail();
+
+    expect($site->type)->toBe(SiteType::Custom);
+    expect($site->name)->toBe('worker-queue');
+    expect($site->git_repository_url)->toBe('git@github.com:me/worker.git');
+    expect($site->git_branch)->toBe('main');
+    expect($site->status)->toBe(Site::STATUS_PENDING);
+    expect($site->deploy_script_id)->not->toBeNull();
+    expect($site->deploy_strategy)->toBe('simple');
+
+    $script = Script::query()->whereKey($site->deploy_script_id)->firstOrFail();
+    expect($script->source)->toBe('site:custom_auto');
+
+    Bus::assertDispatched(ProvisionCustomSiteJob::class);
+});
+test('creating custom site without repo persists no repo mode', function () {
+    Bus::fake();
+    $user = userWithOrganization();
+    $server = vmServer($user);
+
+    Livewire::actingAs($user)
+        ->test(CreateCustom::class, ['server' => $server])
+        ->set('name', 'ci-target')
+        ->set('git_repository_url', '')
+        ->call('store')
+        ->assertHasNoErrors();
+
+    $site = Site::query()->where('server_id', $server->id)->firstOrFail();
+    expect($site->type)->toBe(SiteType::Custom);
+    expect($site->git_repository_url)->toBeNull();
+    expect($site->git_branch)->toBeNull();
+
+    Bus::assertDispatched(ProvisionCustomSiteJob::class);
+});
+test('non vm host rejects custom create', function () {
+    $user = userWithOrganization();
+    $server = dockerServer($user);
+
+    $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
+
+    Livewire::actingAs($user)
+        ->test(CreateCustom::class, ['server' => $server]);
+});
+function vmServer(User $user): Server
 {
-    use RefreshDatabase;
+    return Server::factory()->ready()->create([
+        'organization_id' => $user->currentOrganization()->id,
+        'user_id' => $user->id,
+        'meta' => ['host_kind' => Server::HOST_KIND_VM, 'webserver' => 'nginx'],
+    ]);
+}
+function dockerServer(User $user): Server
+{
+    return Server::factory()->ready()->create([
+        'organization_id' => $user->currentOrganization()->id,
+        'user_id' => $user->id,
+        'meta' => ['host_kind' => Server::HOST_KIND_DOCKER],
+    ]);
+}
+function userWithOrganization(): User
+{
+    $user = User::factory()->create();
+    $organization = Organization::factory()->create();
+    $organization->users()->attach($user->id, ['role' => 'owner']);
+    $user->setRelation('currentOrganization', $organization);
+    session(['current_organization_id' => $organization->id]);
 
-    public function test_vm_host_shows_custom_entry_point_on_create_page(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->vmServer($user);
-
-        Livewire::actingAs($user)
-            ->test(SiteCreate::class, ['server' => $server])
-            ->assertSee('Create a Custom site');
-    }
-
-    public function test_docker_host_hides_custom_entry_point(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->dockerServer($user);
-
-        Livewire::actingAs($user)
-            ->test(SiteCreate::class, ['server' => $server])
-            ->assertDontSee('Create a Custom site');
-    }
-
-    public function test_creating_custom_site_with_repo_persists_git_mode(): void
-    {
-        Bus::fake();
-        $user = $this->userWithOrganization();
-        $server = $this->vmServer($user);
-
-        Livewire::actingAs($user)
-            ->test(CreateCustom::class, ['server' => $server])
-            ->set('name', 'worker-queue')
-            ->set('git_repository_url', 'git@github.com:me/worker.git')
-            ->set('git_branch', 'main')
-            ->call('store')
-            ->assertHasNoErrors();
-
-        $site = Site::query()->where('server_id', $server->id)->firstOrFail();
-
-        $this->assertSame(SiteType::Custom, $site->type);
-        $this->assertSame('worker-queue', $site->name);
-        $this->assertSame('git@github.com:me/worker.git', $site->git_repository_url);
-        $this->assertSame('main', $site->git_branch);
-        $this->assertSame(Site::STATUS_PENDING, $site->status);
-        $this->assertNotNull($site->deploy_script_id);
-        $this->assertSame('simple', $site->deploy_strategy);
-
-        $script = Script::query()->whereKey($site->deploy_script_id)->firstOrFail();
-        $this->assertSame('site:custom_auto', $script->source);
-
-        Bus::assertDispatched(ProvisionCustomSiteJob::class);
-    }
-
-    public function test_creating_custom_site_without_repo_persists_no_repo_mode(): void
-    {
-        Bus::fake();
-        $user = $this->userWithOrganization();
-        $server = $this->vmServer($user);
-
-        Livewire::actingAs($user)
-            ->test(CreateCustom::class, ['server' => $server])
-            ->set('name', 'ci-target')
-            ->set('git_repository_url', '')
-            ->call('store')
-            ->assertHasNoErrors();
-
-        $site = Site::query()->where('server_id', $server->id)->firstOrFail();
-        $this->assertSame(SiteType::Custom, $site->type);
-        $this->assertNull($site->git_repository_url);
-        $this->assertNull($site->git_branch);
-
-        Bus::assertDispatched(ProvisionCustomSiteJob::class);
-    }
-
-    public function test_non_vm_host_rejects_custom_create(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->dockerServer($user);
-
-        $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
-
-        Livewire::actingAs($user)
-            ->test(CreateCustom::class, ['server' => $server]);
-    }
-
-    private function vmServer(User $user): Server
-    {
-        return Server::factory()->ready()->create([
-            'organization_id' => $user->currentOrganization()->id,
-            'user_id' => $user->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_VM, 'webserver' => 'nginx'],
-        ]);
-    }
-
-    private function dockerServer(User $user): Server
-    {
-        return Server::factory()->ready()->create([
-            'organization_id' => $user->currentOrganization()->id,
-            'user_id' => $user->id,
-            'meta' => ['host_kind' => Server::HOST_KIND_DOCKER],
-        ]);
-    }
-
-    private function userWithOrganization(): User
-    {
-        $user = User::factory()->create();
-        $organization = Organization::factory()->create();
-        $organization->users()->attach($user->id, ['role' => 'owner']);
-        $user->setRelation('currentOrganization', $organization);
-        session(['current_organization_id' => $organization->id]);
-
-        return $user;
-    }
+    return $user;
 }

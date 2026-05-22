@@ -31,7 +31,7 @@ function discover(array $files): array
             File::put($path, $contents);
         }
 
-        return discover($dir, capabilities());
+        return (new ServerlessActionDiscovery(new ServerlessRuntimeDetector))->discover($dir, capabilities());
     } finally {
         File::deleteDirectory($dir);
     }

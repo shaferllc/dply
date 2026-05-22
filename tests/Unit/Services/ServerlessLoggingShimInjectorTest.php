@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Tests\Unit\Services\ServerlessLoggingShimInjectorTest;
+use RuntimeException;
+
 use App\Services\Deploy\ServerlessLoggingShimInjector;
 use Illuminate\Support\Facades\File;
 function repo(array $files): string
