@@ -263,8 +263,8 @@ test('k8s servers get lean nav without php databases caches etc', function () {
     $items = server_workspace_nav_for_server($server);
     $keys = array_column($items, 'key');
 
-    expect($keys)->toContain('cluster', 'Cluster nav item should be present for K8s servers');
-    expect($keys)->not->toContain('overview', 'overview should be hidden for K8s servers');
+    expect($keys)->toContain('cluster');
+    expect($keys)->not->toContain('overview');
     expect($keys)->not->toContain('php');
     expect($keys)->not->toContain('databases');
     expect($keys)->not->toContain('caches');

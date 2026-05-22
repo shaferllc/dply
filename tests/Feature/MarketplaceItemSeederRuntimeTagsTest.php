@@ -13,13 +13,13 @@ beforeEach(function () {
 test('seeder tags php recipes with runtime php', function () {
     foreach (['nginx-laravel-php', 'deploy-laravel', 'nginx-php-generic', 'deploy-php-fpm-reload'] as $slug) {
         $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-        expect($item->runtimes ?? [])->toContain('php', "{$slug} should be tagged php");
+        expect($item->runtimes ?? [])->toContain('php');
     }
 });
 test('seeder tags laravel recipes with framework laravel', function () {
     foreach (['nginx-laravel-php', 'deploy-laravel-migrate-only', 'deploy-laravel-storage-link'] as $slug) {
         $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-        expect($item->frameworks ?? [])->toContain('laravel', "{$slug} should be tagged laravel");
+        expect($item->frameworks ?? [])->toContain('laravel');
     }
 });
 test('seeder tags rails recipes with runtime ruby and framework rails', function () {
