@@ -51,6 +51,7 @@ use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
+use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -3124,58 +3125,117 @@ class Settings extends Show
             return parent::render();
         }
 
-        // loadMissing instead of load: earlier lifecycle hooks (mount,
-        // syncGeneralSettingsForm, syncPreviewSettingsForm) already loadMissing some of
-        // these — reloading them in render() doubled queries on every render.
-        $this->site->loadMissing([
-            'domains',
-            'domainAliases',
-            'basicAuthUsers',
-            'previewDomains',
-            'dnsProviderCredential',
-            'certificates.previewDomain',
-            'deployments',
-            'redirects',
-            'tenantDomains',
-            'deployHooks',
-            'deploySteps',
-            'webhookDeliveryLogs',
-            'workspace.variables',
-        ]);
+        $section = $this->section;
+
+        $this->site->loadMissing($this->relationsForSettingsSection($section));
+        $this->server->loadMissing('workspace');
 
         $org = $this->site->organization;
+        $needsDeploymentSurface = $this->sectionNeedsDeploymentSurface($section);
 
-        return view('livewire.sites.settings', [
+        $deploymentContract = $needsDeploymentSurface
+            ? app(DeploymentContractBuilder::class)->build($this->site)
+            : null;
+        $deploymentPreflight = $needsDeploymentSurface
+            ? app(DeploymentPreflightValidator::class)->validate($this->site)
+            : [];
+
+        $viewData = [
             'tabs' => config('site_settings.workspace_tabs', []),
             'routingTabs' => self::ROUTING_TABS,
             'deployHookUrl' => $this->site->deployHookUrl(),
-            'assignableNotificationChannels' => AssignableNotificationChannels::forUser(auth()->user(), $org),
-            'siteNotificationEventLabels' => config('notification_events.categories.site.events', []),
-            'siteIntegrationWebhookDestinations' => NotificationWebhookDestination::query()
+            'deploymentContract' => $deploymentContract,
+            'deploymentPreflight' => $deploymentPreflight,
+        ];
+
+        if ($section === 'notifications') {
+            $viewData['assignableNotificationChannels'] = AssignableNotificationChannels::forUser(auth()->user(), $org);
+            $viewData['siteNotificationEventLabels'] = config('notification_events.categories.site.events', []);
+            $viewData['siteIntegrationWebhookDestinations'] = NotificationWebhookDestination::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->where('site_id', $this->site->id)
                 ->orderBy('name')
-                ->get(),
-            'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
-            'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
-            'availableWorkspaces' => Workspace::query()
+                ->get();
+        }
+
+        if (in_array($section, ['settings', 'general'], true)) {
+            $viewData['availableWorkspaces'] = Workspace::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->orderBy('name')
-                ->get(['id', 'name']),
-            'providerCredentials' => ProviderCredential::query()
+                ->get(['id', 'name']);
+        }
+
+        if (in_array($section, ['dns', 'certificates'], true)) {
+            $viewData['providerCredentials'] = ProviderCredential::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
                 ->orderBy('name')
-                ->get(['id', 'name', 'provider']),
-            'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
-                ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
-                : null,
-            'repositorySyncGroup' => app(SiteDeploySyncGroupManager::class)->findGroupForSite($this->site)?->load(['sites.server', 'leader']),
-            'organizationSites' => Site::query()
+                ->get(['id', 'name', 'provider']);
+        }
+
+        if ($section === 'runtime-php' && $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $viewData['sitePhpData'] = app(ServerPhpManager::class)->sitePhpData($this->server, $this->site);
+        }
+
+        if (in_array($section, ['deploy', 'repository'], true)) {
+            $viewData['repositorySyncGroup'] = app(SiteDeploySyncGroupManager::class)->findGroupForSite($this->site)?->load(['sites.server', 'leader']);
+            $viewData['organizationSites'] = Site::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->with('server:id,name')
                 ->orderBy('name')
-                ->get(),
-        ]);
+                ->get();
+        }
+
+        return view('livewire.sites.settings', array_merge(
+            SiteSettingsViewData::for(
+                $this->server,
+                $this->site,
+                $section,
+                $deploymentContract,
+                $deploymentPreflight,
+                auth()->user(),
+            ),
+            $viewData,
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function relationsForSettingsSection(string $section): array
+    {
+        $shared = ['certificates', 'certificates.previewDomain'];
+
+        $sectionRelations = match ($section) {
+            'general' => ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
+            'settings' => ['workspace', 'workspace.variables'],
+            'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains'],
+            'dns' => ['dnsProviderCredential', 'domains', 'previewDomains'],
+            'certificates' => ['previewDomains'],
+            'deploy', 'repository' => ['deployHooks', 'deploySteps', 'deployments'],
+            'environment' => ['workspace', 'workspace.variables'],
+            'logs' => ['deployments', 'webhookDeliveryLogs'],
+            'basic-auth' => ['basicAuthUsers'],
+            'laravel-stack', 'rails-stack' => ['workspace', 'workspace.variables'],
+            default => [],
+        };
+
+        return array_values(array_unique(array_merge($shared, $sectionRelations)));
+    }
+
+    private function sectionNeedsDeploymentSurface(string $section): bool
+    {
+        return in_array($section, [
+            'general',
+            'deploy',
+            'repository',
+            'runtime',
+            'runtime-php',
+            'runtime-ruby',
+            'runtime-static',
+            'environment',
+            'laravel-stack',
+            'rails-stack',
+        ], true);
     }
 }

@@ -16,6 +16,7 @@ use App\Services\Servers\LaravelQueueWorkCommandBuilder;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
+use App\Support\Servers\DaemonWorkspaceViewData;
 use App\Support\SupervisorEnvFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -194,6 +195,12 @@ class WorkspaceDaemons extends Component
             ], true)) {
             $this->applySupervisorPreset($preset);
         }
+    }
+
+    public function setDaemonsWorkspaceTab(string $tab): void
+    {
+        $allowed = ['programs', 'service', 'sync', 'logs', 'inspect', 'activity'];
+        $this->daemons_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'programs';
     }
 
     /**
@@ -1189,18 +1196,21 @@ class WorkspaceDaemons extends Component
             'total_processes' => (int) $filteredSupervisorPrograms->where('is_active', true)->sum('numprocs'),
         ];
 
-        return view('livewire.servers.workspace-daemons', [
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-            'orgTemplates' => $templates,
-            'auditLogs' => $auditLogs,
-            'orgServersForCopy' => $orgServersForCopy,
-            'sitesForServer' => $sitesForServer,
-            'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
-            'contextSiteModel' => $contextSiteModel,
-            'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
-            'daemonsStats' => $stats,
-        ]);
+        return view('livewire.servers.workspace-daemons', array_merge(
+            DaemonWorkspaceViewData::for($this->server, $this),
+            [
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+                'orgTemplates' => $templates,
+                'auditLogs' => $auditLogs,
+                'orgServersForCopy' => $orgServersForCopy,
+                'sitesForServer' => $sitesForServer,
+                'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
+                'contextSiteModel' => $contextSiteModel,
+                'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
+                'daemonsStats' => $stats,
+            ],
+        ));
     }
 }

@@ -51,6 +51,7 @@ use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
 use App\Support\SiteDeployKeyGenerator;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -2705,37 +2706,87 @@ class Show extends Component
 
     public function render(): View
     {
-        $this->site->load([
+        $ready = $this->site->isReadyForWorkspace();
+        $activeTab = $this->resolveDashboardTab();
+
+        $relations = [
             'domains',
             'domainAliases',
-            'basicAuthUsers',
-            'tenantDomains',
             'previewDomains',
             'certificates',
-            'deployments' => fn ($q) => $q->limit(25),
-            'webhookDeliveryLogs' => fn ($q) => $q->limit(30),
-            'redirects',
-            'deployHooks',
-            'deploySteps',
-            'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
-            'previewDomains',
             'certificates.previewDomain',
-        ]);
+        ];
+
+        if ($ready) {
+            $relations[] = 'workspace';
+
+            if ($activeTab === 'deploys') {
+                $relations['deployments'] = fn ($q) => $q->limit(25);
+                $relations['releases'] = fn ($q) => $q->orderByDesc('id')->limit(30);
+            } else {
+                $relations['deployments'] = fn ($q) => $q->limit(1);
+            }
+        }
+
+        $this->site->load($relations);
+        $this->server->loadMissing('workspace');
 
         $openSiteInsightsCount = InsightFinding::query()
             ->where('site_id', $this->site->id)
             ->where('status', InsightFinding::STATUS_OPEN)
             ->count();
 
-        return view('livewire.sites.show', [
-            'deployHookUrl' => $this->site->deployHookUrl(),
-            'openSiteInsightsCount' => $openSiteInsightsCount,
-            'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
-            'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
-            'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
-                ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
-                : null,
-        ]);
+        $deploymentContract = $ready
+            ? app(DeploymentContractBuilder::class)->build($this->site)
+            : null;
+        $deploymentPreflight = $ready
+            ? app(DeploymentPreflightValidator::class)->validate($this->site)
+            : [];
+
+        $sitePhpData = $this->server->hostCapabilities()->supportsMachinePhpManagement()
+            ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
+            : null;
+
+        return view('livewire.sites.show', array_merge(
+            SiteShowViewData::for(
+                $this->server,
+                $this->site,
+                $this,
+                $deploymentContract,
+                $deploymentPreflight,
+                $activeTab,
+            ),
+            [
+                'deployHookUrl' => $this->site->deployHookUrl(),
+                'openSiteInsightsCount' => $openSiteInsightsCount,
+                'deploymentContract' => $deploymentContract,
+                'deploymentPreflight' => $deploymentPreflight,
+                'sitePhpData' => $sitePhpData,
+            ],
+        ));
+    }
+
+    private function resolveDashboardTab(): string
+    {
+        if (! $this->site->isReadyForWorkspace()) {
+            return 'overview';
+        }
+
+        $showRuntimeTab = $this->site->usesFunctionsRuntime()
+            || $this->site->usesDockerRuntime()
+            || $this->site->usesKubernetesRuntime();
+        $showSslTab = ! $this->site->usesDockerRuntime()
+            && ($this->site->primaryPreviewDomain() || $this->site->certificates()->exists());
+
+        $allowed = ['overview', 'deploys', 'logs'];
+        if ($showRuntimeTab) {
+            $allowed[] = 'runtime';
+        }
+        if ($showSslTab) {
+            $allowed[] = 'ssl';
+        }
+
+        return in_array($this->dashboard_tab, $allowed, true) ? $this->dashboard_tab : 'overview';
     }
 
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void

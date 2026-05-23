@@ -66,11 +66,20 @@ final class ServerNameGenerator
         'wave', 'sirena', 'neptune', 'draught', 'spray',
     ];
 
-    public static function generate(): string
+    public static function generate(?string $exclude = null): string
     {
-        $adj = self::ADJECTIVES[array_rand(self::ADJECTIVES)];
-        $noun = self::NOUNS[array_rand(self::NOUNS)];
+        for ($attempt = 0; $attempt < 25; $attempt++) {
+            $name = Str::slug(
+                self::ADJECTIVES[array_rand(self::ADJECTIVES)].'-'.self::NOUNS[array_rand(self::NOUNS)]
+            );
 
-        return Str::slug($adj.'-'.$noun);
+            if ($exclude === null || $name !== $exclude) {
+                return $name;
+            }
+        }
+
+        return Str::slug(
+            self::ADJECTIVES[array_rand(self::ADJECTIVES)].'-'.self::NOUNS[array_rand(self::NOUNS)].'-'.Str::lower(Str::random(3))
+        );
     }
 }

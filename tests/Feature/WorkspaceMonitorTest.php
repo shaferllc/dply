@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\WorkspaceMonitorTest;
 
+use App\Livewire\Servers\WorkspaceMonitor;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
@@ -11,6 +12,7 @@ use App\Models\User;
 use App\Services\Servers\ServerMetricsGuestScript;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -62,15 +64,15 @@ test('monitor page shows simplified monitor status card', function () {
     $response->assertOk();
     $response->assertSee('Monitor status');
     $response->assertSee('Installed and running');
-
-    // The recovery toolbar (Repair + diagnostics kebab) only renders
-    // when the monitor isn't healthy. With no recent sample, healthy
-    // is false and the toolbar is visible — diagnostics live inside
-    // the kebab dropdown but are still in the markup.
-    $response->assertSee('Repair monitor now');
-    $response->assertSee('Run callback diagnostics');
-    $response->assertSee('Inspect callback env');
     $response->assertSee('The server pushes fresh metrics back to Dply every minute.');
+
+    // Recovery actions live on the Diagnostics tab (lazy-rendered).
+    Livewire::actingAs($user)
+        ->test(WorkspaceMonitor::class, ['server' => $server])
+        ->call('setMonitorWorkspaceTab', 'diagnostics')
+        ->assertSee('Repair monitor now')
+        ->assertSee('Run callback diagnostics')
+        ->assertSee('Inspect callback env');
 });
 
 test('monitor page hides admin actions for deployer role', function () {

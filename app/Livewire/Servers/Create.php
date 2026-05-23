@@ -18,11 +18,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Services\SshConnectionFactory;
 use App\Support\ServerProviderGate;
+use App\Support\Servers\ServerNameGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -78,7 +78,7 @@ class Create extends Component
         }
 
         if ($this->form->name === '') {
-            $this->form->name = $this->generateServerName();
+            $this->form->name = ServerNameGenerator::generate();
         }
 
         $requestedHostTarget = request()->query('host_target');
@@ -129,7 +129,7 @@ class Create extends Component
 
     public function regenerateServerName(): void
     {
-        $this->form->name = $this->generateServerName();
+        $this->form->name = ServerNameGenerator::generate($this->form->name);
     }
 
     public function afterProviderCredentialStored(string $provider): void
@@ -782,35 +782,5 @@ class Create extends Component
             'custom' => __('Server added.'),
             default => __('Server is being created. This usually takes 1–2 minutes.'),
         });
-    }
-
-    protected function generateServerName(): string
-    {
-        $adjectives = [
-            'steady',
-            'brisk',
-            'bold',
-            'calm',
-            'bright',
-            'swift',
-            'sharp',
-            'amber',
-            'silver',
-            'crisp',
-        ];
-        $nouns = [
-            'otter',
-            'falcon',
-            'harbor',
-            'summit',
-            'spruce',
-            'signal',
-            'meadow',
-            'comet',
-            'anchor',
-            'cinder',
-        ];
-
-        return Str::slug($adjectives[array_rand($adjectives)].'-'.$nouns[array_rand($nouns)]);
     }
 }

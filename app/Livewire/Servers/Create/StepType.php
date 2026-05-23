@@ -165,7 +165,7 @@ class StepType extends Component
 
     public function regenerateName(): void
     {
-        $this->form->name = ServerNameGenerator::generate();
+        $this->form->name = ServerNameGenerator::generate($this->form->name);
     }
 
     public function chooseProviderMode(): void

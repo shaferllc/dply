@@ -32,6 +32,7 @@ use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\CacheServicePort;
 use App\Support\Servers\CacheServiceStats;
+use App\Support\Servers\CacheWorkspaceViewData;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -2475,34 +2476,23 @@ BASH;
             ->orderByDesc('created_at')
             ->first();
 
-        return view('livewire.servers.workspace-caches', [
-            'capabilities' => $capabilities,
-            'engineUnsupportedReasons' => $engineUnsupportedReasons,
-            'cacheServices' => $services,
-            'cacheServicesByEngine' => $primaryByEngine,
-            'cacheRunsByEngine' => $cacheRunsByEngine,
-            'cacheStatsByInstance' => $statsByInstance,
-            'cacheAuditEvents' => $auditEvents,
-            // Allowlisted manage actions exposed on Caches (currently just `redis_info`).
-            // Banner-only flow — see RunsAllowlistedManageAction.
-            'serviceActions' => config('server_manage.service_actions', []),
-            'manageActionRun' => $manageActionRun,
-            'engineLabels' => [
-                'redis' => 'Redis',
-                'valkey' => 'Valkey',
-                'memcached' => 'Memcached',
-                'keydb' => 'KeyDB',
-                'dragonfly' => 'Dragonfly',
+        return view('livewire.servers.workspace-caches', array_merge(
+            CacheWorkspaceViewData::for($this->server, $this, $services),
+            [
+                'capabilities' => $capabilities,
+                'engineUnsupportedReasons' => $engineUnsupportedReasons,
+                'cacheServices' => $services,
+                'cacheServicesByEngine' => $primaryByEngine,
+                'cacheRunsByEngine' => $cacheRunsByEngine,
+                'cacheStatsByInstance' => $statsByInstance,
+                'cacheAuditEvents' => $auditEvents,
+                // Allowlisted manage actions exposed on Caches (currently just `redis_info`).
+                // Banner-only flow — see RunsAllowlistedManageAction.
+                'serviceActions' => config('server_manage.service_actions', []),
+                'manageActionRun' => $manageActionRun,
+                'deletionSummary' => null,
             ],
-            'engineDescriptions' => [
-                'redis' => __('In-memory data structure store; the most widely-deployed cache for PHP/Laravel apps.'),
-                'valkey' => __('Open-source fork of Redis maintained by the Linux Foundation; wire-compatible with Redis clients.'),
-                'memcached' => __('Lightweight key-value cache. Smaller feature set than Redis but very low overhead.'),
-                'keydb' => __('Multi-threaded Redis fork. Higher throughput on multi-core boxes; same wire protocol as Redis.'),
-                'dragonfly' => __('Modern in-memory store with Redis wire compatibility and lower memory overhead.'),
-            ],
-            'deletionSummary' => null,
-        ]);
+        ));
     }
 
     /** All cache service rows for this server, keyed by ULID and ordered by engine name. */

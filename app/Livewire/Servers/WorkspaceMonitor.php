@@ -27,6 +27,7 @@ use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerMetricsGuestPushVerifier;
 use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\ServerMetricsRangeQuery;
+use App\Support\Servers\MonitorWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
@@ -933,52 +934,79 @@ BASH);
     {
         $this->server->refresh();
 
+        $allowedTabs = ['status', 'history', 'notifications', 'diagnostics'];
+        if (! in_array($this->monitor_workspace_tab, $allowedTabs, true)) {
+            $this->monitor_workspace_tab = 'status';
+        }
+
+        $needsMetrics = in_array($this->monitor_workspace_tab, ['status', 'history'], true);
+        $needsNotifications = $this->monitor_workspace_tab === 'notifications';
+
         $latest = ServerMetricSnapshot::query()
             ->where('server_id', $this->server->id)
             ->orderByDesc('captured_at')
             ->first();
 
         $chartLimit = (int) config('server_metrics.chart.max_points', 96);
-
-        // Bucketed series per metric across the operator-chosen range.
-        // ServerMetricsRangeQuery handles min/avg/max bucketing in PHP so the
-        // 30d view stays around ~180 points instead of ~43k raw rows.
-        $rangeData = app(ServerMetricsRangeQuery::class)->fetch($this->server, $this->metricsRange);
-        $chartFrom = $rangeData['from'];
-        $chartTo = $rangeData['to'];
-        $rangeMetricSeries = $rangeData['metrics'];
         $tz = config('app.timezone');
-
-        // Threshold tints for per-panel header icon + KPI. Use server-specific
-        // thresholds if set, otherwise fall back to config defaults.
-        $effectiveThresholds = $this->effectiveThresholds();
-        $thresholdCpu = $effectiveThresholds['cpu'];
-        $thresholdMem = $effectiveThresholds['mem'];
-        $thresholdLoad = $effectiveThresholds['load'];
-        $thresholdDiskWarn = 85.0; // Disk has no insights threshold yet — match cpu/mem default.
-
-        $statusFor = function (?float $value, float $warn, float $critical): string {
-            if ($value === null) {
-                return 'unknown';
-            }
-            if ($value >= $critical) {
-                return 'critical';
-            }
-            if ($value >= $warn) {
-                return 'warning';
-            }
-
-            return 'healthy';
-        };
-
-        $latestPayload = is_array($rangeData['latest_payload']) ? $rangeData['latest_payload'] : [];
+        $chartFrom = null;
+        $chartTo = null;
+        $rangeMetricSeries = [];
+        $rangeSampleCount = 0;
+        $rangeBucketSeconds = 0;
         $metricStatuses = [
-            'cpu' => $statusFor($this->floatOrNull($latestPayload['cpu_pct'] ?? null), $thresholdCpu, 95.0),
-            'mem' => $statusFor($this->floatOrNull($latestPayload['mem_pct'] ?? null), $thresholdMem, 95.0),
-            'disk' => $statusFor($this->floatOrNull($latestPayload['disk_pct'] ?? null), $thresholdDiskWarn, 95.0),
-            'load' => $statusFor($this->floatOrNull($latestPayload['load_1m'] ?? null), $thresholdLoad, $thresholdLoad * 1.5),
+            'cpu' => 'unknown',
+            'mem' => 'unknown',
+            'disk' => 'unknown',
+            'load' => 'unknown',
             'network' => 'healthy',
         ];
+        $thresholdCpu = (float) config('insights.thresholds.cpu_warn_pct', 85);
+        $thresholdMem = (float) config('insights.thresholds.mem_warn_pct', 85);
+        $thresholdLoad = (float) config('insights.thresholds.load_warn', 4.0);
+        $thresholdDiskWarn = 85.0;
+
+        if ($needsMetrics) {
+            // Bucketed series per metric across the operator-chosen range.
+            // ServerMetricsRangeQuery handles min/avg/max bucketing in PHP so the
+            // 30d view stays around ~180 points instead of ~43k raw rows.
+            $rangeData = app(ServerMetricsRangeQuery::class)->fetch($this->server, $this->metricsRange);
+            $chartFrom = $rangeData['from'];
+            $chartTo = $rangeData['to'];
+            $rangeMetricSeries = $rangeData['metrics'];
+            $rangeSampleCount = $rangeData['sample_count'];
+            $rangeBucketSeconds = $rangeData['bucket_seconds'];
+
+            // Threshold tints for per-panel header icon + KPI. Use server-specific
+            // thresholds if set, otherwise fall back to config defaults.
+            $effectiveThresholds = $this->effectiveThresholds();
+            $thresholdCpu = $effectiveThresholds['cpu'];
+            $thresholdMem = $effectiveThresholds['mem'];
+            $thresholdLoad = $effectiveThresholds['load'];
+
+            $statusFor = function (?float $value, float $warn, float $critical): string {
+                if ($value === null) {
+                    return 'unknown';
+                }
+                if ($value >= $critical) {
+                    return 'critical';
+                }
+                if ($value >= $warn) {
+                    return 'warning';
+                }
+
+                return 'healthy';
+            };
+
+            $latestPayload = is_array($rangeData['latest_payload']) ? $rangeData['latest_payload'] : [];
+            $metricStatuses = [
+                'cpu' => $statusFor($this->floatOrNull($latestPayload['cpu_pct'] ?? null), $thresholdCpu, 95.0),
+                'mem' => $statusFor($this->floatOrNull($latestPayload['mem_pct'] ?? null), $thresholdMem, 95.0),
+                'disk' => $statusFor($this->floatOrNull($latestPayload['disk_pct'] ?? null), $thresholdDiskWarn, 95.0),
+                'load' => $statusFor($this->floatOrNull($latestPayload['load_1m'] ?? null), $thresholdLoad, $thresholdLoad * 1.5),
+                'network' => 'healthy',
+            ];
+        }
 
         $meta = $this->server->meta ?? [];
         $sshReachable = (bool) ($meta['monitoring_ssh_reachable'] ?? false);
@@ -1076,30 +1104,49 @@ BASH);
             'has_project' => $workspace !== null,
         ];
 
-        // Notification subscriptions data (for the Notifications tab)
-        $serverNotifSubscriptions = NotificationSubscription::query()
-            ->where('subscribable_type', Server::class)
-            ->where('subscribable_id', $this->server->id)
-            ->with('channel')
-            ->get();
+        // Notification subscriptions data (Notifications tab only)
+        $serverNotifSubscriptions = $needsNotifications
+            ? NotificationSubscription::query()
+                ->where('subscribable_type', Server::class)
+                ->where('subscribable_id', $this->server->id)
+                ->with('channel')
+                ->get()
+            : collect();
 
-        $assignableChannels = AssignableNotificationChannels::forUser(
-            Auth::user(),
-            Auth::user()?->currentOrganization()
-        )->sortBy('label')->values();
+        $assignableChannels = $needsNotifications
+            ? AssignableNotificationChannels::forUser(
+                Auth::user(),
+                Auth::user()?->currentOrganization()
+            )->sortBy('label')->values()
+            : collect();
 
-        // Server-scoped notification event labels
-        $serverEventLabels = config('notification_events.categories.server.events', []);
+        $serverEventLabels = $needsNotifications
+            ? config('notification_events.categories.server.events', [])
+            : [];
+
+        $pollRemoteTaskSeconds = (int) config('server_metrics.ui.poll_remote_task_seconds', 2);
+
+        $viewData = MonitorWorkspaceViewData::for(
+            $this->server,
+            $this,
+            $latest,
+            $guestPushVerification,
+            $sampleAgeMinutes,
+            $sampleTimestampInFuture,
+            $guestPushVerification['last_guest_sample_at'] ?? null,
+            $pollRemoteTaskSeconds,
+        );
 
         return view('livewire.servers.workspace-monitor', [
+            ...$viewData,
             'latest' => $latest,
             'chartPointLimit' => $chartLimit,
             'chartFrom' => $chartFrom,
             'chartTo' => $chartTo,
             'chartTimezone' => $tz,
             'rangeMetricSeries' => $rangeMetricSeries,
-            'rangeBucketSeconds' => $rangeData['bucket_seconds'],
-            'rangeSampleCount' => $rangeData['sample_count'],
+            'rangeBucketSeconds' => $rangeBucketSeconds,
+            'rangeSampleCount' => $rangeSampleCount,
             'metricStatuses' => $metricStatuses,
             'thresholds' => [
                 'cpu' => $thresholdCpu,
@@ -1115,7 +1162,7 @@ BASH);
             'monitorLastGuestSampleAt' => $guestPushVerification['last_guest_sample_at'] ?? null,
             'probePending' => $probePending,
             'pollProbeSeconds' => (int) config('server_metrics.ui.poll_probe_seconds', 3),
-            'pollRemoteTaskSeconds' => (int) config('server_metrics.ui.poll_remote_task_seconds', 2),
+            'pollRemoteTaskSeconds' => $pollRemoteTaskSeconds,
             'pollAutoRefreshSeconds' => (int) config('server_metrics.ui.auto_refresh_seconds', 60),
             'guestPushCronExpression' => $guestPushCronExpression,
             'guestPushVerification' => $guestPushVerification,
@@ -1126,11 +1173,9 @@ BASH);
             'routingSummary' => $routingSummary,
             'monitoringInstallAction' => $monitoringInstallAction,
             'monitoringInstallInProgress' => $monitoringInstallInProgress,
-            // Notification subscription data
             'serverNotifSubscriptions' => $serverNotifSubscriptions,
             'assignableChannels' => $assignableChannels,
             'serverEventLabels' => $serverEventLabels,
-            // Threshold editing state
             'editingThresholds' => $this->editingThresholds,
             'thresholdCpuInput' => $this->thresholdCpu ?? $thresholdCpu,
             'thresholdMemInput' => $this->thresholdMem ?? $thresholdMem,

@@ -1,0 +1,246 @@
+{{-- Read-only overview. Edit affordances live elsewhere:
+     primary hostname → Routing > Domains (pencil on the row);
+     everything else → Settings tab. --}}
+<section class="dply-card overflow-hidden">
+    <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="flex items-start gap-3">
+                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                    <x-heroicon-o-globe-alt class="h-5 w-5" />
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        {{ __('At-a-glance summary. Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}
+                    </p>
+                </div>
+            </div>
+            @if ($testingHostname !== '')
+                <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
+                    <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
+                </div>
+            @endif
+        </div>
+
+        <div class="p-6 sm:p-8">
+            <div class="grid gap-5">
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $primaryHostnameLabel }}</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_primary_domain !== '' ? $settings_primary_domain : '—' }}</span>
+                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
+                            <x-heroicon-o-pencil-square class="h-3 w-3" />
+                            {{ __('Edit in Routing') }}
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $documentRootLabel }}</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <span class="break-all font-mono text-sm text-brand-ink">{{ $settings_document_root !== '' ? $settings_document_root : '—' }}</span>
+                        <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">
+                            <x-heroicon-o-pencil-square class="h-3 w-3" />
+                            {{ __('Edit in Settings') }}
+                        </a>
+                    </div>
+                </div>
+
+                <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-2">
+                    @foreach ($summaryCards as $card)
+                        <div>
+                            <dt class="text-brand-mist">{{ $card['label'] }}</dt>
+                            <dd class="mt-1 break-all font-medium text-brand-ink">{{ $card['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="dply-card overflow-hidden">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                <x-heroicon-o-chart-bar class="h-5 w-5" />
+            </span>
+            <div class="min-w-0">
+                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Status') }}</h2>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('At-a-glance deploy, runtime, and certificate state. Detailed editors live on the dedicated tabs.') }}</p>
+            </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap items-center gap-2">
+            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" />
+                {{ __('Deploy') }}
+            </a>
+            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                <x-heroicon-o-cube-transparent class="h-3.5 w-3.5" />
+                {{ __('Runtime') }}
+            </a>
+            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'certificates']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                <x-heroicon-o-shield-check class="h-3.5 w-3.5" />
+                {{ __('Certificates') }}
+            </a>
+        </div>
+    </div>
+
+    <div class="p-6 sm:p-8">
+        <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            @if ($this->latestDeployment !== null)
+                @php
+                    // Tone-coded badge: failed deploys rose, running sky, success emerald.
+                    // Tests assert the bg-rose-100 class for failed deploys so the badge
+                    // colour is part of the contract, not just a decorative cue.
+                    $latestStatus = (string) $this->latestDeployment->status;
+                    $latestTone = match ($latestStatus) {
+                        'failed' => 'bg-rose-100 text-rose-800',
+                        'running' => 'bg-sky-100 text-sky-800',
+                        'success' => 'bg-emerald-100 text-emerald-800',
+                        default => 'bg-brand-sand/60 text-brand-ink',
+                    };
+                @endphp
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                    <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Last deploy') }}</dt>
+                    <dd class="mt-2 text-sm font-medium text-brand-ink">
+                        <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $this->latestDeployment]) }}"
+                            wire:navigate
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize {{ $latestTone }} hover:opacity-90">
+                            {{ $latestStatus }}
+                        </a>
+                        @if ($this->latestDeployment->started_at)
+                            <span class="ml-1 text-xs font-normal text-brand-mist">· {{ $this->latestDeployment->started_at->diffForHumans(null, true) }}</span>
+                        @endif
+                    </dd>
+                    <dd class="mt-1 text-xs">
+                        <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-medium text-brand-sage hover:underline">{{ __('All deploys') }}</a>
+                    </dd>
+                </div>
+            @endif
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Runtime') }}</dt>
+                <dd class="mt-2 text-sm font-medium text-brand-ink">
+                    @if ($site->runtimeKey())
+                        <span class="capitalize">{{ $site->runtimeKey() }}</span>@if ($site->runtimeVersion())
+                            <span class="font-mono text-brand-mist"> · {{ $site->runtimeVersion() }}</span>
+                        @endif
+                    @else
+                        <span class="text-brand-mist">—</span>
+                    @endif
+                </dd>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Preflight') }}</dt>
+                <dd class="mt-2 text-sm font-medium">
+                    @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
+                        <span class="inline-flex items-center gap-1.5 text-emerald-700">
+                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                            {{ __('Ready') }}
+                        </span>
+                    @elseif ($preflightErrors->isNotEmpty())
+                        <span class="inline-flex items-center gap-1.5 text-rose-700">
+                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-600"></span>
+                            {{ trans_choice('{1} :count blocker|[2,*] :count blockers', $preflightErrors->count(), ['count' => $preflightErrors->count()]) }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1.5 text-amber-700">
+                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                            {{ trans_choice('{1} :count warning|[2,*] :count warnings', $preflightWarnings->count(), ['count' => $preflightWarnings->count()]) }}
+                        </span>
+                    @endif
+                </dd>
+            </div>
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('SSL') }}</dt>
+                <dd class="mt-2 text-sm font-medium text-brand-ink">{{ $site->currentSslSummary() }}</dd>
+            </div>
+        </dl>
+
+        @if (in_array($site->runtime, ['node', 'static'], true))
+            <div class="mt-5 rounded-xl border border-brand-sage/30 bg-brand-sage/10 p-3 text-xs text-brand-ink">
+                <span class="font-semibold text-brand-forest">{{ __('Cloud-eligible') }}</span> —
+                <span class="text-brand-moss">{{ __('this :runtime site can deploy globally on dply cloud — managed HTTPS, auto-scaling, no VM to babysit.', ['runtime' => $site->runtime]) }}</span>
+                <a href="{{ route('cloud.create') }}" wire:navigate class="ml-1 font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('Deploy to dply cloud') }} →</a>
+            </div>
+        @endif
+    </div>
+</section>
+
+<section class="dply-card overflow-hidden">
+    <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="flex items-start gap-3">
+                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                    <x-heroicon-o-identification class="h-5 w-5" />
+                </span>
+                <div class="min-w-0">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ $detailsTitle }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        {{ $detailsDescription }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 sm:p-8">
+            @php
+                $diskUsageBytes = data_get($site->meta, 'disk_usage.bytes');
+            @endphp
+            <dl class="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2">
+                <div>
+                    <dt class="text-brand-mist">{{ __('Created at') }}</dt>
+                    <dd class="mt-1 font-medium text-brand-ink">{{ $site->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-brand-mist">{{ __('Site ID') }}</dt>
+                    <dd class="mt-1 font-mono text-xs font-medium text-brand-ink">{{ $site->id }}</dd>
+                </div>
+                <div>
+                    <dt class="text-brand-mist">{{ __('Stack') }}</dt>
+                    <dd class="mt-1 font-medium text-brand-ink">{{ $site->type->label() }}</dd>
+                </div>
+                <div>
+                    <dt class="text-brand-mist">{{ __('Disk usage') }}</dt>
+                    <dd class="mt-1 font-medium text-brand-ink">
+                        {{ is_numeric($diskUsageBytes) ? \Illuminate\Support\Number::fileSize((int) $diskUsageBytes) : __('Not recorded yet') }}
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+</section>
+
+@if (data_get($site->meta, 'notes'))
+    <section class="dply-card overflow-hidden">
+        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+                <div class="flex items-start gap-3">
+                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
+                        <x-heroicon-o-pencil-square class="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Edit in Settings') }}</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 sm:p-8">
+                <p class="whitespace-pre-wrap text-sm leading-relaxed text-brand-ink">{{ data_get($site->meta, 'notes') }}</p>
+            </div>
+        </div>
+    </section>
+@endif
+
+<x-cli-snippet :commands="[
+    ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
+    ['label' => __('Diagnose site'), 'command' => 'dply:site:doctor '.$site->slug],
+    ['label' => __('Rename site'), 'command' => 'dply:site:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
+    ['label' => __('Export full config'), 'command' => 'dply:site:export-config '.$site->slug.' --to=site.json'],
+    ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
+    ['label' => __('List all sites'), 'command' => 'dply:site:list'],
+]" />
