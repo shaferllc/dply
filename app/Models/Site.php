@@ -10,6 +10,7 @@ use App\Services\Deploy\LaravelComposerPackageDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Deploy\ServerlessDeploymentConfigResolver;
 use App\Services\Scaffold\PlaceholderDnsManager;
+use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -1230,11 +1231,118 @@ class Site extends Model
             }
         }
 
-        $testingDomain = (string) (config('edge.testing_domains')[0] ?? 'dply.host');
+        $testingDomain = EdgeTestingDomains::defaultApex();
         $slug = (string) ($this->slug ?: Str::slug((string) $this->name)) ?: 'site';
         $suffix = substr(strtolower((string) $this->id), -6);
 
         return strtolower($slug.'-'.$suffix.'.'.$testingDomain);
+    }
+
+    /**
+     * Hostnames that receive CDN traffic for this Edge site (default delivery + custom domains).
+     *
+     * @return list<string>
+     */
+    public function edgeUsageHostnames(): array
+    {
+        return array_keys($this->edgeUsageHostnameZones());
+    }
+
+    /**
+     * @return array<string, string> hostname => Cloudflare zone apex for analytics
+     */
+    public function edgeUsageHostnameZones(): array
+    {
+        if (! $this->usesEdgeRuntime()) {
+            return [];
+        }
+
+        $zones = [];
+        $primary = strtolower(trim($this->edgeHostname()));
+        if ($primary !== '') {
+            $zones[$primary] = $this->edgeAnalyticsZoneForHostname($primary) ?? $primary;
+        }
+
+        $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
+        $customDomains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+
+        foreach ($customDomains as $key => $domain) {
+            $hostname = is_string($key) && $key !== ''
+                ? strtolower(trim($key))
+                : strtolower(trim((string) (is_array($domain) ? ($domain['hostname'] ?? '') : '')));
+
+            if ($hostname === '') {
+                continue;
+            }
+
+            $zones[$hostname] = $this->edgeAnalyticsZoneForHostname($hostname, is_array($domain) ? $domain : []);
+        }
+
+        return $zones;
+    }
+
+    /**
+     * @param  array<string, mixed>  $customDomainEntry
+     */
+    public function edgeAnalyticsZoneForHostname(string $hostname, array $customDomainEntry = []): ?string
+    {
+        $hostname = strtolower(trim($hostname));
+        if ($hostname === '') {
+            return null;
+        }
+
+        $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
+        $customDomains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+        $entry = $customDomainEntry !== []
+            ? $customDomainEntry
+            : (is_array($customDomains[$hostname] ?? null) ? $customDomains[$hostname] : []);
+
+        foreach (['analytics_zone', 'zone'] as $key) {
+            $zone = strtolower(trim((string) ($entry[$key] ?? '')));
+            if ($zone !== '') {
+                return $zone;
+            }
+        }
+
+        return EdgeTestingDomains::analyticsZoneForHost($hostname)
+            ?? self::deriveRegistrableDomain($hostname);
+    }
+
+    public static function deriveRegistrableDomain(string $hostname): string
+    {
+        $labels = explode('.', strtolower(trim($hostname)));
+        if (count($labels) < 2) {
+            return strtolower(trim($hostname));
+        }
+
+        return implode('.', array_slice($labels, -2));
+    }
+
+    /**
+     * Git remote URL for source-control API browsing (BYO git_repository_url or Edge source.repo).
+     */
+    public function sourceControlRepositoryUrl(): ?string
+    {
+        $direct = trim((string) $this->git_repository_url);
+        if ($direct !== '') {
+            return $direct;
+        }
+
+        if (! $this->usesEdgeRuntime()) {
+            return null;
+        }
+
+        $source = is_array($this->edgeMeta()['source'] ?? null) ? $this->edgeMeta()['source'] : [];
+        $repo = trim((string) ($source['repo'] ?? ''));
+        if ($repo === '') {
+            return null;
+        }
+
+        if (str_contains($repo, '://')) {
+            return $repo;
+        }
+
+        return 'https://github.com/'.$repo.'.git';
     }
 
     public function isEdgePreview(): bool

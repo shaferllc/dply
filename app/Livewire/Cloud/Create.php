@@ -12,6 +12,7 @@ use App\Models\ProviderCredential;
 use App\Services\Billing\ManagedProductCostEstimator;
 use App\Services\Cloud\AwsAppRunnerBackend;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\View\View;
@@ -222,7 +223,9 @@ class Create extends Component
             return;
         }
 
-        $account = auth()->user()?->socialAccounts()->find($this->source_control_account_id);
+        $account = auth()->user() !== null
+            ? app(GitIdentityResolver::class)->forId(auth()->user(), $this->source_control_account_id)
+            : null;
         $this->availableRepositories = $account
             ? app(SourceControlRepositoryBrowser::class)->repositoriesForAccount($account)
             : [];

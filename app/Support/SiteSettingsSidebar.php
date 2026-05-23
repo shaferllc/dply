@@ -230,7 +230,12 @@ final class SiteSettingsSidebar
             $items[] = ['id' => 'edge-previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-sparkles', 'group' => 'deploy'];
         }
 
-        $items[] = ['id' => 'edge-logs', 'label' => __('Logs & activity'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'];
+        if (! $isPreviewChild) {
+            $items[] = ['id' => 'edge-traffic', 'label' => __('Traffic & analytics'), 'icon' => 'heroicon-o-signal', 'group' => 'observability'];
+            $items[] = ['id' => 'edge-billing', 'label' => __('Billing & usage'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability'];
+        }
+
+        $items[] = ['id' => 'edge-logs', 'label' => __('Build & deploy logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'];
         $items[] = ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'danger'];
 
         return $items;

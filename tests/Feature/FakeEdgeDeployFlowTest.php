@@ -46,6 +46,7 @@ test('fake edge create runs build and publish to live deployment', function () {
     expect($deployment)->not->toBeNull();
     expect($deployment->status)->toBe(EdgeDeployment::STATUS_LIVE);
     expect($deployment->published_at)->not->toBeNull();
+    expect($deployment->git_commit)->toMatch('/^[a-f0-9]{40}$/');
 
     $backend = EdgeRouter::backendFor($site);
     expect($backend)->not->toBeNull();

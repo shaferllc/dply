@@ -107,6 +107,8 @@
     </section>
 </div>
 
+@include('livewire.sites.partials.edge.traffic-card')
+
 @include('livewire.sites.partials.edge.billing-card')
 
 @if ($edgeDeployments->isNotEmpty())

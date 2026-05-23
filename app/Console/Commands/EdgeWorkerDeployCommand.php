@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ProviderCredential;
+use App\Services\Edge\EdgeCloudflareClient;
 use App\Services\Edge\EdgeDeliveryContextResolver;
 use App\Support\Edge\EdgeDeliveryContext;
 use App\Support\Edge\EdgePlatformCredentials;
@@ -44,6 +45,7 @@ class EdgeWorkerDeployCommand extends Command
         }
 
         try {
+            $context = $this->filterDeployableRoutes($context);
             $configPath = $generator->write($context);
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
@@ -127,5 +129,40 @@ class EdgeWorkerDeployCommand extends Command
         }
 
         return EdgeDeliveryContext::platform();
+    }
+
+    private function filterDeployableRoutes(EdgeDeliveryContext $context): EdgeDeliveryContext
+    {
+        if ($context->workerRoutes === []) {
+            return $context;
+        }
+
+        try {
+            $client = EdgeCloudflareClient::fromConfig();
+        } catch (\Throwable) {
+            return $context;
+        }
+
+        $deployable = [];
+        foreach ($context->workerRoutes as $pattern) {
+            $zone = EdgeWranglerConfigGenerator::zoneNameForRoute($pattern, $context->workerZoneName);
+            if ($zone === '') {
+                continue;
+            }
+
+            if ($client->activeZoneId($zone) === null) {
+                $this->warn('Skipping Worker route '.$pattern.' — zone '.$zone.' is not active on Cloudflare yet.');
+
+                continue;
+            }
+
+            $deployable[] = $pattern;
+        }
+
+        if ($deployable === [] && $context->workerRoutes !== []) {
+            $this->warn('No Worker routes deployed. Add the Edge delivery zone to Cloudflare first (see: php artisan dply:edge:doctor).');
+        }
+
+        return $context->withWorkerRoutes($deployable);
     }
 }

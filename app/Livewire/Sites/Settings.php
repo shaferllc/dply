@@ -337,10 +337,6 @@ class Settings extends Show
             abort(404);
         }
 
-        if ($server->organization_id !== auth()->user()->currentOrganization()?->id) {
-            abort(404);
-        }
-
         // Section is a path segment (servers/{server}/sites/{site}/{section}).
         // Default to 'general' so /sites/{site} (no trailing segment) still
         // resolves.
@@ -547,11 +543,9 @@ class Settings extends Show
 
     protected function loadSiteNotificationPreferences(): void
     {
-        $subs = NotificationSubscription::query()
-            ->where('subscribable_type', Site::class)
-            ->where('subscribable_id', $this->site->id)
-            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS)
-            ->get();
+        $this->site->loadMissing('notificationSubscriptions');
+        $subs = $this->site->notificationSubscriptions
+            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS);
 
         $this->site_notification_channel_ids = $subs->pluck('notification_channel_id')->unique()->values()->map(fn ($id) => (string) $id)->all();
         $this->site_notification_event_keys = $subs->pluck('event_key')->unique()->values()->all();
@@ -3225,7 +3219,7 @@ class Settings extends Show
             'general' => $this->site->usesEdgeRuntime()
                 ? ['edgeDeployments', 'workspace']
                 : ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
-            'edge-deploys', 'edge-logs', 'edge-domains', 'edge-build', 'edge-previews' => ['edgeDeployments'],
+            'edge-deploys', 'edge-logs', 'edge-traffic', 'edge-domains', 'edge-build', 'edge-previews' => ['edgeDeployments'],
             'settings' => ['workspace', 'workspace.variables'],
             'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains'],
             'dns' => ['dnsProviderCredential', 'domains', 'previewDomains'],
@@ -3233,6 +3227,7 @@ class Settings extends Show
             'deploy', 'repository' => ['deployHooks', 'deploySteps', 'deployments'],
             'environment' => ['workspace', 'workspace.variables'],
             'logs' => ['deployments', 'webhookDeliveryLogs'],
+            'notifications' => ['notificationSubscriptions'],
             'basic-auth' => ['basicAuthUsers'],
             'laravel-stack', 'rails-stack' => ['workspace', 'workspace.variables'],
             default => [],

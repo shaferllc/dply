@@ -43,6 +43,10 @@
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Billing docs') }}
                             </x-outline-link>
+                            <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
+                                <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Billing analytics') }}
+                            </x-outline-link>
                         </div>
                     </div>
                 </div>

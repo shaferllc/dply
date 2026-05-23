@@ -36,6 +36,7 @@ class EdgeDeployment extends Model
         'published_at',
         'failed_at',
         'failure_reason',
+        'pruned_at',
         'meta',
     ];
 
@@ -45,6 +46,7 @@ class EdgeDeployment extends Model
             'meta' => 'array',
             'published_at' => 'datetime',
             'failed_at' => 'datetime',
+            'pruned_at' => 'datetime',
             'cf_kv_version' => 'integer',
         ];
     }

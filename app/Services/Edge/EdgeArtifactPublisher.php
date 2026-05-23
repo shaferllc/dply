@@ -48,6 +48,26 @@ class EdgeArtifactPublisher
         return $count;
     }
 
+    public function directoryBytes(string $localArtifactDir): int
+    {
+        if (! is_dir($localArtifactDir)) {
+            return 0;
+        }
+
+        $bytes = 0;
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($localArtifactDir, \FilesystemIterator::SKIP_DOTS),
+        );
+
+        foreach ($files as $file) {
+            if ($file->isFile()) {
+                $bytes += (int) $file->getSize();
+            }
+        }
+
+        return $bytes;
+    }
+
     public function uploadFile(string $localPath, string $storageKey, ?string $diskName = null): void
     {
         if (! is_file($localPath)) {

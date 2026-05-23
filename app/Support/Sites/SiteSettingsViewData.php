@@ -11,6 +11,10 @@ use App\Models\SiteCertificate;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use App\Services\Billing\EdgeSiteAccessAnalytics;
+use App\Services\Billing\EdgeSiteBillingAnalytics;
+use App\Services\Billing\EdgeSiteTrafficAnalytics;
+use App\Services\Billing\ManagedProductCostEstimator;
 use App\Support\Deployment\DeploymentContract;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
@@ -183,6 +187,18 @@ final class SiteSettingsViewData
         $edgeManagedFee = $isEdgeWorkspace
             ? ((int) config('subscription.standard.edge_cents', 0)) / 100
             : null;
+        $edgeUsageRates = $isEdgeWorkspace
+            ? app(ManagedProductCostEstimator::class)->edgeUsageRates()
+            : [];
+        $edgeSiteBilling = $isEdgeWorkspace
+            ? app(EdgeSiteBillingAnalytics::class)->forSite($site)
+            : null;
+        $edgeSiteTraffic = $isEdgeWorkspace
+            ? app(EdgeSiteTrafficAnalytics::class)->forSite($site)
+            : null;
+        $edgeSiteAccess = $isEdgeWorkspace
+            ? app(EdgeSiteAccessAnalytics::class)->forSite($site)
+            : null;
 
         $edgeContext = $isEdgeWorkspace ? EdgeSiteViewData::context($site) : [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
@@ -266,6 +282,10 @@ final class SiteSettingsViewData
                 'isEdgeWorkspace',
                 'edgeUsageBillingEnabled',
                 'edgeManagedFee',
+                'edgeUsageRates',
+                'edgeSiteBilling',
+                'edgeSiteTraffic',
+                'edgeSiteAccess',
             ),
             $edgeContext,
         );

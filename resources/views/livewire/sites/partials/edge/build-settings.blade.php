@@ -58,26 +58,121 @@
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Build configuration') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Command and output directory used on each deploy.') }}</p>
+        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Command and output directory used on each deploy. Save here, then redeploy to apply.') }}</p>
     </div>
-    <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-            <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Build command') }}</dt>
-            <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $edgeBuildCommand }}</dd>
-        </div>
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-            <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Output directory') }}</dt>
-            <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink">{{ $edgeOutputDir }}</dd>
-        </div>
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-            <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('SPA fallback') }}</dt>
-            <dd class="min-w-0 flex-1 text-brand-ink">{{ $edgeSpaFallback ? __('Enabled — unknown paths serve index.html') : __('Disabled') }}</dd>
-        </div>
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
-            <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Deploy on push') }}</dt>
-            <dd class="min-w-0 flex-1 text-brand-ink">{{ $edgeDeployOnPush ? __('Yes — pushes to :branch trigger builds', ['branch' => $edgeBranch]) : __('No — manual redeploy only') }}</dd>
-        </div>
-    </dl>
+    @can('update', $site)
+        <form wire:submit.prevent="saveEdgeBuildSettings" class="space-y-5 px-6 py-5 sm:px-8">
+            <label class="block">
+                <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Build command') }}</span>
+                <input
+                    type="text"
+                    wire:model="edge_build_command"
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
+                />
+                @error('edge_build_command')
+                    <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                @enderror
+            </label>
+            <label class="block">
+                <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Output directory') }}</span>
+                <input
+                    type="text"
+                    wire:model="edge_output_dir"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="dist"
+                    class="mt-1.5 w-full max-w-xs rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
+                />
+                @error('edge_output_dir')
+                    <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                @enderror
+            </label>
+            <div class="space-y-3">
+                <label class="flex items-start gap-3 text-sm text-brand-ink">
+                    <input type="checkbox" wire:model="edge_spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
+                    <span>
+                        <span class="font-medium">{{ __('SPA fallback') }}</span>
+                        <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Unknown paths serve index.html after a 404.') }}</span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-3 text-sm text-brand-ink">
+                    <input type="checkbox" wire:model="edge_deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
+                    <span>
+                        <span class="font-medium">{{ __('Deploy on push') }}</span>
+                        <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Pushes to :branch trigger builds when GitHub auto-deploy is connected.', ['branch' => $edgeBranch]) }}</span>
+                    </span>
+                </label>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <button
+                    type="submit"
+                    wire:loading.attr="disabled"
+                    wire:target="saveEdgeBuildSettings"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90"
+                >
+                    {{ __('Save build settings') }}
+                </button>
+                <p class="text-xs text-brand-moss">{{ __('Repository and branch stay fixed in v1 — create a new Edge site to change those.') }}</p>
+            </div>
+        </form>
+    @else
+        <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Build command') }}</dt>
+                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink break-all">{{ $edgeBuildCommand }}</dd>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Output directory') }}</dt>
+                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink">{{ $edgeOutputDir }}</dd>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('SPA fallback') }}</dt>
+                <dd class="min-w-0 flex-1 text-brand-ink">{{ $edgeSpaFallback ? __('Enabled') : __('Disabled') }}</dd>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Deploy on push') }}</dt>
+                <dd class="min-w-0 flex-1 text-brand-ink">{{ $edgeDeployOnPush ? __('Yes') : __('No') }}</dd>
+            </div>
+        </dl>
+    @endcan
+</section>
+
+<section class="dply-card overflow-hidden">
+    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Retention') }}</h3>
+        <p class="mt-0.5 text-sm text-brand-moss">
+            {{ __('Older deployments beyond this count have their R2 artifacts deleted. Pruned deployments stay listed for audit but can\'t be rolled back without rebuilding from their commit.') }}
+        </p>
+    </div>
+    <div class="px-6 py-5 sm:px-8">
+        @can('update', $site)
+            <form wire:submit.prevent="saveEdgeReleasesToKeep" class="flex flex-wrap items-end gap-3">
+                <label class="block">
+                    <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Releases to keep') }}</span>
+                    <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        wire:model="edge_releases_to_keep"
+                        class="mt-1.5 w-24 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900"
+                    />
+                </label>
+                <button
+                    type="submit"
+                    wire:loading.attr="disabled"
+                    wire:target="saveEdgeReleasesToKeep"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                >
+                    {{ __('Save') }}
+                </button>
+                <span class="text-xs text-brand-moss">{{ __('Default: :default. Range 1–50.', ['default' => config('edge.retention.default_keep', 10)]) }}</span>
+            </form>
+        @else
+            <p class="text-sm text-brand-ink">{{ __('Releases to keep: :count', ['count' => $edge_releases_to_keep]) }}</p>
+        @endcan
+    </div>
 </section>
 
 @if (! $edgeIsPreviewChild)

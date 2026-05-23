@@ -30,6 +30,26 @@ class EdgeWranglerConfigGenerator
             '',
             '[vars]',
             'ENVIRONMENT = "production"',
+        ];
+
+        $logIngestBase = rtrim((string) config('edge.log_ingest.base_url', config('app.url')), '/');
+        $logIngestKey = (string) config('edge.log_ingest.key', '');
+        if ($logIngestBase !== '') {
+            $lines[] = 'LOG_INGEST_BASE_URL = '.json_encode($logIngestBase, JSON_UNESCAPED_SLASHES);
+        }
+        if ($logIngestKey !== '') {
+            $lines[] = 'LOG_INGEST_KEY = '.json_encode($logIngestKey, JSON_UNESCAPED_SLASHES);
+        }
+
+        $analyticsDataset = trim((string) config('edge.cloudflare.analytics_dataset', ''));
+        if ($analyticsDataset !== '') {
+            $lines[] = '';
+            $lines[] = '[[analytics_engine_datasets]]';
+            $lines[] = 'binding = "EDGE_ANALYTICS"';
+            $lines[] = 'dataset = '.json_encode($analyticsDataset, JSON_UNESCAPED_SLASHES);
+        }
+
+        $lines = array_merge($lines, [
             '',
             '[[r2_buckets]]',
             'binding = "ARTIFACTS"',
@@ -38,14 +58,18 @@ class EdgeWranglerConfigGenerator
             '[[kv_namespaces]]',
             'binding = "HOST_MAP"',
             'id = '.json_encode($context->kvNamespaceId, JSON_UNESCAPED_SLASHES),
-        ];
+        ]);
 
-        if ($context->workerRoutes !== [] && $context->workerZoneName !== '') {
+        if ($context->workerRoutes !== []) {
             $lines[] = '';
             foreach ($context->workerRoutes as $pattern) {
+                $zoneName = self::zoneNameForRoute($pattern, $context->workerZoneName);
+                if ($zoneName === '') {
+                    continue;
+                }
                 $lines[] = '[[routes]]';
                 $lines[] = 'pattern = '.json_encode($pattern, JSON_UNESCAPED_SLASHES);
-                $lines[] = 'zone_name = '.json_encode($context->workerZoneName, JSON_UNESCAPED_SLASHES);
+                $lines[] = 'zone_name = '.json_encode($zoneName, JSON_UNESCAPED_SLASHES);
                 $lines[] = '';
             }
         }
@@ -54,5 +78,14 @@ class EdgeWranglerConfigGenerator
         file_put_contents($this->outputPath(), $contents);
 
         return $this->outputPath();
+    }
+
+    public static function zoneNameForRoute(string $pattern, string $fallbackZone): string
+    {
+        if (preg_match('#^\*\.([^/*]+)/\*$#', trim($pattern), $matches) === 1) {
+            return strtolower($matches[1]);
+        }
+
+        return strtolower(trim($fallbackZone));
     }
 }

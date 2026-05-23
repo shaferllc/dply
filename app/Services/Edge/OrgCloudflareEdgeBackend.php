@@ -23,6 +23,11 @@ class OrgCloudflareEdgeBackend implements EdgeBackend
         return $this->delivery->publishDeployment($deployment, $site, $localArtifactDir);
     }
 
+    public function republishDeployment(EdgeDeployment $deployment, Site $site): array
+    {
+        return $this->delivery->republishDeployment($deployment, $site);
+    }
+
     public function unpublish(Site $site): void
     {
         $this->delivery->unpublish($site);

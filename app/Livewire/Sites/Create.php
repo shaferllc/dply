@@ -24,6 +24,7 @@ use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
@@ -252,7 +253,9 @@ class Create extends Component
 
             return;
         }
-        $account = auth()->user()?->socialAccounts()->find($this->container_source_control_account_id);
+        $account = auth()->user() !== null
+            ? app(GitIdentityResolver::class)->forId(auth()->user(), $this->container_source_control_account_id)
+            : null;
         $this->containerAvailableRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
@@ -601,8 +604,8 @@ class Create extends Component
             return;
         }
 
-        $account = auth()->user()->socialAccounts()->find($value);
-        if (! $account) {
+        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $value);
+        if ($account === null) {
             return;
         }
 
@@ -1258,7 +1261,7 @@ class Create extends Component
             $this->form->functions_source_control_account_id = $this->linkedSourceControlAccounts[0]['id'];
         }
 
-        $account = auth()->user()->socialAccounts()->find($this->form->functions_source_control_account_id);
+        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $this->form->functions_source_control_account_id);
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];

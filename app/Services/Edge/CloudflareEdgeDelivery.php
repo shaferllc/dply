@@ -33,6 +33,29 @@ class CloudflareEdgeDelivery
         if ($uploaded < 1) {
             throw new RuntimeException('Refusing to publish: no artifacts uploaded to R2.');
         }
+
+        $artifactBytes = $this->artifactPublisher->directoryBytes($localArtifactDir);
+        if ($artifactBytes > 0) {
+            $meta = is_array($deployment->meta) ? $deployment->meta : [];
+            $deployment->update([
+                'meta' => array_merge($meta, ['artifact_bytes' => $artifactBytes]),
+            ]);
+        }
+
+        $version = $this->hostMapPublisher->publish($site, $deployment, $context);
+
+        return [
+            'live_url' => 'https://'.$site->edgeHostname(),
+            'cf_kv_version' => $version,
+        ];
+    }
+
+    /**
+     * @return array{live_url: ?string, cf_kv_version: int}
+     */
+    public function republishDeployment(EdgeDeployment $deployment, Site $site): array
+    {
+        $context = $this->contextResolver->forSite($site);
         $version = $this->hostMapPublisher->publish($site, $deployment, $context);
 
         return [

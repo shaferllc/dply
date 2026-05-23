@@ -7,6 +7,7 @@ use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Builds a {@see DesiredBillingState} for an organization by scanning its
@@ -57,10 +58,14 @@ class OrganizationBillingStateComputer
         $cloudCount = 0;
         $edgeCount = 0;
 
-        $organization->sites()
-            ->where('created_at', '<=', $ageCutoff)
-            ->withCount(['functionActions as code_action_count' => fn ($query) => $query->where('kind', FunctionAction::KIND_CODE)])
-            ->get()
+        $siteQuery = $organization->sites()
+            ->where('created_at', '<=', $ageCutoff);
+
+        if (Schema::hasTable('function_actions')) {
+            $siteQuery->withCount(['functionActions as code_action_count' => fn ($query) => $query->where('kind', FunctionAction::KIND_CODE)]);
+        }
+
+        $siteQuery->get()
             ->each(function (Site $site) use (&$serverlessCount, &$cloudCount, &$edgeCount): void {
                 if ($site->status === Site::STATUS_FUNCTIONS_ACTIVE) {
                     $serverlessCount += max(1, (int) $site->code_action_count);
@@ -74,7 +79,11 @@ class OrganizationBillingStateComputer
                     return;
                 }
 
-                if ($site->status === Site::STATUS_EDGE_ACTIVE && $site->usesEdgeRuntime() && ! $site->isEdgePreview()) {
+                if (
+                    $site->status === Site::STATUS_EDGE_ACTIVE
+                    && $site->edge_backend === 'dply_edge'
+                    && ! $site->isEdgePreview()
+                ) {
                     $edgeCount++;
                 }
             });

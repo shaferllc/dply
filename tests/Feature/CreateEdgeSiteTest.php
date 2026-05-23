@@ -54,6 +54,7 @@ test('creates org cloudflare edge site when credential bootstrapped', function (
 
 test('creates edge server site deployment and dispatches build', function () {
     Queue::fake();
+    config(['edge.testing_domains' => ['on-dply.site']]);
     [$user, $org] = scaffold();
 
     $site = (new CreateEdgeSite)->handle($user, $org, [
@@ -73,6 +74,7 @@ test('creates edge server site deployment and dispatches build', function () {
     expect($site->meta['runtime_profile'] ?? null)->toBe('edge_web');
     expect($site->meta['edge']['source']['repo'] ?? null)->toBe('acme/marketing');
     expect($site->meta['edge']['build']['output_dir'] ?? null)->toBe('dist');
+    expect($site->meta['edge']['routing']['hostname'] ?? '')->toMatch('/^marketing-site-[a-z0-9]{6}\.on-dply\.site$/');
     expect($site->server)->not->toBeNull();
     expect($site->server->hostKind())->toBe(Server::HOST_KIND_DPLY_EDGE);
 
@@ -117,17 +119,47 @@ test('creates hybrid edge site with origin config', function () {
     Queue::fake();
     [$user, $org] = scaffold();
 
+    $cloudOrigin = Site::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'type' => SiteType::Container,
+        'container_backend' => 'digitalocean_app_platform',
+    ]);
+
     $site = (new CreateEdgeSite)->handle($user, $org, [
         'name' => 'Hybrid Next',
         'repo' => 'acme/next',
         'runtime_mode' => 'hybrid',
         'origin_url' => 'https://cloud-app.example.test',
+        'cloud_site_id' => (string) $cloudOrigin->id,
+        'origin_managed' => true,
     ]);
 
     expect($site->meta['edge']['runtime_mode'] ?? null)->toBe('hybrid');
     expect($site->meta['edge']['origin']['url'] ?? null)->toBe('https://cloud-app.example.test');
+    expect($site->meta['edge']['origin']['cloud_site_id'] ?? null)->toBe((string) $cloudOrigin->id);
+    expect($site->meta['edge']['origin']['managed'] ?? false)->toBeTrue();
     expect($site->meta['edge']['origin']['routes'] ?? null)->toBeArray();
 });
+
+test('rejects cloud site id from another organization', function () {
+    [$user, $org] = scaffold();
+    $otherOrg = Organization::factory()->create();
+    $foreignCloud = Site::factory()->create([
+        'organization_id' => $otherOrg->id,
+        'user_id' => $user->id,
+        'type' => SiteType::Container,
+        'container_backend' => 'digitalocean_app_platform',
+    ]);
+
+    (new CreateEdgeSite)->handle($user, $org, [
+        'name' => 'Hybrid Next',
+        'repo' => 'acme/next',
+        'runtime_mode' => 'hybrid',
+        'origin_url' => 'https://cloud-app.example.test',
+        'cloud_site_id' => (string) $foreignCloud->id,
+    ]);
+})->throws(\RuntimeException::class);
 
 /**
  * @return array{0: User, 1: Organization}

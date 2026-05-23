@@ -126,6 +126,26 @@ final readonly class EdgeDeliveryContext
         );
     }
 
+    public function withWorkerRoutes(array $workerRoutes): self
+    {
+        return new self(
+            backendKey: $this->backendKey,
+            accountId: $this->accountId,
+            apiToken: $this->apiToken,
+            kvNamespaceId: $this->kvNamespaceId,
+            r2Bucket: $this->r2Bucket,
+            r2AccessKey: $this->r2AccessKey,
+            r2Secret: $this->r2Secret,
+            r2Endpoint: $this->r2Endpoint,
+            r2KeyPrefix: $this->r2KeyPrefix,
+            workerScriptName: $this->workerScriptName,
+            workerZoneName: $this->workerZoneName,
+            workerRoutes: $workerRoutes,
+            diskName: $this->diskName,
+            providerCredentialId: $this->providerCredentialId,
+        );
+    }
+
     public function isPlatform(): bool
     {
         return $this->backendKey === 'dply_edge';

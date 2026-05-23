@@ -4,18 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services\SourceControl;
 
+use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Site;
-use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 /**
- * Loads recent commits for a site's configured Git remote using the viewer's linked OAuth provider.
+ * Loads recent commits for a site's configured Git remote using the viewer's
+ * best {@see GitIdentity} (OAuth account or PAT) for that provider, via
+ * {@see GitIdentityResolver}.
  */
 final class SiteGitCommitsFetcher
 {
     private const MAX_COMMITS = 50;
+
+    public function __construct(
+        private ?GitIdentityResolver $resolver = null,
+    ) {
+        $this->resolver ??= new GitIdentityResolver;
+    }
 
     /**
      * @return array{
@@ -40,7 +48,7 @@ final class SiteGitCommitsFetcher
         $branch = $branchOverride !== null && $branchOverride !== ''
             ? $branchOverride
             : (string) ($site->git_branch ?: 'main');
-        $remote = $this->parseRemoteUrl($site->git_repository_url);
+        $remote = $this->parseRemoteUrl($site->sourceControlRepositoryUrl());
         if ($remote === null) {
             return [
                 'ok' => false,
@@ -69,9 +77,6 @@ final class SiteGitCommitsFetcher
         };
     }
 
-    /**
-     * @return array{provider: string, label: string, owner?: string, repo?: string, project_path?: string, workspace?: string, gitlab_api_base?: string}|null
-     */
     private function parseRemoteUrl(?string $url): ?array
     {
         if ($url === null || trim($url) === '') {
@@ -103,9 +108,6 @@ final class SiteGitCommitsFetcher
         return $this->remoteFromHostAndPath($host, $path);
     }
 
-    /**
-     * @return array{provider: string, label: string, owner?: string, repo?: string, project_path?: string, workspace?: string, gitlab_api_base?: string}|null
-     */
     private function remoteFromHostAndPath(string $host, string $path): ?array
     {
         if ($path === '') {
@@ -154,32 +156,27 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
-    /**
-     * @param  array{provider: string, label: string, owner: string, repo: string}  $remote
-     * @return array{ok: bool, commits: list<array>, error: string|null, provider: string|null, branch: string, remote_label: string|null}
-     */
     private function fetchGithub(array $remote, User $user, string $branch, int $limit): array
     {
-        $account = $this->tokenAccount($user, 'github');
-        if ($account === null) {
+        $identity = $this->resolver->forUserProvider($user, 'github');
+        if ($identity === null) {
             return [
                 'ok' => false,
                 'commits' => [],
-                'error' => __('Link a GitHub account under Profile → Source control to browse commits.'),
+                'error' => __('Link a GitHub account or add a personal access token under Profile → Source control to browse commits.'),
                 'provider' => 'github',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
             ];
         }
 
-        $token = trim((string) $account->access_token);
         $response = Http::withHeaders([
             'User-Agent' => 'Dply (git-commits)',
             'Accept' => 'application/vnd.github+json',
         ])
-            ->withToken($token)
+            ->withToken($identity->accessToken())
             ->acceptJson()
-            ->get('https://api.github.com/repos/'.$remote['owner'].'/'.$remote['repo'].'/commits', [
+            ->get($identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/commits', [
                 'sha' => $branch,
                 'per_page' => $limit,
             ]);
@@ -242,18 +239,14 @@ final class SiteGitCommitsFetcher
         ];
     }
 
-    /**
-     * @param  array{provider: string, label: string, project_path: string, gitlab_api_base: string}  $remote
-     * @return array{ok: bool, commits: list<array>, error: string|null, provider: string|null, branch: string, remote_label: string|null}
-     */
     private function fetchGitlab(array $remote, User $user, string $branch, int $limit): array
     {
-        $account = $this->tokenAccount($user, 'gitlab');
-        if ($account === null) {
+        $identity = $this->resolver->forUserProvider($user, 'gitlab');
+        if ($identity === null) {
             return [
                 'ok' => false,
                 'commits' => [],
-                'error' => __('Link a GitLab account under Profile → Source control to browse commits.'),
+                'error' => __('Link a GitLab account or add a personal access token under Profile → Source control to browse commits.'),
                 'provider' => 'gitlab',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
@@ -261,10 +254,10 @@ final class SiteGitCommitsFetcher
         }
 
         $encoded = rawurlencode($remote['project_path']);
-        $token = trim((string) $account->access_token);
-        $url = rtrim($remote['gitlab_api_base'], '/').'/api/v4/projects/'.$encoded.'/repository/commits';
+        $apiBase = $this->gitlabApiBase($identity, $remote);
+        $url = $apiBase.'/api/v4/projects/'.$encoded.'/repository/commits';
 
-        $response = Http::withToken($token)
+        $response = Http::withToken($identity->accessToken())
             ->acceptJson()
             ->get($url, [
                 'ref_name' => $branch,
@@ -327,28 +320,23 @@ final class SiteGitCommitsFetcher
         ];
     }
 
-    /**
-     * @param  array{provider: string, label: string, workspace: string, repo: string}  $remote
-     * @return array{ok: bool, commits: list<array>, error: string|null, provider: string|null, branch: string, remote_label: string|null}
-     */
     private function fetchBitbucket(array $remote, User $user, string $branch, int $limit): array
     {
-        $account = $this->tokenAccount($user, 'bitbucket');
-        if ($account === null) {
+        $identity = $this->resolver->forUserProvider($user, 'bitbucket');
+        if ($identity === null) {
             return [
                 'ok' => false,
                 'commits' => [],
-                'error' => __('Link a Bitbucket account under Profile → Source control to browse commits.'),
+                'error' => __('Link a Bitbucket account or add a personal access token under Profile → Source control to browse commits.'),
                 'provider' => 'bitbucket',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
             ];
         }
 
-        $token = trim((string) $account->access_token);
-        $url = 'https://api.bitbucket.org/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/commits/'.$branch;
+        $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/commits/'.$branch;
 
-        $response = Http::withToken($token)
+        $response = Http::withToken($identity->accessToken())
             ->acceptJson()
             ->get($url, ['pagelen' => $limit]);
 
@@ -403,15 +391,16 @@ final class SiteGitCommitsFetcher
         ];
     }
 
-    private function tokenAccount(User $user, string $provider): ?SocialAccount
+    private function gitlabApiBase(GitIdentity $identity, array $remote): string
     {
-        return SocialAccount::query()
-            ->where('user_id', $user->id)
-            ->where('provider', $provider)
-            ->whereNotNull('access_token')
-            ->where('access_token', '!=', '')
-            ->orderBy('id')
-            ->first();
+        $base = $identity->apiBaseUrl();
+        if ($base !== '' && $base !== 'https://gitlab.com') {
+            return rtrim($base, '/');
+        }
+
+        $fromRemote = (string) ($remote['gitlab_api_base'] ?? '');
+
+        return $fromRemote !== '' ? rtrim($fromRemote, '/') : rtrim($base, '/');
     }
 
     private function formatApiError(int $status, string $body): string

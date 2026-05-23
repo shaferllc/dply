@@ -1,6 +1,10 @@
+import { injectRumScript, shouldInjectRum, VITALS_BEACON_PATH } from './rum';
+
 export interface HostMapEntry {
   storage_prefix: string;
   deployment_id: string;
+  site_id: string;
+  organization_id: string;
   spa_fallback: boolean;
   headers?: Record<string, string>;
   origin_url?: string;
@@ -10,7 +14,10 @@ export interface HostMapEntry {
 export interface Env {
   ARTIFACTS: R2Bucket;
   HOST_MAP: KVNamespace;
+  EDGE_ANALYTICS?: AnalyticsEngineDataset;
   ENVIRONMENT?: string;
+  LOG_INGEST_BASE_URL?: string;
+  LOG_INGEST_KEY?: string;
 }
 
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
@@ -117,13 +124,22 @@ export class PathTraversalError extends Error {
   }
 }
 
-export async function handleRequest(request: Request, env: Env): Promise<Response> {
+export async function handleRequest(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+): Promise<Response> {
+  const started = Date.now();
   const url = new URL(request.url);
   const hostname = url.hostname;
   const hostEntry = await env.HOST_MAP.get<HostMapEntry>(hostname, 'json');
 
   if (!hostEntry?.storage_prefix) {
     return notFound('Host not configured.');
+  }
+
+  if (url.pathname === VITALS_BEACON_PATH) {
+    return handleVitalsBeacon(request, env, ctx, hostEntry, url);
   }
 
   let requestPath: string;
@@ -152,12 +168,18 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 
   if (!object && hostEntry.origin_url && hostEntry.origin_routes?.length) {
     if (pathMatchesOriginRoute(requestPath, hostEntry.origin_routes)) {
-      return proxyToOrigin(request, hostEntry.origin_url);
+      const response = await proxyToOrigin(request, hostEntry.origin_url);
+      recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'origin');
+
+      return response;
     }
   }
 
   if (!object) {
-    return notFound('Object not found.');
+    const response = notFound('Object not found.');
+    recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'miss');
+
+    return response;
   }
 
   const headers = new Headers();
@@ -182,10 +204,202 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     headers.set(name, value);
   }
 
-  return new Response(object.body, {
-    status: 200,
-    headers,
+  const hasIngest = Boolean(env.LOG_INGEST_BASE_URL && env.LOG_INGEST_KEY && hostEntry.site_id);
+  const contentType = headers.get('Content-Type') ?? '';
+  const isHtml = contentType.includes('text/html') || requestPath.endsWith('.html') || requestPath === 'index.html';
+
+  let response: Response;
+
+  if (isHtml && shouldInjectRum(requestPath, hasIngest)) {
+    const html = injectRumScript(await object.text());
+    headers.delete('Content-Length');
+    response = new Response(html, { status: 200, headers });
+  } else {
+    response = new Response(object.body, { status: 200, headers });
+  }
+
+  recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'hit');
+
+  return response;
+}
+
+async function handleVitalsBeacon(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext | undefined,
+  hostEntry: HostMapEntry,
+  url: URL,
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: SECURITY_HEADERS });
+  }
+
+  const task = () => reportVitals(env, request, hostEntry, url);
+
+  if (ctx) {
+    ctx.waitUntil(task());
+  } else {
+    void task();
+  }
+
+  return new Response(null, { status: 204, headers: SECURITY_HEADERS });
+}
+
+async function reportVitals(
+  env: Env,
+  request: Request,
+  hostEntry: HostMapEntry,
+  url: URL,
+): Promise<void> {
+  const baseUrl = (env.LOG_INGEST_BASE_URL ?? '').replace(/\/+$/, '');
+  const ingestKey = env.LOG_INGEST_KEY ?? '';
+
+  if (baseUrl === '' || ingestKey === '' || !hostEntry.site_id) {
+    return;
+  }
+
+  let body: Record<string, unknown>;
+
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+
+  const payload = JSON.stringify({
+    deployment_id: hostEntry.deployment_id,
+    hostname: url.hostname,
+    path: typeof body.path === 'string' ? body.path : '/',
+    lcp_ms: body.lcp_ms ?? null,
+    cls: body.cls ?? null,
+    inp_ms: body.inp_ms ?? null,
+    fcp_ms: body.fcp_ms ?? null,
+    ttfb_ms: body.ttfb_ms ?? null,
+    country: request.headers.get('CF-IPCountry') ?? '',
+    occurred_at: new Date().toISOString(),
   });
+
+  const signature = await hmacSha256Hex(`${hostEntry.site_id}.${payload}`, ingestKey);
+
+  try {
+    await fetch(`${baseUrl}/hooks/edge/${hostEntry.site_id}/vitals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Dply-Signature': signature,
+      },
+      body: payload,
+    });
+  } catch {
+    // Fire-and-forget vitals ingest.
+  }
+}
+
+function recordRequest(
+  ctx: ExecutionContext | undefined,
+  env: Env,
+  request: Request,
+  response: Response,
+  hostEntry: HostMapEntry,
+  url: URL,
+  requestPath: string,
+  started: number,
+  cacheStatus: string,
+): void {
+  const durationMs = Date.now() - started;
+  const task = () => reportRequest(env, request, response, hostEntry, url, requestPath, durationMs, cacheStatus);
+
+  if (ctx) {
+    ctx.waitUntil(task());
+
+    return;
+  }
+
+  void task();
+}
+
+async function reportRequest(
+  env: Env,
+  request: Request,
+  response: Response,
+  hostEntry: HostMapEntry,
+  url: URL,
+  requestPath: string,
+  durationMs: number,
+  cacheStatus: string,
+): Promise<void> {
+  const status = response.status;
+  const bytesHeader = response.headers.get('Content-Length');
+  const bytes = bytesHeader ? Number.parseInt(bytesHeader, 10) : 0;
+
+  if (env.EDGE_ANALYTICS) {
+    try {
+      env.EDGE_ANALYTICS.writeDataPoint({
+        blobs: [
+          hostEntry.site_id ?? '',
+          url.hostname,
+          request.method,
+          url.pathname,
+          cacheStatus,
+        ],
+        doubles: [status, durationMs, Number.isFinite(bytes) ? bytes : 0],
+        indexes: [hostEntry.site_id ?? url.hostname],
+      });
+    } catch {
+      // Non-fatal — delivery must not fail when analytics errors.
+    }
+  }
+
+  const baseUrl = (env.LOG_INGEST_BASE_URL ?? '').replace(/\/+$/, '');
+  const ingestKey = env.LOG_INGEST_KEY ?? '';
+
+  if (baseUrl === '' || ingestKey === '' || !hostEntry.site_id) {
+    return;
+  }
+
+  const payload = JSON.stringify({
+    deployment_id: hostEntry.deployment_id,
+    hostname: url.hostname,
+    method: request.method,
+    path: url.pathname === '' ? '/' : url.pathname,
+    status,
+    duration_ms: durationMs,
+    bytes_egress: Number.isFinite(bytes) ? bytes : 0,
+    country: request.headers.get('CF-IPCountry') ?? '',
+    cache_status: cacheStatus,
+    referrer: request.headers.get('Referer') ?? '',
+    user_agent: request.headers.get('User-Agent') ?? '',
+    occurred_at: new Date().toISOString(),
+  });
+
+  const signature = await hmacSha256Hex(`${hostEntry.site_id}.${payload}`, ingestKey);
+
+  try {
+    await fetch(`${baseUrl}/hooks/edge/${hostEntry.site_id}/log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Dply-Signature': signature,
+      },
+      body: payload,
+    });
+  } catch {
+    // Fire-and-forget ingest.
+  }
+}
+
+async function hmacSha256Hex(message: string, secret: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+
+  return [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function proxyToOrigin(request: Request, originUrl: string): Promise<Response> {

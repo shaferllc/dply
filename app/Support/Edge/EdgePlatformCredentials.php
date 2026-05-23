@@ -84,6 +84,24 @@ class EdgePlatformCredentials
     }
 
     /**
+     * Worker routes must not nest an on-dply apex under another zone (e.g. *.on-dply.dply.host/*).
+     *
+     * @return list<string>
+     */
+    public static function nestedOnDplyWorkerRoutes(): array
+    {
+        $invalid = [];
+
+        foreach (self::workerRoutes() as $route) {
+            if (preg_match('#\*\.on-dply\.[^/]+\.[^/]+/\*#', $route) === 1) {
+                $invalid[] = $route;
+            }
+        }
+
+        return $invalid;
+    }
+
+    /**
      * @return array<string, string>
      */
     private static function requiredStringKeys(): array

@@ -44,12 +44,31 @@
                         <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('All Edge sites') }}
                     </x-outline-link>
-                    @if ($edgeLiveUrl ?? $site->edgeLiveUrl())
-                        <x-outline-link :href="$edgeLiveUrl ?? $site->edgeLiveUrl()" target="_blank">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Open live site') }}
-                        </x-outline-link>
+                    @if ($liveUrlForHeader = ($edgeLiveUrl ?? $site->edgeLiveUrl()))
+                        <a
+                            href="{{ $liveUrlForHeader }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink hover:bg-brand-sand/40"
+                            title="{{ __('Open the live edge site in a new tab') }}"
+                        >
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
+                            {{ preg_replace('#^https?://#', '', $liveUrlForHeader) }}
+                        </a>
                     @endif
+                    @can('update', $site)
+                        <button
+                            type="button"
+                            wire:click="redeployEdge"
+                            wire:loading.attr="disabled"
+                            wire:target="redeployEdge"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="redeployEdge" />
+                            <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
+                            <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
+                        </button>
+                    @endcan
                 @elseif ($readyForWorkspace && $site->workspace)
                     <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
                         <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />

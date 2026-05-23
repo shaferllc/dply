@@ -772,4 +772,25 @@ trait ManagesContainerSite
                 : __('Health check disabled. The backend will drop it on the next roll.'));
         }
     }
+
+    public function refreshHybridStackStatus(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
+        $stack = is_array($container['hybrid_edge_stack'] ?? null) ? $container['hybrid_edge_stack'] : [];
+        if ($stack === []) {
+            return;
+        }
+
+        $status = (string) ($stack['status'] ?? '');
+        if (in_array($status, ['complete', 'failed'], true)) {
+            return;
+        }
+
+        $this->site->refresh();
+    }
 }

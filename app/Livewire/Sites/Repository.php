@@ -7,8 +7,8 @@ namespace App\Livewire\Sites;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SocialAccount;
 use App\Services\Sites\RepositoryWebhookProvisioner;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SiteGitCommitsFetcher;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Services\SourceControl\SourceControlRepositoryReader;
@@ -192,9 +192,7 @@ class Repository extends Component
             return;
         }
 
-        $account = SocialAccount::query()
-            ->where('user_id', auth()->id())
-            ->find($this->connectionAccountId);
+        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $this->connectionAccountId);
         if ($account === null) {
             $this->toastError(__('That source-control account is no longer linked.'));
 
@@ -320,9 +318,7 @@ class Repository extends Component
         $accounts = $user !== null ? $browser->accountsForUser($user) : [];
         $repositories = [];
         if ($user !== null && $this->connectionAccountId !== '') {
-            $account = SocialAccount::query()
-                ->where('user_id', $user->id)
-                ->find($this->connectionAccountId);
+            $account = app(GitIdentityResolver::class)->forId($user, $this->connectionAccountId);
             if ($account !== null) {
                 $repositories = $browser->repositoriesForAccount($account);
             }

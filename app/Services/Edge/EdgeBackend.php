@@ -22,6 +22,14 @@ interface EdgeBackend
      */
     public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array;
 
+    /**
+     * Re-point routing at an existing deployment's already-stored artifacts (rollback).
+     * Does not re-upload — artifacts must already be present in storage.
+     *
+     * @return array{live_url: ?string, cf_kv_version: int}
+     */
+    public function republishDeployment(EdgeDeployment $deployment, Site $site): array;
+
     public function unpublish(Site $site): void;
 
     /**

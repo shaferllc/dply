@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy;
 
-use App\Models\SocialAccount;
+use App\Models\User;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
@@ -13,6 +14,7 @@ final class ServerlessRepositoryCheckout
 {
     public function __construct(
         private readonly SourceControlRepositoryBrowser $repositoryBrowser,
+        private readonly GitIdentityResolver $resolver = new GitIdentityResolver,
     ) {}
 
     /**
@@ -105,15 +107,17 @@ final class ServerlessRepositoryCheckout
             return $this->normalizeRepositoryUrl($repositoryUrl);
         }
 
-        $account = SocialAccount::query()
-            ->where('user_id', $userId)
-            ->find($accountId);
-
-        if (! $account) {
+        $user = User::query()->find($userId);
+        if ($user === null) {
             throw new \RuntimeException('The selected source-control account could not be found.');
         }
 
-        return $this->repositoryBrowser->authenticatedCloneUrl($account, $repositoryUrl);
+        $identity = $this->resolver->forId($user, $accountId);
+        if ($identity === null) {
+            throw new \RuntimeException('The selected source-control account could not be found.');
+        }
+
+        return $this->repositoryBrowser->authenticatedCloneUrl($identity, $repositoryUrl);
     }
 
     /**

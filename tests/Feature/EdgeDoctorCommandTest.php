@@ -62,6 +62,16 @@ test('doctor verifies cloudflare token when configured', function () {
             'success' => true,
             'result' => ['status' => 'active'],
         ]),
+        'api.cloudflare.com/client/v4/zones*' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone123', 'name' => 'on-dply.site']],
+        ]),
+    ]);
+
+    config([
+        'edge.testing_domains' => ['on-dply.site'],
+        'edge.cloudflare.worker_zone_name' => 'on-dply.site',
+        'edge.cloudflare.worker_routes' => ['*.on-dply.site/*'],
     ]);
 
     $exit = Artisan::call('dply:edge:doctor', ['--json' => true]);
@@ -69,4 +79,39 @@ test('doctor verifies cloudflare token when configured', function () {
 
     expect($exit)->toBe(0);
     expect($payload['ok'] ?? false)->toBeTrue();
+    expect(collect($payload['checks'] ?? [])->pluck('name'))->toContain('edge_usage_analytics');
+});
+
+test('doctor flags nested on-dply worker routes', function () {
+    config([
+        'edge.fake.enabled' => false,
+        'app.env' => 'production',
+        'edge.r2.bucket' => 'dply-edge-artifacts',
+        'edge.r2.key' => 'key',
+        'edge.r2.secret' => 'secret',
+        'edge.r2.endpoint' => 'https://acct.r2.cloudflarestorage.com',
+        'edge.cloudflare.account_id' => 'acct',
+        'edge.cloudflare.api_token' => 'token',
+        'edge.cloudflare.kv_namespace_id' => 'kv123',
+        'edge.cloudflare.worker_routes' => ['*.on-dply.dply.host/*'],
+        'edge.testing_domains' => ['on-dply.site'],
+        'edge.cloudflare.worker_zone_name' => 'on-dply.site',
+    ]);
+
+    Http::fake([
+        'api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => true,
+            'result' => ['status' => 'active'],
+        ]),
+        'api.cloudflare.com/client/v4/zones*' => Http::response([
+            'success' => true,
+            'result' => [],
+        ]),
+    ]);
+
+    $exit = Artisan::call('dply:edge:doctor', ['--json' => true]);
+    $payload = json_decode(Artisan::output(), true);
+
+    expect($exit)->toBe(1);
+    expect(collect($payload['checks'] ?? [])->firstWhere('name', 'edge_worker_routes')['ok'] ?? true)->toBeFalse();
 });

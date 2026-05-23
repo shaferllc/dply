@@ -6,7 +6,9 @@ namespace App\Jobs;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Services\Edge\EdgeDeploymentPruner;
 use App\Services\Edge\EdgeRouter;
+use App\Services\Edge\EdgeTestingHostnameProvisioner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -80,6 +82,18 @@ class PublishEdgeDeploymentJob implements ShouldQueue
                 'edge_backend_id' => (string) ($site->edge_backend_id ?: $deployment->id),
                 'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
             ]);
+
+            try {
+                app(EdgeTestingHostnameProvisioner::class)->provision($site->fresh());
+            } catch (Throwable) {
+                // DNS is best-effort — KV publish already succeeded.
+            }
+
+            try {
+                app(EdgeDeploymentPruner::class)->prune($site->fresh());
+            } catch (Throwable) {
+                // Pruning is best-effort — old artifacts will be retried next publish.
+            }
         } catch (Throwable $e) {
             $this->markFailed($site, $deployment, $e->getMessage());
 

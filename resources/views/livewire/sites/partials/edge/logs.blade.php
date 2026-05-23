@@ -1,7 +1,12 @@
+<div class="space-y-6">
+    @include('livewire.sites.partials.edge.observability-nav', ['activeObservabilitySection' => 'logs'])
+
+    @include('livewire.sites.partials.edge.logs-callout')
+
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Build & deploy activity') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Recent Edge deployments and build status for this site.') }}</p>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Build & deploy logs') }}</h3>
+        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Recent Edge deployments and build output. For CDN visitor traffic, open Traffic & analytics.') }}</p>
     </div>
 
     @php
@@ -60,3 +65,4 @@
 </section>
 
 @include('livewire.sites.partials.edge.deploys-table', ['compact' => false])
+</div>

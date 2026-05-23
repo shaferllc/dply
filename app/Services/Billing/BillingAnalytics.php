@@ -1,0 +1,610 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Billing;
+
+use App\Enums\ServerTier;
+use App\Models\BillingSubscriptionSyncEvent;
+use App\Models\EdgeUsageSnapshot;
+use App\Models\Organization;
+use App\Models\OrganizationBillingSnapshot;
+use App\Models\Server;
+use App\Models\Site;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Laravel\Cashier\Invoice;
+use Throwable;
+
+/**
+ * Aggregates billing analytics for the org billing dashboard — current
+ * estimates, category breakdown, Edge usage history, and Stripe invoices.
+ */
+final class BillingAnalytics
+{
+    public function __construct(
+        private readonly OrganizationBillingStateComputer $billingStateComputer,
+        private readonly EdgeOrganizationUsageReader $edgeUsageReader,
+        private readonly EdgeSiteBillingAnalytics $edgeSiteBillingAnalytics,
+        private readonly BillingForecastCalculator $forecastCalculator,
+    ) {}
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function forOrganization(Organization $organization): array
+    {
+        $state = $this->billingStateComputer->compute($organization);
+        $spendTrend = $this->spendTrend($organization);
+        $snapshotThirtyDaysAgo = $this->snapshotThirtyDaysAgo($organization);
+
+        return [
+            'summary' => $this->summary($organization, $state),
+            'forecast' => $this->forecast($organization, $state, $snapshotThirtyDaysAgo),
+            'spend_trend' => $spendTrend,
+            'category_breakdown' => $this->categoryBreakdown($state),
+            'line_items' => $this->lineItems($state),
+            'edge_usage_daily' => $this->edgeUsageDaily($organization, $state->edgeCount, 30),
+            'edge_sites' => $this->edgeSiteBillingAnalytics->sitesForOrganization($organization),
+            'sync_events' => $this->recentSyncEvents($organization),
+            'invoice_history' => $this->invoiceHistory($organization),
+            'managed_products' => $this->managedProducts($organization),
+            'billable_servers' => $this->billableServersList($organization),
+            'excluded_servers' => $this->excludedServersList($organization),
+            'subscription' => $this->subscriptionSnapshot($organization),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function summary(Organization $organization, DesiredBillingState $state): array
+    {
+        $interval = $this->subscriptionInterval($organization);
+        $monthlyCents = $state->monthlyTotalCents;
+        $annualPct = (int) config('subscription.standard.annual_discount_pct', 20);
+        $yearlyCents = (int) round($monthlyCents * 12 * (100 - $annualPct) / 100);
+
+        return [
+            'monthly_total_cents' => $monthlyCents,
+            'yearly_total_cents' => $yearlyCents,
+            'daily_run_rate_cents' => (int) round($monthlyCents / 30),
+            'interval' => $interval,
+            'on_trial' => $organization->onDplyTrial(),
+            'trial_days_left' => $organization->trial_ends_at
+                ? max(0, (int) ceil(now()->diffInDays($organization->trial_ends_at, false)))
+                : 0,
+            'subscribed' => $organization->subscription('default')?->valid() ?? false,
+            'stripe_status' => $organization->subscription('default')?->stripe_status,
+            'next_invoice_at' => $this->nextInvoiceAt($organization)?->toDateString(),
+            'server_count' => $state->serverCount(),
+            'serverless_count' => $state->serverlessCount,
+            'cloud_count' => $state->cloudCount,
+            'edge_count' => $state->edgeCount,
+        ];
+    }
+
+    /**
+     * @return list<array{key: string, label: string, cents: int, color: string}>
+     */
+    private function categoryBreakdown(DesiredBillingState $state): array
+    {
+        $segments = [
+            ['key' => 'base', 'label' => __('Base'), 'cents' => $state->baseCents, 'color' => 'bg-brand-ink/80'],
+        ];
+
+        $tierColors = [
+            'xs' => 'bg-brand-sage/70',
+            's' => 'bg-brand-sage',
+            'm' => 'bg-brand-forest/80',
+            'l' => 'bg-brand-gold',
+            'xl' => 'bg-brand-rust/80',
+        ];
+
+        foreach (ServerTier::ordered() as $tier) {
+            $qty = $state->quantityFor($tier);
+            if ($qty <= 0) {
+                continue;
+            }
+            $unit = (int) (config('subscription.standard.tiers.'.$tier->value) ?? 0);
+            $segments[] = [
+                'key' => $tier->value,
+                'label' => strtoupper($tier->value).' × '.$qty,
+                'cents' => $unit * $qty,
+                'color' => $tierColors[$tier->value] ?? 'bg-brand-moss',
+            ];
+        }
+
+        if ($state->serverlessSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'serverless',
+                'label' => __('Serverless').' × '.$state->serverlessCount,
+                'cents' => $state->serverlessSubtotalCents,
+                'color' => 'bg-violet-500/70',
+            ];
+        }
+
+        if ($state->cloudSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'cloud',
+                'label' => __('Cloud').' × '.$state->cloudCount,
+                'cents' => $state->cloudSubtotalCents,
+                'color' => 'bg-sky-500/70',
+            ];
+        }
+
+        if ($state->edgeSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'edge',
+                'label' => __('Edge').' × '.$state->edgeCount,
+                'cents' => $state->edgeSubtotalCents,
+                'color' => 'bg-emerald-500/70',
+            ];
+        }
+
+        if ($state->edgeUsageSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'edge_usage',
+                'label' => __('Edge delivery usage'),
+                'cents' => $state->edgeUsageSubtotalCents,
+                'color' => 'bg-brand-sage/50',
+            ];
+        }
+
+        return $segments;
+    }
+
+    /**
+     * @return list<array{label: string, quantity: int, unit_cents: int, line_cents: int, detail: ?string}>
+     */
+    private function lineItems(DesiredBillingState $state): array
+    {
+        $tierPrices = (array) config('subscription.standard.tiers', []);
+
+        $items = [[
+            'label' => __('dply base'),
+            'quantity' => 1,
+            'unit_cents' => $state->baseCents,
+            'line_cents' => $state->baseCents,
+            'detail' => null,
+        ]];
+
+        foreach (ServerTier::ordered() as $tier) {
+            $qty = $state->quantityFor($tier);
+            if ($qty <= 0) {
+                continue;
+            }
+            $unit = (int) ($tierPrices[$tier->value] ?? 0);
+            $items[] = [
+                'label' => __('dply server — :tier', ['tier' => strtoupper($tier->value)]),
+                'quantity' => $qty,
+                'unit_cents' => $unit,
+                'line_cents' => $unit * $qty,
+                'detail' => null,
+            ];
+        }
+
+        if ($state->serverlessCount > 0) {
+            $unit = (int) config('subscription.standard.serverless_cents', 200);
+            $items[] = [
+                'label' => __('dply serverless function'),
+                'quantity' => $state->serverlessCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->serverlessSubtotalCents,
+                'detail' => null,
+            ];
+        }
+
+        if ($state->cloudCount > 0) {
+            $unit = (int) config('subscription.standard.cloud_cents', 500);
+            $items[] = [
+                'label' => __('dply Cloud app'),
+                'quantity' => $state->cloudCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->cloudSubtotalCents,
+                'detail' => null,
+            ];
+        }
+
+        if ($state->edgeCount > 0) {
+            $unit = (int) config('subscription.standard.edge_cents', 200);
+            $items[] = [
+                'label' => __('dply Edge site'),
+                'quantity' => $state->edgeCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->edgeSubtotalCents,
+                'detail' => null,
+            ];
+        }
+
+        if ($state->edgeUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply Edge delivery usage'),
+                'quantity' => 1,
+                'unit_cents' => $state->edgeUsageSubtotalCents,
+                'line_cents' => $state->edgeUsageSubtotalCents,
+                'detail' => $this->formatEdgeUsageDetail($state->edgeUsageEstimate),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return list<array{date: string, label: string, requests: int, bytes_egress: int, cost_cents: int}>
+     */
+    private function edgeUsageDaily(Organization $organization, int $edgeSiteCount, int $days): array
+    {
+        $start = now()->subDays(max(1, $days - 1))->startOfDay();
+
+        $rows = EdgeUsageSnapshot::query()
+            ->where('organization_id', $organization->id)
+            ->where('period_start', '>=', $start->toDateString())
+            ->groupBy('period_start')
+            ->orderBy('period_start')
+            ->get([
+                'period_start',
+                DB::raw('COALESCE(SUM(requests), 0) as requests'),
+                DB::raw('COALESCE(SUM(bytes_egress), 0) as bytes_egress'),
+                DB::raw('COALESCE(MAX(r2_storage_bytes), 0) as r2_storage_bytes'),
+                DB::raw('COALESCE(SUM(r2_class_a_ops), 0) as r2_class_a_ops'),
+                DB::raw('COALESCE(SUM(r2_class_b_ops), 0) as r2_class_b_ops'),
+            ]);
+
+        $calculator = app(EdgeUsageCostCalculator::class);
+        $edgeSiteCount = max(1, $edgeSiteCount);
+        $series = [];
+
+        foreach ($rows as $row) {
+            $totals = new EdgeUsageTotals(
+                requests: (int) $row->requests,
+                bytesEgress: (int) $row->bytes_egress,
+                r2StorageBytes: (int) $row->r2_storage_bytes,
+                r2ClassAOps: (int) $row->r2_class_a_ops,
+                r2ClassBOps: (int) $row->r2_class_b_ops,
+            );
+            $date = (string) $row->period_start;
+
+            $series[] = [
+                'date' => $date,
+                'label' => Carbon::parse($date)->format('M j'),
+                'requests' => $totals->requests,
+                'bytes_egress' => $totals->bytesEgress,
+                'cost_cents' => $calculator->estimate($totals, max(1, $edgeSiteCount))['subtotal_cents'],
+            ];
+        }
+
+        return $series;
+    }
+
+    /**
+     * @return array{
+     *     series_30: list<array{date: string, label: string, total_cents: int, edge_usage_cents: int}>,
+     *     series_90: list<array{date: string, label: string, total_cents: int, edge_usage_cents: int}>
+     * }
+     */
+    private function spendTrend(Organization $organization): array
+    {
+        $start = now()->subDays(89)->toDateString();
+        $rows = OrganizationBillingSnapshot::query()
+            ->where('organization_id', $organization->id)
+            ->where('snapshot_date', '>=', $start)
+            ->orderBy('snapshot_date')
+            ->get(['snapshot_date', 'monthly_total_cents', 'edge_usage_cents']);
+
+        $points = $rows->map(function (OrganizationBillingSnapshot $snapshot): array {
+            $date = $snapshot->snapshot_date?->toDateString() ?? now()->toDateString();
+
+            return [
+                'date' => $date,
+                'label' => Carbon::parse($date)->format('M j'),
+                'total_cents' => (int) $snapshot->monthly_total_cents,
+                'edge_usage_cents' => (int) $snapshot->edge_usage_cents,
+            ];
+        })->values()->all();
+
+        return [
+            'series_30' => array_values(array_slice($points, -30)),
+            'series_90' => $points,
+        ];
+    }
+
+    /**
+     * @return array<string, int|null|string>
+     */
+    private function forecast(
+        Organization $organization,
+        DesiredBillingState $state,
+        ?OrganizationBillingSnapshot $snapshotThirtyDaysAgo,
+    ): array {
+        $interval = $this->subscriptionInterval($organization);
+
+        return $this->forecastCalculator->calculate(
+            state: $state,
+            subscriptionInterval: $interval,
+            snapshotThirtyDaysAgo: $snapshotThirtyDaysAgo,
+        );
+    }
+
+    /**
+     * @return list<array{
+     *     created_at: string,
+     *     trigger: string,
+     *     status: string,
+     *     monthly_total_cents: int,
+     *     change_count: int,
+     *     error_message: ?string
+     * }>
+     */
+    private function recentSyncEvents(Organization $organization): array
+    {
+        return BillingSubscriptionSyncEvent::query()
+            ->where('organization_id', $organization->id)
+            ->orderByDesc('created_at')
+            ->limit(15)
+            ->get(['trigger', 'status', 'changes', 'monthly_total_cents', 'error_message', 'created_at'])
+            ->map(function (BillingSubscriptionSyncEvent $event): array {
+                $changes = is_array($event->changes) ? $event->changes : [];
+
+                return [
+                    'created_at' => $event->created_at?->toDateTimeString() ?? '',
+                    'trigger' => (string) $event->trigger,
+                    'status' => (string) $event->status,
+                    'monthly_total_cents' => (int) $event->monthly_total_cents,
+                    'change_count' => count($changes),
+                    'error_message' => is_string($event->error_message) && $event->error_message !== ''
+                        ? $event->error_message
+                        : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function snapshotThirtyDaysAgo(Organization $organization): ?OrganizationBillingSnapshot
+    {
+        return OrganizationBillingSnapshot::query()
+            ->where('organization_id', $organization->id)
+            ->where('snapshot_date', '<=', now()->subDays(30)->toDateString())
+            ->orderByDesc('snapshot_date')
+            ->first();
+    }
+
+    /**
+     * @return list<array{id: string, number: ?string, date: string, total_cents: int, status: string, paid: bool}>
+     */
+    private function invoiceHistory(Organization $organization): array
+    {
+        if (! $organization->hasStripeId()) {
+            return [];
+        }
+
+        try {
+            /** @var Collection<int, Invoice> $invoices */
+            $invoices = $organization->invoices(false, ['limit' => 24]);
+        } catch (Throwable) {
+            return [];
+        }
+
+        return $invoices->map(function (Invoice $invoice): array {
+            return [
+                'id' => (string) $invoice->asStripeInvoice()->id,
+                'number' => $invoice->number(),
+                'date' => $invoice->date()?->toDateString() ?? '',
+                'total_cents' => (int) $invoice->rawTotal(),
+                'status' => (string) ($invoice->asStripeInvoice()->status ?? 'unknown'),
+                'paid' => $invoice->asStripeInvoice()->paid ?? false,
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * @return array{serverless: list<array>, cloud: list<array>, edge: list<array>}
+     */
+    private function managedProducts(Organization $organization): array
+    {
+        $sites = $organization->sites()->orderBy('name')->get();
+
+        $serverless = [];
+        $cloud = [];
+        $edge = [];
+
+        foreach ($sites as $site) {
+            if ($site->status === Site::STATUS_FUNCTIONS_ACTIVE) {
+                $serverless[] = [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'status' => $site->status,
+                    'unit_cents' => (int) config('subscription.standard.serverless_cents', 200),
+                ];
+            }
+
+            if ($site->status === Site::STATUS_CONTAINER_ACTIVE && $site->isDplyCloudSite() && ! $site->isCloudPreview()) {
+                $cloud[] = [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'live_url' => $site->containerLiveUrl(),
+                    'unit_cents' => (int) config('subscription.standard.cloud_cents', 500),
+                ];
+            }
+
+            if ($site->status === Site::STATUS_EDGE_ACTIVE && $site->edge_backend === 'dply_edge' && ! $site->isEdgePreview()) {
+                $edge[] = [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'live_url' => $site->edgeLiveUrl(),
+                    'unit_cents' => (int) config('subscription.standard.edge_cents', 200),
+                ];
+            }
+        }
+
+        return compact('serverless', 'cloud', 'edge');
+    }
+
+    /**
+     * @return list<array{id: string, name: string, reason: string}>
+     */
+    private function excludedServersList(Organization $organization): array
+    {
+        return $this->excludedServers($organization)
+            ->map(fn (array $row): array => [
+                'id' => (string) $row['server']->id,
+                'name' => (string) $row['server']->name,
+                'reason' => (string) $row['reason'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: string, name: string, tier: string, monthly_cents: int}>
+     */
+    private function billableServersList(Organization $organization): array
+    {
+        return $this->billableServers($organization)
+            ->map(function (Server $server): array {
+                $tier = $server->billingTier();
+
+                return [
+                    'id' => (string) $server->id,
+                    'name' => (string) $server->name,
+                    'tier' => strtoupper($tier->value),
+                    'monthly_cents' => (int) (config('subscription.standard.tiers.'.$tier->value) ?? 0),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    private function billableServers(Organization $organization): Collection
+    {
+        $minAge = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
+
+        return $organization->servers()
+            ->where('status', Server::STATUS_READY)
+            ->where('created_at', '<=', now()->subDays($minAge))
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (Server $server): bool => $server->isManagedProductHost())
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{server: Server, reason: string}>
+     */
+    private function excludedServers(Organization $organization): Collection
+    {
+        $minAge = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
+        $cutoff = now()->subDays($minAge);
+        $billableIds = $this->billableServers($organization)->pluck('id')->all();
+
+        return $organization->servers()
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (Server $s) => in_array($s->id, $billableIds, true))
+            ->map(function (Server $server) use ($cutoff, $minAge): array {
+                $reason = match (true) {
+                    $server->isManagedProductHost() => match (true) {
+                        $server->isDplyCloudHost() => __('Billed as dply Cloud app'),
+                        $server->isDplyEdgeHost() => __('Billed as dply Edge site'),
+                        $server->isServerlessHost() => __('Billed as serverless function'),
+                        default => __('Billed as managed product'),
+                    },
+                    $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
+                    $server->created_at !== null && $server->created_at->gt($cutoff) => __('Under the :days-day billable threshold', ['days' => $minAge]),
+                    default => __('Excluded'),
+                };
+
+                return ['server' => $server, 'reason' => $reason];
+            })
+            ->values();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function subscriptionSnapshot(Organization $organization): array
+    {
+        $subscription = $organization->subscription('default');
+
+        if ($subscription === null) {
+            return [
+                'active' => false,
+                'items' => [],
+            ];
+        }
+
+        $items = [];
+        foreach ($subscription->items as $item) {
+            $items[] = [
+                'price_id' => $item->stripe_price,
+                'quantity' => (int) $item->quantity,
+            ];
+        }
+
+        return [
+            'active' => $subscription->valid(),
+            'status' => $subscription->stripe_status,
+            'on_grace_period' => $subscription->onGracePeriod(),
+            'ends_at' => $subscription->ends_at?->toDateString(),
+            'interval' => $this->subscriptionInterval($organization),
+            'items' => $items,
+        ];
+    }
+
+    private function subscriptionInterval(Organization $organization): ?string
+    {
+        $sub = $organization->subscription('default');
+        if ($sub === null) {
+            return null;
+        }
+
+        $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
+        if ($yearlyBase !== '' && $sub->hasPrice($yearlyBase)) {
+            return 'year';
+        }
+
+        return 'month';
+    }
+
+    private function nextInvoiceAt(Organization $organization): ?CarbonInterface
+    {
+        if ($organization->subscription('default') === null) {
+            return null;
+        }
+
+        try {
+            return $organization->upcomingInvoice()?->date();
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $estimate
+     */
+    private function formatEdgeUsageDetail(array $estimate): ?string
+    {
+        $requests = (int) ($estimate['requests'] ?? 0);
+        $egress = (int) ($estimate['bytes_egress'] ?? 0);
+
+        if ($requests === 0 && $egress === 0) {
+            return null;
+        }
+
+        $parts = [];
+        if ($requests > 0) {
+            $parts[] = number_format($requests).' '.__('requests');
+        }
+        if ($egress > 0) {
+            $parts[] = number_format($egress / (1024 ** 3), 2).' GB '.__('egress');
+        }
+
+        return implode(' · ', $parts);
+    }
+}

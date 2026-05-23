@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Edge;
 
-use App\Jobs\PublishEdgeDeploymentJob;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
-use App\Support\Edge\FakeEdgeProvision;
+use App\Services\Edge\EdgeRouter;
 
 class RollbackEdgeDeployment
 {
@@ -34,27 +33,44 @@ class RollbackEdgeDeployment
             throw new \RuntimeException('That deployment is already live.');
         }
 
-        $artifactDir = $this->resolveArtifactDir($deployment);
-        if ($artifactDir === null || ! is_dir($artifactDir)) {
-            throw new \RuntimeException('Stored build artifacts for that deployment are no longer available.');
+        if ($deployment->storage_prefix === null) {
+            $short = substr((string) $deployment->git_commit, 0, 7);
+            $ref = $short !== '' ? $short : $deployment->id;
+            throw new \RuntimeException(
+                'Artifacts for that deployment were pruned. Use "Deploy a specific commit" to rebuild from '.$ref.'.'
+            );
         }
 
-        PublishEdgeDeploymentJob::dispatch($deployment->id, $artifactDir);
-
-        return $deployment;
-    }
-
-    private function resolveArtifactDir(EdgeDeployment $deployment): ?string
-    {
-        if (! FakeEdgeProvision::enabled()) {
-            return null;
+        $backend = EdgeRouter::backendFor($site);
+        if ($backend === null) {
+            throw new \RuntimeException('No edge backend available for this site.');
         }
 
-        $path = rtrim(FakeEdgeProvision::storageRoot(), '/').'/'.trim($deployment->storage_prefix, '/');
-        if (! is_dir($path)) {
-            return null;
-        }
+        $result = $backend->republishDeployment($deployment, $site);
 
-        return $path;
+        EdgeDeployment::query()
+            ->where('site_id', $site->id)
+            ->where('status', EdgeDeployment::STATUS_LIVE)
+            ->update(['status' => EdgeDeployment::STATUS_SUPERSEDED]);
+
+        $deployment->update([
+            'status' => EdgeDeployment::STATUS_LIVE,
+            'published_at' => now(),
+            'cf_kv_version' => $result['cf_kv_version'],
+        ]);
+
+        $meta = $site->edgeMeta();
+        $meta['active_deployment_id'] = $deployment->id;
+        if (is_string($result['live_url'] ?? null) && $result['live_url'] !== '') {
+            $meta['live_url'] = $result['live_url'];
+        }
+        unset($meta['last_error'], $meta['last_error_at']);
+
+        $site->update([
+            'status' => Site::STATUS_EDGE_ACTIVE,
+            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+        ]);
+
+        return $deployment->refresh();
     }
 }

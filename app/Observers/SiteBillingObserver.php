@@ -53,6 +53,6 @@ class SiteBillingObserver
             return;
         }
 
-        SyncOrganizationBillingJob::dispatch($organizationId);
+        SyncOrganizationBillingJob::dispatch($organizationId, 'site_lifecycle');
     }
 }

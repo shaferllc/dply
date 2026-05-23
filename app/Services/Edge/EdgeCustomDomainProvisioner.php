@@ -61,6 +61,7 @@ final class EdgeCustomDomainProvisioner
                 'mode' => 'manual',
                 'dns_status' => 'pending',
                 'cname_target' => $edgeHost,
+                'analytics_zone' => Site::deriveRegistrableDomain($hostname),
                 'attached_at' => now()->toIso8601String(),
                 'error' => null,
             ]);
@@ -72,6 +73,7 @@ final class EdgeCustomDomainProvisioner
                 'mode' => 'manual',
                 'dns_status' => 'pending',
                 'cname_target' => $edgeHost,
+                'analytics_zone' => Site::deriveRegistrableDomain($hostname),
                 'attached_at' => now()->toIso8601String(),
                 'error' => null,
             ]);
@@ -91,6 +93,7 @@ final class EdgeCustomDomainProvisioner
                 'dns_status' => 'ready',
                 'cname_target' => $edgeHost,
                 'zone' => $zone,
+                'analytics_zone' => $zone,
                 'record_name' => $recordName,
                 'attached_at' => now()->toIso8601String(),
                 'verified_at' => now()->toIso8601String(),

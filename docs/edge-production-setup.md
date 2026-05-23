@@ -24,7 +24,7 @@ Customer Cloudflare tokens connected for DNS-only scopes are **not** sufficient 
   - Account → Workers Scripts → Edit
   - Account → Workers KV Storage → Edit
   - Account → Workers R2 Storage → Edit
-- Wildcard DNS for preview domains (e.g. `*.dply.host`) routed to the Worker zone
+- Wildcard DNS for Edge delivery domains (e.g. `*.on-dply.site`) routed to the Worker zone
 - Queue workers with **Docker** available for `BuildEdgeSiteJob`
 
 ## 1. Bootstrap R2 + KV (API)
@@ -75,9 +75,9 @@ DPLY_EDGE_CF_ACCOUNT_ID=...
 DPLY_EDGE_CF_API_TOKEN=...
 DPLY_EDGE_CF_KV_NAMESPACE_ID=...
 DPLY_EDGE_CF_WORKER_SCRIPT=dply-edge
-DPLY_EDGE_CF_ZONE_NAME=dply.host
-DPLY_EDGE_CF_WORKER_ROUTES=*.dply.host/*
-DPLY_EDGE_TESTING_DOMAINS=dply.host
+DPLY_EDGE_CF_ZONE_NAME=on-dply.site
+DPLY_EDGE_CF_WORKER_ROUTES=*.on-dply.site/*
+DPLY_EDGE_TESTING_DOMAINS=on-dply.site
 ```
 
 `DPLY_EDGE_R2_ENDPOINT` is optional when `DPLY_EDGE_CF_ACCOUNT_ID` is set — Laravel derives `https://{account_id}.r2.cloudflarestorage.com`.
@@ -118,7 +118,7 @@ Point Edge preview hostnames at Cloudflare:
 
 | Record | Value |
 |--------|--------|
-| `*.dply.host` | Worker route (via `DPLY_EDGE_CF_WORKER_ROUTES`) or CNAME to Worker |
+| `*.on-dply.site` | Worker route (via `DPLY_EDGE_CF_WORKER_ROUTES`) or CNAME to Worker |
 
 When `DPLY_EDGE_CF_ZONE_NAME` + `DPLY_EDGE_CF_WORKER_ROUTES` are set, `edge:worker:deploy` attaches routes automatically.
 
@@ -141,7 +141,7 @@ Ensure queue workers can run `docker run` (socket mounted or remote builder).
 1. Enable `FEATURE_SURFACE_EDGE=true`
 2. Create an Edge site from git (static/SSG repo) — choose **Dply Edge (managed)** on the create form
 3. Confirm deployment reaches **live** in site workspace
-4. Open `{slug}.dply.host` — Worker serves R2 artifacts
+4. Open `{slug}.on-dply.site` — Worker serves R2 artifacts
 5. Redeploy → new immutable prefix; KV pointer updates
 
 ---

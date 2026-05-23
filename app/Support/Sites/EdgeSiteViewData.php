@@ -33,7 +33,7 @@ final class EdgeSiteViewData
         $edgeWebhookMeta = is_array($edgeMeta['webhook'] ?? null) ? $edgeMeta['webhook'] : null;
         $edgeGithubWebhookConnected = is_array($edgeWebhookMeta) && ($edgeWebhookMeta['hook_id'] ?? null) !== null;
         $edgeWebhookLastEventAt = is_array($edgeWebhookMeta) ? ($edgeWebhookMeta['last_event_at'] ?? null) : null;
-        $edgeSpaFallback = (bool) ($edgeMeta['spa_fallback'] ?? true);
+        $edgeSpaFallback = (bool) (($edgeMeta['routing']['spa_fallback'] ?? null) ?? ($edgeMeta['spa_fallback'] ?? true));
         $edgeRuntimeMode = (string) ($edgeMeta['runtime_mode'] ?? 'static');
         $edgeOrigin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : null;
         $edgeAttachedDomains = is_array($edgeMeta['routing']['custom_domains'] ?? null) ? $edgeMeta['routing']['custom_domains'] : [];

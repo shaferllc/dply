@@ -36,4 +36,9 @@ readonly class EdgeUsageTotals
             && $this->r2ClassAOps === 0
             && $this->r2ClassBOps === 0;
     }
+
+    public static function empty(): self
+    {
+        return new self;
+    }
 }

@@ -22,6 +22,8 @@
     };
 @endphp
 
+@include('livewire.sites.partials.hybrid-edge-stack-panel')
+
 <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div>

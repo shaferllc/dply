@@ -33,7 +33,9 @@ return [
         'edge-domains' => ['label' => 'Domains'],
         'edge-build' => ['label' => 'Build settings'],
         'edge-previews' => ['label' => 'Previews'],
-        'edge-logs' => ['label' => 'Logs & activity'],
+        'edge-traffic' => ['label' => 'Traffic & analytics'],
+        'edge-billing' => ['label' => 'Billing & usage'],
+        'edge-logs' => ['label' => 'Build & deploy logs'],
     ],
 
     /*

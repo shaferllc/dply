@@ -160,9 +160,19 @@ final class SiteSettingsHeader
                 'description' => __('Branch preview deployments created from pull requests — each gets its own Edge URL.'),
                 'icon' => 'heroicon-o-sparkles',
             ],
+            'edge-billing' => [
+                'title' => __('Billing & usage'),
+                'description' => __('Platform fee, delivery usage, and request/egress stats for this Edge site.'),
+                'icon' => 'heroicon-o-chart-bar',
+            ],
+            'edge-traffic' => [
+                'title' => __('Traffic & analytics'),
+                'description' => __('CDN request and bandwidth stats from daily Cloudflare zone analytics — not real-time HTTP access logs.'),
+                'icon' => 'heroicon-o-signal',
+            ],
             'edge-logs' => [
-                'title' => __('Logs & activity'),
-                'description' => __('Recent build output and deployment activity for this Edge site.'),
+                'title' => __('Build & deploy logs'),
+                'description' => __('Recent build output and deployment activity — not HTTP visitor access logs.'),
                 'icon' => 'heroicon-o-clipboard-document-list',
             ],
             'danger' => [

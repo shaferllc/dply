@@ -26,6 +26,19 @@ class FakeEdgeBackend implements EdgeBackend
         File::ensureDirectoryExists($dest);
         File::copyDirectory($localArtifactDir, $dest);
 
+        return $this->writeHostMap($deployment, $site);
+    }
+
+    public function republishDeployment(EdgeDeployment $deployment, Site $site): array
+    {
+        return $this->writeHostMap($deployment, $site);
+    }
+
+    /**
+     * @return array{live_url: string, cf_kv_version: int}
+     */
+    private function writeHostMap(EdgeDeployment $deployment, Site $site): array
+    {
         $hostname = $site->edgeHostname();
         $routing = $this->routingPayload($deployment, $site);
         $map = $this->hostMap();
@@ -36,12 +49,9 @@ class FakeEdgeBackend implements EdgeBackend
         }
         Cache::put($this->hostMapKey(), $map, now()->addDay());
 
-        $liveUrl = 'https://'.$hostname;
-        $version = (int) $deployment->cf_kv_version + 1;
-
         return [
-            'live_url' => $liveUrl,
-            'cf_kv_version' => $version,
+            'live_url' => 'https://'.$hostname,
+            'cf_kv_version' => (int) $deployment->cf_kv_version + 1,
         ];
     }
 

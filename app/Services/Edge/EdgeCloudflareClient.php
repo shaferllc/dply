@@ -148,12 +148,18 @@ class EdgeCloudflareClient
         array $hostnames,
         CarbonInterface $periodStart,
         CarbonInterface $periodEnd,
+        ?string $zoneName = null,
     ): Collection {
         if ($hostnames === [] || ! $this->canCollectAnalytics()) {
             return collect();
         }
 
-        $zoneId = $this->resolveZoneId((string) config('edge.cloudflare.worker_zone_name'));
+        $zoneName = strtolower(trim($zoneName ?? (string) config('edge.cloudflare.worker_zone_name')));
+        if ($zoneName === '') {
+            throw new RuntimeException('Could not resolve Cloudflare zone for Edge analytics.');
+        }
+
+        $zoneId = $this->resolveZoneId($zoneName);
         if ($zoneId === null) {
             throw new RuntimeException('Could not resolve Cloudflare zone for Edge analytics.');
         }
@@ -167,8 +173,9 @@ class EdgeCloudflareClient
                 filter: { datetime_geq: $since, datetime_leq: $until }
                 orderBy: [count_DESC]
               ) {
+                count
                 dimensions { clientRequestHTTPHost }
-                sum { requests edgeResponseBytes }
+                sum { edgeResponseBytes }
               }
             }
           }
@@ -221,7 +228,7 @@ class EdgeCloudflareClient
                 continue;
             }
 
-            $requests = (int) data_get($group, 'sum.requests', 0);
+            $requests = (int) data_get($group, 'count', 0);
             $bytes = (int) data_get($group, 'sum.edgeResponseBytes', 0);
 
             $existing = $totals->get($host, new EdgeUsageTotals);
@@ -232,6 +239,209 @@ class EdgeCloudflareClient
         }
 
         return $totals;
+    }
+
+    public function canQueryAnalyticsEngine(): bool
+    {
+        return $this->accountId !== ''
+            && $this->apiToken !== ''
+            && trim((string) config('edge.cloudflare.analytics_dataset', '')) !== '';
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function queryAnalyticsEngineSql(string $sql): array
+    {
+        if (! $this->canQueryAnalyticsEngine()) {
+            return [];
+        }
+
+        $response = Http::withToken($this->apiToken)
+            ->withHeaders(['Content-Type' => 'text/plain'])
+            ->withBody($sql, 'text/plain')
+            ->post(self::BASE.'/accounts/'.$this->accountId.'/analytics_engine/sql');
+
+        $json = $response->json();
+        if (! is_array($json) || ($json['success'] ?? false) !== true) {
+            $message = is_array($json['errors'][0] ?? null)
+                ? (string) ($json['errors'][0]['message'] ?? 'Analytics Engine SQL failed.')
+                : 'Analytics Engine SQL failed.';
+
+            throw new RuntimeException($message);
+        }
+
+        $rows = $json['result']['data'] ?? $json['result'] ?? [];
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $meta = $json['result']['meta'] ?? [];
+        if (is_array($meta) && $meta !== [] && isset($rows[0]) && is_array($rows[0]) && ! array_is_list($rows[0])) {
+            return array_values(array_filter($rows, is_array(...)));
+        }
+
+        if (! is_array($meta) || $meta === [] || ! isset($rows[0]) || ! is_array($rows[0])) {
+            return [];
+        }
+
+        $columns = array_map(
+            static fn ($column): string => is_array($column) ? (string) ($column['name'] ?? '') : '',
+            $meta,
+        );
+
+        $mapped = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $assoc = [];
+            foreach ($columns as $index => $column) {
+                if ($column === '') {
+                    continue;
+                }
+                $assoc[$column] = $row[$index] ?? null;
+            }
+
+            $mapped[] = $assoc;
+        }
+
+        return $mapped;
+    }
+
+    /**
+     * @return array{id: string, enabled: bool}
+     */
+    public function ensureLogpushJob(string $zoneId, string $destinationConf, string $dataset = 'http_requests'): array
+    {
+        foreach ($this->listLogpushJobs($zoneId) as $job) {
+            if (($job['dataset'] ?? null) === $dataset && ($job['enabled'] ?? false) === true) {
+                return [
+                    'id' => (string) ($job['id'] ?? ''),
+                    'enabled' => true,
+                ];
+            }
+        }
+
+        $payload = $this->decode(
+            Http::withToken($this->apiToken)->post(self::BASE.'/zones/'.$zoneId.'/logpush/jobs', [
+                'name' => 'dply-edge-'.$dataset,
+                'destination_conf' => $destinationConf,
+                'dataset' => $dataset,
+                'enabled' => true,
+            ]),
+        );
+
+        return [
+            'id' => (string) ($payload['id'] ?? ''),
+            'enabled' => (bool) ($payload['enabled'] ?? true),
+        ];
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listLogpushJobs(string $zoneId): array
+    {
+        $response = Http::withToken($this->apiToken)->get(self::BASE.'/zones/'.$zoneId.'/logpush/jobs');
+        $json = $response->json();
+        if (! is_array($json) || ($json['success'] ?? false) !== true) {
+            return [];
+        }
+
+        $result = $json['result'] ?? [];
+
+        return is_array($result) ? $result : [];
+    }
+
+    public function fetchR2BucketUsage(
+        CarbonInterface $periodStart,
+        CarbonInterface $periodEnd,
+        ?string $bucketName = null,
+    ): EdgeUsageTotals {
+        $bucketName = trim($bucketName ?? (string) config('edge.r2.bucket', ''));
+        if ($bucketName === '' || $this->accountId === '') {
+            return EdgeUsageTotals::empty();
+        }
+
+        $query = <<<'GRAPHQL'
+        query EdgeR2Usage($accountTag: string!, $since: Time!, $until: Time!, $bucket: string!) {
+          viewer {
+            accounts(filter: { accountTag: $accountTag }) {
+              r2StorageAdaptiveGroups(
+                limit: 100
+                filter: { datetime_geq: $since, datetime_leq: $until, bucketName: $bucket }
+              ) {
+                max { storedBytes }
+              }
+              r2OperationsAdaptiveGroups(
+                limit: 1000
+                filter: { datetime_geq: $since, datetime_leq: $until, bucketName: $bucket }
+              ) {
+                sum { requests }
+                dimensions { actionType }
+              }
+            }
+          }
+        }
+        GRAPHQL;
+
+        $response = Http::withToken($this->apiToken)
+            ->post(self::BASE.'/graphql', [
+                'query' => $query,
+                'variables' => [
+                    'accountTag' => $this->accountId,
+                    'since' => $periodStart->toIso8601String(),
+                    'until' => $periodEnd->toIso8601String(),
+                    'bucket' => $bucketName,
+                ],
+            ]);
+
+        $json = $response->json();
+        if (! is_array($json) || ! empty($json['errors'])) {
+            throw new RuntimeException('Cloudflare R2 GraphQL request failed.');
+        }
+
+        $storageGroups = data_get($json, 'data.viewer.accounts.0.r2StorageAdaptiveGroups', []);
+        $operationGroups = data_get($json, 'data.viewer.accounts.0.r2OperationsAdaptiveGroups', []);
+
+        $storedBytes = 0;
+        if (is_array($storageGroups)) {
+            foreach ($storageGroups as $group) {
+                $storedBytes = max($storedBytes, (int) data_get($group, 'max.storedBytes', 0));
+            }
+        }
+
+        $classA = 0;
+        $classB = 0;
+        $classAActions = [
+            'PutObject', 'CopyObject', 'ListObjects', 'CreateMultipartUpload',
+            'UploadPart', 'CompleteMultipartUpload', 'DeleteObject', 'AbortMultipartUpload',
+        ];
+
+        if (is_array($operationGroups)) {
+            foreach ($operationGroups as $group) {
+                $action = (string) data_get($group, 'dimensions.actionType', '');
+                $requests = (int) data_get($group, 'sum.requests', 0);
+                if (in_array($action, $classAActions, true)) {
+                    $classA += $requests;
+                } elseif (in_array($action, ['GetObject', 'HeadObject'], true)) {
+                    $classB += $requests;
+                }
+            }
+        }
+
+        return new EdgeUsageTotals(
+            r2StorageBytes: $storedBytes,
+            r2ClassAOps: $classA,
+            r2ClassBOps: $classB,
+        );
+    }
+
+    public function activeZoneId(string $zoneName): ?string
+    {
+        return $this->resolveZoneId($zoneName);
     }
 
     private function resolveZoneId(string $zoneName): ?string

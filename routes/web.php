@@ -5,6 +5,9 @@ use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\EdgeLogIngestController;
+use App\Http\Controllers\EdgeLogpushIngestController;
+use App\Http\Controllers\EdgeVitalsIngestController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\GithubEdgeWebhookController;
@@ -16,6 +19,7 @@ use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
+use App\Livewire\Billing\Analytics as BillingAnalytics;
 use App\Livewire\Billing\Invoices as BillingInvoices;
 use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Cloud\Create as CloudCreate;
@@ -159,6 +163,18 @@ Route::post('/hooks/functions/{site}/log', FunctionLogIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.functions.log');
 
+Route::post('/hooks/edge/{site}/log', EdgeLogIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.edge.log');
+
+Route::post('/hooks/edge/{site}/vitals', EdgeVitalsIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.edge.vitals');
+
+Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('hooks.edge.logpush');
+
 // Friendly public URL for a serverless function — dply proxies it through
 // to the function's raw DigitalOcean Functions invocation URL.
 Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
@@ -260,6 +276,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
     Route::livewire('organizations/{organization}/billing', BillingShow::class)->name('billing.show');
+    Route::livewire('organizations/{organization}/billing/analytics', BillingAnalytics::class)->name('billing.analytics');
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');

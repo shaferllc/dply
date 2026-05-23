@@ -101,6 +101,8 @@ class EdgeHostMapPublisher
         $payload = [
             'storage_prefix' => $deployment->storage_prefix,
             'deployment_id' => $deployment->id,
+            'site_id' => (string) $site->id,
+            'organization_id' => (string) $site->organization_id,
             'spa_fallback' => (bool) ($routing['spa_fallback'] ?? true),
             'headers' => is_array($routing['headers'] ?? null) ? $routing['headers'] : [],
         ];

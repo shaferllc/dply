@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\Edge\EdgeTestingDomains;
+
 return [
 
     /*
@@ -43,8 +45,44 @@ return [
         'worker_zone_name' => env('DPLY_EDGE_CF_ZONE_NAME'),
         'worker_routes' => array_values(array_filter(array_map(
             'trim',
-            explode(',', (string) env('DPLY_EDGE_CF_WORKER_ROUTES', '*.dply.host/*'))
+            explode(',', (string) env('DPLY_EDGE_CF_WORKER_ROUTES', '*.on-dply.site/*'))
         ))),
+        'analytics_dataset' => env('DPLY_EDGE_CF_ANALYTICS_DATASET', 'dply_edge_requests'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Worker log ingest (access logs + performance rollups)
+    |--------------------------------------------------------------------------
+    */
+    'log_ingest' => [
+        'key' => env('DPLY_EDGE_LOG_INGEST_KEY'),
+        'base_url' => env('DPLY_EDGE_LOG_INGEST_BASE_URL', env('APP_URL')),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cloudflare Logpush (http_requests → Dply ingest)
+    |--------------------------------------------------------------------------
+    */
+    'logpush' => [
+        'enabled' => filter_var(env('DPLY_EDGE_LOGPUSH_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'secret' => env('DPLY_EDGE_LOGPUSH_SECRET'),
+        'destination_url' => env('DPLY_EDGE_LOGPUSH_DESTINATION_URL', rtrim((string) env('APP_URL', ''), '/').'/hooks/edge/logpush'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Edge analytics retention (prune command)
+    |--------------------------------------------------------------------------
+    */
+    'analytics' => [
+        'access_logs_days' => (int) env('DPLY_EDGE_ACCESS_LOGS_DAYS', 7),
+        'access_logs_keep_per_site' => (int) env('DPLY_EDGE_ACCESS_LOGS_KEEP', 500),
+        'web_vitals_days' => (int) env('DPLY_EDGE_WEB_VITALS_DAYS', 30),
+        'web_vitals_keep_per_site' => (int) env('DPLY_EDGE_WEB_VITALS_KEEP', 200),
+        'performance_hourly_days' => (int) env('DPLY_EDGE_PERFORMANCE_HOURLY_DAYS', 45),
+        'prefer_analytics_engine' => filter_var(env('DPLY_EDGE_PREFER_ANALYTICS_ENGINE', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
     /*
@@ -59,15 +97,40 @@ return [
     ],
 
     /*
-    | Testing hostnames — defaults to DigitalOcean testing domain pool.
+    |--------------------------------------------------------------------------
+    | Retention
+    |--------------------------------------------------------------------------
+    | Per-site override lives in sites.releases_to_keep (1..50). This value is
+    | the fallback when a site hasn't set its own. Pruned deployments lose
+    | their R2 artifacts but stay listed (with pruned_at set) for audit.
     */
-    'testing_domains' => array_values(array_filter(array_map(
-        'trim',
-        explode(',', (string) env(
-            'DPLY_EDGE_TESTING_DOMAINS',
-            implode(',', (array) config('services.digitalocean.testing_domains', ['dply.host']))
-        ))
-    ))),
+    'retention' => [
+        'default_keep' => (int) env('DPLY_EDGE_RETENTION_KEEP', 10),
+    ],
+
+    /*
+    | Edge delivery hostnames — on-dply.* by default (e.g. on-dply.site).
+    | Override with DPLY_EDGE_TESTING_DOMAINS; when unset, on-dply.* entries
+    | from DPLY_TESTING_DOMAINS are preferred over generic BYO testing domains.
+    */
+    'testing_domains' => (static function (): array {
+        $explicit = trim((string) env('DPLY_EDGE_TESTING_DOMAINS', ''));
+        if ($explicit !== '') {
+            return array_values(array_filter(array_map(
+                static fn (string $value): string => strtolower(trim($value)),
+                explode(',', $explicit),
+            )));
+        }
+
+        return EdgeTestingDomains::defaultFromPool();
+    })(),
+
+    /*
+    | DNS target for Edge delivery hostnames on DO-managed on-dply zones when
+    | the zone is not the Cloudflare Worker zone. IP → A record; hostname → CNAME.
+    | When unset, subdomains CNAME onto the zone apex.
+    */
+    'testing_dns_target' => env('DPLY_EDGE_TESTING_DNS_TARGET'),
 
     'default_backend' => 'dply_edge',
 

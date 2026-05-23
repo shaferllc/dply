@@ -9,6 +9,7 @@ use App\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
@@ -45,7 +46,7 @@ class CreateEdgePreviewSite
 
         $slug = $this->previewSlug($parent->slug ?? Str::slug($parent->name), $branch, $prNumber);
         $name = $this->previewName($parent->name, $branch, $prNumber);
-        $testingDomain = (string) (config('edge.testing_domains')[0] ?? 'dply.host');
+        $testingDomain = EdgeTestingDomains::defaultApex();
         $hostname = $slug.'.'.$testingDomain;
 
         $parentBuild = is_array($parent->edgeMeta()['build'] ?? null) ? $parent->edgeMeta()['build'] : [];

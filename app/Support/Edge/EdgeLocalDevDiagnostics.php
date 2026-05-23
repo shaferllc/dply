@@ -14,8 +14,7 @@ final class EdgeLocalDevDiagnostics
      */
     public static function checks(): array
     {
-        $testingDomain = trim((string) (config('edge.testing_domains')[0] ?? ''));
-        if ($testingDomain === '') {
+        if (EdgeTestingDomains::all() === []) {
             return [[
                 'name' => 'edge_testing_domain',
                 'ok' => false,
@@ -23,10 +22,11 @@ final class EdgeLocalDevDiagnostics
             ]];
         }
 
-        $appHost = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST)));
+        $testingDomain = EdgeTestingDomains::defaultApex();
         $sampleHost = 'edge-local-dev-probe.'.$testingDomain;
         $resolved = self::resolveHost($sampleHost);
         $loopback = in_array($resolved, ['127.0.0.1', '::1'], true);
+        $appHost = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST)));
 
         $checks = [[
             'name' => 'edge_testing_domain',
@@ -58,7 +58,7 @@ final class EdgeLocalDevDiagnostics
      */
     public static function fakeModeBannerHint(): array
     {
-        $testingDomain = trim((string) (config('edge.testing_domains')[0] ?? 'dply.host'));
+        $testingDomain = EdgeTestingDomains::defaultApex();
         $appHost = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST)));
 
         if (str_ends_with($testingDomain, '.test')) {

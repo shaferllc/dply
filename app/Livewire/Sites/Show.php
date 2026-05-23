@@ -30,7 +30,6 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
-use App\Models\SocialAccount;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
@@ -50,6 +49,7 @@ use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\Sites\SiteReleaseRollback;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
 use App\Support\SiteDeployKeyGenerator;
@@ -334,8 +334,16 @@ class Show extends Component
         if ($site->server_id !== $server->id) {
             abort(404);
         }
-        if ($server->organization_id !== request()->user()?->currentOrganization()?->id) {
+        $currentOrganization = request()->user()?->currentOrganization();
+        if ($server->organization_id !== $currentOrganization?->id) {
             abort(404);
+        }
+
+        // Reuse route-bound models during policy checks to avoid lazy re-queries.
+        $site->setRelation('server', $server);
+        if ($currentOrganization !== null && $site->organization_id === $currentOrganization->id) {
+            $server->setRelation('organization', $currentOrganization);
+            $site->setRelation('organization', $currentOrganization);
         }
 
         $this->authorize('view', $site);
@@ -1045,8 +1053,9 @@ class Show extends Component
             return;
         }
 
-        $account = $this->git_source_control_account_id !== ''
-            ? SocialAccount::query()->where('user_id', request()->user()?->id ?? 0)->findOrFail($this->git_source_control_account_id)
+        $user = request()->user();
+        $account = $this->git_source_control_account_id !== '' && $user !== null
+            ? app(GitIdentityResolver::class)->forId($user, $this->git_source_control_account_id)
             : null;
         if ($account === null) {
             $this->toastError(__('Select a connected source control account first.'));
@@ -1128,8 +1137,9 @@ class Show extends Component
             return;
         }
 
-        $account = request()->user()?->socialAccounts()->findOrFail($value);
-        if (! $account) {
+        $user = request()->user();
+        $account = $user !== null ? app(GitIdentityResolver::class)->forId($user, $value) : null;
+        if ($account === null) {
             return;
         }
 
@@ -2854,7 +2864,10 @@ class Show extends Component
             return;
         }
 
-        $account = request()->user()?->socialAccounts()->findOrFail($this->functions_source_control_account_id);
+        $user = request()->user();
+        $account = $user !== null
+            ? app(GitIdentityResolver::class)->forId($user, $this->functions_source_control_account_id)
+            : null;
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];

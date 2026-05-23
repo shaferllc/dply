@@ -5,7 +5,36 @@
         <div class="min-w-0 lg:col-span-9">
             <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
 
-            <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
+                @if ($site->usesEdgeRuntime() && $site->edgeLiveUrl())
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a
+                            href="{{ $site->edgeLiveUrl() }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[11px] text-brand-ink hover:bg-brand-sand/40"
+                            title="{{ __('Open the live edge site in a new tab') }}"
+                        >
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
+                            {{ preg_replace('#^https?://#', '', $site->edgeLiveUrl()) }}
+                        </a>
+                        @can('update', $site)
+                            <button
+                                type="button"
+                                wire:click="redeployEdge"
+                                wire:loading.attr="disabled"
+                                wire:target="redeployEdge"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="redeployEdge" />
+                                <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
+                                <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
+                            </button>
+                        @endcan
+                    </div>
+                @endif
+            </div>
 
             @if ($headerRoleLabel !== null)
                 <div class="mt-3 flex items-center gap-2">
@@ -59,6 +88,10 @@
                             @include('livewire.sites.partials.edge.build-settings')
                         @elseif ($section === 'edge-previews')
                             @include('livewire.sites.partials.edge.previews')
+                        @elseif ($section === 'edge-billing')
+                            @include('livewire.sites.partials.edge.billing')
+                        @elseif ($section === 'edge-traffic')
+                            @include('livewire.sites.partials.edge.traffic')
                         @elseif ($section === 'edge-logs')
                             @include('livewire.sites.partials.edge.logs')
                         @elseif ($section === 'danger')

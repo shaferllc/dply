@@ -398,6 +398,16 @@ class Organization extends Model
         return $this->hasMany(Site::class);
     }
 
+    public function billingSnapshots(): HasMany
+    {
+        return $this->hasMany(OrganizationBillingSnapshot::class);
+    }
+
+    public function billingSubscriptionSyncEvents(): HasMany
+    {
+        return $this->hasMany(BillingSubscriptionSyncEvent::class);
+    }
+
     public function scripts(): HasMany
     {
         return $this->hasMany(Script::class);

@@ -18,7 +18,7 @@ class EdgeBuildRunner
      */
     /**
      * @param  array<string, string>  $env
-     * @return array{artifact_dir: string, build_log: string}
+     * @return array{artifact_dir: string, build_log: string, git_commit: ?string}
      */
     public function build(
         EdgeDeployment $deployment,
@@ -27,6 +27,7 @@ class EdgeBuildRunner
         string $buildCommand,
         string $outputDir,
         array $env = [],
+        ?string $commitOverride = null,
     ): array {
         $workRoot = rtrim(sys_get_temp_dir(), '/').'/dply-edge-build-'.$deployment->id;
         File::ensureDirectoryExists($workRoot);
@@ -40,23 +41,43 @@ class EdgeBuildRunner
                 File::ensureDirectoryExists($artifactDir);
                 File::put($artifactDir.'/index.html', '<!doctype html><html><body><h1>dply Edge fake build</h1></body></html>');
                 $this->appendBuildLog($buildLog, "Fake edge build — skipped git clone and Docker.\n");
+                $fakeCommit = $commitOverride !== null
+                    ? strtolower($commitOverride)
+                    : substr(hash('sha1', $deployment->id), 0, 40);
 
                 return [
                     'artifact_dir' => $artifactDir,
                     'build_log' => $buildLog,
+                    'git_commit' => $fakeCommit,
                 ];
             }
 
             $this->assertDockerAvailable();
 
-            $this->appendBuildLog($buildLog, "Cloning {$repoUrl} @ {$branch}\n");
-            $clone = Process::timeout(300)->run([
-                'git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout,
-            ]);
-            $this->appendBuildLog($buildLog, $clone->output().$clone->errorOutput());
-            if (! $clone->successful()) {
-                throw new RuntimeException('Git clone failed: '.$clone->errorOutput());
+            if ($commitOverride !== null) {
+                $this->appendBuildLog($buildLog, "Cloning {$repoUrl} (full history) for commit {$commitOverride}\n");
+                $clone = Process::timeout(300)->run(['git', 'clone', $repoUrl, $checkout]);
+                $this->appendBuildLog($buildLog, $clone->output().$clone->errorOutput());
+                if (! $clone->successful()) {
+                    throw new RuntimeException('Git clone failed: '.$clone->errorOutput());
+                }
+                $checkoutResult = Process::timeout(60)->path($checkout)->run(['git', 'checkout', $commitOverride]);
+                $this->appendBuildLog($buildLog, $checkoutResult->output().$checkoutResult->errorOutput());
+                if (! $checkoutResult->successful()) {
+                    throw new RuntimeException('Build failed: commit "'.$commitOverride.'" not found in repository.');
+                }
+            } else {
+                $this->appendBuildLog($buildLog, "Cloning {$repoUrl} @ {$branch}\n");
+                $clone = Process::timeout(300)->run([
+                    'git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout,
+                ]);
+                $this->appendBuildLog($buildLog, $clone->output().$clone->errorOutput());
+                if (! $clone->successful()) {
+                    throw new RuntimeException('Git clone failed: '.$clone->errorOutput());
+                }
             }
+
+            $resolvedCommit = $this->resolveHead($checkout);
 
             $dockerImage = (string) config('edge.build.docker_image', 'node:20-bookworm');
             $script = $this->composeBuildScript($checkout, $buildCommand);
@@ -89,12 +110,25 @@ class EdgeBuildRunner
             return [
                 'artifact_dir' => $artifactDir,
                 'build_log' => $buildLog,
+                'git_commit' => $resolvedCommit,
             ];
         } finally {
             if (is_dir($checkout)) {
                 File::deleteDirectory($checkout);
             }
         }
+    }
+
+    private function resolveHead(string $checkout): ?string
+    {
+        $result = Process::timeout(10)->path($checkout)->run(['git', 'rev-parse', 'HEAD']);
+        if (! $result->successful()) {
+            return null;
+        }
+
+        $sha = trim($result->output());
+
+        return $sha === '' ? null : strtolower($sha);
     }
 
     private function appendBuildLog(string $path, string $chunk): void

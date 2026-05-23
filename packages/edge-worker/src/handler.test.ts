@@ -26,6 +26,7 @@ function createMockR2(objects: Record<string, { body: string; contentType?: stri
             controller.close();
           },
         }),
+        text: async () => object.body,
         writeHttpMetadata(headers: Headers) {
           if (object.contentType) {
             headers.set('Content-Type', object.contentType);
@@ -98,6 +99,8 @@ describe('handleRequest', () => {
   const hostEntry: HostMapEntry = {
     storage_prefix: 'edge/site-1/deploy-9/',
     deployment_id: 'deploy-9',
+    site_id: 'site-1',
+    organization_id: 'org-1',
     spa_fallback: true,
     headers: {
       'X-Dply-Site': 'site-1',
@@ -147,6 +150,58 @@ describe('handleRequest', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toContain('edge');
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate');
+  });
+
+  it('injects RUM script into html when log ingest is configured', async () => {
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'preview.example.test': hostEntry }),
+      ARTIFACTS: createMockR2({
+        'edge/site-1/deploy-9/index.html': {
+          body: '<!doctype html><html><body>edge</body></html>',
+          contentType: 'text/html; charset=utf-8',
+        },
+      }),
+      LOG_INGEST_BASE_URL: 'https://dply.test',
+      LOG_INGEST_KEY: 'secret',
+    };
+
+    const response = await handleRequest(new Request('https://preview.example.test/'), env);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('/__dply/vitals');
+  });
+
+  it('accepts vitals beacon posts on worker path', async () => {
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'preview.example.test': hostEntry }),
+      ARTIFACTS: createMockR2({}),
+      LOG_INGEST_BASE_URL: 'https://dply.test',
+      LOG_INGEST_KEY: 'secret',
+    };
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      expect(url).toContain('/hooks/edge/site-1/vitals');
+      expect(init?.method).toBe('POST');
+
+      return new Response('{"message":"Recorded."}', { status: 202 });
+    }) as typeof fetch;
+
+    try {
+      const response = await handleRequest(
+        new Request('https://preview.example.test/__dply/vitals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: '/', lcp_ms: 1200 }),
+        }),
+        env,
+      );
+
+      expect(response.status).toBe(204);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it('returns 404 for unknown hosts', async () => {

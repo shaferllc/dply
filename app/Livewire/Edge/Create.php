@@ -5,13 +5,21 @@ declare(strict_types=1);
 namespace App\Livewire\Edge;
 
 use App\Actions\Edge\CreateEdgeSite;
+use App\Actions\Edge\CreateHybridEdgeStack;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
+use App\Models\Site;
 use App\Services\Billing\ManagedProductCostEstimator;
+use App\Services\Cloud\CloudRouter;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Support\Edge\EdgeSsrDetection;
 use App\Support\Edge\FakeEdgeProvision;
+use App\Support\Edge\HybridEdgeOriginMatcher;
+use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
 
@@ -58,12 +66,20 @@ class Create extends Component
 
     public string $origin_url = '';
 
+    public string $origin_cloud_site_id = '';
+
+    public bool $runtimeModeTouched = false;
+
+    public bool $originUrlTouched = false;
+
     /** managed = dply platform; byo = org Cloudflare credential */
     public string $delivery_mode = 'managed';
 
     public string $edge_provider_credential_id = '';
 
     public bool $buildOverridesTouched = false;
+
+    public bool $confirmingHybridStack = false;
 
     private string $lastDetectionFingerprint = '';
 
@@ -213,6 +229,47 @@ class Create extends Component
         return trim($owner) !== '' && trim($name) !== '';
     }
 
+    public function updatedName(): void
+    {
+        if ($this->runtime_mode === 'hybrid' && ! $this->originUrlTouched) {
+            $this->applyHybridOriginSuggestion();
+        }
+    }
+
+    public function updatedRuntimeMode(): void
+    {
+        $this->runtimeModeTouched = true;
+
+        if ($this->runtime_mode === 'hybrid') {
+            $this->applyHybridOriginSuggestion();
+        }
+    }
+
+    public function updatedOriginUrl(): void
+    {
+        $this->originUrlTouched = true;
+    }
+
+    public function updatedOriginCloudSiteId(string $value): void
+    {
+        if ($value === '') {
+            if (! $this->originUrlTouched) {
+                $this->applyHybridOriginSuggestion();
+            }
+
+            return;
+        }
+
+        $site = $this->findOrgCloudSite($value);
+        if ($site === null) {
+            return;
+        }
+
+        $liveUrl = $site->containerLiveUrl();
+        $this->origin_url = $liveUrl ?? '';
+        $this->originUrlTouched = $liveUrl !== null;
+    }
+
     public function updatedBuildCommand(): void
     {
         $this->buildOverridesTouched = true;
@@ -254,6 +311,145 @@ class Create extends Component
                 default => $this->output_dir !== '' ? $this->output_dir : 'dist',
             };
         }
+
+        $this->applyDetectedDeliveryPrefills();
+    }
+
+    private function applyDetectedDeliveryPrefills(): void
+    {
+        if ($this->runtimeModeTouched || $this->detectedPlan === []) {
+            return;
+        }
+
+        if (! EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)) {
+            return;
+        }
+
+        $this->runtime_mode = 'hybrid';
+        $this->applyHybridOriginSuggestion();
+    }
+
+    private function applyHybridOriginSuggestion(): void
+    {
+        if ($this->originUrlTouched) {
+            return;
+        }
+
+        $name = trim($this->name);
+        if ($name === '') {
+            $this->origin_url = '';
+            $this->origin_cloud_site_id = '';
+
+            return;
+        }
+
+        $matched = $this->findOrgCloudSiteForHybridOrigin($name);
+        if ($matched !== null) {
+            $this->origin_cloud_site_id = (string) $matched->id;
+            $this->origin_url = $matched->containerLiveUrl() ?? '';
+
+            return;
+        }
+
+        $this->origin_cloud_site_id = '';
+        $this->origin_url = $this->suggestedHybridOriginUrl($name);
+    }
+
+    public function suggestedHybridOriginUrlForName(): string
+    {
+        $name = trim($this->name);
+
+        return $name !== '' ? $this->suggestedHybridOriginUrl($name) : '';
+    }
+
+    private function suggestedHybridOriginUrl(string $name): string
+    {
+        if (FakeCloudProvision::enabled()) {
+            $slug = Str::slug($name) ?: 'app';
+
+            return 'https://'.$slug.'.fake-cloud.dply.local';
+        }
+
+        return '';
+    }
+
+    private function findOrgCloudSiteForHybridOrigin(string $name): ?Site
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return null;
+        }
+
+        $repo = HybridEdgeOriginMatcher::normalizeRepo(trim($this->repo));
+        $slug = Str::slug($name) ?: 'app';
+
+        $sites = Site::query()
+            ->where('organization_id', $org->id)
+            ->whereIn('container_backend', ['digitalocean_app_platform', 'aws_app_runner', 'dply_cloud'])
+            ->orderBy('name')
+            ->get();
+
+        if ($repo !== '') {
+            foreach ($sites as $site) {
+                $container = is_array($site->meta['container'] ?? null) ? $site->meta['container'] : [];
+                $source = is_array($container['source'] ?? null) ? $container['source'] : [];
+                $sourceRepo = is_string($source['repo'] ?? null) ? HybridEdgeOriginMatcher::normalizeRepo((string) $source['repo']) : '';
+                if ($sourceRepo !== '' && $sourceRepo === $repo) {
+                    return $site;
+                }
+            }
+        }
+
+        foreach ($sites as $site) {
+            if (($site->slug === $slug || Str::slug((string) $site->name) === $slug) && $site->containerLiveUrl() !== null) {
+                return $site;
+            }
+        }
+
+        return null;
+    }
+
+    private function findOrgCloudSite(string $siteId): ?Site
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return null;
+        }
+
+        return Site::query()
+            ->where('organization_id', $org->id)
+            ->whereIn('container_backend', ['digitalocean_app_platform', 'aws_app_runner', 'dply_cloud'])
+            ->find($siteId);
+    }
+
+    /**
+     * @return list<array{id: string, label: string, live_url: ?string, repo: ?string}>
+     */
+    private function orgCloudSitesForPicker(): array
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return [];
+        }
+
+        return Site::query()
+            ->where('organization_id', $org->id)
+            ->whereIn('container_backend', ['digitalocean_app_platform', 'aws_app_runner', 'dply_cloud'])
+            ->orderBy('name')
+            ->get()
+            ->map(function (Site $site): array {
+                $container = is_array($site->meta['container'] ?? null) ? $site->meta['container'] : [];
+                $source = is_array($container['source'] ?? null) ? $container['source'] : [];
+
+                return [
+                    'id' => (string) $site->id,
+                    'label' => (string) $site->name,
+                    'live_url' => $site->containerLiveUrl(),
+                    'repo' => is_string($source['repo'] ?? null) ? (string) $source['repo'] : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function deploy(): void
@@ -267,7 +463,7 @@ class Create extends Component
 
         $this->validate();
 
-        if ($this->detectedPlan !== [] && $this->detectedPlanLooksLikeSsr($this->detectedPlan) && $this->runtime_mode !== 'hybrid') {
+        if ($this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan) && $this->runtime_mode !== 'hybrid') {
             $this->toastError(__('This repository looks like an SSR app. Choose hybrid mode with an origin URL, configure static export, or use dply Cloud for full server workloads.'));
 
             return;
@@ -294,6 +490,7 @@ class Create extends Component
                 'framework' => (string) ($this->detectedPlan['framework'] ?? ''),
                 'runtime_mode' => $this->runtime_mode,
                 'origin_url' => trim($this->origin_url),
+                'cloud_site_id' => $this->origin_cloud_site_id !== '' ? $this->origin_cloud_site_id : null,
                 'origin_routes' => ['/_next/*', '/api/*'],
                 'edge_backend' => $this->delivery_mode === 'byo' ? 'org_cloudflare' : 'dply_edge',
                 'edge_provider_credential_id' => $this->delivery_mode === 'byo' ? $this->edge_provider_credential_id : null,
@@ -308,31 +505,100 @@ class Create extends Component
         $this->redirect(route('sites.show', ['server' => $site->server, 'site' => $site]), navigate: true);
     }
 
-    /**
-     * @param  array<string, mixed>  $plan
-     */
-    private function detectedPlanLooksLikeSsr(array $plan): bool
+    public function openHybridStackModal(): void
     {
-        $framework = strtolower((string) ($plan['framework'] ?? ''));
-        if (! in_array($framework, ['next', 'nuxt', 'remix', 'sveltekit'], true)) {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            $this->toastError(__('Select or create an organization first.'));
+
+            return;
+        }
+
+        $this->validate();
+
+        $this->confirmingHybridStack = true;
+        $this->dispatch('open-modal', 'edge-create-hybrid-stack-confirmation');
+    }
+
+    public function closeHybridStackModal(): void
+    {
+        $this->confirmingHybridStack = false;
+        $this->dispatch('close-modal', 'edge-create-hybrid-stack-confirmation');
+    }
+
+    public function deployHybridStack(): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            $this->toastError(__('Select or create an organization first.'));
+
+            return;
+        }
+
+        $this->validate();
+
+        if ($this->detectedPlan !== [] && ! EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)) {
+            $this->toastError(__('Hybrid stack deploy is only available for server-rendered JavaScript frameworks.'));
+
+            return;
+        }
+
+        $buildCommand = trim($this->build_command);
+        $outputDir = trim($this->output_dir);
+
+        try {
+            $result = (new CreateHybridEdgeStack)->handle(auth()->user(), $org, [
+                'name' => $this->name,
+                'repo' => $this->repo,
+                'branch' => $this->branch,
+                'build_command' => $buildCommand !== '' ? $buildCommand : 'npm ci && npm run build',
+                'output_dir' => $outputDir !== '' ? $outputDir : 'dist',
+                'spa_fallback' => $this->spa_fallback,
+                'deploy_on_push' => $this->deploy_on_push,
+                'detected_plan' => $this->detectedPlan,
+                'origin_routes' => ['/_next/*', '/api/*'],
+                'edge_backend' => $this->delivery_mode === 'byo' ? 'org_cloudflare' : 'dply_edge',
+                'edge_provider_credential_id' => $this->delivery_mode === 'byo' ? $this->edge_provider_credential_id : null,
+            ]);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->closeHybridStackModal();
+
+        if ($result['redirect_to'] === 'edge' && $result['edge_site'] instanceof Site) {
+            $this->toastSuccess(__('Edge hybrid app build queued. We\'ll keep the site workspace updated as it goes live.'));
+            $this->redirect(route('sites.show', ['server' => $result['edge_site']->server, 'site' => $result['edge_site']]), navigate: true);
+
+            return;
+        }
+
+        $this->toastSuccess(__('Cloud origin queued. We\'ll create the Edge hybrid app when the origin is live.'));
+        $this->redirect(route('sites.show', ['server' => $result['cloud_site']->server, 'site' => $result['cloud_site']]), navigate: true);
+    }
+
+    private function canProvisionCloudOrigin(): bool
+    {
+        if (! Feature::active('surface.cloud')) {
             return false;
         }
 
-        $start = strtolower((string) ($plan['start_command'] ?? ''));
-        if ($start === '') {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
             return false;
         }
 
-        if (str_contains($start, 'export') || str_contains($start, 'generate')) {
-            return false;
-        }
+        return CloudRouter::pickAutoBackend($org->id) !== null;
+    }
 
-        $build = strtolower((string) ($plan['build_command'] ?? ''));
-        if (str_contains($build, ' export') || str_contains($build, 'generate')) {
-            return false;
-        }
-
-        return true;
+    private function showHybridStackCta(): bool
+    {
+        return $this->detectedPlan !== []
+            && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)
+            && trim($this->origin_url) === ''
+            && $this->canProvisionCloudOrigin();
     }
 
     private function loadRepositoriesForSelectedAccount(): void
@@ -343,7 +609,9 @@ class Create extends Component
             return;
         }
 
-        $account = auth()->user()?->socialAccounts()->find($this->source_control_account_id);
+        $account = auth()->user() !== null
+            ? app(GitIdentityResolver::class)->forId(auth()->user(), $this->source_control_account_id)
+            : null;
         $this->availableRepositories = $account
             ? app(SourceControlRepositoryBrowser::class)->repositoriesForAccount($account)
             : [];
@@ -376,6 +644,12 @@ class Create extends Component
             'edgeUsageBillingEnabled' => app(ManagedProductCostEstimator::class)->edgeUsageBillingEnabled(),
             'edgeUsageRates' => app(ManagedProductCostEstimator::class)->edgeUsageRates(),
             'cloudflareCredentials' => $cloudflareCredentials,
+            'orgCloudSites' => $this->orgCloudSitesForPicker(),
+            'ssrDetected' => $this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan),
+            'suggestedHybridOriginUrl' => $this->suggestedHybridOriginUrlForName(),
+            'showHybridStackCta' => $this->showHybridStackCta(),
+            'canProvisionCloudOrigin' => $this->canProvisionCloudOrigin(),
+            'cloudFee' => app(ManagedProductCostEstimator::class)->cloudFee(),
         ])->layout('layouts.app');
     }
 }

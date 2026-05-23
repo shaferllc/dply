@@ -73,6 +73,14 @@
                         {{ __('Billing & plan') }}
                     </a>
                     <a
+                        href="{{ route('billing.analytics', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('billing-analytics')])
+                    >
+                        <x-heroicon-o-chart-bar class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Billing analytics') }}
+                    </a>
+                    <a
                         href="{{ route('billing.invoices', $org) }}"
                         wire:navigate
                         @class([$navBase, $link('invoices')])

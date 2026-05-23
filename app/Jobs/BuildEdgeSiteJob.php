@@ -26,7 +26,10 @@ class BuildEdgeSiteJob implements ShouldQueue
 
     public int $tries = 2;
 
-    public function __construct(public string $deploymentId) {}
+    public function __construct(
+        public string $deploymentId,
+        public ?string $commitOverride = null,
+    ) {}
 
     public function handle(EdgeBuildRunner $runner): void
     {
@@ -57,12 +60,16 @@ class BuildEdgeSiteJob implements ShouldQueue
 
         try {
             $repoUrl = str_contains($repo, '://') ? $repo : 'https://github.com/'.$repo.'.git';
-            $buildResult = $runner->build($deployment, $repoUrl, $branch, $buildCommand, $outputDir);
+            $buildResult = $runner->build($deployment, $repoUrl, $branch, $buildCommand, $outputDir, [], $this->commitOverride);
             $artifactDir = $buildResult['artifact_dir'];
             $workRoot = dirname($artifactDir);
 
             $buildLogPath = $this->persistBuildLog($site, $deployment, $buildResult['build_log']);
-            $deployment->update(['build_log_path' => $buildLogPath]);
+            $updates = ['build_log_path' => $buildLogPath];
+            if (is_string($buildResult['git_commit'] ?? null) && $buildResult['git_commit'] !== '') {
+                $updates['git_commit'] = $buildResult['git_commit'];
+            }
+            $deployment->update($updates);
 
             if (! Site::query()->whereKey($site->id)->exists()) {
                 if (is_dir($artifactDir) && str_contains($artifactDir, sys_get_temp_dir())) {

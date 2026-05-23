@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -50,10 +51,15 @@ class CreateEdgeSite
             if ($originUrl === '') {
                 throw new RuntimeException('Hybrid Edge sites require an SSR origin URL.');
             }
+            $cloudSiteId = $payload['cloud_site_id'] ?? null;
+            if ($cloudSiteId !== null && $cloudSiteId !== '') {
+                $this->assertCloudOriginSite($organization, (string) $cloudSiteId);
+            }
             $originRoutes = is_array($payload['origin_routes'] ?? null) ? $payload['origin_routes'] : ['/_next/*', '/api/*'];
             $originConfig = [
                 'url' => $originUrl,
-                'cloud_site_id' => $payload['cloud_site_id'] ?? null,
+                'cloud_site_id' => $cloudSiteId !== null && $cloudSiteId !== '' ? $cloudSiteId : null,
+                'managed' => ! empty($payload['origin_managed']),
                 'routes' => array_values(array_filter(array_map(
                     fn ($route) => is_string($route) ? $route : null,
                     $originRoutes,
@@ -177,9 +183,21 @@ class CreateEdgeSite
             }
         }
 
-        $testingDomain = (string) (config('edge.testing_domains')[0] ?? 'dply.host');
+        $testingDomain = EdgeTestingDomains::defaultApex();
 
         return strtolower($slug.'-'.$suffix.'.'.$testingDomain);
+    }
+
+    private function assertCloudOriginSite(Organization $organization, string $cloudSiteId): void
+    {
+        $originSite = Site::query()
+            ->where('organization_id', $organization->id)
+            ->whereIn('container_backend', ['digitalocean_app_platform', 'aws_app_runner', 'dply_cloud'])
+            ->find($cloudSiteId);
+
+        if ($originSite === null || ! $originSite->usesContainerRuntime()) {
+            throw new RuntimeException('The selected Cloud origin app was not found for this organization.');
+        }
     }
 
     private function normalizeRepo(string $value): string
