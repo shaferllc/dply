@@ -24,6 +24,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('surface.cloud');
+
 test('page renders with no backends connected warning', function () {
     config(['server_provision_fake.env_flag' => false]);
     $user = ownerWithOrg();
@@ -354,7 +356,7 @@ test('source mode detection failure does not block deploy', function () {
 });
 function fakeClonerProducingNodeRepo(string $startScript): void
 {
-    $this->app->instance(GitCloner::class, new class($startScript) implements GitCloner
+    app()->instance(GitCloner::class, new class($startScript) implements GitCloner
     {
         public function __construct(private string $startScript) {}
 
@@ -374,7 +376,7 @@ function fakeClonerProducingNodeRepo(string $startScript): void
 
     // RepositoryRuntimePreview is constructed per-request; rebinding the
     // GitCloner is enough — the concern resolves the preview fresh.
-    unset($this->app[RepositoryRuntimePreview::class]);
+    app()->forgetInstance(RepositoryRuntimePreview::class);
 }
 function ownerWithOrg(): User
 {

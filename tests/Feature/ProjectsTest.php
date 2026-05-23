@@ -18,11 +18,10 @@ use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
-uses(WithFeatures::class);
+usesFeatures('surface.projects');
 
 function userWithOrganization(string $role = 'owner'): User
 {

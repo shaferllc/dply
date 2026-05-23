@@ -24,6 +24,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.cluster', 'provider.aws', 'provider.aws_eks');
+
 test('choosing kubernetes host kind clears type for provider pick', function () {
     // Choosing the K8s host-kind tile sets provider_host_kind=kubernetes
     // but does NOT pin form.type — the user must then click a provider

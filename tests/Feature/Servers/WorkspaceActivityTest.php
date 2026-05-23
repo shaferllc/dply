@@ -19,6 +19,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.activity');
+
 /**
  * @return array{0: User, 1: Server, 2: Organization}
  */

@@ -13,11 +13,10 @@ use App\Models\StatusPage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
-uses(WithFeatures::class);
+usesFeatures('surface.status_pages');
 
 function userWithOrg(string $role = 'owner'): User
 {

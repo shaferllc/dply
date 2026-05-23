@@ -12,11 +12,10 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
-uses(WithFeatures::class);
+usesFeatures('surface.fleet');
 
 test('renders clean state when nothing wrong', function () {
     [$user, $org] = makeUserOrg();

@@ -114,7 +114,7 @@ test('run on connection persists remote script and output paths on task model', 
         }
     };
 
-    runOnConnection($pendingTask);
+    $dispatcher->runOnConnection($pendingTask);
 
     $taskModel->refresh();
 
@@ -155,13 +155,17 @@ test('run on connection uploads tracking wrapper for remote tracked tasks', func
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
+        public ?string $uploadedFilename = null;
+
+        public ?string $uploadedContents = null;
+
         public function createRemoteRunner(PendingTask $pendingTask): RemoteProcessRunner
         {
             return new class($pendingTask->getConnection(), app(ProcessRunner::class), $this) extends RemoteProcessRunner
             {
                 public function __construct(Connection $connection, ProcessRunner $processRunner, private readonly object $testHarness)
                 {
-                    __construct($connection, $processRunner);
+                    parent::__construct($connection, $processRunner);
                 }
 
                 public function verifyScriptDirectoryExists(): self
@@ -184,7 +188,7 @@ test('run on connection uploads tracking wrapper for remote tracked tasks', func
             };
         }
     };
-    runOnConnection($pendingTask);
+    $dispatcher->runOnConnection($pendingTask);
 
     $this->assertSame('tracked123.sh', $dispatcher->uploadedFilename);
     $this->assertStringContainsString('Task completed successfully, calling finished webhook...', (string) $dispatcher->uploadedContents);
@@ -202,6 +206,8 @@ test('remote process runner background command does not require local remote fil
 
     $runner = new class($connection, app(ProcessRunner::class)) extends RemoteProcessRunner
     {
+        public ?string $capturedScript = null;
+
         public function run(string $script, int $timeout = 0): ProcessOutput
         {
             $this->capturedScript = $script;
@@ -209,7 +215,7 @@ test('remote process runner background command does not require local remote fil
             return ProcessOutput::make('ok')->setExitCode(0);
         }
     };
-    runUploadedScriptInBackground('task-abc123.sh', 'task-abc123.log', 300);
+    $runner->runUploadedScriptInBackground('task-abc123.sh', 'task-abc123.log', 300);
 
     $this->assertSame(
         'timeout 300s bash /root/.dply-task-runner/task-abc123.sh > /root/.dply-task-runner/task-abc123.log 2>&1 &',
@@ -327,6 +333,10 @@ test('run in background with model uses remote dispatch path for tracked remote 
 
     $dispatcher = new class(app(ProcessRunner::class)) extends TaskDispatcher
     {
+        public bool $usedRemoteDispatch = false;
+
+        public bool $usedLocalBackground = false;
+
         public function runOnConnection(PendingTask $pendingTask): ProcessOutput
         {
             $this->usedRemoteDispatch = true;

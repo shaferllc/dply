@@ -25,263 +25,263 @@
             <!-- <directory>tests/Feature/Livewire</directory> -->
             <!-- <directory>tests/Feature/Marketing</directory> -->
             <!-- <directory>tests/Feature/Models</directory> -->
-            <!-- <directory>tests/Feature/Notifications</directory> -->
-            <!-- <directory>tests/Feature/Observers</directory> -->
-            <!-- <directory>tests/Feature/Serverless</directory> -->
+            <directory>tests/Feature/Notifications</directory>
+            <directory>tests/Feature/Observers</directory>
+            <directory>tests/Feature/Serverless</directory>
             <directory>tests/Feature/Servers</directory>
-            <!-- <directory>tests/Feature/Services</directory> -->
-            <!-- <directory>tests/Feature/Sites</directory> -->
-            <!-- <directory>tests/Feature/TaskRunner</directory> -->
+            <directory>tests/Feature/Services</directory>
+            <directory>tests/Feature/Sites</directory>
+            <directory>tests/Feature/TaskRunner</directory>
 
             <!-- Root-level test files -->
-            <!-- <file>tests/Feature/AbortSiteDeployCommandTest.php</file> -->
-            <!-- <file>tests/Feature/AddRemoveServerDatabaseEngineCommandTest.php</file> -->
-            <!-- <file>tests/Feature/AddSiteDomainCommandTest.php</file> -->
-            <!-- <file>tests/Feature/AdminDashboardTest.php</file> -->
-            <!-- <file>tests/Feature/ApiKeysSettingsTest.php</file> -->
-            <!-- <file>tests/Feature/ApplyFirewallJobTest.php</file> -->
-            <!-- <file>tests/Feature/AttachCloudDatabaseJobTest.php</file> -->
-            <!-- <file>tests/Feature/AwsAppRunnerServiceTest.php</file> -->
-            <!-- <file>tests/Feature/BackfillOrganizationMembershipsTest.php</file> -->
-            <!-- <file>tests/Feature/BackupConfigurationTest.php</file> -->
-            <!-- <file>tests/Feature/BackupsTest.php</file> -->
-            <!-- <file>tests/Feature/BillingInvoicesTest.php</file> -->
-            <!-- <file>tests/Feature/CacheServiceNetworkExposureTest.php</file> -->
-            <!-- <file>tests/Feature/CheckSupervisorHealthCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ClearSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CliSearchCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudAutoscalingTest.php</file> -->
-            <!-- <file>tests/Feature/CloudBuildEnvTest.php</file> -->
-            <!-- <file>tests/Feature/CloudCreatePageTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDatabaseAttachmentTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDatabaseCommandsTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDatabaseCreatePageTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDatabaseIndexPageTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDatabaseModelTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDeployCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDeployWebhookTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDeploymentsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDeploymentsDashboardTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDoctorCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDomainAttachmentTest.php</file> -->
-            <!-- <file>tests/Feature/CloudDomainCommandsTest.php</file> -->
-            <!-- <file>tests/Feature/CloudEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudEnvEditorTest.php</file> -->
-            <!-- <file>tests/Feature/CloudFleetPanelTest.php</file> -->
-            <!-- <file>tests/Feature/CloudImageRollbackTest.php</file> -->
-            <!-- <file>tests/Feature/CloudIndexPageTest.php</file> -->
-            <!-- <file>tests/Feature/CloudListCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudLogsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudLogsDashboardTest.php</file> -->
-            <!-- <file>tests/Feature/CloudMetricsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudNavLinkTest.php</file> -->
-            <!-- <file>tests/Feature/CloudObservabilityBackendTest.php</file> -->
-            <!-- <file>tests/Feature/CloudObservabilityDashboardTest.php</file> -->
-            <!-- <file>tests/Feature/CloudPollStatusCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudPreviewFlowTest.php</file> -->
-            <!-- <file>tests/Feature/CloudRedeployCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudResizeTest.php</file> -->
-            <!-- <file>tests/Feature/CloudRollbackCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudRouterTest.php</file> -->
-            <!-- <file>tests/Feature/CloudScaleTest.php</file> -->
-            <!-- <file>tests/Feature/CloudTeardownCommandTest.php</file> -->
-            <!-- <file>tests/Feature/CloudWorkerCommandsTest.php</file> -->
-            <!-- <file>tests/Feature/CloudWorkerDashboardTest.php</file> -->
-            <!-- <file>tests/Feature/CloudWorkerModelTest.php</file> -->
-            <!-- <file>tests/Feature/CloudWorkerProvisionSpecTest.php</file> -->
-            <!-- <file>tests/Feature/ContainerActivityTimelineTest.php</file> -->
-            <!-- <file>tests/Feature/ContainerProviderCredentialsTest.php</file> -->
-            <!-- <file>tests/Feature/ContainerSiteDashboardTest.php</file> -->
-            <!-- <file>tests/Feature/ContainerSiteFieldsTest.php</file> -->
-            <!-- <file>tests/Feature/ContextBreadcrumbTest.php</file> -->
-            <!-- <file>tests/Feature/CreateCloudDatabaseTest.php</file> -->
-            <!-- <file>tests/Feature/CreateCloudSiteFromSourceTest.php</file> -->
-            <!-- <file>tests/Feature/CreateCloudSiteTest.php</file> -->
-            <!-- <file>tests/Feature/CreateCloudWorkerTest.php</file> -->
-            <!-- <file>tests/Feature/CredentialTest.php</file> -->
-            <!-- <file>tests/Feature/DashboardFleetAlertBannerTest.php</file> -->
-            <!-- <file>tests/Feature/DashboardTest.php</file> -->
-            <!-- <file>tests/Feature/DeployPhaseRunnerTest.php</file> -->
-            <!-- <file>tests/Feature/DeploySiteCommandTest.php</file> -->
-            <!-- <file>tests/Feature/DeploymentRunnerTest.php</file> -->
-            <!-- <file>tests/Feature/DetectRuntimeCommandTest.php</file> -->
-            <!-- <file>tests/Feature/DetectWebserverHealthTransitionsJobTest.php</file> -->
-            <!-- <file>tests/Feature/DiffSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/DigitalOceanAppPlatformServiceTest.php</file> -->
-            <!-- <file>tests/Feature/DigitalOceanCatalogTokenTest.php</file> -->
-            <!-- <file>tests/Feature/DoctorOrphansCommandTest.php</file> -->
-            <!-- <file>tests/Feature/DplyAboutCommandTest.php</file> -->
-            <!-- <file>tests/Feature/EdgeProxyTest.php</file> -->
-            <!-- <file>tests/Feature/ExampleTest.php</file> -->
-            <!-- <file>tests/Feature/ExportSiteConfigCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ExportSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ExportSiteManifestCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FailedDeploysFleetCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FakeCloudBackendTest.php</file> -->
-            <!-- <file>tests/Feature/FakeCloudProvisionTest.php</file> -->
-            <!-- <file>tests/Feature/FindFleetDomainCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FindFleetEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FleetAgeCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FleetDeploysPageTest.php</file> -->
-            <!-- <file>tests/Feature/FleetDoctorCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FleetDomainsPageTest.php</file> -->
-            <!-- <file>tests/Feature/FleetEnvSearchPageTest.php</file> -->
-            <!-- <file>tests/Feature/FleetHealthPageTest.php</file> -->
-            <!-- <file>tests/Feature/FleetSummaryCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FlushDeployDigestCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FlushServerSystemdNotificationDigestCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FlyEligibilityCommandTest.php</file> -->
-            <!-- <file>tests/Feature/FunctionLogIngestControllerTest.php</file> -->
-            <!-- <file>tests/Feature/GetServerMetaCommandTest.php</file> -->
-            <!-- <file>tests/Feature/GithubCloudWebhookTest.php</file> -->
-            <!-- <file>tests/Feature/ImportSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/InsightsFeatureTest.php</file> -->
-            <!-- <file>tests/Feature/InsightsNotificationsTest.php</file> -->
-            <!-- <file>tests/Feature/InstallDatabaseEngineOnServerTest.php</file> -->
-            <!-- <file>tests/Feature/InstallRuntimeCommandTest.php</file> -->
-            <!-- <file>tests/Feature/LaunchesContainersCreateTest.php</file> -->
-            <!-- <file>tests/Feature/ListEnginesCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListFleetDomainsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListFrameworksCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListPresetsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListRuntimesCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListServersCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ListSitesCommandTest.php</file> -->
-            <!-- <file>tests/Feature/MarketplaceItemSeederRuntimeTagsTest.php</file> -->
-            <!-- <file>tests/Feature/MarketplaceTest.php</file> -->
-            <!-- <file>tests/Feature/NotificationChannelsTest.php</file> -->
-            <!-- <file>tests/Feature/OrganizationTest.php</file> -->
-            <!-- <file>tests/Feature/PollCloudStatusJobTest.php</file> -->
-            <!-- <file>tests/Feature/PreviewDriftJobTest.php</file> -->
-            <!-- <file>tests/Feature/PrimaryHostnameRenameTest.php</file> -->
-            <!-- <file>tests/Feature/ProcessInsightDigestQueueCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ProcessScheduledServerDeletionsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ProcessSshKeyRotationRemindersCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ProfileSecurityTest.php</file> -->
-            <!-- <file>tests/Feature/ProfileTest.php</file> -->
-            <!-- <file>tests/Feature/ProjectsTest.php</file> -->
-            <!-- <file>tests/Feature/ProviderOAuthTest.php</file> -->
-            <!-- <file>tests/Feature/ProvisionCloudDatabaseJobTest.php</file> -->
-            <!-- <file>tests/Feature/ProvisionCloudSiteJobTest.php</file> -->
-            <!-- <file>tests/Feature/ProvisionFailureSurfaceTest.php</file> -->
-            <!-- <file>tests/Feature/ProvisionSiteSystemdUnitsJobTest.php</file> -->
-            <!-- <file>tests/Feature/PruneServerCreateDraftsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/PruneServerCronJobRunsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/PruneTestingHostnameRecordsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RedeploySiteSystemdCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ReferralTest.php</file> -->
-            <!-- <file>tests/Feature/RelocateSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RemoveSiteDomainCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RemoveSiteProcessCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RenameServerCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RenameSiteCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RestartSiteProcessCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RunSitePhaseCommandTest.php</file> -->
-            <!-- <file>tests/Feature/RunningDeploysFleetCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ScriptSeederTest.php</file> -->
-            <!-- <file>tests/Feature/ScriptsTest.php</file> -->
-            <!-- <file>tests/Feature/SeedProvisionedEnginesTest.php</file> -->
-            <!-- <file>tests/Feature/ServerCreateStepReviewSshKeyModalTest.php</file> -->
-            <!-- <file>tests/Feature/ServerCreateStepWhatPresetsTest.php</file> -->
-            <!-- <file>tests/Feature/ServerCronBasicsTest.php</file> -->
-            <!-- <file>tests/Feature/ServerDatabaseEngineActionsTest.php</file> -->
-            <!-- <file>tests/Feature/ServerDatabaseEngineTest.php</file> -->
-            <!-- <file>tests/Feature/ServerDeploysPageTest.php</file> -->
-            <!-- <file>tests/Feature/ServerDoctorCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ServerOverviewEnginesPanelTest.php</file> -->
-            <!-- <file>tests/Feature/ServerOverviewRuntimePanelTest.php</file> -->
-            <!-- <file>tests/Feature/ServerProviderFeatureFlagsTest.php</file> -->
-            <!-- <file>tests/Feature/ServerRecipesTest.php</file> -->
-            <!-- <file>tests/Feature/ServerResourcePreflightTest.php</file> -->
-            <!-- <file>tests/Feature/ServerScheduledDeletionTest.php</file> -->
-            <!-- <file>tests/Feature/ServerSshCommandPrinterTest.php</file> -->
-            <!-- <file>tests/Feature/ServerTest.php</file> -->
-            <!-- <file>tests/Feature/ServerWorkspaceNavTest.php</file> -->
-            <!-- <file>tests/Feature/ServerWorkspaceSshKeysTest.php</file> -->
-            <!-- <file>tests/Feature/ServerlessFunctionProxyTest.php</file> -->
-            <!-- <file>tests/Feature/SetServerMetaCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SetSiteEnvCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SetSiteProcessCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SetSiteRepoCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SetSiteRuntimeCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SettingsAndNotificationsTest.php</file> -->
-            <!-- <file>tests/Feature/SettingsHubTest.php</file> -->
-            <!-- <file>tests/Feature/ShowServerCommandTest.php</file> -->
-            <!-- <file>tests/Feature/ShowSiteDeployCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SiteBackgroundPagesTest.php</file> -->
-            <!-- <file>tests/Feature/SiteCloneTest.php</file> -->
-            <!-- <file>tests/Feature/SiteCommitsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteCreateRuntimeDetectionTest.php</file> -->
-            <!-- <file>tests/Feature/SiteCreateScaffoldModeTest.php</file> -->
-            <!-- <file>tests/Feature/SiteCreationGateTest.php</file> -->
-            <!-- <file>tests/Feature/SiteCronDaemonsRoutesTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDashboardFlyCloudUpsellTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDashboardLatestDeployBadgeTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDatabaseEngineTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDefaultMonitorTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeleteSystemdTeardownTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeployHistoryCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeployStepPhaseBadgeTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeployStepPhaseTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeployWebhookTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeploymentDetailPageTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeploymentPhaseResultsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDeploymentsListPageTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDoctorCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SiteDomainCommandsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteEnvDiffPageTest.php</file> -->
-            <!-- <file>tests/Feature/SiteEnvironmentSettingsPageTest.php</file> -->
-            <!-- <file>tests/Feature/SiteLatestDeploymentTest.php</file> -->
-            <!-- <file>tests/Feature/SiteNotificationsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteProvisionerPreviewSslTest.php</file> -->
-            <!-- <file>tests/Feature/SitePsCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SiteRoutingAliasesTest.php</file> -->
-            <!-- <file>tests/Feature/SiteRoutingCliCommandsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteRoutingDomainsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteRoutingPreviewTest.php</file> -->
-            <!-- <file>tests/Feature/SiteRoutingRedirectsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteRoutingTenantsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteSettingsCliPanelsTest.php</file> -->
-            <!-- <file>tests/Feature/SiteSettingsProcessesEditorTest.php</file> -->
-            <!-- <file>tests/Feature/SiteSettingsProcessesPanelTest.php</file> -->
-            <!-- <file>tests/Feature/SiteSettingsRecentDeploymentsPanelTest.php</file> -->
-            <!-- <file>tests/Feature/SiteShowRuntimeSummaryTest.php</file> -->
-            <!-- <file>tests/Feature/SiteTest.php</file> -->
-            <!-- <file>tests/Feature/SiteUptimeMonitorTest.php</file> -->
-            <!-- <file>tests/Feature/SiteUrlCommandTest.php</file> -->
-            <!-- <file>tests/Feature/SiteWebserverConfigTest.php</file> -->
-            <!-- <file>tests/Feature/SnapshotDigitalOceanCommandsTest.php</file> -->
-            <!-- <file>tests/Feature/SourceControlOAuthReturnTest.php</file> -->
-            <!-- <file>tests/Feature/SourceControlTest.php</file> -->
-            <!-- <file>tests/Feature/SshKeysTest.php</file> -->
-            <!-- <file>tests/Feature/StaleDeploysFleetCommandTest.php</file> -->
-            <!-- <file>tests/Feature/StatusPagesTest.php</file> -->
-            <!-- <file>tests/Feature/SupervisorHealthNotificationsTest.php</file> -->
-            <!-- <file>tests/Feature/SyncAuthorizedKeysJobTest.php</file> -->
-            <!-- <file>tests/Feature/SyncCloudWorkersJobTest.php</file> -->
-            <!-- <file>tests/Feature/SyncEnvFromServerJobTest.php</file> -->
-            <!-- <file>tests/Feature/TaskRunnerCancellationTest.php</file> -->
-            <!-- <file>tests/Feature/TaskRunnerVerifyWebhooksCommandTest.php</file> -->
-            <!-- <file>tests/Feature/TeardownCloudDatabaseJobTest.php</file> -->
-            <!-- <file>tests/Feature/TeardownSiteSystemdCommandTest.php</file> -->
-            <!-- <file>tests/Feature/TestingHostnameCleanupCommandTest.php</file> -->
-            <!-- <file>tests/Feature/TrialStateGatingTest.php</file> -->
-            <!-- <file>tests/Feature/UniversalNotificationsTest.php</file> -->
-            <!-- <file>tests/Feature/WebserverRevisionsMigrationTest.php</file> -->
-            <!-- <file>tests/Feature/WebserverSwitchTest.php</file> -->
-            <!-- <file>tests/Feature/WebserverTemplatesTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceCachesKeyBrowserTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceCachesKeyspaceTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceCachesMonitorTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceCachesReplTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceCachesTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceDatabasesTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceFirewallTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceMonitorTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspacePhpRevisionsTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspacePhpTest.php</file> -->
-            <!-- <file>tests/Feature/WorkspaceSettingsRepairAccessTest.php</file> -->
+            <file>tests/Feature/AbortSiteDeployCommandTest.php</file>
+            <file>tests/Feature/AddRemoveServerDatabaseEngineCommandTest.php</file>
+            <file>tests/Feature/AddSiteDomainCommandTest.php</file>
+            <file>tests/Feature/AdminDashboardTest.php</file>
+            <file>tests/Feature/ApiKeysSettingsTest.php</file>
+            <file>tests/Feature/ApplyFirewallJobTest.php</file>
+            <file>tests/Feature/AttachCloudDatabaseJobTest.php</file>
+            <file>tests/Feature/AwsAppRunnerServiceTest.php</file>
+            <file>tests/Feature/BackfillOrganizationMembershipsTest.php</file>
+            <file>tests/Feature/BackupConfigurationTest.php</file>
+            <file>tests/Feature/BackupsTest.php</file>
+            <file>tests/Feature/BillingInvoicesTest.php</file>
+            <file>tests/Feature/CacheServiceNetworkExposureTest.php</file>
+            <file>tests/Feature/CheckSupervisorHealthCommandTest.php</file>
+            <file>tests/Feature/ClearSiteEnvCommandTest.php</file>
+            <file>tests/Feature/CliSearchCommandTest.php</file>
+            <file>tests/Feature/CloudAutoscalingTest.php</file>
+            <file>tests/Feature/CloudBuildEnvTest.php</file>
+            <file>tests/Feature/CloudCreatePageTest.php</file>
+            <file>tests/Feature/CloudDatabaseAttachmentTest.php</file>
+            <file>tests/Feature/CloudDatabaseCommandsTest.php</file>
+            <file>tests/Feature/CloudDatabaseCreatePageTest.php</file>
+            <file>tests/Feature/CloudDatabaseIndexPageTest.php</file>
+            <file>tests/Feature/CloudDatabaseModelTest.php</file>
+            <file>tests/Feature/CloudDeployCommandTest.php</file>
+            <file>tests/Feature/CloudDeployWebhookTest.php</file>
+            <file>tests/Feature/CloudDeploymentsCommandTest.php</file>
+            <file>tests/Feature/CloudDeploymentsDashboardTest.php</file>
+            <file>tests/Feature/CloudDoctorCommandTest.php</file>
+            <file>tests/Feature/CloudDomainAttachmentTest.php</file>
+            <file>tests/Feature/CloudDomainCommandsTest.php</file>
+            <file>tests/Feature/CloudEnvCommandTest.php</file>
+            <file>tests/Feature/CloudEnvEditorTest.php</file>
+            <file>tests/Feature/CloudFleetPanelTest.php</file>
+            <file>tests/Feature/CloudImageRollbackTest.php</file>
+            <file>tests/Feature/CloudIndexPageTest.php</file>
+            <file>tests/Feature/CloudListCommandTest.php</file>
+            <file>tests/Feature/CloudLogsCommandTest.php</file>
+            <file>tests/Feature/CloudLogsDashboardTest.php</file>
+            <file>tests/Feature/CloudMetricsCommandTest.php</file>
+            <file>tests/Feature/CloudNavLinkTest.php</file>
+            <file>tests/Feature/CloudObservabilityBackendTest.php</file>
+            <file>tests/Feature/CloudObservabilityDashboardTest.php</file>
+            <file>tests/Feature/CloudPollStatusCommandTest.php</file>
+            <file>tests/Feature/CloudPreviewFlowTest.php</file>
+            <file>tests/Feature/CloudRedeployCommandTest.php</file>
+            <file>tests/Feature/CloudResizeTest.php</file>
+            <file>tests/Feature/CloudRollbackCommandTest.php</file>
+            <file>tests/Feature/CloudRouterTest.php</file>
+            <file>tests/Feature/CloudScaleTest.php</file>
+            <file>tests/Feature/CloudTeardownCommandTest.php</file>
+            <file>tests/Feature/CloudWorkerCommandsTest.php</file>
+            <file>tests/Feature/CloudWorkerDashboardTest.php</file>
+            <file>tests/Feature/CloudWorkerModelTest.php</file>
+            <file>tests/Feature/CloudWorkerProvisionSpecTest.php</file>
+            <file>tests/Feature/ContainerActivityTimelineTest.php</file>
+            <file>tests/Feature/ContainerProviderCredentialsTest.php</file>
+            <file>tests/Feature/ContainerSiteDashboardTest.php</file>
+            <file>tests/Feature/ContainerSiteFieldsTest.php</file>
+            <file>tests/Feature/ContextBreadcrumbTest.php</file>
+            <file>tests/Feature/CreateCloudDatabaseTest.php</file>
+            <file>tests/Feature/CreateCloudSiteFromSourceTest.php</file>
+            <file>tests/Feature/CreateCloudSiteTest.php</file>
+            <file>tests/Feature/CreateCloudWorkerTest.php</file>
+            <file>tests/Feature/CredentialTest.php</file>
+            <file>tests/Feature/DashboardFleetAlertBannerTest.php</file>
+            <file>tests/Feature/DashboardTest.php</file>
+            <file>tests/Feature/DeployPhaseRunnerTest.php</file>
+            <file>tests/Feature/DeploySiteCommandTest.php</file>
+            <file>tests/Feature/DeploymentRunnerTest.php</file>
+            <file>tests/Feature/DetectRuntimeCommandTest.php</file>
+            <file>tests/Feature/DetectWebserverHealthTransitionsJobTest.php</file>
+            <file>tests/Feature/DiffSiteEnvCommandTest.php</file>
+            <file>tests/Feature/DigitalOceanAppPlatformServiceTest.php</file>
+            <file>tests/Feature/DigitalOceanCatalogTokenTest.php</file>
+            <file>tests/Feature/DoctorOrphansCommandTest.php</file>
+            <file>tests/Feature/DplyAboutCommandTest.php</file>
+            <file>tests/Feature/EdgeProxyTest.php</file>
+            <file>tests/Feature/ExampleTest.php</file>
+            <file>tests/Feature/ExportSiteConfigCommandTest.php</file>
+            <file>tests/Feature/ExportSiteEnvCommandTest.php</file>
+            <file>tests/Feature/ExportSiteManifestCommandTest.php</file>
+            <file>tests/Feature/FailedDeploysFleetCommandTest.php</file>
+            <file>tests/Feature/FakeCloudBackendTest.php</file>
+            <file>tests/Feature/FakeCloudProvisionTest.php</file>
+            <file>tests/Feature/FindFleetDomainCommandTest.php</file>
+            <file>tests/Feature/FindFleetEnvCommandTest.php</file>
+            <file>tests/Feature/FleetAgeCommandTest.php</file>
+            <file>tests/Feature/FleetDeploysPageTest.php</file>
+            <file>tests/Feature/FleetDoctorCommandTest.php</file>
+            <file>tests/Feature/FleetDomainsPageTest.php</file>
+            <file>tests/Feature/FleetEnvSearchPageTest.php</file>
+            <file>tests/Feature/FleetHealthPageTest.php</file>
+            <file>tests/Feature/FleetSummaryCommandTest.php</file>
+            <file>tests/Feature/FlushDeployDigestCommandTest.php</file>
+            <file>tests/Feature/FlushServerSystemdNotificationDigestCommandTest.php</file>
+            <file>tests/Feature/FlyEligibilityCommandTest.php</file>
+            <file>tests/Feature/FunctionLogIngestControllerTest.php</file>
+            <file>tests/Feature/GetServerMetaCommandTest.php</file>
+            <file>tests/Feature/GithubCloudWebhookTest.php</file>
+            <file>tests/Feature/ImportSiteEnvCommandTest.php</file>
+            <file>tests/Feature/InsightsFeatureTest.php</file>
+            <file>tests/Feature/InsightsNotificationsTest.php</file>
+            <file>tests/Feature/InstallDatabaseEngineOnServerTest.php</file>
+            <file>tests/Feature/InstallRuntimeCommandTest.php</file>
+            <file>tests/Feature/LaunchesContainersCreateTest.php</file>
+            <file>tests/Feature/ListEnginesCommandTest.php</file>
+            <file>tests/Feature/ListFleetDomainsCommandTest.php</file>
+            <file>tests/Feature/ListFrameworksCommandTest.php</file>
+            <file>tests/Feature/ListPresetsCommandTest.php</file>
+            <file>tests/Feature/ListRuntimesCommandTest.php</file>
+            <file>tests/Feature/ListServersCommandTest.php</file>
+            <file>tests/Feature/ListSiteEnvCommandTest.php</file>
+            <file>tests/Feature/ListSitesCommandTest.php</file>
+            <file>tests/Feature/MarketplaceItemSeederRuntimeTagsTest.php</file>
+            <file>tests/Feature/MarketplaceTest.php</file>
+            <file>tests/Feature/NotificationChannelsTest.php</file>
+            <file>tests/Feature/OrganizationTest.php</file>
+            <file>tests/Feature/PollCloudStatusJobTest.php</file>
+            <file>tests/Feature/PreviewDriftJobTest.php</file>
+            <file>tests/Feature/PrimaryHostnameRenameTest.php</file>
+            <file>tests/Feature/ProcessInsightDigestQueueCommandTest.php</file>
+            <file>tests/Feature/ProcessScheduledServerDeletionsCommandTest.php</file>
+            <file>tests/Feature/ProcessSshKeyRotationRemindersCommandTest.php</file>
+            <file>tests/Feature/ProfileSecurityTest.php</file>
+            <file>tests/Feature/ProfileTest.php</file>
+            <file>tests/Feature/ProjectsTest.php</file>
+            <file>tests/Feature/ProviderOAuthTest.php</file>
+            <file>tests/Feature/ProvisionCloudDatabaseJobTest.php</file>
+            <file>tests/Feature/ProvisionCloudSiteJobTest.php</file>
+            <file>tests/Feature/ProvisionFailureSurfaceTest.php</file>
+            <file>tests/Feature/ProvisionSiteSystemdUnitsJobTest.php</file>
+            <file>tests/Feature/PruneServerCreateDraftsCommandTest.php</file>
+            <file>tests/Feature/PruneServerCronJobRunsCommandTest.php</file>
+            <file>tests/Feature/PruneTestingHostnameRecordsCommandTest.php</file>
+            <file>tests/Feature/RedeploySiteSystemdCommandTest.php</file>
+            <file>tests/Feature/ReferralTest.php</file>
+            <file>tests/Feature/RelocateSiteEnvCommandTest.php</file>
+            <file>tests/Feature/RemoveSiteDomainCommandTest.php</file>
+            <file>tests/Feature/RemoveSiteProcessCommandTest.php</file>
+            <file>tests/Feature/RenameServerCommandTest.php</file>
+            <file>tests/Feature/RenameSiteCommandTest.php</file>
+            <file>tests/Feature/RestartSiteProcessCommandTest.php</file>
+            <file>tests/Feature/RunSitePhaseCommandTest.php</file>
+            <file>tests/Feature/RunningDeploysFleetCommandTest.php</file>
+            <file>tests/Feature/ScriptSeederTest.php</file>
+            <file>tests/Feature/ScriptsTest.php</file>
+            <file>tests/Feature/SeedProvisionedEnginesTest.php</file>
+            <file>tests/Feature/ServerCreateStepReviewSshKeyModalTest.php</file>
+            <file>tests/Feature/ServerCreateStepWhatPresetsTest.php</file>
+            <file>tests/Feature/ServerCronBasicsTest.php</file>
+            <file>tests/Feature/ServerDatabaseEngineActionsTest.php</file>
+            <file>tests/Feature/ServerDatabaseEngineTest.php</file>
+            <file>tests/Feature/ServerDeploysPageTest.php</file>
+            <file>tests/Feature/ServerDoctorCommandTest.php</file>
+            <file>tests/Feature/ServerOverviewEnginesPanelTest.php</file>
+            <file>tests/Feature/ServerOverviewRuntimePanelTest.php</file>
+            <file>tests/Feature/ServerProviderFeatureFlagsTest.php</file>
+            <file>tests/Feature/ServerRecipesTest.php</file>
+            <file>tests/Feature/ServerResourcePreflightTest.php</file>
+            <file>tests/Feature/ServerScheduledDeletionTest.php</file>
+            <file>tests/Feature/ServerSshCommandPrinterTest.php</file>
+            <file>tests/Feature/ServerTest.php</file>
+            <file>tests/Feature/ServerWorkspaceNavTest.php</file>
+            <file>tests/Feature/ServerWorkspaceSshKeysTest.php</file>
+            <file>tests/Feature/ServerlessFunctionProxyTest.php</file>
+            <file>tests/Feature/SetServerMetaCommandTest.php</file>
+            <file>tests/Feature/SetSiteEnvCommandTest.php</file>
+            <file>tests/Feature/SetSiteProcessCommandTest.php</file>
+            <file>tests/Feature/SetSiteRepoCommandTest.php</file>
+            <file>tests/Feature/SetSiteRuntimeCommandTest.php</file>
+            <file>tests/Feature/SettingsAndNotificationsTest.php</file>
+            <file>tests/Feature/SettingsHubTest.php</file>
+            <file>tests/Feature/ShowServerCommandTest.php</file>
+            <file>tests/Feature/ShowSiteDeployCommandTest.php</file>
+            <file>tests/Feature/SiteBackgroundPagesTest.php</file>
+            <file>tests/Feature/SiteCloneTest.php</file>
+            <file>tests/Feature/SiteCommitsTest.php</file>
+            <file>tests/Feature/SiteCreateRuntimeDetectionTest.php</file>
+            <file>tests/Feature/SiteCreateScaffoldModeTest.php</file>
+            <file>tests/Feature/SiteCreationGateTest.php</file>
+            <file>tests/Feature/SiteCronDaemonsRoutesTest.php</file>
+            <file>tests/Feature/SiteDashboardFlyCloudUpsellTest.php</file>
+            <file>tests/Feature/SiteDashboardLatestDeployBadgeTest.php</file>
+            <file>tests/Feature/SiteDatabaseEngineTest.php</file>
+            <file>tests/Feature/SiteDefaultMonitorTest.php</file>
+            <file>tests/Feature/SiteDeleteSystemdTeardownTest.php</file>
+            <file>tests/Feature/SiteDeployHistoryCommandTest.php</file>
+            <file>tests/Feature/SiteDeployStepPhaseBadgeTest.php</file>
+            <file>tests/Feature/SiteDeployStepPhaseTest.php</file>
+            <file>tests/Feature/SiteDeployWebhookTest.php</file>
+            <file>tests/Feature/SiteDeploymentDetailPageTest.php</file>
+            <file>tests/Feature/SiteDeploymentPhaseResultsTest.php</file>
+            <file>tests/Feature/SiteDeploymentsListPageTest.php</file>
+            <file>tests/Feature/SiteDoctorCommandTest.php</file>
+            <file>tests/Feature/SiteDomainCommandsTest.php</file>
+            <file>tests/Feature/SiteEnvDiffPageTest.php</file>
+            <file>tests/Feature/SiteEnvironmentSettingsPageTest.php</file>
+            <file>tests/Feature/SiteLatestDeploymentTest.php</file>
+            <file>tests/Feature/SiteNotificationsTest.php</file>
+            <file>tests/Feature/SiteProvisionerPreviewSslTest.php</file>
+            <file>tests/Feature/SitePsCommandTest.php</file>
+            <file>tests/Feature/SiteRoutingAliasesTest.php</file>
+            <file>tests/Feature/SiteRoutingCliCommandsTest.php</file>
+            <file>tests/Feature/SiteRoutingDomainsTest.php</file>
+            <file>tests/Feature/SiteRoutingPreviewTest.php</file>
+            <file>tests/Feature/SiteRoutingRedirectsTest.php</file>
+            <file>tests/Feature/SiteRoutingTenantsTest.php</file>
+            <file>tests/Feature/SiteSettingsCliPanelsTest.php</file>
+            <file>tests/Feature/SiteSettingsProcessesEditorTest.php</file>
+            <file>tests/Feature/SiteSettingsProcessesPanelTest.php</file>
+            <file>tests/Feature/SiteSettingsRecentDeploymentsPanelTest.php</file>
+            <file>tests/Feature/SiteShowRuntimeSummaryTest.php</file>
+            <file>tests/Feature/SiteTest.php</file>
+            <file>tests/Feature/SiteUptimeMonitorTest.php</file>
+            <file>tests/Feature/SiteUrlCommandTest.php</file>
+            <file>tests/Feature/SiteWebserverConfigTest.php</file>
+            <file>tests/Feature/SnapshotDigitalOceanCommandsTest.php</file>
+            <file>tests/Feature/SourceControlOAuthReturnTest.php</file>
+            <file>tests/Feature/SourceControlTest.php</file>
+            <file>tests/Feature/SshKeysTest.php</file>
+            <file>tests/Feature/StaleDeploysFleetCommandTest.php</file>
+            <file>tests/Feature/StatusPagesTest.php</file>
+            <file>tests/Feature/SupervisorHealthNotificationsTest.php</file>
+            <file>tests/Feature/SyncAuthorizedKeysJobTest.php</file>
+            <file>tests/Feature/SyncCloudWorkersJobTest.php</file>
+            <file>tests/Feature/SyncEnvFromServerJobTest.php</file>
+            <file>tests/Feature/TaskRunnerCancellationTest.php</file>
+            <file>tests/Feature/TaskRunnerVerifyWebhooksCommandTest.php</file>
+            <file>tests/Feature/TeardownCloudDatabaseJobTest.php</file>
+            <file>tests/Feature/TeardownSiteSystemdCommandTest.php</file>
+            <file>tests/Feature/TestingHostnameCleanupCommandTest.php</file>
+            <file>tests/Feature/TrialStateGatingTest.php</file>
+            <file>tests/Feature/UniversalNotificationsTest.php</file>
+            <file>tests/Feature/WebserverRevisionsMigrationTest.php</file>
+            <file>tests/Feature/WebserverSwitchTest.php</file>
+            <file>tests/Feature/WebserverTemplatesTest.php</file>
+            <file>tests/Feature/WorkspaceCachesKeyBrowserTest.php</file>
+            <file>tests/Feature/WorkspaceCachesKeyspaceTest.php</file>
+            <file>tests/Feature/WorkspaceCachesMonitorTest.php</file>
+            <file>tests/Feature/WorkspaceCachesReplTest.php</file>
+            <file>tests/Feature/WorkspaceCachesTest.php</file>
+            <file>tests/Feature/WorkspaceDatabasesTest.php</file>
+            <file>tests/Feature/WorkspaceFirewallTest.php</file>
+            <file>tests/Feature/WorkspaceMonitorTest.php</file>
+            <file>tests/Feature/WorkspacePhpRevisionsTest.php</file>
+            <file>tests/Feature/WorkspacePhpTest.php</file>
+            <file>tests/Feature/WorkspaceSettingsRepairAccessTest.php</file>
         </testsuite>
     </testsuites>
     <source>
@@ -309,5 +309,6 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <ini name="max_execution_time" value="0"/>
     </php>
 </phpunit>

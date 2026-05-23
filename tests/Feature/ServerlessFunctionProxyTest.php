@@ -39,7 +39,7 @@ test('it proxies a testing domain subdomain', function () {
         ]],
     ]);
 
-    $this->get('http://orders-api.dply.cc/')
+    $this->get('http://orders-api.dply.host/')
         ->assertOk()
         ->assertSee('reached via subdomain');
 });

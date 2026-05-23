@@ -12,11 +12,10 @@ use App\Models\WebserverTemplate;
 use Database\Seeders\MarketplaceItemSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
-uses(WithFeatures::class);
+usesFeatures('surface.marketplace');
 
 beforeEach(function () {
     $this->seed(MarketplaceItemSeeder::class);

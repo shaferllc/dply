@@ -14,6 +14,8 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+usesFeatures('global.signups_open');
+
 test('valid referrer query sets session', function () {
     $referrer = User::factory()->create();
 
@@ -51,7 +53,7 @@ test('registration assigns referrer from session', function () {
 
 test('invoice webhook marks conversion and records reward', function () {
     config([
-        'subscription.plans.pro_monthly.price_id' => 'price_test_pro',
+        'subscription.standard.stripe.base_monthly' => 'price_test_pro',
         'referral.bonus_credit_cents' => 0,
     ]);
 
@@ -104,8 +106,9 @@ test('invoice webhook marks conversion and records reward', function () {
 
 test('conversion service skips without pro price match', function () {
     config([
-        'subscription.plans.pro_monthly.price_id' => 'price_real_pro',
-        'subscription.plans.pro_yearly.price_id' => '',
+        'subscription.standard.stripe.base_monthly' => 'price_real_pro',
+        'subscription.standard.stripe.base_yearly' => '',
+        'subscription.enterprise.stripe_price_id' => '',
     ]);
 
     $referrer = User::factory()->create();

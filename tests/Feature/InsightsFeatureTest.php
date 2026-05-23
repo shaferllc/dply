@@ -41,12 +41,22 @@ use App\Services\Servers\ServerPhpFpmProbe;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
-uses(WithFeatures::class);
+usesFeatures('workspace.insights');
+
+beforeEach(function (): void {
+    // FakesRemoteServerAccess fakes the queue globally; ShouldQueue jobs
+    // dispatched here must run inline for assertions on side effects.
+    Queue::getFacadeRoot()->except([
+        RunServerInsightsJob::class,
+        ApplyInsightFixJob::class,
+        RevertInsightFixJob::class,
+    ]);
+});
 
 /**
  * @return array{0: User, 1: Server}
@@ -1099,6 +1109,8 @@ test('apply fix job refuses config mutating fix when org disables it', function 
 
     $handler = new class implements InsightFixActionInterface
     {
+        public bool $applyCalled = false;
+
         public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
@@ -1171,6 +1183,8 @@ test('apply fix job runs config mutating fix when org allows it', function () {
     // Default behavior: no `allow_config_mutation` key set → gate is open.
     $handler = new class implements InsightFixActionInterface
     {
+        public bool $applyCalled = false;
+
         public function preflight($server, $site, $finding, array $params): ?string
         {
             return null;
@@ -2087,6 +2101,10 @@ test('apply fix job dispatches through handler and resolves problem when recheck
     // Stub handler that captures invocations.
     $handler = new class implements InsightFixActionInterface
     {
+        public bool $preflightCalled = false;
+
+        public bool $applyCalled = false;
+
         public function preflight($server, $site, $finding, array $params): ?string
         {
             $this->preflightCalled = true;
@@ -2177,6 +2195,8 @@ test('apply fix job records refusal from preflight without running apply', funct
 
     $handler = new class implements InsightFixActionInterface
     {
+        public bool $applyCalled = false;
+
         public function preflight($server, $site, $finding, array $params): ?string
         {
             return 'not enough RAM headroom';

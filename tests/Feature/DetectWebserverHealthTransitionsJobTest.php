@@ -11,9 +11,18 @@ use App\Models\ServerMetricSnapshot;
 use App\Models\User;
 use App\Notifications\WebserverHealthAlertNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Carbon::setTestNow('2026-05-22 12:00:00');
+});
+
+afterEach(function (): void {
+    Carbon::setTestNow();
+});
 
 function makeServer(): Server
 {
@@ -27,11 +36,11 @@ function makeServer(): Server
         'organization_id' => $org->id,
     ]);
 }
-function snapshot(Server $server, array $webserverHealth): void
+function snapshot(Server $server, array $webserverHealth, ?Carbon $capturedAt = null): ServerMetricSnapshot
 {
-    ServerMetricSnapshot::query()->create([
+    return ServerMetricSnapshot::query()->create([
         'server_id' => $server->id,
-        'captured_at' => now(),
+        'captured_at' => $capturedAt ?? now(),
         'payload' => [
             'cpu_pct' => 5.0,
             'webserver_health' => $webserverHealth,
@@ -63,11 +72,11 @@ test('no repeat alert while still tripped', function () {
     $server = makeServer();
 
     // First scrape — trips.
-    snapshot($server, [['engine' => 'nginx', 'active_connections' => 6000]]);
+    snapshot($server, [['engine' => 'nginx', 'active_connections' => 6000]], now());
     app()->call([new DetectWebserverHealthTransitionsJob($server->id), 'handle']);
 
     // Second scrape — still tripped. Should NOT re-fire.
-    snapshot($server, [['engine' => 'nginx', 'active_connections' => 7000]]);
+    snapshot($server, [['engine' => 'nginx', 'active_connections' => 7000]], now()->addMinute());
     app()->call([new DetectWebserverHealthTransitionsJob($server->id), 'handle']);
 
     Notification::assertSentTimes(WebserverHealthAlertNotification::class, 1);
@@ -75,13 +84,28 @@ test('no repeat alert while still tripped', function () {
 test('fires recovery notification on down transition', function () {
     Notification::fake();
     $server = makeServer();
+    $owner = $server->organization->users()->wherePivot('role', 'owner')->firstOrFail();
 
-    snapshot($server, [['engine' => 'nginx', 'active_connections' => 6000]]);
+    snapshot($server, [['engine' => 'nginx', 'active_connections' => 6000]], now());
     app()->call([new DetectWebserverHealthTransitionsJob($server->id), 'handle']);
+
+    $server->refresh();
+    expect($server->meta['webserver_health_alert_state']['nginx']['active_connections']['tripped'] ?? null)->toBeTrue();
+
+    Notification::assertSentTo(
+        $owner,
+        WebserverHealthAlertNotification::class,
+        fn (WebserverHealthAlertNotification $notification): bool => $notification->transition === 'tripped',
+    );
 
     // Drop below threshold — should fire RECOVERY notification.
-    snapshot($server, [['engine' => 'nginx', 'active_connections' => 100]]);
+    snapshot($server, [['engine' => 'nginx', 'active_connections' => 100]], now()->addMinute());
     app()->call([new DetectWebserverHealthTransitionsJob($server->id), 'handle']);
 
+    Notification::assertSentTo(
+        $owner,
+        WebserverHealthAlertNotification::class,
+        fn (WebserverHealthAlertNotification $notification): bool => $notification->transition === 'recovered',
+    );
     Notification::assertSentTimes(WebserverHealthAlertNotification::class, 2);
 });

@@ -896,9 +896,13 @@ test('servers create custom path shows warning preflight and unavailable cost', 
 });
 
 test('servers create custom connection test can report success', function () {
-    $sshMock = Mockery::mock('overload:App\Services\SshConnection');
-    $sshMock->shouldReceive('connect')->once()->with(8)->andReturn(true);
-    $sshMock->shouldReceive('exec')->once()->with('whoami', 8)->andReturn('root');
+    $shell = new \Tests\Support\FakeRemoteShell(
+        fn (string $command): ?string => $command === 'whoami' ? 'root' : null,
+    );
+    app()->instance(
+        \App\Services\SshConnectionFactory::class,
+        new \Tests\Support\FakeSshConnectionFactory($shell),
+    );
 
     $user = userWithOrganization();
 

@@ -22,10 +22,16 @@ use App\Notifications\UniversalEventNotification;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Queue::getFacadeRoot()->except([SendQueuedNotifications::class]);
+});
 
 test('publisher creates event and in app items for resource stakeholders', function () {
     $owner = User::factory()->create();

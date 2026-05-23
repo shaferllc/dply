@@ -12,10 +12,17 @@ use App\Models\Server;
 use App\Models\User;
 use App\Notifications\UniversalEventNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    // UniversalEventNotification is ShouldQueue; global Queue::fake() otherwise
+    // leaves the notifications table empty while notification_events still persist.
+    Queue::getFacadeRoot()->except([SendQueuedNotifications::class]);
+});
 
 function userWithOrganization(): User
 {

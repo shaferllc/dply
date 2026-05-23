@@ -103,7 +103,7 @@ function makeSiteWithoutEnvSupport(): Site
 }
 function bindFakeReader(string $serverEnv): void
 {
-    $this->app->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
+    app()->bind(SiteEnvReader::class, fn () => new class($serverEnv) extends SiteEnvReader
     {
         public function __construct(private readonly string $payload)
         {

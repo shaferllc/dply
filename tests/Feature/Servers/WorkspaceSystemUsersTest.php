@@ -24,6 +24,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.system_users');
+
 /**
  * @return array{0: User, 1: Server}
  */

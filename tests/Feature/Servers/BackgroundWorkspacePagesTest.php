@@ -39,6 +39,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.schedule', 'workspace.activity');
+
 function actingOrgUser(): User
 {
     $user = User::factory()->create();

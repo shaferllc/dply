@@ -9,11 +9,10 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
 
-uses(WithFeatures::class);
+usesFeatures('surface.fleet');
 
 test('lists all domains for current org', function () {
     [$user, $org] = makeUserOrg();

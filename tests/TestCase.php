@@ -18,6 +18,11 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // Production Livewire actions (e.g. server log tailing) call set_time_limit()
+        // with request budgets. That applies to the whole PHPUnit worker, so one
+        // test can poison the remaining batch with a 90s cap.
+        set_time_limit(0);
+
         $this->withoutVite();
 
         // Avoid blocking Livewire tests on SSH; tests that assert queued manage jobs opt in explicitly.

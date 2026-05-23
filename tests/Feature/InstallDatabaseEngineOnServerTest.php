@@ -124,6 +124,9 @@ test('add engine command with install flag falls back when engine unknown', func
 });
 class InstallDbRecordingShell implements RemoteShell
 {
+    /** @var list<string> */
+    public array $execCalls = [];
+
     public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;

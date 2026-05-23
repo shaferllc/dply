@@ -19,6 +19,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.files');
+
 function actingOrgUser(string $role = 'owner'): User
 {
     $user = User::factory()->create();

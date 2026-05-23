@@ -49,7 +49,10 @@ class DetectWebserverHealthTransitionsJob implements ShouldQueue
         }
 
         // Most recent snapshot — the one whose ingest spawned this job.
-        $snapshot = $server->metricSnapshots()->orderByDesc('captured_at')->first();
+        $snapshot = $server->metricSnapshots()
+            ->orderByDesc('captured_at')
+            ->orderByDesc('id')
+            ->first();
         if ($snapshot === null) {
             return;
         }

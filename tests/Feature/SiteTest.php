@@ -6,6 +6,7 @@ use App\Contracts\DeployEngine;
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
@@ -477,7 +478,7 @@ test('functions host site creation uses runtime profile and artifact metadata', 
     expect($site->git_repository_url)->toBe($origin);
     expect($site->git_branch)->toBe('main');
     expect(data_get($site->meta, 'serverless.runtime'))->toBe('nodejs:18');
-    expect(data_get($site->meta, 'serverless.entrypoint'))->toBe('index');
+    expect(data_get($site->meta, 'serverless.entrypoint'))->toBe('main');
     expect(data_get($site->meta, 'serverless.build_command'))->toBe('npm install && npm run build');
     expect(data_get($site->meta, 'serverless.artifact_output_path'))->toBe('dist');
     expect(data_get($site->meta, 'serverless.detected_runtime.framework'))->toBe('vite_static');
@@ -597,7 +598,7 @@ test('kubernetes host site creation uses kubernetes runtime profile', function (
     expect($site->provisioningState())->toBe('queued');
 });
 
-test('functions host site creation blocks laravel repo on unsupported target', function () {
+test('functions host site creation allows laravel repo on digitalocean functions', function () {
     Queue::fake();
 
     $origin = makeGitRepository([
@@ -635,10 +636,16 @@ test('functions host site creation blocks laravel repo on unsupported target', f
         ->set('form.functions_repository_url', $origin)
         ->set('form.functions_repository_branch', 'main')
         ->call('store')
-        ->assertHasErrors(['form.functions_repository_url']);
+        ->assertHasNoErrors()
+        ->assertRedirect();
 
-    expect(Site::query()->where('name', 'Laravel Functions Site')->first())->toBeNull();
-    Queue::assertNotPushed(ProvisionSiteJob::class);
+    $site = Site::query()->where('name', 'Laravel Functions Site')->firstOrFail();
+
+    expect($site->usesFunctionsRuntime())->toBeTrue();
+    expect($site->runtimeProfile())->toBe('digitalocean_functions_web');
+    expect(data_get($site->meta, 'serverless.detected_runtime.framework'))->toBe('laravel');
+    expect(data_get($site->meta, 'serverless.entrypoint'))->toBe('main');
+    expect($site->provisioningState())->toBe('queued');
 });
 
 test('functions host site settings deploy hides server only controls', function () {
@@ -732,6 +739,8 @@ test('aws lambda site settings deploy renders recipe only', function () {
 });
 
 test('functions host deploy uses digitalocean functions engine', function () {
+    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+
     Http::fake([
         'https://faas-nyc1-example.doserverless.co/api/v1/namespaces/*' => Http::response([
             'version' => '7',
@@ -813,6 +822,8 @@ test('functions host deploy uses digitalocean functions engine', function () {
 });
 
 test('aws lambda host deploy uses aws lambda engine', function () {
+    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+
     $origin = makeGitRepository([
         'artisan' => "#!/usr/bin/env php\n",
         'bootstrap/app.php' => "<?php\n",
@@ -885,6 +896,8 @@ test('functions configured state is ready for workspace but not traffic', functi
 });
 
 test('docker host site provisioning prepares runtime until first deploy', function () {
+    Queue::getFacadeRoot()->except([ProvisionSiteJob::class]);
+
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -919,6 +932,8 @@ test('docker host site provisioning prepares runtime until first deploy', functi
 });
 
 test('docker host deploy uses docker engine', function () {
+    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+
     app()->instance(DockerDeployEngine::class, new class implements DeployEngine
     {
         public function run(DeployContext $context): array
@@ -971,6 +986,8 @@ test('docker host deploy uses docker engine', function () {
 });
 
 test('kubernetes host deploy uses kubernetes engine', function () {
+    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
+
     app()->instance(KubernetesKubectlExecutor::class, new class extends KubernetesKubectlExecutor
     {
         public function deploy(string $manifest, string $namespace, string $deploymentName, ?string $kubeconfigPath = null, ?string $context = null): array
@@ -1141,11 +1158,13 @@ test('site show defaults to general site workspace', function () {
     $response->assertOk()
         ->assertSee('Site workspace')
         ->assertSee('General')
-        ->assertSee('Site project settings')
-        ->assertSee('Save project settings')
-        ->assertSee('Deployment foundation')
-        ->assertSee('Deployment log')
-        ->assertSee('Site notes');
+        ->assertSee('Site domain')
+        ->assertSee('Status')
+        ->assertSee('Site details')
+        ->assertSee('Edit in Settings')
+        ->assertDontSee('Save project settings')
+        ->assertDontSee('Deployment foundation')
+        ->assertDontSee('Deployment log');
 });
 
 test('site show surfaces deployment foundation preflight and resource state', function () {
@@ -1185,23 +1204,24 @@ test('site show surfaces deployment foundation preflight and resource state', fu
 
     $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
+    // Docker workspaces land on the container dashboard Overview — preflight,
+    // foundation contract, and env keys live on dedicated sections now.
     $response->assertOk()
-        ->assertSee('Launch preflight')
-        ->assertSee('A repository URL is required for this runtime target.')
-        ->assertSee('Attached resources')
-        ->assertSee('Publication')
-        ->assertSee('Deployment foundation')
-        ->assertSee('Shared secrets &amp; config', false)
-        ->assertSee('1 secret')
-        ->assertSee('1 config value')
+        ->assertSee('Container app workspace')
+        ->assertSee('Overview')
+        ->assertSee('Container deployment')
+        ->assertSee('Backend');
+
+    $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'environment',
+    ], false))
+        ->assertOk()
+        ->assertSee('Environment variables')
         ->assertSee('APP_KEY')
-        ->assertSee('Redacted')
         ->assertSee('APP_NAME')
-        ->assertSee('Dply Demo')
-        ->assertSee('Injected into the managed Docker runtime inputs Dply builds for this site.')
-        ->assertSee('Current revision')
-        ->assertSee('Last applied revision')
-        ->assertSee('Detected');
+        ->assertSee('Dply Demo');
 });
 
 test('site environment section renders keys for serverless sites', function () {
@@ -1367,7 +1387,7 @@ test('site settings deploy section can save repository and strategy settings', f
         ->set('zero_downtime_enabled', true)
         ->call('saveZeroDowntimeDeployment')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Zero downtime deployment settings saved. Webserver config reloaded.', type: 'success')
+        ->assertDispatched('notify', message: 'Zero downtime deployment settings saved. Webserver config queued.', type: 'success')
         ->set('releases_to_keep', 8)
         ->set('deployment_environment', 'staging')
         ->set('octane_port', '8080')
@@ -1433,7 +1453,7 @@ test('site settings general section uses certificate summary for ssl status', fu
         ->assertSee('active');
 });
 
-test('site settings general section shows project context links', function () {
+test('site settings section shows project context links', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $workspace = Workspace::factory()->create([
@@ -1453,7 +1473,7 @@ test('site settings general section shows project context links', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false));
+    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings'], false));
 
     $response->assertOk()
         ->assertSee('Current project')
@@ -1546,8 +1566,9 @@ test('site show links to dedicated settings workspace and omits settings forms',
 
     $response->assertOk()
         ->assertSee(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general'], false), escape: false)
-        ->assertSee('Site settings')
-        ->assertSee('Deployment log')
+        ->assertSee(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings'], false), escape: false)
+        ->assertSee('Settings')
+        ->assertSee('Logs')
         ->assertDontSee('Save PHP settings')
         ->assertDontSee('Deploy webhook')
         ->assertDontSee('Environment (.env)');
@@ -1586,12 +1607,26 @@ test('site show displays aws lambda runtime target details', function () {
 
     $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
 
+    // Lambda invocation metadata lives on the serverless Overview dashboard now,
+    // not the legacy "Runtime target" panel from Sites\Show.
     $response->assertOk()
-        ->assertSee('Runtime target')
-        ->assertSee('AWS Lambda')
+        ->assertSee('Cloud app workspace')
+        ->assertSee('Overview')
+        ->assertSee('Serverless')
+        ->assertSee('Function')
         ->assertSee('aws-stub-revision-1')
-        ->assertSee('Function ARN')
-        ->assertSee('provided.al2023');
+        ->assertSee('provided.al2023')
+        ->assertSee('Live');
+
+    $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'runtime',
+    ], false))
+        ->assertOk()
+        ->assertSee('Execution profile')
+        ->assertSee('Current revision')
+        ->assertSee('public/index.php');
 });
 
 test('site show displays docker runtime target summary', function () {
@@ -1638,11 +1673,24 @@ test('site show displays docker runtime target summary', function () {
         ],
     ]);
 
-    Livewire::actingAs($user)
-        ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+    // Compose / Dockerfile artifacts live on Deploy; live discovery on Runtime.
+    $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'deploy',
+    ], false))
+        ->assertOk()
         ->assertSee('Runtime target')
-        ->assertSee('Last generated compose file')
+        ->assertSee('Compose file')
         ->assertSee('Managed Dockerfile')
+        ->assertSee('FROM php:8.3-cli');
+
+    $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'runtime',
+    ], false))
+        ->assertOk()
         ->assertSee('Docker discovery')
         ->assertSee('laravel.repo.orb.local')
         ->assertSee('192.168.107.2')
@@ -1676,14 +1724,17 @@ test('site show displays kubernetes runtime target summary', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+    $response = $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'deploy',
+    ], false));
 
     $response->assertOk()
         ->assertSee('Runtime target')
-        ->assertSee('Kubernetes cluster')
-        ->assertSee('Namespace')
         ->assertSee('orbit-local')
-        ->assertSee('Manifest');
+        ->assertSee('Manifest')
+        ->assertSee('kind: Deployment');
 });
 
 test('runtime target model maps local and cloud container families', function () {
@@ -1787,12 +1838,13 @@ test('site show exposes orbstack runtime controls and records runtime actions', 
     ]);
 
     Livewire::actingAs($user)
-        ->test(SitesShow::class, ['server' => $server, 'site' => $site])
-        ->assertSee('Runtime controls')
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
+        ->assertSee('Container lifecycle')
         ->assertSee('Rebuild')
         ->assertSee('Refresh Docker details')
         ->assertSee('Destroy')
         ->call('runRuntimeAction', 'status')
+        ->assertHasNoErrors()
         ->assertDispatched('notify', message: 'Runtime status refreshed.', type: 'success');
 
     $site->refresh();
@@ -1840,7 +1892,7 @@ test('site show surfaces runtime error console from error diagnostics', function
     ]);
 
     Livewire::actingAs($user)
-        ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'logs'])
         ->assertSee('Runtime errors')
         ->assertSee('Database file does not exist');
 });
@@ -2125,14 +2177,22 @@ test('site show displays preview and certificate summary', function () {
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
-
-    $response->assertOk()
-        ->assertSee('Preview & SSL')
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'preview'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+        ->assertSee('Preview domains')
         ->assertSee('preview-app.dply.cc')
-        ->assertSee('ready')
-        ->assertSee('Letsencrypt')
-        ->assertSee('Preview')
+        ->assertSee('ready');
+
+    $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'certificates',
+    ], false))
+        ->assertOk()
+        ->assertSee('Existing certificates')
+        ->assertSee('Letsencrypt · Preview')
+        ->assertSee('preview-app.dply.cc')
         ->assertSee('active');
 });
 
@@ -2159,16 +2219,22 @@ test('site show displays certificate retry affordance for failed certificate', f
         'last_output' => 'DNS validation failed for app.example.com',
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
+    $response = $this->actingAs($user)->get(route('sites.show', [
+        'server' => $server,
+        'site' => $site,
+        'section' => 'certificates',
+    ], false));
 
     $response->assertOk()
-        ->assertSee('Latest certificate output')
-        ->assertSee('DNS validation failed for app.example.com')
-        ->assertSee('Retry certificate')
-        ->assertSee('Open certificate settings');
+        ->assertSee('Existing certificates')
+        ->assertSee('failed')
+        ->assertSee('Last output')
+        ->assertSee('DNS validation failed for app.example.com');
 });
 
 test('site show can retry a failed certificate', function () {
+    Queue::getFacadeRoot()->except([ExecuteSiteCertificateJob::class]);
+
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -2206,7 +2272,7 @@ test('site show can retry a failed certificate', function () {
     });
 
     Livewire::actingAs($user)
-        ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
         ->call('retryCertificate', $certificate->id)
         ->assertDispatched('notify', message: 'Certificate retry finished.', type: 'success');
 
@@ -2431,13 +2497,9 @@ test('site settings redirects section renders separately', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'redirects'], false));
-
-    // Manual "Apply webserver config now" button was removed when the
-    // Routing page adopted the env-page UX (auto-apply on every save).
-    // The page still renders the section header, the Add CTA, and the
-    // "Auto-applied to the webserver after save." note in the modal.
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'redirects'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->assertSee('Redirects')
         ->assertSee('Add redirect');
 });
@@ -2544,7 +2606,7 @@ test('site settings logs section renders site deployments and webhook deliveries
         ->assertSee(route('servers.logs', $server, false), escape: false);
 });
 
-test('site settings general section can save primary domain and web directory', function () {
+test('site settings can save web directory and primary hostname from dedicated sections', function () {
     Bus::fake();
 
     $user = userWithOrganization();
@@ -2567,12 +2629,20 @@ test('site settings general section can save primary domain and web directory', 
     ]);
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-        ->set('settings_primary_domain', 'new.example.com')
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'settings'])
         ->set('settings_document_root', '/srv/new/public')
-        ->call('saveGeneralSettings')
+        ->call('saveWebDirectory')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Site settings saved. Webserver config reloaded.', type: 'success');
+        ->assertDispatched('notify', message: 'Web directory saved. Webserver config queued.', type: 'success');
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'domains'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+        ->call('editDomain', $domain->id)
+        ->set('editing_domain_hostname', 'new.example.com')
+        ->call('saveEditedDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('notify', message: 'Primary hostname renamed. Webserver config queued.', type: 'success');
 
     $site->refresh();
     $domain->refresh();
@@ -2769,7 +2839,7 @@ test('site settings preview section can save primary preview domain', function (
         ->set('preview_https_redirect', true)
         ->call('savePreviewSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Preview settings saved. Webserver config reloaded.', type: 'success');
+        ->assertDispatched('notify', message: 'Preview settings saved. Webserver config queued.', type: 'success');
 
     $site->refresh();
     $previewDomain = SitePreviewDomain::query()->where('site_id', $site->id)->first();
@@ -2813,9 +2883,9 @@ test('site settings domains section shows quick ssl action only for uncovered do
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'domains'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'domains'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->assertSee('SSL configured')
         ->assertSee('SSL missing')
         ->assertSee("openQuickDomainSslModal('www.example.com')", escape: false)
@@ -2854,9 +2924,9 @@ test('site settings aliases section shows quick ssl action only for uncovered al
         'status' => SiteCertificate::STATUS_ACTIVE,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => 'aliases'], false));
-
-    $response->assertOk()
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'aliases'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->assertSee('SSL missing')
         ->assertSee("openQuickDomainSslModal('alias.example.com')", escape: false)
         ->assertDontSee("openQuickDomainSslModal('app.example.com')", escape: false);
@@ -2885,6 +2955,8 @@ test('site settings aliases section can quick add letsencrypt ssl for alias', fu
         'hostname' => 'alias.example.com',
         'label' => 'Marketing',
     ]);
+
+    Queue::getFacadeRoot()->except([ExecuteSiteCertificateJob::class]);
 
     $this->mock(CertificateRequestService::class, function ($mock) use ($site): void {
         $mock->shouldReceive('create')
@@ -2920,7 +2992,7 @@ test('site settings aliases section can quick add letsencrypt ssl for alias', fu
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'SSL request started for alias.example.com via Let\'s Encrypt.', type: 'success');
+        ->assertDispatched('notify', message: 'SSL request queued for alias.example.com via Let\'s Encrypt.', type: 'success');
 
     $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -2947,6 +3019,8 @@ test('site settings domains section can quick add letsencrypt ssl', function () 
         'hostname' => 'app.example.com',
         'is_primary' => true,
     ]);
+
+    Queue::getFacadeRoot()->except([ExecuteSiteCertificateJob::class]);
 
     $this->mock(CertificateRequestService::class, function ($mock) use ($site): void {
         $mock->shouldReceive('create')
@@ -2982,7 +3056,7 @@ test('site settings domains section can quick add letsencrypt ssl', function () 
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'SSL request started for app.example.com via Let\'s Encrypt.', type: 'success');
+        ->assertDispatched('notify', message: 'SSL request queued for app.example.com via Let\'s Encrypt.', type: 'success');
 
     $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -3009,6 +3083,8 @@ test('site settings domains section can quick add zerossl ssl', function () {
         'hostname' => 'api.example.com',
         'is_primary' => true,
     ]);
+
+    Queue::getFacadeRoot()->except([ExecuteSiteCertificateJob::class]);
 
     $this->mock(CertificateRequestService::class, function ($mock) use ($site): void {
         $mock->shouldReceive('create')
@@ -3043,7 +3119,7 @@ test('site settings domains section can quick add zerossl ssl', function () {
         ->set('quick_ssl_provider_type', SiteCertificate::PROVIDER_ZEROSSL)
         ->call('quickAddDomainSsl')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'SSL request started for api.example.com via ZeroSSL.', type: 'success');
+        ->assertDispatched('notify', message: 'SSL request queued for api.example.com via ZeroSSL.', type: 'success');
 
     $certificate = SiteCertificate::query()->where('site_id', $site->id)->latest('created_at')->first();
 
@@ -3112,6 +3188,8 @@ test('site settings certificates section scopes dns request to preview domain', 
         'organization_id' => $org->id,
         'provider' => 'digitalocean',
     ]);
+
+    Queue::getFacadeRoot()->except([ExecuteSiteCertificateJob::class]);
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
@@ -3379,6 +3457,8 @@ test('site settings suspend and resume updates site and applies webserver config
     $this->mock(SiteWebserverConfigApplier::class, function ($mock): void {
         $mock->shouldReceive('apply')->twice()->andReturn('ok');
     });
+
+    Queue::getFacadeRoot()->except([ApplySiteWebserverConfigJob::class]);
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'danger'])

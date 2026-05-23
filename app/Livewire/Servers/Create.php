@@ -16,7 +16,7 @@ use App\Livewire\Forms\ServerCreateForm;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -297,7 +297,7 @@ class Create extends Component
         ]);
 
         try {
-            $ssh = new SshConnection($server);
+            $ssh = app(SshConnectionFactory::class)->forServer($server);
             if (! $ssh->connect(8)) {
                 throw new \RuntimeException('SSH authentication failed.');
             }

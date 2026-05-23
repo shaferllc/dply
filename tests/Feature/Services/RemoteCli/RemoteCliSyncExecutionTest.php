@@ -21,9 +21,16 @@ use App\Services\RemoteCli\WpCli;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    // Async wp-cli runs settle via RunRemoteCliInBackgroundJob; allow it
+    // to execute inline while the global Feature test harness fakes SSH.
+    Queue::getFacadeRoot()->except([RunRemoteCliInBackgroundJob::class]);
+});
 
 afterEach(function () {
     Mockery::close();

@@ -13,7 +13,6 @@ use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -87,10 +86,9 @@ test('non vm host rejects custom create', function () {
     $user = userWithOrganization();
     $server = dockerServer($user);
 
-    $this->expectException(AuthorizationException::class);
-
-    Livewire::actingAs($user)
-        ->test(CreateCustom::class, ['server' => $server]);
+    $this->actingAs($user)
+        ->get(route('sites.create-custom', $server))
+        ->assertForbidden();
 });
 function vmServer(User $user): Server
 {

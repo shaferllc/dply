@@ -22,6 +22,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.insights');
+
 /**
  * @return array{0: User, 1: Server, 2: Organization}
  */

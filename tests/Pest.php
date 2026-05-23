@@ -1,7 +1,22 @@
 <?php
 
+use Laravel\Pennant\Feature;
 use Tests\Concerns\FakesRemoteServerAccess;
 use Tests\TestCase;
+
+/**
+ * Enable Pennant flags for Pest procedural tests. Class-based tests can set
+ * WithFeatures::$features instead; Pest files should call this helper.
+ */
+function usesFeatures(string ...$flags): void
+{
+    beforeEach(function () use ($flags): void {
+        foreach ($flags as $flag) {
+            Feature::define($flag, fn (): bool => true);
+        }
+        Feature::flushCache();
+    });
+}
 
 /*
 |--------------------------------------------------------------------------

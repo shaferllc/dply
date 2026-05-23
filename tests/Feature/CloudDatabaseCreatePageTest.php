@@ -20,6 +20,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('surface.cloud');
+
 test('page renders', function () {
     $user = ownerWithOrg();
 

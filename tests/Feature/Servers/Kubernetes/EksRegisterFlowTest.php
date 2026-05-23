@@ -23,6 +23,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.cluster', 'provider.aws', 'provider.aws_eks');
+
 test('step what lists aws supported regions in the picker', function () {
     Queue::fake();
     [$user, $org, $credential] = userOrgAndAwsCredential();

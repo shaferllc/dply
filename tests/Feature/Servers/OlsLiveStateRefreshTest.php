@@ -38,7 +38,9 @@ test('refresh engine live state invokes probe and caches result', function () {
     // Server.meta so the assertion below can verify the cache hand-off.
     $stub = new class extends OlsLiveStateProbe
     {
-        public function runFreshProbe(Server $server): EngineLiveState
+        public int $calls = 0;
+
+        protected function runFreshProbe(Server $server): EngineLiveState
         {
             $this->calls++;
 

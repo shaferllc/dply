@@ -16,6 +16,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('provider.aws_app_runner');
+
 test('panels visible only when provider is enabled', function () {
     config([
         'server_providers.enabled.digitalocean_app_platform' => false,

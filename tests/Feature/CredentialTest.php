@@ -15,6 +15,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('provider.fly_io');
+
 function userWithOrganization(): User
 {
     $user = User::factory()->create();

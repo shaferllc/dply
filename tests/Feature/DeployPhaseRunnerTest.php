@@ -267,6 +267,11 @@ function makeSite(array $overrides = []): array
 }
 class DeployRecordingShell implements RemoteShell
 {
+    /** @var list<string> */
+    public array $execCalls = [];
+
+    public ?string $failOn = null;
+
     public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = $command;

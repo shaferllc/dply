@@ -16,6 +16,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('surface.fleet');
+
 test('panel hidden when no cloud sites', function () {
     $user = ownerWithOrg();
 

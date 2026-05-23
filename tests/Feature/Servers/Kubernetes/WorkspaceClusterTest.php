@@ -21,6 +21,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('workspace.cluster', 'provider.aws', 'provider.aws_eks');
+
 test('poller keeps polling while state is provisioning', function () {
     Cache::flush();
     Queue::fake();

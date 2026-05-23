@@ -24,6 +24,11 @@ class FakeRemoteShell extends SshConnection
         protected $execHandler = null
     ) {}
 
+    public function connect(int $timeout = 10): bool
+    {
+        return true;
+    }
+
     public function exec(string $command, int $timeoutSeconds = 120): string
     {
         $this->execCalls[] = [$command, $timeoutSeconds];

@@ -19,6 +19,8 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
+usesFeatures('surface.cloud');
+
 test('page renders with empty state', function () {
     $user = ownerWithOrg();
 

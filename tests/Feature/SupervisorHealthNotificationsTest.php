@@ -9,24 +9,27 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\SupervisorProgram;
 use App\Models\User;
-use App\Notifications\UniversalEventNotification;
+use App\Notifications\SupervisorProgramsUnhealthyNotification;
 use App\Services\Servers\SupervisorProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
 test('supervisor health command publishes universal notification for org admins', function () {
-    Mail::fake();
+    Config::set('dply.supervisor_health_check_enabled', true);
+    Notification::fake();
+    Cache::flush();
 
     $owner = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($owner->id, ['role' => 'owner']);
 
-    $server = Server::factory()->create([
+    $server = Server::factory()->ready()->create([
         'user_id' => $owner->id,
         'organization_id' => $org->id,
-        'status' => Server::STATUS_READY,
         'ssh_private_key' => 'test-private-key',
         'supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED,
         'name' => 'queue-1',
@@ -63,9 +66,5 @@ test('supervisor health command publishes universal notification for org admins'
         'organization_id' => $org->id,
     ]);
 
-    $this->assertDatabaseHas('notifications', [
-        'notifiable_type' => User::class,
-        'notifiable_id' => $owner->id,
-        'type' => UniversalEventNotification::class,
-    ]);
+    Notification::assertSentTo($owner, SupervisorProgramsUnhealthyNotification::class);
 });
