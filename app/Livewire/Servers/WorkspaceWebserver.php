@@ -35,6 +35,7 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Servers\WebserverConfigDriftDetector;
+use App\Support\Servers\WebserverWorkspaceViewData;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -54,9 +55,9 @@ use Livewire\Attributes\Url;
  *   - `mount()` accepts no `?section` query string (this isn't a sub-tab
  *     anymore) — section is fixed at 'web' so the parent's render share +
  *     trait-internal asserts continue working.
- *   - `render()` points at a dedicated `workspace-webserver.blade.php` view
- *     that wraps the group-web partial in {@see <x-server-workspace-layout>}
- *     with `active="webserver"` (sidebar highlight).
+ *   - `render()` points at `workspace-webserver.blade.php`, a thin orchestrator
+ *     that lazy-renders tab partials under `partials/webserver/` inside
+ *     {@see <x-server-workspace-layout>} with `active="webserver"`.
  *   - Adds Tools / Logs / Config sub-tabs and their backing Livewire methods
  *     (load/save/validate/restore for config; tail for logs). Path safety and
  *     atomic-write semantics live in {@see RemoteWebserverConfigService}.
@@ -3231,17 +3232,20 @@ class WorkspaceWebserver extends WorkspaceManage
             }
         }
 
-        return view('livewire.servers.workspace-webserver', [
-            'configPreviews' => config('server_manage.config_previews', []),
-            'serviceActions' => config('server_manage.service_actions', []),
-            'dangerousActions' => config('server_manage.dangerous_actions', []),
-            'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
-            'webserverConfigLayout' => config('server_manage.webserver_config_layout', []),
-            'webserverConfigFiles' => $configFiles,
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-        ]);
+        return view('livewire.servers.workspace-webserver', array_merge(
+            WebserverWorkspaceViewData::for($this->server, $this),
+            [
+                'configPreviews' => config('server_manage.config_previews', []),
+                'serviceActions' => config('server_manage.service_actions', []),
+                'dangerousActions' => config('server_manage.dangerous_actions', []),
+                'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
+                'webserverConfigLayout' => config('server_manage.webserver_config_layout', []),
+                'webserverConfigFiles' => $configFiles,
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+            ],
+        ));
     }
 
     /**

@@ -284,21 +284,12 @@ test('workspace manage dispatches job on confirm', function () {
     $user = makeUser();
     $server = makeServer($user);
 
-    $component = Livewire::actingAs($user)
+    Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
-        ->call('openSwitchWebserver', 'caddy');
-
-    // Batch opt-in + confirm in one Livewire request. Separate ->set() and
-    // ->call() each re-render the ~6k-line workspace-webserver view and can
-    // exhaust PHPUnit's memory limit.
-    $component->update(
-        [
-            ['method' => 'confirmSwitchWebserver', 'params' => [], 'path' => ''],
-        ],
-        ['switch_tls_to_caddy' => true],
-    );
-
-    expect($component->get('switch_plan'))->toBeNull();
+        ->call('openSwitchWebserver', 'caddy')
+        ->set('switch_tls_to_caddy', true)
+        ->call('confirmSwitchWebserver')
+        ->assertSet('switch_plan', null);
 
     Queue::assertPushed(SwitchServerWebserverJob::class, function (SwitchServerWebserverJob $job) use ($server) {
         return $job->serverId === $server->id
@@ -409,6 +400,7 @@ test('recent switches audit renders on web tab', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('setWorkspaceTab', 'advanced')
         ->assertSee('Switch history')
         ->assertSee('nginx')
         ->assertSee('caddy')
