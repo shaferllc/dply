@@ -125,24 +125,47 @@
                     <p class="mt-3 text-sm font-semibold text-brand-sage group-hover:text-brand-ink">{{ __('Open serverless') }} →</p>
                 </a>
 
-                {{-- Edge (coming soon) --}}
-                <a
-                    href="{{ route('edge.index') }}"
-                    wire:navigate
-                    class="group relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/70 p-6 opacity-[0.88] shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-ink/20 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
-                >
-                    <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                        {{ __('Coming soon') }}
-                    </span>
-                    <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-globe-alt class="h-7 w-7 shrink-0 opacity-80" aria-hidden="true" />
-                    </span>
-                    <h3 id="infrastructure-edge-soon" class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Edge') }}</h3>
-                    <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
-                        {{ __('JavaScript frameworks, static sites, previews, and CDN-style delivery.') }}
-                    </p>
-                    <p class="mt-5 text-sm font-semibold text-brand-sage group-hover:text-brand-ink">{{ __('Learn more') }} →</p>
-                </a>
+                {{-- Edge --}}
+                @if ($edgeEnabled)
+                    <a
+                        href="{{ route('edge.index') }}"
+                        wire:navigate
+                        class="group relative flex flex-col rounded-2xl border-2 border-brand-sage/35 bg-white p-6 shadow-sm ring-1 ring-brand-ink/[0.06] transition hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
+                    >
+                        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-globe-alt class="h-7 w-7 shrink-0" aria-hidden="true" />
+                        </span>
+                        <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Edge') }}</h3>
+                        <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
+                            {{ __('JavaScript frameworks, static sites, previews, and CDN-style delivery.') }}
+                        </p>
+                        <p class="mt-4 text-sm font-semibold text-brand-ink">
+                            <span class="font-mono">{{ $counts['edge']['active'] }}</span>
+                            <span class="text-brand-moss">/</span>
+                            <span class="font-mono text-brand-moss">{{ $counts['edge']['total'] }}</span>
+                            <span class="ms-1 font-normal text-brand-moss">{{ __('active') }}</span>
+                        </p>
+                        <p class="mt-3 text-sm font-semibold text-brand-sage group-hover:text-brand-ink">{{ __('Open edge apps') }} →</p>
+                    </a>
+                @else
+                    <a
+                        href="{{ route('edge.index') }}"
+                        wire:navigate
+                        class="group relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/70 p-6 opacity-[0.88] shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-ink/20 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
+                    >
+                        <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-ink/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
+                            {{ __('Coming soon') }}
+                        </span>
+                        <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">
+                            <x-heroicon-o-globe-alt class="h-7 w-7 shrink-0 opacity-80" aria-hidden="true" />
+                        </span>
+                        <h3 id="infrastructure-edge-soon" class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Edge') }}</h3>
+                        <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
+                            {{ __('JavaScript frameworks, static sites, previews, and CDN-style delivery.') }}
+                        </p>
+                        <p class="mt-5 text-sm font-semibold text-brand-sage group-hover:text-brand-ink">{{ __('Learn more') }} →</p>
+                    </a>
+                @endif
             </div>
         </section>
     </div>

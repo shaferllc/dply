@@ -48,7 +48,9 @@
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
                     @if ($section === 'general')
-                        @if ($isContainerWorkspace && ! $site->usesFunctionsRuntime())
+                        @if ($site->usesEdgeRuntime())
+                            @include('livewire.sites.partials.edge-dashboard')
+                        @elseif ($isContainerWorkspace && ! $site->usesFunctionsRuntime())
                             @include('livewire.sites.partials.container-dashboard')
                         @endif
 

@@ -13,7 +13,7 @@ return [
         'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false), // https://www.digitalocean.com/products/app-platform/
         'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', true), // https://www.hetzner.com/cloud
         'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false), // https://www.linode.com/
-        'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', false), // https://www.vultr.com/
+        'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', true), // https://www.vultr.com/
         'akamai' => env('DPLY_SERVER_PROVIDER_AKAMAI', false), // https://www.akamai.com/solutions/cloud-computing
         'scaleway' => env('DPLY_SERVER_PROVIDER_SCALEWAY', false), // https://www.scaleway.com/en/iaas/
         'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', false), // https://upcloud.com/

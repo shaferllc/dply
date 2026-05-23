@@ -7,24 +7,40 @@ namespace Tests\Feature\EdgeIndexTest;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
 test('guest is redirected from edge index', function () {
+    Feature::define('surface.edge', fn () => true);
+    Feature::flushCache();
+
     $this->get(route('edge.index'))
         ->assertRedirect(route('login'));
 });
 
-test('authenticated user can load edge coming soon index', function () {
+test('edge index blocked when surface edge inactive', function () {
+    Feature::define('surface.edge', fn () => false);
+    Feature::flushCache();
+
+    $user = ownerWithOrg();
+
+    $this->actingAs($user)
+        ->get(route('edge.index'))
+        ->assertStatus(400);
+});
+
+test('authenticated user sees edge sites index when surface edge active', function () {
+    Feature::define('surface.edge', fn () => true);
+    Feature::flushCache();
+
     $user = ownerWithOrg();
 
     $this->actingAs($user)
         ->get(route('edge.index'))
         ->assertOk()
-        ->assertSee('Edge')
-        ->assertSee('Coming soon')
-        ->assertSee('JavaScript frameworks')
-        ->assertSee(route('infrastructure.index'), false);
+        ->assertSee('Edge sites')
+        ->assertSee('No edge sites found');
 });
 
 function ownerWithOrg(): User

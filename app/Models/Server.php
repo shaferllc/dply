@@ -49,6 +49,8 @@ class Server extends Model
 
     public const HOST_KIND_DPLY_CLOUD = 'dply_cloud';
 
+    public const HOST_KIND_DPLY_EDGE = 'dply_edge_delivery';
+
     public const HEALTH_REACHABLE = 'reachable';
 
     public const HEALTH_UNREACHABLE = 'unreachable';
@@ -354,6 +356,7 @@ class Server extends Model
             self::HOST_KIND_AWS_LAMBDA,
             self::HOST_KIND_AWS_APP_RUNNER,
             self::HOST_KIND_DPLY_CLOUD,
+            self::HOST_KIND_DPLY_EDGE,
         ], true) ? $hostKind : self::HOST_KIND_VM;
     }
 
@@ -400,6 +403,11 @@ class Server extends Model
     public function isDplyCloudHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_DPLY_CLOUD;
+    }
+
+    public function isDplyEdgeHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DPLY_EDGE;
     }
 
     public function isContainerHost(): bool

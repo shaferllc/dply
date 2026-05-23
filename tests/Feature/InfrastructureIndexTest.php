@@ -35,7 +35,11 @@ test('authenticated user can load infrastructure index', function () {
         ->assertSee('Compute');
 });
 
-test('infrastructure index shows compute cards and links when cloud enabled', function () {
+test('infrastructure index shows compute cards and links when cloud and edge enabled', function () {
+    Feature::define('surface.cloud', fn () => true);
+    Feature::define('surface.edge', fn () => true);
+    Feature::flushCache();
+
     $user = ownerWithOrg();
 
     $response = $this->actingAs($user)->get(route('infrastructure.index'));
@@ -46,12 +50,28 @@ test('infrastructure index shows compute cards and links when cloud enabled', fu
         ->assertSee('Serverless')
         ->assertSee('Edge')
         ->assertSee('Open cloud apps')
-        ->assertSee('Learn more')
+        ->assertSee('Open edge apps')
         ->assertSee(route('servers.index'), false)
         ->assertSee(route('cloud.index'), false)
         ->assertSee(route('serverless.index'), false)
         ->assertSee(route('edge.index'), false)
         ->assertSee(route('launches.create'), false);
+});
+
+test('infrastructure index shows edge coming soon when surface edge inactive', function () {
+    Feature::define('surface.edge', fn () => false);
+    Feature::flushCache();
+
+    $user = ownerWithOrg();
+
+    $response = $this->actingAs($user)->get(route('infrastructure.index'));
+
+    $response->assertOk()
+        ->assertSee('Edge')
+        ->assertSee('Coming soon')
+        ->assertSee('Learn more')
+        ->assertDontSee('Open edge apps')
+        ->assertSee(route('edge.index'), false);
 });
 
 test('infrastructure index shows cloud coming soon when surface cloud inactive', function () {

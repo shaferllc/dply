@@ -78,6 +78,8 @@ use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Services\Edge\EdgeArtifactPublisher;
+use App\Services\Edge\EdgeHostMapPublisher;
 use App\Services\Imports\Handlers\HandlerManifest;
 use App\Services\Imports\StepRegistry;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
@@ -245,6 +247,9 @@ class AppServiceProvider extends ServiceProvider
         ], 'site.runtime.detectors');
 
         $this->app->bind(GitCloner::class, ProcessGitCloner::class);
+
+        $this->app->singleton(EdgeArtifactPublisher::class);
+        $this->app->singleton(EdgeHostMapPublisher::class);
     }
 
     /**
@@ -252,6 +257,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registerEdgeR2FilesystemDisk();
+
         $this->discardCorruptedViteHotFile();
 
         $this->mergeServerMonitoringInstallScript();
@@ -560,5 +567,28 @@ class AppServiceProvider extends ServiceProvider
         if ($line === '' || ! preg_match('/\Ahttps?:\/\//i', $line)) {
             @unlink($path);
         }
+    }
+
+    private function registerEdgeR2FilesystemDisk(): void
+    {
+        $cfg = config('edge.r2');
+        $bucket = is_string($cfg['bucket'] ?? null) ? trim($cfg['bucket']) : '';
+        if ($bucket === '') {
+            return;
+        }
+
+        config([
+            'filesystems.disks.edge_r2' => [
+                'driver' => 's3',
+                'key' => $cfg['key'],
+                'secret' => $cfg['secret'],
+                'region' => $cfg['region'],
+                'bucket' => $bucket,
+                'endpoint' => $cfg['endpoint'],
+                'use_path_style_endpoint' => $cfg['use_path_style_endpoint'],
+                'throw' => false,
+                'report' => false,
+            ],
+        ]);
     }
 }

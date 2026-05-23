@@ -14,6 +14,9 @@
 /.claude/scheduled_tasks.lock
 /auth.json
 /node_modules
+/packages/*/node_modules
+/packages/*/.wrangler
+/packages/*/.dev.vars
 /public/build
 /public/hot
 /public/storage

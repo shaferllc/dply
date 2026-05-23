@@ -11,9 +11,9 @@ use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
+usesFeatures('surface.cloud', 'surface.edge');
+
 test('authenticated dashboard includes cloud apps link when surface cloud active', function () {
-    Feature::define('surface.cloud', fn () => true);
-    Feature::flushCache();
     $user = ownerWithOrg();
 
     $response = $this->actingAs($user)->get(route('dashboard'));
@@ -37,16 +37,14 @@ test('cloud apps link hidden when surface cloud inactive', function () {
 });
 
 test('browse dropdown includes compute apps and org sections', function () {
-    Feature::define('surface.cloud', fn () => true);
-    Feature::flushCache();
     $user = ownerWithOrg();
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertOk()
         ->assertSee('Compute')
-        ->assertSee('Apps')
-        ->assertSee('Org')
+        ->assertSee('>Apps<', false)
+        ->assertSee('>Org<', false)
         ->assertSee('Servers')
         ->assertSee('Serverless')
         ->assertSee('Edge')

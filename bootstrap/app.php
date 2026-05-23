@@ -20,6 +20,7 @@ use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
+use App\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
@@ -230,6 +231,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // marketing welcome view (which has no host constraint on /).
         $middleware->prependToGroup('web', [
             ResolveServerlessCustomDomain::class,
+            ResolveEdgeCustomDomain::class,
         ]);
 
         $middleware->appendToGroup('web', [

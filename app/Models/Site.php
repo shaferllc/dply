@@ -58,6 +58,12 @@ class Site extends Model
 
     public const STATUS_CONTAINER_FAILED = 'container_failed';
 
+    public const STATUS_EDGE_PROVISIONING = 'edge_provisioning';
+
+    public const STATUS_EDGE_ACTIVE = 'edge_active';
+
+    public const STATUS_EDGE_FAILED = 'edge_failed';
+
     /**
      * Serverless function resource limits. These map onto the OpenWhisk
      * action `limits` block DigitalOcean Functions is built on, and are
@@ -153,6 +159,8 @@ class Site extends Model
         'container_backend',
         'container_backend_id',
         'container_region',
+        'edge_backend',
+        'edge_backend_id',
         'meta',
     ];
 
@@ -1160,6 +1168,67 @@ class Site extends Model
                 'aws_app_runner',
                 'dply_cloud',
             ], true);
+    }
+
+    public function usesEdgeRuntime(): bool
+    {
+        return is_string($this->edge_backend) && $this->edge_backend !== '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function edgeMeta(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+    }
+
+    public function edgeLiveUrl(): ?string
+    {
+        $url = $this->edgeMeta()['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    public function edgeHostname(): string
+    {
+        $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
+        $hostname = trim((string) ($routing['hostname'] ?? ''));
+        if ($hostname !== '') {
+            return strtolower($hostname);
+        }
+
+        $liveUrl = $this->edgeLiveUrl();
+        if ($liveUrl !== null) {
+            $host = parse_url($liveUrl, PHP_URL_HOST);
+            if (is_string($host) && $host !== '') {
+                return strtolower($host);
+            }
+        }
+
+        $testingDomain = (string) (config('edge.testing_domains')[0] ?? 'dply.host');
+        $slug = (string) ($this->slug ?: Str::slug((string) $this->name));
+
+        return strtolower($slug.'.'.$testingDomain);
+    }
+
+    public function isEdgePreview(): bool
+    {
+        $parentId = $this->edgeMeta()['preview_parent_site_id'] ?? null;
+
+        return is_string($parentId) && $parentId !== '';
+    }
+
+    public function edgeGithubHookUrl(): string
+    {
+        return route('hooks.edge.github', ['site' => $this->id]);
+    }
+
+    public function edgeDeployments(): HasMany
+    {
+        return $this->hasMany(EdgeDeployment::class)->orderByDesc('created_at');
     }
 
     /**

@@ -60,4 +60,13 @@ class ServerFactory extends Factory
             'size' => 'cx22',
         ]);
     }
+
+    public function vultr(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Vultr,
+            'region' => 'ewr',
+            'size' => 'vc2-1c-1gb',
+        ]);
+    }
 }

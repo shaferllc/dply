@@ -4,9 +4,10 @@ namespace Tests\Unit\ServerProviderGateTest;
 
 use App\Support\ServerProviderGate;
 
-test('defaults enable digitalocean hetzner and custom', function () {
+test('defaults enable digitalocean hetzner vultr and custom', function () {
     expect(ServerProviderGate::enabled('digitalocean'))->toBeTrue();
     expect(ServerProviderGate::enabled('hetzner'))->toBeTrue();
+    expect(ServerProviderGate::enabled('vultr'))->toBeTrue();
     expect(ServerProviderGate::enabled('custom'))->toBeTrue();
     expect(ServerProviderGate::enabled('linode'))->toBeFalse();
 });

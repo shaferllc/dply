@@ -1,0 +1,154 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildObjectKey,
+  cacheControlForPath,
+  handleRequest,
+  isImmutableAsset,
+  normalizeRequestPath,
+  type Env,
+  type HostMapEntry,
+} from './handler';
+
+function createMockR2(objects: Record<string, { body: string; contentType?: string }>): R2Bucket {
+  return {
+    get: async (key: string) => {
+      const object = objects[key];
+
+      if (!object) {
+        return null;
+      }
+
+      return {
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(object.body));
+            controller.close();
+          },
+        }),
+        writeHttpMetadata(headers: Headers) {
+          if (object.contentType) {
+            headers.set('Content-Type', object.contentType);
+          }
+        },
+      } as R2ObjectBody;
+    },
+  } as R2Bucket;
+}
+
+function createMockKv(entries: Record<string, HostMapEntry>): KVNamespace {
+  return {
+    get: async (key: string, type?: 'text' | 'json' | 'arrayBuffer' | 'stream') => {
+      const entry = entries[key];
+
+      if (!entry) {
+        return null;
+      }
+
+      if (type === 'json') {
+        return entry;
+      }
+
+      return JSON.stringify(entry);
+    },
+  } as KVNamespace;
+}
+
+describe('normalizeRequestPath', () => {
+  it('maps root to index.html', () => {
+    expect(normalizeRequestPath('/')).toBe('index.html');
+  });
+
+  it('maps directory paths to index.html', () => {
+    expect(normalizeRequestPath('/assets/')).toBe('assets/index.html');
+  });
+
+  it('rejects path traversal', () => {
+    expect(() => normalizeRequestPath('/../secret.txt')).toThrow();
+  });
+});
+
+describe('buildObjectKey', () => {
+  it('joins storage prefix and path', () => {
+    expect(buildObjectKey('edge/site-1/deploy-9/', 'assets/app.abc12345.js')).toBe(
+      'edge/site-1/deploy-9/assets/app.abc12345.js',
+    );
+  });
+});
+
+describe('cacheControlForPath', () => {
+  it('uses short cache for index.html', () => {
+    expect(cacheControlForPath('index.html')).toBe('public, max-age=0, must-revalidate');
+  });
+
+  it('uses immutable cache for hashed assets', () => {
+    expect(isImmutableAsset('assets/app.abc12345.js')).toBe(true);
+    expect(cacheControlForPath('assets/app.abc12345.js')).toBe('public, max-age=31536000, immutable');
+  });
+});
+
+describe('handleRequest', () => {
+  const hostEntry: HostMapEntry = {
+    storage_prefix: 'edge/site-1/deploy-9/',
+    deployment_id: 'deploy-9',
+    spa_fallback: true,
+    headers: {
+      'X-Dply-Site': 'site-1',
+    },
+  };
+
+  it('serves a static asset from R2', async () => {
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'preview.example.test': hostEntry }),
+      ARTIFACTS: createMockR2({
+        'edge/site-1/deploy-9/assets/app.abc12345.js': {
+          body: 'console.log("edge");',
+          contentType: 'application/javascript; charset=utf-8',
+        },
+      }),
+    };
+
+    const response = await handleRequest(
+      new Request('https://preview.example.test/assets/app.abc12345.js'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('console.log("edge");');
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+    expect(response.headers.get('X-Dply-Deployment-Id')).toBe('deploy-9');
+    expect(response.headers.get('X-Dply-Site')).toBe('site-1');
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('falls back to index.html for SPA routes', async () => {
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'preview.example.test': hostEntry }),
+      ARTIFACTS: createMockR2({
+        'edge/site-1/deploy-9/index.html': {
+          body: '<!doctype html><html><body>edge</body></html>',
+          contentType: 'text/html; charset=utf-8',
+        },
+      }),
+    };
+
+    const response = await handleRequest(
+      new Request('https://preview.example.test/dashboard/settings'),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('edge');
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate');
+  });
+
+  it('returns 404 for unknown hosts', async () => {
+    const env: Env = {
+      HOST_MAP: createMockKv({}),
+      ARTIFACTS: createMockR2({}),
+    };
+
+    const response = await handleRequest(new Request('https://unknown.example.test/'), env);
+
+    expect(response.status).toBe(404);
+  });
+});

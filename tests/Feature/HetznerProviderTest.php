@@ -12,6 +12,7 @@ use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Forms\ServerCreateForm;
+use App\Livewire\Servers\Create\StepType;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -66,7 +67,7 @@ test('server create wizard step shows hetzner in provider mode copy', function (
     $user = hetznerTestUser();
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Servers\Create\StepType::class)
+        ->test(StepType::class)
         ->assertSee('Hetzner', false);
 });
 

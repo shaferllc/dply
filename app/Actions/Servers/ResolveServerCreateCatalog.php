@@ -83,7 +83,7 @@ final class ResolveServerCreateCatalog
             'digitalocean_kubernetes' => $this->catalogDigitalOceanKubernetes($credentials, $credential),
             'hetzner' => $this->catalogHetzner($credentials, $credential),
             'linode' => $this->catalogLinode($credentials, $credential),
-            'vultr' => $this->catalogVultr($credentials, $credential),
+            'vultr' => $this->catalogVultr($credentials, $credential, $selectedRegion),
             'akamai' => $this->catalogAkamai($credentials, $credential),
             'scaleway' => $this->catalogScaleway($credentials, $credential, $selectedRegion),
             'upcloud' => $this->catalogUpcloud($credentials, $credential),
@@ -443,10 +443,11 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    private function catalogVultr(Collection $credentials, ProviderCredential $credential): array
+    private function catalogVultr(Collection $credentials, ProviderCredential $credential, string $selectedRegion = ''): array
     {
         $regions = [];
         $sizes = [];
+        $selectedRegion = trim($selectedRegion);
         try {
             $svc = new VultrService($credential);
             foreach ($svc->getRegions() as $reg) {
@@ -462,6 +463,10 @@ final class ResolveServerCreateCatalog
             foreach ($svc->getPlans() as $p) {
                 $v = (string) ($p['id'] ?? '');
                 if ($v === '') {
+                    continue;
+                }
+                $planRegions = is_array($p['locations'] ?? null) ? array_map('strval', $p['locations']) : [];
+                if ($selectedRegion !== '' && $planRegions !== [] && ! in_array($selectedRegion, $planRegions, true)) {
                     continue;
                 }
                 $monthly = $this->extractFloat($p, ['monthly_cost', 'price_monthly', 'month']);

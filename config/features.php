@@ -30,16 +30,16 @@
 return [
 
     /*
-    | Cloud providers. MVP ships DigitalOcean + Hetzner globally; every
-    | other provider is per-org gated for design partners.
+    | Cloud providers. MVP ships DigitalOcean + Hetzner + Vultr globally;
+    | every other provider is per-org gated for design partners.
     */
     'provider' => [
         // exit: ship to all orgs once we've had 5+ successful AWS provisions in prod
         'aws' => env('FEATURE_PROVIDER_AWS', false),
         // exit: ship to all orgs once Linode cost-catalog parity is verified
         'linode' => env('FEATURE_PROVIDER_LINODE', false),
-        // exit: ship when Vultr regions/specs are wired and one design partner has provisioned
-        'vultr' => env('FEATURE_PROVIDER_VULTR', false),
+        // exit: ship to all orgs once we've had 5+ successful Vultr provisions in prod
+        'vultr' => env('FEATURE_PROVIDER_VULTR', true),
         // exit: ship once Fly.io machine provisioning is end-to-end green
         'fly_io' => env('FEATURE_PROVIDER_FLY_IO', false),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
@@ -97,6 +97,8 @@ return [
         'scripts' => env('FEATURE_SURFACE_SCRIPTS', false),
         // exit: ship as a standalone product launch with its own positioning
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
+        // exit: ship when Edge build → R2 → CF Worker loop is green in staging
+        'edge' => env('FEATURE_SURFACE_EDGE', false),
     ],
 
     /*

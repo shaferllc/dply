@@ -111,7 +111,16 @@
             <file>tests/Feature/DigitalOceanCatalogTokenTest.php</file>
             <file>tests/Feature/DoctorOrphansCommandTest.php</file>
             <file>tests/Feature/DplyAboutCommandTest.php</file>
+            <file>tests/Feature/CreateEdgeSiteTest.php</file>
+            <file>tests/Feature/EdgeCreatePageTest.php</file>
+            <file>tests/Feature/EdgeCustomDomainTest.php</file>
+            <file>tests/Feature/EdgeIndexPageTest.php</file>
+            <file>tests/Feature/EdgeIndexTest.php</file>
+            <file>tests/Feature/EdgeNavLinkTest.php</file>
             <file>tests/Feature/EdgeProxyTest.php</file>
+            <file>tests/Feature/EdgeSiteDashboardTest.php</file>
+            <file>tests/Feature/FakeEdgeDeployFlowTest.php</file>
+            <file>tests/Feature/GithubEdgeWebhookTest.php</file>
             <file>tests/Feature/ExampleTest.php</file>
             <file>tests/Feature/ExportSiteConfigCommandTest.php</file>
             <file>tests/Feature/ExportSiteEnvCommandTest.php</file>
@@ -119,6 +128,7 @@
             <file>tests/Feature/FailedDeploysFleetCommandTest.php</file>
             <file>tests/Feature/FakeCloudBackendTest.php</file>
             <file>tests/Feature/HetznerProviderTest.php</file>
+            <file>tests/Feature/VultrProviderTest.php</file>
             <file>tests/Feature/FakeCloudProvisionTest.php</file>
             <file>tests/Feature/FindFleetDomainCommandTest.php</file>
             <file>tests/Feature/FindFleetEnvCommandTest.php</file>
@@ -313,6 +323,7 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="DPLY_FAKE_EDGE" value="true"/>
         <ini name="max_execution_time" value="0"/>
         <ini name="memory_limit" value="1G"/>
     </php>

@@ -46,6 +46,18 @@ class Index extends Component
             ->whereIn('meta->runtime_profile', ['digitalocean_functions_web', 'aws_lambda_bref_web'])
             ->count();
 
+        $edgeQuery = Site::query()
+            ->where('organization_id', $org->id)
+            ->where(function (Builder $q): void {
+                $q->whereNotNull('edge_backend')
+                    ->orWhere('meta->runtime_profile', 'edge_web');
+            });
+
+        $edgeTotal = (clone $edgeQuery)->count();
+        $edgeActive = (clone $edgeQuery)
+            ->where('status', Site::STATUS_EDGE_ACTIVE)
+            ->count();
+
         return view('livewire.infrastructure.index', [
             'org' => $org,
             'counts' => [
@@ -60,8 +72,13 @@ class Index extends Component
                 'serverless' => [
                     'total' => $serverlessTotal,
                 ],
+                'edge' => [
+                    'active' => $edgeActive,
+                    'total' => $edgeTotal,
+                ],
             ],
             'cloudEnabled' => Feature::active('surface.cloud'),
+            'edgeEnabled' => Feature::active('surface.edge'),
             'fleetEnabled' => Feature::active('surface.fleet'),
         ]);
     }

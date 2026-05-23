@@ -7,6 +7,7 @@ use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
+use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\SiteDeployWebhookController;
@@ -23,15 +24,16 @@ use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Edge\Create as EdgeCreate;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
-use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Imports\Forge\Inventory;
 use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
 use App\Livewire\Imports\Ploi\MigrationProgress;
+use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Launches\Create as LaunchesCreate;
 use App\Livewire\Launches\Path as LaunchesPath;
@@ -145,6 +147,10 @@ Route::match(['post', 'options'], '/hooks/cloud/{site}/redeploy', CloudDeployWeb
 Route::match(['post', 'options'], '/hooks/cloud/{site}/github', GithubCloudWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.cloud.github');
+
+Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
+    ->middleware(['throttle:site-webhook'])
+    ->name('hooks.edge.github');
 
 // Per-request log records POSTed by a deployed serverless function's handler
 // — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
@@ -278,6 +284,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
     });
     Route::livewire('edge', EdgeIndex::class)->name('edge.index');
+    Route::middleware('feature:surface.edge')->group(function (): void {
+        Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+    });
     Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
     Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');

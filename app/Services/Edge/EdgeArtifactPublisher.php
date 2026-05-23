@@ -1,0 +1,92 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Edge;
+
+use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
+
+/**
+ * Walks a local artifact directory and uploads every file to the
+ * configured Edge R2 disk under a storage prefix.
+ */
+class EdgeArtifactPublisher
+{
+    public function uploadDirectory(string $localArtifactDir, string $storagePrefix, ?string $diskName = null): int
+    {
+        if (! is_dir($localArtifactDir)) {
+            throw new RuntimeException("Artifact directory not found: {$localArtifactDir}");
+        }
+
+        $disk = $this->disk($diskName);
+        $prefix = trim($storagePrefix, '/');
+        $count = 0;
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($localArtifactDir, \FilesystemIterator::SKIP_DOTS),
+        );
+
+        foreach ($files as $file) {
+            if (! $file->isFile()) {
+                continue;
+            }
+
+            $relative = ltrim(str_replace($localArtifactDir, '', $file->getPathname()), '/\\');
+            $key = $prefix.'/'.$relative;
+
+            $disk->put($key, file_get_contents($file->getPathname()), [
+                'visibility' => 'public',
+                'CacheControl' => $this->cacheControlFor($relative),
+                'ContentType' => $this->mimeFor($relative),
+            ]);
+
+            $count++;
+        }
+
+        return $count;
+    }
+
+    public function deletePrefix(string $storagePrefix, ?string $diskName = null): void
+    {
+        $disk = $this->disk($diskName);
+        $disk->deleteDirectory(trim($storagePrefix, '/'));
+    }
+
+    private function disk(?string $diskName): Filesystem
+    {
+        $name = $diskName ?? (string) config('edge.disk.name', 'edge_r2');
+
+        return Storage::disk($name);
+    }
+
+    private function cacheControlFor(string $path): string
+    {
+        if ($path === 'index.html' || str_ends_with($path, '/index.html')) {
+            return 'public, max-age=0, must-revalidate';
+        }
+        if (preg_match('/\.[a-f0-9]{8,}\./', $path) === 1) {
+            return 'public, max-age=31536000, immutable';
+        }
+
+        return 'public, max-age=3600';
+    }
+
+    private function mimeFor(string $path): string
+    {
+        return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+            'html' => 'text/html; charset=utf-8',
+            'css' => 'text/css; charset=utf-8',
+            'js' => 'application/javascript; charset=utf-8',
+            'json' => 'application/json; charset=utf-8',
+            'svg' => 'image/svg+xml',
+            'png' => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp' => 'image/webp',
+            'woff2' => 'font/woff2',
+            'woff' => 'font/woff',
+            default => 'application/octet-stream',
+        };
+    }
+}
