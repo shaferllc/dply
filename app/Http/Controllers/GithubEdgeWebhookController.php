@@ -43,7 +43,7 @@ class GithubEdgeWebhookController extends Controller
         return match ($event) {
             'pull_request' => $this->handlePullRequest($site, $payload),
             'push' => $this->handlePush($site, $payload),
-            'ping' => response()->json(['ok' => true, 'event' => 'ping']),
+            'ping' => tap(response()->json(['ok' => true, 'event' => 'ping']), fn () => $this->touchWebhookLastEvent($site)),
             default => response()->json(['ok' => true, 'queued' => false, 'reason' => 'event_ignored', 'event' => $event]),
         };
     }
@@ -64,6 +64,7 @@ class GithubEdgeWebhookController extends Controller
 
         if (in_array($action, ['opened', 'reopened', 'synchronize'], true)) {
             $preview = (new CreateEdgePreviewSite)->handle($site, $branch, $prNumber);
+            $this->touchWebhookLastEvent($site);
 
             return response()->json([
                 'ok' => true,
@@ -79,6 +80,7 @@ class GithubEdgeWebhookController extends Controller
                 return response()->json(['ok' => true, 'queued' => false, 'reason' => 'no_preview']);
             }
             TeardownEdgeSiteJob::dispatch($preview->id);
+            $this->touchWebhookLastEvent($site);
 
             return response()->json([
                 'ok' => true,
@@ -112,6 +114,7 @@ class GithubEdgeWebhookController extends Controller
 
         $commit = is_string($payload['after'] ?? null) ? (string) $payload['after'] : null;
         $deployment = (new RedeployEdgeSite)->handle($site, $commit);
+        $this->touchWebhookLastEvent($site);
 
         return response()->json([
             'ok' => true,
@@ -135,5 +138,20 @@ class GithubEdgeWebhookController extends Controller
         $expected = hash_hmac('sha256', $request->getContent(), $site->webhook_secret);
 
         return hash_equals($expected, $provided);
+    }
+
+    private function touchWebhookLastEvent(Site $site): void
+    {
+        $webhook = is_array($site->edgeMeta()['webhook'] ?? null) ? $site->edgeMeta()['webhook'] : null;
+        if (! is_array($webhook)) {
+            return;
+        }
+
+        $site->mergeEdgeMeta([
+            'webhook' => array_merge($webhook, [
+                'last_event_at' => now()->toIso8601String(),
+            ]),
+        ]);
+        $site->save();
     }
 }

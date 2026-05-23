@@ -38,7 +38,27 @@ class CreateEdgeSite
         $spaFallback = ! array_key_exists('spa_fallback', $payload) || (bool) $payload['spa_fallback'];
         $runtimeMode = (string) ($payload['runtime_mode'] ?? 'static');
         if ($runtimeMode === 'ssr') {
-            throw new RuntimeException('SSR Edge sites are not supported yet. Use static export or SSG.');
+            throw new RuntimeException('Worker-native SSR Edge sites are not supported yet. Use static export, hybrid origin-fetch, or dply Cloud.');
+        }
+        if (! in_array($runtimeMode, ['static', 'hybrid'], true)) {
+            $runtimeMode = 'static';
+        }
+
+        $originConfig = null;
+        if ($runtimeMode === 'hybrid') {
+            $originUrl = trim((string) ($payload['origin_url'] ?? ''));
+            if ($originUrl === '') {
+                throw new RuntimeException('Hybrid Edge sites require an SSR origin URL.');
+            }
+            $originRoutes = is_array($payload['origin_routes'] ?? null) ? $payload['origin_routes'] : ['/_next/*', '/api/*'];
+            $originConfig = [
+                'url' => $originUrl,
+                'cloud_site_id' => $payload['cloud_site_id'] ?? null,
+                'routes' => array_values(array_filter(array_map(
+                    fn ($route) => is_string($route) ? $route : null,
+                    $originRoutes,
+                ))),
+            ];
         }
 
         $edgeBackend = (string) ($payload['edge_backend'] ?? config('edge.default_backend', 'dply_edge'));
@@ -72,7 +92,8 @@ class CreateEdgeSite
             'meta' => [
                 'runtime_profile' => 'edge_web',
                 'edge' => [
-                    'runtime_mode' => 'static',
+                    'runtime_mode' => $runtimeMode,
+                    'origin' => $originConfig,
                     'source' => [
                         'repo' => $repo,
                         'branch' => $branch,

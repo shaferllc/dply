@@ -54,6 +54,10 @@ class Create extends Component
 
     public bool $deploy_on_push = true;
 
+    public string $runtime_mode = 'static';
+
+    public string $origin_url = '';
+
     /** managed = dply platform; byo = org Cloudflare credential */
     public string $delivery_mode = 'managed';
 
@@ -73,6 +77,8 @@ class Create extends Component
             'output_dir' => ['nullable', 'string', 'max:200'],
             'spa_fallback' => ['boolean'],
             'deploy_on_push' => ['boolean'],
+            'runtime_mode' => ['required', 'in:static,hybrid'],
+            'origin_url' => ['required_if:runtime_mode,hybrid', 'nullable', 'string', 'max:500'],
             'delivery_mode' => ['required', 'in:managed,byo'],
             'edge_provider_credential_id' => ['required_if:delivery_mode,byo', 'nullable', 'string'],
         ];
@@ -261,8 +267,14 @@ class Create extends Component
 
         $this->validate();
 
-        if ($this->detectedPlan !== [] && $this->detectedPlanLooksLikeSsr($this->detectedPlan)) {
-            $this->toastError(__('This repository looks like an SSR app (server-rendered Next.js, Nuxt, Remix, or SvelteKit). dply Edge v1 supports static export and SSG only — configure static output in your framework, or use dply Cloud for server workloads.'));
+        if ($this->detectedPlan !== [] && $this->detectedPlanLooksLikeSsr($this->detectedPlan) && $this->runtime_mode !== 'hybrid') {
+            $this->toastError(__('This repository looks like an SSR app. Choose hybrid mode with an origin URL, configure static export, or use dply Cloud for full server workloads.'));
+
+            return;
+        }
+
+        if ($this->runtime_mode === 'hybrid' && trim($this->origin_url) === '') {
+            $this->toastError(__('Enter the SSR origin URL for hybrid delivery.'));
 
             return;
         }
@@ -280,7 +292,9 @@ class Create extends Component
                 'spa_fallback' => $this->spa_fallback,
                 'deploy_on_push' => $this->deploy_on_push,
                 'framework' => (string) ($this->detectedPlan['framework'] ?? ''),
-                'runtime_mode' => 'static',
+                'runtime_mode' => $this->runtime_mode,
+                'origin_url' => trim($this->origin_url),
+                'origin_routes' => ['/_next/*', '/api/*'],
                 'edge_backend' => $this->delivery_mode === 'byo' ? 'org_cloudflare' : 'dply_edge',
                 'edge_provider_credential_id' => $this->delivery_mode === 'byo' ? $this->edge_provider_credential_id : null,
             ]);

@@ -13,7 +13,7 @@ Historical note: the token `dply_edge` was absorbed into Cloud (`dply_cloud`). E
 1. **dply Edge** = first-party static/SSG delivery on dply-controlled Cloudflare R2 + Workers. Not customer Netlify accounts.
 2. **Host kind** = `dply_edge_delivery` (`Server::HOST_KIND_DPLY_EDGE`). Never reuse `dply_edge`.
 3. **Site discriminator** = `sites.edge_backend = 'dply_edge'` plus `meta.edge.runtime_profile = 'edge_web'`.
-4. **v1 scope** = static + SSG export only (`meta.edge.runtime_mode = 'static'`). SSR reserved for v2 (`runtime_mode = 'ssr'`).
+4. **v1 scope** = static + SSG export (`runtime_mode = 'static'`) and **hybrid origin-fetch** (`runtime_mode = 'hybrid'`) where static assets stay on R2 and dynamic routes proxy to a container origin. Worker-native SSR (`runtime_mode = 'ssr'`) is Phase 4b — deferred until OpenNext-style build + Worker bundle upload ships.
 5. **Build plane** = dply queue workers run isolated Docker builds; artifacts land in immutable R2 prefixes per `edge_deployments` row.
 6. **Delivery plane** = Cloudflare Worker reads KV host map, serves from R2. Laravel orchestrates; it does not serve production static assets.
 7. **Previews** = sibling Site rows (same pattern as Cloud previews), idempotent on `(parent, branch)`.
@@ -30,5 +30,5 @@ Historical note: the token `dply_edge` was absorbed into Cloud (`dply_cloud`). E
 ## Consequences
 
 - New tables/columns: `edge_deployments`, `sites.edge_backend`, `sites.edge_backend_id`.
-- Edge jobs stay separate from `DeployEngineResolver` until SSR v2.
+- Edge jobs stay separate from `DeployEngineResolver` until Worker-native SSR (Phase 4b).
 - Platform CF credentials (`DPLY_EDGE_*`) are dply-operated; customer Cloudflare tokens in `/credentials` remain DNS-only.

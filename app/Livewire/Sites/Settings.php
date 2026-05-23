@@ -50,6 +50,7 @@ use App\Services\Sites\SiteSystemdProvisioner;
 use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
@@ -428,6 +429,10 @@ class Settings extends Show
         }
 
         $this->loadSiteNotificationPreferences();
+
+        if ($this->site->usesEdgeRuntime()) {
+            $this->mountEdgeWebhookAccount();
+        }
 
         if ($this->section === 'repository') {
             $this->syncRepositorySyncUiState();
@@ -3189,6 +3194,11 @@ class Settings extends Show
                 ->with('server:id,name')
                 ->orderBy('name')
                 ->get();
+        }
+
+        if ($section === 'edge-build' && auth()->user() !== null) {
+            $viewData['linkedSourceControlAccounts'] = app(SourceControlRepositoryBrowser::class)
+                ->accountsForUser(auth()->user());
         }
 
         return view('livewire.sites.settings', array_merge(

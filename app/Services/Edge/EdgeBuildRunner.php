@@ -13,7 +13,12 @@ use RuntimeException;
 class EdgeBuildRunner
 {
     /**
+     * Phase 4b (Worker-native SSR): OpenNext / @cloudflare/next-on-pages bundle upload
+     * will extend this runner — not implemented in v1. Hybrid origin-fetch ships in 4a.
+     */
+    /**
      * @param  array<string, string>  $env
+     * @return array{artifact_dir: string, build_log: string}
      */
     public function build(
         EdgeDeployment $deployment,
@@ -22,31 +27,40 @@ class EdgeBuildRunner
         string $buildCommand,
         string $outputDir,
         array $env = [],
-    ): string {
+    ): array {
         $workRoot = rtrim(sys_get_temp_dir(), '/').'/dply-edge-build-'.$deployment->id;
         File::ensureDirectoryExists($workRoot);
         $checkout = $workRoot.'/src';
         $artifactDir = $workRoot.'/out';
+        $buildLog = $workRoot.'/build.log';
+        File::put($buildLog, '=== dply Edge build '.$deployment->id." ===\n");
 
         try {
             if (FakeEdgeProvision::enabled()) {
                 File::ensureDirectoryExists($artifactDir);
                 File::put($artifactDir.'/index.html', '<!doctype html><html><body><h1>dply Edge fake build</h1></body></html>');
+                $this->appendBuildLog($buildLog, "Fake edge build — skipped git clone and Docker.\n");
 
-                return $artifactDir;
+                return [
+                    'artifact_dir' => $artifactDir,
+                    'build_log' => $buildLog,
+                ];
             }
 
             $this->assertDockerAvailable();
 
+            $this->appendBuildLog($buildLog, "Cloning {$repoUrl} @ {$branch}\n");
             $clone = Process::timeout(300)->run([
                 'git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout,
             ]);
+            $this->appendBuildLog($buildLog, $clone->output().$clone->errorOutput());
             if (! $clone->successful()) {
                 throw new RuntimeException('Git clone failed: '.$clone->errorOutput());
             }
 
             $dockerImage = (string) config('edge.build.docker_image', 'node:20-bookworm');
             $script = $this->composeBuildScript($checkout, $buildCommand);
+            $this->appendBuildLog($buildLog, "Running build in {$dockerImage}: {$script}\n");
             $build = Process::timeout((int) config('edge.build.timeout_seconds', 900))
                 ->run([
                     'docker', 'run', '--rm',
@@ -56,6 +70,7 @@ class EdgeBuildRunner
                     $dockerImage,
                     'bash', '-lc', $script,
                 ]);
+            $this->appendBuildLog($buildLog, $build->output().$build->errorOutput());
             if (! $build->successful()) {
                 throw new RuntimeException('Build failed: '.$build->errorOutput());
             }
@@ -69,13 +84,22 @@ class EdgeBuildRunner
             File::copyDirectory($resolvedOutput, $artifactDir);
             $this->assertArtifactContents($artifactDir, $outputDir);
             $this->assertArtifactSize($artifactDir);
+            $this->appendBuildLog($buildLog, "Build succeeded — artifacts copied to output.\n");
 
-            return $artifactDir;
+            return [
+                'artifact_dir' => $artifactDir,
+                'build_log' => $buildLog,
+            ];
         } finally {
             if (is_dir($checkout)) {
                 File::deleteDirectory($checkout);
             }
         }
+    }
+
+    private function appendBuildLog(string $path, string $chunk): void
+    {
+        File::append($path, $chunk);
     }
 
     private function composeBuildScript(string $checkout, string $buildCommand): string

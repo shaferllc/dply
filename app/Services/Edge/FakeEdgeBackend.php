@@ -31,7 +31,7 @@ class FakeEdgeBackend implements EdgeBackend
         $map = $this->hostMap();
         $map[$hostname] = $routing;
 
-        foreach ($this->customHostnames($site) as $customHost) {
+        foreach ($this->readyCustomHostnames($site) as $customHost) {
             $map[$customHost] = $routing;
         }
         Cache::put($this->hostMapKey(), $map, now()->addDay());
@@ -49,7 +49,7 @@ class FakeEdgeBackend implements EdgeBackend
     {
         $map = $this->hostMap();
         unset($map[$site->edgeHostname()]);
-        foreach ($this->customHostnames($site) as $customHost) {
+        foreach ($this->readyCustomHostnames($site) as $customHost) {
             unset($map[$customHost]);
         }
         Cache::put($this->hostMapKey(), $map, now()->addDay());
@@ -62,52 +62,24 @@ class FakeEdgeBackend implements EdgeBackend
 
     public function attachDomain(Site $site, string $hostname): array
     {
-        $hostname = strtolower(trim($hostname));
-        $activeId = $site->edgeMeta()['active_deployment_id'] ?? null;
-        if (! is_string($activeId) || $activeId === '') {
+        $entry = app(EdgeCustomDomainProvisioner::class)->provision($site, $hostname);
+        if ($entry === null) {
             return [];
         }
 
-        $deployment = EdgeDeployment::query()->find($activeId);
-        if ($deployment === null) {
-            return [];
-        }
-
-        $map = $this->hostMap();
-        $map[$hostname] = $this->routingPayload($deployment, $site);
-        Cache::put($this->hostMapKey(), $map, now()->addDay());
-
-        $meta = $site->edgeMeta();
-        $domains = is_array($meta['routing']['custom_domains'] ?? null) ? $meta['routing']['custom_domains'] : [];
-        $domains[$hostname] = ['dns_status' => 'ready', 'attached_at' => now()->toIso8601String()];
-        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
-            'edge' => array_merge($meta, [
-                'routing' => array_merge(is_array($meta['routing'] ?? null) ? $meta['routing'] : [], [
-                    'custom_domains' => $domains,
-                ]),
-            ]),
-        ])]);
-
-        return [];
+        return [
+            [
+                'name' => strtolower(trim($hostname)),
+                'type' => 'CNAME',
+                'value' => (string) ($entry['cname_target'] ?? $site->edgeHostname()),
+                'status' => (string) ($entry['dns_status'] ?? 'pending'),
+            ],
+        ];
     }
 
     public function detachDomain(Site $site, string $hostname): void
     {
-        $hostname = strtolower(trim($hostname));
-        $map = $this->hostMap();
-        unset($map[$hostname]);
-        Cache::put($this->hostMapKey(), $map, now()->addDay());
-
-        $meta = $site->edgeMeta();
-        $domains = is_array($meta['routing']['custom_domains'] ?? null) ? $meta['routing']['custom_domains'] : [];
-        unset($domains[$hostname]);
-        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
-            'edge' => array_merge($meta, [
-                'routing' => array_merge(is_array($meta['routing'] ?? null) ? $meta['routing'] : [], [
-                    'custom_domains' => $domains,
-                ]),
-            ]),
-        ])]);
+        app(EdgeCustomDomainProvisioner::class)->remove($site, $hostname);
     }
 
     public function inspect(Site $site): array
@@ -175,28 +147,47 @@ class FakeEdgeBackend implements EdgeBackend
      */
     private function routingPayload(EdgeDeployment $deployment, Site $site): array
     {
-        $routing = is_array($site->edgeMeta()['routing'] ?? null) ? $site->edgeMeta()['routing'] : [];
-
-        return [
+        $edgeMeta = $site->edgeMeta();
+        $routing = is_array($edgeMeta['routing'] ?? null) ? $edgeMeta['routing'] : [];
+        $payload = [
             'storage_prefix' => $deployment->storage_prefix,
             'deployment_id' => $deployment->id,
             'spa_fallback' => (bool) ($routing['spa_fallback'] ?? true),
             'headers' => is_array($routing['headers'] ?? null) ? $routing['headers'] : [],
         ];
+
+        if (($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid') {
+            $origin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : [];
+            $originUrl = trim((string) ($origin['url'] ?? ''));
+            if ($originUrl !== '') {
+                $payload['origin_url'] = $originUrl;
+                $routes = is_array($origin['routes'] ?? null) ? $origin['routes'] : [];
+                $payload['origin_routes'] = array_values(array_filter(array_map(
+                    fn ($route) => is_string($route) ? $route : null,
+                    $routes,
+                )));
+            }
+        }
+
+        return $payload;
     }
 
     /**
      * @return list<string>
      */
-    private function customHostnames(Site $site): array
+    private function readyCustomHostnames(Site $site): array
     {
         $routing = is_array($site->edgeMeta()['routing'] ?? null) ? $site->edgeMeta()['routing'] : [];
         $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
         $hosts = [];
         foreach ($domains as $hostname => $info) {
-            if (is_string($hostname) && $hostname !== '') {
-                $hosts[] = strtolower($hostname);
+            if (! is_string($hostname) || $hostname === '') {
+                continue;
             }
+            if (is_array($info) && ($info['dns_status'] ?? null) !== 'ready') {
+                continue;
+            }
+            $hosts[] = strtolower($hostname);
         }
 
         return $hosts;

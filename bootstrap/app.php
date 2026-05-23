@@ -34,6 +34,7 @@ use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Jobs\ScanServerSshLoginsJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Jobs\UpgradeGuestMetricsScriptJob;
+use App\Jobs\VerifyEdgeCustomDomainsJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
@@ -114,6 +115,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command(CollectEdgeUsageCommand::class)->dailyAt('02:00');
+
+        $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();
 
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 

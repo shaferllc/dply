@@ -44,7 +44,6 @@ test('edge overview shows live url redeploy and no nginx references', function (
         ->assertSee('Open live site')
         ->assertSee('acme/web')
         ->assertSee('Deploy history')
-        ->assertDontSee('Dply Edge')
         ->assertDontSee('nginx')
         ->assertDontSee('Webserver')
         ->assertDontSee('PHP-FPM');

@@ -6,7 +6,9 @@ namespace App\Jobs;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Services\Edge\EdgeArtifactPublisher;
 use App\Services\Edge\EdgeBuildRunner;
+use App\Services\Edge\EdgeDeliveryContextResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -50,13 +52,21 @@ class BuildEdgeSiteJob implements ShouldQueue
         $site->update(['status' => Site::STATUS_EDGE_PROVISIONING]);
         $deployment->update(['status' => EdgeDeployment::STATUS_BUILDING]);
 
+        $buildResult = null;
+        $workRoot = null;
+
         try {
             $repoUrl = str_contains($repo, '://') ? $repo : 'https://github.com/'.$repo.'.git';
-            $artifactDir = $runner->build($deployment, $repoUrl, $branch, $buildCommand, $outputDir);
+            $buildResult = $runner->build($deployment, $repoUrl, $branch, $buildCommand, $outputDir);
+            $artifactDir = $buildResult['artifact_dir'];
+            $workRoot = dirname($artifactDir);
+
+            $buildLogPath = $this->persistBuildLog($site, $deployment, $buildResult['build_log']);
+            $deployment->update(['build_log_path' => $buildLogPath]);
 
             if (! Site::query()->whereKey($site->id)->exists()) {
                 if (is_dir($artifactDir) && str_contains($artifactDir, sys_get_temp_dir())) {
-                    File::deleteDirectory(dirname($artifactDir));
+                    File::deleteDirectory($workRoot);
                 }
 
                 return;
@@ -64,10 +74,35 @@ class BuildEdgeSiteJob implements ShouldQueue
 
             PublishEdgeDeploymentJob::dispatch($deployment->id, $artifactDir);
         } catch (Throwable $e) {
+            if (is_array($buildResult) && isset($buildResult['build_log']) && is_file($buildResult['build_log'])) {
+                try {
+                    $buildLogPath = $this->persistBuildLog($site, $deployment, $buildResult['build_log']);
+                    $deployment->update(['build_log_path' => $buildLogPath]);
+                } catch (Throwable) {
+                    // Best-effort — failure reason still captures the exception message.
+                }
+            }
+
             $this->markFailed($site, $deployment, $e->getMessage());
 
             throw $e;
         }
+    }
+
+    private function persistBuildLog(Site $site, EdgeDeployment $deployment, string $localLogPath): string
+    {
+        $storageKey = trim($deployment->storage_prefix, '/').'/build.log';
+
+        try {
+            $context = app(EdgeDeliveryContextResolver::class)->forSite($site);
+            $diskName = $context->diskName;
+        } catch (Throwable) {
+            $diskName = (string) config('edge.disk.name', 'edge_r2');
+        }
+
+        app(EdgeArtifactPublisher::class)->uploadFile($localLogPath, $storageKey, $diskName);
+
+        return $storageKey;
     }
 
     private function markFailed(Site $site, EdgeDeployment $deployment, string $message): void

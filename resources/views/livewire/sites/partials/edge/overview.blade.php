@@ -101,7 +101,7 @@
                     @endforeach
                 </ul>
             @else
-                <p class="text-sm text-brand-moss">{{ __('No custom domains attached — your dply Edge hostname is used by default.') }}</p>
+                <p class="text-sm text-brand-moss">{{ __('No custom domains attached — your Edge hostname is used by default.') }}</p>
             @endif
         </div>
     </section>

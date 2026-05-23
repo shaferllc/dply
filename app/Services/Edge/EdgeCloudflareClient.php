@@ -261,6 +261,26 @@ class EdgeCloudflareClient
     }
 
     /**
+     * MVP stub for Cloudflare Custom Hostnames (SSL for SaaS) — full provisioning deferred to Phase 3b.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    public function createCustomHostname(string $zoneId, string $hostname, array $options = []): array
+    {
+        $response = Http::withToken($this->apiToken)
+            ->post(self::BASE.'/zones/'.$zoneId.'/custom_hostnames', array_merge([
+                'hostname' => strtolower(trim($hostname)),
+                'ssl' => [
+                    'method' => 'http',
+                    'type' => 'dv',
+                ],
+            ], $options));
+
+        return $this->decode($response);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function decode(Response $response): array

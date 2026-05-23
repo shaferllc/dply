@@ -15,24 +15,75 @@
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Point DNS at dply Edge, then attach the hostname here. TLS is handled automatically.') }}</p>
+        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS here. SSL is provided when traffic is proxied through Cloudflare on your zone, or via the dply Edge zone for managed delivery.') }}</p>
     </div>
     <div class="space-y-4 px-6 py-5 sm:px-8">
         @if ($edgeAttachedDomains !== [])
             <ul class="divide-y divide-brand-ink/8 rounded-xl border border-brand-ink/10">
                 @foreach ($edgeAttachedDomains as $hostname => $info)
-                    <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                        <div class="min-w-0">
-                            <p class="font-mono text-sm text-brand-ink">{{ $hostname }}</p>
-                            @if (is_array($info) && ! empty($info['attached_at']))
-                                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Attached :time', ['time' => $info['attached_at']]) }}</p>
-                            @endif
+                    @php
+                        $dnsStatus = is_array($info) ? (string) ($info['dns_status'] ?? 'pending') : 'pending';
+                        $cnameTarget = is_array($info) ? (string) ($info['cname_target'] ?? $edgeDeliveryHostname ?? $site->edgeHostname()) : ($edgeDeliveryHostname ?? $site->edgeHostname());
+                        $statusBadge = match ($dnsStatus) {
+                            'ready' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300',
+                            'failed' => 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300',
+                            default => 'bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200',
+                        };
+                        $statusLabel = match ($dnsStatus) {
+                            'ready' => __('Ready'),
+                            'failed' => __('Failed'),
+                            default => __('Pending DNS'),
+                        };
+                    @endphp
+                    <li class="px-4 py-4" wire:key="edge-domain-{{ $hostname }}">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="font-mono text-sm text-brand-ink">{{ $hostname }}</p>
+                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusBadge }}">{{ $statusLabel }}</span>
+                                </div>
+                                @if ($cnameTarget !== '')
+                                    <div class="mt-2" x-data="{ copied: false }">
+                                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('CNAME target') }}</p>
+                                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                                            <code class="rounded-lg bg-brand-sand/30 px-2 py-1 font-mono text-xs text-brand-ink">{{ $cnameTarget }}</code>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2 py-1 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
+                                                @click="navigator.clipboard.writeText(@js($cnameTarget)); copied = true; setTimeout(() => copied = false, 2000)"
+                                            >
+                                                <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                                <span x-show="!copied">{{ __('Copy') }}</span>
+                                                <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
+                                @if (is_array($info) && ! empty($info['error']))
+                                    <p class="mt-2 text-xs text-rose-700 dark:text-rose-300">{{ $info['error'] }}</p>
+                                @endif
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                @can('update', $site)
+                                    @if ($dnsStatus !== 'ready')
+                                        <button
+                                            type="button"
+                                            wire:click="verifyEdgeDomain('{{ $hostname }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="verifyEdgeDomain('{{ $hostname }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                        >
+                                            <x-heroicon-o-check-badge class="h-3.5 w-3.5" />
+                                            <span wire:loading.remove wire:target="verifyEdgeDomain('{{ $hostname }}')">{{ __('Verify DNS') }}</span>
+                                            <span wire:loading wire:target="verifyEdgeDomain('{{ $hostname }}')">{{ __('Checking…') }}</span>
+                                        </button>
+                                    @endif
+                                    <button type="button" wire:click="detachEdgeDomain('{{ $hostname }}')" class="text-xs font-medium text-rose-700 hover:text-rose-900 dark:text-rose-400">
+                                        {{ __('Remove') }}
+                                    </button>
+                                @endcan
+                            </div>
                         </div>
-                        @can('update', $site)
-                            <button type="button" wire:click="detachEdgeDomain('{{ $hostname }}')" class="text-xs font-medium text-rose-700 hover:text-rose-900 dark:text-rose-400">
-                                {{ __('Remove') }}
-                            </button>
-                        @endcan
                     </li>
                 @endforeach
             </ul>

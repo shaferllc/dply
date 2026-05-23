@@ -29,8 +29,13 @@ final class EdgeSiteViewData
         $edgeSourceRef = $edgeRepo !== '' ? $edgeRepo.'@'.$edgeBranch : '';
         $edgeBuildCommand = (string) ($edgeBuildSpec['command'] ?? 'npm ci && npm run build');
         $edgeOutputDir = (string) ($edgeBuildSpec['output_dir'] ?? 'dist');
-        $edgeDeployOnPush = (bool) ($edgeMeta['deploy_on_push'] ?? true);
+        $edgeDeployOnPush = (bool) ($edgeSourceSpec['deploy_on_push'] ?? true);
+        $edgeWebhookMeta = is_array($edgeMeta['webhook'] ?? null) ? $edgeMeta['webhook'] : null;
+        $edgeGithubWebhookConnected = is_array($edgeWebhookMeta) && ($edgeWebhookMeta['hook_id'] ?? null) !== null;
+        $edgeWebhookLastEventAt = is_array($edgeWebhookMeta) ? ($edgeWebhookMeta['last_event_at'] ?? null) : null;
         $edgeSpaFallback = (bool) ($edgeMeta['spa_fallback'] ?? true);
+        $edgeRuntimeMode = (string) ($edgeMeta['runtime_mode'] ?? 'static');
+        $edgeOrigin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : null;
         $edgeAttachedDomains = is_array($edgeMeta['routing']['custom_domains'] ?? null) ? $edgeMeta['routing']['custom_domains'] : [];
         $edgeIsPreviewChild = ! empty($edgeMeta['preview_parent_site_id']);
         $edgeActiveDeploymentId = $edgeMeta['active_deployment_id'] ?? null;
@@ -93,7 +98,12 @@ final class EdgeSiteViewData
             'edgeBuildCommand',
             'edgeOutputDir',
             'edgeDeployOnPush',
+            'edgeWebhookMeta',
+            'edgeGithubWebhookConnected',
+            'edgeWebhookLastEventAt',
             'edgeSpaFallback',
+            'edgeRuntimeMode',
+            'edgeOrigin',
             'edgeAttachedDomains',
             'edgeIsPreviewChild',
             'edgeActiveDeploymentId',

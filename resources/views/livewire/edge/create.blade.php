@@ -258,6 +258,29 @@
                         <p x-show="! advancedOpen" class="mt-3 rounded-xl border border-dashed border-brand-ink/12 bg-brand-cream/30 px-4 py-3 text-xs text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-800/40">
                             {{ __('Using detected or default build settings. Open overrides to customize the command and output folder.') }}
                         </p>
+
+                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-cream/25 p-4 dark:border-brand-mist/20 dark:bg-zinc-800/40">
+                            <p class="text-sm font-semibold text-brand-ink">{{ __('Delivery mode') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ __('Static sites serve everything from Edge. Hybrid keeps static assets on Edge and proxies dynamic routes to a long-running origin (dply Cloud or external URL).') }}</p>
+                            <div class="mt-3 flex flex-wrap gap-3">
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input type="radio" wire:model.live="runtime_mode" value="static" class="text-brand-sage focus:ring-brand-sage/40" />
+                                    <span>{{ __('Static / SSG') }}</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm">
+                                    <input type="radio" wire:model.live="runtime_mode" value="hybrid" class="text-brand-sage focus:ring-brand-sage/40" />
+                                    <span>{{ __('Hybrid (static + origin SSR)') }}</span>
+                                </label>
+                            </div>
+                            @if ($runtime_mode === 'hybrid')
+                                <div class="mt-4">
+                                    <x-input-label for="origin_url" :value="__('SSR origin URL')" />
+                                    <x-text-input id="origin_url" wire:model="origin_url" type="url" class="mt-1 block w-full font-mono text-sm" placeholder="https://my-app.dply.cloud" required />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Container or external URL that handles server-rendered routes (e.g. a dply Cloud app).') }}</p>
+                                    <x-input-error :messages="$errors->get('origin_url')" class="mt-2" />
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 </div>
             </section>

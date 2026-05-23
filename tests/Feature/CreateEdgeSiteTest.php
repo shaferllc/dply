@@ -49,7 +49,7 @@ test('creates org cloudflare edge site when credential bootstrapped', function (
 
     expect($site->edge_backend)->toBe('org_cloudflare')
         ->and($site->edge_provider_credential_id)->toBe($credential->id)
-        ->and($site->meta['edge']['routing']['hostname'] ?? '')->toBe('byo-marketing.example.com');
+        ->and($site->meta['edge']['routing']['hostname'] ?? '')->toMatch('/^byo-marketing-[a-z0-9]{6}\.example\.com$/');
 });
 
 test('creates edge server site deployment and dispatches build', function () {
@@ -112,6 +112,22 @@ test('throws when runtime mode is ssr', function () {
         'runtime_mode' => 'ssr',
     ]);
 })->throws(\RuntimeException::class);
+
+test('creates hybrid edge site with origin config', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+
+    $site = (new CreateEdgeSite)->handle($user, $org, [
+        'name' => 'Hybrid Next',
+        'repo' => 'acme/next',
+        'runtime_mode' => 'hybrid',
+        'origin_url' => 'https://cloud-app.example.test',
+    ]);
+
+    expect($site->meta['edge']['runtime_mode'] ?? null)->toBe('hybrid');
+    expect($site->meta['edge']['origin']['url'] ?? null)->toBe('https://cloud-app.example.test');
+    expect($site->meta['edge']['origin']['routes'] ?? null)->toBeArray();
+});
 
 /**
  * @return array{0: User, 1: Organization}

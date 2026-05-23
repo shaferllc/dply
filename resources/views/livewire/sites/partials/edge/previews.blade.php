@@ -23,11 +23,17 @@
                 @php
                     $previewMeta = $preview->edgeMeta();
                     $previewBranch = (string) ($previewMeta['preview_branch'] ?? '—');
+                    $previewPrNumber = $previewMeta['preview_pr_number'] ?? null;
                     $previewUrl = $preview->edgeLiveUrl();
                 @endphp
                 <li class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 sm:px-8">
                     <div class="min-w-0">
-                        <p class="font-mono text-sm font-medium text-brand-ink">{{ $previewBranch }}</p>
+                        <p class="font-mono text-sm font-medium text-brand-ink">
+                            {{ $previewBranch }}
+                            @if (is_int($previewPrNumber) || (is_string($previewPrNumber) && $previewPrNumber !== ''))
+                                <span class="ms-1 text-xs font-normal text-brand-moss">· PR #{{ $previewPrNumber }}</span>
+                            @endif
+                        </p>
                         @if ($previewUrl)
                             <a href="{{ $previewUrl }}" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex items-center gap-1 font-mono text-xs text-brand-forest hover:underline dark:text-brand-sage">
                                 {{ $previewUrl }}

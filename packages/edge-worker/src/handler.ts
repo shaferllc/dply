@@ -3,6 +3,8 @@ export interface HostMapEntry {
   deployment_id: string;
   spa_fallback: boolean;
   headers?: Record<string, string>;
+  origin_url?: string;
+  origin_routes?: string[];
 }
 
 export interface Env {
@@ -85,6 +87,29 @@ export function contentTypeForPath(path: string): string | undefined {
   return MIME_BY_EXTENSION[extension];
 }
 
+export function pathMatchesOriginRoute(path: string, routes: string[]): boolean {
+  const normalizedPath = `/${path}`.replace(/\/+/g, '/');
+
+  for (const route of routes) {
+    const normalizedRoute = route.startsWith('/') ? route : `/${route}`;
+
+    if (normalizedRoute.endsWith('*')) {
+      const prefix = normalizedRoute.slice(0, -1);
+      if (normalizedPath.startsWith(prefix)) {
+        return true;
+      }
+
+      continue;
+    }
+
+    if (normalizedPath === normalizedRoute || normalizedPath === `${normalizedRoute}/`) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export class PathTraversalError extends Error {
   constructor() {
     super('Path traversal is not allowed.');
@@ -93,7 +118,8 @@ export class PathTraversalError extends Error {
 }
 
 export async function handleRequest(request: Request, env: Env): Promise<Response> {
-  const hostname = new URL(request.url).hostname;
+  const url = new URL(request.url);
+  const hostname = url.hostname;
   const hostEntry = await env.HOST_MAP.get<HostMapEntry>(hostname, 'json');
 
   if (!hostEntry?.storage_prefix) {
@@ -103,7 +129,7 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
   let requestPath: string;
 
   try {
-    requestPath = normalizeRequestPath(new URL(request.url).pathname);
+    requestPath = normalizeRequestPath(url.pathname);
   } catch (error) {
     if (error instanceof PathTraversalError) {
       return new Response('Bad Request', { status: 400 });
@@ -117,8 +143,17 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 
   if (!object && hostEntry.spa_fallback && requestPath !== 'index.html') {
     const fallbackKey = buildObjectKey(hostEntry.storage_prefix, 'index.html');
-    object = await env.ARTIFACTS.get(fallbackKey);
-    requestPath = 'index.html';
+    const fallbackObject = await env.ARTIFACTS.get(fallbackKey);
+    if (fallbackObject) {
+      object = fallbackObject;
+      requestPath = 'index.html';
+    }
+  }
+
+  if (!object && hostEntry.origin_url && hostEntry.origin_routes?.length) {
+    if (pathMatchesOriginRoute(requestPath, hostEntry.origin_routes)) {
+      return proxyToOrigin(request, hostEntry.origin_url);
+    }
   }
 
   if (!object) {
@@ -149,6 +184,28 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
 
   return new Response(object.body, {
     status: 200,
+    headers,
+  });
+}
+
+async function proxyToOrigin(request: Request, originUrl: string): Promise<Response> {
+  const target = new URL(request.url);
+  const origin = new URL(originUrl);
+  target.protocol = origin.protocol;
+  target.hostname = origin.hostname;
+  target.port = origin.port;
+
+  const upstream = await fetch(new Request(target.toString(), request));
+
+  const headers = new Headers(upstream.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+  headers.set('X-Dply-Origin-Proxy', '1');
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
     headers,
   });
 }

@@ -130,6 +130,81 @@ class CloudflareDnsService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function upsertCnameRecord(string $zoneName, string $relativeRecordName, string $targetHost): array
+    {
+        $zoneId = $this->findZoneId($zoneName);
+        if ($zoneId === null) {
+            throw new \RuntimeException('Zone not found in this Cloudflare account.');
+        }
+
+        $fqdn = $this->fqdn($zoneName, $relativeRecordName);
+        $target = rtrim(strtolower(trim($targetHost)), '.');
+        $existing = $this->findCnameRecord($zoneName, $fqdn);
+
+        if ($existing !== null) {
+            $recordId = (string) ($existing['id'] ?? '');
+            if ($recordId === '') {
+                throw new \RuntimeException('Cloudflare returned a CNAME record without an id.');
+            }
+
+            $response = $this->request('put', '/zones/'.$zoneId.'/dns_records/'.$recordId, [
+                'type' => 'CNAME',
+                'name' => $fqdn,
+                'content' => $target,
+                'ttl' => 120,
+                'proxied' => true,
+            ]);
+            $this->assertApiSuccess($response, 'update Cloudflare CNAME record');
+            $result = $response->json('result');
+
+            return is_array($result) ? $result : [];
+        }
+
+        $response = $this->request('post', '/zones/'.$zoneId.'/dns_records', [
+            'type' => 'CNAME',
+            'name' => $fqdn,
+            'content' => $target,
+            'ttl' => 120,
+            'proxied' => true,
+        ]);
+        $this->assertApiSuccess($response, 'create Cloudflare CNAME record');
+        $result = $response->json('result');
+
+        return is_array($result) ? $result : [];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findCnameRecord(string $zoneName, string $fqdn): ?array
+    {
+        $zoneId = $this->findZoneId($zoneName);
+        if ($zoneId === null) {
+            return null;
+        }
+
+        $response = $this->request('get', '/zones/'.$zoneId.'/dns_records', [
+            'type' => 'CNAME',
+            'name' => strtolower($fqdn),
+        ]);
+        $this->assertApiSuccess($response, 'list Cloudflare DNS records');
+        $results = $response->json('result');
+        if (! is_array($results) || $results === []) {
+            return null;
+        }
+
+        foreach ($results as $row) {
+            if (is_array($row) && strtoupper((string) ($row['type'] ?? '')) === 'CNAME') {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function findARecord(string $zoneId, string $fqdn): ?array

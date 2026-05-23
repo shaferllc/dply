@@ -10,12 +10,13 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Edge\EdgeCustomDomainProvisioner;
 use App\Services\Edge\EdgeRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('fake backend attaches custom domain to host map', function () {
+test('attach custom domain starts in pending dns state', function () {
     config(['edge.fake.enabled' => true]);
     $site = makeLiveEdgeSite();
 
@@ -27,7 +28,19 @@ test('fake backend attaches custom domain to host map', function () {
     $site->refresh();
     $domains = $site->edgeMeta()['routing']['custom_domains'] ?? [];
     expect($domains)->toHaveKey('www.example.com');
-    expect($domains['www.example.com']['dns_status'] ?? null)->toBe('ready');
+    expect($domains['www.example.com']['dns_status'] ?? null)->toBe('pending');
+    expect($domains['www.example.com']['cname_target'] ?? '')->not->toBe('');
+});
+
+test('verify fails when dns records are missing', function () {
+    config(['edge.fake.enabled' => true]);
+    $site = makeLiveEdgeSite();
+    $provisioner = app(EdgeCustomDomainProvisioner::class);
+
+    $provisioner->provision($site->fresh(), 'docs.example.com');
+    $entry = $provisioner->verify($site->fresh(), 'docs.example.com');
+
+    expect($entry['dns_status'] ?? null)->toBe('failed');
 });
 
 test('fake backend detaches custom domain', function () {

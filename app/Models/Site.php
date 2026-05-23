@@ -2336,6 +2336,14 @@ class Site extends Model
         $this->meta = $meta;
     }
 
+    public function mergeEdgeMeta(array $patch): void
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $current = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        $meta['edge'] = array_merge($current, $patch);
+        $this->meta = $meta;
+    }
+
     public function deploySyncGroups(): BelongsToMany
     {
         return $this->belongsToMany(SiteDeploySyncGroup::class, 'site_deploy_sync_group_sites', 'site_id', 'site_deploy_sync_group_id')

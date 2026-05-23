@@ -58,6 +58,7 @@ class EdgeWorkerDeployCommand extends Command
             $this->line('Worker script: '.$context->workerScriptName);
             $this->line('R2 bucket: '.$context->r2Bucket);
             $this->line('KV namespace: '.$context->kvNamespaceId);
+            $this->line('Phase 4b: per-deployment Worker SSR bundle upload (OpenNext-style) is not wired yet — static + hybrid origin-fetch only.');
 
             return self::SUCCESS;
         }

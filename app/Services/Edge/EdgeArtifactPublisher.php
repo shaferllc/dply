@@ -48,6 +48,29 @@ class EdgeArtifactPublisher
         return $count;
     }
 
+    public function uploadFile(string $localPath, string $storageKey, ?string $diskName = null): void
+    {
+        if (! is_file($localPath)) {
+            throw new RuntimeException("Build log file not found: {$localPath}");
+        }
+
+        $disk = $this->disk($diskName);
+        $disk->put(trim($storageKey, '/'), file_get_contents($localPath), [
+            'ContentType' => 'text/plain; charset=utf-8',
+        ]);
+    }
+
+    public function readFile(string $storageKey, ?string $diskName = null): ?string
+    {
+        $disk = $this->disk($diskName);
+        $key = trim($storageKey, '/');
+        if (! $disk->exists($key)) {
+            return null;
+        }
+
+        return $disk->get($key);
+    }
+
     public function deletePrefix(string $storagePrefix, ?string $diskName = null): void
     {
         $disk = $this->disk($diskName);

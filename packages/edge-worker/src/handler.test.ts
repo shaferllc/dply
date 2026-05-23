@@ -5,6 +5,7 @@ import {
   handleRequest,
   isImmutableAsset,
   normalizeRequestPath,
+  pathMatchesOriginRoute,
   type Env,
   type HostMapEntry,
 } from './handler';
@@ -86,6 +87,13 @@ describe('cacheControlForPath', () => {
   });
 });
 
+describe('pathMatchesOriginRoute', () => {
+  it('matches wildcard origin routes', () => {
+    expect(pathMatchesOriginRoute('_next/data/build-id/page.json', ['/_next/*'])).toBe(true);
+    expect(pathMatchesOriginRoute('assets/app.js', ['/_next/*'])).toBe(false);
+  });
+});
+
 describe('handleRequest', () => {
   const hostEntry: HostMapEntry = {
     storage_prefix: 'edge/site-1/deploy-9/',
@@ -150,5 +158,39 @@ describe('handleRequest', () => {
     const response = await handleRequest(new Request('https://unknown.example.test/'), env);
 
     expect(response.status).toBe(404);
+  });
+
+  it('proxies unmatched hybrid routes to the configured origin', async () => {
+    const hybridEntry: HostMapEntry = {
+      ...hostEntry,
+      origin_url: 'https://origin.example.test',
+      origin_routes: ['/_next/*', '/api/*'],
+    };
+
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'hybrid.example.test': hybridEntry }),
+      ARTIFACTS: createMockR2({}),
+    };
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      expect(url).toContain('origin.example.test');
+      expect(url).toContain('/api/users');
+
+      return new Response('{"ok":true}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    try {
+      const response = await handleRequest(new Request('https://hybrid.example.test/api/users'), env);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('{"ok":true}');
+      expect(response.headers.get('X-Dply-Origin-Proxy')).toBe('1');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

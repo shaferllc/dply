@@ -57,52 +57,24 @@ class CloudflareEdgeDelivery
      */
     public function attachDomain(Site $site, string $hostname): array
     {
-        $hostname = strtolower(trim($hostname));
-        $activeId = $site->edgeMeta()['active_deployment_id'] ?? null;
-        if (! is_string($activeId) || $activeId === '') {
-            throw new RuntimeException('No active deployment to attach domain to.');
+        $entry = app(EdgeCustomDomainProvisioner::class)->provision($site, $hostname);
+        if ($entry === null) {
+            throw new RuntimeException('Could not attach custom domain.');
         }
-
-        $deployment = EdgeDeployment::query()->findOrFail($activeId);
-        $context = $this->contextResolver->forSite($site);
-        $this->hostMapPublisher->publishHostname($site, $deployment, $hostname, $context);
-
-        $meta = $site->edgeMeta();
-        $domains = is_array($meta['routing']['custom_domains'] ?? null) ? $meta['routing']['custom_domains'] : [];
-        $domains[$hostname] = ['dns_status' => 'ready', 'attached_at' => now()->toIso8601String()];
-        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
-            'edge' => array_merge($meta, [
-                'routing' => array_merge(is_array($meta['routing'] ?? null) ? $meta['routing'] : [], [
-                    'custom_domains' => $domains,
-                ]),
-            ]),
-        ])]);
 
         return [
             [
-                'name' => $hostname,
+                'name' => strtolower(trim($hostname)),
                 'type' => 'CNAME',
-                'value' => $site->edgeHostname(),
-                'status' => 'pending',
+                'value' => (string) ($entry['cname_target'] ?? $site->edgeHostname()),
+                'status' => (string) ($entry['dns_status'] ?? 'pending'),
             ],
         ];
     }
 
     public function detachDomain(Site $site, string $hostname): void
     {
-        $context = $this->contextResolver->forSite($site);
-        $this->hostMapPublisher->unpublishHostname($site, $hostname, $context);
-
-        $meta = $site->edgeMeta();
-        $domains = is_array($meta['routing']['custom_domains'] ?? null) ? $meta['routing']['custom_domains'] : [];
-        unset($domains[strtolower(trim($hostname))]);
-        $site->update(['meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
-            'edge' => array_merge($meta, [
-                'routing' => array_merge(is_array($meta['routing'] ?? null) ? $meta['routing'] : [], [
-                    'custom_domains' => $domains,
-                ]),
-            ]),
-        ])]);
+        app(EdgeCustomDomainProvisioner::class)->remove($site, $hostname);
     }
 
     /**

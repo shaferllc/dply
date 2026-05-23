@@ -19,7 +19,7 @@ class EdgeHostMapPublisher
         $version = (int) $deployment->cf_kv_version + 1;
         $this->publishHostname($site, $deployment, $site->edgeHostname(), $context);
 
-        foreach ($this->customHostnames($site) as $hostname) {
+        foreach ($this->readyCustomHostnames($site) as $hostname) {
             $this->publishHostname($site, $deployment, $hostname, $context);
         }
 
@@ -50,7 +50,7 @@ class EdgeHostMapPublisher
     {
         $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
         $this->unpublishHostname($site, $site->edgeHostname(), $context);
-        foreach ($this->customHostnames($site) as $hostname) {
+        foreach ($this->readyCustomHostnames($site) as $hostname) {
             $this->unpublishHostname($site, $hostname, $context);
         }
     }
@@ -96,27 +96,49 @@ class EdgeHostMapPublisher
      */
     private function routingPayload(EdgeDeployment $deployment, Site $site): array
     {
-        $routing = is_array($site->edgeMeta()['routing'] ?? null) ? $site->edgeMeta()['routing'] : [];
-
-        return [
+        $edgeMeta = $site->edgeMeta();
+        $routing = is_array($edgeMeta['routing'] ?? null) ? $edgeMeta['routing'] : [];
+        $payload = [
             'storage_prefix' => $deployment->storage_prefix,
             'deployment_id' => $deployment->id,
             'spa_fallback' => (bool) ($routing['spa_fallback'] ?? true),
             'headers' => is_array($routing['headers'] ?? null) ? $routing['headers'] : [],
         ];
+
+        if (($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid') {
+            $origin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : [];
+            $originUrl = trim((string) ($origin['url'] ?? ''));
+            if ($originUrl !== '') {
+                $payload['origin_url'] = $originUrl;
+                $routes = is_array($origin['routes'] ?? null) ? $origin['routes'] : [];
+                $payload['origin_routes'] = array_values(array_filter(array_map(
+                    fn ($route) => is_string($route) ? $route : null,
+                    $routes,
+                )));
+            }
+        }
+
+        return $payload;
     }
 
     /**
      * @return list<string>
      */
-    private function customHostnames(Site $site): array
+    private function readyCustomHostnames(Site $site): array
     {
         $routing = is_array($site->edgeMeta()['routing'] ?? null) ? $site->edgeMeta()['routing'] : [];
         $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+        $hosts = [];
+        foreach ($domains as $hostname => $info) {
+            if (! is_string($hostname) || $hostname === '') {
+                continue;
+            }
+            if (is_array($info) && ($info['dns_status'] ?? null) !== 'ready') {
+                continue;
+            }
+            $hosts[] = strtolower($hostname);
+        }
 
-        return array_values(array_filter(array_map(
-            fn ($host) => is_string($host) ? strtolower($host) : null,
-            array_keys($domains),
-        )));
+        return $hosts;
     }
 }

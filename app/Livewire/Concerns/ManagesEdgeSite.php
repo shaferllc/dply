@@ -10,6 +10,8 @@ use App\Actions\Edge\RollbackEdgeDeployment;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Services\Edge\EdgeCustomDomainProvisioner;
+use App\Services\Edge\EdgeGithubWebhookProvisioner;
 use App\Services\Edge\EdgeRouter;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -20,6 +22,80 @@ use Illuminate\Database\Eloquent\Collection;
 trait ManagesEdgeSite
 {
     public string $edge_domain_input = '';
+
+    public string $edge_webhook_account_id = '';
+
+    public function mountEdgeWebhookAccount(): void
+    {
+        if (! $this->site->usesEdgeRuntime()) {
+            return;
+        }
+
+        $webhook = is_array($this->site->edgeMeta()['webhook'] ?? null) ? $this->site->edgeMeta()['webhook'] : null;
+        $accountId = is_array($webhook) ? (string) ($webhook['account_id'] ?? '') : '';
+        if ($accountId !== '') {
+            $this->edge_webhook_account_id = $accountId;
+        }
+    }
+
+    public function enableEdgeGithubWebhook(EdgeGithubWebhookProvisioner $provisioner): void
+    {
+        if (! $this->site->usesEdgeRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        if ($this->edge_webhook_account_id === '') {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Select a linked GitHub account first.'));
+            }
+
+            return;
+        }
+
+        $account = auth()->user()?->socialAccounts()->find($this->edge_webhook_account_id);
+        if ($account === null) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('That GitHub account is no longer linked.'));
+            }
+
+            return;
+        }
+
+        $result = $provisioner->enable($this->site->fresh(), $account);
+        if (! ($result['ok'] ?? false)) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError((string) ($result['message'] ?? __('Could not connect GitHub webhook.')));
+            }
+
+            return;
+        }
+
+        $this->site->refresh();
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess((string) ($result['message'] ?? __('GitHub webhook connected.')));
+        }
+    }
+
+    public function disableEdgeGithubWebhook(EdgeGithubWebhookProvisioner $provisioner): void
+    {
+        if (! $this->site->usesEdgeRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $account = null;
+        if ($this->edge_webhook_account_id !== '') {
+            $account = auth()->user()?->socialAccounts()->find($this->edge_webhook_account_id);
+        }
+
+        $provisioner->disable($this->site->fresh(), $account);
+        $this->site->refresh();
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('GitHub webhook disconnected.'));
+        }
+    }
 
     public function redeployEdge(): void
     {
@@ -129,9 +205,35 @@ trait ManagesEdgeSite
         }
 
         $this->edge_domain_input = '';
+        $this->site->refresh();
 
         if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Custom domain attached.'));
+            $this->toastSuccess(__('Custom domain attached. Configure DNS, then verify when ready.'));
+        }
+    }
+
+    public function verifyEdgeDomain(string $hostname): void
+    {
+        if (! $this->site->usesEdgeRuntime()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $entry = app(EdgeCustomDomainProvisioner::class)->verify($this->site->fresh(), $hostname);
+        $this->site->refresh();
+
+        $status = is_array($entry) ? (string) ($entry['dns_status'] ?? '') : '';
+        if ($status === 'ready') {
+            if (method_exists($this, 'toastSuccess')) {
+                $this->toastSuccess(__('DNS verified — :hostname is live on Edge.', ['hostname' => $hostname]));
+            }
+
+            return;
+        }
+
+        $error = is_array($entry) ? (string) ($entry['error'] ?? '') : '';
+        if (method_exists($this, 'toastError')) {
+            $this->toastError($error !== '' ? $error : __('DNS verification failed. Check your CNAME and try again.'));
         }
     }
 
@@ -152,7 +254,7 @@ trait ManagesEdgeSite
         }
 
         try {
-            $backend->detachDomain($this->site->fresh(), $hostname);
+            app(EdgeCustomDomainProvisioner::class)->remove($this->site->fresh(), $hostname);
         } catch (\Throwable $e) {
             if (method_exists($this, 'toastError')) {
                 $this->toastError($e->getMessage());
