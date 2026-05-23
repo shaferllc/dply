@@ -41,8 +41,6 @@ class StepWhere extends Component
         }
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
-
-        // Default the active provider tile to whatever the form already has,
         // or the first credentialled provider if blank.
         if ($this->form->mode === 'provider') {
             if ($this->form->provider_host_kind === 'kubernetes' && $this->form->type === '') {
@@ -236,6 +234,24 @@ class StepWhere extends Component
     public function refreshPersonalSshKeyState(): void
     {
         // Triggers re-render so the connection panel reflects newly-saved keys.
+    }
+
+    #[On('provider-credential-created')]
+    public function applyStoredProviderCredential(?string $provider = null, mixed $credentialId = null): void
+    {
+        if (! is_string($provider) || $provider === '' || $credentialId === null || $credentialId === '') {
+            return;
+        }
+
+        $formProvider = str_replace('_kubernetes', '', $this->form->type);
+        if ($formProvider !== $provider) {
+            return;
+        }
+
+        $this->form->provider_credential_id = (string) $credentialId;
+        $this->active_provider = $provider;
+        $this->applyCloudDefaults($provider);
+        $this->autoSelectSingleOptions();
     }
 
     public function previous(): mixed

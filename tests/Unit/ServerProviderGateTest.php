@@ -4,10 +4,11 @@ namespace Tests\Unit\ServerProviderGateTest;
 
 use App\Support\ServerProviderGate;
 
-test('defaults enable digitalocean and custom', function () {
+test('defaults enable digitalocean hetzner and custom', function () {
     expect(ServerProviderGate::enabled('digitalocean'))->toBeTrue();
+    expect(ServerProviderGate::enabled('hetzner'))->toBeTrue();
     expect(ServerProviderGate::enabled('custom'))->toBeTrue();
-    expect(ServerProviderGate::enabled('hetzner'))->toBeFalse();
+    expect(ServerProviderGate::enabled('linode'))->toBeFalse();
 });
 
 test('default server create type respects flags', function () {

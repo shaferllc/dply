@@ -21,6 +21,7 @@ use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\SshConnection;
+use App\Support\Servers\FirewallWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -79,6 +80,12 @@ class WorkspaceFirewall extends Component
     {
         $this->bootWorkspace($server);
         $this->form->resetForNew();
+    }
+
+    public function setFirewallWorkspaceTab(string $tab): void
+    {
+        $allowed = ['rules', 'templates', 'activity'];
+        $this->firewall_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'rules';
     }
 
     protected function opsReady(): bool
@@ -1336,62 +1343,102 @@ class WorkspaceFirewall extends Component
 
     public function render(): View
     {
-        $this->server->loadMissing(['firewallRules', 'organization', 'sites']);
-
         // Backwards compatibility: the History and Audit tabs were merged into a single
         // Activity timeline. Snap stale tab values forward so deep links still land somewhere.
         if (in_array($this->firewall_workspace_tab, ['history', 'audit'], true)) {
             $this->firewall_workspace_tab = 'activity';
         }
 
-        $org = $this->server->organization;
-        $savedTemplates = $org
-            ? FirewallRuleTemplate::query()
-                ->where('organization_id', $org->id)
-                ->where(function ($q) {
-                    $q->whereNull('server_id')->orWhere('server_id', $this->server->id);
-                })
-                ->orderBy('name')
-                ->get()
-            : collect();
+        $allowedTabs = ['rules', 'templates', 'activity'];
+        if (! in_array($this->firewall_workspace_tab, $allowedTabs, true)) {
+            $this->firewall_workspace_tab = 'rules';
+        }
+
+        $tab = $this->firewall_workspace_tab;
+        $needsRules = $tab === 'rules';
+        $needsTemplates = $tab === 'templates';
+        $needsActivity = $tab === 'activity';
+
+        $this->server->loadMissing(['organization']);
+
+        if ($needsRules || $needsTemplates || $this->apply_preview_open) {
+            $this->server->loadMissing(['firewallRules', 'sites']);
+        }
 
         $provisioner = app(ServerFirewallProvisioner::class);
 
-        // Build a normalized "key" for every panel rule so we can fast-check whether each
-        // bundled template's rules are already present. We compare on (port, protocol, action,
-        // source) — the operator-facing label intentionally isn't part of the match because
-        // they may have edited it after applying the bundle.
-        $appliedKeys = $this->server->firewallRules
-            ->mapWithKeys(fn ($r) => [$this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true])
-            ->all();
-
-        $bundledTemplates = config('server_firewall.bundled_templates', []);
+        $savedTemplates = collect();
+        $bundledTemplates = [];
         $bundledAppliedMap = [];
-        foreach ($bundledTemplates as $key => $bundle) {
-            $rules = $bundle['rules'] ?? [];
-            if ($rules === []) {
-                $bundledAppliedMap[$key] = false;
+        $activityItems = [];
 
-                continue;
+        if ($needsTemplates) {
+            $org = $this->server->organization;
+            $savedTemplates = $org
+                ? FirewallRuleTemplate::query()
+                    ->where('organization_id', $org->id)
+                    ->where(function ($q) {
+                        $q->whereNull('server_id')->orWhere('server_id', $this->server->id);
+                    })
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+            $bundledTemplates = config('server_firewall.bundled_templates', []);
+
+            $appliedKeys = $this->server->firewallRules
+                ->mapWithKeys(fn ($r) => [$this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true])
+                ->all();
+
+            foreach ($bundledTemplates as $key => $bundle) {
+                $rules = $bundle['rules'] ?? [];
+                if ($rules === []) {
+                    $bundledAppliedMap[$key] = false;
+
+                    continue;
+                }
+                $bundledAppliedMap[$key] = collect($rules)->every(fn ($r) => isset($appliedKeys[
+                    $this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)
+                ]));
             }
-            $bundledAppliedMap[$key] = collect($rules)->every(fn ($r) => isset($appliedKeys[
-                $this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)
-            ]));
         }
 
-        return view('livewire.servers.workspace-firewall', [
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-            'bundledTemplates' => $bundledTemplates,
-            'bundledAppliedMap' => $bundledAppliedMap,
-            'savedTemplates' => $savedTemplates,
-            'activityItems' => $this->buildActivityItems(),
-            'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),
-            'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
-            'defaultPolicies' => $provisioner->defaultPoliciesFromMeta($this->server),
-            'loggingLevel' => $provisioner->loggingLevelFromMeta($this->server),
-        ]);
+        if ($needsActivity) {
+            $activityItems = $this->buildActivityItems();
+        }
+
+        $sshNotCovered = false;
+        $defaultPolicies = [];
+        $loggingLevel = null;
+
+        if ($needsRules || $this->apply_preview_open) {
+            $sshNotCovered = $provisioner->sshAccessNotExplicitlyAllowed($this->server);
+            $defaultPolicies = $provisioner->defaultPoliciesFromMeta($this->server);
+            $loggingLevel = $provisioner->loggingLevelFromMeta($this->server);
+        }
+
+        return view('livewire.servers.workspace-firewall', array_merge(
+            FirewallWorkspaceViewData::for(
+                $this->server,
+                $this,
+                $needsRules,
+                $needsActivity,
+                $activityItems,
+            ),
+            [
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+                'bundledTemplates' => $bundledTemplates,
+                'bundledAppliedMap' => $bundledAppliedMap,
+                'savedTemplates' => $savedTemplates,
+                'activityItems' => $activityItems,
+                'sshNotCovered' => $sshNotCovered,
+                'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
+                'defaultPolicies' => $defaultPolicies,
+                'loggingLevel' => $loggingLevel,
+            ],
+        ));
     }
 
     /**

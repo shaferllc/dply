@@ -1,4 +1,10 @@
 <div class="mx-auto max-w-6xl px-6 py-10">
+    <x-breadcrumb-trail :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
+        ['label' => __('Cloud apps'), 'icon' => 'cloud'],
+    ]" />
+
     <header class="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
             <h1 class="text-2xl font-semibold text-slate-900">{{ __('Cloud sites') }}</h1>

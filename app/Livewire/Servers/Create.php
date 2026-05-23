@@ -152,6 +152,26 @@ class Create extends Component
         // Re-render so preflight picks up the newly saved profile key.
     }
 
+    #[On('provider-credential-created')]
+    public function applyStoredProviderCredential(?string $provider = null, mixed $credentialId = null): void
+    {
+        if (! is_string($provider) || $provider === '' || $credentialId === null || $credentialId === '') {
+            return;
+        }
+
+        $formProvider = str_replace('_kubernetes', '', $this->form->type);
+        if ($formProvider !== $provider) {
+            return;
+        }
+
+        $this->form->provider_credential_id = (string) $credentialId;
+        $this->active_provider = $provider;
+
+        if ($this->form->mode === 'provider') {
+            $this->applyCloudDefaults($provider);
+        }
+    }
+
     public function store(): mixed
     {
         $user = auth()->user();

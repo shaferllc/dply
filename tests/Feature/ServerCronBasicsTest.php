@@ -58,8 +58,6 @@ test('cron page uses basics first layout', function () {
         ->assertOk()
         ->assertSee('Schedule commands in the Dply-managed crontab block for this server.')
         ->assertSee('Scheduled jobs')
-        ->assertSee('Recent run history')
-        ->assertSee('Inspect crontab')
         ->assertDontSee('Troubleshooting')
         // Tab strip: every section is reachable, including the org-level ones.
         ->assertSee('cron-tab-jobs', false)
@@ -67,6 +65,13 @@ test('cron page uses basics first layout', function () {
         ->assertSee('cron-tab-inspect', false)
         ->assertSee('cron-tab-templates', false)
         ->assertSee('cron-tab-maintenance', false);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceCron::class, ['server' => $server])
+        ->call('setCronWorkspaceTab', 'history')
+        ->assertSee('Recent run history')
+        ->call('setCronWorkspaceTab', 'inspect')
+        ->assertSee('Inspect crontab');
 });
 
 test('user can add basic cron job', function () {

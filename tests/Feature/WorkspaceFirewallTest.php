@@ -119,7 +119,7 @@ test('firewall history and audit tabs render their sections', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceFirewall::class, ['server' => $server])
-        ->set('firewall_workspace_tab', 'activity')
+        ->call('setFirewallWorkspaceTab', 'activity')
         ->assertSee('Activity')
         ->assertSee('Applied')
         ->assertSee(ServerFirewallAuditEvent::EVENT_RULE_CREATED);
@@ -201,11 +201,11 @@ test('saved template is listed on the templates tab', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('servers.firewall', $server, false));
-
-    $response->assertOk();
-    $response->assertSee('Saved templates');
-    $response->assertSee('Web basics');
+    Livewire::actingAs($user)
+        ->test(WorkspaceFirewall::class, ['server' => $server])
+        ->call('setFirewallWorkspaceTab', 'templates')
+        ->assertSee('Saved templates')
+        ->assertSee('Web basics');
 });
 
 test('apply firewall dispatches queued job and marks meta', function () {

@@ -11,7 +11,7 @@ return [
         'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true), // https://www.digitalocean.com/products/functions/
         'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true), // https://www.digitalocean.com/products/kubernetes/
         'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false), // https://www.digitalocean.com/products/app-platform/
-        'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', false), // https://www.hetzner.com/cloud
+        'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', true), // https://www.hetzner.com/cloud
         'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false), // https://www.linode.com/
         'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', false), // https://www.vultr.com/
         'akamai' => env('DPLY_SERVER_PROVIDER_AKAMAI', false), // https://www.akamai.com/solutions/cloud-computing

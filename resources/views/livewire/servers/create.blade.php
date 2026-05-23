@@ -254,9 +254,14 @@
                                         <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
                                             <p class="font-medium">{{ __('Add a credential first') }}</p>
                                             <p class="mt-1 text-sm">
-                                                {{ __('Save an API token for this provider under Server providers, then return here to continue with provisioning.') }}
-                                                <a href="{{ route('credentials.index') }}" wire:navigate class="underline font-medium">{{ __('Go to Server providers') }}</a>
+                                                {{ __('Connect a provider account here, then continue with provisioning.') }}
                                             </p>
+                                            <x-add-provider-credential-link
+                                                :provider="$form->type"
+                                                class="mt-3 inline-flex h-9 items-center rounded-lg bg-amber-500 px-3 text-xs font-semibold text-amber-950 no-underline hover:bg-amber-400"
+                                            >
+                                                {{ __('Connect account') }}
+                                            </x-add-provider-credential-link>
                                         </div>
                                     @endif
                                 @endif
@@ -970,4 +975,5 @@
     </div>
 
     <livewire:profile.personal-ssh-key-modal source="servers.create" />
+    <livewire:credentials.add-provider-credential-modal capability="compute" />
 </div>

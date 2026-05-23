@@ -22,16 +22,38 @@ class HetznerService
     }
 
     /**
+     * Register an SSH public key in the Hetzner project. Returns key array with id.
+     *
+     * @return array<string, mixed>
+     */
+    public function addSshKey(string $name, string $publicKey): array
+    {
+        $response = $this->request('post', '/ssh_keys', [
+            'name' => $name,
+            'public_key' => trim($publicKey),
+        ]);
+        $this->assertSuccess($response, 'create SSH key');
+
+        $data = $response->json();
+        $key = $data['ssh_key'] ?? null;
+        if (! is_array($key) || ! isset($key['id'])) {
+            throw new \RuntimeException('Hetzner API did not return SSH key id.');
+        }
+
+        return $key;
+    }
+
+    /**
      * Create a new server (instance) and return its ID.
      *
-     * @param  array<string>  $sshPublicKeys  Optional SSH public key strings to inject
+     * @param  array<int|string>  $sshKeyIds  Hetzner SSH key IDs or names
      */
     public function createInstance(
         string $name,
         string $location,
         string $serverType,
         string $image,
-        array $sshPublicKeys = [],
+        array $sshKeyIds = [],
         string $userData = ''
     ): int {
         $body = [
@@ -40,8 +62,8 @@ class HetznerService
             'server_type' => $serverType,
             'image' => $image,
         ];
-        if ($sshPublicKeys !== []) {
-            $body['ssh_keys'] = $sshPublicKeys;
+        if ($sshKeyIds !== []) {
+            $body['ssh_keys'] = $sshKeyIds;
         }
         if ($userData !== '') {
             $body['user_data'] = $userData;

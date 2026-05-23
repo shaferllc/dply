@@ -21,6 +21,7 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SshKeyLabelTemplate;
 use App\Services\Servers\SshPublicKeyFingerprint;
 use App\Support\OpenSshEd25519KeyPairGenerator;
+use App\Support\Servers\SshKeysWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -91,6 +92,12 @@ class WorkspaceSshKeys extends Component
         $this->deploy_target_linux_user = $this->new_target_linux_user;
         $this->hydrateAdvancedFromServer();
         $this->loadReviewDateInputs();
+    }
+
+    public function setSshWorkspaceTab(string $tab): void
+    {
+        $allowed = ['keys', 'preview', 'advanced', 'activity'];
+        $this->ssh_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'keys';
     }
 
     protected function loadReviewDateInputs(): void
@@ -299,7 +306,7 @@ class WorkspaceSshKeys extends Component
         // transcript before the queued state takes over.
         $this->diff_output = [];
         $this->diff_result = null;
-        $this->ssh_workspace_tab = 'preview';
+        $this->setSshWorkspaceTab('preview');
 
         PreviewDriftJob::dispatch($this->server->id, $runId);
     }
@@ -854,45 +861,79 @@ class WorkspaceSshKeys extends Component
 
     public function render(): View
     {
-        $this->server->loadMissing('authorizedKeys');
-        $user = Auth::user();
-
-        $profileKeys = UserSshKey::query()
-            ->where('user_id', $user?->id)
-            ->orderBy('name')
-            ->get();
-
-        $orgKeys = $this->server->organization_id
-            ? OrganizationSshKey::query()
-                ->where('organization_id', $this->server->organization_id)
-                ->orderBy('name')
-                ->get()
-            : collect();
-
-        $teamKeys = $this->server->team_id
-            ? TeamSshKey::query()
-                ->where('team_id', $this->server->team_id)
-                ->orderBy('name')
-                ->get()
-            : collect();
-
-        $auditEvents = $this->server->sshKeyAuditEvents()->with('user')->limit(100)->get();
-
-        $fingerprints = [];
-        foreach ($this->server->authorizedKeys as $ak) {
-            $fingerprints[$ak->id] = SshPublicKeyFingerprint::forLine((string) $ak->public_key);
+        $allowedTabs = ['keys', 'preview', 'advanced', 'activity'];
+        if (! in_array($this->ssh_workspace_tab, $allowedTabs, true)) {
+            $this->ssh_workspace_tab = 'keys';
         }
 
-        return view('livewire.servers.workspace-ssh-keys', [
+        $tab = $this->ssh_workspace_tab;
+        $needsKeys = $tab === 'keys';
+        $needsPreview = $tab === 'preview';
+        $needsActivity = $tab === 'activity';
+
+        if ($needsKeys || $needsPreview) {
+            $this->server->loadMissing('authorizedKeys');
+        }
+
+        $user = Auth::user();
+
+        $profileKeys = collect();
+        $orgKeys = collect();
+        $teamKeys = collect();
+        $auditEvents = collect();
+        $fingerprints = [];
+        $serverHasPersonalProfileKey = false;
+
+        if ($needsKeys) {
+            $profileKeys = UserSshKey::query()
+                ->where('user_id', $user?->id)
+                ->orderBy('name')
+                ->get();
+
+            $orgKeys = $this->server->organization_id
+                ? OrganizationSshKey::query()
+                    ->where('organization_id', $this->server->organization_id)
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+            $teamKeys = $this->server->team_id
+                ? TeamSshKey::query()
+                    ->where('team_id', $this->server->team_id)
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+            $serverHasPersonalProfileKey = $this->server->hasPersonalUserSshKey($user);
+
+            foreach ($this->server->authorizedKeys as $ak) {
+                $fingerprints[$ak->id] = SshPublicKeyFingerprint::forLine((string) $ak->public_key);
+            }
+        }
+
+        if ($needsActivity) {
+            $auditEvents = $this->server->sshKeyAuditEvents()->with('user')->limit(100)->get();
+        }
+
+        $viewData = SshKeysWorkspaceViewData::for(
+            $this->server,
+            $this,
+            includeKeysContext: $needsKeys,
+            includePreviewContext: $needsPreview,
+            includeActivityContext: $needsActivity,
+            auditEvents: $needsActivity ? $auditEvents : null,
+        );
+
+        return view('livewire.servers.workspace-ssh-keys', array_merge($viewData, [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
             'profileKeys' => $profileKeys,
-            'serverHasPersonalProfileKey' => $this->server->hasPersonalUserSshKey($user),
+            'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
             'orgKeys' => $orgKeys,
             'teamKeys' => $teamKeys,
             'auditEvents' => $auditEvents,
             'fingerprints' => $fingerprints,
-        ]);
+        ]));
     }
 }

@@ -29,6 +29,7 @@ use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\DatabaseWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -1233,20 +1234,40 @@ class WorkspaceDatabases extends Component
         ServerDatabaseDriftAnalyzer $driftAnalyzer,
         ServerDatabaseHostCapabilities $capabilitiesService,
     ): View {
-        $this->server->load([
-            'serverDatabases.extraUsers',
-            'databaseAuditEvents' => fn ($q) => $q->with('user:id,name')->limit(80),
-        ]);
-
-        $capabilities = ['mysql' => false, 'postgres' => false, 'sqlite' => false];
-        try {
-            $capabilities = $capabilitiesService->forServer($this->server);
-        } catch (\Throwable) {
-            // Probe failures (SSH timeout, key issues) leave engine tabs hidden.
-            // The user can still create databases from Basics — provisioner errors surface there.
+        $allowedTabs = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
+        if (! in_array($this->workspace_tab, $allowedTabs, true)) {
+            $this->workspace_tab = 'databases';
         }
 
-        if (! ($capabilities[$this->new_db_engine] ?? false)) {
+        $tab = $this->workspace_tab;
+        $needsBasics = $tab === 'databases';
+        $needsAdvanced = $tab === 'advanced';
+        $needsNotifications = $tab === 'notifications';
+        $needsEngine = in_array($tab, ['mysql', 'postgres', 'sqlite'], true);
+        $activeEngine = $needsEngine ? $tab : null;
+
+        if ($needsBasics || $needsEngine) {
+            $this->server->loadMissing(['serverDatabases.extraUsers']);
+        }
+
+        if ($needsAdvanced) {
+            $this->server->loadMissing([
+                'serverDatabases',
+                'databaseAuditEvents' => fn ($q) => $q->with('user:id,name')->limit(80),
+            ]);
+        }
+
+        $capabilities = ['mysql' => false, 'postgres' => false, 'sqlite' => false];
+        if (! $needsNotifications) {
+            try {
+                $capabilities = $capabilitiesService->forServer($this->server);
+            } catch (\Throwable) {
+                // Probe failures (SSH timeout, key issues) leave engine badges off.
+                // The user can still create databases from Basics — provisioner errors surface there.
+            }
+        }
+
+        if ($needsBasics && ! ($capabilities[$this->new_db_engine] ?? false)) {
             foreach (['mysql', 'postgres', 'sqlite'] as $engine) {
                 if ($capabilities[$engine] ?? false) {
                     $this->new_db_engine = $engine;
@@ -1255,13 +1276,25 @@ class WorkspaceDatabases extends Component
             }
         }
 
-        // Engine tabs are now ALWAYS reachable — even when an engine isn't installed yet, the
-        // operator needs to land on the tab to click the Install button. The capability probe
-        // still drives what the tab renders (status panel vs install CTA); it just doesn't gate
-        // navigability anymore.
-        $allowedTabs = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
-        if (! in_array($this->workspace_tab, $allowedTabs, true)) {
-            $this->workspace_tab = 'databases';
+        $engineRows = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->get()
+            ->keyBy('engine');
+
+        if ($needsEngine && in_array($activeEngine, ['mysql', 'postgres'], true) && $this->drift_snapshot === null) {
+            try {
+                $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
+                $this->driftProbeErrorNotified = false;
+            } catch (\Throwable $e) {
+                $message = $this->friendlyDatabaseWorkspaceError(
+                    $e,
+                    __('Dply could not connect to the server to compare database drift.')
+                );
+                if (! $this->driftProbeErrorNotified) {
+                    $this->toastError($message);
+                    $this->driftProbeErrorNotified = true;
+                }
+            }
         }
 
         $credentialsModalDatabase = null;
@@ -1278,91 +1311,80 @@ class WorkspaceDatabases extends Component
                 ->find($this->connection_url_modal_db_id);
         }
 
-        if ($this->workspace_tab === 'advanced' && $this->drift_snapshot === null) {
-            try {
-                $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
-                $this->driftProbeErrorNotified = false;
-            } catch (\Throwable $e) {
-                $message = $this->friendlyDatabaseWorkspaceError(
-                    $e,
-                    __('Dply could not connect to the server to compare database drift.')
-                );
-                if (! $this->driftProbeErrorNotified) {
-                    $this->toastError($message);
-                    $this->driftProbeErrorNotified = true;
+        $recentBackupsByEngine = collect();
+        if ($needsEngine) {
+            $recentBackupsByEngine = ServerDatabaseBackup::query()
+                ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
+                ->with('serverDatabase')
+                ->orderByDesc('created_at')
+                ->limit(60)
+                ->get()
+                ->groupBy(fn ($b) => $b->serverDatabase?->engine ?? 'unknown');
+        }
+
+        $orgAllowsCredentialShares = true;
+        $databaseImportMaxBytes = (int) config('server_database.import_max_bytes', 10485760);
+        if ($needsEngine) {
+            $this->server->loadMissing('organization');
+            $org = $this->server->organization;
+            $orgAllowsCredentialShares = $org ? $org->allowsDatabaseCredentialShares() : true;
+            $databaseImportMaxBytes = $org
+                ? $org->databaseImportMaxBytes()
+                : $databaseImportMaxBytes;
+        }
+
+        $dbRunsByEngine = [];
+        if ($needsEngine && $activeEngine !== null) {
+            if (in_array($activeEngine, ['mysql', 'postgres'], true)) {
+                $row = $engineRows->get($activeEngine);
+                if ($row !== null) {
+                    $run = $this->latestConsoleActionFor($row, 'db_');
+                    if ($run !== null) {
+                        $dbRunsByEngine[$activeEngine] = $run;
+                    }
+                }
+            } else {
+                $run = $this->latestConsoleActionFor($this->server, 'db_');
+                if ($run !== null) {
+                    $dbRunsByEngine['sqlite'] = $run;
                 }
             }
         }
 
-        $recentBackups = ServerDatabaseBackup::query()
-            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
-            ->with('serverDatabase')
-            ->orderByDesc('created_at')
-            ->limit(60)
-            ->get();
-
-        // Group by engine so each engine tab can render only its own backups.
-        $recentBackupsByEngine = $recentBackups->groupBy(fn ($b) => $b->serverDatabase?->engine ?? 'unknown');
-
-        $this->server->loadMissing('organization');
-        $org = $this->server->organization;
-        $orgAllowsCredentialShares = $org ? $org->allowsDatabaseCredentialShares() : true;
-        $databaseImportMaxBytes = $org
-            ? $org->databaseImportMaxBytes()
-            : (int) config('server_database.import_max_bytes', 10485760);
-
-        // Engine rows keyed by engine name so the per-engine tabs can render install/status
-        // without repeated queries. Sqlite doesn't have a row in this table — it's a binary
-        // that ships with the others.
-        $engineRows = ServerDatabaseEngine::query()
-            ->where('server_id', $this->server->id)
-            ->get()
-            ->keyBy('engine');
-
-        // Per-engine console-action runs (db_create/db_drop/etc). Engines that have an
-        // actual row get the per-row banner; sqlite (no row) falls back to a server-scoped
-        // lookup so its create/drop banners still surface on the sqlite subtab.
-        $dbRunsByEngine = [];
-        foreach (['mysql', 'postgres'] as $engine) {
-            $row = $engineRows->get($engine);
-            if ($row !== null) {
-                $dbRunsByEngine[$engine] = $this->latestConsoleActionFor($row, 'db_');
-            }
+        $manageActionRun = null;
+        if ($activeEngine === 'mysql' && $this->engine_subtab === 'info') {
+            $manageActionRun = ConsoleAction::query()
+                ->where('subject_type', $this->server->getMorphClass())
+                ->where('subject_id', $this->server->id)
+                ->where('kind', 'manage_action')
+                ->whereNull('dismissed_at')
+                ->orderByDesc('created_at')
+                ->first();
         }
-        $dbRunsByEngine['sqlite'] = $this->latestConsoleActionFor($this->server, 'db_');
 
-        // Latest non-dismissed manage_action run for this server. Drives the
-        // Show processlist output banner on the MySQL → Info subtab. Picks up
-        // any `manage_*` allowlisted action (also fires from the Caches workspace
-        // for `redis_info`), but the banner is rendered only inside the MySQL tab.
-        $manageActionRun = ConsoleAction::query()
-            ->where('subject_type', $this->server->getMorphClass())
-            ->where('subject_id', $this->server->id)
-            ->where('kind', 'manage_action')
-            ->whereNull('dismissed_at')
-            ->orderByDesc('created_at')
-            ->first();
-
-        return view('livewire.servers.workspace-databases', [
-            'capabilities' => $capabilities,
-            'credentialsModalDatabase' => $credentialsModalDatabase,
-            'connectionUrlModalDatabase' => $connectionUrlModalDatabase,
-            'existingMysqlUserOptions' => $this->existingMysqlUserOptions(),
-            'recentBackups' => $recentBackups,
-            'recentBackupsByEngine' => $recentBackupsByEngine,
-            'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
-            'databaseImportMaxBytes' => $databaseImportMaxBytes,
-            'engineRows' => $engineRows,
-            'dbRunsByEngine' => array_filter($dbRunsByEngine),
-            // Allowlisted manage actions exposed in the Databases workspace
-            // (currently just `mysql_processlist`). Banner-only — see
-            // RunsAllowlistedManageAction. Migrated here when /manage/data was retired.
-            'serviceActions' => config('server_manage.service_actions', []),
-            'manageActionRun' => $manageActionRun,
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-        ]);
+        return view('livewire.servers.workspace-databases', array_merge(
+            DatabaseWorkspaceViewData::for(
+                $this->server,
+                $this,
+                $engineRows,
+                $capabilities,
+                $needsAdvanced,
+            ),
+            [
+                'credentialsModalDatabase' => $credentialsModalDatabase,
+                'connectionUrlModalDatabase' => $connectionUrlModalDatabase,
+                'existingMysqlUserOptions' => $needsBasics ? $this->existingMysqlUserOptions() : [],
+                'recentBackupsByEngine' => $recentBackupsByEngine,
+                'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
+                'databaseImportMaxBytes' => $databaseImportMaxBytes,
+                'dbRunsByEngine' => $dbRunsByEngine,
+                'serviceActions' => config('server_manage.service_actions', []),
+                'manageActionRun' => $manageActionRun,
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+            ],
+        ));
     }
 
     protected function friendlyDatabaseWorkspaceError(\Throwable $e, string $defaultMessage): string

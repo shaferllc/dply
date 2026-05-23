@@ -1,7 +1,7 @@
 <?php
 
 use App\Console\Commands\CheckSupervisorHealthCommand;
-use App\Console\Commands\EdgePollStatusCommand;
+use App\Console\Commands\CloudPollStatusCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
@@ -103,7 +103,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Sweep edge sites for backend status updates. Runs every
         // minute so an active deploy reaches "active" within ~60s
         // of the backend reporting ready.
-        $schedule->command(EdgePollStatusCommand::class)->everyMinute();
+        $schedule->command(CloudPollStatusCommand::class)->everyMinute();
 
         // Drive the Laravel scheduler + queue worker on serverless functions
         // — DigitalOcean Functions has no long-running process of its own.

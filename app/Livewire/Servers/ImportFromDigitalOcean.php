@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
 
@@ -59,6 +60,9 @@ class ImportFromDigitalOcean extends Component
     public string $adoptedServerUrl = '';
 
     public string $adoptError = '';
+
+    /** @var Collection<int, ProviderCredential>|null */
+    private ?Collection $credentialsCache = null;
 
     public function mount(): void
     {
@@ -218,29 +222,61 @@ class ImportFromDigitalOcean extends Component
         $this->adoptedServerUrl = '';
     }
 
+    #[On('provider-credential-created')]
+    public function refreshCredentials(?string $provider = null, mixed $credentialId = null): void
+    {
+        if ($provider !== null && $provider !== 'digitalocean') {
+            return;
+        }
+
+        if ($credentialId !== null && $credentialId !== '') {
+            $this->credentialId = (string) $credentialId;
+
+            return;
+        }
+
+        $this->credentialsCache = null;
+
+        $credentials = $this->availableCredentials();
+        if ($credentials->count() === 1) {
+            $this->credentialId = (string) $credentials->first()->id;
+        }
+    }
+
     public function render(): View
     {
+        $dropletCollection = collect($this->droplets);
+
         return view('livewire.servers.import-from-digital-ocean', [
             'credentials' => $this->availableCredentials(),
+            'dropletStats' => [
+                'total' => $dropletCollection->count(),
+                'available' => $dropletCollection->where(fn (array $d): bool => ! ($d['_already_imported'] ?? false))->count(),
+                'imported' => $dropletCollection->where(fn (array $d): bool => (bool) ($d['_already_imported'] ?? false))->count(),
+            ],
         ]);
     }
 
     /**
      * @return Collection<int, ProviderCredential>
      */
-    private function availableCredentials()
+    private function availableCredentials(): Collection
     {
+        if ($this->credentialsCache !== null) {
+            return $this->credentialsCache;
+        }
+
         $user = auth()->user();
         if (! $user) {
-            return collect();
+            return $this->credentialsCache = collect();
         }
 
         $orgId = $user->currentOrganization()?->id;
         if (! $orgId) {
-            return collect();
+            return $this->credentialsCache = collect();
         }
 
-        return ProviderCredential::query()
+        return $this->credentialsCache = ProviderCredential::query()
             ->where('organization_id', $orgId)
             ->where('provider', 'digitalocean')
             ->orderBy('name')

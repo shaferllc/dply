@@ -15,21 +15,29 @@ class SetCurrentOrganization
             return $next($request);
         }
 
-        $orgId = session('current_organization_id');
         $user = $request->user();
-
-        if ($orgId) {
-            $inOrg = $user->organizations()->where('organizations.id', $orgId)->exists();
-            if (! $inOrg) {
-                session()->forget('current_organization_id');
-                session()->forget('current_team_id');
-            }
-        }
 
         if (! session()->has('current_organization_id')) {
             $first = $user->organizations()->first();
             if ($first) {
                 session(['current_organization_id' => $first->id]);
+                $user->rememberCurrentOrganization($first);
+            }
+        } else {
+            // Resolve through the user's organizations() relation so a
+            // stale session id returns null instead of a separate exists()
+            // round-trip plus a second membership lookup.
+            $org = $user->currentOrganization();
+            if (! $org) {
+                session()->forget('current_organization_id');
+                session()->forget('current_team_id');
+
+                $first = $user->organizations()->first();
+                if ($first) {
+                    session(['current_organization_id' => $first->id]);
+                    $user->flushCurrentOrganizationCache();
+                    $user->rememberCurrentOrganization($first);
+                }
             }
         }
 
@@ -40,10 +48,10 @@ class SetCurrentOrganization
             return $next($request);
         }
 
-        // Use the User-level memo so downstream callers (page header, gates,
-        // layout) share this lookup instead of re-querying the join.
+        // Memo hit for downstream callers; membership is implicit because
+        // the org was resolved through organizations().
         $org = $user->currentOrganization();
-        if (! $org || ! $org->hasMember($user)) {
+        if (! $org) {
             session()->forget('current_team_id');
 
             return $next($request);

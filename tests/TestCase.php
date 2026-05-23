@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -43,6 +44,16 @@ abstract class TestCase extends BaseTestCase
             if (method_exists($this, $hook)) {
                 $this->{$hook}();
             }
+        }
+
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles();
+        }
+
+        try {
+            DB::disconnect(config('database.default'));
+        } catch (\Throwable) {
+            // Best-effort cleanup only.
         }
 
         parent::tearDown();

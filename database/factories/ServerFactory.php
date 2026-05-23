@@ -51,4 +51,13 @@ class ServerFactory extends Factory
             'size' => 's-1vcpu-1gb',
         ]);
     }
+
+    public function hetzner(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Hetzner,
+            'region' => 'fsn1',
+            'size' => 'cx22',
+        ]);
+    }
 }

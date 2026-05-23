@@ -81,17 +81,6 @@
                 @if (! empty($digitalOceanOAuthConfigured))
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
                         <p class="text-sm text-brand-moss leading-relaxed">{{ __('Sign in with DigitalOcean to connect without pasting a personal access token. Requires a DigitalOcean OAuth app on this deployment.') }}</p>
-                        @env('local')
-                            <p class="text-xs text-brand-moss leading-relaxed">
-                                {{ __('OAuth needs a URL DigitalOcean can redirect to. For local dev use a tunnel (e.g. :expose), set :app and :proxy in :env, and register the callback URL in your DO OAuth app.', [
-                                    'expose' => 'Expose',
-                                    'app' => 'APP_URL',
-                                    'proxy' => 'TRUSTED_PROXIES=*',
-                                    'env' => '.env',
-                                ]) }}
-                                {{ __('Creating droplets does not use inbound webhooks; an API token below works without a tunnel.') }}
-                            </p>
-                        @endenv
                         <a
                             href="{{ route('credentials.oauth.digitalocean.redirect') }}"
                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0080FF] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0066CC] transition-colors"

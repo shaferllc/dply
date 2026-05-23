@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          colors="true"
 >
     <testsuites>
@@ -118,6 +118,7 @@
             <file>tests/Feature/ExportSiteManifestCommandTest.php</file>
             <file>tests/Feature/FailedDeploysFleetCommandTest.php</file>
             <file>tests/Feature/FakeCloudBackendTest.php</file>
+            <file>tests/Feature/HetznerProviderTest.php</file>
             <file>tests/Feature/FakeCloudProvisionTest.php</file>
             <file>tests/Feature/FindFleetDomainCommandTest.php</file>
             <file>tests/Feature/FindFleetEnvCommandTest.php</file>
@@ -135,6 +136,7 @@
             <file>tests/Feature/GetServerMetaCommandTest.php</file>
             <file>tests/Feature/GithubCloudWebhookTest.php</file>
             <file>tests/Feature/ImportSiteEnvCommandTest.php</file>
+            <file>tests/Feature/InfrastructureIndexTest.php</file>
             <file>tests/Feature/InsightsFeatureTest.php</file>
             <file>tests/Feature/InsightsNotificationsTest.php</file>
             <file>tests/Feature/InstallDatabaseEngineOnServerTest.php</file>
@@ -296,6 +298,8 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Parallel RefreshDatabase: if lock errors persist locally, set max_locks_per_transaction=256+ in DBngin Postgres config and restart. -->
+        <!-- Parallel + coverage: parent merge uses 2G via tests/bootstrap.php; prefer sequential coverage for HTML reports on large suites. -->
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="5432"/>
@@ -310,5 +314,6 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <ini name="max_execution_time" value="0"/>
+        <ini name="memory_limit" value="1G"/>
     </php>
 </phpunit>

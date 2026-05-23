@@ -11,6 +11,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseEngine;
 use App\Models\User;
+use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Services\Servers\ServerDatabaseHostCapabilities;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -255,6 +256,13 @@ test('databases page uses basics first layout', function () {
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
+    $this->mock(ServerDatabaseDriftAnalyzer::class, function ($mock): void {
+        $mock->shouldReceive('analyze')->andReturn([
+            'mysql' => ['only_in_dply' => [], 'only_on_server' => []],
+            'postgres' => ['only_in_dply' => [], 'only_on_server' => []],
+        ]);
+    });
+
     Livewire::actingAs($user)
         ->test(WorkspaceDatabases::class, ['server' => $server])
         ->assertSet('workspace_tab', 'databases')
@@ -262,9 +270,11 @@ test('databases page uses basics first layout', function () {
         ->assertSee('Advanced')
         ->assertSee('Notifications')
         ->assertSee('MySQL')
-        ->assertSee('See credentials')
-        ->assertSee('Connection URL')
+        ->assertSee('New database')
         ->assertSee('Advanced MySQL options')
+        ->assertDontSee('See credentials')
+        ->assertDontSee('MySQL admin credentials')
+        ->assertDontSee('MySQL drift')
         ->assertDontSee('Redis (redis-cli)')
         ->assertDontSee('Import SQL')
         ->assertDontSee('Export SQL (queued)')
@@ -281,10 +291,9 @@ test('databases page uses basics first layout', function () {
         ->assertSee('Drop on server')
         ->call('setWorkspaceTab', 'advanced')
         ->assertSet('workspace_tab', 'advanced')
-        ->assertSee('Synchronize databases')
-        ->assertSee('Recheck engines')
         ->assertSee('Audit log')
         ->assertDontSee('Database activity notifications')
+        ->assertDontSee('MySQL admin credentials')
         ->assertDontSee('Redis (redis-cli)')
         ->assertDontSee('Import SQL')
         ->assertDontSee('Export SQL (queued)');

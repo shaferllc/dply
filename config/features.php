@@ -85,8 +85,8 @@ return [
     | Whole non-workspace product surfaces. Each is a top-level route group.
     */
     'surface' => [
-        // exit: ship once container/cloud flow inversion (project memo) is complete
-        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
+        // exit: shipped — container/cloud index, create, and databases are live
+        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
         // exit: ship once cross-server views have a saved-view persistence model
         'fleet' => env('FEATURE_SURFACE_FLEET', false),
         // exit: ship after a curated v1 marketplace catalog is approved

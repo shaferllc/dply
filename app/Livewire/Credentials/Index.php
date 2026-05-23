@@ -218,15 +218,20 @@ class Index extends Component
 
     public function resolveActiveProviderLabel(): string
     {
+        return self::providerLabel($this->active_provider);
+    }
+
+    public static function providerLabel(string $providerId): string
+    {
         foreach (self::credentialProviderNav() as $group) {
             foreach ($group['items'] as $item) {
-                if ($item['id'] === $this->active_provider) {
+                if ($item['id'] === $providerId) {
                     return $item['label'];
                 }
             }
         }
 
-        return $this->active_provider;
+        return $providerId;
     }
 
     public function credentialCountFor(string $provider): int

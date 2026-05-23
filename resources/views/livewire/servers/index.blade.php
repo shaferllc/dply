@@ -76,7 +76,11 @@
     @endif
 >
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <x-dashboard-breadcrumb :current="__('Servers')" current-icon="server-stack" />
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
+            ['label' => __('Servers'), 'icon' => 'server-stack'],
+        ]" />
 
         @if (session('success'))
             <x-alert tone="success">{{ session('success') }}</x-alert>
@@ -301,6 +305,14 @@
                                 </span>
                             </li>
                             <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <x-heroicon-o-rectangle-group class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span>
+                                    <span class="font-semibold text-brand-ink">{{ __('Browse infrastructure') }}</span>
+                                    <span class="text-brand-mist"> — </span>
+                                    {{ __('See servers, cloud apps, and serverless in one place.') }}
+                                </span>
+                            </li>
+                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                                 <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span>
                                     <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
@@ -326,6 +338,14 @@
                                 >
                                     <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Create a server') }}
+                                </a>
+                                <a
+                                    href="{{ route('infrastructure.index') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-5 py-3 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-rectangle-group class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                    {{ __('Browse infrastructure') }}
                                 </a>
                                 <a
                                     href="{{ route('launches.create') }}"

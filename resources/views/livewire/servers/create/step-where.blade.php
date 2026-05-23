@@ -98,7 +98,12 @@
             <section class="space-y-4">
                 <div class="flex items-baseline justify-between gap-2">
                     <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Provider') }}</h2>
-                    <a href="{{ route('credentials.index') }}" wire:navigate class="text-sm font-medium text-brand-sage transition-colors hover:text-brand-forest">{{ __('Manage credentials') }} →</a>
+                    @if ($form->type !== '' && $form->type !== 'custom')
+                        @php $credentialProvider = str_replace('_kubernetes', '', $form->type); @endphp
+                        <x-add-provider-credential-link :provider="$credentialProvider">
+                            {{ __('Connect account') }} →
+                        </x-add-provider-credential-link>
+                    @endif
                 </div>
                 <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($providerCards as $card)
@@ -144,9 +149,15 @@
                     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
                         <p class="font-medium">{{ __('No saved credential for this provider') }}</p>
                         <p class="mt-1 text-sm">
-                            {{ __('Save an API token under Server providers, then come back here. Your draft will still be waiting.') }}
-                            <a href="{{ route('credentials.index') }}" wire:navigate class="underline font-medium">{{ __('Go to Server providers') }}</a>
+                            {{ __('Connect an API token here without leaving this step. Your draft will still be waiting.') }}
                         </p>
+                        @php $credentialProvider = str_replace('_kubernetes', '', $form->type); @endphp
+                        <x-add-provider-credential-link
+                            :provider="$credentialProvider"
+                            class="mt-3 inline-flex h-9 items-center rounded-lg bg-amber-500 px-3 text-xs font-semibold text-amber-950 no-underline hover:bg-amber-400"
+                        >
+                            {{ __('Connect account') }}
+                        </x-add-provider-credential-link>
                     </div>
                 @else
                     @include('livewire.servers.create._rich-select', [
@@ -360,4 +371,6 @@
     </form>
 
     @include('livewire.servers.create._discard-draft-modal')
+
+    <livewire:credentials.add-provider-credential-modal capability="compute" />
 </div>

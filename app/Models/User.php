@@ -161,13 +161,39 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         }
 
         if (! $id) {
-            return $this->currentOrganizationMemo[$key] = $this->organizations()
-                ->orderByPivot('created_at')
-                ->orderBy('organizations.id')
-                ->first();
+            return $this->currentOrganizationMemo[$key] = $this->primeOrganizationMemberRole(
+                $this->organizations()
+                    ->orderByPivot('created_at')
+                    ->orderBy('organizations.id')
+                    ->first()
+            );
         }
 
-        return $this->currentOrganizationMemo[$key] = $this->organizations()->find($id);
+        return $this->currentOrganizationMemo[$key] = $this->primeOrganizationMemberRole(
+            $this->organizations()->find($id)
+        );
+    }
+
+    /**
+     * Prime the per-request {@see currentOrganization()} memo after code
+     * has already loaded the org (e.g. middleware picking the first org).
+     */
+    public function rememberCurrentOrganization(Organization $organization): void
+    {
+        $id = session('current_organization_id');
+        $key = $id ? (string) $id : '__default__';
+        $this->currentOrganizationMemo[$key] = $this->primeOrganizationMemberRole($organization);
+    }
+
+    private function primeOrganizationMemberRole(?Organization $organization): ?Organization
+    {
+        if ($organization !== null
+            && $organization->relationLoaded('pivot')
+            && $organization->pivot !== null) {
+            $organization->rememberMemberRoleFor($this, (string) $organization->pivot->role);
+        }
+
+        return $organization;
     }
 
     /**

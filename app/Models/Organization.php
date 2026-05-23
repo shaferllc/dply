@@ -519,6 +519,17 @@ class Organization extends Model
         return $this->memberRoleMemo[$userId] = $role;
     }
 
+    /**
+     * Seed the member-role memo from an organization_user pivot that was
+     * already loaded on this org instance (e.g. via $user->organizations()).
+     */
+    public function rememberMemberRoleFor(User $user, ?string $role): void
+    {
+        $userId = (string) $user->id;
+        $this->memberRoleMemo[$userId] = $role;
+        self::$memberRoleStaticMemo[(string) $this->id.':'.$userId] = $role;
+    }
+
     /** Drop the cross-instance member-role cache (between requests in long-running processes / tests). */
     public static function flushMemberRoleCache(): void
     {

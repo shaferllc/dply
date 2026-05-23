@@ -72,6 +72,34 @@ test('component renders simplified sections', function () {
         ->assertSee('Generate key pair');
 });
 
+test('ssh keys workspace tabs lazy render their sections', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    ServerSshKeyAuditEvent::query()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'event' => ServerSshKeyAuditEvent::EVENT_KEY_CREATED,
+        'meta' => ['name' => 'audit-tab-test'],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSshKeys::class, ['server' => $server])
+        ->assertSee('Keys on this server')
+        ->assertDontSee('key_created')
+        ->call('setSshWorkspaceTab', 'activity')
+        ->assertSee('key_created')
+        ->assertDontSee('Keys on this server')
+        ->call('setSshWorkspaceTab', 'preview')
+        ->assertSee('Refresh preview')
+        ->assertDontSee('Keys on this server')
+        ->call('setSshWorkspaceTab', 'advanced')
+        ->assertSee('Disable authorized_keys sync (break-glass)')
+        ->assertDontSee('Refresh preview')
+        ->call('setSshWorkspaceTab', 'keys')
+        ->assertSee('Keys on this server')
+        ->assertDontSee('Disable authorized_keys sync (break-glass)');
+});
+
 test('generate key pair prefills public and dispatches browser event', function () {
     if (! function_exists('sodium_crypto_sign_keypair')) {
         $this->markTestSkipped('sodium extension required for Ed25519 generation.');

@@ -23,10 +23,12 @@ use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
 use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
+use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Imports\Forge\Inventory;
 use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
 use App\Livewire\Imports\Ploi\MigrationProgress;
@@ -202,6 +204,7 @@ Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareContro
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
+    Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
     Route::middleware('feature:surface.fleet')->group(function (): void {
         Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
         Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
@@ -274,6 +277,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('cloud/databases', CloudDatabaseIndex::class)->name('cloud.databases.index');
         Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
     });
+    Route::livewire('edge', EdgeIndex::class)->name('edge.index');
     Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
     Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
