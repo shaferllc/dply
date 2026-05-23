@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Services\Billing\OrganizationBillingStateComputerTest;
 
+use App\Models\EdgeUsageSnapshot;
 use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
@@ -175,6 +176,79 @@ test('serverless host is not counted as a spec tier', function () {
     expect($state->monthlyTotalCents)->toBe(1500);
 });
 
+test('dply cloud and edge hosts are not counted as spec tiers', function () {
+    $org = Organization::factory()->create();
+
+    Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
+    ]);
+    Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+    ]);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(0);
+    expect($state->monthlyTotalCents)->toBe(1500);
+});
+
+test('active dply cloud sites bill per app excluding previews', function () {
+    Config::set('subscription.standard.cloud_cents', 500);
+    $org = Organization::factory()->create();
+    makeCloudSite($org, Site::STATUS_CONTAINER_ACTIVE);
+    makeCloudSite($org, Site::STATUS_CONTAINER_ACTIVE, preview: true);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->cloudCount)->toBe(1);
+    expect($state->cloudSubtotalCents)->toBe(500);
+    expect($state->monthlyTotalCents)->toBe(2000);
+});
+
+test('active dply edge sites bill per site excluding previews', function () {
+    Config::set('subscription.standard.edge_cents', 200);
+    $org = Organization::factory()->create();
+    makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE);
+    makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE, preview: true);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->edgeCount)->toBe(1);
+    expect($state->edgeSubtotalCents)->toBe(200);
+    expect($state->monthlyTotalCents)->toBe(1700);
+});
+
+test('edge delivery usage adds pass through subtotal when enabled', function () {
+    Config::set('subscription.standard.edge_cents', 200);
+    Config::set('dply.edge.usage_billing.enabled', true);
+    Config::set('dply.edge.usage_billing.markup_percent', 0);
+    Config::set('dply.edge.usage_billing.requests_cents_per_million', 100);
+    Config::set('dply.edge.usage_billing.included_requests_per_site', 0);
+
+    $org = Organization::factory()->create();
+    $site = makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE);
+
+    EdgeUsageSnapshot::query()->create([
+        'organization_id' => $org->id,
+        'site_id' => $site->id,
+        'period_start' => now()->startOfMonth()->toDateString(),
+        'period_end' => now()->startOfMonth()->toDateString(),
+        'requests' => 2_000_000,
+        'source' => EdgeUsageSnapshot::SOURCE_MANUAL,
+    ]);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->edgeCount)->toBe(1);
+    expect($state->edgeSubtotalCents)->toBe(200);
+    expect($state->edgeUsageSubtotalCents)->toBe(200);
+    expect($state->monthlyTotalCents)->toBe(1900);
+});
+
 test('active serverless functions bill per function', function () {
     Config::set('subscription.standard.serverless_cents', 200);
     $org = Organization::factory()->create();
@@ -273,5 +347,39 @@ function makeFunctionSite(Organization $org, string $status): Site
         'organization_id' => $org->id,
         'server_id' => $server->id,
         'status' => $status,
+    ]);
+}
+
+function makeCloudSite(Organization $org, string $status, bool $preview = false): Site
+{
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_CLOUD],
+    ]);
+
+    return Site::factory()->create([
+        'organization_id' => $org->id,
+        'server_id' => $server->id,
+        'status' => $status,
+        'container_backend' => 'dply_cloud',
+        'meta' => $preview ? ['container' => ['preview_parent_site_id' => 'parent-id']] : [],
+    ]);
+}
+
+function makeEdgeSite(Organization $org, string $status, bool $preview = false): Site
+{
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'meta' => ['host_kind' => Server::HOST_KIND_DPLY_EDGE],
+    ]);
+
+    return Site::factory()->create([
+        'organization_id' => $org->id,
+        'server_id' => $server->id,
+        'status' => $status,
+        'edge_backend' => 'dply_edge',
+        'meta' => $preview ? ['edge' => ['preview_parent_site_id' => 'parent-id']] : [],
     ]);
 }

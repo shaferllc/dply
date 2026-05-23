@@ -42,6 +42,7 @@
             <file>tests/Feature/ApplyFirewallJobTest.php</file>
             <file>tests/Feature/AttachCloudDatabaseJobTest.php</file>
             <file>tests/Feature/AwsAppRunnerServiceTest.php</file>
+            <file>tests/Feature/AwsEc2ProviderTest.php</file>
             <file>tests/Feature/BackfillOrganizationMembershipsTest.php</file>
             <file>tests/Feature/BackupConfigurationTest.php</file>
             <file>tests/Feature/BackupsTest.php</file>
@@ -113,7 +114,8 @@
             <file>tests/Feature/DplyAboutCommandTest.php</file>
             <file>tests/Feature/CreateEdgeSiteTest.php</file>
             <file>tests/Feature/EdgeCreatePageTest.php</file>
-            <file>tests/Feature/EdgeCustomDomainTest.php</file>
+            <file>tests/Feature/EdgeDoctorCommandTest.php</file>
+            <file>tests/Feature/EdgeInfraBootstrapCommandTest.php</file>
             <file>tests/Feature/EdgeIndexPageTest.php</file>
             <file>tests/Feature/EdgeIndexTest.php</file>
             <file>tests/Feature/EdgeNavLinkTest.php</file>
@@ -128,6 +130,9 @@
             <file>tests/Feature/FailedDeploysFleetCommandTest.php</file>
             <file>tests/Feature/FakeCloudBackendTest.php</file>
             <file>tests/Feature/HetznerProviderTest.php</file>
+            <file>tests/Feature/LinodeProviderTest.php</file>
+            <file>tests/Feature/ScalewayProviderTest.php</file>
+            <file>tests/Feature/UpCloudProviderTest.php</file>
             <file>tests/Feature/VultrProviderTest.php</file>
             <file>tests/Feature/FakeCloudProvisionTest.php</file>
             <file>tests/Feature/FindFleetDomainCommandTest.php</file>

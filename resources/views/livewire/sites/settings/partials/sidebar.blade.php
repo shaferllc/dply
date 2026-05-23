@@ -134,14 +134,25 @@
             @endforeach
         </nav>
         <div class="border-t border-brand-ink/10 p-3">
-            <a
-                href="{{ route('servers.sites', $server) }}"
-                wire:navigate
-                class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
-            >
-                <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
-                {{ __('Back to :resources', ['resources' => $resourcePlural]) }}
-            </a>
+            @if ($site->usesEdgeRuntime())
+                <a
+                    href="{{ route('edge.index') }}"
+                    wire:navigate
+                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
+                >
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
+                    {{ __('Back to Edge sites') }}
+                </a>
+            @else
+                <a
+                    href="{{ route('servers.sites', $server) }}"
+                    wire:navigate
+                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
+                >
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
+                    {{ __('Back to :resources', ['resources' => $resourcePlural]) }}
+                </a>
+            @endif
         </div>
     </div>
 </aside>

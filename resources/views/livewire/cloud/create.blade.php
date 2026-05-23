@@ -186,6 +186,11 @@
             </div>
         </div>
 
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+            <span class="font-semibold text-slate-900">{{ __('Estimated cost:') }} ${{ number_format($cloudFee, 2) }}/mo</span>
+            — {{ __('a flat dply per-app fee once the container is live. Branch previews are free. Underlying container runtime (DigitalOcean App Platform or AWS App Runner) is billed separately by your cloud provider.') }}
+        </div>
+
         <div class="flex items-center justify-end gap-3">
             <a href="{{ route('sites.index') }}" wire:navigate class="text-sm font-medium text-slate-700 hover:text-slate-900">{{ __('Cancel') }}</a>
             <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="deploy">

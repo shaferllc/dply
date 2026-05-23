@@ -410,6 +410,14 @@ class Server extends Model
         return $this->hostKind() === self::HOST_KIND_DPLY_EDGE;
     }
 
+    /**
+     * Logical hosts for dply-managed products — never spec-tiered as BYO VMs.
+     */
+    public function isManagedProductHost(): bool
+    {
+        return $this->isServerlessHost() || $this->isDplyCloudHost() || $this->isDplyEdgeHost();
+    }
+
     public function isContainerHost(): bool
     {
         return in_array($this->hostKind(), [

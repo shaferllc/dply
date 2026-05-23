@@ -30,22 +30,22 @@
 return [
 
     /*
-    | Cloud providers. MVP ships DigitalOcean + Hetzner + Vultr globally;
-    | every other provider is per-org gated for design partners.
+    | Cloud providers. MVP ships DigitalOcean + Hetzner + Vultr + Linode
+    | globally; every other provider is per-org gated for design partners.
     */
     'provider' => [
         // exit: ship to all orgs once we've had 5+ successful AWS provisions in prod
-        'aws' => env('FEATURE_PROVIDER_AWS', false),
+        'aws' => env('FEATURE_PROVIDER_AWS', true),
         // exit: ship to all orgs once Linode cost-catalog parity is verified
-        'linode' => env('FEATURE_PROVIDER_LINODE', false),
+        'linode' => env('FEATURE_PROVIDER_LINODE', true),
         // exit: ship to all orgs once we've had 5+ successful Vultr provisions in prod
         'vultr' => env('FEATURE_PROVIDER_VULTR', true),
         // exit: ship once Fly.io machine provisioning is end-to-end green
         'fly_io' => env('FEATURE_PROVIDER_FLY_IO', false),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
-        'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', false),
+        'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', true),
         // exit: ship after Scaleway API token flow + cost catalog are validated
-        'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', false),
+        'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', true),
         // exit: bare-metal flow is materially different; keep gated until a paying customer asks
         'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', false),
         // exit: ship once container-on-AppRunner architecture lands per dply cloud memo

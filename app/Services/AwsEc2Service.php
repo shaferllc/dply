@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProviderCredential;
 use Aws\Ec2\Ec2Client;
+use Aws\Ssm\SsmClient;
 
 class AwsEc2Service
 {
@@ -12,6 +13,8 @@ class AwsEc2Service
     protected string $region;
 
     protected ProviderCredential $credential;
+
+    protected ?SsmClient $ssmClient = null;
 
     public function __construct(ProviderCredential $credential, ?string $region = null)
     {
@@ -34,6 +37,26 @@ class AwsEc2Service
     }
 
     /**
+     * Replace the underlying Ec2Client — used by tests.
+     */
+    public function withClient(Ec2Client $client): self
+    {
+        $this->client = $client;
+
+        return $this;
+    }
+
+    /**
+     * Replace the underlying SsmClient — used by tests.
+     */
+    public function withSsmClient(SsmClient $client): self
+    {
+        $this->ssmClient = $client;
+
+        return $this;
+    }
+
+    /**
      * Create an EC2 key pair. Returns key name and private key material.
      *
      * @return array{key_name: string, key_material: string}
@@ -51,13 +74,97 @@ class AwsEc2Service
     }
 
     /**
+     * Resolve the AMI for provisioning. Uses AWS_EC2_DEFAULT_IMAGE when set,
+     * otherwise the regional Ubuntu SSM parameter (region-aware).
+     */
+    public function resolveDefaultImageId(): string
+    {
+        $configured = config('services.aws.default_image');
+        if (is_string($configured) && $configured !== '') {
+            return $configured;
+        }
+
+        $parameterName = (string) config(
+            'services.aws.ami_ssm_parameter',
+            '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+        );
+
+        $result = $this->ssm()->getParameter(['Name' => $parameterName]);
+        $value = $result['Parameter']['Value'] ?? null;
+        if (! is_string($value) || $value === '') {
+            throw new \RuntimeException('Could not resolve Ubuntu AMI for region '.$this->region.'. Set AWS_EC2_DEFAULT_IMAGE.');
+        }
+
+        return $value;
+    }
+
+    /**
+     * Resolve the security group used for new instances. Prefers AWS_EC2_SECURITY_GROUP_ID;
+     * otherwise finds or creates a Dply-managed group with SSH ingress.
+     */
+    public function resolveProvisionSecurityGroupId(): string
+    {
+        $configured = config('services.aws.security_group_id');
+        if (is_string($configured) && $configured !== '') {
+            return $configured;
+        }
+
+        if (! filter_var(config('services.aws.provision_security_group', true), FILTER_VALIDATE_BOOL)) {
+            throw new \RuntimeException(
+                'AWS EC2 requires a security group with SSH access. Set AWS_EC2_SECURITY_GROUP_ID or enable AWS_EC2_PROVISION_SECURITY_GROUP.'
+            );
+        }
+
+        $name = (string) config('services.aws.provision_security_group_name', 'dply-provision');
+
+        $existing = $this->client->describeSecurityGroups([
+            'Filters' => [
+                ['Name' => 'group-name', 'Values' => [$name]],
+            ],
+        ]);
+
+        foreach ($existing['SecurityGroups'] ?? [] as $group) {
+            if (($group['GroupName'] ?? '') === $name && ! empty($group['GroupId'])) {
+                return (string) $group['GroupId'];
+            }
+        }
+
+        $created = $this->client->createSecurityGroup([
+            'GroupName' => $name,
+            'Description' => 'Dply-managed security group for provisioned EC2 instances (SSH).',
+        ]);
+
+        $groupId = (string) ($created['GroupId'] ?? '');
+        if ($groupId === '') {
+            throw new \RuntimeException('AWS EC2 did not return a security group id.');
+        }
+
+        $this->client->authorizeSecurityGroupIngress([
+            'GroupId' => $groupId,
+            'IpPermissions' => [
+                [
+                    'IpProtocol' => 'tcp',
+                    'FromPort' => 22,
+                    'ToPort' => 22,
+                    'IpRanges' => [
+                        ['CidrIp' => '0.0.0.0/0', 'Description' => 'SSH'],
+                    ],
+                ],
+            ],
+        ]);
+
+        return $groupId;
+    }
+
+    /**
      * Run an EC2 instance in the client's region. Returns instance ID.
      */
     public function runInstances(
         string $imageId,
         string $instanceType,
         string $keyName,
-        ?string $nameTag = null
+        ?string $nameTag = null,
+        ?string $securityGroupId = null,
     ): string {
         $params = [
             'ImageId' => $imageId,
@@ -66,6 +173,17 @@ class AwsEc2Service
             'MaxCount' => 1,
             'KeyName' => $keyName,
         ];
+
+        if ($securityGroupId !== null && $securityGroupId !== '') {
+            $params['NetworkInterfaces'] = [
+                [
+                    'AssociatePublicIpAddress' => true,
+                    'DeviceIndex' => 0,
+                    'Groups' => [$securityGroupId],
+                ],
+            ];
+        }
+
         if ($nameTag !== null && $nameTag !== '') {
             $params['TagSpecifications'] = [
                 [
@@ -226,5 +344,23 @@ class AwsEc2Service
     public function validateCredentials(): void
     {
         $this->client->describeRegions(['AllRegions' => false]);
+    }
+
+    protected function ssm(): SsmClient
+    {
+        if ($this->ssmClient !== null) {
+            return $this->ssmClient;
+        }
+
+        $creds = $this->credential->credentials ?? [];
+
+        return new SsmClient([
+            'region' => $this->region,
+            'version' => 'latest',
+            'credentials' => [
+                'key' => (string) ($creds['access_key_id'] ?? ''),
+                'secret' => (string) ($creds['secret_access_key'] ?? ''),
+            ],
+        ]);
     }
 }

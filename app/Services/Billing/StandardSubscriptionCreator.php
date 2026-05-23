@@ -59,9 +59,30 @@ class StandardSubscriptionCreator
         }
 
         if ($desired->serverlessCount > 0) {
-            $serverlessPriceId = $this->serverlessPriceIdForInterval($interval);
+            $serverlessPriceId = $this->managedProductPriceIdForInterval('serverless', $interval);
             if ($serverlessPriceId !== '') {
                 $items[] = ['price' => $serverlessPriceId, 'quantity' => $desired->serverlessCount];
+            }
+        }
+
+        if ($desired->cloudCount > 0) {
+            $cloudPriceId = $this->managedProductPriceIdForInterval('cloud', $interval);
+            if ($cloudPriceId !== '') {
+                $items[] = ['price' => $cloudPriceId, 'quantity' => $desired->cloudCount];
+            }
+        }
+
+        if ($desired->edgeCount > 0) {
+            $edgePriceId = $this->managedProductPriceIdForInterval('edge', $interval);
+            if ($edgePriceId !== '') {
+                $items[] = ['price' => $edgePriceId, 'quantity' => $desired->edgeCount];
+            }
+        }
+
+        if ($interval === self::INTERVAL_MONTH && $desired->edgeUsageSubtotalCents > 0) {
+            $usagePriceId = $this->edgeUsagePriceId();
+            if ($usagePriceId !== '') {
+                $items[] = ['price' => $usagePriceId, 'quantity' => $desired->edgeUsageSubtotalCents];
             }
         }
 
@@ -70,9 +91,29 @@ class StandardSubscriptionCreator
 
     public function serverlessPriceIdForInterval(string $interval): string
     {
+        return $this->managedProductPriceIdForInterval('serverless', $interval);
+    }
+
+    public function cloudPriceIdForInterval(string $interval): string
+    {
+        return $this->managedProductPriceIdForInterval('cloud', $interval);
+    }
+
+    public function edgePriceIdForInterval(string $interval): string
+    {
+        return $this->managedProductPriceIdForInterval('edge', $interval);
+    }
+
+    public function edgeUsagePriceId(): string
+    {
+        return (string) (config('subscription.standard.stripe.edge_usage') ?? '');
+    }
+
+    private function managedProductPriceIdForInterval(string $product, string $interval): string
+    {
         return (string) match ($interval) {
-            self::INTERVAL_MONTH => config('subscription.standard.stripe.serverless') ?? '',
-            self::INTERVAL_YEAR => config('subscription.standard.stripe.serverless_yearly') ?? '',
+            self::INTERVAL_MONTH => config('subscription.standard.stripe.'.$product) ?? '',
+            self::INTERVAL_YEAR => config('subscription.standard.stripe.'.$product.'_yearly') ?? '',
             default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
         };
     }

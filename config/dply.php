@@ -171,4 +171,32 @@ return [
     */
     'scaffold_v1_enabled' => filter_var(env('DPLY_SCAFFOLD_V1_ENABLED', false), FILTER_VALIDATE_BOOL),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Edge: usage-based billing (pass-through + margin)
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, live Edge sites keep the flat platform fee (edge_cents in
+    | config/subscription.php) plus metered delivery usage on top. Snapshots
+    | are collected by `dply:edge:collect-usage` (scheduled daily).
+    |
+    | Unit rates are customer-facing and should embed margin over Cloudflare
+    | list pricing. Per-site included allowances absorb typical small-site
+    | traffic so the base fee covers quiet sites.
+    */
+    'edge' => [
+        'usage_billing' => [
+            'enabled' => filter_var(env('DPLY_EDGE_USAGE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+            'markup_percent' => (int) env('DPLY_EDGE_USAGE_MARKUP_PERCENT', 0),
+            'requests_cents_per_million' => (int) env('DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION', 30),
+            'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 2),
+            'r2_storage_cents_per_gb_month' => (int) env('DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH', 2),
+            'r2_class_a_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_A_CENTS_PER_MILLION', 450),
+            'r2_class_b_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_B_CENTS_PER_MILLION', 360),
+            'included_requests_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_REQUESTS_PER_SITE', 5_000_000),
+            'included_egress_gb_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_EGRESS_GB_PER_SITE', 100),
+            'included_r2_storage_gb_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_STORAGE_GB_PER_SITE', 5),
+        ],
+    ],
+
 ];

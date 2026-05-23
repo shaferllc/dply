@@ -196,6 +196,7 @@ trait DetectsRepositoryRuntime
             'build_command' => $plan->buildCommand,
             'start_command' => $plan->startCommand,
             'app_port' => $plan->appPort,
+            'output_dir' => $plan->detection?->outputDirectory,
             'confidence' => $plan->confidence,
             'sources' => $plan->sources,
             'reasons' => $plan->reasons,

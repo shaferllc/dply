@@ -36,10 +36,12 @@ First-party Netlify-style platform: git-connected builds, branch previews, CDN d
 
 ## Infra prerequisites
 
-- Cloudflare: R2 bucket, Workers KV namespace, Worker deployed
+See **[edge-production-setup.md](edge-production-setup.md)** for the full runbook.
+
+- Cloudflare: R2 bucket, Workers KV namespace, Worker deployed (`php artisan dply:edge:infra:bootstrap`, `php artisan edge:worker:deploy`)
 - Wildcard DNS on testing domains (`*.dply.host`) → Worker
 - Queue workers with Docker for builds
-- Env: `DPLY_EDGE_*` (see `config/edge.php`)
+- Env: `DPLY_EDGE_*` (see `config/edge.php`); validate with `php artisan dply:edge:doctor --probe`
 
 ## Related
 

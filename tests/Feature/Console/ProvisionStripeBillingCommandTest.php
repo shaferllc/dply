@@ -20,6 +20,11 @@ test('dry run lists objects without calling stripe', function () {
         ->expectsOutputToContain('Base yearly:  $144.00')
         ->expectsOutputToContain('Tier XS')
         ->expectsOutputToContain('Tier XL')
+        ->expectsOutputToContain('dply serverless function')
+        ->expectsOutputToContain('dply Cloud app')
+        ->expectsOutputToContain('Per app $5.00/mo')
+        ->expectsOutputToContain('dply Edge site')
+        ->expectsOutputToContain('Per site $2.00/mo')
         ->expectsOutputToContain('dply Enterprise')
         ->assertOk();
 });
@@ -45,6 +50,12 @@ test('format env emits expected lines', function () {
         StripeBillingProvisioner::ROLE_TIER_PREFIX.'xs'.StripeBillingProvisioner::ROLE_TIER_YEARLY_SUFFIX => 'price_xs_y',
         StripeBillingProvisioner::ROLE_TIER_PREFIX.'m'.StripeBillingProvisioner::ROLE_TIER_YEARLY_SUFFIX => 'price_m_y',
         StripeBillingProvisioner::ROLE_TIER_PREFIX.'xl'.StripeBillingProvisioner::ROLE_TIER_YEARLY_SUFFIX => 'price_xl_y',
+        StripeBillingProvisioner::ROLE_SERVERLESS_MONTHLY => 'price_sl',
+        StripeBillingProvisioner::ROLE_SERVERLESS_YEARLY => 'price_sl_y',
+        StripeBillingProvisioner::ROLE_CLOUD_MONTHLY => 'price_cloud',
+        StripeBillingProvisioner::ROLE_CLOUD_YEARLY => 'price_cloud_y',
+        StripeBillingProvisioner::ROLE_EDGE_MONTHLY => 'price_edge',
+        StripeBillingProvisioner::ROLE_EDGE_YEARLY => 'price_edge_y',
         StripeBillingProvisioner::ROLE_ENTERPRISE_PRODUCT => 'prod_ent',
     ];
 
@@ -58,6 +69,12 @@ test('format env emits expected lines', function () {
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_XS_YEARLY=price_xs_y', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_M_YEARLY=price_m_y', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_XL_YEARLY=price_xl_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_SERVERLESS=price_sl', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_sl_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_CLOUD=price_cloud', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_cloud_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_EDGE=price_edge', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_EDGE_YEARLY=price_edge_y', $env);
 
     // No coupon env var — credit retired.
     $this->assertStringNotContainsString('STRIPE_COUPON_STANDARD_CREDIT', $env);

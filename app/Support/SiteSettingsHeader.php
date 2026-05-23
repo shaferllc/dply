@@ -22,6 +22,10 @@ final class SiteSettingsHeader
      */
     public static function for(Site $site, Server $server, string $section): array
     {
+        if ($site->usesEdgeRuntime()) {
+            return self::forEdge($section);
+        }
+
         $resourceNoun = $site->runtimeTargetMode() === 'vm' ? __('site') : __('app');
 
         return match ($section) {
@@ -121,6 +125,55 @@ final class SiteSettingsHeader
                 'title' => $site->name,
                 'description' => __('Manage this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-rectangle-stack',
+            ],
+        };
+    }
+
+    /**
+     * @return array{title: string, description: string, icon: string}
+     */
+    private static function forEdge(string $section): array
+    {
+        return match ($section) {
+            'general' => [
+                'title' => __('Overview'),
+                'description' => __('Live URL, source repository, deploy status, and quick actions for this Edge site.'),
+                'icon' => 'heroicon-o-home',
+            ],
+            'edge-deploys' => [
+                'title' => __('Deploys'),
+                'description' => __('Build and publish history — redeploy production or roll back to a previous release.'),
+                'icon' => 'heroicon-o-code-bracket-square',
+            ],
+            'edge-domains' => [
+                'title' => __('Domains'),
+                'description' => __('Attach custom hostnames to this Edge site. TLS is provisioned automatically on the edge network.'),
+                'icon' => 'heroicon-o-globe-alt',
+            ],
+            'edge-build' => [
+                'title' => __('Build settings'),
+                'description' => __('Repository, branch, build command, output directory, and GitHub webhook for automatic deploys.'),
+                'icon' => 'heroicon-o-wrench-screwdriver',
+            ],
+            'edge-previews' => [
+                'title' => __('Previews'),
+                'description' => __('Branch preview deployments created from pull requests — each gets its own Edge URL.'),
+                'icon' => 'heroicon-o-sparkles',
+            ],
+            'edge-logs' => [
+                'title' => __('Logs & activity'),
+                'description' => __('Recent build output and deployment activity for this Edge site.'),
+                'icon' => 'heroicon-o-clipboard-document-list',
+            ],
+            'danger' => [
+                'title' => __('Danger zone'),
+                'description' => __('Permanently delete this Edge site and remove all deployments from the CDN.'),
+                'icon' => 'heroicon-o-exclamation-triangle',
+            ],
+            default => [
+                'title' => __('Edge site'),
+                'description' => __('Manage this Edge site.'),
+                'icon' => 'heroicon-o-globe-alt',
             ],
         };
     }

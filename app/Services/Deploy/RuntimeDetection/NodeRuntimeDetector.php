@@ -50,6 +50,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
         $startCommand = $this->detectStartCommand($scripts, $packageJson, $framework, $reasons);
         $appPort = $this->detectAppPort($scripts, $framework, $reasons);
         $processes = $this->detectProcesses($scripts, $deps, $reasons);
+        $outputDirectory = $this->detectOutputDirectory($framework, $reasons);
 
         $confidence = $framework !== null && $framework !== 'node' ? 'high' : 'medium';
 
@@ -64,6 +65,7 @@ final class NodeRuntimeDetector implements RuntimeDetector
             reasons: $reasons,
             processes: $processes,
             confidence: $confidence,
+            outputDirectory: $outputDirectory,
         );
     }
 
@@ -274,6 +276,29 @@ final class NodeRuntimeDetector implements RuntimeDetector
         }
 
         return array_values(array_unique($deps));
+    }
+
+    /**
+     * @param  list<string>  $reasons
+     */
+    private function detectOutputDirectory(?string $framework, array &$reasons): ?string
+    {
+        $directory = match ($framework) {
+            'next' => 'out',
+            'nuxt' => '.output/public',
+            'astro' => 'dist',
+            'sveltekit' => 'build',
+            'vite', 'vue', 'react', 'svelte', 'remix', 'nest' => 'dist',
+            default => null,
+        };
+
+        if ($directory === null) {
+            return null;
+        }
+
+        $reasons[] = "Suggested output directory: `{$directory}` ({$framework} convention).";
+
+        return $directory;
     }
 
     /**

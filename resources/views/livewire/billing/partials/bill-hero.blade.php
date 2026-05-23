@@ -14,6 +14,7 @@
         'm' => 'bg-brand-forest/80',
         'l' => 'bg-brand-gold',
         'xl' => 'bg-brand-rust/80',
+        'edge_usage' => 'bg-brand-sage/50',
     ];
 
     $totalCents = max(1, $state->monthlyTotalCents);
@@ -30,6 +31,13 @@
             'key' => $tierKey,
             'label' => strtoupper($tierKey).' × '.$qty,
             'cents' => $unit * $qty,
+        ];
+    }
+    if ($state->edgeUsageSubtotalCents > 0) {
+        $segments[] = [
+            'key' => 'edge_usage',
+            'label' => __('Edge usage'),
+            'cents' => $state->edgeUsageSubtotalCents,
         ];
     }
 @endphp
@@ -150,10 +158,15 @@
                 <ul class="divide-y divide-brand-ink/5 text-sm">
                     @foreach ($this->tierLineItems as $item)
                         <li class="flex items-center justify-between px-5 py-3">
-                            <div class="flex items-baseline gap-3">
-                                <span class="font-medium text-brand-ink">{{ $item['label'] }}</span>
-                                @if ($item['quantity'] > 1)
-                                    <span class="text-xs text-brand-moss">× {{ $item['quantity'] }}</span>
+                            <div class="min-w-0">
+                                <div class="flex items-baseline gap-3">
+                                    <span class="font-medium text-brand-ink">{{ $item['label'] }}</span>
+                                    @if ($item['quantity'] > 1)
+                                        <span class="text-xs text-brand-moss">× {{ $item['quantity'] }}</span>
+                                    @endif
+                                </div>
+                                @if (! empty($item['detail']))
+                                    <p class="mt-0.5 text-xs text-brand-moss truncate">{{ $item['detail'] }}</p>
                                 @endif
                             </div>
                             <div class="flex items-baseline gap-2 text-brand-ink tabular-nums">

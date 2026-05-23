@@ -167,6 +167,92 @@ test('negative serverless count is clamped', function () {
     expect($state->serverlessSubtotalCents)->toBe(0);
 });
 
+test('cloud apps add a flat per app subtotal', function () {
+    // 2 apps × $5 + $15 base = $25 = 2500 cents
+    $state = DesiredBillingState::fromCounts(
+        tierQuantities: [],
+        baseCents: 1500,
+        creditCents: 0,
+        tierPricesCents: TIER_PRICES,
+        cloudCount: 2,
+        cloudUnitCents: 500,
+    );
+
+    expect($state->cloudCount)->toBe(2);
+    expect($state->cloudSubtotalCents)->toBe(1000);
+    expect($state->monthlyTotalCents)->toBe(2500);
+});
+
+test('edge sites add a flat per site subtotal', function () {
+    // 3 sites × $2 + $15 base = $21 = 2100 cents
+    $state = DesiredBillingState::fromCounts(
+        tierQuantities: [],
+        baseCents: 1500,
+        creditCents: 0,
+        tierPricesCents: TIER_PRICES,
+        edgeCount: 3,
+        edgeUnitCents: 200,
+    );
+
+    expect($state->edgeCount)->toBe(3);
+    expect($state->edgeSubtotalCents)->toBe(600);
+    expect($state->monthlyTotalCents)->toBe(2100);
+});
+
+test('edge delivery usage is added after credit and is not credit eligible', function () {
+    $state = DesiredBillingState::fromCounts(
+        tierQuantities: ['m' => 1],
+        baseCents: 1500,
+        creditCents: 1000,
+        tierPricesCents: TIER_PRICES,
+        edgeCount: 1,
+        edgeUnitCents: 200,
+        edgeUsageSubtotalCents: 500,
+    );
+
+    expect($state->appliedCreditCents)->toBe(1000);
+    // $15 base + $10 M + $2 edge - $10 credit + $5 usage = $22
+    expect($state->monthlyTotalCents)->toBe(2200);
+});
+
+test('managed products and servers combine and credit applies to managed subtotal', function () {
+    // 1 M server ($10) + 2 cloud ($10) + 1 edge ($2) + $15 base - $10 credit = $27
+    $state = DesiredBillingState::fromCounts(
+        tierQuantities: ['m' => 1],
+        baseCents: 1500,
+        creditCents: 1000,
+        tierPricesCents: TIER_PRICES,
+        cloudCount: 2,
+        cloudUnitCents: 500,
+        edgeCount: 1,
+        edgeUnitCents: 200,
+    );
+
+    expect($state->serverSubtotalCents)->toBe(1000);
+    expect($state->cloudSubtotalCents)->toBe(1000);
+    expect($state->edgeSubtotalCents)->toBe(200);
+    expect($state->appliedCreditCents)->toBe(1000);
+    expect($state->monthlyTotalCents)->toBe(2700);
+});
+
+test('negative cloud and edge counts are clamped', function () {
+    $state = DesiredBillingState::fromCounts(
+        tierQuantities: [],
+        baseCents: 1500,
+        creditCents: 0,
+        tierPricesCents: TIER_PRICES,
+        cloudCount: -2,
+        cloudUnitCents: 500,
+        edgeCount: -1,
+        edgeUnitCents: 200,
+    );
+
+    expect($state->cloudCount)->toBe(0);
+    expect($state->cloudSubtotalCents)->toBe(0);
+    expect($state->edgeCount)->toBe(0);
+    expect($state->edgeSubtotalCents)->toBe(0);
+});
+
 test('to array round trips for queue payloads', function () {
     $state = DesiredBillingState::fromCounts(
         tierQuantities: ['s' => 2, 'l' => 1],

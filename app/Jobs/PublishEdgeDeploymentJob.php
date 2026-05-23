@@ -67,6 +67,12 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             $meta = $site->edgeMeta();
             $meta['live_url'] = $result['live_url'];
             $meta['active_deployment_id'] = $deployment->id;
+            $hostname = parse_url((string) ($result['live_url'] ?? ''), PHP_URL_HOST);
+            if (is_string($hostname) && $hostname !== '') {
+                $routing = is_array($meta['routing'] ?? null) ? $meta['routing'] : [];
+                $routing['hostname'] = strtolower($hostname);
+                $meta['routing'] = $routing;
+            }
             unset($meta['last_error'], $meta['last_error_at']);
 
             $site->update([

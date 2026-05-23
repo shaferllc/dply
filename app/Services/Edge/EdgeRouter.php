@@ -16,6 +16,7 @@ class EdgeRouter
     {
         return [
             'dply_edge' => DplyEdgeBackend::class,
+            'org_cloudflare' => OrgCloudflareEdgeBackend::class,
         ];
     }
 

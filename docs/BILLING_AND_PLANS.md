@@ -16,7 +16,52 @@ dply runs on one usage-based plan: **$15/mo organization base + a per-server fee
 
 Per-server fees are **capped at $40** — you're never charged more than the XL rate per box, no matter how large.
 
-dply prices its own work, not your cloud invoice — the **same fee applies whether you run on $5 Hetzner boxes or $500 AWS instances**.
+**dply-managed products** (Cloud, Edge, Serverless) bill separately as flat per-app fees — not as VM tiers. BYO servers you SSH into use the tier table below.
+
+| Product | Unit | Default fee |
+|---------|------|-------------|
+| dply Cloud | per live app | $5/mo |
+| dply Edge | per live site | $2/mo platform fee |
+| dply Edge delivery (managed mode) | metered usage | pass-through + margin (see below) |
+
+**Delivery usage billing applies to managed (`dply_edge`) sites only.** BYO Cloudflare (`org_cloudflare`) sites publish into the customer's account — they pay Cloudflare directly for Workers, R2, and bandwidth; dply does not meter that usage today.
+| Serverless | per code function | $2/mo |
+| BYO server | per VM (XS–XL) | $2–$40/mo |
+
+dply prices its own work, not your cloud invoice — the **same BYO server fee applies whether you run on $5 Hetzner boxes or $500 AWS instances**.
+
+### dply Edge — platform fee + delivery usage
+
+Edge uses a **two-part model** so dply can pass Cloudflare delivery costs through with margin instead of absorbing them in the flat site fee alone:
+
+| Component | What it covers | Default |
+|-----------|----------------|---------|
+| **Platform fee** | Builds, deploys, previews, console management | **$2/mo per live production site** |
+| **Delivery usage** | HTTP requests, bandwidth egress, R2 storage/ops beyond per-site included allowances | **Metered monthly** (see unit rates below) |
+
+**Default included allowances per live Edge site (each month):**
+
+- 1M HTTP requests
+- 10 GB egress
+- 1 GB R2 storage
+
+Usage above those thresholds bills at customer-facing unit rates (configured in `config/edge.php`, embed ~25% markup over Cloudflare list pricing by default):
+
+| Meter | Default rate |
+|-------|----------------|
+| Requests | $0.50 / million |
+| Bandwidth egress | $0.05 / GB |
+| R2 storage | $0.03 / GB-month |
+
+Enable usage billing per install:
+
+```env
+DPLY_EDGE_USAGE_BILLING_ENABLED=true
+```
+
+Snapshots are collected daily (`php artisan dply:edge:collect-usage`, scheduled at 02:00 UTC). When Cloudflare Analytics credentials are configured (`DPLY_EDGE_CF_*`), the collector pulls zone HTTP metrics via GraphQL; otherwise it writes **placeholder zero snapshots** so billing hooks stay wired — operators can import manual rows or reconcile from the monthly Cloudflare invoice until full automation lands.
+
+Stripe sync adds a **monthly** `dply Edge delivery usage` line item (quantity = estimated cents) for monthly subscriptions. Yearly subscribers see the usage estimate in-product; Stripe metered sync for yearly plans is a follow-up.
 
 ## Annual
 
@@ -96,6 +141,25 @@ STRIPE_PRICE_STANDARD_TIER_S_YEARLY=price_...
 STRIPE_PRICE_STANDARD_TIER_M_YEARLY=price_...
 STRIPE_PRICE_STANDARD_TIER_L_YEARLY=price_...
 STRIPE_PRICE_STANDARD_TIER_XL_YEARLY=price_...
+
+# dply-managed products — flat per unit (monthly + yearly)
+STRIPE_PRICE_STANDARD_SERVERLESS=price_...
+STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_...
+STRIPE_PRICE_STANDARD_CLOUD=price_...
+STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_...
+STRIPE_PRICE_STANDARD_EDGE=price_...
+STRIPE_PRICE_STANDARD_EDGE_YEARLY=price_...
+STRIPE_PRICE_STANDARD_EDGE_USAGE=price_...
+
+# Edge usage billing (optional — pass-through delivery costs)
+# DPLY_EDGE_USAGE_BILLING_ENABLED=true
+# DPLY_EDGE_USAGE_MARKUP_PERCENT=25
+# DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION=50
+# DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB=5
+# DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH=3
+# DPLY_EDGE_USAGE_INCLUDED_REQUESTS_PER_SITE=1000000
+# DPLY_EDGE_USAGE_INCLUDED_EGRESS_GB_PER_SITE=10
+# DPLY_EDGE_USAGE_INCLUDED_R2_STORAGE_GB_PER_SITE=1
 
 # Enterprise — single negotiated price, applied manually
 STRIPE_PRICE_ENTERPRISE=price_...

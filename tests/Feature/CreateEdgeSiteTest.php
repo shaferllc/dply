@@ -9,13 +9,48 @@ use App\Enums\SiteType;
 use App\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Edge\EdgeOrgCredentialConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
+
+test('creates org cloudflare edge site when credential bootstrapped', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'cloudflare',
+        'credentials' => ['api_token' => 'cf-token'],
+    ]);
+
+    EdgeOrgCredentialConfig::merge($credential, [
+        'account_id' => 'acct-org',
+        'kv_namespace_id' => 'kv-org',
+        'r2_bucket' => 'dply-edge-org',
+        'r2_access_key' => 'access',
+        'r2_secret' => 'secret',
+        'r2_endpoint' => 'https://acct-org.r2.cloudflarestorage.com',
+        'worker_zone_name' => 'example.com',
+    ]);
+
+    $site = (new CreateEdgeSite)->handle($user, $org, [
+        'name' => 'BYO Marketing',
+        'repo' => 'acme/marketing',
+        'edge_backend' => 'org_cloudflare',
+        'edge_provider_credential_id' => $credential->id,
+    ]);
+
+    expect($site->edge_backend)->toBe('org_cloudflare')
+        ->and($site->edge_provider_credential_id)->toBe($credential->id)
+        ->and($site->meta['edge']['routing']['hostname'] ?? '')->toBe('byo-marketing.example.com');
+});
 
 test('creates edge server site deployment and dispatches build', function () {
     Queue::fake();

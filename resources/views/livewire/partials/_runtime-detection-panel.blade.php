@@ -57,6 +57,12 @@
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['build_command'] }}</dd>
                 </div>
             @endif
+            @if (! empty($detectedPlan['output_dir']))
+                <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Output directory') }}</dt>
+                    <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['output_dir'] }}</dd>
+                </div>
+            @endif
             @if (! empty($detectedPlan['start_command']))
                 <div>
                     <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>

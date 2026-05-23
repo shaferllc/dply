@@ -45,6 +45,7 @@ test('detects jekyll from config yml', function () {
     expect($result->framework)->toBe('jekyll');
     expect($result->confidence)->toBe('high');
     expect($result->buildCommand)->toBe('bundle exec jekyll build');
+    expect($result->outputDirectory)->toBe('_site');
     expect($result->startCommand)->toBeNull();
 });
 test('detects hugo from hugo toml', function () {
@@ -58,6 +59,7 @@ test('detects hugo from hugo toml', function () {
     expect($result)->not->toBeNull();
     expect($result->framework)->toBe('hugo');
     expect($result->buildCommand)->toBe('hugo --minify');
+    expect($result->outputDirectory)->toBe('public');
 });
 test('detects hugo from config toml with hugo keys', function () {
     file_put_contents(
@@ -92,6 +94,18 @@ test('detects eleventy from dotted config', function () {
     expect($result)->not->toBeNull();
     expect($result->framework)->toBe('eleventy');
     expect($result->buildCommand)->toBe('npx @11ty/eleventy');
+    expect($result->outputDirectory)->toBe('_site');
+});
+test('detects eleventy output directory from config', function () {
+    file_put_contents(
+        $this->tempDir.'/eleventy.config.js',
+        "export default { dir: { output: 'build' } };\n",
+    );
+
+    $result = (new StaticRuntimeDetector)->detect($this->tempDir);
+
+    expect($result)->not->toBeNull();
+    expect($result->outputDirectory)->toBe('build');
 });
 test('detects eleventy from modern config filenames', function () {
     file_put_contents(

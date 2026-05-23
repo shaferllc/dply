@@ -47,10 +47,25 @@
                 @endif
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
-                    @if ($section === 'general')
-                        @if ($site->usesEdgeRuntime())
-                            @include('livewire.sites.partials.edge-dashboard')
-                        @elseif ($isContainerWorkspace && ! $site->usesFunctionsRuntime())
+                    @if ($site->usesEdgeRuntime())
+                        @if ($section === 'general')
+                            @include('livewire.sites.partials.edge.overview')
+                        @elseif ($section === 'edge-deploys')
+                            @include('livewire.sites.partials.edge.hero')
+                            @include('livewire.sites.partials.edge.deploys-table', ['compact' => false])
+                        @elseif ($section === 'edge-domains')
+                            @include('livewire.sites.partials.edge.domains')
+                        @elseif ($section === 'edge-build')
+                            @include('livewire.sites.partials.edge.build-settings')
+                        @elseif ($section === 'edge-previews')
+                            @include('livewire.sites.partials.edge.previews')
+                        @elseif ($section === 'edge-logs')
+                            @include('livewire.sites.partials.edge.logs')
+                        @elseif ($section === 'danger')
+                            @include('livewire.sites.partials.edge.danger')
+                        @endif
+                    @elseif ($section === 'general')
+                        @if ($isContainerWorkspace && ! $site->usesFunctionsRuntime())
                             @include('livewire.sites.partials.container-dashboard')
                         @endif
 

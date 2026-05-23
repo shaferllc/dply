@@ -64,13 +64,13 @@ test('credentials nav includes vultr when enabled', function () {
     expect($allIds)->toContain('vultr');
 });
 
-test('server create wizard step shows provider mode copy', function () {
+test('server create wizard step shows vultr in provider mode copy', function () {
     $user = vultrTestUser();
 
     Livewire::actingAs($user)
         ->test(StepType::class)
         ->assertSee('Provision with a provider', false)
-        ->assertSee('DigitalOcean', false);
+        ->assertSee('Vultr', false);
 });
 
 test('vultr credential store validates token via api', function () {

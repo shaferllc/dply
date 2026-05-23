@@ -38,6 +38,7 @@ use App\Observers\BackupAutoResumeObserver;
 use App\Observers\BackupFailureNotifyObserver;
 use App\Observers\ImportSiteWakeupObserver;
 use App\Observers\ServerObserver;
+use App\Observers\SiteBillingObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
 use App\Policies\BackupConfigurationPolicy;
@@ -78,7 +79,9 @@ use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Services\Edge\CloudflareEdgeDelivery;
 use App\Services\Edge\EdgeArtifactPublisher;
+use App\Services\Edge\EdgeDeliveryContextResolver;
 use App\Services\Edge\EdgeHostMapPublisher;
 use App\Services\Imports\Handlers\HandlerManifest;
 use App\Services\Imports\StepRegistry;
@@ -111,6 +114,8 @@ use App\Services\Webhooks\OutboundWebhookDispatcher;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
+use App\Support\Edge\EdgeFilesystemRegistrar;
+use App\Support\Edge\EdgePlatformCredentials;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -250,6 +255,9 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(EdgeArtifactPublisher::class);
         $this->app->singleton(EdgeHostMapPublisher::class);
+        $this->app->singleton(EdgeDeliveryContextResolver::class);
+        $this->app->singleton(CloudflareEdgeDelivery::class);
+        $this->app->singleton(EdgeFilesystemRegistrar::class);
     }
 
     /**
@@ -354,6 +362,7 @@ class AppServiceProvider extends ServiceProvider
 
         Server::observe(ServerObserver::class);
         Site::observe(ImportSiteWakeupObserver::class);
+        Site::observe(SiteBillingObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
         TaskRunnerTask::observe(TaskRunnerTaskObserver::class);
         ServerDatabaseBackup::observe(BackupAutoResumeObserver::class);
@@ -584,7 +593,7 @@ class AppServiceProvider extends ServiceProvider
                 'secret' => $cfg['secret'],
                 'region' => $cfg['region'],
                 'bucket' => $bucket,
-                'endpoint' => $cfg['endpoint'],
+                'endpoint' => EdgePlatformCredentials::r2Endpoint(),
                 'use_path_style_endpoint' => $cfg['use_path_style_endpoint'],
                 'throw' => false,
                 'report' => false,

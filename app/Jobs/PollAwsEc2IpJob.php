@@ -6,6 +6,7 @@ use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
 use App\Services\AwsEc2Service;
+use App\Services\AwsEc2ServiceFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -36,10 +37,16 @@ class PollAwsEc2IpJob implements ShouldQueue
             return;
         }
 
-        $aws = new AwsEc2Service($credential, $this->server->region);
+        $aws = app(AwsEc2ServiceFactory::class)->make($credential, $this->server->region);
         $instances = $aws->describeInstances($this->server->provider_id);
         $state = AwsEc2Service::getState($instances);
         $ip = AwsEc2Service::getPublicIp($instances);
+
+        if (in_array($state, ['terminated', 'shutting-down', 'stopped'], true)) {
+            $this->server->update(['status' => Server::STATUS_ERROR]);
+
+            return;
+        }
 
         if ($state === 'running' && $ip) {
             $this->server->update([

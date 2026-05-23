@@ -114,7 +114,9 @@ final class SiteSettingsViewData
         $resourceNoun = $runtimeMode === 'vm' ? __('Site') : __('App');
         $resourceNounLower = strtolower($resourceNoun);
         $resourcePlural = $runtimeMode === 'vm' ? __('sites') : __('apps');
+        $isEdgeWorkspace = $site->usesEdgeRuntime();
         $workspacePrefix = match (true) {
+            $isEdgeWorkspace => __('Edge'),
             str_contains($runtimeFamily, 'cloud') || str_contains($runtimePlatform, 'cloud') => __('Cloud'),
             in_array($runtimePlatform, ['aws', 'digitalocean'], true) => __('Cloud'),
             $runtimeMode === 'docker' => __('Container'),
@@ -123,6 +125,9 @@ final class SiteSettingsViewData
             default => null,
         };
         $workspaceTitle = $workspacePrefix ? $workspacePrefix.' '.$resourceNounLower.' '.__('workspace') : $resourceNoun.' '.__('workspace');
+        if ($isEdgeWorkspace) {
+            $workspaceTitle = __('Edge site workspace');
+        }
         $sectionHeader = SiteSettingsHeader::for($site, $server, $section);
         $headerUser = $user;
         $headerOrg = $headerUser?->currentOrganization();
@@ -174,83 +179,95 @@ final class SiteSettingsViewData
                 ['label' => __('Zero downtime'), 'value' => $site->deploy_strategy === 'atomic' ? __('Enabled') : __('Disabled')],
             ];
         $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
+        $edgeUsageBillingEnabled = $isEdgeWorkspace && (bool) config('dply.edge.usage_billing.enabled', false);
+        $edgeManagedFee = $isEdgeWorkspace
+            ? ((int) config('subscription.standard.edge_cents', 0)) / 100
+            : null;
+
+        $edgeContext = $isEdgeWorkspace ? EdgeSiteViewData::context($site) : [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
         $generalRecentDeployments = $section === 'general'
             ? self::recentDeploymentsWithPhaseResults($site)
             : collect();
 
-        return compact(
-            'functionsHost',
-            'supportsMachinePhp',
-            'supportsWebserverProvisioning',
-            'showWebserverConfigEditor',
-            'supportsHttp3Certificates',
-            'supportsEnvPush',
-            'supportsSshDeployHooks',
-            'testingHostname',
-            'deployVariableReference',
-            'deployHookPhaseLabels',
-            'runtimeMode',
-            'runtimePlatform',
-            'runtimeFamily',
-            'isContainerWorkspace',
-            'settingsSidebarItems',
-            'routingTabIcons',
-            'previewDomain',
-            'activeCertificate',
-            'pendingCertificate',
-            'latestCertificate',
-            'serverlessRuntime',
-            'dockerRuntime',
-            'kubernetesRuntime',
-            'runtimeTarget',
-            'runtimePublication',
-            'foundationStatus',
-            'foundationSecrets',
-            'secretConfigEntries',
-            'secretEntries',
-            'configEntries',
-            'secretDeliveryLabel',
-            'resourceBindings',
-            'preflightChecks',
-            'preflightErrors',
-            'preflightWarnings',
-            'dockerRuntimeDetails',
-            'dockerContainers',
-            'runtimeLogs',
-            'runtimeOperationConsoles',
-            'runtimeErrorConsole',
-            'resourceNoun',
-            'resourceNounLower',
-            'resourcePlural',
-            'workspacePrefix',
-            'workspaceTitle',
-            'sectionHeader',
-            'headerUser',
-            'headerOrg',
-            'headerCanUpdateSite',
-            'headerCanDeleteSite',
-            'headerIsDeployer',
-            'headerIsAdmin',
-            'headerRoleLabel',
-            'headerRoleTone',
-            'sectionDescription',
-            'generalOverviewTitle',
-            'generalOverviewDescription',
-            'workspaceDescription',
-            'projectSettingsTitle',
-            'projectSettingsDescription',
-            'detailsTitle',
-            'detailsDescription',
-            'primaryHostnameLabel',
-            'documentRootLabel',
-            'documentRootPlaceholder',
-            'summaryCards',
-            'settingsBreadcrumbs',
-            'sectionConsoleActionKinds',
-            'sectionConsoleActionRun',
-            'generalRecentDeployments',
+        return array_merge(
+            compact(
+                'functionsHost',
+                'supportsMachinePhp',
+                'supportsWebserverProvisioning',
+                'showWebserverConfigEditor',
+                'supportsHttp3Certificates',
+                'supportsEnvPush',
+                'supportsSshDeployHooks',
+                'testingHostname',
+                'deployVariableReference',
+                'deployHookPhaseLabels',
+                'runtimeMode',
+                'runtimePlatform',
+                'runtimeFamily',
+                'isContainerWorkspace',
+                'settingsSidebarItems',
+                'routingTabIcons',
+                'previewDomain',
+                'activeCertificate',
+                'pendingCertificate',
+                'latestCertificate',
+                'serverlessRuntime',
+                'dockerRuntime',
+                'kubernetesRuntime',
+                'runtimeTarget',
+                'runtimePublication',
+                'foundationStatus',
+                'foundationSecrets',
+                'secretConfigEntries',
+                'secretEntries',
+                'configEntries',
+                'secretDeliveryLabel',
+                'resourceBindings',
+                'preflightChecks',
+                'preflightErrors',
+                'preflightWarnings',
+                'dockerRuntimeDetails',
+                'dockerContainers',
+                'runtimeLogs',
+                'runtimeOperationConsoles',
+                'runtimeErrorConsole',
+                'resourceNoun',
+                'resourceNounLower',
+                'resourcePlural',
+                'workspacePrefix',
+                'workspaceTitle',
+                'sectionHeader',
+                'headerUser',
+                'headerOrg',
+                'headerCanUpdateSite',
+                'headerCanDeleteSite',
+                'headerIsDeployer',
+                'headerIsAdmin',
+                'headerRoleLabel',
+                'headerRoleTone',
+                'sectionDescription',
+                'generalOverviewTitle',
+                'generalOverviewDescription',
+                'workspaceDescription',
+                'projectSettingsTitle',
+                'projectSettingsDescription',
+                'detailsTitle',
+                'detailsDescription',
+                'primaryHostnameLabel',
+                'documentRootLabel',
+                'documentRootPlaceholder',
+                'summaryCards',
+                'settingsBreadcrumbs',
+                'sectionConsoleActionKinds',
+                'sectionConsoleActionRun',
+                'generalRecentDeployments',
+                'isEdgeWorkspace',
+                'edgeUsageBillingEnabled',
+                'edgeManagedFee',
+            ),
+            $edgeContext,
         );
     }
 
@@ -260,6 +277,26 @@ final class SiteSettingsViewData
      */
     private static function breadcrumbs(Server $server, Site $site, string $section, array $sectionHeader): array
     {
+        if ($site->usesEdgeRuntime()) {
+            $items = [
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
+                ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
+            ];
+
+            $items[] = [
+                'label' => $site->name,
+                'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
+                'icon' => 'globe-alt',
+            ];
+
+            if ($section !== 'general') {
+                $items[] = ['label' => $sectionHeader['title'], 'icon' => 'cog-6-tooth'];
+            }
+
+            return $items;
+        }
+
         $items = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],

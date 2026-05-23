@@ -6,26 +6,33 @@ namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Support\Edge\EdgeDeliveryContext;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class EdgeHostMapPublisher
 {
-    public function publish(Site $site, EdgeDeployment $deployment): int
+    public function publish(Site $site, EdgeDeployment $deployment, ?EdgeDeliveryContext $context = null): int
     {
+        $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
         $version = (int) $deployment->cf_kv_version + 1;
-        $this->publishHostname($site, $deployment, $site->edgeHostname());
+        $this->publishHostname($site, $deployment, $site->edgeHostname(), $context);
 
         foreach ($this->customHostnames($site) as $hostname) {
-            $this->publishHostname($site, $deployment, $hostname);
+            $this->publishHostname($site, $deployment, $hostname, $context);
         }
 
         return $version;
     }
 
-    public function publishHostname(Site $site, EdgeDeployment $deployment, string $hostname): void
-    {
+    public function publishHostname(
+        Site $site,
+        EdgeDeployment $deployment,
+        string $hostname,
+        ?EdgeDeliveryContext $context = null,
+    ): void {
+        $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
         $payload = $this->routingPayload($deployment, $site);
 
         if (FakeEdgeProvision::enabled()) {
@@ -36,19 +43,21 @@ class EdgeHostMapPublisher
             return;
         }
 
-        $this->writeKv(strtolower($hostname), $payload);
+        $this->writeKv(strtolower($hostname), $payload, $context);
     }
 
-    public function unpublish(Site $site): void
+    public function unpublish(Site $site, ?EdgeDeliveryContext $context = null): void
     {
-        $this->unpublishHostname($site, $site->edgeHostname());
+        $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
+        $this->unpublishHostname($site, $site->edgeHostname(), $context);
         foreach ($this->customHostnames($site) as $hostname) {
-            $this->unpublishHostname($site, $hostname);
+            $this->unpublishHostname($site, $hostname, $context);
         }
     }
 
-    public function unpublishHostname(Site $site, string $hostname): void
+    public function unpublishHostname(Site $site, string $hostname, ?EdgeDeliveryContext $context = null): void
     {
+        $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
         $hostname = strtolower(trim($hostname));
 
         if (FakeEdgeProvision::enabled()) {
@@ -59,28 +68,27 @@ class EdgeHostMapPublisher
             return;
         }
 
-        $accountId = (string) config('edge.cloudflare.account_id');
-        $namespaceId = (string) config('edge.cloudflare.kv_namespace_id');
-        $token = (string) config('edge.cloudflare.api_token');
-
-        Http::withToken($token)
-            ->delete("https://api.cloudflare.com/client/v4/accounts/{$accountId}/storage/kv/namespaces/{$namespaceId}/values/".rawurlencode($hostname))
+        Http::withToken($context->apiToken)
+            ->delete($this->kvValueUrl($context, $hostname))
             ->throw();
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function writeKv(string $key, array $payload): void
+    private function writeKv(string $key, array $payload, EdgeDeliveryContext $context): void
     {
-        $accountId = (string) config('edge.cloudflare.account_id');
-        $namespaceId = (string) config('edge.cloudflare.kv_namespace_id');
-        $token = (string) config('edge.cloudflare.api_token');
-
-        Http::withToken($token)
+        Http::withToken($context->apiToken)
             ->withBody(json_encode($payload, JSON_THROW_ON_ERROR), 'application/json')
-            ->put("https://api.cloudflare.com/client/v4/accounts/{$accountId}/storage/kv/namespaces/{$namespaceId}/values/".rawurlencode($key))
+            ->put($this->kvValueUrl($context, $key))
             ->throw();
+    }
+
+    private function kvValueUrl(EdgeDeliveryContext $context, string $key): string
+    {
+        return 'https://api.cloudflare.com/client/v4/accounts/'.$context->accountId
+            .'/storage/kv/namespaces/'.$context->kvNamespaceId
+            .'/values/'.rawurlencode($key);
     }
 
     /**

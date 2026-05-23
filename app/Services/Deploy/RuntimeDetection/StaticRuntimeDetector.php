@@ -49,6 +49,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
         }
 
         $buildCommand = $this->detectBuildCommand($framework, $reasons);
+        $outputDirectory = $this->detectOutputDirectory($root, $framework, $reasons);
 
         $confidence = $framework !== null ? 'high' : 'medium';
 
@@ -63,6 +64,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
             reasons: $reasons,
             processes: [],
             confidence: $confidence,
+            outputDirectory: $outputDirectory,
         );
     }
 
@@ -131,6 +133,69 @@ final class StaticRuntimeDetector implements RuntimeDetector
             $reasons[] = 'Suggested build: `npx @11ty/eleventy` (Eleventy convention).';
 
             return 'npx @11ty/eleventy';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  list<string>  $reasons
+     */
+    private function detectOutputDirectory(string $root, ?string $framework, array &$reasons): ?string
+    {
+        if ($framework === 'eleventy') {
+            $configured = $this->parseEleventyOutputDirectory($root);
+            if ($configured !== null) {
+                $reasons[] = "Suggested output directory: `{$configured}` (from Eleventy config).";
+
+                return $configured;
+            }
+
+            $reasons[] = 'Suggested output directory: `_site` (Eleventy default).';
+
+            return '_site';
+        }
+
+        if ($framework === 'jekyll') {
+            $reasons[] = 'Suggested output directory: `_site` (Jekyll default).';
+
+            return '_site';
+        }
+
+        if ($framework === 'hugo') {
+            $reasons[] = 'Suggested output directory: `public` (Hugo default).';
+
+            return 'public';
+        }
+
+        if ($framework === null) {
+            $reasons[] = 'Suggested output directory: `.` (static files at repo root).';
+
+            return '.';
+        }
+
+        return null;
+    }
+
+    private function parseEleventyOutputDirectory(string $root): ?string
+    {
+        foreach (['.eleventy.js', 'eleventy.config.js', 'eleventy.config.cjs', 'eleventy.config.mjs'] as $candidate) {
+            $path = $root.'/'.$candidate;
+            if (! is_file($path)) {
+                continue;
+            }
+
+            $contents = (string) @file_get_contents($path);
+            if ($contents === '') {
+                continue;
+            }
+
+            if (preg_match('/output\s*:\s*["\']([^"\']+)["\']/i', $contents, $matches) === 1) {
+                $dir = trim((string) ($matches[1] ?? ''));
+                if ($dir !== '') {
+                    return $dir;
+                }
+            }
         }
 
         return null;

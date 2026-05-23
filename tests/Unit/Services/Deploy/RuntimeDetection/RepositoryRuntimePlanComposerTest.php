@@ -284,6 +284,22 @@ function writeNodeRepoWithBullmq(string $dir): void
         ]),
     );
 }
+test('eleventy repo detection includes output directory', function () {
+    file_put_contents(
+        $this->tempDir.'/eleventy.config.js',
+        "export default { dir: { output: '_site' } };\n",
+    );
+    file_put_contents(
+        $this->tempDir.'/package.json',
+        json_encode(['scripts' => ['build' => 'npx @11ty/eleventy']]),
+    );
+
+    $plan = makeComposer()->compose($this->tempDir);
+
+    expect($plan)->not->toBeNull();
+    expect($plan->framework)->toBe('eleventy');
+    expect($plan->detection?->outputDirectory)->toBe('_site');
+});
 function removeDir(string $dir): void
 {
     if (! is_dir($dir)) {

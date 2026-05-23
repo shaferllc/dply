@@ -80,6 +80,8 @@ After deploy, point preview/production hostnames (for example `*.dply.host`) to 
 
 Laravel publishes host map entries using platform credentials from `config/edge.php` (`DPLY_EDGE_*`).
 
+Production setup: [docs/edge-production-setup.md](../../docs/edge-production-setup.md)
+
 ## Test
 
 ```bash

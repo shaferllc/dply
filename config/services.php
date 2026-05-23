@@ -140,7 +140,16 @@ return [
 
     'aws' => [
         'default_region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
-        'default_image' => env('AWS_EC2_DEFAULT_IMAGE', 'ami-0c55b159cbfafe1f0'),
+        /** When unset, resolveDefaultImageId() reads the regional Ubuntu SSM parameter. */
+        'default_image' => env('AWS_EC2_DEFAULT_IMAGE'),
+        'ami_ssm_parameter' => env(
+            'AWS_EC2_AMI_SSM_PARAMETER',
+            '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+        ),
+        /** Existing security group with SSH ingress; when unset, Dply creates/finds dply-provision. */
+        'security_group_id' => env('AWS_EC2_SECURITY_GROUP_ID'),
+        'provision_security_group' => env('AWS_EC2_PROVISION_SECURITY_GROUP', true),
+        'provision_security_group_name' => env('AWS_EC2_PROVISION_SECURITY_GROUP_NAME', 'dply-provision'),
         'ssh_user' => env('AWS_EC2_SSH_USER', 'ubuntu'),
     ],
 

@@ -108,6 +108,32 @@ class ProvisionStripeBillingCommand extends Command
                 number_format($yearlyOf($serverless) / 100, 2),
             ));
         }
+        $cloud = (int) ($standard['cloud_cents'] ?? 0);
+        if ($cloud > 0) {
+            $this->line('  Product: dply Cloud app');
+            $this->line(sprintf(
+                '    Per app $%s/mo   $%s/yr',
+                number_format($cloud / 100, 2),
+                number_format($yearlyOf($cloud) / 100, 2),
+            ));
+        }
+        $edge = (int) ($standard['edge_cents'] ?? 0);
+        if ($edge > 0) {
+            $this->line('  Product: dply Edge site');
+            $this->line(sprintf(
+                '    Per site $%s/mo   $%s/yr',
+                number_format($edge / 100, 2),
+                number_format($yearlyOf($edge) / 100, 2),
+            ));
+        }
+        $edgeUsageUnit = (int) ($standard['edge_usage_unit_cents'] ?? 1);
+        if ($edgeUsageUnit > 0) {
+            $this->line('  Product: dply Edge delivery usage');
+            $this->line(sprintf(
+                '    Metered $%s/unit (monthly, quantity = cents)',
+                number_format($edgeUsageUnit / 100, 2),
+            ));
+        }
         $this->line('  Product: dply Enterprise (no prices — sales-led)');
         $this->newLine();
         $this->info('Re-run without --dry-run to actually create these in Stripe.');

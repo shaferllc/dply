@@ -29,6 +29,11 @@ return [
         'notifications' => ['label' => 'Notifications'],
         'basic-auth' => ['label' => 'Authentication'],
         'danger' => ['label' => 'Danger zone'],
+        'edge-deploys' => ['label' => 'Deploys'],
+        'edge-domains' => ['label' => 'Domains'],
+        'edge-build' => ['label' => 'Build settings'],
+        'edge-previews' => ['label' => 'Previews'],
+        'edge-logs' => ['label' => 'Logs & activity'],
     ],
 
     /*

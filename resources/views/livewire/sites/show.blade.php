@@ -14,10 +14,16 @@
     </div>
     <div class="dply-page-shell pt-4">
         <x-page-header
-            :title="$readyForWorkspace ? __('Site workspace') : __('Site setup')"
+            :title="$readyForWorkspace
+                ? ($site->usesEdgeRuntime() ? __('Edge site') : __('Site workspace'))
+                : ($site->usesEdgeRuntime() ? __('Edge deployment') : __('Site setup'))"
             :description="$readyForWorkspace
-                ? __('Manage this site from one workspace with General as the default landing section.')
-                : __('Track provisioning steps and setup until this site is ready to receive traffic.')"
+                ? ($site->usesEdgeRuntime()
+                    ? __('Manage builds, domains, deploys, and delivery for this Edge site.')
+                    : __('Manage this site from one workspace with General as the default landing section.'))
+                : ($site->usesEdgeRuntime()
+                    ? __('Track the git build and Edge CDN publish until this site goes live.')
+                    : __('Track provisioning steps and setup until this site is ready to receive traffic.'))"
             doc-route="docs.index"
             toolbar
             compact
@@ -33,19 +39,30 @@
                 </span>
             </x-slot>
             <x-slot name="actions">
-                @if ($readyForWorkspace && $site->workspace)
+                @if ($readyForWorkspace && $site->usesEdgeRuntime())
+                    <x-outline-link :href="route('edge.index')" wire:navigate>
+                        <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('All Edge sites') }}
+                    </x-outline-link>
+                    @if ($edgeLiveUrl ?? $site->edgeLiveUrl())
+                        <x-outline-link :href="$edgeLiveUrl ?? $site->edgeLiveUrl()" target="_blank">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ __('Open live site') }}
+                        </x-outline-link>
+                    @endif
+                @elseif ($readyForWorkspace && $site->workspace)
                     <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
                         <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Open project') }}
                     </x-outline-link>
                 @endif
-                @if ($showWebserverConfigEditor && ! $site->isCustom())
+                @if ($showWebserverConfigEditor && ! $site->isCustom() && ! $site->usesEdgeRuntime())
                     <x-outline-link :href="route('sites.webserver-config', [$server, $site])" wire:navigate>
                         <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Web server config') }}
                     </x-outline-link>
                 @endif
-                @if ($readyForWorkspace && ! $site->isCustom())
+                @if ($readyForWorkspace && ! $site->isCustom() && ! $site->usesEdgeRuntime())
                     <x-outline-link :href="route('sites.files', [$server, $site])" wire:navigate>
                         <x-heroicon-o-folder class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Files') }}
@@ -97,43 +114,51 @@
             @endif
 
             @if (! $readyForWorkspace)
-                @include('livewire.sites.partials.show.provisioning-journey')
+                @if ($site->usesEdgeRuntime())
+                    @include('livewire.sites.partials.show.edge-provisioning-journey')
+                @else
+                    @include('livewire.sites.partials.show.provisioning-journey')
+                @endif
             @else
-                @include('livewire.sites.partials.show.dashboard-header')
+                @if ($site->usesEdgeRuntime())
+                    @include('livewire.sites.partials.edge.overview')
+                @else
+                    @include('livewire.sites.partials.show.dashboard-header')
 
-                <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="dashboard_tab">
+                    <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="dashboard_tab">
 
-                @if ($activeTab === 'overview')
-                    <x-server-workspace-tab-panel id="site-panel-overview" labelled-by="site-tab-overview" panel-class="space-y-6">
-                        @include('livewire.sites.partials.show.overview-tab')
-                    </x-server-workspace-tab-panel>
+                    @if ($activeTab === 'overview')
+                        <x-server-workspace-tab-panel id="site-panel-overview" labelled-by="site-tab-overview" panel-class="space-y-6">
+                            @include('livewire.sites.partials.show.overview-tab')
+                        </x-server-workspace-tab-panel>
+                    @endif
+
+                    @if ($activeTab === 'deploys')
+                        <x-server-workspace-tab-panel id="site-panel-deploys" labelled-by="site-tab-deploys" panel-class="space-y-6">
+                            @include('livewire.sites.partials.show.deploys-tab')
+                        </x-server-workspace-tab-panel>
+                    @endif
+
+                    @if ($showRuntimeTab && $activeTab === 'runtime')
+                        <x-server-workspace-tab-panel id="site-panel-runtime" labelled-by="site-tab-runtime" panel-class="space-y-6">
+                            @include('livewire.sites.partials.show.runtime-tab')
+                        </x-server-workspace-tab-panel>
+                    @endif
+
+                    @if ($activeTab === 'logs')
+                        <x-server-workspace-tab-panel id="site-panel-logs" labelled-by="site-tab-logs">
+                            @include('livewire.sites.partials.show.logs-tab')
+                        </x-server-workspace-tab-panel>
+                    @endif
+
+                    @if ($showSslTab && $activeTab === 'ssl')
+                        <x-server-workspace-tab-panel id="site-panel-ssl" labelled-by="site-tab-ssl">
+                            @include('livewire.sites.partials.show.ssl-tab')
+                        </x-server-workspace-tab-panel>
+                    @endif
+
+                    </div>
                 @endif
-
-                @if ($activeTab === 'deploys')
-                    <x-server-workspace-tab-panel id="site-panel-deploys" labelled-by="site-tab-deploys" panel-class="space-y-6">
-                        @include('livewire.sites.partials.show.deploys-tab')
-                    </x-server-workspace-tab-panel>
-                @endif
-
-                @if ($showRuntimeTab && $activeTab === 'runtime')
-                    <x-server-workspace-tab-panel id="site-panel-runtime" labelled-by="site-tab-runtime" panel-class="space-y-6">
-                        @include('livewire.sites.partials.show.runtime-tab')
-                    </x-server-workspace-tab-panel>
-                @endif
-
-                @if ($activeTab === 'logs')
-                    <x-server-workspace-tab-panel id="site-panel-logs" labelled-by="site-tab-logs">
-                        @include('livewire.sites.partials.show.logs-tab')
-                    </x-server-workspace-tab-panel>
-                @endif
-
-                @if ($showSslTab && $activeTab === 'ssl')
-                    <x-server-workspace-tab-panel id="site-panel-ssl" labelled-by="site-tab-ssl">
-                        @include('livewire.sites.partials.show.ssl-tab')
-                    </x-server-workspace-tab-panel>
-                @endif
-
-                </div>
             @endif
         </div>
 

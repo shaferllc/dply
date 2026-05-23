@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Livewire\Sites\Show;
+use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
@@ -135,31 +136,40 @@ final class SiteShowViewData
 
         $siteHeaderBreadcrumbs = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
-        ];
-        if ($server->workspace) {
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $server->workspace->name,
-                'href' => route('projects.resources', $server->workspace),
-                'icon' => 'rectangle-group',
-            ];
-        }
-        $siteHeaderBreadcrumbs[] = [
-            'label' => $server->name,
-            'href' => route('servers.overview', $server),
-            'icon' => 'server-stack',
-        ];
-        $siteHeaderBreadcrumbs[] = [
-            'label' => $site->name,
-            'icon' => 'globe-alt',
         ];
 
-        $provisioningJourney = self::provisioningJourney(
-            $provisioningState,
-            $statusSteps,
-            $stepKeys,
-            $currentStepIndex,
-        );
+        if ($site->usesEdgeRuntime()) {
+            $siteHeaderBreadcrumbs[] = ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'];
+            $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
+            $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt'];
+        } else {
+            $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
+            if ($server->workspace) {
+                $siteHeaderBreadcrumbs[] = [
+                    'label' => $server->workspace->name,
+                    'href' => route('projects.resources', $server->workspace),
+                    'icon' => 'rectangle-group',
+                ];
+            }
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $server->name,
+                'href' => route('servers.overview', $server),
+                'icon' => 'server-stack',
+            ];
+            $siteHeaderBreadcrumbs[] = [
+                'label' => $site->name,
+                'icon' => 'globe-alt',
+            ];
+        }
+
+        $provisioningJourney = $site->usesEdgeRuntime() && ! $readyForWorkspace
+            ? self::edgeProvisioningJourney($site)
+            : self::provisioningJourney(
+                $provisioningState,
+                $statusSteps,
+                $stepKeys,
+                $currentStepIndex,
+            );
 
         $dashboard = $readyForWorkspace
             ? self::dashboard(
@@ -224,8 +234,115 @@ final class SiteShowViewData
             ),
             $provisioningJourney,
             $dashboard,
+            $site->usesEdgeRuntime() ? EdgeSiteViewData::context($site) : [],
             ['activeTab' => $activeTab],
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function edgeProvisioningJourney(Site $site): array
+    {
+        $edgeMeta = $site->edgeMeta();
+        $sourceSpec = is_array($edgeMeta['source'] ?? null) ? $edgeMeta['source'] : [];
+        $buildSpec = is_array($edgeMeta['build'] ?? null) ? $edgeMeta['build'] : [];
+        $edgeBuildCommand = (string) ($buildSpec['command'] ?? 'npm ci && npm run build');
+        $edgeOutputDir = (string) ($buildSpec['output_dir'] ?? 'dist');
+        $edgeRepoLabel = (($sourceSpec['repo'] ?? '?').'@'.($sourceSpec['branch'] ?? 'main'));
+        $edgeLiveUrl = $site->edgeLiveUrl();
+
+        $edgeLatestDeployment = $site->relationLoaded('edgeDeployments')
+            ? $site->edgeDeployments->first()
+            : $site->edgeDeployments()->first();
+
+        $edgeProvisioningState = self::resolveEdgeProvisioningState($site, $edgeLatestDeployment);
+        $edgeProvisioningError = self::resolveEdgeProvisioningError($site, $edgeLatestDeployment);
+
+        $edgeStatusSteps = [
+            'queued' => __('Queued / cloning repository'),
+            'building' => __('Installing dependencies & building'),
+            'publishing' => __('Publishing to Edge CDN'),
+            'live' => __('Live'),
+            'failed' => __('Needs attention'),
+        ];
+        $edgeStepKeys = array_keys($edgeStatusSteps);
+        $edgeCurrentStepIndex = array_search($edgeProvisioningState, $edgeStepKeys, true);
+        $edgeCurrentStepIndex = $edgeCurrentStepIndex === false ? 0 : $edgeCurrentStepIndex;
+
+        $edgeJourneyHasFailed = $edgeProvisioningState === 'failed';
+        $edgeJourneyIsDone = $edgeProvisioningState === 'live';
+        $edgeVisibleSteps = collect($edgeStatusSteps)->except('failed');
+        $edgeTotalSteps = $edgeVisibleSteps->count();
+        $edgeCompletedSteps = $edgeJourneyHasFailed
+            ? max(0, $edgeCurrentStepIndex)
+            : ($edgeJourneyIsDone ? $edgeTotalSteps : max(0, $edgeCurrentStepIndex));
+        $edgeProgressPercent = $edgeTotalSteps > 0
+            ? (int) round(($edgeCompletedSteps / $edgeTotalSteps) * 100)
+            : 0;
+        $edgeCurrentLabel = $edgeStatusSteps[$edgeProvisioningState]
+            ?? str_replace('_', ' ', $edgeProvisioningState);
+
+        return compact(
+            'edgeMeta',
+            'sourceSpec',
+            'buildSpec',
+            'edgeBuildCommand',
+            'edgeOutputDir',
+            'edgeRepoLabel',
+            'edgeLiveUrl',
+            'edgeLatestDeployment',
+            'edgeProvisioningState',
+            'edgeProvisioningError',
+            'edgeStatusSteps',
+            'edgeStepKeys',
+            'edgeCurrentStepIndex',
+            'edgeJourneyHasFailed',
+            'edgeJourneyIsDone',
+            'edgeVisibleSteps',
+            'edgeTotalSteps',
+            'edgeCompletedSteps',
+            'edgeProgressPercent',
+            'edgeCurrentLabel',
+        );
+    }
+
+    private static function resolveEdgeProvisioningState(Site $site, ?EdgeDeployment $deployment): string
+    {
+        if ($site->status === Site::STATUS_EDGE_FAILED
+            || ($deployment !== null && $deployment->status === EdgeDeployment::STATUS_FAILED)) {
+            return 'failed';
+        }
+
+        if ($site->status === Site::STATUS_EDGE_ACTIVE
+            || ($deployment !== null && $deployment->status === EdgeDeployment::STATUS_LIVE)) {
+            return 'live';
+        }
+
+        if ($deployment === null) {
+            return 'queued';
+        }
+
+        return match ($deployment->status) {
+            EdgeDeployment::STATUS_PUBLISHING => 'publishing',
+            EdgeDeployment::STATUS_BUILDING => 'building',
+            default => 'queued',
+        };
+    }
+
+    private static function resolveEdgeProvisioningError(Site $site, ?EdgeDeployment $deployment): ?string
+    {
+        $metaError = $site->edgeMeta()['last_error'] ?? null;
+        if (is_string($metaError) && $metaError !== '') {
+            return $metaError;
+        }
+
+        $deploymentError = $deployment?->failure_reason;
+        if (is_string($deploymentError) && $deploymentError !== '') {
+            return $deploymentError;
+        }
+
+        return null;
     }
 
     /**
@@ -311,8 +428,11 @@ final class SiteShowViewData
             'red' => 'bg-red-500',
         ][$statusTone];
 
-        $showRuntimeTab = $site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime();
-        $showSslTab = ! $site->usesDockerRuntime() && ($previewDomain || $site->certificates->isNotEmpty());
+        $showRuntimeTab = ! $site->usesEdgeRuntime()
+            && ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime());
+        $showSslTab = ! $site->usesEdgeRuntime()
+            && ! $site->usesDockerRuntime()
+            && ($previewDomain || $site->certificates->isNotEmpty());
         $allowedTabs = collect(['overview', 'deploys', 'logs'])
             ->when($showRuntimeTab, fn ($collection) => $collection->push('runtime'))
             ->when($showSslTab, fn ($collection) => $collection->push('ssl'))

@@ -19,7 +19,7 @@ test('guest is redirected from edge index', function () {
         ->assertRedirect(route('login'));
 });
 
-test('edge index blocked when surface edge inactive', function () {
+test('shows coming soon when surface edge inactive', function () {
     Feature::define('surface.edge', fn () => false);
     Feature::flushCache();
 
@@ -27,7 +27,10 @@ test('edge index blocked when surface edge inactive', function () {
 
     $this->actingAs($user)
         ->get(route('edge.index'))
-        ->assertStatus(400);
+        ->assertOk()
+        ->assertSee('Coming soon')
+        ->assertSee('Not available yet')
+        ->assertDontSee('No edge sites found');
 });
 
 test('authenticated user sees edge sites index when surface edge active', function () {

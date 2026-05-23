@@ -8,7 +8,7 @@ use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Models\User;
 use App\Notifications\ServerRemovalExecutedNotification;
-use App\Services\AwsEc2Service;
+use App\Services\AwsEc2ServiceFactory;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
@@ -208,7 +208,7 @@ final class DeleteServerAction
             $credential = $server->providerCredential;
             if ($credential) {
                 try {
-                    $aws = new AwsEc2Service($credential, $server->region);
+                    $aws = app(AwsEc2ServiceFactory::class)->make($credential, $server->region);
                     $aws->terminateInstances($server->provider_id);
                     $keyName = $server->meta['key_name'] ?? null;
                     if ($keyName) {

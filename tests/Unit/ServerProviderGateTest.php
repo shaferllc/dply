@@ -3,13 +3,18 @@
 namespace Tests\Unit\ServerProviderGateTest;
 
 use App\Support\ServerProviderGate;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-test('defaults enable digitalocean hetzner vultr and custom', function () {
+uses(RefreshDatabase::class);
+usesFeatures('provider.vultr', 'provider.upcloud', 'provider.linode');
+
+test('defaults enable digitalocean hetzner vultr linode upcloud and custom', function () {
     expect(ServerProviderGate::enabled('digitalocean'))->toBeTrue();
     expect(ServerProviderGate::enabled('hetzner'))->toBeTrue();
     expect(ServerProviderGate::enabled('vultr'))->toBeTrue();
+    expect(ServerProviderGate::enabled('linode'))->toBeTrue();
+    expect(ServerProviderGate::enabled('upcloud'))->toBeTrue();
     expect(ServerProviderGate::enabled('custom'))->toBeTrue();
-    expect(ServerProviderGate::enabled('linode'))->toBeFalse();
 });
 
 test('default server create type respects flags', function () {

@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\File;
 use Throwable;
 
 class BuildEdgeSiteJob implements ShouldQueue
@@ -52,6 +53,14 @@ class BuildEdgeSiteJob implements ShouldQueue
         try {
             $repoUrl = str_contains($repo, '://') ? $repo : 'https://github.com/'.$repo.'.git';
             $artifactDir = $runner->build($deployment, $repoUrl, $branch, $buildCommand, $outputDir);
+
+            if (! Site::query()->whereKey($site->id)->exists()) {
+                if (is_dir($artifactDir) && str_contains($artifactDir, sys_get_temp_dir())) {
+                    File::deleteDirectory(dirname($artifactDir));
+                }
+
+                return;
+            }
 
             PublishEdgeDeploymentJob::dispatch($deployment->id, $artifactDir);
         } catch (Throwable $e) {

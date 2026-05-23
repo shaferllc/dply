@@ -2,6 +2,7 @@
 
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\CloudPollStatusCommand;
+use App\Console\Commands\CollectEdgeUsageCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
@@ -111,6 +112,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(ServerlessTickCommand::class)
             ->everyMinute()
             ->withoutOverlapping();
+
+        $schedule->command(CollectEdgeUsageCommand::class)->dailyAt('02:00');
 
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 

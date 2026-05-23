@@ -336,7 +336,9 @@ class Show extends Component
             ->where('status', Server::STATUS_READY)
             ->where('created_at', '<=', now()->subDays($minAge))
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->reject(fn (Server $server): bool => $server->isManagedProductHost())
+            ->values();
     }
 
     /**
@@ -357,6 +359,12 @@ class Show extends Component
             ->reject(fn (Server $s) => in_array($s->id, $billableIds, true))
             ->map(function (Server $server) use ($cutoff, $minAge): array {
                 $reason = match (true) {
+                    $server->isManagedProductHost() => match (true) {
+                        $server->isDplyCloudHost() => __('Billed as dply Cloud app'),
+                        $server->isDplyEdgeHost() => __('Billed as dply Edge site'),
+                        $server->isServerlessHost() => __('Billed as serverless function'),
+                        default => __('Billed as managed product'),
+                    },
                     $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
                     $server->created_at !== null && $server->created_at->gt($cutoff) => __('Under the :days-day billable threshold', ['days' => $minAge]),
                     default => __('Excluded'),
@@ -403,7 +411,76 @@ class Show extends Component
             ];
         }
 
+        if ($state->serverlessCount > 0) {
+            $unit = (int) config('subscription.standard.serverless_cents', 200);
+            $items[] = [
+                'label' => __('dply serverless function'),
+                'quantity' => $state->serverlessCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->serverlessSubtotalCents,
+            ];
+        }
+
+        if ($state->cloudCount > 0) {
+            $unit = (int) config('subscription.standard.cloud_cents', 500);
+            $items[] = [
+                'label' => __('dply Cloud app'),
+                'quantity' => $state->cloudCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->cloudSubtotalCents,
+            ];
+        }
+
+        if ($state->edgeCount > 0) {
+            $unit = (int) config('subscription.standard.edge_cents', 200);
+            $items[] = [
+                'label' => __('dply Edge site'),
+                'quantity' => $state->edgeCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->edgeSubtotalCents,
+            ];
+        }
+
+        if ($state->edgeUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply Edge delivery usage'),
+                'quantity' => 1,
+                'unit_cents' => $state->edgeUsageSubtotalCents,
+                'line_cents' => $state->edgeUsageSubtotalCents,
+                'detail' => $this->formatEdgeUsageDetail($state->edgeUsageEstimate),
+            ];
+        }
+
         return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $estimate
+     */
+    private function formatEdgeUsageDetail(array $estimate): ?string
+    {
+        $requests = (int) ($estimate['requests'] ?? 0);
+        $egress = (int) ($estimate['bytes_egress'] ?? 0);
+
+        if ($requests === 0 && $egress === 0) {
+            return null;
+        }
+
+        $parts = [];
+        if ($requests > 0) {
+            $parts[] = number_format($requests).' '.__('requests');
+        }
+        if ($egress > 0) {
+            $parts[] = number_format($egress / (1024 ** 3), 2).' GB '.__('egress');
+        }
+
+        $periodStart = (string) ($estimate['period_start'] ?? '');
+        $periodEnd = (string) ($estimate['period_end'] ?? '');
+        if ($periodStart !== '' && $periodEnd !== '') {
+            $parts[] = $periodStart.' → '.$periodEnd;
+        }
+
+        return implode(' · ', $parts);
     }
 
     public function getYearlyTotalCentsProperty(): int

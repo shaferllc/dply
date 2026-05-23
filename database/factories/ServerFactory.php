@@ -61,12 +61,48 @@ class ServerFactory extends Factory
         ]);
     }
 
+    public function linode(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Linode,
+            'region' => 'us-east',
+            'size' => 'g6-nanode-1',
+        ]);
+    }
+
     public function vultr(): static
     {
         return $this->state(fn (array $attributes) => [
             'provider' => ServerProvider::Vultr,
             'region' => 'ewr',
             'size' => 'vc2-1c-1gb',
+        ]);
+    }
+
+    public function upcloud(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::UpCloud,
+            'region' => 'fi-hel1',
+            'size' => '1xCPU-1GB',
+        ]);
+    }
+
+    public function aws(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Aws,
+            'region' => 'us-east-1',
+            'size' => 't3.micro',
+        ]);
+    }
+
+    public function scaleway(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Scaleway,
+            'region' => 'fr-par-1',
+            'size' => 'DEV1-S',
         ]);
     }
 }

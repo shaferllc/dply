@@ -161,6 +161,7 @@ class Site extends Model
         'container_region',
         'edge_backend',
         'edge_backend_id',
+        'edge_provider_credential_id',
         'meta',
     ];
 
@@ -351,6 +352,25 @@ class Site extends Model
     public function dnsProviderCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class, 'dns_provider_credential_id');
+    }
+
+    public function edgeProviderCredential(): BelongsTo
+    {
+        return $this->belongsTo(ProviderCredential::class, 'edge_provider_credential_id');
+    }
+
+    public function usesOrgCloudflareEdge(): bool
+    {
+        return $this->edge_backend === 'org_cloudflare';
+    }
+
+    public function edgeBackendLabel(): string
+    {
+        return match ($this->edge_backend) {
+            'org_cloudflare' => __('Your Cloudflare account'),
+            'dply_edge' => __('Dply Edge (managed)'),
+            default => (string) ($this->edge_backend ?: __('Unknown')),
+        };
     }
 
     /**
@@ -799,6 +819,8 @@ class Site extends Model
                 self::STATUS_CONTAINER_ACTIVE,
                 self::STATUS_CONTAINER_FAILED,
                 self::STATUS_CUSTOM_ACTIVE,
+                self::STATUS_EDGE_ACTIVE,
+                self::STATUS_EDGE_FAILED,
             ], true);
     }
 
@@ -1209,14 +1231,28 @@ class Site extends Model
         }
 
         $testingDomain = (string) (config('edge.testing_domains')[0] ?? 'dply.host');
-        $slug = (string) ($this->slug ?: Str::slug((string) $this->name));
+        $slug = (string) ($this->slug ?: Str::slug((string) $this->name)) ?: 'site';
+        $suffix = substr(strtolower((string) $this->id), -6);
 
-        return strtolower($slug.'.'.$testingDomain);
+        return strtolower($slug.'-'.$suffix.'.'.$testingDomain);
     }
 
     public function isEdgePreview(): bool
     {
         $parentId = $this->edgeMeta()['preview_parent_site_id'] ?? null;
+
+        return is_string($parentId) && $parentId !== '';
+    }
+
+    public function isDplyCloudSite(): bool
+    {
+        return $this->container_backend === 'dply_cloud';
+    }
+
+    public function isCloudPreview(): bool
+    {
+        $container = is_array($this->meta['container'] ?? null) ? $this->meta['container'] : [];
+        $parentId = $container['preview_parent_site_id'] ?? null;
 
         return is_string($parentId) && $parentId !== '';
     }

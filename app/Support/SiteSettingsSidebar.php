@@ -19,6 +19,10 @@ final class SiteSettingsSidebar
      */
     public static function items(Site $site, Server $server): array
     {
+        if ($site->usesEdgeRuntime()) {
+            return self::edgeItems($site);
+        }
+
         $supportsSsh = $server->hostCapabilities()->supportsSsh();
 
         if ($site->isCustom()) {
@@ -202,6 +206,34 @@ final class SiteSettingsSidebar
             ...$background,
             ...array_slice($items, $insertIndex),
         ];
+    }
+
+    /**
+     * Edge-native workspace — git builds, CDN delivery, custom domains.
+     * No VM runtime, SSH, nginx, or certificate automation tabs.
+     *
+     * @return list<array{id: string, label: string, icon: string, group: string}>
+     */
+    private static function edgeItems(Site $site): array
+    {
+        $edgeMeta = $site->edgeMeta();
+        $isPreviewChild = ! empty($edgeMeta['preview_parent_site_id']);
+
+        $items = [
+            ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
+            ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
+            ['id' => 'edge-domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
+            ['id' => 'edge-build', 'label' => __('Build settings'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
+        ];
+
+        if (! $isPreviewChild) {
+            $items[] = ['id' => 'edge-previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-sparkles', 'group' => 'deploy'];
+        }
+
+        $items[] = ['id' => 'edge-logs', 'label' => __('Logs & activity'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'];
+        $items[] = ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'danger'];
+
+        return $items;
     }
 
     /**

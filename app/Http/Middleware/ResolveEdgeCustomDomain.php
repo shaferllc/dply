@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Http\Controllers\EdgeStaticDevController;
 use App\Models\Site;
+use App\Services\Edge\FakeEdgeBackend;
 use App\Support\Edge\FakeEdgeProvision;
 use Closure;
 use Illuminate\Http\Request;
@@ -44,7 +45,48 @@ class ResolveEdgeCustomDomain
             return $next($request);
         }
 
-        return app(EdgeStaticDevController::class)->__invoke($request, ltrim($request->path(), '/'));
+        $routing = $this->resolveRouting($host, $site);
+        if ($routing === null) {
+            return $next($request);
+        }
+
+        $request->attributes->set('edge.routing', $routing);
+
+        $path = ltrim($request->path(), '/');
+
+        return app(EdgeStaticDevController::class)->__invoke(
+            $request,
+            (string) $site->slug,
+            $path !== '' ? $path : null,
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveRouting(string $host, Site $site): ?array
+    {
+        $map = Cache::get('edge:fake:host-map', []);
+        $routing = $map[$host] ?? null;
+
+        if (is_array($routing) && ($routing['storage_prefix'] ?? '') !== '') {
+            return $routing;
+        }
+
+        $backend = app(FakeEdgeBackend::class);
+        $deployment = $backend->resolveActiveDeployment($site);
+        if ($deployment === null) {
+            return null;
+        }
+
+        $edgeRouting = is_array($site->edgeMeta()['routing'] ?? null) ? $site->edgeMeta()['routing'] : [];
+
+        return [
+            'storage_prefix' => $deployment->storage_prefix,
+            'deployment_id' => $deployment->id,
+            'spa_fallback' => (bool) ($edgeRouting['spa_fallback'] ?? true),
+            'headers' => is_array($edgeRouting['headers'] ?? null) ? $edgeRouting['headers'] : [],
+        ];
     }
 
     public static function invalidateHostMap(): void

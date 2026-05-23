@@ -109,7 +109,10 @@ class Index extends Component
                     ['id' => 'hetzner', 'label' => 'Hetzner'],
                     ['id' => 'linode', 'label' => 'Linode'],
                     ['id' => 'vultr', 'label' => 'Vultr'],
+                    ['id' => 'upcloud', 'label' => 'UpCloud'],
+                    ['id' => 'scaleway', 'label' => 'Scaleway'],
                     ['id' => 'akamai', 'label' => __('Akamai (Linode API)')],
+                    ['id' => 'equinix_metal', 'label' => 'Equinix Metal'],
                 ],
             ],
             [
@@ -122,11 +125,8 @@ class Index extends Component
                 ],
             ],
             [
-                'label' => __('Infrastructure'),
+                'label' => __('Other providers'),
                 'items' => [
-                    ['id' => 'equinix_metal', 'label' => 'Equinix Metal'],
-                    ['id' => 'upcloud', 'label' => 'UpCloud'],
-                    ['id' => 'scaleway', 'label' => 'Scaleway'],
                     ['id' => 'ovh', 'label' => __('OVH Public Cloud')],
                     ['id' => 'rackspace', 'label' => __('Rackspace (OpenStack)')],
                 ],

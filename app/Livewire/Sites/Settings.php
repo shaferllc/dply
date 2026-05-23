@@ -53,6 +53,7 @@ use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -397,7 +398,9 @@ class Settings extends Show
             return;
         }
 
-        $allowed = array_keys(config('site_settings.workspace_tabs', []));
+        $allowed = $site->usesEdgeRuntime()
+            ? array_column(SiteSettingsSidebar::items($site, $server), 'id')
+            : array_keys(config('site_settings.workspace_tabs', []));
 
         if (! in_array($section, $allowed, true)) {
             abort(404);
@@ -3209,7 +3212,10 @@ class Settings extends Show
         $shared = ['certificates', 'certificates.previewDomain'];
 
         $sectionRelations = match ($section) {
-            'general' => ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
+            'general' => $this->site->usesEdgeRuntime()
+                ? ['edgeDeployments', 'workspace']
+                : ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
+            'edge-deploys', 'edge-logs', 'edge-domains', 'edge-build', 'edge-previews' => ['edgeDeployments'],
             'settings' => ['workspace', 'workspace.variables'],
             'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains'],
             'dns' => ['dnsProviderCredential', 'domains', 'previewDomains'],

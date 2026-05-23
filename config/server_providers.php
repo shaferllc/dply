@@ -12,11 +12,11 @@ return [
         'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true), // https://www.digitalocean.com/products/kubernetes/
         'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false), // https://www.digitalocean.com/products/app-platform/
         'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', true), // https://www.hetzner.com/cloud
-        'linode' => env('DPLY_SERVER_PROVIDER_LINODE', false), // https://www.linode.com/
+        'linode' => env('DPLY_SERVER_PROVIDER_LINODE', true), // https://www.linode.com/
         'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', true), // https://www.vultr.com/
         'akamai' => env('DPLY_SERVER_PROVIDER_AKAMAI', false), // https://www.akamai.com/solutions/cloud-computing
-        'scaleway' => env('DPLY_SERVER_PROVIDER_SCALEWAY', false), // https://www.scaleway.com/en/iaas/
-        'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', false), // https://upcloud.com/
+        'scaleway' => env('DPLY_SERVER_PROVIDER_SCALEWAY', true), // https://www.scaleway.com/en/iaas/
+        'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', true), // https://upcloud.com/
         'equinix_metal' => env('DPLY_SERVER_PROVIDER_EQUINIX_METAL', false), // https://metal.equinix.com/
         'ovh' => env('DPLY_SERVER_PROVIDER_OVH', false), // https://www.ovhcloud.com/en/public-cloud/
         'rackspace' => env('DPLY_SERVER_PROVIDER_RACKSPACE', false), // https://www.rackspace.com/cloud
@@ -24,7 +24,7 @@ return [
         'render' => env('DPLY_SERVER_PROVIDER_RENDER', false), // https://render.com/
         'railway' => env('DPLY_SERVER_PROVIDER_RAILWAY', false), // https://railway.app/
         'coolify' => env('DPLY_SERVER_PROVIDER_COOLIFY', false), // https://coolify.io/
-        'aws' => env('DPLY_SERVER_PROVIDER_AWS', false), // https://aws.amazon.com/ec2/
+        'aws' => env('DPLY_SERVER_PROVIDER_AWS', true), // https://aws.amazon.com/ec2/
         'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
         /** DNS / CDN — API token only (not a compute host in v1). */
         'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/

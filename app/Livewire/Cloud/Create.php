@@ -9,6 +9,7 @@ use App\Actions\Cloud\CreateCloudSiteFromSource;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
+use App\Services\Billing\ManagedProductCostEstimator;
 use App\Services\Cloud\AwsAppRunnerBackend;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -341,6 +342,7 @@ class Create extends Component
             'regions' => $this->backendRegions($this->backend),
             'awsSourceReady' => $awsSourceReady,
             'fakeCloudActive' => FakeCloudProvision::enabled(),
+            'cloudFee' => app(ManagedProductCostEstimator::class)->cloudFee(),
         ])->layout('layouts.app');
     }
 }

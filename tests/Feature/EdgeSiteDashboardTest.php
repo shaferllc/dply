@@ -24,9 +24,40 @@ test('dashboard renders edge panel for edge site', function () {
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
-        ->assertSee('Dply Edge')
-        ->assertSee('Static / SSG deployment')
-        ->assertSee('acme/web@main');
+        ->assertSee('Edge App')
+        ->assertSee('https://edge-app.dply.host')
+        ->assertSee('acme/web@main')
+        ->assertDontSee('{{ $edgeBranch }}')
+        ->assertSee('Redeploy')
+        ->assertSee('acme/web');
+});
+
+test('dashboard shows fake edge banner when fake mode enabled', function () {
+    config(['edge.fake.enabled' => true]);
+    [$user, $server, $site] = makeEdgeSite();
+
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->assertSee('Fake edge — not Cloudflare Worker')
+        ->assertSee('Dply Edge (local fake backend)');
+});
+
+test('dashboard shows cloudflare delivery label when platform configured', function () {
+    config([
+        'edge.fake.enabled' => false,
+        'edge.r2.bucket' => 'dply-edge',
+        'edge.r2.key' => 'access',
+        'edge.r2.secret' => 'secret',
+        'edge.cloudflare.account_id' => 'acct',
+        'edge.cloudflare.api_token' => 'token',
+        'edge.cloudflare.kv_namespace_id' => 'kv',
+    ]);
+    [$user, $server, $site] = makeEdgeSite();
+
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->assertSee('Dply Edge (Cloudflare Worker)')
+        ->assertSee('Live on Cloudflare Edge');
 });
 
 test('redeploy button dispatches build job', function () {
@@ -60,7 +91,7 @@ test('panel does not render for non edge site', function () {
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site]))
         ->assertOk()
-        ->assertDontSee('Dply Edge');
+        ->assertDontSee('Delete Edge site');
 });
 
 test('preview teardown dispatches job', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sites;
 
+use App\Actions\Edge\RedeployEdgeSite;
 use App\Enums\SiteRedirectKind;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AttachCloudDomainJob;
@@ -15,6 +16,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\ManagesEdgeSite;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
@@ -36,6 +38,7 @@ use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
+use App\Services\Edge\EdgeSiteCanceller;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ServerPhpManager;
@@ -66,6 +69,7 @@ class Show extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesEdgeSite;
     use ManagesServerlessRuntime;
 
     public Server $server;
@@ -670,6 +674,21 @@ class Show extends Component
             return;
         }
 
+        if ($this->site->usesEdgeRuntime()) {
+            try {
+                (new RedeployEdgeSite)->handle($this->site->fresh());
+            } catch (\Throwable $e) {
+                $this->toastError($e->getMessage());
+
+                return;
+            }
+
+            $this->site->refresh();
+            $this->toastSuccess(__('Edge build queued again.'));
+
+            return;
+        }
+
         $this->site->status = Site::STATUS_PENDING;
         $this->site->save();
 
@@ -684,6 +703,19 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
 
+        if ($this->site->usesEdgeRuntime()) {
+            $this->openConfirmActionModal(
+                'cancelProvisioning',
+                [],
+                __('Cancel Edge build?'),
+                __('This stops the build, removes any partial deployment from the edge network, and deletes the pending site. If you cancel this dialog, the build keeps running.'),
+                __('Cancel and remove site'),
+                true,
+            );
+
+            return;
+        }
+
         $this->openConfirmActionModal(
             'cancelProvisioning',
             [],
@@ -694,7 +726,7 @@ class Show extends Component
         );
     }
 
-    public function cancelProvisioning(SiteProvisioningCanceller $canceller): void
+    public function cancelProvisioning(SiteProvisioningCanceller $canceller, EdgeSiteCanceller $edgeCanceller): void
     {
         $this->authorize('update', $this->site);
 
@@ -707,6 +739,13 @@ class Show extends Component
         }
 
         try {
+            if ($this->site->usesEdgeRuntime()) {
+                $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
+                $this->redirect(route('edge.index'), navigate: true);
+
+                return;
+            }
+
             $canceller->cancel($this->site->fresh(['server', 'domains']));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -2726,6 +2765,10 @@ class Show extends Component
             } else {
                 $relations['deployments'] = fn ($q) => $q->limit(1);
             }
+        }
+
+        if ($this->site->usesEdgeRuntime()) {
+            $relations['edgeDeployments'] = fn ($q) => $q->limit($ready ? 10 : 1);
         }
 
         $this->site->load($relations);

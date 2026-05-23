@@ -76,9 +76,6 @@ class LinodeService
     }
 
     /**
-     * Get public IPv4 from instance (first ipv4 address).
-     */
-    /**
      * Get public IPv4 from instance. Linode may return ipv4 as array of strings or nested.
      */
     public static function getPublicIp(array $instance): ?string

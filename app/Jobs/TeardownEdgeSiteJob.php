@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Server;
 use App\Models\Site;
 use App\Services\Edge\EdgeRouter;
 use Illuminate\Bus\Queueable;
@@ -28,11 +29,29 @@ class TeardownEdgeSiteJob implements ShouldQueue
             return;
         }
 
+        $server = $site->server;
+        $serverId = $site->server_id;
+
         $backend = EdgeRouter::backendFor($site);
         $site->load('edgeDeployments');
         $backend?->unpublish($site);
 
         $site->edgeDeployments()->delete();
         $site->delete();
+
+        $this->deleteOrphanedEdgeServer($serverId, $server);
+    }
+
+    private function deleteOrphanedEdgeServer(?string $serverId, ?Server $server): void
+    {
+        if ($serverId === null || $server === null || ! $server->isDplyEdgeHost()) {
+            return;
+        }
+
+        if (Site::query()->where('server_id', $serverId)->exists()) {
+            return;
+        }
+
+        $server->delete();
     }
 }

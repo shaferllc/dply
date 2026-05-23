@@ -50,16 +50,13 @@ class StripeSubscriptionSyncer
             }
         }
 
-        // Serverless functions — a flat per-function line item, reconciled
-        // the same way as a tier.
-        $serverlessPriceId = $this->serverlessPriceIdForSubscription($subscription);
-        if ($serverlessPriceId !== '') {
-            $current = $this->currentQuantity($subscription, $serverlessPriceId);
-            $change = $this->applyDelta($subscription, $serverlessPriceId, $current, $desired->serverlessCount);
-            if ($change !== null) {
-                $changes[] = ['tier' => 'serverless'] + $change;
-            }
-        }
+        // Serverless functions — flat per-function line item.
+        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'serverless', $desired->serverlessCount);
+
+        // dply Cloud + Edge — flat per live site.
+        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'cloud', $desired->cloudCount);
+        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeCount);
+        $this->reconcileEdgeUsageLine($subscription, $desired, $changes);
 
         if ($changes !== []) {
             Log::info('billing.stripe.subscription_synced', [
@@ -140,12 +137,55 @@ class StripeSubscriptionSyncer
     }
 
     /**
-     * The serverless line-item price ID matching the subscription's interval.
-     * Empty string when serverless pricing isn't configured.
+     * @param  array<int, array<string, mixed>>  $changes
      */
-    private function serverlessPriceIdForSubscription(Subscription $subscription): string
+    private function reconcileManagedProductLine(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+        string $product,
+        int $desiredQty,
+    ): void {
+        $priceId = $this->managedProductPriceIdForSubscription($subscription, $product);
+        if ($priceId === '') {
+            return;
+        }
+
+        $current = $this->currentQuantity($subscription, $priceId);
+        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => $product] + $change;
+        }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function reconcileEdgeUsageLine(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        if ($this->isYearly($subscription)) {
+            return;
+        }
+
+        $priceId = (string) (config('subscription.standard.stripe.edge_usage') ?? '');
+        if ($priceId === '') {
+            return;
+        }
+
+        $desiredQty = max(0, $desired->edgeUsageSubtotalCents);
+        $current = $this->currentQuantity($subscription, $priceId);
+        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => 'edge_usage'] + $change;
+        }
+    }
+
+    private function managedProductPriceIdForSubscription(Subscription $subscription, string $product): string
     {
-        $key = $this->isYearly($subscription) ? 'serverless_yearly' : 'serverless';
+        $key = $this->isYearly($subscription) ? $product.'_yearly' : $product;
 
         return (string) (config('subscription.standard.stripe.'.$key) ?? '');
     }

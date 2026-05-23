@@ -15,6 +15,22 @@ test('login screen can be rendered', function () {
     $response->assertStatus(200);
 });
 
+test('local login screen shows quick login button', function () {
+    config()->set('app.env', 'local');
+
+    $this->get('/login')
+        ->assertOk()
+        ->assertSee('Quick login as TJ', false);
+});
+
+test('production login screen hides quick login button', function () {
+    config()->set('app.env', 'production');
+
+    $this->get('/login')
+        ->assertOk()
+        ->assertDontSee('Quick login as TJ', false);
+});
+
 test('users can authenticate using the login screen', function () {
     $user = User::factory()->create();
 

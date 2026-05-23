@@ -40,6 +40,11 @@ return [
         'api_token' => env('DPLY_EDGE_CF_API_TOKEN'),
         'kv_namespace_id' => env('DPLY_EDGE_CF_KV_NAMESPACE_ID'),
         'worker_script_name' => env('DPLY_EDGE_CF_WORKER_SCRIPT', 'dply-edge'),
+        'worker_zone_name' => env('DPLY_EDGE_CF_ZONE_NAME'),
+        'worker_routes' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('DPLY_EDGE_CF_WORKER_ROUTES', '*.dply.host/*'))
+        ))),
     ],
 
     /*
@@ -65,6 +70,19 @@ return [
     ))),
 
     'default_backend' => 'dply_edge',
+
+    /*
+    | Edge delivery backends. Platform `dply_edge` is default; `org_cloudflare` uses
+    | an org-linked Cloudflare credential bootstrapped via dply:edge:bootstrap-org.
+    */
+    'backends' => [
+        'dply_edge' => [
+            'label' => 'Dply Edge (managed)',
+        ],
+        'org_cloudflare' => [
+            'label' => 'Your Cloudflare account',
+        ],
+    ],
 
     /*
     | Laravel filesystem disk name for Edge R2 uploads.

@@ -68,12 +68,14 @@
                         </span>
                     </div>
                     <span class="mt-4 block text-base font-semibold text-brand-ink">{{ __('Provision with a provider') }}</span>
-                    <span class="mt-1.5 block text-sm leading-relaxed text-brand-moss">{{ __('We talk to DigitalOcean, AWS, Hetzner and friends, then bring up a fresh VM ready for your stack.') }}</span>
+                    <span class="mt-1.5 block text-sm leading-relaxed text-brand-moss">{{ __('We talk to DigitalOcean, AWS, Hetzner, Vultr, Linode and friends, then bring up a fresh VM ready for your stack.') }}</span>
                     <div class="mt-4 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss/80">
                         <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('DigitalOcean') }}</span>
                         <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('AWS') }}</span>
                         <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('Hetzner') }}</span>
-                        <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('+5 more') }}</span>
+                        <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('Vultr') }}</span>
+                        <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('Linode') }}</span>
+                        <span class="rounded-full bg-brand-ink/[0.04] px-2 py-0.5 ring-1 ring-brand-ink/[0.06]">{{ __('+3 more') }}</span>
                     </div>
                 </button>
 

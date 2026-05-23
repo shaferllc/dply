@@ -4,7 +4,9 @@ namespace App\Livewire\Concerns;
 
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
+use App\Services\AwsEc2ServiceFactory;
 use App\Services\Cloudflare\CloudflareDnsService;
+use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
@@ -15,6 +17,7 @@ use App\Services\LinodeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
+use App\Support\Edge\EdgeOrgCredentialConfig;
 use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials
@@ -637,7 +640,7 @@ trait ManagesProviderCredentials
             'credentials' => ['access_key_id' => $this->aws_access_key_id, 'secret_access_key' => $this->aws_secret_access_key],
         ]);
         try {
-            $aws = new AwsEc2Service($credential);
+            $aws = app(AwsEc2ServiceFactory::class)->make($credential);
             $aws->validateCredentials();
         } catch (\Throwable $e) {
             $credential->delete();
@@ -815,6 +818,10 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
+                if (($this->capability ?? null) === 'cdn') {
+                    $accountId = (new CloudflareEdgeCredentialValidator)->validate($credential);
+                    EdgeOrgCredentialConfig::merge($credential, ['account_id' => $accountId]);
+                }
             } elseif ($provider === 'ploi') {
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
@@ -871,7 +878,9 @@ trait ManagesProviderCredentials
             match ($credential->provider) {
                 // Light GET /account — confirms the token works (same check as when connecting).
                 'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
-                'cloudflare' => (new CloudflareDnsService($credential))->verifyToken(),
+                'cloudflare' => EdgeOrgCredentialConfig::isBootstrapped($credential)
+                    ? (new CloudflareEdgeCredentialValidator)->validate($credential)
+                    : (new CloudflareDnsService($credential))->verifyToken(),
                 'hetzner' => (new HetznerService($credential))->validateToken(),
                 'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
                 'vultr' => (new VultrService($credential))->validateToken(),

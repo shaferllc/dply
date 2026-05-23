@@ -24,6 +24,10 @@ beforeEach(function () {
         'base_yearly' => 'price_base_yearly',
         'serverless' => 'price_serverless',
         'serverless_yearly' => 'price_serverless_y',
+        'cloud' => 'price_cloud',
+        'cloud_yearly' => 'price_cloud_y',
+        'edge' => 'price_edge',
+        'edge_yearly' => 'price_edge_y',
         'tiers' => [
             'xs' => 'price_tier_xs',
             's' => 'price_tier_s',
@@ -152,6 +156,27 @@ test('serverless functions add an interval aware line item', function () {
 
     $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
     $this->assertContainsEquals(['price' => 'price_serverless_y', 'quantity' => 3], $yearly);
+});
+
+test('cloud and edge sites add interval aware line items', function () {
+    $desired = DesiredBillingState::fromCounts(
+        tierQuantities: [],
+        baseCents: 1500,
+        creditCents: 0,
+        tierPricesCents: ['xs' => 200],
+        cloudCount: 2,
+        cloudUnitCents: 500,
+        edgeCount: 4,
+        edgeUnitCents: 200,
+    );
+
+    $monthly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_MONTH);
+    $this->assertContainsEquals(['price' => 'price_cloud', 'quantity' => 2], $monthly);
+    $this->assertContainsEquals(['price' => 'price_edge', 'quantity' => 4], $monthly);
+
+    $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
+    $this->assertContainsEquals(['price' => 'price_cloud_y', 'quantity' => 2], $yearly);
+    $this->assertContainsEquals(['price' => 'price_edge_y', 'quantity' => 4], $yearly);
 });
 
 test('no serverless line item when count is zero', function () {
