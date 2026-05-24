@@ -1,22 +1,19 @@
 <?php
 
+use App\Console\Commands\CdnSyncMetricsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
-use App\Console\Commands\CloudPollStatusCommand;
-use App\Console\Commands\CollectEdgeUsageCommand;
+use App\Console\Commands\EdgePollStatusCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
-use App\Console\Commands\PruneEdgeAnalyticsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
-use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\ServerlessTickCommand;
-use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
@@ -118,7 +115,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyMinute()
             ->withoutOverlapping();
 
-        $schedule->command(CollectEdgeUsageCommand::class)->dailyAt('02:00');
+        $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         $schedule->call(function (): void {
             Artisan::call('dply:edge:collect-usage', [
@@ -138,7 +135,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
-        $schedule->command(PruneEdgeAnalyticsCommand::class)->dailyAt('03:55');
         // Q17 trust-window enforcement: revoke ephemeral SSH keys for migrations
         // paused beyond 168h. Hourly cadence so the trust window doesn't quietly
         // extend during scheduler downtime.
@@ -147,6 +143,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()
             ->when(fn (): bool => (bool) config('dply.supervisor_health_check_enabled', true));
+
+        $schedule->command(CdnSyncMetricsCommand::class, ['--all-enabled'])
+            ->hourly()
+            ->withoutOverlapping();
 
         $schedule->command(ProcessSshKeyRotationRemindersCommand::class)->dailyAt('08:30');
 

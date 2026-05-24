@@ -2268,6 +2268,17 @@ class Site extends Model
      *
      * @return array<string, mixed>
      */
+    /**
+     * @return array<string, mixed>
+     */
+    public function cdnConfig(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $cdn = $meta['cdn'] ?? null;
+
+        return is_array($cdn) ? $cdn : [];
+    }
+
     public function cachingConfig(): array
     {
         $meta = is_array($this->meta) ? $this->meta : [];
