@@ -274,34 +274,85 @@ class CloudflareCdnService
      * window. Returns a flat snapshot (totals only, no timeseries) so the
      * caller can persist it without parsing a nested payload.
      *
-     * Uses the legacy `/analytics/dashboard` REST endpoint — broader plan
-     * coverage than the GraphQL analytics API and one round trip. Free
-     * plans receive 24h windows only; tighter windows silently widen.
+     * Uses Cloudflare's GraphQL Analytics API — the legacy
+     * `/analytics/dashboard` REST endpoint is being sunset. We sum the
+     * hourly `httpRequests1hGroups` buckets to get a window total; the
+     * GraphQL schema returns hourly granularity for windows ≥ 1h and the
+     * caller is responsible for clamping `sinceMinutes` accordingly
+     * (the default of 1440 ⇒ 24 buckets).
      *
      * @return array{requests_all: int, requests_cached: int, bandwidth_all: int, bandwidth_cached: int, since_minutes: int}
      */
     public function fetchDashboardAnalytics(string $zoneId, int $sinceMinutes = 1440): array
     {
-        $response = $this->request('get', '/zones/'.$zoneId.'/analytics/dashboard', [
-            'since' => '-'.$sinceMinutes,
-            'until' => '0',
-            'continuous' => 'true',
-        ]);
-        $this->assertApiSuccess($response, 'fetch Cloudflare analytics');
+        // Cloudflare's GraphQL Analytics expects ISO-8601 timestamps; align
+        // the window to the previous full hour so the same query keeps
+        // returning the same answer when re-run within the same minute.
+        $until = now()->startOfHour();
+        $since = $until->copy()->subMinutes($sinceMinutes);
 
-        $totals = $response->json('result.totals');
-        if (! is_array($totals)) {
-            throw new \RuntimeException('Cloudflare analytics response missing totals.');
+        $query = <<<'GQL'
+        query($zoneTag: string!, $since: Time!, $until: Time!) {
+          viewer {
+            zones(filter: {zoneTag: $zoneTag}) {
+              httpRequests1hGroups(
+                limit: 10000,
+                filter: {datetime_geq: $since, datetime_lt: $until}
+              ) {
+                sum {
+                  requests
+                  cachedRequests
+                  bytes
+                  cachedBytes
+                }
+              }
+            }
+          }
+        }
+        GQL;
+
+        $response = $this->request('post', '/graphql', [
+            'query' => $query,
+            'variables' => [
+                'zoneTag' => $zoneId,
+                'since' => $since->toIso8601String(),
+                'until' => $until->toIso8601String(),
+            ],
+        ]);
+        if (! $response->successful()) {
+            $message = $response->json('errors.0.message')
+                ?? $response->body()
+                ?: $response->reason();
+
+            throw new \RuntimeException("Failed to fetch Cloudflare analytics: {$message}");
         }
 
-        $requests = is_array($totals['requests'] ?? null) ? $totals['requests'] : [];
-        $bandwidth = is_array($totals['bandwidth'] ?? null) ? $totals['bandwidth'] : [];
+        $errors = $response->json('errors');
+        if (is_array($errors) && $errors !== []) {
+            $first = $errors[0] ?? [];
+            $msg = is_array($first) ? ($first['message'] ?? json_encode($errors)) : json_encode($errors);
+
+            throw new \RuntimeException("Failed to fetch Cloudflare analytics: {$msg}");
+        }
+
+        $zones = $response->json('data.viewer.zones');
+        $groups = is_array($zones) && isset($zones[0]['httpRequests1hGroups']) && is_array($zones[0]['httpRequests1hGroups'])
+            ? $zones[0]['httpRequests1hGroups']
+            : [];
+
+        $totals = ['requests' => 0, 'cachedRequests' => 0, 'bytes' => 0, 'cachedBytes' => 0];
+        foreach ($groups as $group) {
+            $sum = is_array($group) && is_array($group['sum'] ?? null) ? $group['sum'] : [];
+            foreach ($totals as $key => $_) {
+                $totals[$key] += (int) ($sum[$key] ?? 0);
+            }
+        }
 
         return [
-            'requests_all' => (int) ($requests['all'] ?? 0),
-            'requests_cached' => (int) ($requests['cached'] ?? 0),
-            'bandwidth_all' => (int) ($bandwidth['all'] ?? 0),
-            'bandwidth_cached' => (int) ($bandwidth['cached'] ?? 0),
+            'requests_all' => $totals['requests'],
+            'requests_cached' => $totals['cachedRequests'],
+            'bandwidth_all' => $totals['bytes'],
+            'bandwidth_cached' => $totals['cachedBytes'],
             'since_minutes' => $sinceMinutes,
         ];
     }

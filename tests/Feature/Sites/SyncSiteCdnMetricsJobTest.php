@@ -48,12 +48,10 @@ function seedMetricsSite(array $cdnOverrides = []): array
 
 test('persists totals, derived hit rate, and polled timestamp', function () {
     Http::fake([
-        'https://api.cloudflare.com/client/v4/zones/zone-1/analytics/dashboard*' => Http::response([
-            'success' => true,
-            'result' => ['totals' => [
-                'requests' => ['all' => 2000, 'cached' => 1500],
-                'bandwidth' => ['all' => 10_000_000, 'cached' => 7_500_000],
-            ]],
+        'https://api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => ['viewer' => ['zones' => [['httpRequests1hGroups' => [
+                ['sum' => ['requests' => 2000, 'cachedRequests' => 1500, 'bytes' => 10_000_000, 'cachedBytes' => 7_500_000]],
+            ]]]]],
         ]),
     ]);
 
@@ -71,12 +69,8 @@ test('persists totals, derived hit rate, and polled timestamp', function () {
 
 test('hit rate is null when there are zero requests', function () {
     Http::fake([
-        'https://api.cloudflare.com/client/v4/zones/zone-1/analytics/dashboard*' => Http::response([
-            'success' => true,
-            'result' => ['totals' => [
-                'requests' => ['all' => 0, 'cached' => 0],
-                'bandwidth' => ['all' => 0, 'cached' => 0],
-            ]],
+        'https://api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => ['viewer' => ['zones' => [['httpRequests1hGroups' => []]]]],
         ]),
     ]);
 
@@ -107,8 +101,9 @@ test('skips when zone id not resolved yet', function () {
 
 test('records error and rethrows on api failure', function () {
     Http::fake([
-        'https://api.cloudflare.com/client/v4/zones/zone-1/analytics/dashboard*' => Http::response([
-            'success' => false, 'errors' => [['message' => 'plan unsupported']],
+        'https://api.cloudflare.com/client/v4/graphql' => Http::response([
+            'data' => null,
+            'errors' => [['message' => 'plan unsupported']],
         ], 200),
     ]);
 
