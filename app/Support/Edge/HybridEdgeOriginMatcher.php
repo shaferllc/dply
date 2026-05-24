@@ -6,6 +6,7 @@ namespace App\Support\Edge;
 
 use App\Models\Organization;
 use App\Models\Site;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -55,9 +56,9 @@ final class HybridEdgeOriginMatcher
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, Site>
+     * @return Collection<int, Site>
      */
-    private static function orgCloudSites(Organization $organization): \Illuminate\Support\Collection
+    private static function orgCloudSites(Organization $organization): Collection
     {
         return Site::query()
             ->where('organization_id', $organization->id)

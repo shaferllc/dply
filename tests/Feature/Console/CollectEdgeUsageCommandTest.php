@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console\CollectEdgeUsageCommandTest;
 
+use App\Models\EdgeDeployment;
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
@@ -190,10 +191,10 @@ test('collect usage merges r2 metrics into snapshots', function () {
         'meta' => ['edge' => ['routing' => ['hostname' => 'demo.on-dply.site']]],
     ]);
 
-    \App\Models\EdgeDeployment::query()->create([
+    EdgeDeployment::query()->create([
         'site_id' => $site->id,
         'organization_id' => $org->id,
-        'status' => \App\Models\EdgeDeployment::STATUS_LIVE,
+        'status' => EdgeDeployment::STATUS_LIVE,
         'storage_prefix' => 'edge/'.$site->id.'/deploy-1/',
         'meta' => ['artifact_bytes' => 2048],
     ]);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\EdgeCreatePageTest;
 
+use App\Enums\SiteType;
 use App\Livewire\Edge\Create;
 use App\Models\Organization;
 use App\Models\Site;
@@ -11,6 +12,7 @@ use App\Models\SocialAccount;
 use App\Models\User;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use ReflectionMethod;
@@ -50,12 +52,11 @@ test('returns 404 when surface edge inactive', function () {
         ->assertStatus(400);
 });
 
-test('ssr detection auto selects hybrid without origin when no cloud app', function () {
+test('ssr detection auto selects hybrid and name from repo when no cloud app', function () {
     $user = ownerWithOrg();
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
         ->set('detectedPlan', [
@@ -69,6 +70,7 @@ test('ssr detection auto selects hybrid without origin when no cloud app', funct
             $method->invoke($component->instance());
         })
         ->assertSet('runtime_mode', 'hybrid')
+        ->assertSet('name', 'Next App')
         ->assertSet('origin_url', '');
 });
 
@@ -253,7 +255,7 @@ test('does not auto detect for incomplete manual repo slug', function () {
         ->assertSet('detectedPlan', []);
 });
 
-test('ssr without origin shows hybrid stack cta when cloud available', function () {
+test('ssr without origin shows auto provision messaging when cloud available', function () {
     config(['server_provision_fake.env_flag' => true]);
     $user = ownerWithOrg();
 
@@ -262,17 +264,41 @@ test('ssr without origin shows hybrid stack cta when cloud available', function 
         ->set('name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
+        ->set('runtime_mode', 'hybrid')
         ->set('detectedPlan', [
             'framework' => 'next',
             'start_command' => 'next start',
             'build_command' => 'npm run build',
         ])
         ->assertSee('Deploy hybrid stack')
-        ->assertSee('Server-rendered app detected');
+        ->assertSee('provisioned from this repository')
+        ->assertSee('SSR origin');
+});
+
+test('deploy auto provisions hybrid stack when ssr detected and cloud available', function () {
+    Queue::fake();
+    config(['server_provision_fake.env_flag' => true]);
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('runtime_mode', 'hybrid')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+        ])
+        ->call('deploy')
+        ->assertRedirect();
+
+    expect(Site::query()->where('type', SiteType::Container)->count())->toBe(1);
 });
 
 test('deploy hybrid stack redirects to cloud workspace', function () {
-    \Illuminate\Support\Facades\Queue::fake();
+    Queue::fake();
     config(['server_provision_fake.env_flag' => true]);
     $user = ownerWithOrg();
 
@@ -289,12 +315,12 @@ test('deploy hybrid stack redirects to cloud workspace', function () {
         ->call('deployHybridStack')
         ->assertRedirect();
 
-    $cloudSite = Site::query()->where('type', \App\Enums\SiteType::Container)->first();
+    $cloudSite = Site::query()->where('type', SiteType::Container)->first();
     expect($cloudSite)->not->toBeNull();
     expect($cloudSite->meta['container']['hybrid_edge_stack']['status'] ?? null)->toBe('awaiting_origin');
 });
 
-test('hybrid stack cta hidden when origin auto filled', function () {
+test('hybrid stack auto provision hidden when origin auto filled', function () {
     config(['server_provision_fake.env_flag' => true]);
     $user = ownerWithOrg();
     $org = $user->currentOrganization();
@@ -321,12 +347,10 @@ test('hybrid stack cta hidden when origin auto filled', function () {
             'framework' => 'next',
             'start_command' => 'next start',
         ])
-        ->tap(function ($component): void {
-            $method = new ReflectionMethod($component->instance(), 'applyDetectedRuntimePrefills');
-            $method->setAccessible(true);
-            $method->invoke($component->instance());
-        })
-        ->assertDontSee('Deploy hybrid stack');
+        ->set('runtime_mode', 'hybrid')
+        ->assertSet('origin_url', 'https://next-api.ondigitalocean.app')
+        ->assertSee('SSR origin URL')
+        ->assertSee('Deploy edge app');
 });
 
 function ownerWithOrg(): User

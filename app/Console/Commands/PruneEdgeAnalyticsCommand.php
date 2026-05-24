@@ -8,6 +8,8 @@ use App\Models\EdgeAccessLog;
 use App\Models\EdgePerformanceHourly;
 use App\Models\EdgeWebVital;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * Keeps Edge analytics tables bounded.
@@ -41,7 +43,7 @@ class PruneEdgeAnalyticsCommand extends Command
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  Builder<Model>  $query
      */
     private function pruneTable($query, int $keep, int $days): int
     {

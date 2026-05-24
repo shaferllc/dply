@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\Edge\EdgeAnalyticsEngineRollup;
 use App\Services\Edge\EdgeCloudflareClient;
+use App\Services\Edge\EdgePerformanceHourlyRollup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 
@@ -51,7 +52,7 @@ test('analytics engine rollup writes hourly rows by site', function () {
 
     app()->instance(EdgeAnalyticsEngineRollup::class, new EdgeAnalyticsEngineRollup(
         $mockClient,
-        app(\App\Services\Edge\EdgePerformanceHourlyRollup::class),
+        app(EdgePerformanceHourlyRollup::class),
     ));
 
     $this->artisan('dply:edge:rollup-analytics-engine', ['--hours' => 2])->assertOk();

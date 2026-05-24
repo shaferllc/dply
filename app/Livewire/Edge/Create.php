@@ -81,6 +81,10 @@ class Create extends Component
 
     public bool $confirmingHybridStack = false;
 
+    private bool $prefillingOrigin = false;
+
+    private bool $prefillingFromDetection = false;
+
     private string $lastDetectionFingerprint = '';
 
     public function rules(): array
@@ -94,7 +98,7 @@ class Create extends Component
             'spa_fallback' => ['boolean'],
             'deploy_on_push' => ['boolean'],
             'runtime_mode' => ['required', 'in:static,hybrid'],
-            'origin_url' => ['required_if:runtime_mode,hybrid', 'nullable', 'string', 'max:500'],
+            'origin_url' => ['nullable', 'string', 'max:500'],
             'delivery_mode' => ['required', 'in:managed,byo'],
             'edge_provider_credential_id' => ['required_if:delivery_mode,byo', 'nullable', 'string'],
         ];
@@ -231,6 +235,10 @@ class Create extends Component
 
     public function updatedName(): void
     {
+        if ($this->prefillingFromDetection) {
+            return;
+        }
+
         if ($this->runtime_mode === 'hybrid' && ! $this->originUrlTouched) {
             $this->applyHybridOriginSuggestion();
         }
@@ -238,6 +246,10 @@ class Create extends Component
 
     public function updatedRuntimeMode(): void
     {
+        if ($this->prefillingFromDetection) {
+            return;
+        }
+
         $this->runtimeModeTouched = true;
 
         if ($this->runtime_mode === 'hybrid') {
@@ -247,6 +259,10 @@ class Create extends Component
 
     public function updatedOriginUrl(): void
     {
+        if ($this->prefillingOrigin) {
+            return;
+        }
+
         $this->originUrlTouched = true;
     }
 
@@ -254,7 +270,9 @@ class Create extends Component
     {
         if ($value === '') {
             if (! $this->originUrlTouched) {
-                $this->applyHybridOriginSuggestion();
+                $this->prefillingOrigin = true;
+                $this->origin_url = '';
+                $this->prefillingOrigin = false;
             }
 
             return;
@@ -325,8 +343,28 @@ class Create extends Component
             return;
         }
 
+        if (trim($this->name) === '' && trim($this->repo) !== '') {
+            $this->prefillingFromDetection = true;
+            $this->name = $this->defaultNameFromRepo();
+            $this->prefillingFromDetection = false;
+        }
+
+        $this->prefillingFromDetection = true;
         $this->runtime_mode = 'hybrid';
+        $this->prefillingFromDetection = false;
         $this->applyHybridOriginSuggestion();
+    }
+
+    private function defaultNameFromRepo(): string
+    {
+        $repo = HybridEdgeOriginMatcher::normalizeRepo(trim($this->repo));
+        if ($repo === '') {
+            return '';
+        }
+
+        $segment = (string) (array_slice(explode('/', $repo), -1)[0] ?? '');
+
+        return Str::title(str_replace(['-', '_'], ' ', $segment));
     }
 
     private function applyHybridOriginSuggestion(): void
@@ -335,24 +373,46 @@ class Create extends Component
             return;
         }
 
-        $name = trim($this->name);
-        if ($name === '') {
-            $this->origin_url = '';
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $this->prefillingOrigin = true;
+
+        try {
+            $repo = HybridEdgeOriginMatcher::normalizeRepo(trim($this->repo));
+            if ($repo !== '') {
+                $matched = HybridEdgeOriginMatcher::findForRepo($org, $repo);
+                if ($matched !== null) {
+                    $this->origin_cloud_site_id = (string) $matched->id;
+                    $this->origin_url = $matched->containerLiveUrl() ?? '';
+
+                    return;
+                }
+            }
+
+            $name = trim($this->name) ?: $this->defaultNameFromRepo();
+            if ($name === '') {
+                $this->origin_cloud_site_id = '';
+                $this->origin_url = '';
+
+                return;
+            }
+
+            $matched = HybridEdgeOriginMatcher::findForEdgeName($org, $name);
+            if ($matched !== null) {
+                $this->origin_cloud_site_id = (string) $matched->id;
+                $this->origin_url = $matched->containerLiveUrl() ?? '';
+
+                return;
+            }
+
             $this->origin_cloud_site_id = '';
-
-            return;
+            $this->origin_url = $this->suggestedHybridOriginUrl($name);
+        } finally {
+            $this->prefillingOrigin = false;
         }
-
-        $matched = $this->findOrgCloudSiteForHybridOrigin($name);
-        if ($matched !== null) {
-            $this->origin_cloud_site_id = (string) $matched->id;
-            $this->origin_url = $matched->containerLiveUrl() ?? '';
-
-            return;
-        }
-
-        $this->origin_cloud_site_id = '';
-        $this->origin_url = $this->suggestedHybridOriginUrl($name);
     }
 
     public function suggestedHybridOriginUrlForName(): string
@@ -364,6 +424,10 @@ class Create extends Component
 
     private function suggestedHybridOriginUrl(string $name): string
     {
+        if ($this->canProvisionCloudOrigin()) {
+            return '';
+        }
+
         if (FakeCloudProvision::enabled()) {
             $slug = Str::slug($name) ?: 'app';
 
@@ -371,42 +435,6 @@ class Create extends Component
         }
 
         return '';
-    }
-
-    private function findOrgCloudSiteForHybridOrigin(string $name): ?Site
-    {
-        $org = auth()->user()?->currentOrganization();
-        if ($org === null) {
-            return null;
-        }
-
-        $repo = HybridEdgeOriginMatcher::normalizeRepo(trim($this->repo));
-        $slug = Str::slug($name) ?: 'app';
-
-        $sites = Site::query()
-            ->where('organization_id', $org->id)
-            ->whereIn('container_backend', ['digitalocean_app_platform', 'aws_app_runner', 'dply_cloud'])
-            ->orderBy('name')
-            ->get();
-
-        if ($repo !== '') {
-            foreach ($sites as $site) {
-                $container = is_array($site->meta['container'] ?? null) ? $site->meta['container'] : [];
-                $source = is_array($container['source'] ?? null) ? $container['source'] : [];
-                $sourceRepo = is_string($source['repo'] ?? null) ? HybridEdgeOriginMatcher::normalizeRepo((string) $source['repo']) : '';
-                if ($sourceRepo !== '' && $sourceRepo === $repo) {
-                    return $site;
-                }
-            }
-        }
-
-        foreach ($sites as $site) {
-            if (($site->slug === $slug || Str::slug((string) $site->name) === $slug) && $site->containerLiveUrl() !== null) {
-                return $site;
-            }
-        }
-
-        return null;
     }
 
     private function findOrgCloudSite(string $siteId): ?Site
@@ -465,6 +493,12 @@ class Create extends Component
 
         if ($this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan) && $this->runtime_mode !== 'hybrid') {
             $this->toastError(__('This repository looks like an SSR app. Choose hybrid mode with an origin URL, configure static export, or use dply Cloud for full server workloads.'));
+
+            return;
+        }
+
+        if ($this->runtime_mode === 'hybrid' && trim($this->origin_url) === '' && $this->shouldAutoProvisionHybridOrigin()) {
+            $this->deployHybridStack();
 
             return;
         }
@@ -595,9 +629,15 @@ class Create extends Component
 
     private function showHybridStackCta(): bool
     {
-        return $this->detectedPlan !== []
-            && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)
+        return $this->shouldAutoProvisionHybridOrigin();
+    }
+
+    private function shouldAutoProvisionHybridOrigin(): bool
+    {
+        return $this->runtime_mode === 'hybrid'
             && trim($this->origin_url) === ''
+            && $this->detectedPlan !== []
+            && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)
             && $this->canProvisionCloudOrigin();
     }
 
@@ -648,6 +688,7 @@ class Create extends Component
             'ssrDetected' => $this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan),
             'suggestedHybridOriginUrl' => $this->suggestedHybridOriginUrlForName(),
             'showHybridStackCta' => $this->showHybridStackCta(),
+            'autoProvisionHybridOrigin' => $this->shouldAutoProvisionHybridOrigin(),
             'canProvisionCloudOrigin' => $this->canProvisionCloudOrigin(),
             'cloudFee' => app(ManagedProductCostEstimator::class)->cloudFee(),
         ])->layout('layouts.app');

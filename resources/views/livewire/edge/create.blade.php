@@ -266,7 +266,9 @@
                                 <div class="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
                                     <p class="font-semibold">{{ __('Server-rendered app detected') }}</p>
                                     <p class="mt-1 leading-relaxed">
-                                        @if ($showHybridStackCta)
+                                        @if ($autoProvisionHybridOrigin)
+                                            {{ __('dply will create a Cloud SSR origin and Edge front automatically when you deploy — no manual origin URL needed.') }}
+                                        @elseif ($showHybridStackCta)
                                             {{ __('Deploy a hybrid stack to create a dply Cloud SSR origin and Edge front from this repository in one step, or link an existing Cloud app below.') }}
                                         @else
                                             {{ __('Hybrid delivery needs an SSR origin. Link an existing Cloud app, enter a live URL, or connect a container backend to use one-click hybrid deploy.') }}
@@ -291,29 +293,38 @@
                                     </div>
                                 @endif
                                 <div class="mt-4">
-                                    <x-input-label for="origin_url" :value="__('SSR origin URL')" />
-                                    @if ($suggestedHybridOriginUrl !== '' && ! $originUrlTouched)
-                                        <p class="mt-1 text-xs text-brand-moss">
-                                            {{ __('Suggested from a matching dply Cloud app in this organization.') }}
+                                    @if ($autoProvisionHybridOrigin)
+                                        <div class="rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-sm text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">
+                                            <p class="font-medium text-brand-ink">{{ __('SSR origin') }}</p>
+                                            <p class="mt-1 text-xs leading-relaxed">
+                                                {{ __('A dply Cloud app will be provisioned from this repository as the SSR origin. The Edge site is created automatically when the origin is live.') }}
+                                            </p>
+                                        </div>
+                                    @else
+                                        <x-input-label for="origin_url" :value="__('SSR origin URL')" />
+                                        @if ($suggestedHybridOriginUrl !== '' && ! $originUrlTouched)
+                                            <p class="mt-1 text-xs text-brand-moss">
+                                                {{ __('Suggested from a matching dply Cloud app in this organization.') }}
+                                            </p>
+                                        @elseif ($suggestedHybridOriginUrl === '' && ! $originUrlTouched)
+                                            <p class="mt-1 text-xs text-brand-moss">
+                                                {{ __('Hybrid delivery needs a server-rendered origin — link an existing Cloud app below or enter its live URL.') }}
+                                            </p>
+                                        @endif
+                                        <x-text-input id="origin_url" wire:model.live="origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.ondigitalocean.app" required />
+                                        @if ($suggestedHybridOriginUrl !== '' && $origin_url === $suggestedHybridOriginUrl)
+                                            <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
+                                                <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
+                                                {{ __('Auto-filled from Cloud app') }}
+                                            </p>
+                                        @endif
+                                        <p class="mt-2 text-xs text-brand-moss">
+                                            {{ __('Need a new origin?') }}
+                                            <a href="{{ route('cloud.create') }}" wire:navigate class="font-medium text-brand-forest hover:underline dark:text-brand-sage">{{ __('Create a Cloud app') }}</a>
+                                            {{ __('for server-rendered routes (e.g. ondigitalocean.app or your Cloud URL).') }}
                                         </p>
-                                    @elseif ($suggestedHybridOriginUrl === '' && ! $originUrlTouched)
-                                        <p class="mt-1 text-xs text-brand-moss">
-                                            {{ __('Hybrid delivery needs a server-rendered origin — link an existing Cloud app below or enter its live URL.') }}
-                                        </p>
+                                        <x-input-error :messages="$errors->get('origin_url')" class="mt-2" />
                                     @endif
-                                    <x-text-input id="origin_url" wire:model.live="origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.ondigitalocean.app" required />
-                                    @if ($suggestedHybridOriginUrl !== '' && $origin_url === $suggestedHybridOriginUrl)
-                                        <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
-                                            <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
-                                            {{ __('Auto-filled from Cloud app') }}
-                                        </p>
-                                    @endif
-                                    <p class="mt-2 text-xs text-brand-moss">
-                                        {{ __('Need a new origin?') }}
-                                        <a href="{{ route('cloud.create') }}" wire:navigate class="font-medium text-brand-forest hover:underline dark:text-brand-sage">{{ __('Create a Cloud app') }}</a>
-                                        {{ __('for server-rendered routes (e.g. ondigitalocean.app or your Cloud URL).') }}
-                                    </p>
-                                    <x-input-error :messages="$errors->get('origin_url')" class="mt-2" />
                                 </div>
                                 @if ($orgCloudSites !== [])
                                     <details class="mt-4 rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3 dark:border-brand-mist/20 dark:bg-zinc-900/40">
@@ -434,37 +445,24 @@
                     {{ __('Back to Edge sites') }}
                 </a>
                 <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                    @if ($showHybridStackCta)
-                        <button
-                            type="button"
-                            wire:click="openHybridStackModal"
-                            wire:loading.attr="disabled"
-                            wire:target="openHybridStackModal,deployHybridStack"
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-forest px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-ink disabled:opacity-60 dark:bg-brand-sage dark:text-brand-ink dark:hover:bg-brand-sage/90 sm:w-auto"
-                        >
-                            <x-heroicon-o-squares-plus wire:loading.remove wire:target="deployHybridStack" class="h-4 w-4" aria-hidden="true" />
-                            <x-spinner wire:loading wire:target="deployHybridStack" size="sm" variant="cream" />
-                            <span wire:loading.remove wire:target="deployHybridStack">{{ __('Deploy hybrid stack') }}</span>
-                            <span wire:loading wire:target="deployHybridStack">{{ __('Queueing…') }}</span>
-                        </button>
-                    @endif
                     @php
                         $deployBlocked = $ssrDetected && trim($origin_url) === '' && $runtime_mode !== 'hybrid';
-                        $hybridMissingOrigin = $runtime_mode === 'hybrid' && trim($origin_url) === '' && ! $showHybridStackCta;
-                        $edgeDeployDisabled = $deployBlocked || ($showHybridStackCta && trim($origin_url) === '') || $hybridMissingOrigin;
+                        $hybridMissingOrigin = $runtime_mode === 'hybrid' && trim($origin_url) === '' && ! $autoProvisionHybridOrigin;
+                        $edgeDeployDisabled = $deployBlocked || $hybridMissingOrigin;
+                        $deployLabel = $autoProvisionHybridOrigin ? __('Deploy hybrid stack') : __('Deploy edge app');
                     @endphp
                     <x-primary-button
                         type="submit"
                         wire:loading.attr="disabled"
-                        wire:target="deploy"
+                        wire:target="deploy,deployHybridStack"
                         :disabled="$edgeDeployDisabled"
-                        class="w-full sm:w-auto {{ ($showHybridStackCta && trim($origin_url) === '') ? 'opacity-60' : '' }}"
+                        class="w-full sm:w-auto"
                     >
-                        <span wire:loading.remove wire:target="deploy" class="inline-flex items-center gap-2">
+                        <span wire:loading.remove wire:target="deploy,deployHybridStack" class="inline-flex items-center gap-2">
                             <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Deploy edge app') }}
+                            {{ $deployLabel }}
                         </span>
-                        <span wire:loading wire:target="deploy" class="inline-flex items-center justify-center gap-2">
+                        <span wire:loading wire:target="deploy,deployHybridStack" class="inline-flex items-center justify-center gap-2">
                             <x-spinner variant="cream" />
                             {{ __('Queueing…') }}
                         </span>
