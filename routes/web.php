@@ -421,6 +421,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // future iterations).
     Route::livewire('servers/{server}/sites/{site}/schedule', Schedule::class)->name('sites.schedule');
     Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
+    Route::livewire('servers/{server}/sites/{site}/resources', \App\Livewire\Sites\Resources::class)->name('sites.resources');
     // NETWORKING group for serverless workspaces — manages the dply edge
     // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). Distinct from VM `routing` which edits nginx.

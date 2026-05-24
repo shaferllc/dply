@@ -8,6 +8,8 @@ use App\Actions\Cloud\CreateCloudSite;
 use App\Actions\Cloud\CreateCloudSiteFromSource;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\CloudDatabase;
+use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
 use App\Services\Billing\ManagedProductCostEstimator;
 use App\Services\Cloud\AwsAppRunnerBackend;
@@ -90,6 +92,42 @@ class Create extends Component
 
     public string $env_file_content = '';
 
+    /** @var list<array{type: string, name: string, command: string, size: string, instance_count: int}> */
+    public array $workers = [];
+
+    public bool $autoscaling_enabled = false;
+
+    public int $autoscaling_min = 1;
+
+    public int $autoscaling_max = 3;
+
+    public int $autoscaling_cpu_percent = 75;
+
+    public bool $health_check_enabled = false;
+
+    public string $health_check_path = '/healthz';
+
+    public int $health_check_period_seconds = 30;
+
+    public int $health_check_timeout_seconds = 5;
+
+    public int $health_check_failure_threshold = 3;
+
+    public string $database_mode = 'none';
+
+    public ?string $database_id = null;
+
+    public string $new_database_engine = 'postgres';
+
+    public string $new_database_size = 'small';
+
+    public string $new_database_name = '';
+
+    /** @var list<string> */
+    public array $domains = [];
+
+    public string $new_domain = '';
+
     public function rules(): array
     {
         $rules = [
@@ -111,7 +149,98 @@ class Create extends Component
             $rules['image'] = ['required', 'string', 'max:500'];
         }
 
+        if ($this->autoscaling_enabled) {
+            $rules['autoscaling_min'] = ['required', 'integer', 'min:1', 'max:50'];
+            $rules['autoscaling_max'] = ['required', 'integer', 'min:1', 'max:50', 'gte:autoscaling_min'];
+            $rules['autoscaling_cpu_percent'] = ['required', 'integer', 'min:1', 'max:100'];
+        }
+
+        if ($this->health_check_enabled) {
+            $rules['health_check_path'] = ['required', 'string', 'regex:#^/#'];
+            $rules['health_check_period_seconds'] = ['required', 'integer', 'min:1'];
+            $rules['health_check_timeout_seconds'] = ['required', 'integer', 'min:1'];
+            $rules['health_check_failure_threshold'] = ['required', 'integer', 'min:1'];
+        }
+
+        if ($this->database_mode === 'attach') {
+            $rules['database_id'] = ['required', 'string'];
+        }
+
+        if ($this->database_mode === 'create') {
+            $rules['new_database_name'] = ['required', 'string', 'min:3', 'max:60'];
+            $rules['new_database_engine'] = ['required', 'in:postgres,mysql,redis'];
+            $rules['new_database_size'] = ['required', 'in:small,medium,large'];
+        }
+
         return $rules;
+    }
+
+    public function addDomain(): void
+    {
+        $hostname = strtolower(trim($this->new_domain));
+        if ($hostname === '') {
+            $this->toastError(__('Hostname is required.'));
+
+            return;
+        }
+        if (! preg_match('/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$/', $hostname)) {
+            $this->toastError(__('That doesn\'t look like a valid hostname.'));
+
+            return;
+        }
+        if (in_array($hostname, $this->domains, true)) {
+            $this->new_domain = '';
+
+            return;
+        }
+        $this->domains[] = $hostname;
+        $this->new_domain = '';
+    }
+
+    public function removeDomain(int $index): void
+    {
+        if (! isset($this->domains[$index])) {
+            return;
+        }
+        array_splice($this->domains, $index, 1);
+        $this->domains = array_values($this->domains);
+    }
+
+    public function addWorker(string $type = CloudWorker::TYPE_WORKER): void
+    {
+        if ($type === CloudWorker::TYPE_SCHEDULER && $this->hasScheduler()) {
+            $this->toastError(__('Only one scheduler is allowed per site.'));
+
+            return;
+        }
+
+        $this->workers[] = [
+            'type' => $type,
+            'name' => $type === CloudWorker::TYPE_SCHEDULER ? 'scheduler' : 'worker-'.(count($this->workers) + 1),
+            'command' => $type === CloudWorker::TYPE_SCHEDULER ? CloudWorker::SCHEDULER_COMMAND : CloudWorker::DEFAULT_WORKER_COMMAND,
+            'size' => 'small',
+            'instance_count' => 1,
+        ];
+    }
+
+    public function removeWorker(int $index): void
+    {
+        if (! isset($this->workers[$index])) {
+            return;
+        }
+        array_splice($this->workers, $index, 1);
+        $this->workers = array_values($this->workers);
+    }
+
+    public function hasScheduler(): bool
+    {
+        foreach ($this->workers as $worker) {
+            if (($worker['type'] ?? null) === CloudWorker::TYPE_SCHEDULER) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
@@ -260,6 +389,8 @@ class Create extends Component
 
         $this->validate();
 
+        $extras = $this->extrasPayload();
+
         try {
             $site = $this->mode === 'source'
                 ? (new CreateCloudSiteFromSource)->handle(auth()->user(), $org, [
@@ -274,6 +405,7 @@ class Create extends Component
                     'region' => $this->region,
                     'backend' => $this->backend,
                     'env_file_content' => $this->env_file_content,
+                    ...$extras,
                 ])
                 : (new CreateCloudSite)->handle(auth()->user(), $org, [
                     'name' => $this->name,
@@ -284,6 +416,7 @@ class Create extends Component
                     'region' => $this->region,
                     'backend' => $this->backend,
                     'env_file_content' => $this->env_file_content,
+                    ...$extras,
                 ]);
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -323,6 +456,66 @@ class Create extends Component
         return array_values($merged);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function extrasPayload(): array
+    {
+        $extras = [];
+
+        if ($this->workers !== []) {
+            $extras['workers'] = array_map(static fn (array $w): array => [
+                'type' => (string) ($w['type'] ?? CloudWorker::TYPE_WORKER),
+                'name' => (string) ($w['name'] ?? ''),
+                'command' => (string) ($w['command'] ?? ''),
+                'size' => (string) ($w['size'] ?? 'small'),
+                'instance_count' => (int) ($w['instance_count'] ?? 1),
+            ], $this->workers);
+        }
+
+        if ($this->autoscaling_enabled) {
+            $extras['autoscaling'] = [
+                'enabled' => true,
+                'min_instances' => $this->autoscaling_min,
+                'max_instances' => $this->autoscaling_max,
+                'cpu_percent' => $this->autoscaling_cpu_percent,
+            ];
+        }
+
+        if ($this->health_check_enabled) {
+            $extras['health_check'] = [
+                'enabled' => true,
+                'http_path' => $this->health_check_path,
+                'period_seconds' => $this->health_check_period_seconds,
+                'timeout_seconds' => $this->health_check_timeout_seconds,
+                'failure_threshold' => $this->health_check_failure_threshold,
+            ];
+        }
+
+        if ($this->database_mode === 'attach' && $this->database_id !== null && $this->database_id !== '') {
+            $extras['database'] = [
+                'mode' => 'attach',
+                'cloud_database_id' => $this->database_id,
+            ];
+        }
+
+        if ($this->database_mode === 'create') {
+            $extras['database'] = [
+                'mode' => 'create',
+                'name' => $this->new_database_name,
+                'engine' => $this->new_database_engine,
+                'size' => $this->new_database_size,
+                'region' => $this->region,
+            ];
+        }
+
+        if ($this->domains !== []) {
+            $extras['domains'] = $this->domains;
+        }
+
+        return $extras;
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -330,6 +523,12 @@ class Create extends Component
             ->where('organization_id', $org->id)
             ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
             ->get(['id', 'provider', 'name', 'credentials']);
+
+        $databases = $org === null ? collect() : CloudDatabase::query()
+            ->where('organization_id', $org->id)
+            ->whereIn('status', [CloudDatabase::STATUS_ACTIVE, CloudDatabase::STATUS_PROVISIONING])
+            ->orderBy('name')
+            ->get(['id', 'name', 'engine', 'status']);
 
         // Source mode on AWS App Runner needs an authorized GitHub
         // connection on the credential. Surface this in the form so
@@ -346,6 +545,8 @@ class Create extends Component
             'awsSourceReady' => $awsSourceReady,
             'fakeCloudActive' => FakeCloudProvision::enabled(),
             'cloudFee' => app(ManagedProductCostEstimator::class)->cloudFee(),
+            'attachableDatabases' => $databases,
+            'backendSupportsWorkers' => $this->backend !== 'aws_app_runner',
         ])->layout('layouts.app');
     }
 }
