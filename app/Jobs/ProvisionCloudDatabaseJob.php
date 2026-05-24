@@ -118,6 +118,14 @@ class ProvisionCloudDatabaseJob implements ShouldQueue
             ],
             'meta' => $meta,
         ])->save();
+
+        // The create-DB-alongside wizard path pivots a fresh Site to this
+        // DB before its connection block exists. Now that the cluster is
+        // online, fan out an attach per pivoted site so each one gets the
+        // DB_* env vars merged + a redeploy queued.
+        foreach ($database->sites()->pluck('sites.id') as $siteId) {
+            AttachCloudDatabaseJob::dispatch((string) $database->id, (string) $siteId);
+        }
     }
 
     private function clusterName(CloudDatabase $database): string

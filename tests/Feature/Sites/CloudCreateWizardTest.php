@@ -175,6 +175,92 @@ test('attach database requires a selection', function () {
         ->assertHasErrors(['database_id']);
 });
 
+test('addDomain accepts a hostname and dedups; removeDomain re-indexes', function () {
+    [$user] = bootCloudOrg();
+
+    Livewire::actingAs($user)
+        ->test(CloudCreate::class)
+        ->set('new_domain', 'app.example.com')
+        ->call('addDomain')
+        ->set('new_domain', 'APP.example.com') // case-insensitive dedup
+        ->call('addDomain')
+        ->set('new_domain', 'www.example.com')
+        ->call('addDomain')
+        ->assertSet('domains', ['app.example.com', 'www.example.com'])
+        ->call('removeDomain', 0)
+        ->assertSet('domains', ['www.example.com']);
+});
+
+test('addDomain rejects invalid hostname', function () {
+    [$user] = bootCloudOrg();
+
+    Livewire::actingAs($user)
+        ->test(CloudCreate::class)
+        ->set('new_domain', 'not a host')
+        ->call('addDomain')
+        ->assertSet('domains', []);
+});
+
+test('deploy with domains stages them as pending', function () {
+    Bus::fake();
+    [$user] = bootCloudOrg();
+
+    Livewire::actingAs($user)
+        ->test(CloudCreate::class)
+        ->set('mode', 'image')
+        ->set('name', 'with-domains')
+        ->set('image', 'x:1')
+        ->set('backend', 'digitalocean_app_platform')
+        ->set('region', 'nyc')
+        ->set('domains', ['app.acme.com', 'www.acme.com'])
+        ->call('deploy')
+        ->assertHasNoErrors();
+
+    $site = Site::query()->where('name', 'with-domains')->first();
+    expect($site->meta['container']['pending_domains'] ?? null)->toBe(['app.acme.com', 'www.acme.com']);
+});
+
+test('deploy with database mode create provisions a fresh DB row', function () {
+    Bus::fake();
+    [$user] = bootCloudOrg();
+
+    Livewire::actingAs($user)
+        ->test(CloudCreate::class)
+        ->set('mode', 'image')
+        ->set('name', 'fresh-db-app')
+        ->set('image', 'x:1')
+        ->set('backend', 'digitalocean_app_platform')
+        ->set('region', 'nyc')
+        ->set('database_mode', 'create')
+        ->set('new_database_name', 'fresh-db')
+        ->set('new_database_engine', 'postgres')
+        ->set('new_database_size', 'small')
+        ->call('deploy')
+        ->assertHasNoErrors();
+
+    $site = Site::query()->where('name', 'fresh-db-app')->first();
+    $db = CloudDatabase::query()->where('name', 'fresh-db')->first();
+    expect($db)->not->toBeNull();
+    expect($db->status)->toBe(CloudDatabase::STATUS_PROVISIONING);
+    expect($db->sites()->where('sites.id', $site->id)->exists())->toBeTrue();
+});
+
+test('deploy with database mode create validates required fields', function () {
+    [$user] = bootCloudOrg();
+
+    Livewire::actingAs($user)
+        ->test(CloudCreate::class)
+        ->set('mode', 'image')
+        ->set('name', 'broken-db-app')
+        ->set('image', 'x:1')
+        ->set('backend', 'digitalocean_app_platform')
+        ->set('region', 'nyc')
+        ->set('database_mode', 'create')
+        ->set('new_database_name', 'a') // too short
+        ->call('deploy')
+        ->assertHasErrors(['new_database_name']);
+});
+
 test('removeWorker re-indexes', function () {
     [$user] = bootCloudOrg();
 

@@ -117,6 +117,17 @@ class Create extends Component
 
     public ?string $database_id = null;
 
+    public string $new_database_engine = 'postgres';
+
+    public string $new_database_size = 'small';
+
+    public string $new_database_name = '';
+
+    /** @var list<string> */
+    public array $domains = [];
+
+    public string $new_domain = '';
+
     public function rules(): array
     {
         $rules = [
@@ -155,7 +166,44 @@ class Create extends Component
             $rules['database_id'] = ['required', 'string'];
         }
 
+        if ($this->database_mode === 'create') {
+            $rules['new_database_name'] = ['required', 'string', 'min:3', 'max:60'];
+            $rules['new_database_engine'] = ['required', 'in:postgres,mysql,redis'];
+            $rules['new_database_size'] = ['required', 'in:small,medium,large'];
+        }
+
         return $rules;
+    }
+
+    public function addDomain(): void
+    {
+        $hostname = strtolower(trim($this->new_domain));
+        if ($hostname === '') {
+            $this->toastError(__('Hostname is required.'));
+
+            return;
+        }
+        if (! preg_match('/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$/', $hostname)) {
+            $this->toastError(__('That doesn\'t look like a valid hostname.'));
+
+            return;
+        }
+        if (in_array($hostname, $this->domains, true)) {
+            $this->new_domain = '';
+
+            return;
+        }
+        $this->domains[] = $hostname;
+        $this->new_domain = '';
+    }
+
+    public function removeDomain(int $index): void
+    {
+        if (! isset($this->domains[$index])) {
+            return;
+        }
+        array_splice($this->domains, $index, 1);
+        $this->domains = array_values($this->domains);
     }
 
     public function addWorker(string $type = CloudWorker::TYPE_WORKER): void
@@ -449,6 +497,20 @@ class Create extends Component
                 'mode' => 'attach',
                 'cloud_database_id' => $this->database_id,
             ];
+        }
+
+        if ($this->database_mode === 'create') {
+            $extras['database'] = [
+                'mode' => 'create',
+                'name' => $this->new_database_name,
+                'engine' => $this->new_database_engine,
+                'size' => $this->new_database_size,
+                'region' => $this->region,
+            ];
+        }
+
+        if ($this->domains !== []) {
+            $extras['domains'] = $this->domains;
         }
 
         return $extras;

@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Cloud\CloudScalingConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
@@ -162,4 +163,57 @@ test('database mode none is a no-op', function () {
     ]);
 
     expect($site->fresh()->env_file_content)->toBe('');
+});
+
+test('create database mode provisions a new DB and pivots it', function () {
+    Bus::fake();
+    $site = cloudSiteWithBackend();
+
+    (new ApplyCloudSiteExtras)->handle($site, [
+        'database' => ['mode' => 'create', 'name' => 'fresh', 'engine' => 'postgres', 'size' => 'small', 'region' => 'nyc1'],
+    ]);
+
+    $db = CloudDatabase::query()->where('organization_id', $site->organization_id)->where('name', 'fresh')->first();
+    expect($db)->not->toBeNull();
+    expect($db->status)->toBe(CloudDatabase::STATUS_PROVISIONING);
+    expect($db->sites()->where('sites.id', $site->id)->exists())->toBeTrue();
+
+    // env vars stay empty since the DB connection block is empty pre-provision;
+    // ProvisionCloudDatabaseJob fans out an AttachCloudDatabaseJob on activation.
+    expect($site->fresh()->env_file_content)->toBe('');
+});
+
+test('create database rejects unknown engine', function () {
+    $site = cloudSiteWithBackend();
+
+    expect(fn () => (new ApplyCloudSiteExtras)->handle($site, [
+        'database' => ['mode' => 'create', 'name' => 'fresh', 'engine' => 'oracle'],
+    ]))->toThrow(\InvalidArgumentException::class);
+});
+
+test('domains are staged as pending until site activates', function () {
+    $site = cloudSiteWithBackend();
+
+    (new ApplyCloudSiteExtras)->handle($site, [
+        'domains' => ['app.example.com', 'WWW.example.COM'],
+    ]);
+
+    $pending = $site->fresh()->meta['container']['pending_domains'] ?? null;
+    expect($pending)->toBe(['app.example.com', 'www.example.com']);
+});
+
+test('invalid hostname rejected', function () {
+    $site = cloudSiteWithBackend();
+
+    expect(fn () => (new ApplyCloudSiteExtras)->handle($site, [
+        'domains' => ['not a hostname'],
+    ]))->toThrow(\InvalidArgumentException::class);
+});
+
+test('empty domains list is a no-op', function () {
+    $site = cloudSiteWithBackend();
+
+    (new ApplyCloudSiteExtras)->handle($site, ['domains' => ['', '   ']]);
+
+    expect($site->fresh()->meta['container']['pending_domains'] ?? null)->toBeNull();
 });

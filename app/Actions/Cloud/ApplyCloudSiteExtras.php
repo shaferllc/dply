@@ -6,6 +6,7 @@ namespace App\Actions\Cloud;
 
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\CloudScalingConfig;
@@ -39,6 +40,7 @@ class ApplyCloudSiteExtras
         $this->applyHealthCheck($site, $payload['health_check'] ?? null);
         $this->applyWorkers($site, $payload['workers'] ?? null);
         $this->applyDatabase($site, $payload['database'] ?? null);
+        $this->applyDomains($site, $payload['domains'] ?? null);
     }
 
     private function applyAutoscaling(Site $site, mixed $input): void
@@ -145,12 +147,37 @@ class ApplyCloudSiteExtras
         if ($mode === 'none' || $mode === '') {
             return;
         }
-        if ($mode !== 'attach') {
-            throw new InvalidArgumentException(
-                'Unsupported database mode: '.$mode.' (only "attach" is supported in the create wizard).',
-            );
-        }
 
+        $database = match ($mode) {
+            'attach' => $this->resolveExistingDatabase($site, $input),
+            'create' => $this->createNewDatabase($site, $input),
+            default => throw new InvalidArgumentException(
+                'Unsupported database mode: '.$mode.' (use "attach" or "create").',
+            ),
+        };
+
+        // Pivot first so the relationship exists even if the DB is still
+        // provisioning when initial provision runs.
+        $database->sites()->syncWithoutDetaching([$site->id]);
+
+        // Merge connection env vars synchronously — when the DB is already
+        // active these land in env_file_content before the provision job
+        // reads it. When the DB is still provisioning, connectionEnvVars()
+        // returns an empty array; ProvisionCloudDatabaseJob fans out an
+        // AttachCloudDatabaseJob to every pivoted site on activation, so
+        // the env vars + redeploy land automatically later.
+        $vars = $this->parseEnvLines((string) ($site->env_file_content ?? ''));
+        foreach ($database->connectionEnvVars() as $key => $value) {
+            $vars[$key] = $value;
+        }
+        $site->update(['env_file_content' => $this->serializeEnvLines($vars)]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function resolveExistingDatabase(Site $site, array $input): CloudDatabase
+    {
         $databaseId = (string) ($input['cloud_database_id'] ?? '');
         if ($databaseId === '') {
             throw new InvalidArgumentException('Pick a database to attach.');
@@ -161,20 +188,63 @@ class ApplyCloudSiteExtras
             throw new InvalidArgumentException('Selected database is not available in this organization.');
         }
 
-        // Pivot first so the relationship exists even if the DB is still
-        // provisioning when initial provision runs.
-        $database->sites()->syncWithoutDetaching([$site->id]);
+        return $database;
+    }
 
-        // Merge connection env vars synchronously — when the DB is already
-        // active these land in env_file_content before the provision job
-        // reads it. When the DB is still provisioning, connectionEnvVars()
-        // returns an empty array; AttachCloudDatabaseJob will fill them
-        // in later (the standard post-create attach path remains valid).
-        $vars = $this->parseEnvLines((string) ($site->env_file_content ?? ''));
-        foreach ($database->connectionEnvVars() as $key => $value) {
-            $vars[$key] = $value;
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function createNewDatabase(Site $site, array $input): CloudDatabase
+    {
+        $organization = Organization::query()->find($site->organization_id);
+        if ($organization === null) {
+            throw new InvalidArgumentException('Site has no organization — cannot provision a database for it.');
         }
-        $site->update(['env_file_content' => $this->serializeEnvLines($vars)]);
+
+        return (new CreateCloudDatabase)->handle($organization, [
+            'name' => (string) ($input['name'] ?? ''),
+            'engine' => (string) ($input['engine'] ?? ''),
+            'version' => (string) ($input['version'] ?? ''),
+            'size' => (string) ($input['size'] ?? 'small'),
+            'region' => (string) ($input['region'] ?? ''),
+        ]);
+    }
+
+    private function applyDomains(Site $site, mixed $input): void
+    {
+        if (! is_array($input) || $input === []) {
+            return;
+        }
+
+        $hostnames = [];
+        foreach ($input as $raw) {
+            $hostname = strtolower(trim((string) $raw));
+            if ($hostname === '') {
+                continue;
+            }
+            if (! preg_match('/^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)+$/', $hostname)) {
+                throw new InvalidArgumentException("Invalid hostname: {$hostname}");
+            }
+            $hostnames[$hostname] = true; // dedup
+        }
+        if ($hostnames === []) {
+            return;
+        }
+
+        // Custom domain attach must happen on the backend AFTER the site has a
+        // container_backend_id — too early and AttachCloudDomainJob no-ops.
+        // Stage the desired hostnames on meta; PollCloudStatusJob fans out
+        // the actual attach jobs when the site flips to active.
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
+        $existing = is_array($container['pending_domains'] ?? null) ? $container['pending_domains'] : [];
+        $merged = array_values(array_unique(array_merge(
+            array_values(array_filter($existing, 'is_string')),
+            array_keys($hostnames),
+        )));
+        $container['pending_domains'] = $merged;
+        $meta['container'] = $container;
+        $site->update(['meta' => $meta]);
     }
 
     /**

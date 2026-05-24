@@ -71,6 +71,7 @@ class PollCloudStatusJob implements ShouldQueue
 
         $newStatus = $this->mapPhase($result['phase']);
         $update = [];
+        $becameActive = $newStatus === Site::STATUS_CONTAINER_ACTIVE && $site->status !== Site::STATUS_CONTAINER_ACTIVE;
 
         if ($newStatus !== null && $newStatus !== $site->status) {
             $update['status'] = $newStatus;
@@ -86,8 +87,22 @@ class PollCloudStatusJob implements ShouldQueue
             $meta['container']['live_url'] = $result['live_url'];
         }
 
+        // Drain any custom hostnames the create wizard staged for this site.
+        // We only fan out on the transition into ACTIVE so re-polls of an
+        // already-active site don't re-dispatch the same attach jobs.
+        $pendingDomains = $becameActive && is_array($meta['container']['pending_domains'] ?? null)
+            ? array_values(array_filter($meta['container']['pending_domains'], 'is_string'))
+            : [];
+        if ($pendingDomains !== []) {
+            unset($meta['container']['pending_domains']);
+        }
+
         $update['meta'] = $meta;
         $site->update($update);
+
+        foreach ($pendingDomains as $hostname) {
+            AttachCloudDomainJob::dispatch((string) $site->id, $hostname);
+        }
     }
 
     private function mapPhase(string $phase): ?string

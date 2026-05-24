@@ -262,9 +262,10 @@
                     <select id="database_mode" wire:model.live="database_mode" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm">
                         <option value="none">{{ __('No database') }}</option>
                         <option value="attach" @disabled($attachableDatabases->isEmpty())>{{ __('Attach existing') }}</option>
+                        <option value="create">{{ __('Create new alongside') }}</option>
                     </select>
-                    @if ($attachableDatabases->isEmpty())
-                        <p class="mt-1 text-xs text-slate-500">{{ __('No managed databases in this org yet.') }} <a href="{{ route('cloud.databases.create') }}" wire:navigate class="font-semibold text-slate-700 hover:underline">{{ __('Create one') }}</a></p>
+                    @if ($database_mode === 'create')
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Provisioning takes ~5-10 minutes. DB_* env vars are merged + the site is redeployed automatically once the cluster is online.') }}</p>
                     @endif
                 </div>
                 @if ($database_mode === 'attach')
@@ -279,6 +280,53 @@
                         <x-input-error :messages="$errors->get('database_id')" class="mt-2" />
                     </div>
                 @endif
+                @if ($database_mode === 'create')
+                    <div>
+                        <x-input-label for="new_database_name" :value="__('Cluster name')" />
+                        <input id="new_database_name" type="text" wire:model="new_database_name" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm" placeholder="acme-prod" required>
+                        <x-input-error :messages="$errors->get('new_database_name')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="new_database_engine" :value="__('Engine')" />
+                        <select id="new_database_engine" wire:model="new_database_engine" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                            <option value="postgres">Postgres</option>
+                            <option value="mysql">MySQL</option>
+                            <option value="redis">Redis</option>
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label for="new_database_size" :value="__('Size')" />
+                        <select id="new_database_size" wire:model="new_database_size" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm">
+                            <option value="small">small (1 vCPU / 1 GB)</option>
+                            <option value="medium">medium (1 vCPU / 2 GB)</option>
+                            <option value="large">large (2 vCPU / 4 GB)</option>
+                        </select>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- Custom domains --}}
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div>
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-700">{{ __('Custom domains') }}</h2>
+                <p class="mt-1 text-xs text-slate-500">{{ __('Hostnames you want pointed at this site. Each is attached automatically once the site finishes provisioning; the backend returns DNS validation records you can find on the site dashboard afterward.') }}</p>
+            </div>
+
+            @if (! empty($domains))
+                <ul class="mt-4 divide-y divide-slate-200 rounded-lg border border-slate-200">
+                    @foreach ($domains as $i => $hostname)
+                        <li class="flex items-center justify-between gap-3 px-3 py-2">
+                            <span class="font-mono text-xs text-slate-900">{{ $hostname }}</span>
+                            <button type="button" wire:click="removeDomain({{ $i }})" class="text-[11px] font-semibold text-rose-700 hover:underline">{{ __('Remove') }}</button>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+
+            <div class="mt-4 flex flex-wrap gap-2">
+                <input type="text" wire:model="new_domain" wire:keydown.enter.prevent="addDomain" placeholder="app.acme.com" class="flex-1 min-w-[12rem] rounded-md border-slate-300 font-mono text-xs shadow-sm">
+                <button type="button" wire:click="addDomain" class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">+ {{ __('Add domain') }}</button>
             </div>
         </div>
 
