@@ -6,6 +6,7 @@ namespace Tests\Feature\Sites\CdnCommandsTest;
 
 use App\Jobs\ApplySiteCdnJob;
 use App\Jobs\PurgeSiteCdnJob;
+use App\Jobs\SyncSiteCdnMetricsJob;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -21,8 +22,13 @@ uses(RefreshDatabase::class);
 /**
  * @return array{0: Site, 1: ProviderCredential}
  */
-function seedCdnCommandSite(): array
+function seedCdnCommandSite(?string $hostname = null, ?string $slug = null): array
 {
+    static $counter = 0;
+    $counter++;
+    $hostname ??= "app{$counter}.example.com";
+    $slug ??= "cdn-test-site-{$counter}";
+
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $server = Server::factory()->ready()->create([
@@ -33,11 +39,11 @@ function seedCdnCommandSite(): array
     $site = Site::factory()->create([
         'server_id' => $server->id,
         'organization_id' => $org->id,
-        'slug' => 'cdn-test-site',
+        'slug' => $slug,
     ]);
     SiteDomain::query()->create([
         'site_id' => $site->id,
-        'hostname' => 'app.example.com',
+        'hostname' => $hostname,
         'is_primary' => true,
         'www_redirect' => false,
     ]);
@@ -54,7 +60,7 @@ function seedCdnCommandSite(): array
 
 test('cdn-enable writes meta, audits, and dispatches', function () {
     Bus::fake();
-    [$site, $credential] = seedCdnCommandSite();
+    [$site, $credential] = seedCdnCommandSite('app.example.com');
 
     $this->artisan('dply:site:cdn-enable', ['site' => $site->slug])
         ->assertSuccessful();
@@ -148,4 +154,41 @@ test('cdn-purge no-ops when disabled', function () {
 
     $this->artisan('dply:site:cdn-purge', ['site' => $site->slug])->assertSuccessful();
     Bus::assertNotDispatched(PurgeSiteCdnJob::class);
+});
+
+test('cdn-sync-metrics dispatches for one site', function () {
+    Bus::fake();
+    [$site, $credential] = seedCdnCommandSite();
+    $site->meta = ['cdn' => [
+        'enabled' => true, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'zone_id' => 'zone-1', 'hostname' => 'app.example.com',
+    ]];
+    $site->save();
+
+    $this->artisan('dply:site:cdn-sync-metrics', ['site' => $site->slug])->assertSuccessful();
+    Bus::assertDispatched(SyncSiteCdnMetricsJob::class, fn ($job) => $job->siteId === $site->id);
+});
+
+test('cdn-sync-metrics --all-enabled only targets enabled sites with a zone id', function () {
+    Bus::fake();
+    [$enabledSite, $credential] = seedCdnCommandSite();
+    $enabledSite->meta = ['cdn' => [
+        'enabled' => true, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'zone_id' => 'zone-1', 'hostname' => 'app.example.com',
+    ]];
+    $enabledSite->save();
+
+    // Second site: enabled but no zone_id yet (should be skipped).
+    [$pendingSite] = seedCdnCommandSite();
+    $pendingSite->meta = ['cdn' => ['enabled' => true, 'provider' => 'cloudflare']];
+    $pendingSite->save();
+
+    // Third site: no cdn config at all.
+    [$plainSite] = seedCdnCommandSite();
+
+    $this->artisan('dply:site:cdn-sync-metrics', ['--all-enabled' => true])->assertSuccessful();
+
+    Bus::assertDispatched(SyncSiteCdnMetricsJob::class, fn ($job) => $job->siteId === $enabledSite->id);
+    Bus::assertNotDispatched(SyncSiteCdnMetricsJob::class, fn ($job) => $job->siteId === $pendingSite->id);
+    Bus::assertNotDispatched(SyncSiteCdnMetricsJob::class, fn ($job) => $job->siteId === $plainSite->id);
 });

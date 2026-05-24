@@ -108,6 +108,33 @@ test('purge hostname scopes to the host', function () {
         && $req['hosts'] === ['app.example.com']);
 });
 
+test('fetches analytics totals and returns a flat snapshot', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/analytics/dashboard*' => Http::response([
+            'success' => true,
+            'result' => [
+                'totals' => [
+                    'requests' => ['all' => 1000, 'cached' => 750],
+                    'bandwidth' => ['all' => 5_000_000, 'cached' => 3_500_000],
+                ],
+            ],
+        ]),
+    ]);
+
+    $snap = (new CloudflareCdnService('tok'))->fetchDashboardAnalytics('zone-1', 60);
+
+    expect($snap)->toMatchArray([
+        'requests_all' => 1000,
+        'requests_cached' => 750,
+        'bandwidth_all' => 5_000_000,
+        'bandwidth_cached' => 3_500_000,
+        'since_minutes' => 60,
+    ]);
+    Http::assertSent(fn ($req) => $req->method() === 'GET'
+        && str_contains($req->url(), '/zones/zone-1/analytics/dashboard')
+        && $req['since'] === '-60');
+});
+
 test('throws when API reports success false', function () {
     Http::fake([
         'https://api.cloudflare.com/client/v4/zones/zone-1/purge_cache' => Http::response([

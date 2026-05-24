@@ -123,6 +123,72 @@
             @error('cachePreset') <p class="mt-2 text-xs text-rose-700">{{ $message }}</p> @enderror
         </div>
 
+        @php
+            $metrics = $this->site->cdnConfig()['metrics'] ?? [];
+            $hitRate = isset($metrics['hit_rate']) && is_numeric($metrics['hit_rate']) ? (float) $metrics['hit_rate'] : null;
+            $reqAll = (int) ($metrics['requests_all'] ?? 0);
+            $reqCached = (int) ($metrics['requests_cached'] ?? 0);
+            $bwAll = (int) ($metrics['bandwidth_all'] ?? 0);
+            $bwCached = (int) ($metrics['bandwidth_cached'] ?? 0);
+            $lastPolled = $metrics['last_polled_at'] ?? null;
+            $metricsError = $metrics['last_error'] ?? null;
+            $formatBytes = function (int $bytes): string {
+                if ($bytes < 1024) {
+                    return $bytes.' B';
+                }
+                $units = ['KB', 'MB', 'GB', 'TB'];
+                $value = $bytes / 1024;
+                $i = 0;
+                while ($value >= 1024 && $i < count($units) - 1) {
+                    $value /= 1024;
+                    $i++;
+                }
+                return number_format($value, $value >= 100 ? 0 : 1).' '.$units[$i];
+            };
+        @endphp
+
+        @if ($enabled)
+            <div class="{{ $card }}">
+                <div class="flex items-baseline justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Last 24 hours') }}</h3>
+                        @if ($lastPolled)
+                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Polled') }} <span class="font-mono text-brand-ink">{{ $lastPolled }}</span></p>
+                        @else
+                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('No snapshot yet — hourly scheduler will populate this, or refresh manually.') }}</p>
+                        @endif
+                    </div>
+                    <button type="button" wire:click="refreshMetrics" class="rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40">
+                        {{ __('Refresh') }}
+                    </button>
+                </div>
+                @if ($metricsError)
+                    <p class="mt-3 text-xs text-rose-700">{{ __('Last poll error:') }} {{ $metricsError }}</p>
+                @endif
+                <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="rounded-lg border border-brand-ink/10 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Hit rate') }}</p>
+                        <p class="mt-1 text-xl font-semibold text-brand-ink">{{ $hitRate !== null ? number_format($hitRate * 100, 1).'%' : '—' }}</p>
+                    </div>
+                    <div class="rounded-lg border border-brand-ink/10 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Requests') }}</p>
+                        <p class="mt-1 text-xl font-semibold text-brand-ink">{{ number_format($reqAll) }}</p>
+                        <p class="text-[10px] text-brand-moss">{{ number_format($reqCached) }} {{ __('cached') }}</p>
+                    </div>
+                    <div class="rounded-lg border border-brand-ink/10 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Bandwidth') }}</p>
+                        <p class="mt-1 text-xl font-semibold text-brand-ink">{{ $formatBytes($bwAll) }}</p>
+                        <p class="text-[10px] text-brand-moss">{{ $formatBytes($bwCached) }} {{ __('cached') }}</p>
+                    </div>
+                    <div class="rounded-lg border border-brand-ink/10 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Origin saved') }}</p>
+                        <p class="mt-1 text-xl font-semibold text-brand-ink">{{ $formatBytes($bwCached) }}</p>
+                        <p class="text-[10px] text-brand-moss">{{ __('served from edge') }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="flex flex-wrap items-center gap-3">
             <button type="submit" class="{{ $btnPrimary }}">{{ __('Save and sync') }}</button>
             <button type="button" wire:click="purge" class="{{ $btnSecondary }}" @disabled(! $enabled)>

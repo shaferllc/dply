@@ -158,6 +158,43 @@ class CloudflareCdnService
         $this->assertApiSuccess($response, 'purge Cloudflare cache');
     }
 
+    /**
+     * Fetch zone-level analytics totals over the trailing `sinceMinutes`
+     * window. Returns a flat snapshot (totals only, no timeseries) so the
+     * caller can persist it without parsing a nested payload.
+     *
+     * Uses the legacy `/analytics/dashboard` REST endpoint — broader plan
+     * coverage than the GraphQL analytics API and one round trip. Free
+     * plans receive 24h windows only; tighter windows silently widen.
+     *
+     * @return array{requests_all: int, requests_cached: int, bandwidth_all: int, bandwidth_cached: int, since_minutes: int}
+     */
+    public function fetchDashboardAnalytics(string $zoneId, int $sinceMinutes = 1440): array
+    {
+        $response = $this->request('get', '/zones/'.$zoneId.'/analytics/dashboard', [
+            'since' => '-'.$sinceMinutes,
+            'until' => '0',
+            'continuous' => 'true',
+        ]);
+        $this->assertApiSuccess($response, 'fetch Cloudflare analytics');
+
+        $totals = $response->json('result.totals');
+        if (! is_array($totals)) {
+            throw new \RuntimeException('Cloudflare analytics response missing totals.');
+        }
+
+        $requests = is_array($totals['requests'] ?? null) ? $totals['requests'] : [];
+        $bandwidth = is_array($totals['bandwidth'] ?? null) ? $totals['bandwidth'] : [];
+
+        return [
+            'requests_all' => (int) ($requests['all'] ?? 0),
+            'requests_cached' => (int) ($requests['cached'] ?? 0),
+            'bandwidth_all' => (int) ($bandwidth['all'] ?? 0),
+            'bandwidth_cached' => (int) ($bandwidth['cached'] ?? 0),
+            'since_minutes' => $sinceMinutes,
+        ];
+    }
+
     private function patchZoneSetting(string $zoneId, string $key, mixed $value): void
     {
         $response = $this->request('patch', '/zones/'.$zoneId.'/settings/'.$key, [

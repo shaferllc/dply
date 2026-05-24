@@ -6,6 +6,7 @@ namespace Tests\Feature\Sites\SiteCdnPanelTest;
 
 use App\Jobs\ApplySiteCdnJob;
 use App\Jobs\PurgeSiteCdnJob;
+use App\Jobs\SyncSiteCdnMetricsJob;
 use App\Livewire\Sites\Cdn;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -164,6 +165,33 @@ test('purge refuses when edge disabled', function () {
         ->call('purge');
 
     Bus::assertNotDispatched(PurgeSiteCdnJob::class);
+});
+
+test('refreshMetrics queues sync job only when enabled', function () {
+    Bus::fake();
+    [$user, $server, $site, $credential] = setUpCdnSite();
+    $site->meta = array_merge($site->meta ?? [], ['cdn' => [
+        'enabled' => true, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'zone_id' => 'zone-1', 'hostname' => 'app.example.com', 'origin_ip' => '203.0.113.10',
+    ]]);
+    $site->save();
+
+    Livewire::actingAs($user)
+        ->test(Cdn::class, ['server' => $server, 'site' => $site])
+        ->call('refreshMetrics');
+
+    Bus::assertDispatched(SyncSiteCdnMetricsJob::class, fn ($job) => $job->siteId === $site->id);
+});
+
+test('refreshMetrics refuses when edge disabled', function () {
+    Bus::fake();
+    [$user, $server, $site] = setUpCdnSite();
+
+    Livewire::actingAs($user)
+        ->test(Cdn::class, ['server' => $server, 'site' => $site])
+        ->call('refreshMetrics');
+
+    Bus::assertNotDispatched(SyncSiteCdnMetricsJob::class);
 });
 
 test('save rejects credential from another organization', function () {

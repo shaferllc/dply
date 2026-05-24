@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Enums\ServerProvider;
 use App\Jobs\ApplySiteCdnJob;
 use App\Jobs\PurgeSiteCdnJob;
+use App\Jobs\SyncSiteCdnMetricsJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -174,6 +175,20 @@ class Cdn extends Component
 
         $this->site = $this->site->fresh() ?? $this->site;
         $this->hydrateFromSite();
+    }
+
+    public function refreshMetrics(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if (! $this->enabled) {
+            $this->toastError(__('Enable the edge before fetching metrics.'));
+
+            return;
+        }
+
+        SyncSiteCdnMetricsJob::dispatch($this->site->id);
+        $this->toastSuccess(__('Metrics refresh queued. Reload in a moment.'));
     }
 
     public function purge(): void

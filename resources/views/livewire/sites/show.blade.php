@@ -845,7 +845,12 @@
                                     <dd class="min-w-0 flex-1 break-all font-mono text-xs text-brand-ink">{{ $runtimePublication['url'] }}</dd>
                                 </div>
                             @endif
-                            @php $cdnCfg = $site->cdnConfig(); @endphp
+                            @php
+                                $cdnCfg = $site->cdnConfig();
+                                $cdnHitRate = isset($cdnCfg['metrics']['hit_rate']) && is_numeric($cdnCfg['metrics']['hit_rate'])
+                                    ? (float) $cdnCfg['metrics']['hit_rate']
+                                    : null;
+                            @endphp
                             @if (! empty($cdnCfg['provider']))
                                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
                                     <dt class="w-32 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Edge / CDN') }}</dt>
@@ -856,6 +861,11 @@
                                                 {{ ! empty($cdnCfg['enabled']) ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-sand/40 text-brand-mist' }}">
                                                 {{ ! empty($cdnCfg['enabled']) ? __('Active') : __('Off') }}
                                             </span>
+                                            @if ($cdnHitRate !== null)
+                                                <span class="ml-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800" title="{{ __('Cache hit rate over the last 24h') }}">
+                                                    {{ number_format($cdnHitRate * 100, 0) }}% {{ __('hit') }}
+                                                </span>
+                                            @endif
                                             @if (! empty($cdnCfg['last_error']))
                                                 <span class="ml-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800" title="{{ $cdnCfg['last_error'] }}">{{ __('Error') }}</span>
                                             @endif
