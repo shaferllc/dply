@@ -68,6 +68,7 @@ final class SiteSettingsSidebar
                 ['id' => 'commits', 'label' => __('Commits'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'deploy', 'route' => 'sites.commits'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
+                ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
                 ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
