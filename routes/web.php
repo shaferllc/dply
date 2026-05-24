@@ -386,6 +386,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // at `?section=repository`.
     Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
     Route::livewire('servers/{server}/sites/{site}/caching', \App\Livewire\Sites\Caching::class)->name('sites.caching');
+    Route::livewire('servers/{server}/sites/{site}/cdn', \App\Livewire\Sites\Cdn::class)->name('sites.cdn');
     Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides

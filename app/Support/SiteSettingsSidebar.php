@@ -141,6 +141,13 @@ final class SiteSettingsSidebar
                             'group' => 'networking',
                             'route' => 'sites.caching',
                         ],
+                        [
+                            'id' => 'cdn',
+                            'label' => __('CDN / Edge'),
+                            'icon' => 'heroicon-o-globe-alt',
+                            'group' => 'networking',
+                            'route' => 'sites.cdn',
+                        ],
                     ];
                 })
                 ->values()
