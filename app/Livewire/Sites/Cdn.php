@@ -51,6 +51,15 @@ class Cdn extends Component
 
     public string $cachePreset = CloudflareCdnService::PRESET_STANDARD;
 
+    /** @var list<array{path: string, action: string, ttl: int}> */
+    public array $rules = [];
+
+    public string $newRulePath = '';
+
+    public string $newRuleAction = CloudflareCdnService::RULE_ACTION_BYPASS;
+
+    public int $newRuleTtl = 3600;
+
     public ?string $lastAppliedAt = null;
 
     public ?string $lastPurgeAt = null;
@@ -93,6 +102,53 @@ class Cdn extends Component
         $this->originIp = is_string($cfg['origin_ip'] ?? null) && $cfg['origin_ip'] !== ''
             ? (string) $cfg['origin_ip']
             : (string) ($this->server->ip_address ?? '');
+
+        $this->rules = [];
+        foreach (ApplySiteCdnJob::normaliseRules(is_array($cfg['rules'] ?? null) ? $cfg['rules'] : []) as $rule) {
+            $this->rules[] = [
+                'path' => $rule['path'],
+                'action' => $rule['action'],
+                'ttl' => (int) ($rule['ttl'] ?? 3600),
+            ];
+        }
+    }
+
+    public function addRule(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $path = trim($this->newRulePath);
+        if ($path === '') {
+            $this->toastError(__('Path is required.'));
+
+            return;
+        }
+        if (! str_starts_with($path, '/')) {
+            $path = '/'.$path;
+        }
+        if (! in_array($this->newRuleAction, [CloudflareCdnService::RULE_ACTION_BYPASS, CloudflareCdnService::RULE_ACTION_CACHE], true)) {
+            $this->toastError(__('Unknown rule action.'));
+
+            return;
+        }
+
+        $this->rules[] = [
+            'path' => $path,
+            'action' => $this->newRuleAction,
+            'ttl' => max(1, $this->newRuleTtl),
+        ];
+        $this->newRulePath = '';
+    }
+
+    public function removeRule(int $index): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if (! isset($this->rules[$index])) {
+            return;
+        }
+        array_splice($this->rules, $index, 1);
+        $this->rules = array_values($this->rules);
     }
 
     /**
@@ -145,6 +201,7 @@ class Cdn extends Component
             'hostname' => strtolower(trim($this->hostname)),
             'origin_ip' => trim($this->originIp),
             'cache_preset' => $this->cachePreset,
+            'rules' => ApplySiteCdnJob::normaliseRules($this->rules),
         ]);
 
         $this->site->meta = $meta;

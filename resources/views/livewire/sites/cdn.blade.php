@@ -123,6 +123,58 @@
             @error('cachePreset') <p class="mt-2 text-xs text-rose-700">{{ $message }}</p> @enderror
         </div>
 
+        <div class="{{ $card }}">
+            <div class="flex items-baseline justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Path cache rules') }}</h3>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Per-path overrides applied at the edge. Rules are matched top-to-bottom; the first match wins for that request. Bypass skips the cache entirely; cache forces a TTL regardless of origin headers.') }}</p>
+                </div>
+            </div>
+
+            @if (! empty($rules))
+                <div class="mt-4 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
+                    @foreach ($rules as $idx => $rule)
+                        <div class="flex flex-wrap items-center gap-3 px-3 py-2">
+                            <span class="font-mono text-xs text-brand-ink flex-1 min-w-[10rem] break-all">{{ $rule['path'] }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
+                                {{ $rule['action'] === 'bypass' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">
+                                {{ $rule['action'] === 'bypass' ? __('Bypass') : __('Cache') }}
+                            </span>
+                            @if ($rule['action'] === 'cache')
+                                <span class="text-[11px] text-brand-moss">{{ __('TTL') }}: <span class="font-mono text-brand-ink">{{ $rule['ttl'] }}s</span></span>
+                            @endif
+                            <button type="button" wire:click="removeRule({{ $idx }})" class="text-[11px] font-semibold text-rose-700 hover:underline">
+                                {{ __('Remove') }}
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <p class="mt-4 text-xs text-brand-moss italic">{{ __('No path rules yet — the cache preset above applies to all paths.') }}</p>
+            @endif
+
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                <div class="sm:col-span-5">
+                    <label class="{{ $labelCls }}" for="newRulePath">{{ __('Path prefix') }}</label>
+                    <input id="newRulePath" type="text" wire:model="newRulePath" placeholder="/api/" class="{{ $inputCls }}">
+                </div>
+                <div class="sm:col-span-3">
+                    <label class="{{ $labelCls }}" for="newRuleAction">{{ __('Action') }}</label>
+                    <select id="newRuleAction" wire:model.live="newRuleAction" class="{{ $inputCls }}">
+                        <option value="bypass">{{ __('Bypass') }}</option>
+                        <option value="cache">{{ __('Cache') }}</option>
+                    </select>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="{{ $labelCls }}" for="newRuleTtl">{{ __('TTL (s)') }}</label>
+                    <input id="newRuleTtl" type="number" min="1" wire:model="newRuleTtl" class="{{ $inputCls }}" @disabled($newRuleAction !== 'cache')>
+                </div>
+                <div class="sm:col-span-2">
+                    <button type="button" wire:click="addRule" class="{{ $btnSecondary }} w-full">{{ __('Add rule') }}</button>
+                </div>
+            </div>
+        </div>
+
         @php
             $metrics = $this->site->cdnConfig()['metrics'] ?? [];
             $hitRate = isset($metrics['hit_rate']) && is_numeric($metrics['hit_rate']) ? (float) $metrics['hit_rate'] : null;

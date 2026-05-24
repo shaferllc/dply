@@ -108,6 +108,81 @@ test('purge hostname scopes to the host', function () {
         && $req['hosts'] === ['app.example.com']);
 });
 
+test('syncCacheRules preserves user rules and replaces dply-managed rules', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint' => Http::sequence()
+            ->push([
+                'success' => true,
+                'result' => ['rules' => [
+                    ['description' => 'user manual rule', 'expression' => '(http.host eq "x")', 'action' => 'set_cache_settings', 'action_parameters' => ['cache' => false]],
+                    ['description' => 'dply-site-S1:0', 'expression' => '(stale)', 'action' => 'set_cache_settings', 'action_parameters' => ['cache' => false]],
+                ]],
+            ])
+            ->push(['success' => true, 'result' => ['id' => 'rs-1']]),
+    ]);
+
+    (new CloudflareCdnService('tok'))->syncCacheRules('zone-1', 'app.example.com', [
+        ['path' => '/api/', 'action' => 'bypass'],
+        ['path' => '/static/', 'action' => 'cache', 'ttl' => 7200],
+    ], 'dply-site-S1');
+
+    Http::assertSent(fn ($req) => $req->method() === 'PUT'
+        && str_ends_with($req->url(), '/zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint')
+        && collect($req['rules'])->pluck('description')->all() === ['user manual rule', 'dply-site-S1:0', 'dply-site-S1:1']
+        && $req['rules'][1]['action_parameters'] === ['cache' => false]
+        && $req['rules'][2]['action_parameters']['cache'] === true
+        && $req['rules'][2]['action_parameters']['edge_ttl']['default'] === 7200);
+});
+
+test('syncCacheRules creates entrypoint when none exists', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint' => Http::sequence()
+            ->push(['errors' => [['message' => 'not found']]], 404)
+            ->push(['success' => true, 'result' => ['id' => 'rs-new']]),
+    ]);
+
+    (new CloudflareCdnService('tok'))->syncCacheRules('zone-1', 'app.example.com', [
+        ['path' => '/api/', 'action' => 'bypass'],
+    ], 'dply-site-S2');
+
+    Http::assertSent(fn ($req) => $req->method() === 'PUT'
+        && collect($req['rules'])->pluck('description')->all() === ['dply-site-S2:0']);
+});
+
+test('clearManagedCacheRules drops only our rules', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint' => Http::sequence()
+            ->push([
+                'success' => true,
+                'result' => ['rules' => [
+                    ['description' => 'user rule', 'expression' => '(x)', 'action' => 'set_cache_settings', 'action_parameters' => ['cache' => false]],
+                    ['description' => 'dply-site-S3:0', 'expression' => '(y)', 'action' => 'set_cache_settings', 'action_parameters' => ['cache' => false]],
+                ]],
+            ])
+            ->push(['success' => true]),
+    ]);
+
+    (new CloudflareCdnService('tok'))->clearManagedCacheRules('zone-1', 'dply-site-S3');
+
+    Http::assertSent(fn ($req) => $req->method() === 'PUT'
+        && collect($req['rules'])->pluck('description')->all() === ['user rule']);
+});
+
+test('clearManagedCacheRules is a no-op when nothing of ours is present', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/rulesets/phases/http_request_cache_settings/entrypoint' => Http::response([
+            'success' => true,
+            'result' => ['rules' => [
+                ['description' => 'user rule', 'expression' => '(x)', 'action' => 'set_cache_settings', 'action_parameters' => ['cache' => false]],
+            ]],
+        ]),
+    ]);
+
+    (new CloudflareCdnService('tok'))->clearManagedCacheRules('zone-1', 'dply-site-missing');
+
+    Http::assertSentCount(1); // only the GET; no PUT.
+});
+
 test('fetches analytics totals and returns a flat snapshot', function () {
     Http::fake([
         'https://api.cloudflare.com/client/v4/zones/zone-1/analytics/dashboard*' => Http::response([

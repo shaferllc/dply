@@ -194,6 +194,77 @@ test('refreshMetrics refuses when edge disabled', function () {
     Bus::assertNotDispatched(SyncSiteCdnMetricsJob::class);
 });
 
+test('addRule appends to rules list and forces leading slash', function () {
+    [$user, $server, $site] = setUpCdnSite();
+
+    Livewire::actingAs($user)
+        ->test(Cdn::class, ['server' => $server, 'site' => $site])
+        ->set('newRulePath', 'api/')
+        ->set('newRuleAction', 'bypass')
+        ->call('addRule')
+        ->set('newRulePath', '/static/')
+        ->set('newRuleAction', 'cache')
+        ->set('newRuleTtl', 7200)
+        ->call('addRule')
+        ->assertSet('rules', [
+            ['path' => '/api/', 'action' => 'bypass', 'ttl' => 3600],
+            ['path' => '/static/', 'action' => 'cache', 'ttl' => 7200],
+        ]);
+});
+
+test('addRule rejects empty path', function () {
+    [$user, $server, $site] = setUpCdnSite();
+
+    Livewire::actingAs($user)
+        ->test(Cdn::class, ['server' => $server, 'site' => $site])
+        ->set('newRulePath', '   ')
+        ->call('addRule')
+        ->assertSet('rules', []);
+});
+
+test('removeRule deletes by index and re-indexes', function () {
+    [$user, $server, $site, $credential] = setUpCdnSite();
+    $site->meta = array_merge($site->meta ?? [], ['cdn' => [
+        'enabled' => true, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'rules' => [
+            ['path' => '/a', 'action' => 'bypass'],
+            ['path' => '/b', 'action' => 'cache', 'ttl' => 60],
+            ['path' => '/c', 'action' => 'bypass'],
+        ],
+    ]]);
+    $site->save();
+
+    Livewire::actingAs($user)
+        ->test(Cdn::class, ['server' => $server, 'site' => $site->fresh()])
+        ->call('removeRule', 1)
+        ->assertSet('rules', [
+            ['path' => '/a', 'action' => 'bypass', 'ttl' => 3600],
+            ['path' => '/c', 'action' => 'bypass', 'ttl' => 3600],
+        ]);
+});
+
+test('save persists rules into meta.cdn.rules', function () {
+    Bus::fake();
+    [$user, $server, $site, $credential] = setUpCdnSite();
+
+    Livewire::actingAs($user)
+        ->test(Cdn::class, ['server' => $server, 'site' => $site])
+        ->set('enabled', true)
+        ->set('credentialId', $credential->id)
+        ->set('rules', [
+            ['path' => '/api/', 'action' => 'bypass', 'ttl' => 3600],
+            ['path' => '/cdn/', 'action' => 'cache', 'ttl' => 1800],
+        ])
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $fresh = $site->fresh();
+    expect($fresh->meta['cdn']['rules'])->toBe([
+        ['path' => '/api/', 'action' => 'bypass'],
+        ['path' => '/cdn/', 'action' => 'cache', 'ttl' => 1800],
+    ]);
+});
+
 test('save rejects credential from another organization', function () {
     [$user, $server, $site] = setUpCdnSite();
     $otherOrg = Organization::factory()->create();

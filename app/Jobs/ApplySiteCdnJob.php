@@ -70,12 +70,15 @@ class ApplySiteCdnJob implements ShouldQueue
                 throw new \RuntimeException('Cloudflare zone not found: '.$zoneName);
             }
 
+            $managedPrefix = 'dply-site-'.$site->id;
             if (! empty($cfg['enabled'])) {
                 $recordId = $service->enableProxyForRecord($zoneId, $hostname, $originIp);
                 $service->applyCachePreset(
                     $zoneId,
                     is_string($cfg['cache_preset'] ?? null) ? $cfg['cache_preset'] : CloudflareCdnService::PRESET_STANDARD,
                 );
+                $rules = is_array($cfg['rules'] ?? null) ? self::normaliseRules($cfg['rules']) : [];
+                $service->syncCacheRules($zoneId, $hostname, $rules, $managedPrefix);
                 $this->persist($site, [
                     'zone_id' => $zoneId,
                     'record_id' => $recordId,
@@ -87,6 +90,7 @@ class ApplySiteCdnJob implements ShouldQueue
                 if ($recordId !== '') {
                     $service->disableProxyForRecord($zoneId, $recordId, $hostname, $originIp);
                 }
+                $service->clearManagedCacheRules($zoneId, $managedPrefix);
                 $this->persist($site, [
                     'last_applied_at' => now()->toIso8601String(),
                     'last_error' => null,
@@ -100,6 +104,39 @@ class ApplySiteCdnJob implements ShouldQueue
             $this->persist($site, ['last_error' => $e->getMessage()]);
             throw $e;
         }
+    }
+
+    /**
+     * Reduce arbitrary stored shapes into the strict tuple shape the
+     * service builder needs. Drops malformed entries instead of letting
+     * the Cloudflare API reject the whole ruleset.
+     *
+     * @param  array<int|string, mixed>  $raw
+     * @return list<array{path: string, action: string, ttl?: int}>
+     */
+    public static function normaliseRules(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $path = trim((string) ($entry['path'] ?? ''));
+            $action = (string) ($entry['action'] ?? '');
+            if ($path === '' || ! in_array($action, [CloudflareCdnService::RULE_ACTION_BYPASS, CloudflareCdnService::RULE_ACTION_CACHE], true)) {
+                continue;
+            }
+            if (! str_starts_with($path, '/')) {
+                $path = '/'.$path;
+            }
+            $tuple = ['path' => $path, 'action' => $action];
+            if ($action === CloudflareCdnService::RULE_ACTION_CACHE) {
+                $tuple['ttl'] = max(1, (int) ($entry['ttl'] ?? 3600));
+            }
+            $out[] = $tuple;
+        }
+
+        return $out;
     }
 
     /**

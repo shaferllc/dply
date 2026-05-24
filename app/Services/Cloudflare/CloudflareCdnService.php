@@ -158,6 +158,117 @@ class CloudflareCdnService
         $this->assertApiSuccess($response, 'purge Cloudflare cache');
     }
 
+    public const RULE_ACTION_BYPASS = 'bypass';
+
+    public const RULE_ACTION_CACHE = 'cache';
+
+    /**
+     * Reconcile dply-managed cache rules in the zone's
+     * `http_request_cache_settings` entrypoint ruleset. User-managed rules
+     * (any rule whose `description` does not start with `$managedPrefix`)
+     * are preserved verbatim; ours are stripped and re-appended from
+     * `$rules` so each save is a full overwrite of dply's slice.
+     *
+     * @param  list<array{path: string, action: string, ttl?: int}>  $rules
+     */
+    public function syncCacheRules(string $zoneId, string $hostname, array $rules, string $managedPrefix): void
+    {
+        $existing = $this->fetchCachePhaseRules($zoneId);
+        $preserved = array_values(array_filter(
+            $existing,
+            fn (array $r): bool => ! str_starts_with((string) ($r['description'] ?? ''), $managedPrefix),
+        ));
+
+        $managed = [];
+        foreach (array_values($rules) as $i => $rule) {
+            $managed[] = $this->buildCacheRule($hostname, $rule, $managedPrefix.':'.$i);
+        }
+
+        $this->putCachePhaseRules($zoneId, array_merge($preserved, $managed));
+    }
+
+    public function clearManagedCacheRules(string $zoneId, string $managedPrefix): void
+    {
+        $existing = $this->fetchCachePhaseRules($zoneId);
+        $preserved = array_values(array_filter(
+            $existing,
+            fn (array $r): bool => ! str_starts_with((string) ($r['description'] ?? ''), $managedPrefix),
+        ));
+
+        if (count($preserved) === count($existing)) {
+            return; // nothing of ours present.
+        }
+
+        $this->putCachePhaseRules($zoneId, $preserved);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fetchCachePhaseRules(string $zoneId): array
+    {
+        $response = $this->request('get', '/zones/'.$zoneId.'/rulesets/phases/http_request_cache_settings/entrypoint');
+        if ($response->status() === 404) {
+            return [];
+        }
+        $this->assertApiSuccess($response, 'fetch Cloudflare cache ruleset');
+
+        $rules = $response->json('result.rules');
+
+        return is_array($rules) ? array_values(array_filter($rules, 'is_array')) : [];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rules
+     */
+    private function putCachePhaseRules(string $zoneId, array $rules): void
+    {
+        $response = $this->request(
+            'put',
+            '/zones/'.$zoneId.'/rulesets/phases/http_request_cache_settings/entrypoint',
+            ['rules' => $rules],
+        );
+        $this->assertApiSuccess($response, 'update Cloudflare cache ruleset');
+    }
+
+    /**
+     * @param  array{path: string, action: string, ttl?: int}  $rule
+     * @return array<string, mixed>
+     */
+    private function buildCacheRule(string $hostname, array $rule, string $description): array
+    {
+        $path = (string) $rule['path'];
+        $expression = sprintf(
+            '(http.host eq "%s" and starts_with(http.request.uri.path, "%s"))',
+            $this->escapeWirefilter(strtolower($hostname)),
+            $this->escapeWirefilter($path),
+        );
+
+        $params = $rule['action'] === self::RULE_ACTION_BYPASS
+            ? ['cache' => false]
+            : [
+                'cache' => true,
+                'edge_ttl' => [
+                    'mode' => 'override_origin',
+                    'default' => max(1, (int) ($rule['ttl'] ?? 3600)),
+                ],
+            ];
+
+        return [
+            'description' => $description,
+            'expression' => $expression,
+            'action' => 'set_cache_settings',
+            'action_parameters' => $params,
+            'enabled' => true,
+        ];
+    }
+
+    private function escapeWirefilter(string $value): string
+    {
+        // Wirefilter string literals use backslash-escaped double quotes.
+        return str_replace(['\\', '"'], ['\\\\', '\\"'], $value);
+    }
+
     /**
      * Fetch zone-level analytics totals over the trailing `sinceMinutes`
      * window. Returns a flat snapshot (totals only, no timeseries) so the

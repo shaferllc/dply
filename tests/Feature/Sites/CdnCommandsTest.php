@@ -169,6 +169,96 @@ test('cdn-sync-metrics dispatches for one site', function () {
     Bus::assertDispatched(SyncSiteCdnMetricsJob::class, fn ($job) => $job->siteId === $site->id);
 });
 
+test('cdn-rule-add appends to meta and writes audit', function () {
+    Bus::fake();
+    [$site, $credential] = seedCdnCommandSite();
+    $site->meta = ['cdn' => [
+        'enabled' => false, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+    ]];
+    $site->save();
+
+    $this->artisan('dply:site:cdn-rule-add', [
+        'site' => $site->slug,
+        'path' => 'api/',
+        '--action' => 'bypass',
+    ])->assertSuccessful();
+
+    $rules = $site->fresh()->meta['cdn']['rules'];
+    expect($rules)->toBe([['path' => '/api/', 'action' => 'bypass']]);
+
+    // Apply job should NOT have fired because edge is disabled — meta edits
+    // wait until the operator flips enabled on.
+    Bus::assertNotDispatched(ApplySiteCdnJob::class);
+
+    $audit = SiteAuditEvent::query()->where('action', 'site_cdn_rule_added')->first();
+    expect($audit)->not->toBeNull();
+});
+
+test('cdn-rule-add dispatches apply job when edge enabled', function () {
+    Bus::fake();
+    [$site, $credential] = seedCdnCommandSite();
+    $site->meta = ['cdn' => [
+        'enabled' => true, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'zone_id' => 'zone-1', 'hostname' => 'app.example.com', 'origin_ip' => '203.0.113.10',
+        'zone_name' => 'example.com',
+    ]];
+    $site->save();
+
+    $this->artisan('dply:site:cdn-rule-add', [
+        'site' => $site->slug,
+        'path' => '/static/',
+        '--action' => 'cache',
+        '--ttl' => 7200,
+    ])->assertSuccessful();
+
+    expect($site->fresh()->meta['cdn']['rules'])->toBe([
+        ['path' => '/static/', 'action' => 'cache', 'ttl' => 7200],
+    ]);
+    Bus::assertDispatched(ApplySiteCdnJob::class);
+});
+
+test('cdn-rule-remove drops first matching path', function () {
+    Bus::fake();
+    [$site, $credential] = seedCdnCommandSite();
+    $site->meta = ['cdn' => [
+        'enabled' => true, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'zone_id' => 'zone-1', 'hostname' => 'app.example.com',
+        'rules' => [
+            ['path' => '/api/', 'action' => 'bypass'],
+            ['path' => '/static/', 'action' => 'cache', 'ttl' => 60],
+        ],
+    ]];
+    $site->save();
+
+    $this->artisan('dply:site:cdn-rule-remove', [
+        'site' => $site->slug,
+        'path' => '/api/',
+    ])->assertSuccessful();
+
+    expect($site->fresh()->meta['cdn']['rules'])->toBe([
+        ['path' => '/static/', 'action' => 'cache', 'ttl' => 60],
+    ]);
+});
+
+test('cdn-rule-remove is a no-op for unknown path', function () {
+    Bus::fake();
+    [$site, $credential] = seedCdnCommandSite();
+    $site->meta = ['cdn' => [
+        'enabled' => false, 'provider' => 'cloudflare', 'credential_id' => $credential->id,
+        'rules' => [['path' => '/api/', 'action' => 'bypass']],
+    ]];
+    $site->save();
+
+    $this->artisan('dply:site:cdn-rule-remove', [
+        'site' => $site->slug,
+        'path' => '/missing/',
+    ])->assertSuccessful();
+
+    expect($site->fresh()->meta['cdn']['rules'])->toBe([
+        ['path' => '/api/', 'action' => 'bypass'],
+    ]);
+});
+
 test('cdn-sync-metrics --all-enabled only targets enabled sites with a zone id', function () {
     Bus::fake();
     [$enabledSite, $credential] = seedCdnCommandSite();
