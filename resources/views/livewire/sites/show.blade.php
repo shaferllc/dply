@@ -845,6 +845,24 @@
                                     <dd class="min-w-0 flex-1 break-all font-mono text-xs text-brand-ink">{{ $runtimePublication['url'] }}</dd>
                                 </div>
                             @endif
+                            @php $cdnCfg = $site->cdnConfig(); @endphp
+                            @if (! empty($cdnCfg['provider']))
+                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                                    <dt class="w-32 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Edge / CDN') }}</dt>
+                                    <dd class="min-w-0 flex-1 text-xs text-brand-ink">
+                                        <a href="{{ route('sites.cdn', [$server, $site]) }}" wire:navigate class="hover:underline">
+                                            <span class="font-mono">{{ ucfirst($cdnCfg['provider']) }}</span>
+                                            <span class="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide
+                                                {{ ! empty($cdnCfg['enabled']) ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-sand/40 text-brand-mist' }}">
+                                                {{ ! empty($cdnCfg['enabled']) ? __('Active') : __('Off') }}
+                                            </span>
+                                            @if (! empty($cdnCfg['last_error']))
+                                                <span class="ml-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800" title="{{ $cdnCfg['last_error'] }}">{{ __('Error') }}</span>
+                                            @endif
+                                        </a>
+                                    </dd>
+                                </div>
+                            @endif
                         </dl>
                         <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 text-xs text-brand-moss sm:px-8">
                             {{ __('Show this site on a public') }}

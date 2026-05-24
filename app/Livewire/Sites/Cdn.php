@@ -11,7 +11,10 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteAuditEvent;
 use App\Services\Cloudflare\CloudflareCdnService;
+use App\Services\RemoteCli\RiskLevel;
+use App\Services\RemoteCli\SiteAuditWriter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -148,6 +151,23 @@ class Cdn extends Component
 
         ApplySiteCdnJob::dispatch($this->site->id);
 
+        app(SiteAuditWriter::class)->record(
+            site: $this->site,
+            user: auth()->user(),
+            action: $this->enabled ? 'site_cdn_enabled' : 'site_cdn_disabled',
+            risk: RiskLevel::MutatingRecoverable,
+            transport: SiteAuditEvent::TRANSPORT_WEB,
+            summary: $this->enabled
+                ? __('Edge enabled (:provider) for :host', ['provider' => $this->provider, 'host' => $this->hostname])
+                : __('Edge disabled for :host', ['host' => $this->hostname]),
+            payload: [
+                'provider' => $this->provider,
+                'zone_name' => strtolower(trim($this->zoneName)),
+                'hostname' => strtolower(trim($this->hostname)),
+                'cache_preset' => $this->cachePreset,
+            ],
+        );
+
         $this->toastSuccess($this->enabled
             ? __('Edge enabled. Provider sync queued.')
             : __('Edge disabled. Provider sync queued.'));
@@ -167,6 +187,17 @@ class Cdn extends Component
         }
 
         PurgeSiteCdnJob::dispatch($this->site->id);
+
+        app(SiteAuditWriter::class)->record(
+            site: $this->site,
+            user: auth()->user(),
+            action: 'site_cdn_purged',
+            risk: RiskLevel::MutatingRecoverable,
+            transport: SiteAuditEvent::TRANSPORT_WEB,
+            summary: __('Edge cache purge requested for :host', ['host' => $this->hostname]),
+            payload: ['provider' => $this->provider, 'hostname' => $this->hostname],
+        );
+
         $this->toastSuccess(__('Purge queued for :host.', ['host' => $this->hostname]));
     }
 

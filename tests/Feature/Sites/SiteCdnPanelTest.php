@@ -11,6 +11,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteAuditEvent;
 use App\Models\SiteDomain;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -109,6 +110,11 @@ test('save persists meta and dispatches apply job', function () {
     expect($fresh->meta['cdn']['origin_ip'] ?? null)->toBe('203.0.113.10');
 
     Bus::assertDispatched(ApplySiteCdnJob::class, fn ($job) => $job->siteId === $site->id);
+
+    $audit = SiteAuditEvent::query()->where('site_id', $site->id)->where('action', 'site_cdn_enabled')->first();
+    expect($audit)->not->toBeNull();
+    expect($audit->transport)->toBe('web');
+    expect($audit->user_id)->toBe($user->id);
 });
 
 test('save validates ip address', function () {
