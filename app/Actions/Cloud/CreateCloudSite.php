@@ -94,6 +94,8 @@ class CreateCloudSite
             ],
         ]);
 
+        (new ApplyCloudSiteExtras)->handle($site, $payload);
+
         ProvisionCloudSiteJob::dispatch($site->id);
 
         return $site;
