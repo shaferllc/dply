@@ -1,0 +1,353 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "dply Edge API",
+    "version": "1.0.0",
+    "description": "HTTP API v1 Edge endpoints under /api/v1/edge. Requires auth.api with edge.read, edge.deploy, and edge.write abilities as noted per route. OpenAPI spec for the Wave A programmatic surface (sites, deployments, previews, domains, aliases, cache, usage, logs, lint)."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "security": [{ "bearerAuth": [] }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Organization-scoped API token from Settings → API tokens"
+      }
+    },
+    "schemas": {
+      "EdgeSite": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "organization_id": { "type": "string" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "status": { "type": "string" },
+          "is_preview": { "type": "boolean" },
+          "runtime_mode": { "type": "string" },
+          "hostname": { "type": "string", "nullable": true },
+          "live_url": { "type": "string", "nullable": true },
+          "dashboard_url": { "type": "string", "nullable": true },
+          "repository": { "type": "string", "nullable": true },
+          "branch": { "type": "string", "nullable": true },
+          "repo_root": { "type": "string", "nullable": true }
+        }
+      },
+      "EdgeDeployment": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "site_id": { "type": "string" },
+          "status": { "type": "string" },
+          "git_commit": { "type": "string", "nullable": true },
+          "git_branch": { "type": "string", "nullable": true },
+          "storage_prefix": { "type": "string", "nullable": true },
+          "aliases": { "type": "array", "items": { "type": "string" } },
+          "published_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "LintResult": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "source_path": { "type": "string", "nullable": true },
+          "errors": { "type": "array", "items": { "type": "string" } },
+          "warnings": { "type": "array", "items": { "type": "string" } },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "redirects": { "type": "integer" },
+              "rewrites": { "type": "integer" },
+              "headers": { "type": "integer" },
+              "build_keys": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/edge/sites": {
+      "get": {
+        "summary": "List Edge sites",
+        "operationId": "edgeSitesIndex",
+        "tags": ["sites"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/EdgeSite" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/edge/sites/{site}": {
+      "get": {
+        "summary": "Show an Edge site",
+        "operationId": "edgeSitesShow",
+        "tags": ["sites"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "OK" },
+          "404": { "description": "Edge site not found" }
+        }
+      }
+    },
+    "/edge/sites/{site}/deployments": {
+      "get": {
+        "summary": "List deployments",
+        "operationId": "edgeDeploymentsIndex",
+        "tags": ["deployments"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "summary": "Queue a deploy",
+        "operationId": "edgeDeploymentsStore",
+        "tags": ["deployments"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "commit": { "type": "string", "description": "7–40 hex SHA" },
+                  "branch": { "type": "string" },
+                  "branch_tip": { "type": "boolean", "description": "Redeploy branch HEAD when true or body empty" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": { "description": "Deploy queued" },
+          "422": { "description": "Validation or deploy error" }
+        }
+      }
+    },
+    "/edge/sites/{site}/deployments/{deployment}": {
+      "get": {
+        "summary": "Show a deployment",
+        "operationId": "edgeDeploymentsShow",
+        "tags": ["deployments"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "deployment", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/edge/sites/{site}/deployments/{deployment}/rollback": {
+      "post": {
+        "summary": "Rollback production to a prior deployment",
+        "operationId": "edgeDeploymentsRollback",
+        "tags": ["deployments"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "deployment", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Rolled back" }, "422": { "description": "Rollback failed" } }
+      }
+    },
+    "/edge/sites/{site}/previews": {
+      "get": {
+        "summary": "List preview sites",
+        "operationId": "edgePreviewsIndex",
+        "tags": ["previews"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "summary": "Create a preview from a commit",
+        "operationId": "edgePreviewsStore",
+        "tags": ["previews"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["commit"],
+                "properties": {
+                  "commit": { "type": "string" },
+                  "branch": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "202": { "description": "Preview queued" } }
+      }
+    },
+    "/edge/sites/{site}/previews/{preview}/promote": {
+      "post": {
+        "summary": "Promote a preview to production",
+        "operationId": "edgePreviewsPromote",
+        "tags": ["previews"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "preview", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Promoted" } }
+      }
+    },
+    "/edge/sites/{site}/domains": {
+      "get": {
+        "summary": "List custom domains",
+        "operationId": "edgeDomainsIndex",
+        "tags": ["domains"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "summary": "Attach a custom domain",
+        "operationId": "edgeDomainsStore",
+        "tags": ["domains"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["hostname"],
+                "properties": { "hostname": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Domain attached" } }
+      }
+    },
+    "/edge/sites/{site}/aliases": {
+      "get": {
+        "summary": "List per-deploy alias hostnames",
+        "operationId": "edgeAliasesIndex",
+        "tags": ["aliases"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/edge/sites/{site}/cache/purge": {
+      "post": {
+        "summary": "Purge edge cache by tag",
+        "operationId": "edgeCachePurge",
+        "tags": ["cache"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "tag": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Purge queued" } }
+      }
+    },
+    "/edge/sites/{site}/usage": {
+      "get": {
+        "summary": "Traffic and billing usage",
+        "operationId": "edgeUsageShow",
+        "tags": ["usage"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "days", "in": "query", "schema": { "type": "integer", "default": 30 } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/edge/sites/{site}/logs": {
+      "get": {
+        "summary": "Poll request logs",
+        "operationId": "edgeLogsIndex",
+        "tags": ["logs"],
+        "parameters": [
+          { "name": "site", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "since", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/edge/lint": {
+      "post": {
+        "summary": "Validate dply.yaml / dply.json content",
+        "operationId": "edgeLintStore",
+        "tags": ["config"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["path", "content"],
+                "properties": {
+                  "path": { "type": "string", "example": "dply.yaml" },
+                  "content": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lint passed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/LintResult" }
+                  }
+                }
+              }
+            }
+          },
+          "422": { "description": "Lint failed (errors in data.errors)" }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "sites", "description": "Edge site inventory" },
+    { "name": "deployments", "description": "Build and publish lifecycle" },
+    { "name": "previews", "description": "Preview deployments" },
+    { "name": "domains", "description": "Custom hostnames" },
+    { "name": "aliases", "description": "Per-deploy stable URLs" },
+    { "name": "cache", "description": "CDN cache purge" },
+    { "name": "usage", "description": "Traffic and billing metrics" },
+    { "name": "logs", "description": "Request log polling" },
+    { "name": "config", "description": "Repo config validation" }
+  ]
+}

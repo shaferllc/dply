@@ -22,6 +22,7 @@ class EdgeDeliveryFeaturesEnsurer
 
     public function __construct(
         private readonly EdgeHostMapPublisher $hostMapPublisher,
+        private readonly EdgeAccessGate $accessGate,
     ) {}
 
     /**
@@ -31,6 +32,7 @@ class EdgeDeliveryFeaturesEnsurer
      *     image_zones: list<array{ok: bool, zone: string, detail: string}>,
      *     sites_enabled: list<string>,
      *     worker_deployed: bool,
+     *     access_gates_republished: int,
      * }
      */
     public function ensurePlatform(bool $deployWorker = true): array
@@ -54,6 +56,7 @@ class EdgeDeliveryFeaturesEnsurer
         $imageZones = $this->ensureImageResizingOnWorkerZones($client);
         $sitesEnabled = $this->enableImageOptimizationOnEdgeSites();
         $workerDeployed = false;
+        $accessGatesRepublished = 0;
 
         if ($deployWorker) {
             $exitCode = Artisan::call('edge:worker:deploy');
@@ -61,6 +64,7 @@ class EdgeDeliveryFeaturesEnsurer
                 throw new \RuntimeException(trim(Artisan::output()) ?: 'edge:worker:deploy failed.');
             }
             $workerDeployed = true;
+            $accessGatesRepublished = $this->accessGate->republishAllProtectedSites();
         }
 
         return [
@@ -69,6 +73,7 @@ class EdgeDeliveryFeaturesEnsurer
             'image_zones' => $imageZones,
             'sites_enabled' => $sitesEnabled,
             'worker_deployed' => $workerDeployed,
+            'access_gates_republished' => $accessGatesRepublished,
         ];
     }
 

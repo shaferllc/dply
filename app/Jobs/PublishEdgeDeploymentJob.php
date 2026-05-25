@@ -9,7 +9,9 @@ use App\Models\Site;
 use App\Services\Edge\EdgeDeploymentPruner;
 use App\Services\Edge\EdgeGithubCheckRunService;
 use App\Services\Edge\EdgeGithubPullRequestCommenter;
+use App\Services\Edge\EdgeMiddlewareBundleUploader;
 use App\Services\Edge\EdgeRouter;
+use App\Services\Edge\EdgeSsrBundleUploader;
 use App\Services\Edge\EdgeTestingHostnameProvisioner;
 use App\Services\Edge\OriginHealthcheckRunner;
 use Illuminate\Bus\Queueable;
@@ -32,6 +34,18 @@ class PublishEdgeDeploymentJob implements ShouldQueue
     public function __construct(
         public string $deploymentId,
         public string $localArtifactDir,
+        /**
+         * Path to the JSON sidecar BuildEdgeSiteJob writes when the
+         * build is SSR-mode — contains the bundled worker.js module
+         * source. Null for static + hybrid deploys.
+         */
+        public ?string $ssrBundlePath = null,
+        /**
+         * Sidecar for an esbuild-bundled middleware module (P10a).
+         * Null when the repo has no middleware.{ts,js} or when the
+         * runtime is SSR (the SSR Worker handles middleware itself).
+         */
+        public ?string $middlewareBundlePath = null,
     ) {}
 
     public function handle(): void
@@ -70,6 +84,25 @@ class PublishEdgeDeploymentJob implements ShouldQueue
         }
 
         try {
+            // SSR: ship the bundled worker.js into the dispatch
+            // namespace BEFORE we publish KV — that way the host map
+            // is never pointing at a script that hasn't landed yet.
+            // Script name gets persisted to deployment.meta.ssr so
+            // the publisher payload includes it on the very first
+            // host map write.
+            // Middleware: upload before the host map publish (same
+            // reasoning as SSR — never let KV point at a script that
+            // isn't live yet). No-op when no sidecar was produced.
+            app(EdgeMiddlewareBundleUploader::class)
+                ->uploadFromSidecar($deployment, $site, $this->middlewareBundlePath);
+            $deployment->refresh();
+
+            if (($site->edgeMeta()['runtime_mode'] ?? 'static') === 'ssr') {
+                app(EdgeSsrBundleUploader::class)
+                    ->uploadFromSidecar($deployment, $site, $this->ssrBundlePath);
+                $deployment->refresh();
+            }
+
             $result = $backend->publishDeployment($deployment, $site, $this->localArtifactDir);
 
             EdgeDeployment::query()
@@ -139,6 +172,12 @@ class PublishEdgeDeploymentJob implements ShouldQueue
     {
         if (is_dir($this->localArtifactDir) && str_contains($this->localArtifactDir, sys_get_temp_dir())) {
             File::deleteDirectory(dirname($this->localArtifactDir));
+        }
+        if ($this->ssrBundlePath !== null && is_file($this->ssrBundlePath)) {
+            @unlink($this->ssrBundlePath);
+        }
+        if ($this->middlewareBundlePath !== null && is_file($this->middlewareBundlePath)) {
+            @unlink($this->middlewareBundlePath);
         }
     }
 

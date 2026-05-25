@@ -5,8 +5,10 @@ use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\EdgeDeployHookController;
 use App\Http\Controllers\EdgeLogIngestController;
 use App\Http\Controllers\EdgeLogpushIngestController;
+use App\Http\Controllers\EdgePreviewAccessController;
 use App\Http\Controllers\EdgePreviewCommentsController;
 use App\Http\Controllers\EdgeVitalsIngestController;
 use App\Http\Controllers\FunctionLogIngestController;
@@ -19,6 +21,7 @@ use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
+use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
 use App\Livewire\Billing\Analytics as BillingAnalytics;
@@ -31,7 +34,9 @@ use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Edge\Create as EdgeCreate;
+use App\Livewire\Edge\Import;
 use App\Livewire\Edge\Index as EdgeIndex;
+use App\Livewire\Edge\Templates;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
@@ -115,6 +120,7 @@ use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
+use App\Livewire\Sites\EdgeDeploymentDetail;
 use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Files;
@@ -179,6 +185,14 @@ Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.edge.logpush');
 
+// Per-site deploy hooks (P10b). Match POST + GET so CMSes that only
+// emit GET pings (Sanity, some Webflow integrations) still work.
+// Rate-limit by IP via the cheap default throttle to slow brute-force.
+Route::match(['get', 'post'], '/hooks/edge/deploy/{token}', EdgeDeployHookController::class)
+    ->middleware(['throttle:60,1'])
+    ->where('token', '[A-Za-z0-9]{16,64}')
+    ->name('hooks.edge.deploy');
+
 // Preview-comment widget REST endpoints. Public (no Laravel session);
 // auth is per-parent widget token in X-Dply-Preview-Widget. CORS is
 // echoed for testing-domain origins.
@@ -241,6 +255,13 @@ Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareContro
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
+    // OAuth-style device-flow approval page for the dply CLI. The CLI
+    // prints a short code; user lands here (deep link or paste),
+    // confirms scopes + org, and we mint an ApiToken that the polling
+    // CLI picks up exactly once via /api/v1/auth/device/poll.
+    Route::livewire('/auth/device', AuthDeviceApproval::class)->name('auth.device.show');
+    Route::get('/edge/sites/{site}/preview-access', EdgePreviewAccessController::class)
+        ->name('edge.preview-access');
     Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
     Route::middleware('feature:surface.fleet')->group(function (): void {
         Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
@@ -318,6 +339,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('edge', EdgeIndex::class)->name('edge.index');
     Route::middleware('feature:surface.edge')->group(function (): void {
         Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
+        Route::livewire('edge/import', Import::class)->name('edge.import');
+        Route::livewire('edge/templates', Templates::class)->name('edge.templates');
     });
     Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
@@ -424,6 +447,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
+    Route::livewire('servers/{server}/sites/{site}/edge/deployments/{deployment}', EdgeDeploymentDetail::class)->name('sites.edge.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');

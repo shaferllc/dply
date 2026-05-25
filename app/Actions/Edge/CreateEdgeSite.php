@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Edge\EdgeOrgCredentialConfig;
+use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -32,17 +33,29 @@ class CreateEdgeSite
         }
 
         $branch = (string) ($payload['branch'] ?? 'main') ?: 'main';
+        $repoRoot = EdgeRepoRoot::normalize(is_string($payload['repo_root'] ?? null) ? $payload['repo_root'] : null);
         $deployOnPush = ! array_key_exists('deploy_on_push', $payload) || (bool) $payload['deploy_on_push'];
         $buildCommand = (string) ($payload['build_command'] ?? 'npm ci && npm run build');
         $outputDir = (string) ($payload['output_dir'] ?? 'dist');
         $framework = (string) ($payload['framework'] ?? '');
         $spaFallback = ! array_key_exists('spa_fallback', $payload) || (bool) $payload['spa_fallback'];
         $runtimeMode = (string) ($payload['runtime_mode'] ?? 'static');
-        if ($runtimeMode === 'ssr') {
-            throw new RuntimeException('Worker-native SSR Edge sites are not supported yet. Use static export, hybrid origin-fetch, or dply Cloud.');
-        }
-        if (! in_array($runtimeMode, ['static', 'hybrid'], true)) {
+        if (! in_array($runtimeMode, ['static', 'hybrid', 'ssr'], true)) {
             $runtimeMode = 'static';
+        }
+
+        if ($runtimeMode === 'ssr') {
+            // Block before any of the per-site infra is created — once
+            // the server + site rows exist the user has to tear them
+            // down to recover. Failing here keeps the screen clean.
+            $dispatchNamespace = trim((string) config('edge.cloudflare.dispatch_namespace_name', ''));
+            $dispatchId = trim((string) config('edge.cloudflare.dispatch_namespace_id', ''));
+            if ($dispatchNamespace === '' || $dispatchId === '') {
+                throw new RuntimeException(
+                    'SSR Edge sites need a Workers for Platforms dispatch namespace. '
+                    .'Run `php artisan dply:edge:infra:bootstrap` (auto-creates it) before creating an SSR site.'
+                );
+            }
         }
 
         $originConfig = null;
@@ -100,11 +113,12 @@ class CreateEdgeSite
                 'edge' => [
                     'runtime_mode' => $runtimeMode,
                     'origin' => $originConfig,
-                    'source' => [
+                    'source' => array_filter([
                         'repo' => $repo,
                         'branch' => $branch,
+                        'repo_root' => $repoRoot !== '' ? $repoRoot : null,
                         'deploy_on_push' => $deployOnPush,
-                    ],
+                    ], static fn ($value) => $value !== null),
                     'build' => [
                         'command' => $buildCommand,
                         'output_dir' => $outputDir,

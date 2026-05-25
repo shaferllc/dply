@@ -260,15 +260,73 @@
                         @endif
                     </div>
                     @can('update', $site)
-                        <button
-                            type="button"
-                            wire:click="confirmTearDownEdgePreview('{{ $preview->id }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="confirmTearDownEdgePreview('{{ $preview->id }}')"
-                            class="text-xs font-medium text-rose-700 hover:text-rose-900 disabled:cursor-wait disabled:opacity-60 dark:text-rose-400"
-                        >
-                            {{ __('Tear down') }}
-                        </button>
+                        @php
+                            $previewIsLive = $preview->status === \App\Models\Site::STATUS_EDGE_ACTIVE
+                                && $latestPreviewDeployment !== null
+                                && $latestPreviewDeployment->status === \App\Models\EdgeDeployment::STATUS_LIVE
+                                && $latestPreviewDeployment->storage_prefix !== null;
+                            $parentSplit = is_array($site->edgeMeta()['split'] ?? null) ? $site->edgeMeta()['split'] : null;
+                            $splitTargetsThisPreview = is_array($parentSplit)
+                                && ($parentSplit['enabled'] ?? false)
+                                && ($parentSplit['preview_site_id'] ?? null) === (string) $preview->id;
+                            $splitInputName = 'edge_split_pct_'.$preview->id;
+                            $currentSplitPct = $splitTargetsThisPreview ? (int) ($parentSplit['percentage'] ?? 0) : 0;
+                        @endphp
+                        <div class="flex flex-col items-end gap-2">
+                            <div class="flex items-center gap-3">
+                                @if ($previewIsLive)
+                                    <button
+                                        type="button"
+                                        wire:click="confirmPromoteEdgePreview('{{ $preview->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="confirmPromoteEdgePreview('{{ $preview->id }}'),promoteEdgePreview('{{ $preview->id }}')"
+                                        class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:text-brand-ink disabled:cursor-wait disabled:opacity-60 dark:text-brand-sage"
+                                        title="{{ __('Copy this preview\'s artifacts into a new production deployment and flip the host map. The preview keeps running.') }}"
+                                    >
+                                        <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Promote to prod') }}
+                                    </button>
+                                @endif
+                                <button
+                                    type="button"
+                                    wire:click="confirmTearDownEdgePreview('{{ $preview->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="confirmTearDownEdgePreview('{{ $preview->id }}')"
+                                    class="text-xs font-medium text-rose-700 hover:text-rose-900 disabled:cursor-wait disabled:opacity-60 dark:text-rose-400"
+                                >
+                                    {{ __('Tear down') }}
+                                </button>
+                            </div>
+                            @if ($previewIsLive)
+                                <div x-data="{ pct: {{ $currentSplitPct }} }" class="flex items-center gap-2 text-[11px] text-brand-moss">
+                                    <label for="{{ $splitInputName }}" class="inline-flex items-center gap-1" title="{{ __('Route a % of production traffic to this preview (sticky via cookie).') }}">
+                                        <x-heroicon-o-beaker class="h-3 w-3" aria-hidden="true" />
+                                        {{ __('Split') }}
+                                    </label>
+                                    <input
+                                        id="{{ $splitInputName }}"
+                                        type="number"
+                                        min="0" max="99" step="1"
+                                        x-model.number="pct"
+                                        class="w-14 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 font-mono text-[11px] text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
+                                    <span>%</span>
+                                    <button
+                                        type="button"
+                                        x-on:click="$wire.saveEdgeSplitTraffic('{{ $preview->id }}', pct, true)"
+                                        class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900">
+                                        {{ $splitTargetsThisPreview ? __('Update') : __('Apply') }}
+                                    </button>
+                                    @if ($splitTargetsThisPreview)
+                                        <button
+                                            type="button"
+                                            x-on:click="pct = 0; $wire.saveEdgeSplitTraffic('{{ $preview->id }}', 0, true)"
+                                            class="text-[10px] font-semibold uppercase tracking-wide text-rose-700 hover:underline dark:text-rose-400">
+                                            {{ __('Off') }}
+                                        </button>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
                     @endcan
                 </li>
             @endforeach

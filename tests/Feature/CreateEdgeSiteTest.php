@@ -83,6 +83,20 @@ test('creates edge server site deployment and dispatches build', function () {
     Queue::assertPushed(BuildEdgeSiteJob::class);
 });
 
+test('persists monorepo repo root on the edge source spec', function () {
+    Queue::fake();
+    [$user, $org] = scaffold();
+
+    $site = (new CreateEdgeSite)->handle($user, $org, [
+        'name' => 'Web App',
+        'repo' => 'acme/platform',
+        'repo_root' => 'apps/web',
+    ]);
+
+    expect($site->edgeRepoRoot())->toBe('apps/web');
+    expect($site->meta['edge']['source']['repo_root'] ?? null)->toBe('apps/web');
+});
+
 test('normalizes github url to owner slash repo', function () {
     Queue::fake();
     [$user, $org] = scaffold();

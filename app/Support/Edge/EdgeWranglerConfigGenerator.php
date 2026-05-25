@@ -69,6 +69,19 @@ class EdgeWranglerConfigGenerator
             ]);
         }
 
+        // Workers for Platforms dispatch binding — emitted only when
+        // the scope has a namespace configured. Without it the
+        // platform Worker still serves static + hybrid sites; SSR
+        // sites simply can't be created until the namespace lands.
+        if ($context->supportsSsr()) {
+            $lines = array_merge($lines, [
+                '',
+                '[[dispatch_namespaces]]',
+                'binding = "DISPATCHER"',
+                'namespace = '.json_encode($context->dispatchNamespaceName, JSON_UNESCAPED_SLASHES),
+            ]);
+        }
+
         if ($context->workerRoutes !== []) {
             $lines[] = '';
             foreach ($context->workerRoutes as $pattern) {

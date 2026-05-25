@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
+use App\Services\Edge\Config\EdgeRepoConfigLinter;
+use App\Services\Edge\Config\EdgeRepoConfigLoader;
+use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -12,13 +15,37 @@ use RuntimeException;
 
 class EdgeBuildRunner
 {
+    /** Static / SSG sites — output is a directory of files served from R2. */
+    public const MODE_STATIC = 'static';
+
+    /** Hybrid sites — same static output, plus a configured origin proxy. */
+    public const MODE_HYBRID = 'hybrid';
+
     /**
-     * Phase 4b (Worker-native SSR): OpenNext / @cloudflare/next-on-pages bundle upload
-     * will extend this runner — not implemented in v1. Hybrid origin-fetch ships in 4a.
+     * SSR sites — Next.js + @opennextjs/cloudflare produces both a static
+     * assets directory AND a Worker script that ships to a per-deployment
+     * dispatch namespace. See {@see EdgeSsrBundleUploader}.
      */
+    public const MODE_SSR = 'ssr';
+
+    /** Cap per-script source bytes to avoid blowing past CF's 10 MB Worker limit. */
+    private const SSR_SCRIPT_MAX_BYTES = 9 * 1024 * 1024;
+
     /**
      * @param  array<string, string>  $env
-     * @return array{artifact_dir: string, build_log: string, git_commit: ?string}
+     * @return array{
+     *     artifact_dir: string,
+     *     build_log: string,
+     *     git_commit: ?string,
+     *     git_commit_subject?: ?string,
+     *     git_commit_author?: ?string,
+     *     git_commit_at?: ?string,
+     *     ssr_modules?: array<string, string>,
+     *     ssr_entry_module?: string,
+     *     middleware_modules?: array<string, string>,
+     *     middleware_entry_module?: string,
+     *     middleware_source_path?: string
+     * }
      */
     public function build(
         EdgeDeployment $deployment,
@@ -28,6 +55,8 @@ class EdgeBuildRunner
         string $outputDir,
         array $env = [],
         ?string $commitOverride = null,
+        string $runtimeMode = self::MODE_STATIC,
+        ?string $repoRoot = null,
     ): array {
         $workRoot = rtrim(sys_get_temp_dir(), '/').'/dply-edge-build-'.$deployment->id;
         File::ensureDirectoryExists($workRoot);
@@ -45,11 +74,23 @@ class EdgeBuildRunner
                     ? strtolower($commitOverride)
                     : substr(hash('sha1', $deployment->id), 0, 40);
 
-                return [
+                $result = [
                     'artifact_dir' => $artifactDir,
                     'build_log' => $buildLog,
                     'git_commit' => $fakeCommit,
                 ];
+
+                if ($runtimeMode === self::MODE_SSR) {
+                    // Stand-in worker module so the fake-edge path covers
+                    // the SSR upload code (publisher reads ssr_modules
+                    // verbatim and ships it to the dispatch namespace).
+                    $result['ssr_entry_module'] = 'worker.js';
+                    $result['ssr_modules'] = [
+                        'worker.js' => "export default {\n  async fetch(request) {\n    return new Response('dply Edge fake SSR build', { headers: { 'content-type': 'text/plain' } });\n  },\n};\n",
+                    ];
+                }
+
+                return $result;
             }
 
             $this->assertDockerAvailable();
@@ -80,6 +121,106 @@ class EdgeBuildRunner
             $resolvedCommit = $this->resolveHead($checkout);
             $commitDetails = $this->resolveHeadDetails($checkout);
 
+            $checkout = EdgeRepoRoot::applyToCheckout(
+                $checkout,
+                $repoRoot,
+                fn (string $line) => $this->appendBuildLog($buildLog, $line."\n"),
+            );
+
+            // Read dply.yaml (if present) from the checkout root before
+            // running the build so build overrides + redirects/headers
+            // ship in the same deploy. Snapshot persists on the
+            // deployment row so the worker payload can read it later.
+            $repoConfig = app(EdgeRepoConfigLoader::class)->loadFromDirectory($checkout);
+            $lint = app(EdgeRepoConfigLinter::class)->lint($repoConfig);
+            $this->appendBuildLog($buildLog, 'Config lint: '.($lint['ok'] ? 'ok' : 'FAILED')."\n");
+            foreach ($lint['warnings'] as $warning) {
+                $this->appendBuildLog($buildLog, '[dply.yaml] '.$warning."\n");
+            }
+            foreach ($lint['errors'] as $error) {
+                $this->appendBuildLog($buildLog, '[dply.yaml] ERROR: '.$error."\n");
+            }
+            if (! $lint['ok']) {
+                throw new RuntimeException(
+                    'dply config lint failed: '.implode('; ', $lint['errors']),
+                );
+            }
+
+            if ($repoConfig !== null) {
+                $this->appendBuildLog($buildLog, sprintf(
+                    "Loaded %s — build:%s redirects:%d rewrites:%d headers:%d\n",
+                    $repoConfig->sourcePath,
+                    $repoConfig->build === [] ? ' (defaults)' : ' '.json_encode($repoConfig->build, JSON_THROW_ON_ERROR),
+                    count($repoConfig->redirects),
+                    count($repoConfig->rewrites),
+                    count($repoConfig->headers),
+                ));
+                $deployment->update(['repo_config' => $repoConfig->toArray()]);
+
+                if (isset($repoConfig->build['root'])) {
+                    $candidate = $checkout.'/'.trim($repoConfig->build['root'], '/');
+                    if (is_dir($candidate)) {
+                        $checkout = $candidate;
+                        $this->appendBuildLog($buildLog, 'Using build.root from dply.yaml: '.$repoConfig->build['root']."\n");
+                    } else {
+                        $this->appendBuildLog($buildLog, '[dply.yaml] build.root '.$repoConfig->build['root'].' not found; falling back to repo root.'."\n");
+                    }
+                }
+
+                if (isset($repoConfig->build['command']) && $repoConfig->build['command'] !== '') {
+                    $buildCommand = $repoConfig->build['command'];
+                }
+                if (isset($repoConfig->build['output']) && $repoConfig->build['output'] !== '') {
+                    $outputDir = $repoConfig->build['output'];
+                }
+            }
+
+            // SSR mode: ignore the dashboard build command and output dir.
+            // OpenNext owns both — its build runs `next build` internally
+            // and writes assets to .open-next/assets + the Worker entry to
+            // .open-next/worker.js. Letting operators override either
+            // would just produce broken bundles.
+            if ($runtimeMode === self::MODE_SSR) {
+                if (! is_file($checkout.'/package.json')) {
+                    throw new RuntimeException('SSR builds require a package.json with Next.js as a dependency.');
+                }
+                $packageJson = json_decode((string) file_get_contents($checkout.'/package.json'), true);
+                $hasNext = false;
+                foreach (['dependencies', 'devDependencies', 'peerDependencies'] as $section) {
+                    if (is_array($packageJson[$section] ?? null) && isset($packageJson[$section]['next'])) {
+                        $hasNext = true;
+                        break;
+                    }
+                }
+                if (! $hasNext) {
+                    throw new RuntimeException('SSR Edge sites currently support Next.js only — add next to package.json or pick static / hybrid mode.');
+                }
+                $install = $this->detectInstallCommand($checkout) ?? 'npm install';
+                $buildCommand = $install.' && npx --yes @opennextjs/cloudflare@latest build';
+                $outputDir = '.open-next/assets';
+                $this->appendBuildLog($buildLog, "SSR mode (Next.js) — overriding build with @opennextjs/cloudflare build pipeline.\n");
+            }
+
+            // Build cache restore — best-effort. Cache key is derived
+            // from the lockfile contents in the resolved checkout so
+            // monorepo subdirs + dply.yaml root overrides hash the
+            // right file. Cache miss is silent; failures only print
+            // to the build log and the deploy continues cold.
+            $site = $deployment->site;
+            $cacheKey = null;
+            if ($site !== null) {
+                try {
+                    $cacheKey = app(EdgeBuildCache::class)->cacheKey($checkout, null);
+                    $restoreResult = app(EdgeBuildCache::class)->restore($checkout, null, $cacheKey, $site);
+                    $this->appendBuildLog(
+                        $buildLog,
+                        '[cache] '.$restoreResult['message'].' (key '.$cacheKey.')'."\n",
+                    );
+                } catch (\Throwable $e) {
+                    $this->appendBuildLog($buildLog, '[cache] restore error: '.$e->getMessage()."\n");
+                }
+            }
+
             $dockerImage = (string) config('edge.build.docker_image', 'node:20-bookworm');
             $script = $this->composeBuildScript($checkout, $buildCommand);
             $this->appendBuildLog($buildLog, "Running build in {$dockerImage}: {$script}\n");
@@ -97,6 +238,44 @@ class EdgeBuildRunner
                 throw new RuntimeException('Build failed: '.$build->errorOutput());
             }
 
+            // Middleware bundling — runs in a separate docker
+            // invocation against the same image so user-authored
+            // middleware.ts can ship to the dispatch namespace without
+            // requiring node + esbuild on the build host. Static + hybrid
+            // sites only (SSR already owns middleware via OpenNext).
+            $middlewareBundle = ['bundled' => false];
+            if ($runtimeMode !== self::MODE_SSR) {
+                try {
+                    $middlewareBundle = app(EdgeMiddlewareBundler::class)->bundle(
+                        $checkout,
+                        $dockerImage,
+                        fn (string $line) => $this->appendBuildLog($buildLog, $line."\n"),
+                    );
+                } catch (\Throwable $e) {
+                    $this->appendBuildLog($buildLog, '[middleware] bundler error: '.$e->getMessage()."\n");
+                    $middlewareBundle = ['bundled' => false];
+                }
+            }
+
+            // Cache snapshot — runs inline after the Docker build
+            // succeeds. ~5–30s on a typical Next.js build; acceptable
+            // for v1, can move to a background queue later if it
+            // becomes a deploy-time hotspot.
+            if ($site !== null && $cacheKey !== null) {
+                try {
+                    $snapResult = app(EdgeBuildCache::class)->snapshot($checkout, null, $cacheKey, $site);
+                    $this->appendBuildLog($buildLog, '[cache] '.$snapResult['message']."\n");
+                    if ($snapResult['ok']) {
+                        $deleted = app(EdgeBuildCache::class)->prune($site);
+                        if ($deleted > 0) {
+                            $this->appendBuildLog($buildLog, '[cache] pruned '.$deleted.' old cache entr(ies).'."\n");
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    $this->appendBuildLog($buildLog, '[cache] snapshot error: '.$e->getMessage()."\n");
+                }
+            }
+
             $resolvedOutput = $checkout.'/'.trim($outputDir, '/');
             if (! is_dir($resolvedOutput)) {
                 throw new RuntimeException("Build output directory not found: {$outputDir}");
@@ -104,11 +283,42 @@ class EdgeBuildRunner
 
             File::ensureDirectoryExists($artifactDir);
             File::copyDirectory($resolvedOutput, $artifactDir);
+
+            if ($runtimeMode === self::MODE_SSR) {
+                // OpenNext writes the static assets layer + a single
+                // bundled Worker entry. The assets ship to R2 like any
+                // other deploy; the Worker entry is read into memory
+                // here so {@see EdgeSsrBundleUploader} can ship it to
+                // the dispatch namespace from the publish phase.
+                $workerPath = $checkout.'/.open-next/worker.js';
+                if (! is_file($workerPath)) {
+                    throw new RuntimeException('SSR build did not produce .open-next/worker.js — check the build log for OpenNext errors.');
+                }
+                $workerBytes = filesize($workerPath);
+                if ($workerBytes === false || $workerBytes > self::SSR_SCRIPT_MAX_BYTES) {
+                    throw new RuntimeException('SSR worker script exceeds the per-script size limit ('.number_format(self::SSR_SCRIPT_MAX_BYTES).' bytes).');
+                }
+                $workerSource = (string) file_get_contents($workerPath);
+                $this->assertArtifactSize($artifactDir);
+                $this->appendBuildLog($buildLog, 'Build succeeded — SSR assets + worker.js ready ('.strlen($workerSource)." bytes).\n");
+
+                return [
+                    'artifact_dir' => $artifactDir,
+                    'build_log' => $buildLog,
+                    'git_commit' => $resolvedCommit,
+                    'git_commit_subject' => $commitDetails['subject'] ?? null,
+                    'git_commit_author' => $commitDetails['author'] ?? null,
+                    'git_commit_at' => $commitDetails['committed_at'] ?? null,
+                    'ssr_entry_module' => 'worker.js',
+                    'ssr_modules' => ['worker.js' => $workerSource],
+                ];
+            }
+
             $this->assertArtifactContents($artifactDir, $outputDir);
             $this->assertArtifactSize($artifactDir);
             $this->appendBuildLog($buildLog, "Build succeeded — artifacts copied to output.\n");
 
-            return [
+            $result = [
                 'artifact_dir' => $artifactDir,
                 'build_log' => $buildLog,
                 'git_commit' => $resolvedCommit,
@@ -116,6 +326,14 @@ class EdgeBuildRunner
                 'git_commit_author' => $commitDetails['author'] ?? null,
                 'git_commit_at' => $commitDetails['committed_at'] ?? null,
             ];
+
+            if (($middlewareBundle['bundled'] ?? false) === true) {
+                $result['middleware_modules'] = $middlewareBundle['modules'];
+                $result['middleware_entry_module'] = (string) ($middlewareBundle['entry_module'] ?? 'middleware.js');
+                $result['middleware_source_path'] = (string) ($middlewareBundle['source_path'] ?? '');
+            }
+
+            return $result;
         } finally {
             if (is_dir($checkout)) {
                 File::deleteDirectory($checkout);

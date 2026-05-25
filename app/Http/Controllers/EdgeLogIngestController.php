@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Events\Edge\EdgeAccessLogReceived;
 use App\Models\EdgeAccessLog;
 use App\Models\Site;
 use App\Services\Edge\EdgePerformanceHourlyRollup;
@@ -70,6 +71,30 @@ class EdgeLogIngestController extends Controller
             $bytes,
             (string) $request->input('cache_status', ''),
         );
+
+        // Fan out to the dashboard live-tail. ShouldBroadcastNow means
+        // we ship synchronously — Reverb's bus is in-process so the
+        // latency is fine and we avoid the queue hop. Wrapped in a
+        // try/catch so a broken broadcast bus never fails ingest.
+        try {
+            EdgeAccessLogReceived::dispatch(
+                (string) $site->id,
+                Str::limit((string) $request->input('deployment_id', ''), 26, ''),
+                strtolower(Str::limit((string) $request->input('hostname', ''), 255, '')),
+                strtoupper(Str::limit((string) $request->input('method', 'GET'), 12, '')),
+                Str::limit('/'.ltrim((string) $request->input('path', '/'), '/'), self::MAX_PATH, ''),
+                $status,
+                $durationMs,
+                $bytes,
+                Str::limit((string) $request->input('cache_status', ''), 32, ''),
+                Str::limit((string) $request->input('country', ''), 8, ''),
+                Str::limit((string) $request->input('referrer', ''), 2048, ''),
+                Str::limit((string) $request->input('user_agent', ''), 512, ''),
+                $occurredAt->toIso8601String(),
+            );
+        } catch (\Throwable) {
+            // Broadcast bus unavailable / Reverb down — never fail ingest.
+        }
 
         return response()->json(['message' => 'Recorded.'], 202);
     }

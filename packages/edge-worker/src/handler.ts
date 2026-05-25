@@ -1,4 +1,39 @@
+import { handleAccessGate } from './auth';
+import type { AccessGateConfig } from './auth';
 import { injectRumScript, shouldInjectRum, VITALS_BEACON_PATH } from './rum';
+
+/**
+ * In-repo dply.yaml redirect rule. Worker matches by glob ("*" wildcard,
+ * `:splat` substitution in the destination) before R2 lookup so the
+ * 30x is the very first thing the visitor sees.
+ */
+export interface RepoRedirect {
+  from: string;
+  to: string;
+  status: number;
+}
+
+/**
+ * In-repo rewrite rule. When the destination is a path (`/foo`) the
+ * Worker rewrites the lookup key before hitting R2. When it's an
+ * absolute URL the Worker proxies to that origin (uses the same auth
+ * secret as a configured hybrid origin so locked-down APIs still get
+ * the shared-secret header).
+ */
+export interface RepoRewrite {
+  from: string;
+  to: string;
+}
+
+/**
+ * Header rule layered onto the final response when `for` matches the
+ * request path. Multiple matching rules are merged in declaration
+ * order; later rules win on duplicate header names.
+ */
+export interface RepoHeaderRule {
+  for: string;
+  values: Record<string, string>;
+}
 
 export interface HostMapEntry {
   storage_prefix: string;
@@ -7,6 +42,43 @@ export interface HostMapEntry {
   organization_id: string;
   spa_fallback: boolean;
   headers?: Record<string, string>;
+  /**
+   * "static" (default), "hybrid", or "ssr". When ssr, the platform
+   * Worker dispatches every request (after redirects) to the
+   * per-deployment Worker named by `ssr_worker_script`.
+   */
+  runtime_mode?: 'static' | 'hybrid' | 'ssr';
+  /** Dispatch namespace script name (Phase 4b). Required when runtime_mode=ssr. */
+  ssr_worker_script?: string;
+  /**
+   * Per-deployment middleware script in the dispatch namespace (P10a).
+   * When set, the platform Worker dispatches to it before redirects /
+   * rewrites / R2 / origin. The script default-exports `{ fetch }` and
+   * either short-circuits the request (returning the final response) or
+   * returns 204 + `X-Dply-Middleware: continue` to let the platform
+   * Worker keep handling the original request.
+   */
+  middleware_worker_script?: string;
+  /**
+   * Split-traffic (A/B) override (P10d). When present + the visitor
+   * gets bucketed into variant B, the Worker swaps `storage_prefix`
+   * for `split.preview_storage_prefix` so the request resolves
+   * against the preview's R2 assets. Variant choice is persisted in
+   * `sticky_cookie` (when set) so the visitor sees a consistent
+   * variant on subsequent requests.
+   */
+  split?: {
+    preview_storage_prefix: string;
+    preview_deployment_id?: string;
+    percentage: number;
+    sticky_cookie?: string | null;
+  };
+  /** Per-deploy redirects sourced from dply.yaml (P6). */
+  repo_redirects?: RepoRedirect[];
+  /** Per-deploy rewrites sourced from dply.yaml (P6). */
+  repo_rewrites?: RepoRewrite[];
+  /** Per-deploy header rules sourced from dply.yaml (P6). */
+  repo_header_rules?: RepoHeaderRule[];
   origin_url?: string;
   origin_routes?: string[];
   /**
@@ -53,6 +125,14 @@ export interface HostMapEntry {
    * preview hostnames so production traffic stays clean.
    */
   is_preview?: boolean;
+  /**
+   * True for the site's live delivery hostname and verified custom
+   * domains. Preview deploy hostnames and per-deploy aliases set this
+   * false so preview protection can gate them without touching prod.
+   */
+  is_production?: boolean;
+  /** Preview protection rule copied from the parent Edge site. */
+  access_gate?: AccessGateConfig;
 }
 
 const DEFAULT_ORIGIN_FAILOVER_HTML = `<!doctype html>
@@ -94,9 +174,25 @@ export interface Env {
    */
   EDGE_CACHE?: KVNamespace;
   EDGE_ANALYTICS?: AnalyticsEngineDataset;
+  /**
+   * Workers for Platforms dispatch binding. When bound + a host map
+   * entry sets runtime_mode=ssr + ssr_worker_script, the platform
+   * Worker hands the request off to the per-deployment Worker living
+   * in the namespace. Unbound = SSR sites cannot serve traffic (the
+   * platform Worker returns 503 and surfaces a clear error).
+   */
+  DISPATCHER?: DispatchNamespace;
   ENVIRONMENT?: string;
   LOG_INGEST_BASE_URL?: string;
   LOG_INGEST_KEY?: string;
+}
+
+// Workers for Platforms binding shape. Cloudflare's official types
+// expose it via @cloudflare/workers-types but only when the project
+// opts into the workers-for-platforms entrypoint — declare locally
+// so we don't drag the larger types surface in.
+interface DispatchNamespace {
+  get(scriptName: string): { fetch(request: Request, init?: RequestInit): Promise<Response> };
 }
 
 /** Path the image optimizer answers on. Reserved — sites cannot publish here. */
@@ -198,6 +294,38 @@ export function contentTypeForPath(path: string): string | undefined {
   return MIME_BY_EXTENSION[extension];
 }
 
+/**
+ * Glob-style match for a single rule's `from`. Supports a trailing `*`
+ * (prefix match) or a bare `*` segment (matches anything). The captured
+ * splat (the text matched by `*`) is returned so destinations can use
+ * `:splat` substitution Netlify-style.
+ *
+ * Returns null when the rule doesn't match.
+ */
+export function matchRepoRule(requestPath: string, from: string): string | null {
+  const normalizedPath = `/${requestPath}`.replace(/\/+/g, '/');
+  const normalizedFrom = from.startsWith('/') ? from : `/${from}`;
+
+  if (normalizedFrom.endsWith('*')) {
+    const prefix = normalizedFrom.slice(0, -1);
+    if (normalizedPath === prefix || normalizedPath.startsWith(prefix)) {
+      return normalizedPath.slice(prefix.length);
+    }
+
+    return null;
+  }
+
+  if (normalizedPath === normalizedFrom || normalizedPath === `${normalizedFrom}/`) {
+    return '';
+  }
+
+  return null;
+}
+
+export function applySplat(destination: string, splat: string): string {
+  return destination.replaceAll(':splat', splat);
+}
+
 export function pathMatchesOriginRoute(path: string, routes: string[]): boolean {
   const normalizedPath = `/${path}`.replace(/\/+/g, '/');
 
@@ -236,10 +364,24 @@ export async function handleRequest(
   const started = Date.now();
   const url = new URL(request.url);
   const hostname = url.hostname;
-  const hostEntry = await env.HOST_MAP.get<HostMapEntry>(hostname, 'json');
+  let hostEntry = await env.HOST_MAP.get<HostMapEntry>(hostname, 'json');
 
   if (!hostEntry?.storage_prefix) {
     return notFound('Host not configured.');
+  }
+
+  // Split-traffic (P10d) — pick a variant before everything else so
+  // middleware + redirects + R2 lookup all see the variant's
+  // storage_prefix. Returns the (possibly mutated) hostEntry +
+  // a function the caller uses to stamp the sticky cookie on the
+  // outgoing response.
+  const split = applySplitTrafficVariant(request, hostEntry);
+  hostEntry = split.hostEntry;
+  const stampVariantCookie = split.stampCookie;
+
+  const accessResponse = await handleAccessGate(request, url, hostEntry);
+  if (accessResponse) {
+    return accessResponse;
   }
 
   if (url.pathname === VITALS_BEACON_PATH) {
@@ -263,6 +405,75 @@ export async function handleRequest(
     }
 
     throw error;
+  }
+
+  // Per-site middleware (P10a) — for static + hybrid sites only.
+  // Runs before redirects/rewrites/R2 so it can short-circuit (auth
+  // gates, A/B routing, custom 404s) or pass through (returning
+  // 204 + X-Dply-Middleware: continue) to let the rest of the
+  // pipeline keep handling the request.
+  if (hostEntry.middleware_worker_script && hostEntry.runtime_mode !== 'ssr') {
+    const mwResult = await runMiddleware(request, env, hostEntry);
+    if (mwResult.kind === 'short-circuit') {
+      const finalResponse = stampVariantCookie(applyRepoHeaderRules(mwResult.response, requestPath, hostEntry));
+      recordRequest(ctx, env, request, finalResponse, hostEntry, url, requestPath, started, 'middleware');
+
+      return finalResponse;
+    }
+    // pass-through — keep handling the original request below.
+  }
+
+  // dply.yaml redirects run first so the visitor sees a clean 30x
+  // before any R2 / origin work happens.
+  const redirectResponse = matchRepoRedirect(requestPath, hostEntry);
+  if (redirectResponse) {
+    const stamped = stampVariantCookie(redirectResponse);
+    recordRequest(ctx, env, request, stamped, hostEntry, url, requestPath, started, 'redirect');
+
+    return stamped;
+  }
+
+  // SSR: hand the request to the per-deployment Worker living in the
+  // dispatch namespace. The dispatched script owns asset lookup and
+  // SSR rendering — the platform Worker just provides identity +
+  // observability hooks. Falls through to a clear 503 when either
+  // the dispatch binding is missing or the script name isn't set,
+  // rather than silently serving a wrong response.
+  if (hostEntry.runtime_mode === 'ssr') {
+    const ssrResponse = await dispatchSsrRequest(request, env, hostEntry);
+    const finalResponse = stampVariantCookie(applyRepoHeaderRules(ssrResponse, requestPath, hostEntry));
+    recordRequest(ctx, env, request, finalResponse, hostEntry, url, requestPath, started, 'ssr');
+
+    return finalResponse;
+  }
+
+  // dply.yaml rewrites: path-form rewrites update the lookup key;
+  // URL-form rewrites proxy to an external origin (re-using the
+  // hybrid origin proxy + failover machinery so behavior is consistent).
+  const rewriteMatch = matchRepoRewrite(requestPath, hostEntry);
+  if (rewriteMatch) {
+    if (rewriteMatch.kind === 'path') {
+      try {
+        requestPath = normalizeRequestPath(rewriteMatch.target);
+      } catch (error) {
+        if (error instanceof PathTraversalError) {
+          return new Response('Bad Request', { status: 400 });
+        }
+
+        throw error;
+      }
+    } else {
+      const response = await proxyToOriginWithFailover(
+        request,
+        rewriteMatch.target,
+        hostEntry.origin_auth_secret,
+        hostEntry.origin_failover_html,
+      );
+      const finalResponse = stampVariantCookie(applyRepoHeaderRules(response, requestPath, hostEntry));
+      recordRequest(ctx, env, request, finalResponse, hostEntry, url, requestPath, started, 'rewrite-proxy');
+
+      return finalResponse;
+    }
   }
 
   const objectKey = buildObjectKey(hostEntry.storage_prefix, requestPath);
@@ -370,9 +581,252 @@ export async function handleRequest(
     response = new Response(object.body, { status: 200, headers });
   }
 
+  response = applyRepoHeaderRules(response, requestPath, hostEntry);
+  response = stampVariantCookie(response);
+
   recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'hit');
 
   return response;
+}
+
+type MiddlewareResult =
+  | { kind: 'short-circuit'; response: Response }
+  | { kind: 'pass-through' };
+
+async function runMiddleware(
+  request: Request,
+  env: Env,
+  hostEntry: HostMapEntry,
+): Promise<MiddlewareResult> {
+  if (!env.DISPATCHER) {
+    // No dispatch binding — log + pass through. Better to serve the
+    // page without middleware than to fail the entire site.
+    return { kind: 'pass-through' };
+  }
+  const scriptName = (hostEntry.middleware_worker_script ?? '').trim();
+  if (scriptName === '') {
+    return { kind: 'pass-through' };
+  }
+
+  try {
+    const upstream = env.DISPATCHER.get(scriptName);
+    const upstreamRequest = new Request(request);
+    upstreamRequest.headers.set('X-Dply-Deployment-Id', hostEntry.deployment_id);
+    upstreamRequest.headers.set('X-Dply-Site-Id', hostEntry.site_id);
+
+    const response = await upstream.fetch(upstreamRequest);
+    if (response.status === 204 && response.headers.get('X-Dply-Middleware') === 'continue') {
+      return { kind: 'pass-through' };
+    }
+
+    const headers = new Headers(response.headers);
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      if (!headers.has(name)) headers.set(name, value);
+    }
+    headers.set('X-Dply-Middleware', 'handled');
+
+    return {
+      kind: 'short-circuit',
+      response: new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      }),
+    };
+  } catch {
+    // Middleware crashed — pass through to preserve visitor experience.
+    return { kind: 'pass-through' };
+  }
+}
+
+/**
+ * P10d split-traffic: decide which storage prefix to use for this
+ * request and (when sticky) what cookie to stamp on the response.
+ * No-op when the host entry has no split config.
+ */
+function applySplitTrafficVariant(
+  request: Request,
+  hostEntry: HostMapEntry,
+): { hostEntry: HostMapEntry; stampCookie: (response: Response) => Response } {
+  const noop = (response: Response) => response;
+  const split = hostEntry.split;
+  if (!split || !split.preview_storage_prefix || split.percentage <= 0 || split.percentage >= 100) {
+    return { hostEntry, stampCookie: noop };
+  }
+
+  const cookieName = split.sticky_cookie ?? '';
+  const incomingVariant = cookieName !== '' ? readCookie(request, cookieName) : null;
+
+  let variant: 'A' | 'B';
+  if (incomingVariant === 'A' || incomingVariant === 'B') {
+    variant = incomingVariant;
+  } else {
+    const bucket = bucketRequest(request);
+    variant = bucket < split.percentage ? 'B' : 'A';
+  }
+
+  const swapped: HostMapEntry = variant === 'B'
+    ? { ...hostEntry, storage_prefix: split.preview_storage_prefix, deployment_id: split.preview_deployment_id ?? hostEntry.deployment_id }
+    : hostEntry;
+
+  const stampCookie = cookieName === '' || incomingVariant === variant
+    ? noop
+    : (response: Response): Response => {
+        const headers = new Headers(response.headers);
+        headers.append(
+          'Set-Cookie',
+          `${cookieName}=${variant}; Path=/; SameSite=Lax; Max-Age=86400`,
+        );
+        headers.append('X-Dply-Edge-Variant', variant);
+
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        });
+      };
+
+  return { hostEntry: swapped, stampCookie };
+}
+
+function readCookie(request: Request, name: string): string | null {
+  const header = request.headers.get('Cookie');
+  if (!header) return null;
+  const needle = `${name}=`;
+  for (const part of header.split(';')) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(needle)) {
+      return trimmed.slice(needle.length);
+    }
+  }
+
+  return null;
+}
+
+function bucketRequest(request: Request): number {
+  // Deterministic 0-99 bucket from the visitor's IP + UA so anonymous
+  // visitors get a consistent first-visit variant even before the
+  // sticky cookie is set.
+  const seed =
+    (request.headers.get('CF-Connecting-IP') ?? request.headers.get('X-Forwarded-For') ?? '') +
+    '|' +
+    (request.headers.get('User-Agent') ?? '');
+  let hash = 5381;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) + hash) ^ seed.charCodeAt(i);
+  }
+
+  return Math.abs(hash) % 100;
+}
+
+async function dispatchSsrRequest(
+  request: Request,
+  env: Env,
+  hostEntry: HostMapEntry,
+): Promise<Response> {
+  if (!env.DISPATCHER) {
+    return ssrUnavailable('Worker dispatch binding missing — platform Worker was deployed without DISPATCHER.');
+  }
+  const scriptName = (hostEntry.ssr_worker_script ?? '').trim();
+  if (scriptName === '') {
+    return ssrUnavailable('SSR deployment is missing a worker script name.');
+  }
+
+  try {
+    const upstream = env.DISPATCHER.get(scriptName);
+    const upstreamRequest = new Request(request);
+    upstreamRequest.headers.set('X-Dply-Deployment-Id', hostEntry.deployment_id);
+    upstreamRequest.headers.set('X-Dply-Site-Id', hostEntry.site_id);
+
+    return await upstream.fetch(upstreamRequest);
+  } catch (err) {
+    return ssrUnavailable(
+      err instanceof Error ? err.message : 'Dispatch namespace returned an error.',
+    );
+  }
+}
+
+function ssrUnavailable(detail: string): Response {
+  const headers = new Headers({
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Retry-After': '30',
+    'X-Dply-SSR-Status': 'unavailable',
+  });
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+
+  return new Response('Service temporarily unavailable — SSR worker not reachable.\n\n' + detail, {
+    status: 503,
+    headers,
+  });
+}
+
+function matchRepoRedirect(requestPath: string, hostEntry: HostMapEntry): Response | null {
+  const rules = hostEntry.repo_redirects ?? [];
+  for (const rule of rules) {
+    const splat = matchRepoRule(requestPath, rule.from);
+    if (splat === null) continue;
+    const location = applySplat(rule.to, splat);
+    const status = rule.status >= 300 && rule.status < 400 ? rule.status : 301;
+    const headers = new Headers({
+      Location: location,
+      'Cache-Control': 'no-cache',
+      'X-Dply-Repo-Redirect': '1',
+    });
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      headers.set(name, value);
+    }
+
+    return new Response(null, { status, headers });
+  }
+
+  return null;
+}
+
+interface RepoRewriteMatch {
+  kind: 'path' | 'url';
+  target: string;
+}
+
+function matchRepoRewrite(requestPath: string, hostEntry: HostMapEntry): RepoRewriteMatch | null {
+  const rules = hostEntry.repo_rewrites ?? [];
+  for (const rule of rules) {
+    const splat = matchRepoRule(requestPath, rule.from);
+    if (splat === null) continue;
+    const target = applySplat(rule.to, splat);
+    const kind: 'path' | 'url' = /^https?:\/\//i.test(target) ? 'url' : 'path';
+
+    return { kind, target };
+  }
+
+  return null;
+}
+
+function applyRepoHeaderRules(
+  response: Response,
+  requestPath: string,
+  hostEntry: HostMapEntry,
+): Response {
+  const rules = hostEntry.repo_header_rules ?? [];
+  if (rules.length === 0) return response;
+
+  const matched = rules.filter((rule) => matchRepoRule(requestPath, rule.for) !== null);
+  if (matched.length === 0) return response;
+
+  const headers = new Headers(response.headers);
+  for (const rule of matched) {
+    for (const [name, value] of Object.entries(rule.values)) {
+      headers.set(name, value);
+    }
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function handleVitalsBeacon(

@@ -148,6 +148,155 @@ class EdgeCloudflareClient
     }
 
     /**
+     * Workers for Platforms — list dispatch namespaces under this account.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listDispatchNamespaces(): array
+    {
+        $payload = $this->decode(
+            Http::withToken($this->apiToken)
+                ->get(self::BASE.'/accounts/'.$this->accountId.'/workers/dispatch/namespaces'),
+        );
+
+        return is_array($payload) ? array_values(array_filter($payload, 'is_array')) : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createDispatchNamespace(string $name): array
+    {
+        return $this->decode(
+            Http::withToken($this->apiToken)
+                ->post(self::BASE.'/accounts/'.$this->accountId.'/workers/dispatch/namespaces', [
+                    'name' => $name,
+                ]),
+        );
+    }
+
+    public function dispatchNamespaceIdByName(string $name): ?string
+    {
+        foreach ($this->listDispatchNamespaces() as $namespace) {
+            if (($namespace['name'] ?? null) === $name) {
+                $id = $namespace['namespace_id'] ?? $namespace['id'] ?? null;
+                if (is_string($id) && $id !== '') {
+                    return $id;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve an existing dispatch namespace by name or create it.
+     * Returns the namespace id (UUID assigned by Cloudflare).
+     */
+    public function ensureDispatchNamespace(string $name): string
+    {
+        $existing = $this->dispatchNamespaceIdByName($name);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $created = $this->createDispatchNamespace($name);
+        $id = $created['namespace_id'] ?? $created['id'] ?? '';
+        $id = is_string($id) ? trim($id) : '';
+        if ($id === '') {
+            throw new RuntimeException('Cloudflare did not return a namespace id when creating dispatch namespace '.$name.'.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * Upload a per-deployment Worker script into a dispatch namespace.
+     * The script is private to the namespace — only callable via the
+     * `env.DISPATCHER.get($scriptName).fetch(request)` binding from
+     * the platform Worker, never via a public workers.dev URL.
+     *
+     * @param  string  $namespace  Namespace NAME (not id) — CF API uses name here.
+     * @param  string  $entryModulePath  File name the metadata.main_module points at (e.g. "worker.js").
+     * @param  array<string, string>  $modules  Map of module file name → module source. Must include $entryModulePath.
+     * @param  list<array<string, mixed>>  $bindings  Cloudflare binding descriptors (kv_namespace, r2_bucket, plain_text, secret_text, etc.).
+     * @param  array{compatibility_date?: string, compatibility_flags?: list<string>, tags?: list<string>}  $metaExtras
+     * @return array<string, mixed>
+     */
+    public function uploadDispatchScript(
+        string $namespace,
+        string $scriptName,
+        string $entryModulePath,
+        array $modules,
+        array $bindings = [],
+        array $metaExtras = [],
+    ): array {
+        if ($namespace === '' || $scriptName === '') {
+            throw new RuntimeException('Dispatch namespace + script name are required.');
+        }
+        if (! array_key_exists($entryModulePath, $modules)) {
+            throw new RuntimeException('Entry module '.$entryModulePath.' is missing from the modules map.');
+        }
+
+        $metadata = array_merge(
+            [
+                'main_module' => $entryModulePath,
+                'bindings' => array_values($bindings),
+            ],
+            array_intersect_key($metaExtras, array_flip(['compatibility_date', 'compatibility_flags', 'tags'])),
+        );
+
+        // Laravel HTTP's attach() converts to Guzzle multipart parts.
+        // Each part has its own Content-Type so Cloudflare can tell
+        // the metadata JSON apart from the JS module bodies.
+        $request = Http::withToken($this->apiToken)
+            ->attach(
+                'metadata',
+                json_encode($metadata, JSON_THROW_ON_ERROR),
+                'metadata.json',
+                ['Content-Type' => 'application/json'],
+            );
+
+        foreach ($modules as $moduleName => $source) {
+            $request = $request->attach(
+                $moduleName,
+                $source,
+                $moduleName,
+                ['Content-Type' => 'application/javascript+module'],
+            );
+        }
+
+        $response = $request->put(
+            self::BASE.'/accounts/'.$this->accountId
+                .'/workers/dispatch/namespaces/'.rawurlencode($namespace)
+                .'/scripts/'.rawurlencode($scriptName),
+        );
+
+        return $this->decode($response);
+    }
+
+    public function deleteDispatchScript(string $namespace, string $scriptName): void
+    {
+        if ($namespace === '' || $scriptName === '') {
+            return;
+        }
+
+        $response = Http::withToken($this->apiToken)
+            ->delete(
+                self::BASE.'/accounts/'.$this->accountId
+                    .'/workers/dispatch/namespaces/'.rawurlencode($namespace)
+                    .'/scripts/'.rawurlencode($scriptName)
+                    .'?force=true',
+            );
+
+        if ($response->status() === 404) {
+            return;
+        }
+
+        $this->decode($response);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function zoneSetting(string $zoneId, string $settingId): ?array

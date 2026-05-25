@@ -6,7 +6,9 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Edge\EdgeMiddlewareBundleUploader;
 use App\Services\Edge\EdgeRouter;
+use App\Services\Edge\EdgeSsrBundleUploader;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -34,6 +36,24 @@ class TeardownEdgeSiteJob implements ShouldQueue
 
         $backend = EdgeRouter::backendFor($site);
         $site->load('edgeDeployments');
+
+        // Drop every per-deployment SSR script in the dispatch
+        // namespace BEFORE wiping the deployment rows — once the rows
+        // are gone we lose the script names and the scripts would
+        // sit in the namespace forever, consuming quota.
+        try {
+            app(EdgeSsrBundleUploader::class)->deleteAllForSite($site);
+        } catch (\Throwable) {
+            // Best-effort — leaving an orphan script is preferable to
+            // failing the rest of the teardown.
+        }
+
+        try {
+            app(EdgeMiddlewareBundleUploader::class)->deleteAllForSite($site);
+        } catch (\Throwable) {
+            // Same — orphan middleware scripts are non-blocking.
+        }
+
         $backend?->unpublish($site);
 
         $site->edgeDeployments()->delete();

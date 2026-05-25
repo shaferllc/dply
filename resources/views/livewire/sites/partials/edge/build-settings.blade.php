@@ -1,4 +1,21 @@
-<section class="dply-card overflow-hidden">
+@php
+    use App\Models\EdgeDeployment;
+
+    $edgeBuildRepoConfig = null;
+    if ($site->relationLoaded('edgeDeployments') && $site->edgeDeployments !== null) {
+        $deploymentsWithConfig = $site->edgeDeployments->filter(
+            fn (EdgeDeployment $deployment): bool => is_array($deployment->repo_config) && $deployment->repo_config !== [],
+        );
+        $edgeBuildRepoConfig = $deploymentsWithConfig
+            ->first(fn (EdgeDeployment $deployment): bool => $deployment->status === EdgeDeployment::STATUS_LIVE)
+            ?->repo_config
+            ?? $deploymentsWithConfig->first()?->repo_config;
+    }
+@endphp
+
+@include('livewire.sites.partials.edge.build-settings-nav')
+
+<section id="edge-build-delivery" class="scroll-mt-24 dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h3>
         <p class="mt-0.5 text-sm text-brand-moss">{{ __('Where builds are published after each deploy.') }}</p>
@@ -52,10 +69,94 @@
             <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Production branch') }}</dt>
             <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink">{{ $edgeBranch }}</dd>
         </div>
+        @if (($edgeRepoRoot ?? $site->edgeRepoRoot()) !== '')
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+                <dt class="w-36 shrink-0 text-xs uppercase tracking-wide text-brand-mist">{{ __('Repository root') }}</dt>
+                <dd class="min-w-0 flex-1 font-mono text-xs text-brand-ink">{{ $edgeRepoRoot ?? $site->edgeRepoRoot() }}</dd>
+            </div>
+        @endif
     </dl>
 </section>
 
-<section class="dply-card overflow-hidden">
+@php
+    $latestRepoConfig = $edgeBuildRepoConfig;
+@endphp
+
+@if ($latestRepoConfig !== null)
+    <section id="edge-build-repo-config" class="scroll-mt-24 dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+                <div>
+                    <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
+                        <x-heroicon-o-document-text class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
+                        {{ __('Managed by :file', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml']) }}
+                    </h3>
+                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Build, redirects, rewrites, and header rules from the repo override the dashboard settings below on each deploy.') }}</p>
+                </div>
+                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    {{ __('Repo config') }}
+                </span>
+            </div>
+        </div>
+        <dl class="grid grid-cols-2 gap-y-3 gap-x-6 px-6 py-4 text-sm sm:grid-cols-4 sm:px-8">
+            <div>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Build overrides') }}</dt>
+                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ empty($latestRepoConfig['build']) ? __('—') : count($latestRepoConfig['build']).' '.__('keys') }}</dd>
+            </div>
+            <div>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Redirects') }}</dt>
+                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ count((array) ($latestRepoConfig['redirects'] ?? [])) }}</dd>
+            </div>
+            <div>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Rewrites') }}</dt>
+                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ count((array) ($latestRepoConfig['rewrites'] ?? [])) }}</dd>
+            </div>
+            <div>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Header rules') }}</dt>
+                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ count((array) ($latestRepoConfig['headers'] ?? [])) }}</dd>
+            </div>
+        </dl>
+        @php
+            $latestBindings = is_array($latestRepoConfig['bindings'] ?? null) ? $latestRepoConfig['bindings'] : [];
+        @endphp
+        @if ($latestBindings !== [])
+            <div class="border-t border-brand-ink/10 px-6 py-3 text-xs text-brand-moss sm:px-8">
+                <p class="font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bindings exposed to middleware / SSR') }}</p>
+                <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    @foreach (['kv' => __('KV namespaces'), 'r2' => __('R2 buckets'), 'd1' => __('D1 databases'), 'queues' => __('Queues')] as $kind => $label)
+                        @php
+                            $items = is_array($latestBindings[$kind] ?? null) ? $latestBindings[$kind] : [];
+                        @endphp
+                        @if ($items !== [])
+                            <div>
+                                <p class="font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</p>
+                                <ul class="mt-1 space-y-0.5 font-mono">
+                                    @foreach ($items as $bindingName => $targetId)
+                                        <li><span class="text-brand-ink">{{ $bindingName }}</span> <span class="text-brand-mist">→</span> {{ \Illuminate\Support\Str::limit((string) $targetId, 32) }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            </div>
+        @endif
+        @if (! empty($latestRepoConfig['warnings']))
+            <div class="border-t border-amber-300/60 bg-amber-50 px-6 py-3 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200 sm:px-8">
+                <p class="font-semibold uppercase tracking-wide">{{ __('Warnings from the last parse') }}</p>
+                <ul class="mt-1 list-disc space-y-0.5 pl-4">
+                    @foreach ((array) $latestRepoConfig['warnings'] as $warning)
+                        <li class="font-mono">{{ $warning }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+    </section>
+@endif
+
+@include('livewire.sites.partials.edge.repo-routing-rules')
+
+<section id="edge-build-configuration" class="scroll-mt-24 dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Build configuration') }}</h3>
         <p class="mt-0.5 text-sm text-brand-moss">{{ __('Command and output directory used on each deploy. Save here, then redeploy to apply.') }}</p>
@@ -86,6 +187,21 @@
                     class="mt-1.5 w-full max-w-xs rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                 />
                 @error('edge_output_dir')
+                    <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                @enderror
+            </label>
+            <label class="block">
+                <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Repository root') }}</span>
+                <input
+                    type="text"
+                    wire:model="edge_repo_root"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="apps/web"
+                    class="mt-1.5 w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
+                />
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Optional monorepo subdirectory. Builds run from this folder; GitHub auto-deploy only triggers when changed files touch this path or dply.toml/yaml at the repo root.') }}</p>
+                @error('edge_repo_root')
                     <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                 @enderror
             </label>
@@ -140,6 +256,74 @@
         </dl>
     @endcan
 </section>
+
+@if (! $site->isEdgePreview())
+    <section class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+            <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
+            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Per-site URLs that trigger a redeploy when POSTed. Hand the URL to your CMS (Sanity, Contentful, Strapi) so a content change publishes automatically.') }}</p>
+        </div>
+
+        @if ($edge_just_minted_deploy_hook_url !== null)
+            <div class="border-b border-emerald-300/60 bg-emerald-50 px-6 py-4 text-sm text-emerald-950 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100 sm:px-8">
+                <p class="font-semibold">{{ __('Copy your hook URL now — dply won\'t show it again') }}</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <code class="flex-1 min-w-0 break-all rounded-lg bg-white px-3 py-2 font-mono text-[11px] text-brand-ink shadow-sm dark:bg-zinc-900">{{ $edge_just_minted_deploy_hook_url }}</code>
+                    <button type="button" wire:click="dismissEdgeDeployHookUrl" class="text-[11px] font-semibold text-emerald-900 hover:underline dark:text-emerald-200">{{ __('Got it') }}</button>
+                </div>
+            </div>
+        @endif
+
+        @can('update', $site)
+            <form wire:submit.prevent="mintEdgeDeployHook" class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                <label class="flex-1 min-w-[14rem]">
+                    <span class="block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Hook name') }}</span>
+                    <input type="text"
+                           wire:model="edge_new_deploy_hook_name"
+                           placeholder="Sanity prod publish"
+                           class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
+                </label>
+                <button type="submit" wire:loading.attr="disabled" wire:target="mintEdgeDeployHook" class="rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60">
+                    {{ __('Create hook') }}
+                </button>
+            </form>
+        @endcan
+
+        @php
+            $hooks = $this->edgeDeployHooks();
+        @endphp
+        @if ($hooks->isEmpty())
+            <div class="px-6 py-6 text-center text-xs text-brand-moss sm:px-8">{{ __('No deploy hooks yet.') }}</div>
+        @else
+            <ul class="divide-y divide-brand-ink/8">
+                @foreach ($hooks as $hook)
+                    <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8" wire:key="edge-hook-{{ $hook->id }}">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-brand-ink">{{ $hook->name }}</p>
+                            <p class="mt-0.5 font-mono text-[11px] text-brand-moss">
+                                {{ __('Token starts with') }} <span class="rounded-md bg-brand-sand/40 px-1.5 py-0.5 text-brand-ink">{{ $hook->token_prefix }}…</span>
+                                @if ($hook->last_used_at)
+                                    · {{ __('last fired :when', ['when' => $hook->last_used_at->diffForHumans()]) }}
+                                @else
+                                    · {{ __('never fired') }}
+                                @endif
+                            </p>
+                        </div>
+                        @can('update', $site)
+                            <button
+                                type="button"
+                                wire:click="revokeEdgeDeployHook('{{ $hook->id }}')"
+                                wire:confirm="{{ __('Revoke this deploy hook? The URL will stop working immediately.') }}"
+                                class="text-xs font-medium text-rose-700 hover:text-rose-900 dark:text-rose-400">
+                                {{ __('Revoke') }}
+                            </button>
+                        @endcan
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
+@endif
 
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
@@ -505,6 +689,87 @@
                     <x-spinner variant="white" size="sm" wire:loading wire:target="saveEdgeCommentWidget" />
                     <span wire:loading.remove wire:target="saveEdgeCommentWidget">{{ __('Save widget settings') }}</span>
                     <span wire:loading wire:target="saveEdgeCommentWidget">{{ __('Saving…') }}</span>
+                </button>
+            </form>
+        </section>
+
+        <section id="edge-build-preview-protection" class="scroll-mt-24 dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Preview protection') }}</h3>
+                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Require a password or Dply sign-in before anyone can view PR previews and deploy aliases. Your live production URL and custom domains stay public.') }}</p>
+            </div>
+            <form wire:submit.prevent="saveEdgePreviewProtection" class="space-y-5 px-6 py-5 sm:px-8">
+                <fieldset class="space-y-3">
+                    <legend class="sr-only">{{ __('Preview protection mode') }}</legend>
+                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                        <input type="radio" wire:model="edge_preview_protection_mode" value="off" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <span>
+                            <span class="font-medium">{{ __('Off') }}</span>
+                            <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Anyone with a preview or alias URL can view the deploy.') }}</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                        <input type="radio" wire:model="edge_preview_protection_mode" value="password" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <span>
+                            <span class="font-medium">{{ __('Shared password') }}</span>
+                            <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Visitors enter one site-wide password at the edge before the preview loads.') }}</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-3 text-sm text-brand-ink">
+                        <input type="radio" wire:model="edge_preview_protection_mode" value="dply_account" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <span>
+                            <span class="font-medium">{{ __('Dply account') }}</span>
+                            <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Visitors sign in to Dply; optionally restrict to specific email addresses.') }}</span>
+                        </span>
+                    </label>
+                    @error('edge_preview_protection_mode')
+                        <p class="text-xs text-rose-700">{{ $message }}</p>
+                    @enderror
+                </fieldset>
+
+                @if ($edge_preview_protection_mode === 'password')
+                    <label class="block">
+                        <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Preview password') }}</span>
+                        <input
+                            type="password"
+                            wire:model="edge_preview_protection_password"
+                            autocomplete="new-password"
+                            placeholder="{{ __('Leave blank to keep the current password') }}"
+                            class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
+                        />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Required when enabling password protection for the first time. Changing the password invalidates existing preview access cookies.') }}</p>
+                        @error('edge_preview_protection_password')
+                            <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                        @enderror
+                    </label>
+                @endif
+
+                @if ($edge_preview_protection_mode === 'dply_account')
+                    <label class="block">
+                        <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Allowed email addresses') }}</span>
+                        <textarea
+                            wire:model="edge_preview_protection_allowed_emails"
+                            rows="4"
+                            spellcheck="false"
+                            placeholder="reviewer@example.com&#10;pm@example.com"
+                            class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
+                        ></textarea>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Optional. One email per line (commas also work). Leave empty to allow any signed-in Dply user who can view this site.') }}</p>
+                        @error('edge_preview_protection_allowed_emails')
+                            <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                        @enderror
+                    </label>
+                @endif
+
+                <button
+                    type="submit"
+                    wire:loading.attr="disabled"
+                    wire:target="saveEdgePreviewProtection"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                >
+                    <x-spinner variant="white" size="sm" wire:loading wire:target="saveEdgePreviewProtection" />
+                    <span wire:loading.remove wire:target="saveEdgePreviewProtection">{{ __('Save preview protection') }}</span>
+                    <span wire:loading wire:target="saveEdgePreviewProtection">{{ __('Saving…') }}</span>
                 </button>
             </form>
         </section>

@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\Edge\EdgeGithubCheckRunService;
 use App\Services\Edge\EdgeGithubPullRequestCommenter;
+use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -79,11 +80,12 @@ class CreateEdgePreviewSite
             ],
         ]);
 
-        $sourceSpec = [
+        $sourceSpec = array_filter([
             'repo' => (string) $parentSource['repo'],
             'branch' => $branch,
+            'repo_root' => EdgeRepoRoot::normalize(is_string($parentSource['repo_root'] ?? null) ? $parentSource['repo_root'] : null) ?: null,
             'deploy_on_push' => true,
-        ];
+        ], static fn ($value) => $value !== null);
 
         $edgeMeta = [
             'runtime_mode' => $parent->edgeMeta()['runtime_mode'] ?? 'static',
@@ -191,14 +193,15 @@ class CreateEdgePreviewSite
             ],
         ]);
 
-        $sourceSpec = [
+        $sourceSpec = array_filter([
             'repo' => (string) $parentSource['repo'],
             'branch' => $branch,
+            'repo_root' => EdgeRepoRoot::normalize(is_string($parentSource['repo_root'] ?? null) ? $parentSource['repo_root'] : null) ?: null,
             // Ad-hoc previews freeze on the picked commit — auto-deploy on
             // future branch pushes would defeat the "this URL is that SHA"
             // contract the operator is asking for.
             'deploy_on_push' => false,
-        ];
+        ], static fn ($value) => $value !== null);
 
         // Normalize ref kind so the view can branch on it safely. Anything
         // outside the known set falls back to null (renders like a branch).

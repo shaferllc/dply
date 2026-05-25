@@ -13,10 +13,20 @@
                 <p class="mt-1 text-sm text-slate-600 dark:text-zinc-300">{{ __('Static and SSG apps on the dply Edge platform across :org.', ['org' => $org->name]) }}</p>
             </div>
             @if ($edgeEnabled)
-                <a href="{{ route('edge.create') }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/40 dark:bg-brand-sky dark:text-brand-ink dark:hover:bg-brand-sky/90">
-                    <x-heroicon-o-sparkles class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Deploy an edge app') }}
-                </a>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a href="{{ route('edge.templates') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                        <x-heroicon-o-rectangle-stack class="h-3.5 w-3.5" aria-hidden="true" />
+                        {{ __('Templates') }}
+                    </a>
+                    <a href="{{ route('edge.import') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                        <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                        {{ __('Import') }}
+                    </a>
+                    <a href="{{ route('edge.create') }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-ink/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/40 dark:bg-brand-sky dark:text-brand-ink dark:hover:bg-brand-sky/90">
+                        <x-heroicon-o-sparkles class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Deploy an edge app') }}
+                    </a>
+                </div>
             @endif
         </div>
 

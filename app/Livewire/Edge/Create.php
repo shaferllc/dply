@@ -14,6 +14,8 @@ use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Services\Billing\ManagedProductCostEstimator;
 use App\Services\Cloud\CloudRouter;
+use App\Services\Edge\EdgeMonorepoDetector;
+use App\Services\Edge\Frameworks\EdgeFrameworkPresetRegistry;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\Edge\EdgeSsrDetection;
@@ -71,6 +73,16 @@ class Create extends Component
 
     private string $lastDetectionFingerprint = '';
 
+    /** @var list<array{path: string, label: string}> */
+    public array $monorepoPackages = [];
+
+    public bool $monorepoDetected = false;
+
+    /** @var list<string> */
+    public array $monorepoMarkers = [];
+
+    public bool $repoRootTouched = false;
+
     public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         abort_unless(Feature::active('surface.edge'), 404);
@@ -87,6 +99,65 @@ class Create extends Component
             $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
             $this->loadRepositoriesForSelectedAccount();
             $this->repo_source = 'connected';
+        }
+
+        $this->applyQueryPrefills(request()->query());
+    }
+
+    /**
+     * Honor ?repo=…&branch=…&framework=…&runtime_mode=…&build_command=…&output_dir=…&name=…
+     * query params on initial mount so the import wizard + template
+     * gallery can hand off a ready-to-deploy state without re-asking
+     * the user to type anything they've already picked.
+     *
+     * Only fields the user hasn't manually touched (still empty) get
+     * filled — refreshing the page doesn't blow away in-progress
+     * edits.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    private function applyQueryPrefills(array $query): void
+    {
+        $stringValue = static function ($v): string {
+            return is_string($v) ? trim($v) : (is_scalar($v) ? (string) $v : '');
+        };
+
+        $repo = $stringValue($query['repo'] ?? null);
+        if ($repo !== '') {
+            $this->repo = EdgeCreateForm::normalizeRepo($repo);
+            $this->repo_source = 'manual';
+        }
+
+        $branch = $stringValue($query['branch'] ?? null);
+        if ($branch !== '') {
+            $this->branch = $branch;
+        }
+
+        $name = $stringValue($query['name'] ?? null);
+        if ($name !== '' && $this->form->name === '') {
+            $this->form->name = $name;
+        }
+
+        $runtimeMode = strtolower($stringValue($query['runtime_mode'] ?? null));
+        if (in_array($runtimeMode, ['static', 'hybrid', 'ssr'], true)) {
+            $this->form->runtime_mode = $runtimeMode;
+            $this->runtimeModeTouched = true;
+        }
+
+        $build = $stringValue($query['build_command'] ?? null);
+        if ($build !== '' && $this->form->build_command === '') {
+            $this->form->build_command = $build;
+            $this->buildOverridesTouched = true;
+        }
+
+        $output = $stringValue($query['output_dir'] ?? null);
+        if ($output !== '' && ($this->form->output_dir === '' || $this->form->output_dir === 'dist')) {
+            $this->form->output_dir = $output;
+            $this->buildOverridesTouched = true;
+        }
+
+        if ($repo !== '') {
+            $this->maybeAutoDetectFromRepository();
         }
     }
 
@@ -156,6 +227,40 @@ class Create extends Component
     public function detectFromRepository(): void
     {
         $this->runDetection($this->normalizeToCloneUrl($this->repo), $this->branch);
+        $this->detectMonorepoFromRepository();
+    }
+
+    public function updatedFormRepoRoot(): void
+    {
+        $this->repoRootTouched = true;
+    }
+
+    private function detectMonorepoFromRepository(): void
+    {
+        $url = $this->normalizeToCloneUrl($this->repo);
+        $branch = trim($this->branch) !== '' ? trim($this->branch) : 'main';
+        if ($url === '') {
+            $this->monorepoDetected = false;
+            $this->monorepoPackages = [];
+            $this->monorepoMarkers = [];
+
+            return;
+        }
+
+        try {
+            $result = app(EdgeMonorepoDetector::class)->inspectUrl($url, $branch);
+            $this->monorepoDetected = (bool) ($result['is_monorepo'] ?? false);
+            $this->monorepoPackages = is_array($result['packages'] ?? null) ? $result['packages'] : [];
+            $this->monorepoMarkers = is_array($result['markers'] ?? null) ? $result['markers'] : [];
+
+            if ($this->monorepoDetected && ! $this->repoRootTouched && count($this->monorepoPackages) === 1) {
+                $this->form->repo_root = (string) ($this->monorepoPackages[0]['path'] ?? '');
+            }
+        } catch (\Throwable) {
+            $this->monorepoDetected = false;
+            $this->monorepoPackages = [];
+            $this->monorepoMarkers = [];
+        }
     }
 
     private function maybeAutoDetectFromRepository(): void
@@ -270,9 +375,18 @@ class Create extends Component
             return;
         }
 
+        // Detection ships its own build_command + output_dir when
+        // they're confident; we honor those verbatim. When either is
+        // missing we fall back to the framework preset registry —
+        // single source of truth shared with the build cache + import
+        // wizard.
+        $preset = EdgeFrameworkPresetRegistry::byDetectionPlan($this->detectedPlan);
+
         $build = trim((string) ($this->detectedPlan['build_command'] ?? ''));
         if ($build !== '') {
             $this->form->build_command = $build;
+        } elseif ($preset->buildCommand !== '') {
+            $this->form->build_command = $preset->buildCommand;
         }
 
         $detectedOutput = trim((string) ($this->detectedPlan['output_dir'] ?? ''));
@@ -282,18 +396,8 @@ class Create extends Component
             return;
         }
 
-        $framework = strtolower((string) ($this->detectedPlan['framework'] ?? ''));
         if ($this->form->output_dir === '' || $this->form->output_dir === 'dist') {
-            $this->form->output_dir = match ($framework) {
-                'next' => 'out',
-                'nuxt' => '.output/public',
-                'astro' => 'dist',
-                'eleventy', 'jekyll' => '_site',
-                'hugo' => 'public',
-                'static' => '.',
-                'vite', 'vue', 'react', 'svelte', 'sveltekit', 'remix' => 'dist',
-                default => $this->form->output_dir !== '' ? $this->form->output_dir : 'dist',
-            };
+            $this->form->output_dir = $preset->outputDir !== '' ? $preset->outputDir : 'dist';
         }
 
         $this->applyDetectedDeliveryPrefills();
@@ -467,8 +571,9 @@ class Create extends Component
 
         $this->validateCreateForm();
 
-        if ($this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan) && $this->form->runtime_mode !== 'hybrid') {
-            $this->toastError(__('This repository looks like an SSR app. Choose hybrid mode with an origin URL, configure static export, or use dply Cloud for full server workloads.'));
+        if ($this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)
+            && ! in_array($this->form->runtime_mode, ['hybrid', 'ssr'], true)) {
+            $this->toastError(__('This repository looks like an SSR app. Pick "Worker-native SSR" (Next.js via OpenNext), hybrid mode with an origin URL, or use dply Cloud for full server workloads.'));
 
             return;
         }

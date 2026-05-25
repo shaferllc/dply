@@ -73,6 +73,10 @@ class EdgeEnsureDeliveryFeaturesCommand extends Command
             $this->warn('Worker was not redeployed.');
         }
 
+        if (($result['access_gates_republished'] ?? 0) > 0) {
+            $this->info('Preview access gates republished for '.$result['access_gates_republished'].' site(s).');
+        }
+
         return self::SUCCESS;
     }
 }

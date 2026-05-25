@@ -3,6 +3,8 @@
 
     @include('livewire.sites.partials.edge.logs-callout')
 
+    @include('livewire.sites.partials.edge.live-request-tail')
+
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Build & deploy logs') }}</h3>
@@ -28,7 +30,8 @@
                             default => 'text-brand-moss',
                         };
                         $failureReason = $deployment->failure_reason;
-                        $buildLog = $deployment->readBuildLog($site);
+                        $loadedBuildLog = $edgeDeploymentBuildLogs[$deployment->id] ?? null;
+                        $buildLogLoaded = array_key_exists($deployment->id, $edgeDeploymentBuildLogs);
                     @endphp
                     <li class="px-6 py-4 sm:px-8" wire:key="edge-log-{{ $deployment->id }}">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -47,15 +50,46 @@
                             @endif
                         </div>
                         @if (is_string($failureReason) && $failureReason !== '')
-                            <pre class="mt-3 max-h-48 overflow-auto rounded-xl border border-rose-200/60 bg-rose-50/50 p-3 font-mono text-[11px] text-rose-900 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-200">{{ $failureReason }}</pre>
+                            @include('livewire.sites.partials.edge.build-log-lint-callout', [
+                                'buildLog' => $buildLogLoaded ? $loadedBuildLog : null,
+                                'failureReason' => $failureReason,
+                                'site' => $site,
+                                'server' => $server ?? $site->server,
+                                'deployment' => $deployment,
+                            ])
+                            @if (! str_contains($failureReason, 'dply config lint failed'))
+                                <pre class="mt-3 max-h-48 overflow-auto rounded-xl border border-rose-200/60 bg-rose-50/50 p-3 font-mono text-[11px] text-rose-900 dark:border-rose-900/30 dark:bg-rose-950/20 dark:text-rose-200">{{ $failureReason }}</pre>
+                            @endif
                         @endif
-                        @if (is_string($buildLog) && $buildLog !== '')
-                            <details class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 dark:border-brand-mist/20 dark:bg-zinc-900/40">
+
+                        @if ($deployment->build_log_path || (is_string($failureReason) && $failureReason !== ''))
+                            <details
+                                class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 dark:border-brand-mist/20 dark:bg-zinc-900/40"
+                                x-on:toggle="if ($el.open) $wire.loadEdgeDeploymentBuildLog(@js($deployment->id))"
+                            >
                                 <summary class="cursor-pointer px-3 py-2 text-xs font-semibold text-brand-moss">{{ __('Build log') }}</summary>
-                                <pre class="max-h-64 overflow-auto border-t border-brand-ink/8 p-3 font-mono text-[11px] text-brand-ink">{{ $buildLog }}</pre>
+                                <div class="border-t border-brand-ink/8 p-3">
+                                    <div wire:loading wire:target="loadEdgeDeploymentBuildLog('{{ $deployment->id }}')" class="text-xs text-brand-moss">
+                                        {{ __('Loading build log…') }}
+                                    </div>
+                                    @if ($buildLogLoaded)
+                                        @if ($loadedBuildLog !== null && $loadedBuildLog !== '')
+                                            @if ($deployment->status !== \App\Models\EdgeDeployment::STATUS_FAILED || ! is_string($failureReason) || $failureReason === '')
+                                                @include('livewire.sites.partials.edge.build-log-lint-callout', [
+                                                    'buildLog' => $loadedBuildLog,
+                                                    'failureReason' => null,
+                                                    'site' => $site,
+                                                    'server' => $server ?? $site->server,
+                                                    'deployment' => $deployment,
+                                                ])
+                                            @endif
+                                            <pre class="max-h-64 overflow-auto font-mono text-[11px] text-brand-ink">{{ $loadedBuildLog }}</pre>
+                                        @else
+                                            <p class="text-xs text-brand-moss">{{ __('No build log stored for this deployment.') }}</p>
+                                        @endif
+                                    @endif
+                                </div>
                             </details>
-                        @elseif ($deployment->build_log_path)
-                            <p class="mt-2 text-xs text-brand-moss">{{ __('Build log stored at :path', ['path' => $deployment->build_log_path]) }}</p>
                         @endif
                     </li>
                 @endforeach

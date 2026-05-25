@@ -49,6 +49,27 @@ return [
          * silent no-op — safe to leave blank during rollout.
          */
         'cache_kv_namespace_id' => env('DPLY_EDGE_CF_CACHE_KV_NAMESPACE_ID'),
+        /*
+         * Workers for Platforms dispatch namespace used to host
+         * per-deployment SSR Worker scripts (Phase 4b). When unset,
+         * SSR Edge sites can't be created — static + hybrid still
+         * work. Bootstrap with `php artisan dply:edge:infra:bootstrap`
+         * (auto-creates the namespace + prints the env line) or set
+         * manually after creating one in the Cloudflare dashboard.
+         */
+        'dispatch_namespace_name' => env('DPLY_EDGE_CF_DISPATCH_NAMESPACE', 'dply-edge-ssr'),
+        'dispatch_namespace_id' => env('DPLY_EDGE_CF_DISPATCH_NAMESPACE_ID'),
+        /*
+         * Default compatibility flags + date for per-deployment SSR
+         * scripts uploaded into the dispatch namespace. nodejs_compat
+         * is required by Next.js/OpenNext; bump the date as Cloudflare
+         * ships new runtime versions.
+         */
+        'ssr_script_compatibility_date' => env('DPLY_EDGE_CF_SSR_COMPAT_DATE', '2024-11-01'),
+        'ssr_script_compatibility_flags' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('DPLY_EDGE_CF_SSR_COMPAT_FLAGS', 'nodejs_compat'))
+        ))),
         'worker_script_name' => env('DPLY_EDGE_CF_WORKER_SCRIPT', 'dply-edge'),
         'worker_zone_name' => env('DPLY_EDGE_CF_ZONE_NAME'),
         'worker_routes' => array_values(array_filter(array_map(

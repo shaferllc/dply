@@ -7,11 +7,13 @@ namespace App\Livewire\Concerns;
 use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Actions\Edge\DeployEdgeCommit;
 use App\Actions\Edge\RedeployEdgeSite;
-use App\Actions\Edge\RollbackEdgeDeployment;
 use App\Jobs\TeardownEdgeSiteJob;
+use App\Models\EdgeDeployHook;
 use App\Models\EdgeDeployment;
+use App\Models\EdgeSiteAccessRule;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Edge\EdgeAccessGate;
 use App\Services\Edge\EdgeCachePurger;
 use App\Services\Edge\EdgeCustomDomainProvisioner;
 use App\Services\Edge\EdgeGithubWebhookProvisioner;
@@ -20,6 +22,7 @@ use App\Services\Edge\EdgeRouter;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SiteGitCommitsFetcher;
 use App\Services\SourceControl\SourceControlRepositoryReader;
+use App\Support\Edge\EdgeRepoRoot;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -30,9 +33,25 @@ use Livewire\Attributes\On;
  */
 trait ManagesEdgeSite
 {
+    use ManagesEdgeDeploymentLifecycle;
+
     public string $edge_domain_input = '';
 
     public string $edge_webhook_account_id = '';
+
+    /**
+     * Form input for minting a new deploy hook (P10b). Cleared after
+     * a successful mint; the resulting plaintext URL surfaces via
+     * {@see $edge_just_minted_deploy_hook_url} once.
+     */
+    public string $edge_new_deploy_hook_name = '';
+
+    /**
+     * Plaintext hook URL shown to the operator exactly once right
+     * after mint. Persisted-only-in-component-state so a page reload
+     * makes it disappear (matching API-token UX).
+     */
+    public ?string $edge_just_minted_deploy_hook_url = null;
 
     public string $edge_deploy_commit_sha = '';
 
@@ -91,6 +110,8 @@ trait ManagesEdgeSite
 
     public bool $edge_deploy_on_push = true;
 
+    public string $edge_repo_root = '';
+
     public string $edge_origin_url = '';
 
     /** Multi-line — one route pattern per line. Persisted as a list<string>. */
@@ -122,6 +143,7 @@ trait ManagesEdgeSite
         $this->edge_output_dir = (string) ($build['output_dir'] ?? 'dist');
         $this->edge_spa_fallback = (bool) ($routing['spa_fallback'] ?? ($edge['spa_fallback'] ?? true));
         $this->edge_deploy_on_push = (bool) ($source['deploy_on_push'] ?? true);
+        $this->edge_repo_root = $this->site->edgeRepoRoot();
 
         $this->edge_origin_url = (string) ($origin['url'] ?? '');
         $originRoutes = is_array($origin['routes'] ?? null) ? $origin['routes'] : [];
@@ -142,6 +164,13 @@ trait ManagesEdgeSite
 
         $widget = is_array($edge['comment_widget'] ?? null) ? $edge['comment_widget'] : [];
         $this->edge_comment_widget_enabled = (bool) ($widget['enabled'] ?? false);
+
+        $accessRule = $this->site->edgeSiteAccessRule;
+        $this->edge_preview_protection_mode = is_string($accessRule?->mode)
+            ? $accessRule->mode
+            : EdgeSiteAccessRule::MODE_OFF;
+        $this->edge_preview_protection_password = '';
+        $this->edge_preview_protection_allowed_emails = implode("\n", $accessRule?->normalizedAllowedEmails() ?? []);
 
         $webhook = is_array($edge['webhook'] ?? null) ? $edge['webhook'] : null;
         $accountId = is_array($webhook) ? (string) ($webhook['account_id'] ?? '') : '';
@@ -191,6 +220,7 @@ trait ManagesEdgeSite
             'edge_output_dir' => ['required', 'string', 'max:200'],
             'edge_spa_fallback' => ['boolean'],
             'edge_deploy_on_push' => ['boolean'],
+            'edge_repo_root' => ['nullable', 'string', 'max:255'],
         ]);
 
         $site = $this->site->fresh();
@@ -204,6 +234,12 @@ trait ManagesEdgeSite
         $build['command'] = trim((string) $validated['edge_build_command']);
         $build['output_dir'] = trim((string) $validated['edge_output_dir']);
         $source['deploy_on_push'] = (bool) $validated['edge_deploy_on_push'];
+        $normalizedRepoRoot = EdgeRepoRoot::normalize((string) ($validated['edge_repo_root'] ?? ''));
+        if ($normalizedRepoRoot !== '') {
+            $source['repo_root'] = $normalizedRepoRoot;
+        } else {
+            unset($source['repo_root']);
+        }
         $routing['spa_fallback'] = (bool) $validated['edge_spa_fallback'];
 
         $site->mergeEdgeMeta([
@@ -473,6 +509,12 @@ trait ManagesEdgeSite
 
     public bool $edge_comment_widget_enabled = false;
 
+    public string $edge_preview_protection_mode = EdgeSiteAccessRule::MODE_OFF;
+
+    public string $edge_preview_protection_password = '';
+
+    public string $edge_preview_protection_allowed_emails = '';
+
     /**
      * Toggle the on-page preview comment widget for this site's
      * children. The flag (and its auto-generated widget_token) live on
@@ -541,6 +583,72 @@ trait ManagesEdgeSite
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Preview comment widget enabled. New previews ship with the widget script injected.'));
         }
+    }
+
+    /**
+     * Gate PR previews and per-deploy aliases behind a shared password
+     * or signed-in Dply account. Production hostnames are never gated.
+     */
+    public function saveEdgePreviewProtection(): void
+    {
+        if (! $this->site->usesEdgeRuntime() || $this->site->isEdgePreview()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $validated = $this->validate([
+            'edge_preview_protection_mode' => ['required', 'in:off,password,dply_account'],
+            'edge_preview_protection_password' => ['nullable', 'string', 'max:200'],
+            'edge_preview_protection_allowed_emails' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $emails = $this->parseEdgePreviewAllowedEmails((string) ($validated['edge_preview_protection_allowed_emails'] ?? ''));
+        $password = trim((string) ($validated['edge_preview_protection_password'] ?? ''));
+        $site = $this->site->fresh();
+        $previous = $site->edgeSiteAccessRule?->only(['mode', 'allowed_emails']) ?? ['mode' => EdgeSiteAccessRule::MODE_OFF];
+
+        app(EdgeAccessGate::class)->sync(
+            $site,
+            (string) $validated['edge_preview_protection_mode'],
+            $password !== '' ? $password : null,
+            $emails,
+        );
+
+        $this->edge_preview_protection_password = '';
+        $this->site->refresh();
+        $this->edge_preview_protection_allowed_emails = implode(
+            "\n",
+            $this->site->edgeSiteAccessRule?->normalizedAllowedEmails() ?? [],
+        );
+
+        $org = $site->organization;
+        if ($org !== null) {
+            audit_log($org, auth()->user(), 'site.edge.preview_protection.updated', $site, [
+                'access_rule' => $previous,
+            ], [
+                'access_rule' => $this->site->edgeSiteAccessRule?->only(['mode', 'allowed_emails']),
+            ]);
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Preview protection updated.'));
+        }
+    }
+
+    /** @return list<string> */
+    private function parseEdgePreviewAllowedEmails(string $raw): array
+    {
+        $parts = [];
+        foreach (preg_split('/\R/', $raw) ?: [] as $line) {
+            foreach (array_map('trim', explode(',', $line)) as $email) {
+                $parts[] = strtolower($email);
+            }
+        }
+
+        return array_values(array_unique(array_filter(
+            $parts,
+            static fn (string $email): bool => $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false,
+        )));
     }
 
     /** @return list<string> */
@@ -1254,28 +1362,6 @@ trait ManagesEdgeSite
         }));
     }
 
-    public function rollbackEdgeDeployment(string $deploymentId): void
-    {
-        if (! $this->site->usesEdgeRuntime()) {
-            return;
-        }
-        $this->authorize('update', $this->site);
-
-        try {
-            (new RollbackEdgeDeployment)->handle($this->site, $deploymentId);
-        } catch (\Throwable $e) {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError($e->getMessage());
-            }
-
-            return;
-        }
-
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Rolled back — the selected deployment is now live.'));
-        }
-    }
-
     /**
      * Opens the shared confirm-action modal for tearing down a preview. The
      * row button hits this; the modal then dispatches to {@see tearDownEdgePreview}
@@ -1452,6 +1538,32 @@ trait ManagesEdgeSite
     }
 
     /**
+     * Lazy-loaded build log bodies keyed by deployment id (Edge Logs tab).
+     *
+     * @var array<string, string|null>
+     */
+    public array $edgeDeploymentBuildLogs = [];
+
+    public function loadEdgeDeploymentBuildLog(string $deploymentId): void
+    {
+        if (array_key_exists($deploymentId, $this->edgeDeploymentBuildLogs)) {
+            return;
+        }
+
+        $deployment = EdgeDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->find($deploymentId);
+
+        if ($deployment === null) {
+            $this->edgeDeploymentBuildLogs[$deploymentId] = null;
+
+            return;
+        }
+
+        $this->edgeDeploymentBuildLogs[$deploymentId] = $deployment->readBuildLog($this->site);
+    }
+
+    /**
      * @return Collection<int, EdgeDeployment>
      */
     public function edgeDeploymentHistory(int $limit = 10): Collection
@@ -1465,5 +1577,85 @@ trait ManagesEdgeSite
     public function edgePreviewSites(): Collection
     {
         return CreateEdgePreviewSite::listForParent($this->site);
+    }
+
+    public function mintEdgeDeployHook(): void
+    {
+        if (! $this->site->usesEdgeRuntime() || $this->site->isEdgePreview()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $name = trim($this->edge_new_deploy_hook_name);
+        if ($name === '') {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Give the hook a name so you can tell yours apart later.'));
+            }
+
+            return;
+        }
+
+        $result = EdgeDeployHook::mintFor($this->site, $name, (string) auth()->id());
+        $this->edge_new_deploy_hook_name = '';
+        $this->edge_just_minted_deploy_hook_url = $result['hook_url'];
+
+        $org = $this->site->organization;
+        if ($org !== null) {
+            audit_log($org, auth()->user(), 'site.edge.deploy_hook.created', $this->site, null, [
+                'hook_id' => $result['hook']->id,
+                'name' => $name,
+            ]);
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Deploy hook created. Copy the URL now — dply won\'t show it again.'));
+        }
+    }
+
+    public function dismissEdgeDeployHookUrl(): void
+    {
+        $this->edge_just_minted_deploy_hook_url = null;
+    }
+
+    public function revokeEdgeDeployHook(string $hookId): void
+    {
+        if (! $this->site->usesEdgeRuntime() || $this->site->isEdgePreview()) {
+            return;
+        }
+        $this->authorize('update', $this->site);
+
+        $hook = EdgeDeployHook::query()
+            ->where('site_id', $this->site->id)
+            ->find($hookId);
+
+        if ($hook === null) {
+            return;
+        }
+
+        $name = $hook->name;
+        $hook->delete();
+
+        $org = $this->site->organization;
+        if ($org !== null) {
+            audit_log($org, auth()->user(), 'site.edge.deploy_hook.revoked', $this->site, [
+                'hook_id' => $hookId,
+                'name' => $name,
+            ], null);
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Deploy hook revoked. The URL will return 404 immediately.'));
+        }
+    }
+
+    /**
+     * @return Collection<int, EdgeDeployHook>
+     */
+    public function edgeDeployHooks(): Collection
+    {
+        return EdgeDeployHook::query()
+            ->where('site_id', $this->site->id)
+            ->orderByDesc('created_at')
+            ->get();
     }
 }

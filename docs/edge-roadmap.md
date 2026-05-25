@@ -43,11 +43,14 @@ First-party Netlify-style platform: git-connected builds, branch previews, CDN d
 - Create flow: hybrid mode + SSR origin URL
 - Build settings shows hybrid origin (read-only in v1)
 
-#### Phase 4b — Worker-native SSR (deferred)
+#### Phase 4b — Worker-native SSR ✅ (2026-05-24)
 
-- OpenNext / `@cloudflare/next-on-pages` build pipeline in `EdgeBuildRunner`
-- Per-deployment Worker script upload via `edge:worker:deploy`
-- `runtime_mode = 'ssr'` — blocked until 4b ships
+- `EdgeBuildRunner` runs `@opennextjs/cloudflare build` inside Docker for `runtime_mode = 'ssr'`; emits `.open-next/assets/` + `.open-next/worker.js`
+- `EdgeSsrBundleUploader` ships the bundled Worker entry into a Workers for Platforms dispatch namespace as `dply-ssr-{site-tail}-{deploy-tail}`
+- Platform `packages/edge-worker` gains a `DISPATCHER` binding; `runtime_mode=ssr` hostnames are routed via `env.DISPATCHER.get(scriptName).fetch(request)`
+- `php artisan dply:edge:infra:bootstrap` auto-creates the dispatch namespace; SSR site creation blocks until `DPLY_EDGE_CF_DISPATCH_NAMESPACE_ID` is set
+- Per-deployment scripts are wiped on site teardown so the namespace doesn't accumulate orphans
+- See [edge-ssr.md](edge-ssr.md) for the operator runbook
 - See [edge-product-boundary ADR](adr/edge-product-boundary.md)
 
 ## Infra prerequisites

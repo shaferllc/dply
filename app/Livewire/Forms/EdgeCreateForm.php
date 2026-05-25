@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Forms;
 
+use App\Support\Edge\EdgeRepoRoot;
 use Livewire\Form;
 
 class EdgeCreateForm extends Form
@@ -29,6 +30,8 @@ class EdgeCreateForm extends Form
     public string $origin_cloud_site_id = '';
 
     /** managed = dply platform; byo = org Cloudflare credential */
+    public string $repo_root = '';
+
     public string $delivery_mode = 'managed';
 
     public string $edge_provider_credential_id = '';
@@ -44,7 +47,8 @@ class EdgeCreateForm extends Form
             'output_dir' => ['nullable', 'string', 'max:200'],
             'spa_fallback' => ['boolean'],
             'deploy_on_push' => ['boolean'],
-            'runtime_mode' => ['required', 'in:static,hybrid'],
+            'repo_root' => ['nullable', 'string', 'max:255'],
+            'runtime_mode' => ['required', 'in:static,hybrid,ssr'],
             'origin_url' => ['nullable', 'string', 'max:500'],
             'delivery_mode' => ['required', 'in:managed,byo'],
             'edge_provider_credential_id' => ['required_if:delivery_mode,byo', 'nullable', 'string'],
@@ -78,6 +82,7 @@ class EdgeCreateForm extends Form
             'output_dir' => $this->resolvedOutputDir(),
             'spa_fallback' => $this->spa_fallback,
             'deploy_on_push' => $this->deploy_on_push,
+            'repo_root' => EdgeRepoRoot::normalize($this->repo_root) ?: null,
             'framework' => $framework,
             'runtime_mode' => $this->runtime_mode,
             'origin_url' => trim($this->origin_url),
@@ -102,6 +107,7 @@ class EdgeCreateForm extends Form
             'output_dir' => $this->resolvedOutputDir(),
             'spa_fallback' => $this->spa_fallback,
             'deploy_on_push' => $this->deploy_on_push,
+            'repo_root' => EdgeRepoRoot::normalize($this->repo_root) ?: null,
             'detected_plan' => $detectedPlan,
             'origin_routes' => ['/_next/*', '/api/*'],
             'edge_backend' => $this->delivery_mode === 'byo' ? 'org_cloudflare' : 'dply_edge',

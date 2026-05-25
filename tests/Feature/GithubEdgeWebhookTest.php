@@ -109,6 +109,40 @@ test('push to other branch is no op', function () {
     Queue::assertNotPushed(BuildEdgeSiteJob::class);
 });
 
+test('push outside repo root does not queue redeploy', function () {
+    Queue::fake();
+    $site = makeSourceSite(['repo_root' => 'apps/web']);
+
+    $response = postWebhook($site, 'push', json_encode([
+        'ref' => 'refs/heads/main',
+        'commits' => [[
+            'added' => [],
+            'modified' => ['apps/api/server.ts'],
+            'removed' => [],
+        ]],
+    ]));
+
+    $response->assertOk()->assertJsonPath('reason', 'push_outside_repo_root');
+    Queue::assertNotPushed(BuildEdgeSiteJob::class);
+});
+
+test('push touching repo root still queues redeploy', function () {
+    Queue::fake();
+    $site = makeSourceSite(['repo_root' => 'apps/web']);
+
+    $response = postWebhook($site, 'push', json_encode([
+        'ref' => 'refs/heads/main',
+        'commits' => [[
+            'added' => [],
+            'modified' => ['apps/web/src/page.tsx'],
+            'removed' => [],
+        ]],
+    ]));
+
+    $response->assertOk()->assertJsonPath('queued', 'redeploy');
+    Queue::assertPushed(BuildEdgeSiteJob::class);
+});
+
 test('invalid signature returns 403', function () {
     $site = makeSourceSite();
     $body = json_encode(['action' => 'opened', 'pull_request' => ['number' => 1, 'head' => ['ref' => 'feature/x']]]);
@@ -164,7 +198,7 @@ function postWebhook(Site $site, string $event, string $body)
     );
 }
 
-function makeSourceSite(): Site
+function makeSourceSite(array $sourceOverrides = []): Site
 {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -191,7 +225,10 @@ function makeSourceSite(): Site
         'meta' => [
             'runtime_profile' => 'edge_web',
             'edge' => [
-                'source' => ['repo' => 'acme/marketing', 'branch' => 'main', 'deploy_on_push' => true],
+                'source' => array_merge(
+                    ['repo' => 'acme/marketing', 'branch' => 'main', 'deploy_on_push' => true],
+                    $sourceOverrides,
+                ),
                 'routing' => ['hostname' => 'marketing-site.dply.host'],
                 'live_url' => 'https://marketing-site.dply.host',
             ],

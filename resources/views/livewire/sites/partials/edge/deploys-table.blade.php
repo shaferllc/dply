@@ -145,7 +145,29 @@
                             };
                         @endphp
                         <tr wire:key="edge-dep-{{ $deployment->id }}">
-                            <td class="px-6 py-3 font-mono text-xs sm:px-8">{{ \Illuminate\Support\Str::limit($deployment->id, 14, '') }}</td>
+                            <td class="px-6 py-3 font-mono text-xs sm:px-8">
+                                <a
+                                    href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment]) }}"
+                                    wire:navigate
+                                    class="font-semibold text-brand-forest hover:underline dark:text-brand-sage"
+                                    title="{{ __('Open deployment detail') }}"
+                                >
+                                    {{ \Illuminate\Support\Str::limit($deployment->id, 14, '') }}
+                                </a>
+                                @php
+                                    $deploymentAliases = $deployment->aliasHostnames();
+                                @endphp
+                                @if ($deploymentAliases !== [])
+                                    <div class="mt-1 flex flex-col gap-0.5 text-[10px] font-normal text-brand-moss">
+                                        @foreach ($deploymentAliases as $alias)
+                                            <a href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'aliases']) }}" wire:navigate class="inline-flex items-center gap-1 hover:text-brand-forest dark:hover:text-brand-sage" title="{{ __('Stable per-deploy URL — always points at this build.') }}">
+                                                <x-heroicon-o-link class="h-3 w-3 opacity-60" aria-hidden="true" />
+                                                {{ $alias }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase {{ $depBadge }}">
                                     {{ str_replace('_', ' ', (string) $deployment->status) }}
@@ -171,7 +193,7 @@
                             <td class="px-6 py-3 text-right text-xs sm:px-8">
                                 @if (! $isActive && ($deployment->status === \App\Models\EdgeDeployment::STATUS_LIVE || $deployment->status === \App\Models\EdgeDeployment::STATUS_SUPERSEDED) && $deployment->storage_prefix !== null)
                                     @can('update', $site)
-                                        <button type="button" wire:click="rollbackEdgeDeployment('{{ $deployment->id }}')" class="font-medium text-brand-forest hover:underline dark:text-brand-sage">
+                                        <button type="button" wire:click="confirmRollbackEdgeDeployment('{{ $deployment->id }}')" class="font-medium text-brand-forest hover:underline dark:text-brand-sage">
                                             {{ __('Roll back') }}
                                         </button>
                                     @endcan

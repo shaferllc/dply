@@ -1,0 +1,114 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Api\Edge;
+
+use App\Actions\Edge\DeployEdgeCommit;
+use App\Actions\Edge\RedeployEdgeSite;
+use App\Actions\Edge\RollbackEdgeDeployment;
+use App\Models\EdgeDeployment;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+
+class EdgeDeploymentApiController extends EdgeApiController
+{
+    public function index(Request $request, string $site): JsonResponse
+    {
+        $found = $this->findEdgeSite($request, $site);
+        if ($found === null) {
+            return $this->notFound();
+        }
+
+        $limit = min(100, max(1, (int) $request->query('limit', 20)));
+
+        $rows = EdgeDeployment::query()
+            ->where('site_id', $found->id)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => $rows->map(fn (EdgeDeployment $d) => $this->deploymentResource($d)),
+        ]);
+    }
+
+    public function show(Request $request, string $site, string $deployment): JsonResponse
+    {
+        $found = $this->findEdgeSite($request, $site);
+        if ($found === null) {
+            return $this->notFound();
+        }
+
+        $row = EdgeDeployment::query()
+            ->where('site_id', $found->id)
+            ->find($deployment);
+
+        if ($row === null) {
+            return response()->json(['message' => 'Deployment not found.'], 404);
+        }
+
+        return response()->json(['data' => $this->deploymentResource($row)]);
+    }
+
+    /**
+     * Trigger a deploy. Two flavors via request body:
+     *   - { "commit": "abc123" }           → DeployEdgeCommit (re-flips if known)
+     *   - { } or { "branch_tip": true }    → RedeployEdgeSite (rebuild from branch HEAD)
+     */
+    public function store(Request $request, string $site): JsonResponse
+    {
+        $found = $this->findEdgeSite($request, $site);
+        if ($found === null) {
+            return $this->notFound();
+        }
+
+        try {
+            $data = $request->validate([
+                'commit' => ['nullable', 'string', 'regex:/^[a-fA-F0-9]{7,40}$/'],
+                'branch' => ['nullable', 'string', 'max:200'],
+                'branch_tip' => ['nullable', 'boolean'],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+        }
+
+        try {
+            if (! empty($data['commit'])) {
+                $branch = isset($data['branch']) && $data['branch'] !== '' ? (string) $data['branch'] : null;
+                $deployment = app(DeployEdgeCommit::class)->handle($found, (string) $data['commit'], $branch);
+            } else {
+                $deployment = app(RedeployEdgeSite::class)->handle($found);
+            }
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => $this->deploymentResource($deployment->refresh()),
+        ], 202);
+    }
+
+    /**
+     * Re-point production at an existing deployment. The deployment
+     * must still have artifacts (not pruned).
+     */
+    public function rollback(Request $request, string $site, string $deployment): JsonResponse
+    {
+        $found = $this->findEdgeSite($request, $site);
+        if ($found === null) {
+            return $this->notFound();
+        }
+
+        try {
+            $result = app(RollbackEdgeDeployment::class)->handle($found, $deployment);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'data' => $this->deploymentResource($result->refresh()),
+        ]);
+    }
+}

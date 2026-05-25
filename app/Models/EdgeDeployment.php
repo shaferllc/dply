@@ -33,6 +33,8 @@ class EdgeDeployment extends Model
         'storage_prefix',
         'build_log_path',
         'cf_kv_version',
+        'aliases',
+        'repo_config',
         'published_at',
         'failed_at',
         'failure_reason',
@@ -44,11 +46,30 @@ class EdgeDeployment extends Model
     {
         return [
             'meta' => 'array',
+            'aliases' => 'array',
+            'repo_config' => 'array',
             'published_at' => 'datetime',
             'failed_at' => 'datetime',
             'pruned_at' => 'datetime',
             'cf_kv_version' => 'integer',
         ];
+    }
+
+    /**
+     * Stable per-deployment alias hostnames. Each one resolves to this
+     * deployment via the KV host map so operators can deep-link any
+     * historical build, even when production has moved on.
+     *
+     * @return list<string>
+     */
+    public function aliasHostnames(): array
+    {
+        $aliases = is_array($this->aliases) ? $this->aliases : [];
+
+        return array_values(array_filter(array_map(
+            static fn ($value): string => is_string($value) ? strtolower(trim($value)) : '',
+            $aliases,
+        ), static fn (string $value): bool => $value !== ''));
     }
 
     public function site(): BelongsTo

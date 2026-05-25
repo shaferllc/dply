@@ -38,6 +38,22 @@ final readonly class EdgeDeliveryContext
          * no-op.
          */
         public string $cacheKvNamespaceId = '',
+        /**
+         * Workers for Platforms dispatch namespace name + id for
+         * per-deployment SSR Worker scripts (Phase 4b). Both empty
+         * when SSR isn't bootstrapped for this scope — static and
+         * hybrid sites still work; SSR site creation is blocked.
+         */
+        public string $dispatchNamespaceName = '',
+        public string $dispatchNamespaceId = '',
+        /**
+         * Compatibility date + flags applied to every per-deployment
+         * SSR script uploaded into the dispatch namespace.
+         *
+         * @var list<string>
+         */
+        public string $ssrCompatibilityDate = '2024-11-01',
+        public array $ssrCompatibilityFlags = [],
     ) {}
 
     public static function platform(): self
@@ -60,7 +76,19 @@ final readonly class EdgeDeliveryContext
             workerRoutes: EdgePlatformCredentials::workerRoutes(),
             diskName: (string) config('edge.disk.name', 'edge_r2'),
             cacheKvNamespaceId: trim((string) config('edge.cloudflare.cache_kv_namespace_id', '')),
+            dispatchNamespaceName: trim((string) config('edge.cloudflare.dispatch_namespace_name', '')),
+            dispatchNamespaceId: trim((string) config('edge.cloudflare.dispatch_namespace_id', '')),
+            ssrCompatibilityDate: trim((string) config('edge.cloudflare.ssr_script_compatibility_date', '2024-11-01')) ?: '2024-11-01',
+            ssrCompatibilityFlags: array_values(array_filter(array_map(
+                static fn ($flag) => is_string($flag) ? trim($flag) : '',
+                (array) config('edge.cloudflare.ssr_script_compatibility_flags', []),
+            ))),
         );
+    }
+
+    public function supportsSsr(): bool
+    {
+        return $this->dispatchNamespaceName !== '' && $this->dispatchNamespaceId !== '';
     }
 
     public static function fromProviderCredential(ProviderCredential $credential): self
@@ -132,6 +160,13 @@ final readonly class EdgeDeliveryContext
             diskName: 'edge_r2_org_'.$credential->id,
             providerCredentialId: (string) $credential->id,
             cacheKvNamespaceId: trim((string) ($edge['cache_kv_namespace_id'] ?? '')),
+            dispatchNamespaceName: trim((string) ($edge['dispatch_namespace_name'] ?? '')),
+            dispatchNamespaceId: trim((string) ($edge['dispatch_namespace_id'] ?? '')),
+            ssrCompatibilityDate: trim((string) ($edge['ssr_script_compatibility_date'] ?? '2024-11-01')) ?: '2024-11-01',
+            ssrCompatibilityFlags: array_values(array_filter(array_map(
+                static fn ($flag) => is_string($flag) ? trim($flag) : '',
+                (array) ($edge['ssr_script_compatibility_flags'] ?? []),
+            ))),
         );
     }
 
@@ -153,6 +188,10 @@ final readonly class EdgeDeliveryContext
             diskName: $this->diskName,
             providerCredentialId: $this->providerCredentialId,
             cacheKvNamespaceId: $this->cacheKvNamespaceId,
+            dispatchNamespaceName: $this->dispatchNamespaceName,
+            dispatchNamespaceId: $this->dispatchNamespaceId,
+            ssrCompatibilityDate: $this->ssrCompatibilityDate,
+            ssrCompatibilityFlags: $this->ssrCompatibilityFlags,
         );
     }
 

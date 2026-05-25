@@ -17,10 +17,24 @@ class EdgeHostMapPublisher
     {
         $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
         $version = (int) $deployment->cf_kv_version + 1;
-        $this->publishHostname($site, $deployment, $site->edgeHostname(), $context);
+        $this->publishHostname($site, $deployment, $site->edgeHostname(), $context, ! $site->isEdgePreview());
 
         foreach ($this->readyCustomHostnames($site) as $hostname) {
-            $this->publishHostname($site, $deployment, $hostname, $context);
+            $this->publishHostname($site, $deployment, $hostname, $context, true);
+        }
+
+        // Per-deploy stable aliases — generate (and persist) the first
+        // time this deployment publishes, then re-emit on every
+        // subsequent republish so the KV entries don't TTL out.
+        $aliases = $deployment->aliasHostnames();
+        if ($aliases === []) {
+            $aliases = app(EdgeDeploymentAliasGenerator::class)->aliasesFor($site, $deployment);
+            if ($aliases !== []) {
+                $deployment->update(['aliases' => $aliases]);
+            }
+        }
+        foreach ($aliases as $alias) {
+            $this->publishHostname($site, $deployment, $alias, $context, false);
         }
 
         return $version;
@@ -31,9 +45,10 @@ class EdgeHostMapPublisher
         EdgeDeployment $deployment,
         string $hostname,
         ?EdgeDeliveryContext $context = null,
+        bool $isProduction = false,
     ): void {
         $context ??= app(EdgeDeliveryContextResolver::class)->forSite($site);
-        $payload = $this->routingPayload($deployment, $site);
+        $payload = $this->routingPayload($deployment, $site, $isProduction);
 
         if (FakeEdgeProvision::enabled()) {
             $map = Cache::get('edge:fake:host-map', []);
@@ -52,6 +67,14 @@ class EdgeHostMapPublisher
         $this->unpublishHostname($site, $site->edgeHostname(), $context);
         foreach ($this->readyCustomHostnames($site) as $hostname) {
             $this->unpublishHostname($site, $hostname, $context);
+        }
+
+        // Sweep alias hostnames from every deployment so torn-down sites
+        // don't leave stale KV entries pointing at deleted R2 prefixes.
+        foreach ($site->edgeDeployments as $deployment) {
+            foreach ($deployment->aliasHostnames() as $alias) {
+                $this->unpublishHostname($site, $alias, $context);
+            }
         }
     }
 
@@ -94,7 +117,7 @@ class EdgeHostMapPublisher
     /**
      * @return array<string, mixed>
      */
-    private function routingPayload(EdgeDeployment $deployment, Site $site): array
+    private function routingPayload(EdgeDeployment $deployment, Site $site, bool $isProduction = false): array
     {
         $edgeMeta = $site->edgeMeta();
         $routing = is_array($edgeMeta['routing'] ?? null) ? $edgeMeta['routing'] : [];
@@ -124,8 +147,38 @@ class EdgeHostMapPublisher
             'spa_fallback' => (bool) ($routing['spa_fallback'] ?? true),
             'headers' => is_array($routing['headers'] ?? null) ? $routing['headers'] : [],
             'is_preview' => $isPreview,
+            'is_production' => $isProduction,
             'comment_widget_enabled' => $widgetEnabled,
         ];
+
+        if (! $isProduction) {
+            $accessGate = app(EdgeAccessGate::class)->kvPayloadForSite($site);
+            if ($accessGate !== null) {
+                $payload['access_gate'] = $accessGate;
+            }
+        }
+
+        // Per-deploy config from dply.yaml — redirects/rewrites/headers
+        // travel with the build so reverting a deploy reverts the
+        // routing rules atomically. The Worker applies redirects first
+        // (308/301/etc.), then rewrites (to internal paths), then layers
+        // matching header rules onto the final response.
+        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : null;
+        if (is_array($repoConfig)) {
+            $redirects = is_array($repoConfig['redirects'] ?? null) ? $repoConfig['redirects'] : [];
+            $rewrites = is_array($repoConfig['rewrites'] ?? null) ? $repoConfig['rewrites'] : [];
+            $headerRules = is_array($repoConfig['headers'] ?? null) ? $repoConfig['headers'] : [];
+
+            if ($redirects !== []) {
+                $payload['repo_redirects'] = array_values($redirects);
+            }
+            if ($rewrites !== []) {
+                $payload['repo_rewrites'] = array_values($rewrites);
+            }
+            if ($headerRules !== []) {
+                $payload['repo_header_rules'] = array_values($headerRules);
+            }
+        }
 
         if ($widgetEnabled) {
             $token = is_string($widgetMeta['token'] ?? null) ? trim((string) $widgetMeta['token']) : '';
@@ -150,6 +203,48 @@ class EdgeHostMapPublisher
                 fn ($host) => is_string($host) && $host !== '' ? strtolower($host) : null,
                 $allowed,
             )));
+        }
+
+        // SSR: surface the per-deployment worker script name so the
+        // platform Worker can dispatch to it instead of falling
+        // through to R2/origin proxy logic. Script name lives on the
+        // deployment meta (written by EdgeSsrBundleUploader).
+        if (($edgeMeta['runtime_mode'] ?? 'static') === 'ssr') {
+            $ssrMeta = is_array($deployment->meta['ssr'] ?? null) ? $deployment->meta['ssr'] : [];
+            $scriptName = is_string($ssrMeta['script_name'] ?? null) ? trim($ssrMeta['script_name']) : '';
+            if ($scriptName !== '') {
+                $payload['runtime_mode'] = 'ssr';
+                $payload['ssr_worker_script'] = $scriptName;
+            }
+        }
+
+        // Middleware (P10a) — only for static + hybrid sites. SSR
+        // sites bundle middleware via OpenNext so we'd double-run it.
+        if (($edgeMeta['runtime_mode'] ?? 'static') !== 'ssr') {
+            $mwMeta = is_array($deployment->meta['middleware'] ?? null) ? $deployment->meta['middleware'] : [];
+            $mwScript = is_string($mwMeta['script_name'] ?? null) ? trim($mwMeta['script_name']) : '';
+            if ($mwScript !== '') {
+                $payload['middleware_worker_script'] = $mwScript;
+            }
+        }
+
+        // Split traffic (P10d) — production-only, parent sites only.
+        // The Worker reads `split` from KV, hashes the visitor cookie /
+        // IP into a 0-99 bucket, and serves from preview_storage_prefix
+        // for the configured percentage. Preview sites can't sub-split;
+        // we always read split from the *parent's* meta.
+        if (! $isPreview) {
+            $split = is_array($edgeMeta['split'] ?? null) ? $edgeMeta['split'] : null;
+            $percentage = is_array($split) ? (int) ($split['percentage'] ?? 0) : 0;
+            $previewPrefix = is_array($split) ? (string) ($split['preview_storage_prefix'] ?? '') : '';
+            if (is_array($split) && ($split['enabled'] ?? false) && $percentage > 0 && $previewPrefix !== '') {
+                $payload['split'] = [
+                    'preview_storage_prefix' => $previewPrefix,
+                    'preview_deployment_id' => (string) ($split['preview_deployment_id'] ?? ''),
+                    'percentage' => max(1, min(99, $percentage)),
+                    'sticky_cookie' => is_string($split['sticky_cookie'] ?? null) ? $split['sticky_cookie'] : null,
+                ];
+            }
         }
 
         if (($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid') {

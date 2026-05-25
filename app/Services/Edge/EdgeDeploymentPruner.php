@@ -21,6 +21,8 @@ class EdgeDeploymentPruner
     public function __construct(
         private readonly EdgeArtifactPublisher $artifactPublisher,
         private readonly EdgeDeliveryContextResolver $contextResolver,
+        private readonly EdgeSsrBundleUploader $ssrUploader,
+        private readonly EdgeMiddlewareBundleUploader $middlewareUploader,
     ) {}
 
     public function prune(Site $site): int
@@ -46,6 +48,14 @@ class EdgeDeploymentPruner
 
         foreach ($toPrune as $deployment) {
             try {
+                // Drop dispatch-namespace scripts BEFORE clearing meta /
+                // storage_prefix — both uploaders read script names off
+                // `deployment->meta`. The uploaders swallow CF API
+                // failures internally so a flaky delete won't stop the
+                // pruner.
+                $this->ssrUploader->deleteScriptForDeployment($deployment, $site);
+                $this->middlewareUploader->deleteScriptForDeployment($deployment, $site);
+
                 if ($fake) {
                     File::deleteDirectory(
                         rtrim(FakeEdgeProvision::storageRoot(), '/').'/'.trim((string) $deployment->storage_prefix, '/')

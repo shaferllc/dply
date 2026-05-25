@@ -8,6 +8,7 @@ use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
+use App\Support\Edge\EdgeRepoRoot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -110,6 +111,17 @@ class GithubEdgeWebhookController extends Controller
                 'reason' => 'push_branch_does_not_match_source',
                 'pushed_branch' => $branch,
                 'source_branch' => $sourceBranch,
+            ]);
+        }
+
+        $changedFiles = EdgeRepoRoot::changedFilesFromPushPayload($payload);
+        if (! EdgeRepoRoot::pushTouchesSite($site->edgeRepoRoot(), $changedFiles)) {
+            return response()->json([
+                'ok' => true,
+                'queued' => false,
+                'reason' => 'push_outside_repo_root',
+                'repo_root' => $site->edgeRepoRoot(),
+                'changed_files' => $changedFiles,
             ]);
         }
 

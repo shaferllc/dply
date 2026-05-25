@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Services\Edge\EdgeArtifactPublisher;
 use App\Services\Edge\EdgeBuildRunner;
 use App\Services\Edge\EdgeDeliveryContextResolver;
+use App\Support\Edge\EdgeRepoRoot;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -51,6 +52,7 @@ class BuildEdgeSiteJob implements ShouldQueue
         $branch = (string) ($source['branch'] ?? 'main');
         $buildCommand = (string) ($build['command'] ?? 'npm ci && npm run build');
         $outputDir = (string) ($build['output_dir'] ?? 'dist');
+        $runtimeMode = (string) ($edge['runtime_mode'] ?? EdgeBuildRunner::MODE_STATIC);
 
         $site->update(['status' => Site::STATUS_EDGE_PROVISIONING]);
         $deployment->update(['status' => EdgeDeployment::STATUS_BUILDING]);
@@ -60,7 +62,17 @@ class BuildEdgeSiteJob implements ShouldQueue
 
         try {
             $repoUrl = str_contains($repo, '://') ? $repo : 'https://github.com/'.$repo.'.git';
-            $buildResult = $runner->build($deployment, $repoUrl, $branch, $buildCommand, $outputDir, [], $this->commitOverride);
+            $buildResult = $runner->build(
+                $deployment,
+                $repoUrl,
+                $branch,
+                $buildCommand,
+                $outputDir,
+                [],
+                $this->commitOverride,
+                $runtimeMode,
+                EdgeRepoRoot::normalize(is_string($source['repo_root'] ?? null) ? $source['repo_root'] : null) ?: null,
+            );
             $artifactDir = $buildResult['artifact_dir'];
             $workRoot = dirname($artifactDir);
 
@@ -90,7 +102,38 @@ class BuildEdgeSiteJob implements ShouldQueue
                 return;
             }
 
-            PublishEdgeDeploymentJob::dispatch($deployment->id, $artifactDir);
+            // SSR: persist the bundled worker module(s) into a sidecar
+            // file next to the artifact dir so PublishEdgeDeploymentJob
+            // (which re-resolves over a queue boundary) can find it
+            // without us shoving it through job args / the DB.
+            $ssrSidecarPath = null;
+            if (is_array($buildResult['ssr_modules'] ?? null) && $buildResult['ssr_modules'] !== []) {
+                $ssrSidecarPath = $workRoot.'/ssr-bundle.json';
+                File::put($ssrSidecarPath, json_encode([
+                    'entry_module' => $buildResult['ssr_entry_module'] ?? 'worker.js',
+                    'modules' => $buildResult['ssr_modules'],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            // Middleware: same sidecar pattern, separate file so a
+            // middleware-only deploy doesn't get conflated with SSR
+            // and so the two can coexist on a single deployment.
+            $middlewareSidecarPath = null;
+            if (is_array($buildResult['middleware_modules'] ?? null) && $buildResult['middleware_modules'] !== []) {
+                $middlewareSidecarPath = $workRoot.'/middleware-bundle.json';
+                File::put($middlewareSidecarPath, json_encode([
+                    'entry_module' => $buildResult['middleware_entry_module'] ?? 'middleware.js',
+                    'source_path' => $buildResult['middleware_source_path'] ?? null,
+                    'modules' => $buildResult['middleware_modules'],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            PublishEdgeDeploymentJob::dispatch(
+                $deployment->id,
+                $artifactDir,
+                $ssrSidecarPath,
+                $middlewareSidecarPath,
+            );
         } catch (Throwable $e) {
             if (is_array($buildResult) && isset($buildResult['build_log']) && is_file($buildResult['build_log'])) {
                 try {

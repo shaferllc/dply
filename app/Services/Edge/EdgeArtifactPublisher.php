@@ -97,6 +97,36 @@ class EdgeArtifactPublisher
         $disk->deleteDirectory(trim($storagePrefix, '/'));
     }
 
+    /**
+     * Copy every object under $fromPrefix into $toPrefix on the same disk.
+     * Used by promote — the preview's R2 artifacts get duplicated to a
+     * fresh parent-owned prefix so tearing down the preview later doesn't
+     * delete the production artifacts out from under the live deployment.
+     */
+    public function copyPrefix(string $fromPrefix, string $toPrefix, ?string $diskName = null): int
+    {
+        $disk = $this->disk($diskName);
+        $from = trim($fromPrefix, '/');
+        $to = trim($toPrefix, '/');
+
+        if ($from === '' || $to === '' || $from === $to) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($disk->allFiles($from) as $sourceKey) {
+            $relative = ltrim(substr((string) $sourceKey, strlen($from)), '/');
+            if ($relative === '') {
+                continue;
+            }
+            $destKey = $to.'/'.$relative;
+            $disk->copy($sourceKey, $destKey);
+            $count++;
+        }
+
+        return $count;
+    }
+
     private function disk(?string $diskName): Filesystem
     {
         $name = $diskName ?? (string) config('edge.disk.name', 'edge_r2');

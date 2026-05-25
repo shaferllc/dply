@@ -219,6 +219,48 @@
                 </div>
             </section>
 
+            @if ($monorepoDetected && $monorepoPackages !== [])
+                <section class="rounded-2xl border border-brand-sage/25 bg-brand-sage/5 p-6 shadow-sm sm:p-7 dark:border-brand-sage/30 dark:bg-brand-sage/10">
+                    <div class="flex items-start gap-4">
+                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/20 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/30">↳</span>
+                        <div class="min-w-0 flex-1 space-y-4">
+                            <div>
+                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Monorepo detected') }}</h2>
+                                <p class="mt-0.5 text-sm text-brand-moss">
+                                    {{ __('This repository looks like a monorepo (:markers). Pick the package directory this Edge site should build from.', ['markers' => implode(', ', $monorepoMarkers) ?: __('multiple packages')]) }}
+                                </p>
+                            </div>
+                            <fieldset class="space-y-2">
+                                <legend class="sr-only">{{ __('Package directory') }}</legend>
+                                @foreach ($monorepoPackages as $package)
+                                    <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 text-sm dark:border-brand-mist/20 dark:bg-zinc-900">
+                                        <input
+                                            type="radio"
+                                            wire:model="form.repo_root"
+                                            value="{{ $package['path'] }}"
+                                            class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40"
+                                        />
+                                        <span>
+                                            <span class="font-mono text-brand-ink">{{ $package['path'] !== '' ? $package['path'] : '/' }}</span>
+                                            <span class="mt-0.5 block text-xs text-brand-moss">{{ $package['label'] }}</span>
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </fieldset>
+                            <label class="block">
+                                <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Or enter a custom path') }}</span>
+                                <input
+                                    type="text"
+                                    wire:model.blur="form.repo_root"
+                                    placeholder="apps/marketing-site"
+                                    class="mt-1.5 w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
+                                />
+                            </label>
+                        </div>
+                    </div>
+                </section>
+            @endif
+
             {{-- 04 Build --}}
             <section
                 x-data="{ advancedOpen: @js($form->build_command !== '' || $form->output_dir !== '' && $form->output_dir !== 'dist') }"
@@ -276,6 +318,10 @@
                                     </p>
                                 </div>
                             @endif
+                            @php
+                                $ssrAvailable = trim((string) config('edge.cloudflare.dispatch_namespace_name', '')) !== ''
+                                    && trim((string) config('edge.cloudflare.dispatch_namespace_id', '')) !== '';
+                            @endphp
                             <div class="mt-3 flex flex-wrap gap-3">
                                 <label class="inline-flex items-center gap-2 text-sm">
                                     <input type="radio" wire:model.live="form.runtime_mode" value="static" class="text-brand-sage focus:ring-brand-sage/40" />
@@ -285,7 +331,19 @@
                                     <input type="radio" wire:model.live="form.runtime_mode" value="hybrid" class="text-brand-sage focus:ring-brand-sage/40" />
                                     <span>{{ __('Hybrid (static + origin SSR)') }}</span>
                                 </label>
+                                <label class="inline-flex items-center gap-2 text-sm @if (! $ssrAvailable) opacity-60 @endif" title="{{ $ssrAvailable ? __('Bundle the app to a per-deployment Cloudflare Worker via OpenNext.') : __('SSR is unavailable — operator needs to bootstrap the dispatch namespace.') }}">
+                                    <input type="radio" wire:model.live="form.runtime_mode" value="ssr" class="text-brand-sage focus:ring-brand-sage/40" @disabled(! $ssrAvailable) />
+                                    <span>{{ __('Worker-native SSR (Next.js)') }}</span>
+                                </label>
                             </div>
+                            @if ($form->runtime_mode === 'ssr')
+                                <div class="mt-4 rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-xs text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">
+                                    <p class="font-medium text-brand-ink">{{ __('Worker-native SSR') }}</p>
+                                    <p class="mt-1 leading-relaxed">
+                                        {{ __('dply runs @opennextjs/cloudflare on each deploy, ships the bundled Worker into a Workers for Platforms dispatch namespace, and serves it from the same edge that hosts your static assets. Currently supports Next.js — your package.json must list "next" as a dependency.') }}
+                                    </p>
+                                </div>
+                            @endif
                             @if ($form->runtime_mode === 'hybrid')
                                 @if ($ssrDetected)
                                     <div class="mt-4 rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-xs text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">

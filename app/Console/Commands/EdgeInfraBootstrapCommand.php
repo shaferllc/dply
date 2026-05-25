@@ -21,6 +21,8 @@ class EdgeInfraBootstrapCommand extends Command
                             {--bucket= : R2 bucket name (default: dply-edge-artifacts)}
                             {--kv-title=dply-edge-host-map : KV namespace title for host map}
                             {--cache-kv-title=dply-edge-cache : KV namespace title for hybrid origin cache}
+                            {--dispatch-name=dply-edge-ssr : Workers for Platforms dispatch namespace for SSR scripts}
+                            {--skip-dispatch : Skip creating the dispatch namespace (SSR sites won\'t work)}
                             {--dry-run : Print planned actions without calling Cloudflare}';
 
     protected $description = 'Create Edge R2 bucket and KV namespace via Cloudflare API';
@@ -39,13 +41,27 @@ class EdgeInfraBootstrapCommand extends Command
         $bucket = (string) ($this->option('bucket') ?: config('edge.r2.bucket') ?: 'dply-edge-artifacts');
         $kvTitle = (string) $this->option('kv-title');
         $cacheKvTitle = (string) $this->option('cache-kv-title');
+        $dispatchName = (string) $this->option('dispatch-name');
+        $skipDispatch = (bool) $this->option('skip-dispatch');
 
         if ($this->option('dry-run')) {
             $this->info('[dry-run] Would verify Cloudflare token');
             $this->line('[dry-run] R2 bucket: '.$bucket);
             $this->line('[dry-run] KV namespace title (host map): '.$kvTitle);
             $this->line('[dry-run] KV namespace title (origin cache): '.$cacheKvTitle);
-            $this->printEnvTemplate($bucket, (string) config('edge.cloudflare.kv_namespace_id'), $accountId, (string) config('edge.cloudflare.cache_kv_namespace_id'));
+            if ($skipDispatch) {
+                $this->line('[dry-run] Skipping dispatch namespace (Phase 4b SSR will be unavailable).');
+            } else {
+                $this->line('[dry-run] Dispatch namespace (Phase 4b SSR): '.$dispatchName);
+            }
+            $this->printEnvTemplate(
+                $bucket,
+                (string) config('edge.cloudflare.kv_namespace_id'),
+                $accountId,
+                (string) config('edge.cloudflare.cache_kv_namespace_id'),
+                $skipDispatch ? '' : $dispatchName,
+                (string) config('edge.cloudflare.dispatch_namespace_id'),
+            );
 
             return self::SUCCESS;
         }
@@ -92,8 +108,33 @@ class EdgeInfraBootstrapCommand extends Command
                 $this->line('Using configured cache KV namespace id: '.$cacheKvId);
             }
 
+            $dispatchId = (string) config('edge.cloudflare.dispatch_namespace_id');
+            $resolvedDispatchName = '';
+            if (! $skipDispatch) {
+                try {
+                    $existingDispatch = $client->dispatchNamespaceIdByName($dispatchName);
+                    if ($existingDispatch !== null) {
+                        $dispatchId = $existingDispatch;
+                        $resolvedDispatchName = $dispatchName;
+                        $this->line('Dispatch namespace already exists: '.$dispatchName.' ('.$dispatchId.')');
+                    } else {
+                        $createdDispatch = $client->createDispatchNamespace($dispatchName);
+                        $newId = $createdDispatch['namespace_id'] ?? $createdDispatch['id'] ?? '';
+                        $dispatchId = is_string($newId) ? $newId : '';
+                        $resolvedDispatchName = $dispatchName;
+                        $this->info('Created dispatch namespace: '.$dispatchName.' ('.$dispatchId.')');
+                    }
+                } catch (\Throwable $e) {
+                    $this->warn('Could not create dispatch namespace ('.$e->getMessage().').');
+                    $this->warn('SSR Edge sites (runtime_mode=ssr) will be blocked until this is set up.');
+                    $this->warn('Workers for Platforms requires the Workers Paid plan + dispatch namespace permission on the API token.');
+                }
+            } else {
+                $this->line('Skipped dispatch namespace (--skip-dispatch). SSR sites disabled.');
+            }
+
             $this->newLine();
-            $this->printEnvTemplate($bucket, $kvId, $accountId, $cacheKvId);
+            $this->printEnvTemplate($bucket, $kvId, $accountId, $cacheKvId, $resolvedDispatchName, $dispatchId);
             $this->newLine();
             $this->warn('Create an R2 API token in Cloudflare (R2 → Manage R2 API tokens) with read/write on this bucket.');
             $this->line('Then run: php artisan dply:edge:doctor --probe');
@@ -108,7 +149,7 @@ class EdgeInfraBootstrapCommand extends Command
         }
     }
 
-    private function printEnvTemplate(string $bucket, string $kvId, string $accountId, string $cacheKvId = ''): void
+    private function printEnvTemplate(string $bucket, string $kvId, string $accountId, string $cacheKvId = '', string $dispatchName = '', string $dispatchId = ''): void
     {
         $endpoint = EdgePlatformCredentials::r2Endpoint() ?: 'https://'.$accountId.'.r2.cloudflarestorage.com';
         $routes = EdgePlatformCredentials::workerRoutes();
@@ -130,6 +171,12 @@ class EdgeInfraBootstrapCommand extends Command
         }
         if ($cacheKvId !== '') {
             $this->line('DPLY_EDGE_CF_CACHE_KV_NAMESPACE_ID='.$cacheKvId);
+        }
+        if ($dispatchName !== '') {
+            $this->line('DPLY_EDGE_CF_DISPATCH_NAMESPACE='.$dispatchName);
+        }
+        if ($dispatchId !== '') {
+            $this->line('DPLY_EDGE_CF_DISPATCH_NAMESPACE_ID='.$dispatchId);
         }
         $this->line('DPLY_EDGE_CF_WORKER_SCRIPT=dply-edge');
         if ($zone !== '' && $routes !== []) {

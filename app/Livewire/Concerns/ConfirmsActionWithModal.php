@@ -26,6 +26,12 @@ trait ConfirmsActionWithModal
 
     public bool $confirmActionModalDestructive = false;
 
+    /** @var list<array{label: string, value: string, mono?: bool}>|null */
+    public ?array $confirmActionModalDetails = null;
+
+    /**
+     * @param  list<array{label: string, value: string, mono?: bool}>|null  $details
+     */
     public function openConfirmActionModal(
         string $method,
         mixed $arguments = [],
@@ -33,6 +39,7 @@ trait ConfirmsActionWithModal
         string $message = 'Are you sure?',
         string $confirmLabel = 'Confirm',
         bool $destructive = false,
+        ?array $details = null,
     ): void {
         if (! method_exists($this, $method) || in_array($method, [
             'openConfirmActionModal',
@@ -48,6 +55,7 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalMessage = $message;
         $this->confirmActionModalConfirmLabel = $confirmLabel;
         $this->confirmActionModalDestructive = $destructive;
+        $this->confirmActionModalDetails = $details;
         $this->showConfirmActionModal = true;
     }
 
@@ -60,6 +68,7 @@ trait ConfirmsActionWithModal
         $this->confirmActionModalMethod = '';
         $this->confirmActionModalArguments = [];
         $this->confirmActionModalDestructive = false;
+        $this->confirmActionModalDetails = null;
     }
 
     public function confirmActionModal(): mixed

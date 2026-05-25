@@ -10,6 +10,7 @@ use App\Services\Deploy\LaravelComposerPackageDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Deploy\ServerlessDeploymentConfigResolver;
 use App\Services\Scaffold\PlaceholderDnsManager;
+use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -1238,6 +1239,14 @@ class Site extends Model
         return strtolower($slug.'-'.$suffix.'.'.$testingDomain);
     }
 
+    public function edgeRepoRoot(): string
+    {
+        $source = is_array($this->edgeMeta()['source'] ?? null) ? $this->edgeMeta()['source'] : [];
+        $repoRoot = is_string($source['repo_root'] ?? null) ? $source['repo_root'] : '';
+
+        return EdgeRepoRoot::normalize($repoRoot);
+    }
+
     /**
      * Hostnames that receive CDN traffic for this Edge site (default delivery + custom domains).
      *
@@ -1373,6 +1382,11 @@ class Site extends Model
     public function edgeDeployments(): HasMany
     {
         return $this->hasMany(EdgeDeployment::class)->orderByDesc('created_at');
+    }
+
+    public function edgeSiteAccessRule(): HasOne
+    {
+        return $this->hasOne(EdgeSiteAccessRule::class);
     }
 
     /**

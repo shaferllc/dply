@@ -1,0 +1,29 @@
+{
+  "name": "@dply/cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for the dply Edge platform — deploy, roll back, promote, manage domains, tail logs.",
+  "type": "module",
+  "bin": {
+    "dply": "bin/dply.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/dply/dply",
+  "keywords": [
+    "dply",
+    "edge",
+    "cli",
+    "deploy",
+    "cloudflare"
+  ]
+}
