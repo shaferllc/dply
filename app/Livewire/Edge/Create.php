@@ -10,6 +10,7 @@ use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Forms\EdgeCreateForm;
+use App\Models\EdgeSiteEnvVar;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Services\Billing\ManagedProductCostEstimator;
@@ -83,6 +84,16 @@ class Create extends Component
 
     public bool $repoRootTouched = false;
 
+    /**
+     * Env vars handed over from the Import wizard, pending persistence
+     * until the site is actually created. Keyed by env name, values are
+     * the importer's plaintext payload. Filled by {@see applyQueryPrefills}
+     * when ?import_envs=<session-key> is present; flushed in {@see deploy}.
+     *
+     * @var array<string, string|int|float>
+     */
+    public array $pendingImportedEnvVars = [];
+
     public function mount(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         abort_unless(Feature::active('surface.edge'), 404);
@@ -154,6 +165,24 @@ class Create extends Component
         if ($output !== '' && ($this->form->output_dir === '' || $this->form->output_dir === 'dist')) {
             $this->form->output_dir = $output;
             $this->buildOverridesTouched = true;
+        }
+
+        // Env-var transfer from the Import wizard. The wizard stashes
+        // the importer's plaintext values in session keyed by a ULID
+        // and passes the key through ?import_envs=… (values stay out
+        // of the URL — too sensitive + too long). On consume we pop
+        // the session entry and stash the array on the component;
+        // deploy() writes EdgeSiteEnvVar rows after the site lands.
+        $importEnvsKey = $stringValue($query['import_envs'] ?? null);
+        if ($importEnvsKey !== '') {
+            $envs = session()->pull('edge.import.envs.'.$importEnvsKey);
+            if (is_array($envs)) {
+                $this->pendingImportedEnvVars = array_filter(
+                    $envs,
+                    static fn ($v, $k): bool => is_string($k) && (is_string($v) || is_int($v) || is_float($v)),
+                    ARRAY_FILTER_USE_BOTH,
+                );
+            }
         }
 
         if ($repo !== '') {
@@ -606,8 +635,52 @@ class Create extends Component
             return;
         }
 
-        $this->toastSuccess(__('Edge app build queued. We\'ll keep the site workspace updated as it goes live.'));
+        $importedCount = $this->persistImportedEnvVars($site);
+        if ($importedCount > 0) {
+            $this->toastSuccess(__('Edge app build queued — :count env var(s) imported.', ['count' => $importedCount]));
+        } else {
+            $this->toastSuccess(__('Edge app build queued. We\'ll keep the site workspace updated as it goes live.'));
+        }
         $this->redirect(route('sites.show', ['server' => $site->server, 'site' => $site]), navigate: true);
+    }
+
+    /**
+     * Flush imported env vars onto the freshly-created site as
+     * production-scope EdgeSiteEnvVar rows. Skips keys that conflict
+     * with platform-reserved names (HOST_MAP, ASSETS, etc) or aren't
+     * shaped as ALL_CAPS_WITH_UNDERSCORES. Returns the count actually
+     * persisted so the success toast can report it.
+     */
+    private function persistImportedEnvVars(Site $site): int
+    {
+        if ($this->pendingImportedEnvVars === []) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($this->pendingImportedEnvVars as $key => $value) {
+            if (! is_string($key) || ! EdgeSiteEnvVar::keyIsValid($key)) {
+                continue;
+            }
+            $stringValue = is_string($value) ? $value : (is_scalar($value) ? (string) $value : '');
+            if ($stringValue === '') {
+                // Importer signals secret-redacted values with an
+                // empty string (Cloudflare Pages); skip — the user
+                // re-enters them via the dashboard env panel.
+                continue;
+            }
+            (new EdgeSiteEnvVar([
+                'site_id' => $site->id,
+                'key' => $key,
+                'value' => $stringValue,
+                'scope' => EdgeSiteEnvVar::SCOPE_PRODUCTION,
+                'created_by_user_id' => auth()->id(),
+            ]))->save();
+            $count++;
+        }
+        $this->pendingImportedEnvVars = [];
+
+        return $count;
     }
 
     public function openHybridStackModal(): void

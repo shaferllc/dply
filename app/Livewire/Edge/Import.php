@@ -10,6 +10,7 @@ use App\Services\Edge\Importers\EdgeImporter;
 use App\Services\Edge\Importers\NetlifyImporter;
 use App\Services\Edge\Importers\VercelImporter;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -176,6 +177,27 @@ class Import extends Component
         $prefill = is_array($this->projectPreview['create_form_prefill'] ?? null)
             ? $this->projectPreview['create_form_prefill']
             : [];
+
+        // Env-var transfer (P-import-env): re-fetch the project to
+        // pick up plaintext values (we deliberately don't keep them
+        // in component state past previewProject), stash them in
+        // session keyed by a ULID, and pass that key through the
+        // URL. EdgeCreate::mount pops the session entry and writes
+        // EdgeSiteEnvVar rows after CreateEdgeSite::handle().
+        if ($this->selectedProjectId !== '') {
+            try {
+                $project = $this->makeImporter()->fetchProject($this->selectedProjectId);
+                if ($project->envVars !== []) {
+                    $key = (string) Str::ulid();
+                    session()->put('edge.import.envs.'.$key, $project->envVars);
+                    $prefill['import_envs'] = $key;
+                }
+            } catch (\Throwable) {
+                // Best-effort — if the re-fetch fails (token revoked,
+                // network blip), the user lands on Create without env
+                // transfer and can paste vars manually via the panel.
+            }
+        }
 
         $this->redirectRoute('edge.create', $prefill, navigate: false);
     }
