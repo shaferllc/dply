@@ -75,7 +75,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/imports/migrations', [ImportMigrationController::class, 'index'])->middleware('ability:'.$apiAbilities['imports.migrations_index']);
         Route::get('/imports/migrations/{migration}', [ImportMigrationController::class, 'show'])->middleware('ability:'.$apiAbilities['imports.migrations_show']);
 
-        Route::prefix('edge')->group(function () use ($apiAbilities): void {
+        // Edge surface runs under a higher per-token throttle than
+        // the rest of v1 (log tail + CI deploys are chatty by design).
+        // See edge-api RateLimiter in AppServiceProvider.
+        Route::prefix('edge')->middleware('throttle:edge-api')->group(function () use ($apiAbilities): void {
             Route::get('/sites', [EdgeSiteApiController::class, 'index'])
                 ->middleware('ability:'.$apiAbilities['edge.sites.index']);
             Route::get('/sites/{site}', [EdgeSiteApiController::class, 'show'])

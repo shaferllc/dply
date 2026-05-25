@@ -511,6 +511,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($token ? 'api:'.$token->id : $request->ip());
         });
 
+        // Edge surface gets a higher ceiling — log tailing + ad-hoc
+        // deploys are chatty by design, and a typical CI run can fire
+        // 20–30 calls in quick succession (lint + deploy + poll). Keyed
+        // by token id so one chatty token can't starve another's
+        // budget. Falls back to IP when called pre-auth (shouldn't
+        // happen post-`auth.api` but defensive).
+        RateLimiter::for('edge-api', function (Request $request) {
+            $token = $request->attributes->get('api_token');
+
+            return Limit::perMinute(600)->by($token ? 'edge-api:'.$token->id : 'edge-api-ip:'.$request->ip());
+        });
+
         RateLimiter::for('site-webhook', function (Request $request) {
             $site = $request->route('site');
             $key = $site instanceof Site ? 'wh:'.$site->id : 'wh-ip:'.$request->ip();
