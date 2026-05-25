@@ -231,9 +231,15 @@ final class SiteSettingsSidebar
             ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
             ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
             ['id' => 'edge-domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
-            ['id' => 'edge-build', 'label' => __('Build settings'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
+            ['id' => 'edge-build', 'label' => __('Build'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
+            ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],
+            ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'],
             ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-cube', 'group' => 'networking', 'route' => 'sites.edge-bindings'],
         ];
+
+        if (! $isPreviewChild) {
+            $items[] = ['id' => 'edge-delivery', 'label' => __('Delivery'), 'icon' => 'heroicon-o-cloud', 'group' => 'networking'];
+        }
 
         if (! $isPreviewChild) {
             $items[] = ['id' => 'edge-previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-sparkles', 'group' => 'deploy'];
