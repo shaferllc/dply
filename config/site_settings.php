@@ -32,6 +32,7 @@ return [
         'edge-deploys' => ['label' => 'Deploys'],
         'edge-domains' => ['label' => 'Domains'],
         'edge-build' => ['label' => 'Build settings'],
+        'edge-bindings' => ['label' => 'Bindings'],
         'edge-previews' => ['label' => 'Previews'],
         'edge-traffic' => ['label' => 'Traffic & analytics'],
         'edge-billing' => ['label' => 'Billing & usage'],

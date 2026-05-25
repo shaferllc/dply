@@ -297,6 +297,100 @@ class EdgeCloudflareClient
     }
 
     /**
+     * Cloudflare cron triggers attached to a Workers for Platforms
+     * dispatch script (P10b / Phase 4c). Pass an empty array to
+     * clear all schedules.
+     *
+     * @param  list<string>  $schedules  Cron expressions ("0 * * * *")
+     */
+    public function setDispatchScriptSchedules(string $namespace, string $scriptName, array $schedules): void
+    {
+        if ($namespace === '' || $scriptName === '') {
+            return;
+        }
+
+        $body = array_values(array_map(
+            static fn (string $cron): array => ['cron' => trim($cron)],
+            array_filter($schedules, static fn ($s) => is_string($s) && trim($s) !== ''),
+        ));
+
+        $this->decode(
+            Http::withToken($this->apiToken)
+                ->put(
+                    self::BASE.'/accounts/'.$this->accountId
+                        .'/workers/dispatch/namespaces/'.rawurlencode($namespace)
+                        .'/scripts/'.rawurlencode($scriptName)
+                        .'/schedules',
+                    $body,
+                ),
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listD1Databases(): array
+    {
+        $payload = $this->decode(
+            Http::withToken($this->apiToken)
+                ->get(self::BASE.'/accounts/'.$this->accountId.'/d1/database'),
+        );
+
+        if (isset($payload['value']) && is_array($payload['value'])) {
+            return $payload['value'];
+        }
+
+        return is_array($payload) && array_is_list($payload) ? $payload : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createD1Database(string $name, string $primaryLocationHint = 'wnam'): array
+    {
+        $body = ['name' => $name];
+        $hint = trim($primaryLocationHint);
+        if ($hint !== '') {
+            $body['primary_location_hint'] = $hint;
+        }
+
+        return $this->decode(
+            Http::withToken($this->apiToken)
+                ->post(self::BASE.'/accounts/'.$this->accountId.'/d1/database', $body),
+        );
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function listQueues(): array
+    {
+        $payload = $this->decode(
+            Http::withToken($this->apiToken)
+                ->get(self::BASE.'/accounts/'.$this->accountId.'/queues'),
+        );
+
+        if (isset($payload['value']) && is_array($payload['value'])) {
+            return $payload['value'];
+        }
+
+        return is_array($payload) && array_is_list($payload) ? $payload : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function createQueue(string $name): array
+    {
+        return $this->decode(
+            Http::withToken($this->apiToken)
+                ->post(self::BASE.'/accounts/'.$this->accountId.'/queues', [
+                    'queue_name' => $name,
+                ]),
+        );
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function zoneSetting(string $zoneId, string $settingId): ?array

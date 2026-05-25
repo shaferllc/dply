@@ -232,6 +232,7 @@ final class SiteSettingsSidebar
             ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
             ['id' => 'edge-domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
             ['id' => 'edge-build', 'label' => __('Build settings'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
+            ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-cube', 'group' => 'runtime', 'route' => 'sites.edge-bindings'],
         ];
 
         if (! $isPreviewChild) {
