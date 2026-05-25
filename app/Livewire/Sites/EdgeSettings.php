@@ -81,7 +81,7 @@ class EdgeSettings extends Component
         $this->section = $section;
 
         $this->mountSiteWorkspace($server, $site);
-        $this->mountEdgeWebhookAccount();
+        $this->mountEdgeWebhookAccount($section);
     }
 
     public function render(): View
@@ -102,7 +102,7 @@ class EdgeSettings extends Component
 
         if ($section === 'edge-logs') {
             $this->site->load([
-                'edgeDeployments' => fn ($query) => $query->limit(10),
+                'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(10),
             ]);
         } else {
             $this->site->loadMissing($this->relationsForSection($section));
@@ -130,13 +130,18 @@ class EdgeSettings extends Component
     }
 
     /**
-     * @return list<string>
+     * @return list<string>|array<string, \Closure>
      */
     private function relationsForSection(string $section): array
     {
+        $recentDeployments = [
+            'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(20),
+        ];
+
         return match ($section) {
-            'general' => ['edgeDeployments', 'workspace'],
-            'edge-deploys', 'edge-logs', 'edge-traffic', 'edge-domains', 'edge-build', 'edge-previews' => ['edgeDeployments'],
+            'general' => array_merge($recentDeployments, ['workspace']),
+            'edge-deploys', 'edge-traffic', 'edge-domains', 'edge-build' => $recentDeployments,
+            'edge-previews' => [],
             default => [],
         };
     }

@@ -1,6 +1,6 @@
 # Migrating from Netlify to dply Edge
 
-A low-downtime runbook for cutting a production site over from Netlify to dply Edge. The dply Edge create flow (`/edge/create`) handles the build and gives you a preview hostname; this runbook covers everything that happens around it — domain prep, DNS cutover, SSL timing, and decommissioning Netlify.
+A low-downtime runbook for cutting a production site over from Netlify to dply Edge. The dply Edge create flow (`/edge/import`) handles the build and gives you a preview hostname; this runbook covers everything that happens around it — domain prep, DNS cutover, SSL timing, and decommissioning Netlify.
 
 ## 1. Pre-flight checklist
 
@@ -15,7 +15,7 @@ Before you touch anything:
 
 ## 2. Use the Edge create flow
 
-Open `/edge/create`, pick the connected Git account (or paste the repo URL manually), and let runtime detection fill in `build_command` and `output_dir`. The form covers build config and env vars; it deliberately does **not** touch DNS. Custom domains are attached after the first successful deploy in the next step.
+Open `/edge/import`, pick the connected Git account (or paste the repo URL manually), and let runtime detection fill in `build_command` and `output_dir`. The form covers build config and env vars; it deliberately does **not** touch DNS. Custom domains are attached after the first successful deploy in the next step.
 
 If the site uses SSR rather than pure SSG, the form auto-selects **hybrid** mode and offers to provision a Cloud origin alongside the Edge site.
 

@@ -14,7 +14,7 @@ Before you touch anything:
 
 ## 2. Use the Edge create flow
 
-Open `/edge/create`, pick the connected Git account (or paste the repo URL manually), and let runtime detection fill in `build_command` and `output_dir`. The form covers build config and env vars; it deliberately does **not** touch DNS. Custom domains are attached after the first successful deploy.
+Open `/edge/import`, pick the connected Git account (or paste the repo URL manually), and let runtime detection fill in `build_command` and `output_dir`. The form covers build config and env vars; it deliberately does **not** touch DNS. Custom domains are attached after the first successful deploy.
 
 If you're moving to BYO mode on the same Cloudflare account, pick **Your Cloudflare account** in the delivery picker and select the bootstrapped credential.
 

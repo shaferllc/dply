@@ -38,6 +38,10 @@ final class SiteSettingsViewData
         array $deploymentPreflight,
         ?User $user = null,
     ): array {
+        if ($site->usesEdgeRuntime()) {
+            return self::forEdgeWorkspace($server, $site, $section, $user);
+        }
+
         $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
         $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
         $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
@@ -184,7 +188,7 @@ final class SiteSettingsViewData
             ];
         $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
         $edgeAnalytics = self::edgeAnalyticsForSection($site, $section);
-        $edgeContext = $isEdgeWorkspace ? EdgeSiteViewData::context($site) : [];
+        $edgeContext = $isEdgeWorkspace ? EdgeSiteViewData::context($site, $section) : [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
         $generalRecentDeployments = $section === 'general'
@@ -267,6 +271,101 @@ final class SiteSettingsViewData
             ),
             $edgeAnalytics,
             $edgeContext,
+        );
+    }
+
+    /**
+     * Edge workspaces share the settings shell but skip BYO VM/container view-model work.
+     *
+     * @return array<string, mixed>
+     */
+    private static function forEdgeWorkspace(
+        Server $server,
+        Site $site,
+        string $section,
+        ?User $user = null,
+    ): array {
+        $runtimeTarget = $site->runtimeTarget();
+        $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
+        $resourceNoun = __('App');
+        $resourceNounLower = strtolower($resourceNoun);
+        $resourcePlural = __('apps');
+        $workspaceTitle = __('Edge site workspace');
+        $settingsSidebarItems = SiteSettingsSidebar::items($site, $server);
+        $sectionHeader = SiteSettingsHeader::for($site, $server, $section);
+        $header = self::headerContext($site, $sectionHeader, $section, $user);
+        $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
+        $edgeAnalytics = self::edgeAnalyticsForSection($site, $section);
+        $edgeContext = EdgeSiteViewData::context($site, $section);
+        $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
+        $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
+
+        return array_merge(
+            compact(
+                'runtimePublication',
+                'resourceNoun',
+                'resourceNounLower',
+                'resourcePlural',
+                'workspaceTitle',
+                'settingsSidebarItems',
+                'sectionHeader',
+                'settingsBreadcrumbs',
+                'sectionConsoleActionKinds',
+                'sectionConsoleActionRun',
+            ),
+            $header,
+            [
+                'isEdgeWorkspace' => true,
+                'generalRecentDeployments' => collect(),
+            ],
+            $edgeAnalytics,
+            $edgeContext,
+        );
+    }
+
+    /**
+     * @param  array{title: string, description: string, icon: string}  $sectionHeader
+     * @return array<string, mixed>
+     */
+    private static function headerContext(
+        Site $site,
+        array $sectionHeader,
+        string $section,
+        ?User $user,
+    ): array {
+        $headerUser = $user;
+        $headerOrg = $headerUser?->currentOrganization();
+        $headerCanUpdateSite = (bool) $headerUser?->can('update', $site);
+        $headerCanDeleteSite = (bool) $headerUser?->can('delete', $site);
+        $headerIsDeployer = (bool) $headerOrg?->userIsDeployer($headerUser);
+        $headerIsAdmin = (bool) $headerOrg?->hasAdminAccess($headerUser);
+        $headerRoleLabel = match (true) {
+            $headerIsAdmin => null,
+            $headerIsDeployer => __('Deployer'),
+            $headerCanUpdateSite => __('Editor'),
+            default => __('Read-only'),
+        };
+        $headerRoleTone = match (true) {
+            $headerIsDeployer => 'bg-amber-100 text-amber-900 ring-amber-200/60',
+            $headerCanUpdateSite => 'bg-emerald-100 text-emerald-900 ring-emerald-200/60',
+            default => 'bg-slate-100 text-slate-700 ring-slate-200/60',
+        };
+        $sectionDescription = $headerCanUpdateSite
+            ? $sectionHeader['description']
+            : ($headerIsDeployer
+                ? __('Review this section — settings are read-only for the Deployer role. Use Deploy actions to ship changes.')
+                : __('You have read-only access to this section — settings cannot be changed from this account.'));
+
+        return compact(
+            'headerUser',
+            'headerOrg',
+            'headerCanUpdateSite',
+            'headerCanDeleteSite',
+            'headerIsDeployer',
+            'headerIsAdmin',
+            'headerRoleLabel',
+            'headerRoleTone',
+            'sectionDescription',
         );
     }
 

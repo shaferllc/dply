@@ -1,6 +1,6 @@
 # Migrating from Vercel to dply Edge
 
-A low-downtime runbook for cutting a production site over from Vercel to dply Edge. The dply Edge create flow (`/edge/create`) handles the build and gives you a preview hostname; this runbook covers everything around it — domain prep, DNS cutover, SSL timing, Vercel-specific feature mapping, and decommissioning.
+A low-downtime runbook for cutting a production site over from Vercel to dply Edge. The dply Edge create flow (`/edge/import`) handles the build and gives you a preview hostname; this runbook covers everything around it — domain prep, DNS cutover, SSL timing, Vercel-specific feature mapping, and decommissioning.
 
 ## 1. Pre-flight checklist
 
@@ -15,7 +15,7 @@ Before you touch anything:
 
 ## 2. Use the Edge create flow
 
-Open `/edge/create`, pick the connected Git account (or paste the repo URL manually), and let runtime detection fill in `build_command` and `output_dir`. The form covers build config and env vars; it deliberately does **not** touch DNS. Custom domains are attached after the first successful deploy.
+Open `/edge/import`, pick the connected Git account (or paste the repo URL manually), and let runtime detection fill in `build_command` and `output_dir`. The form covers build config and env vars; it deliberately does **not** touch DNS. Custom domains are attached after the first successful deploy.
 
 For Next.js / Nuxt / SvelteKit projects with SSR, the form auto-selects **hybrid** mode and offers to provision a Cloud origin alongside the Edge site. Static output (`next export`, `nuxt generate`) deploys as pure Edge.
 

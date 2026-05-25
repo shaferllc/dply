@@ -44,6 +44,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'static',
                 'tags' => ['blog', 'astro', 'static'],
                 'hero_emoji' => 'A',
+                'hero_url' => '/edge-templates/astro-blog.svg',
             ],
             [
                 'slug' => 'nextjs-docs',
@@ -56,6 +57,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'ssr',
                 'tags' => ['docs', 'next', 'ssr'],
                 'hero_emoji' => 'N',
+                'hero_url' => '/edge-templates/nextjs-nextra-docs.svg',
             ],
             [
                 'slug' => 'sveltekit-saas-starter',
@@ -68,6 +70,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'hybrid',
                 'tags' => ['saas', 'sveltekit', 'hybrid'],
                 'hero_emoji' => 'S',
+                'hero_url' => '/edge-templates/sveltekit-saas-starter.svg',
             ],
             [
                 'slug' => 'eleventy-portfolio',
@@ -80,6 +83,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'static',
                 'tags' => ['portfolio', 'eleventy', 'static'],
                 'hero_emoji' => '11',
+                'hero_url' => '/edge-templates/eleventy-portfolio.svg',
             ],
             [
                 'slug' => 'hono-api-starter',
@@ -92,6 +96,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'hybrid',
                 'tags' => ['api', 'hono', 'edge'],
                 'hero_emoji' => 'H',
+                'hero_url' => '/edge-templates/hono-edge-api.svg',
             ],
             [
                 'slug' => 'remix-shop',
@@ -104,6 +109,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'hybrid',
                 'tags' => ['fullstack', 'remix', 'auth'],
                 'hero_emoji' => 'R',
+                'hero_url' => '/edge-templates/remix-indie-stack.svg',
             ],
             [
                 'slug' => 'static-html',
@@ -116,6 +122,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'static',
                 'tags' => ['landing', 'html', 'static'],
                 'hero_emoji' => '~',
+                'hero_url' => '/edge-templates/plain-html.svg',
             ],
             [
                 'slug' => 'hugo-docs',
@@ -128,6 +135,7 @@ class EdgeTemplateRegistry
                 'runtime_mode' => 'static',
                 'tags' => ['docs', 'hugo', 'static'],
                 'hero_emoji' => 'H',
+                'hero_url' => '/edge-templates/hugo-docs.svg',
             ],
         ];
     }

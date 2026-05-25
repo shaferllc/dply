@@ -210,7 +210,9 @@
                     // Pull commit subject/author off the latest deployment.meta —
                     // populated by EdgeBuildRunner so it works for any provider
                     // (no extra GitHub/GitLab API call needed).
-                    $latestPreviewDeployment = $preview->edgeDeployments()->latest()->first();
+                    $latestPreviewDeployment = $preview->relationLoaded('edgeDeployments')
+                        ? $preview->edgeDeployments->first()
+                        : $preview->edgeDeployments()->latest()->first();
                     $previewCommitMeta = is_array($latestPreviewDeployment?->meta['commit'] ?? null)
                         ? $latestPreviewDeployment->meta['commit']
                         : [];

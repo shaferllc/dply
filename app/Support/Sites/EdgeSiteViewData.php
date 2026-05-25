@@ -18,7 +18,36 @@ final class EdgeSiteViewData
     /**
      * @return array<string, mixed>
      */
-    public static function context(Site $site): array
+    public static function context(Site $site, string $section = 'general'): array
+    {
+        $context = self::baseContext($site);
+
+        if (self::sectionNeedsDeployments($section)) {
+            $context = array_merge($context, self::deploymentsContext($site));
+        }
+
+        if (self::sectionNeedsDeliveryWorker($section)) {
+            $context = array_merge($context, self::deliveryWorkerContext($site));
+        }
+
+        if (self::sectionNeedsDeliveryBanner($section)) {
+            $context['edgeDeliveryBanner'] = self::deliveryBanner(
+                $context['edgeFakeMode'],
+                $context['edgeUsesManagedBackend'],
+                $context['edgeUsesByoCloudflare'],
+                $context['edgePlatformReady'],
+            );
+        } else {
+            $context['edgeDeliveryBanner'] = null;
+        }
+
+        return $context;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function baseContext(Site $site): array
     {
         $edgeMeta = $site->edgeMeta();
         $edgeSourceSpec = is_array($edgeMeta['source'] ?? null) ? $edgeMeta['source'] : null;
@@ -39,9 +68,6 @@ final class EdgeSiteViewData
         $edgeAttachedDomains = is_array($edgeMeta['routing']['custom_domains'] ?? null) ? $edgeMeta['routing']['custom_domains'] : [];
         $edgeIsPreviewChild = ! empty($edgeMeta['preview_parent_site_id']);
         $edgeActiveDeploymentId = $edgeMeta['active_deployment_id'] ?? null;
-        $edgeDeployments = $site->relationLoaded('edgeDeployments')
-            ? $site->edgeDeployments
-            : $site->edgeDeployments()->limit(20)->get();
         $edgeStatusBadgeClass = match ($site->status) {
             Site::STATUS_EDGE_ACTIVE => 'bg-emerald-100 text-emerald-800 ring-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-800/40',
             Site::STATUS_EDGE_PROVISIONING => 'bg-sky-100 text-sky-800 ring-sky-200/60 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-800/40',
@@ -55,35 +81,14 @@ final class EdgeSiteViewData
             default => str_replace('_', ' ', (string) $site->status),
         };
         $edgeGithubRepoUrl = $edgeRepo !== '' ? 'https://github.com/'.$edgeRepo : null;
-        $edgeLatestDeployment = $edgeDeployments->first();
-
         $edgeFakeMode = FakeEdgeProvision::enabled();
         $edgeUsesManagedBackend = $site->edge_backend === 'dply_edge';
         $edgeUsesByoCloudflare = $site->usesOrgCloudflareEdge();
         $edgePlatformReady = EdgePlatformCredentials::isProductionReady();
-        $edgeWorkerZoneName = '';
-        $edgeWorkerRoutes = [];
-        $edgeWorkerScriptName = '';
-
-        try {
-            $deliveryContext = app(EdgeDeliveryContextResolver::class)->forSite($site);
-            $edgeWorkerZoneName = $deliveryContext->workerZoneName;
-            $edgeWorkerRoutes = $deliveryContext->workerRoutes;
-            $edgeWorkerScriptName = $deliveryContext->workerScriptName;
-        } catch (\Throwable) {
-            // Org credential may be missing on incomplete BYO sites.
-        }
-
         $edgeDeliveryBackendLabel = self::deliveryBackendLabel(
             $edgeUsesManagedBackend,
             $edgeUsesByoCloudflare,
             $edgeFakeMode,
-        );
-        $edgeDeliveryBanner = self::deliveryBanner(
-            $edgeFakeMode,
-            $edgeUsesManagedBackend,
-            $edgeUsesByoCloudflare,
-            $edgePlatformReady,
         );
         $edgeDeliveryHostname = $site->edgeHostname();
 
@@ -107,22 +112,78 @@ final class EdgeSiteViewData
             'edgeAttachedDomains',
             'edgeIsPreviewChild',
             'edgeActiveDeploymentId',
-            'edgeDeployments',
             'edgeStatusBadgeClass',
             'edgeStatusLabel',
             'edgeGithubRepoUrl',
-            'edgeLatestDeployment',
             'edgeFakeMode',
             'edgeUsesManagedBackend',
             'edgeUsesByoCloudflare',
             'edgePlatformReady',
+            'edgeDeliveryBackendLabel',
+            'edgeDeliveryHostname',
+        ) + [
+            'edgeWorkerZoneName' => '',
+            'edgeWorkerRoutes' => [],
+            'edgeWorkerScriptName' => '',
+            'edgeDeployments' => collect(),
+            'edgeLatestDeployment' => null,
+            'edgeDeliveryBanner' => null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function deploymentsContext(Site $site): array
+    {
+        $edgeDeployments = $site->relationLoaded('edgeDeployments')
+            ? $site->edgeDeployments
+            : $site->edgeDeployments()->limit(20)->get();
+
+        return [
+            'edgeDeployments' => $edgeDeployments,
+            'edgeLatestDeployment' => $edgeDeployments->first(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function deliveryWorkerContext(Site $site): array
+    {
+        $edgeWorkerZoneName = '';
+        $edgeWorkerRoutes = [];
+        $edgeWorkerScriptName = '';
+
+        try {
+            $deliveryContext = app(EdgeDeliveryContextResolver::class)->forSite($site);
+            $edgeWorkerZoneName = $deliveryContext->workerZoneName;
+            $edgeWorkerRoutes = $deliveryContext->workerRoutes;
+            $edgeWorkerScriptName = $deliveryContext->workerScriptName;
+        } catch (\Throwable) {
+            // Org credential may be missing on incomplete BYO sites.
+        }
+
+        return compact(
             'edgeWorkerZoneName',
             'edgeWorkerRoutes',
             'edgeWorkerScriptName',
-            'edgeDeliveryBackendLabel',
-            'edgeDeliveryBanner',
-            'edgeDeliveryHostname',
         );
+    }
+
+    private static function sectionNeedsDeployments(string $section): bool
+    {
+        return in_array($section, ['general', 'edge-deploys', 'edge-logs', 'edge-build'], true);
+    }
+
+    private static function sectionNeedsDeliveryWorker(string $section): bool
+    {
+        return in_array($section, ['general', 'edge-build'], true);
+    }
+
+    private static function sectionNeedsDeliveryBanner(string $section): bool
+    {
+        return in_array($section, ['general', 'edge-build'], true);
     }
 
     private static function deliveryBackendLabel(

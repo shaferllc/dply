@@ -128,9 +128,13 @@ trait ManagesEdgeSite
      */
     public string $edge_origin_failover_html = '';
 
-    public function mountEdgeWebhookAccount(): void
+    public function mountEdgeWebhookAccount(?string $section = null): void
     {
         if (! $this->site->usesEdgeRuntime()) {
+            return;
+        }
+
+        if ($section !== null && $section !== 'edge-build') {
             return;
         }
 

@@ -57,15 +57,25 @@
                     $deployUrl = route('edge.create', $prefill);
                 @endphp
                 <article class="group flex flex-col rounded-2xl border border-brand-ink/10 bg-white shadow-sm transition hover:border-brand-sage hover:shadow-md dark:border-brand-mist/20 dark:bg-zinc-900">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4">
-                        <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-sage/30 to-brand-gold/20 text-base font-bold text-brand-ink">
-                            {{ $template['hero_emoji'] ?? '·' }}
-                        </span>
-                        <div class="min-w-0">
+                    @if (! empty($template['hero_url']))
+                        <div class="aspect-[3/2] w-full overflow-hidden rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/30">
+                            <img src="{{ asset(ltrim($template['hero_url'], '/')) }}" alt="{{ $template['name'] }}" class="h-full w-full object-cover" loading="lazy" />
+                        </div>
+                        <div class="px-5 pt-4">
                             <h2 class="text-sm font-semibold text-brand-ink">{{ $template['name'] }}</h2>
                             <p class="mt-0.5 font-mono text-[10px] text-brand-mist truncate" title="{{ $template['repo'] }}">{{ $template['repo'] }}</p>
                         </div>
-                    </div>
+                    @else
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4">
+                            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-sage/30 to-brand-gold/20 text-base font-bold text-brand-ink">
+                                {{ $template['hero_emoji'] ?? '·' }}
+                            </span>
+                            <div class="min-w-0">
+                                <h2 class="text-sm font-semibold text-brand-ink">{{ $template['name'] }}</h2>
+                                <p class="mt-0.5 font-mono text-[10px] text-brand-mist truncate" title="{{ $template['repo'] }}">{{ $template['repo'] }}</p>
+                            </div>
+                        </div>
+                    @endif
                     <p class="flex-1 px-5 py-4 text-xs leading-relaxed text-brand-moss">{{ $template['description'] }}</p>
                     @if (! empty($template['tags']))
                         <div class="flex flex-wrap gap-1.5 px-5 pb-3">

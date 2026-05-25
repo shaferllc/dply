@@ -378,6 +378,7 @@ class CreateEdgePreviewSite
     public static function listForParent(Site $parent): Collection
     {
         return self::livePreviewQuery($parent)
+            ->with(['edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(1)])
             ->orderByDesc('created_at')
             ->get();
     }

@@ -47,7 +47,28 @@ test('edge deploys section skips usage analytics queries', function () {
     expect($payload['edgeSiteBilling'])->toBeNull()
         ->and($payload['edgeSiteTraffic'])->toBeNull()
         ->and($payload['edgeSiteAccess'])->toBeNull()
+        ->and($payload['isEdgeWorkspace'])->toBeTrue()
+        ->and($payload['functionsHost'] ?? null)->toBeNull()
         ->and(collect($queries)->contains(fn (array $query): bool => str_contains($query['query'], 'edge_usage_snapshots')))->toBeFalse();
+});
+
+test('edge deploys section skips delivery worker context', function () {
+    [$server, $site] = makeEdgeSiteForViewData();
+
+    $payload = SiteSettingsViewData::for(
+        $server,
+        $site,
+        'edge-domains',
+        null,
+        [],
+        null,
+    );
+
+    expect($payload['edgeWorkerScriptName'])->toBe('')
+        ->and($payload['edgeWorkerZoneName'])->toBe('')
+        ->and($payload['edgeWorkerRoutes'])->toBe([])
+        ->and($payload['edgeDeliveryBanner'])->toBeNull()
+        ->and($payload['edgeAttachedDomains'])->toBeArray();
 });
 
 test('edge overview section loads billing and traffic snapshots', function () {

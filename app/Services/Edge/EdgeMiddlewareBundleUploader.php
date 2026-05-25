@@ -234,6 +234,25 @@ class EdgeMiddlewareBundleUploader
             $bindings[] = $extra;
         }
 
+        // Per-site env vars (P-env) — ship each as a `secret_text`
+        // binding so middleware reads them via env.MY_VAR. RESERVED_NAMES
+        // on the model already blocks the platform-injected names; we
+        // re-check here defensively. Resolves the relation against the
+        // deployment's site to avoid a separate query when one is loaded.
+        $site = $deployment->site;
+        if ($site !== null) {
+            foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
+                if (! \App\Models\EdgeSiteEnvVar::keyIsValid($envVar->key)) {
+                    continue;
+                }
+                $bindings[] = [
+                    'name' => $envVar->key,
+                    'type' => 'secret_text',
+                    'text' => (string) $envVar->value,
+                ];
+            }
+        }
+
         return $bindings;
     }
 }
