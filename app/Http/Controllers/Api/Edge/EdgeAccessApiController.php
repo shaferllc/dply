@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\Edge;
 
+use App\Http\Resources\Edge\EdgeAccessRuleResource;
 use App\Services\Edge\EdgeAccessGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class EdgeAccessApiController extends EdgeApiController
 {
-    public function show(Request $request, string $site): JsonResponse
+    public function show(Request $request, string $site): EdgeAccessRuleResource|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null) {
@@ -24,14 +25,10 @@ class EdgeAccessApiController extends EdgeApiController
             ], 422);
         }
 
-        $rule = $found->edgeSiteAccessRule;
-
-        return response()->json([
-            'data' => $this->accessRuleResource($found, $rule),
-        ]);
+        return new EdgeAccessRuleResource($found, $found->edgeSiteAccessRule);
     }
 
-    public function update(Request $request, string $site): JsonResponse
+    public function update(Request $request, string $site): EdgeAccessRuleResource|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null) {
@@ -72,8 +69,6 @@ class EdgeAccessApiController extends EdgeApiController
             return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         }
 
-        return response()->json([
-            'data' => $this->accessRuleResource($found->fresh(), $rule),
-        ]);
+        return new EdgeAccessRuleResource($found->fresh(), $rule);
     }
 }

@@ -7,14 +7,16 @@ namespace App\Http\Controllers\Api\Edge;
 use App\Actions\Edge\DeployEdgeCommit;
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Actions\Edge\RollbackEdgeDeployment;
+use App\Http\Resources\Edge\EdgeDeploymentResource;
 use App\Models\EdgeDeployment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\ValidationException;
 
 class EdgeDeploymentApiController extends EdgeApiController
 {
-    public function index(Request $request, string $site): JsonResponse
+    public function index(Request $request, string $site): AnonymousResourceCollection|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null) {
@@ -29,12 +31,10 @@ class EdgeDeploymentApiController extends EdgeApiController
             ->limit($limit)
             ->get();
 
-        return response()->json([
-            'data' => $rows->map(fn (EdgeDeployment $d) => $this->deploymentResource($d)),
-        ]);
+        return EdgeDeploymentResource::collection($rows);
     }
 
-    public function show(Request $request, string $site, string $deployment): JsonResponse
+    public function show(Request $request, string $site, string $deployment): EdgeDeploymentResource|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null) {
@@ -49,7 +49,7 @@ class EdgeDeploymentApiController extends EdgeApiController
             return response()->json(['message' => 'Deployment not found.'], 404);
         }
 
-        return response()->json(['data' => $this->deploymentResource($row)]);
+        return new EdgeDeploymentResource($row);
     }
 
     /**
@@ -85,16 +85,16 @@ class EdgeDeploymentApiController extends EdgeApiController
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json([
-            'data' => $this->deploymentResource($deployment->refresh()),
-        ], 202);
+        return (new EdgeDeploymentResource($deployment->refresh()))
+            ->response()
+            ->setStatusCode(202);
     }
 
     /**
      * Re-point production at an existing deployment. The deployment
      * must still have artifacts (not pruned).
      */
-    public function rollback(Request $request, string $site, string $deployment): JsonResponse
+    public function rollback(Request $request, string $site, string $deployment): EdgeDeploymentResource|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null) {
@@ -107,8 +107,6 @@ class EdgeDeploymentApiController extends EdgeApiController
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json([
-            'data' => $this->deploymentResource($result->refresh()),
-        ]);
+        return new EdgeDeploymentResource($result->refresh());
     }
 }

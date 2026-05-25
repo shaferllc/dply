@@ -6,26 +6,27 @@ namespace App\Http\Controllers\Api\Edge;
 
 use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Actions\Edge\PromoteEdgePreview;
+use App\Http\Resources\Edge\EdgeDeploymentResource;
+use App\Http\Resources\Edge\EdgeSiteResource;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\ValidationException;
 
 class EdgePreviewApiController extends EdgeApiController
 {
-    public function index(Request $request, string $site): JsonResponse
+    public function index(Request $request, string $site): AnonymousResourceCollection|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null || $found->isEdgePreview()) {
             return $this->notFound();
         }
 
-        $previews = CreateEdgePreviewSite::listForParent($found);
+        $previews = CreateEdgePreviewSite::listForParent($found)->values();
 
-        return response()->json([
-            'data' => $previews->values()->map(fn (Site $p) => $this->siteResource($p)),
-        ]);
+        return EdgeSiteResource::collection($previews);
     }
 
     public function store(Request $request, string $site): JsonResponse
@@ -61,7 +62,9 @@ class EdgePreviewApiController extends EdgeApiController
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['data' => $this->siteResource($preview)], 202);
+        return (new EdgeSiteResource($preview))
+            ->response()
+            ->setStatusCode(202);
     }
 
     public function destroy(Request $request, string $site, string $preview): JsonResponse
@@ -87,7 +90,7 @@ class EdgePreviewApiController extends EdgeApiController
      * Copy a preview's artifacts into a fresh parent prefix and flip
      * the parent's host map. The preview keeps running.
      */
-    public function promote(Request $request, string $site, string $preview): JsonResponse
+    public function promote(Request $request, string $site, string $preview): EdgeDeploymentResource|JsonResponse
     {
         $found = $this->findEdgeSite($request, $site);
         if ($found === null || $found->isEdgePreview()) {
@@ -100,8 +103,6 @@ class EdgePreviewApiController extends EdgeApiController
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json([
-            'data' => $this->deploymentResource($deployment->refresh()),
-        ]);
+        return new EdgeDeploymentResource($deployment->refresh());
     }
 }
