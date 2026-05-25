@@ -129,6 +129,20 @@ Route::prefix('v1')->group(function (): void {
 
             Route::post('/lint', [EdgeLintApiController::class, 'store'])
                 ->middleware('ability:'.$apiAbilities['edge.lint.store']);
+
+            // P-env: per-site environment variables. Values are
+            // encrypted at rest + never returned by GET — list shows
+            // keys + updated_at only.
+            Route::get('/sites/{site}/env', [\App\Http\Controllers\Api\EdgeEnvController::class, 'index'])
+                ->middleware('ability:'.$apiAbilities['edge.env.index']);
+            Route::put('/sites/{site}/env', [\App\Http\Controllers\Api\EdgeEnvController::class, 'bulkUpdate'])
+                ->middleware('ability:'.$apiAbilities['edge.env.update']);
+            Route::patch('/sites/{site}/env/{key}', [\App\Http\Controllers\Api\EdgeEnvController::class, 'upsert'])
+                ->middleware('ability:'.$apiAbilities['edge.env.upsert'])
+                ->where('key', '[A-Z][A-Z0-9_]{0,127}');
+            Route::delete('/sites/{site}/env/{key}', [\App\Http\Controllers\Api\EdgeEnvController::class, 'destroy'])
+                ->middleware('ability:'.$apiAbilities['edge.env.destroy'])
+                ->where('key', '[A-Z][A-Z0-9_]{0,127}');
         });
     });
 });

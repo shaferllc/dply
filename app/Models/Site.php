@@ -1389,6 +1389,11 @@ class Site extends Model
         return $this->hasOne(EdgeSiteAccessRule::class);
     }
 
+    public function edgeEnvVars(): HasMany
+    {
+        return $this->hasMany(EdgeSiteEnvVar::class)->orderBy('key');
+    }
+
     /**
      * URL the container deployment is reachable at, set by the
      * provisioner once the backend reports an "ingress" hostname

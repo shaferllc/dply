@@ -83,6 +83,10 @@ return [
         'edge.usage.show' => 'edge.read',
         'edge.logs.index' => 'edge.read',
         'edge.lint.store' => 'edge.read',
+        'edge.env.index' => 'edge.env.read',
+        'edge.env.update' => 'edge.env.write',
+        'edge.env.upsert' => 'edge.env.write',
+        'edge.env.destroy' => 'edge.env.write',
     ],
 
     'categories' => [
@@ -221,6 +225,14 @@ return [
                 ['ability' => 'edge.read', 'label' => 'Read'],
                 ['ability' => 'edge.deploy', 'label' => 'Deploy / rollback / promote'],
                 ['ability' => 'edge.write', 'label' => 'Manage domains and cache'],
+            ],
+        ],
+        [
+            'id' => 'edge_env',
+            'label' => 'Edge env vars',
+            'permissions' => [
+                ['ability' => 'edge.env.read', 'label' => 'Read (keys only)'],
+                ['ability' => 'edge.env.write', 'label' => 'Write'],
             ],
         ],
     ],

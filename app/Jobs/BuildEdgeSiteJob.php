@@ -62,13 +62,27 @@ class BuildEdgeSiteJob implements ShouldQueue
 
         try {
             $repoUrl = str_contains($repo, '://') ? $repo : 'https://github.com/'.$repo.'.git';
+
+            // P-env: production-scope vars become Docker -e flags
+            // (EdgeBuildRunner::dockerEnvFlags). Values are pulled
+            // through the encrypted accessor and filtered against the
+            // model's RESERVED_NAMES so customer code can't shadow
+            // platform bindings like HOST_MAP / ASSETS / DEPLOYMENT_ID.
+            $buildEnv = [];
+            foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
+                if (! \App\Models\EdgeSiteEnvVar::keyIsValid($envVar->key)) {
+                    continue;
+                }
+                $buildEnv[$envVar->key] = (string) $envVar->value;
+            }
+
             $buildResult = $runner->build(
                 $deployment,
                 $repoUrl,
                 $branch,
                 $buildCommand,
                 $outputDir,
-                [],
+                $buildEnv,
                 $this->commitOverride,
                 $runtimeMode,
                 EdgeRepoRoot::normalize(is_string($source['repo_root'] ?? null) ? $source['repo_root'] : null) ?: null,
