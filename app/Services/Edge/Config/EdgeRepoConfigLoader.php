@@ -99,6 +99,7 @@ class EdgeRepoConfigLoader
             rewrites: $this->normalizeRewrites($parsed['rewrites'] ?? null, $warnings),
             headers: $this->normalizeHeaders($parsed['headers'] ?? null, $warnings),
             bindings: $this->normalizeBindings($parsed['bindings'] ?? null, $warnings),
+            crons: $this->normalizeCrons($parsed['crons'] ?? null, $warnings),
             warnings: $warnings,
         );
     }
@@ -325,5 +326,76 @@ class EdgeRepoConfigLoader
         }
 
         return $out;
+    }
+
+    /**
+     * Cron triggers attached to the per-deployment middleware / SSR
+     * Worker. Schema:
+     *
+     *   crons:
+     *     - schedule: "0 * * * *"
+     *       handler: src/cron/hourly.ts  # optional, v1 ignored
+     *
+     * Shape-only cron validation (5 whitespace-separated tokens of
+     * cron-legal characters) — Cloudflare is the source of truth for
+     * semantics. Max 5 schedules per site (CF limit).
+     *
+     * @param  list<string>  $warnings
+     * @return list<array{schedule: string, handler?: string}>
+     */
+    private function normalizeCrons(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($value as $index => $entry) {
+            if (count($out) >= 5) {
+                $warnings[] = 'crons[]: dply Edge supports up to 5 schedules per site — extras ignored.';
+                break;
+            }
+            if (! is_array($entry)) {
+                $warnings[] = sprintf('crons[%d] must be a map.', $index);
+
+                continue;
+            }
+            $schedule = isset($entry['schedule']) && is_string($entry['schedule']) ? trim($entry['schedule']) : '';
+            if ($schedule === '' || ! $this->looksLikeCronExpression($schedule)) {
+                $warnings[] = sprintf('crons[%d] missing or invalid `schedule` (expected 5-field cron).', $index);
+
+                continue;
+            }
+
+            $normalized = ['schedule' => $schedule];
+            $handler = isset($entry['handler']) && is_string($entry['handler']) ? trim($entry['handler']) : '';
+            if ($handler !== '') {
+                // v1 contract is "export `scheduled` from your middleware
+                // module"; standalone handler files are deferred. Surface
+                // the warning so users know their handler field is moot.
+                $warnings[] = sprintf('crons[%d].handler is ignored in v1 — export `scheduled` from your middleware module instead.', $index);
+                $normalized['handler'] = $handler;
+            }
+
+            $out[] = $normalized;
+        }
+
+        return $out;
+    }
+
+    private function looksLikeCronExpression(string $value): bool
+    {
+        $parts = preg_split('/\s+/', trim($value)) ?: [];
+        if (count($parts) !== 5) {
+            return false;
+        }
+
+        foreach ($parts as $part) {
+            if (preg_match('#^[0-9*/,\-A-Z]+$#i', $part) !== 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

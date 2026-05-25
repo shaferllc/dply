@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
+use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Support\Edge\EdgeDeliveryContext;
 use App\Support\Edge\FakeEdgeProvision;
@@ -92,7 +93,39 @@ class EdgeMiddlewareBundleUploader
             ],
         );
 
+        $this->syncCronSchedules($client, $context->dispatchNamespaceName, $scriptName, $deployment);
+
         $this->persistScriptName($deployment, $scriptName, $payload);
+    }
+
+    /**
+     * Push the dply.yaml `crons:` block onto the freshly-uploaded
+     * script. Pass an empty list to clear when a redeploy removes
+     * crons. Wrapped in try/catch so a CF outage during schedule
+     * upsert doesn't fail the whole deploy — the worker is live by
+     * this point, only cron is missing.
+     */
+    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, EdgeDeployment $deployment): void
+    {
+        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : null;
+        $crons = is_array($repoConfig['crons'] ?? null) ? $repoConfig['crons'] : [];
+        $schedules = array_values(array_filter(array_map(
+            static fn ($entry): ?string => is_array($entry) && is_string($entry['schedule'] ?? null) && $entry['schedule'] !== ''
+                ? $entry['schedule']
+                : null,
+            $crons,
+        )));
+
+        try {
+            $client->setDispatchScriptSchedules($namespace, $scriptName, $schedules);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to sync cron schedules to middleware dispatch script', [
+                'deployment_id' => (string) $deployment->id,
+                'script' => $scriptName,
+                'schedules' => $schedules,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function deleteAllForSite(Site $site): void
@@ -242,7 +275,7 @@ class EdgeMiddlewareBundleUploader
         $site = $deployment->site;
         if ($site !== null) {
             foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
-                if (! \App\Models\EdgeSiteEnvVar::keyIsValid($envVar->key)) {
+                if (! EdgeSiteEnvVar::keyIsValid($envVar->key)) {
                     continue;
                 }
                 $bindings[] = [

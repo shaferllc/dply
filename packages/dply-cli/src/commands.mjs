@@ -594,6 +594,124 @@ export async function open(args, flags) {
   ok(`Opened ${c.cyan(url)}`);
 }
 
+/**
+ * `dply edge env <subcommand>` — manage encrypted env vars on an Edge
+ * site. Values are write-only; GET returns keys + updated_at only.
+ *
+ * Subcommands:
+ *   list                     print all keys + updated_at
+ *   set KEY=val [KEY=val…]   upsert one or more keys
+ *   rm KEY [KEY…]            remove keys
+ *   push --file PATH         bulk replace from dotenv-format file
+ *   pull                     print all keys as dotenv comments (no values — GET is keys-only)
+ */
+export async function env(args, flags) {
+  const ctx = await requireSiteContext(flags);
+  const api = new ApiClient(ctx);
+  const sub = args[0] ?? 'list';
+
+  if (sub === 'list' || sub === 'pull') {
+    const response = await api.get(`/edge/sites/${encodeURIComponent(ctx.siteId)}/env`);
+    const rows = response.data ?? [];
+    if (sub === 'pull') {
+      info(c.dim(`# dply env vars for site ${ctx.siteId}`));
+      info(c.dim('# Values are write-only via the API — set them with `dply edge env set KEY=value`.'));
+      for (const row of rows) {
+        info(`${row.key}=`);
+      }
+
+      return;
+    }
+    printTable(['key', 'updated_at'], rows.map((r) => ({
+      key: r.key,
+      updated_at: r.updated_at ?? '—',
+    })));
+
+    return;
+  }
+
+  if (sub === 'set') {
+    const pairs = args.slice(1);
+    if (pairs.length === 0) throw usageError('edge env set KEY=value [KEY=value …]', 'At least one KEY=value pair is required.');
+    for (const pair of pairs) {
+      const eq = pair.indexOf('=');
+      if (eq <= 0) throw fail(`Invalid pair "${pair}" — expected KEY=value.`, 2);
+      const key = pair.slice(0, eq);
+      const value = pair.slice(eq + 1);
+      await api.request(
+        `/edge/sites/${encodeURIComponent(ctx.siteId)}/env/${encodeURIComponent(key)}`,
+        { method: 'PATCH', body: { value } },
+      );
+      ok(`Set ${c.cyan(key)}`);
+    }
+
+    return;
+  }
+
+  if (sub === 'rm' || sub === 'remove' || sub === 'unset') {
+    const keys = args.slice(1);
+    if (keys.length === 0) throw usageError('edge env rm KEY [KEY …]', 'Pass at least one key.');
+    for (const key of keys) {
+      await api.delete(`/edge/sites/${encodeURIComponent(ctx.siteId)}/env/${encodeURIComponent(key)}`);
+      ok(`Removed ${c.cyan(key)}`);
+    }
+
+    return;
+  }
+
+  if (sub === 'push') {
+    const file = flags.file || flags.f;
+    if (!file) throw usageError('edge env push --file PATH', 'Pass --file pointing at a dotenv-format file.');
+    const raw = await readFile(file, 'utf8');
+    const parsed = parseDotenv(raw);
+    if (Object.keys(parsed).length === 0) {
+      warn(`${file} produced no KEY=value pairs — nothing pushed.`);
+
+      return;
+    }
+    await api.request(`/edge/sites/${encodeURIComponent(ctx.siteId)}/env`, {
+      method: 'PUT',
+      body: parsed,
+    });
+    ok(`Pushed ${Object.keys(parsed).length} key(s) from ${c.dim(file)}.`);
+
+    return;
+  }
+
+  throw usageError('edge env', `Unknown subcommand "${sub}". Use list, set, rm, push, pull.`);
+}
+
+/**
+ * Minimal dotenv parser. Honors `KEY=value`, double-quoted values
+ * (with \\n / \\t escapes), single-quoted values (literal), and
+ * #-prefixed comments. No variable expansion. Sufficient for env
+ * files produced by `dply edge env pull` + standard `.env` workflows.
+ */
+function parseDotenv(raw) {
+  const out = {};
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim().replace(/^export\s+/, '');
+    if (!/^[A-Z_][A-Z0-9_]*$/.test(key)) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"') && value.length >= 2) {
+      value = value.slice(1, -1).replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"');
+    } else if (value.startsWith("'") && value.endsWith("'") && value.length >= 2) {
+      value = value.slice(1, -1);
+    } else {
+      // Strip inline #-comments only when preceded by whitespace.
+      const hashIdx = value.indexOf(' #');
+      if (hashIdx > -1) value = value.slice(0, hashIdx).trim();
+    }
+    out[key] = value;
+  }
+
+  return out;
+}
+
 async function findRepoConfigFile() {
   for (const candidate of CONFIG_CANDIDATES) {
     try {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
+use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Support\Edge\EdgeDeliveryContext;
 use App\Support\Edge\FakeEdgeProvision;
@@ -100,7 +101,37 @@ class EdgeSsrBundleUploader
             ],
         );
 
+        $this->syncCronSchedules($client, $context->dispatchNamespaceName, $scriptName, $deployment);
+
         $this->persistScriptName($deployment, $scriptName);
+    }
+
+    /**
+     * Push the dply.yaml `crons:` block onto the freshly-uploaded SSR
+     * script. Empty list clears schedules when a redeploy removes the
+     * crons block. Best-effort — never throws.
+     */
+    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, EdgeDeployment $deployment): void
+    {
+        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : null;
+        $crons = is_array($repoConfig['crons'] ?? null) ? $repoConfig['crons'] : [];
+        $schedules = array_values(array_filter(array_map(
+            static fn ($entry): ?string => is_array($entry) && is_string($entry['schedule'] ?? null) && $entry['schedule'] !== ''
+                ? $entry['schedule']
+                : null,
+            $crons,
+        )));
+
+        try {
+            $client->setDispatchScriptSchedules($namespace, $scriptName, $schedules);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to sync cron schedules to SSR dispatch script', [
+                'deployment_id' => (string) $deployment->id,
+                'script' => $scriptName,
+                'schedules' => $schedules,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -273,7 +304,7 @@ class EdgeSsrBundleUploader
         $site = $deployment->site;
         if ($site !== null) {
             foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
-                if (! \App\Models\EdgeSiteEnvVar::keyIsValid($envVar->key)) {
+                if (! EdgeSiteEnvVar::keyIsValid($envVar->key)) {
                     continue;
                 }
                 $bindings[] = [

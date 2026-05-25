@@ -18,6 +18,7 @@ final class EdgeRepoConfig
      * @param  list<array{from: string, to: string}>  $rewrites
      * @param  list<array{for: string, values: array<string, string>}>  $headers
      * @param  array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>}  $bindings
+     * @param  list<array{schedule: string, handler?: string}>  $crons
      * @param  list<string>  $warnings
      */
     public function __construct(
@@ -27,6 +28,7 @@ final class EdgeRepoConfig
         public readonly array $rewrites = [],
         public readonly array $headers = [],
         public readonly array $bindings = [],
+        public readonly array $crons = [],
         public readonly array $warnings = [],
     ) {}
 
@@ -38,6 +40,7 @@ final class EdgeRepoConfig
      *     rewrites: list<array{from: string, to: string}>,
      *     headers: list<array{for: string, values: array<string, string>}>,
      *     bindings: array<string, array<string, string>>,
+     *     crons: list<array{schedule: string, handler?: string}>,
      *     warnings: list<string>
      * }
      */
@@ -50,8 +53,22 @@ final class EdgeRepoConfig
             'rewrites' => $this->rewrites,
             'headers' => $this->headers,
             'bindings' => $this->bindings,
+            'crons' => $this->crons,
             'warnings' => $this->warnings,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function cronSchedules(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (array $entry): ?string => is_string($entry['schedule'] ?? null) && $entry['schedule'] !== ''
+                ? $entry['schedule']
+                : null,
+            $this->crons,
+        )));
     }
 
     public function isEmpty(): bool
@@ -60,6 +77,7 @@ final class EdgeRepoConfig
             && $this->redirects === []
             && $this->rewrites === []
             && $this->headers === []
-            && $this->bindings === [];
+            && $this->bindings === []
+            && $this->crons === [];
     }
 }

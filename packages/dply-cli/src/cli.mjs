@@ -22,6 +22,7 @@ const EDGE_COMMANDS = {
   purge: { handler: commands.purge, summary: 'Purge edge cache by tag (--tag X).' },
   usage: { handler: commands.usage, summary: 'Show traffic / billing usage.' },
   logs: { handler: commands.logs, summary: 'Tail request logs (--interval ms, --window s, --once).' },
+  env: { handler: commands.env, summary: 'list | set KEY=val | rm KEY | push --file .env | pull' },
 };
 
 /**
