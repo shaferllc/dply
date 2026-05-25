@@ -232,9 +232,12 @@ final class SiteSettingsSidebar
             ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
             ['id' => 'edge-domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
             ['id' => 'edge-build', 'label' => __('Build'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
+            ['id' => 'edge-environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'deploy'],
             ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],
             ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'],
             ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-cube', 'group' => 'networking', 'route' => 'sites.edge-bindings'],
+            ['id' => 'edge-audit', 'label' => __('Audit log'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
+            ['id' => 'edge-members', 'label' => __('Members'), 'icon' => 'heroicon-o-user-group', 'group' => 'access'],
         ];
 
         if (! $isPreviewChild) {

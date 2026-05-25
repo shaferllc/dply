@@ -45,3 +45,40 @@ test('api virtual slug renders http api markdown', function () {
     expect($result['title'])->toBe('HTTP API')
         ->and($result['html'])->not->toBe('');
 });
+
+test('markdown doc renderer transforms wide tables into spec cards', function () {
+    $renderer = app(MarkdownDocRenderer::class);
+
+    $result = $renderer->render('edge-overview');
+
+    expect($result['html'])
+        ->toContain('docs-spec-list')
+        ->toContain('docs-spec-card')
+        ->toContain('Static / SSG')
+        ->toContain('Best for')
+        ->not->toContain('<table');
+});
+
+test('markdown doc renderer transforms two option tables into compare cards', function () {
+    $renderer = app(MarkdownDocRenderer::class);
+
+    $result = $renderer->render('edge-overview');
+
+    expect($result['html'])
+        ->toContain('docs-compare-list')
+        ->toContain('docs-compare-card')
+        ->toContain('Choose <strong>Edge</strong>')
+        ->toContain('Choose <strong>Cloud</strong>');
+});
+
+test('markdown doc renderer transforms edge previews comparison table', function () {
+    $renderer = app(MarkdownDocRenderer::class);
+
+    $result = $renderer->render('edge-previews');
+
+    expect($result['html'])
+        ->toContain('docs-spec-card__title')
+        ->toContain('Branch')
+        ->toContain('Production site')
+        ->toContain('Preview child');
+});

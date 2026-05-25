@@ -44,6 +44,26 @@ test('contextual doc resolver maps edge create route', function () {
     expect(app(ContextualDocResolver::class)->resolve())->toBe('edge-create');
 });
 
+test('contextual doc resolver maps edge site previews section', function () {
+    [$user, $server, $site] = makeEdgeSiteForDocs();
+
+    $this->actingAs($user)
+        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-previews']))
+        ->assertOk();
+
+    expect(app(ContextualDocResolver::class)->resolve())->toBe('edge-previews');
+});
+
+test('contextual doc resolver builds documentation breadcrumbs', function () {
+    $resolver = app(ContextualDocResolver::class);
+
+    expect($resolver->breadcrumbsForSlug('edge-previews'))->toBe([
+        ['label' => 'Documentation', 'slug' => 'docs-index'],
+        ['label' => 'Edge guides', 'slug' => null],
+        ['label' => 'Edge previews', 'slug' => 'edge-previews'],
+    ]);
+});
+
 test('contextual doc resolver maps edge site build section', function () {
     [$user, $server, $site] = makeEdgeSiteForDocs();
 

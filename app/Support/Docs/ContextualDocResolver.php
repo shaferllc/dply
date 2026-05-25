@@ -73,6 +73,40 @@ final class ContextualDocResolver
         ];
     }
 
+    /**
+     * @return list<array{label: string, slug: string|null}>
+     */
+    public function breadcrumbsForSlug(string $slug): array
+    {
+        if ($slug === 'docs-index') {
+            return [
+                ['label' => __('Documentation'), 'slug' => 'docs-index'],
+            ];
+        }
+
+        $items = [
+            ['label' => __('Documentation'), 'slug' => 'docs-index'],
+        ];
+
+        $group = $this->guideGroup($slug);
+        if ($group !== null && ($group['label'] ?? '') !== '') {
+            $items[] = [
+                'label' => (string) $group['label'],
+                'slug' => null,
+            ];
+        }
+
+        $title = $this->titleForSlug($slug);
+        if ($title !== null) {
+            $items[] = [
+                'label' => $title,
+                'slug' => $slug,
+            ];
+        }
+
+        return $items;
+    }
+
     public function titleForSlug(string $slug): ?string
     {
         if ($slug === 'docs-index') {

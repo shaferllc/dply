@@ -17,6 +17,40 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+test('failed edge deployment detail does not show stable aliases', function () {
+    [$user, $server, $site] = makeEdgeDeploymentDetailFixtures();
+
+    $failed = EdgeDeployment::query()->create([
+        'site_id' => $site->id,
+        'organization_id' => $site->organization_id,
+        'status' => EdgeDeployment::STATUS_FAILED,
+        'git_branch' => 'main',
+        'storage_prefix' => 'edge/test/failed-prefix',
+        'failed_at' => now(),
+        'failure_reason' => 'Build command exited with code 1',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('sites.edge.deployments.show', [
+            'server' => $server,
+            'site' => $site,
+            'deployment' => $failed,
+        ]))
+        ->assertOk()
+        ->assertDontSee('Stable aliases', false)
+        ->assertDontSee('edge-app--d-', false);
+
+    $this->actingAs($user)
+        ->get(route('sites.edge.deployments.show', [
+            'server' => $server,
+            'site' => $site,
+            'deployment' => $failed,
+            'tab' => 'aliases',
+        ]))
+        ->assertOk()
+        ->assertSee('No aliases yet', false);
+});
+
 test('edge deployment detail page renders overview and aliases tabs', function () {
     [$user, $server, $site, $deployment] = makeEdgeDeploymentDetailFixtures();
 

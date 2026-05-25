@@ -32,7 +32,7 @@
             <x-page-header
                 :title="__('Bindings')"
                 :description="__('Wire Cloudflare resources to your Edge site. Create or attach KV namespaces, R2 buckets, and D1 databases — then paste the generated snippet into dply.yaml. We never write to your repository.')"
-                doc-route="docs.index"
+                doc-contextual
                 flush
                 compact
             />

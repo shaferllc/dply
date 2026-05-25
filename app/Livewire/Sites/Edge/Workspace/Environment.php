@@ -10,12 +10,11 @@ use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Livewire\Forms\EdgeBuildSettingsForm;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
-class Build extends Component
+class Environment extends Component
 {
     use DispatchesToastNotifications;
     use ManagesEdgeBuildSettings;
@@ -26,29 +25,17 @@ class Build extends Component
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
-
-        $this->site->load([
-            'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(20),
-        ]);
-
         $this->mountEdgeBuildSettings($site);
     }
 
     public function render(): View
     {
-        $viewData = array_merge(
-            EdgeSiteViewData::context($this->site, 'edge-build'),
+        return view('livewire.sites.edge.workspace.environment', array_merge(
+            EdgeSiteViewData::context($this->site, 'edge-environment'),
             [
                 'server' => $this->server,
                 'site' => $this->site,
             ],
-        );
-
-        if (auth()->user() !== null) {
-            $viewData['linkedSourceControlAccounts'] = app(SourceControlRepositoryBrowser::class)
-                ->accountsForUser(auth()->user());
-        }
-
-        return view('livewire.sites.edge.workspace.build', $viewData);
+        ));
     }
 }

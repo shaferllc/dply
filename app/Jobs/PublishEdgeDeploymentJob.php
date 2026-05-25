@@ -14,6 +14,7 @@ use App\Services\Edge\EdgeRouter;
 use App\Services\Edge\EdgeSsrBundleUploader;
 use App\Services\Edge\EdgeTestingHostnameProvisioner;
 use App\Services\Edge\OriginHealthcheckRunner;
+use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -159,6 +160,37 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             } catch (Throwable) {
                 // PR comment update is best-effort.
             }
+
+            // P9b: edge.deploy.succeeded — fan out to subscribed
+            // notification channels (Slack / Discord / email / webhook).
+            // Best-effort; downstream channel failures are isolated by
+            // NotificationRoutingResolver, so we just need to avoid
+            // letting publisher exceptions kill an otherwise-good deploy.
+            try {
+                $commit = $deployment->git_commit
+                    ? substr((string) $deployment->git_commit, 0, 7)
+                    : null;
+                app(NotificationPublisher::class)->publish(
+                    eventKey: 'edge.deploy.succeeded',
+                    subject: $site->fresh(),
+                    title: $commit !== null
+                        ? "Edge deploy live: {$site->name} ({$commit})"
+                        : "Edge deploy live: {$site->name}",
+                    body: $liveUrl,
+                    url: $liveUrl,
+                    metadata: [
+                        'deployment_id' => (string) $deployment->id,
+                        'commit' => $deployment->git_commit,
+                        'branch' => $deployment->git_branch,
+                        'live_url' => $liveUrl,
+                        'duration_ms' => $deployment->published_at && $deployment->created_at
+                            ? max(0, $deployment->published_at->diffInMilliseconds($deployment->created_at))
+                            : null,
+                    ],
+                );
+            } catch (Throwable) {
+                // Notification publish is best-effort.
+            }
         } catch (Throwable $e) {
             $this->markFailed($site, $deployment, $e->getMessage());
 
@@ -205,6 +237,28 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             app(EdgeGithubPullRequestCommenter::class)->upsert($site->fresh(), 'failure');
         } catch (Throwable) {
             // PR comment update is best-effort.
+        }
+
+        // P9b: edge.deploy.failed — fan out to subscribed channels.
+        // Body carries the failure reason so the operator sees
+        // *why* the deploy died in their Slack / inbox without
+        // having to open the dashboard.
+        try {
+            app(NotificationPublisher::class)->publish(
+                eventKey: 'edge.deploy.failed',
+                subject: $site->fresh(),
+                title: "Edge deploy failed: {$site->name}",
+                body: $message,
+                url: route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'edge-deploys']),
+                metadata: [
+                    'deployment_id' => (string) $deployment->id,
+                    'commit' => $deployment->git_commit,
+                    'branch' => $deployment->git_branch,
+                    'failure_reason' => $message,
+                ],
+            );
+        } catch (Throwable) {
+            // Notification publish is best-effort.
         }
     }
 }

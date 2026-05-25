@@ -31,6 +31,16 @@ return [
                 'site.uptime' => 'Site uptime monitoring',
             ],
         ],
+        'edge' => [
+            'label' => 'Edge notifications',
+            'events' => [
+                'edge.deploy.succeeded' => 'Edge deploy succeeded',
+                'edge.deploy.failed' => 'Edge deploy failed (action required)',
+                'edge.domain.verified' => 'Custom domain verified',
+                'edge.domain.failing' => 'Custom domain verification failing (action required)',
+                'edge.usage.over_budget' => 'Edge usage over budget (action required)',
+            ],
+        ],
         'backup' => [
             'label' => 'Backup notifications',
             'events' => [

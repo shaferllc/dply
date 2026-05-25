@@ -15,7 +15,7 @@ use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
-class Build extends Component
+class DeployTriggers extends Component
 {
     use DispatchesToastNotifications;
     use ManagesEdgeBuildSettings;
@@ -26,18 +26,13 @@ class Build extends Component
     public function mount(Server $server, Site $site): void
     {
         $this->mountEdgeWorkspaceSection($server, $site);
-
-        $this->site->load([
-            'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(20),
-        ]);
-
         $this->mountEdgeBuildSettings($site);
     }
 
     public function render(): View
     {
         $viewData = array_merge(
-            EdgeSiteViewData::context($this->site, 'edge-build'),
+            EdgeSiteViewData::context($this->site, 'edge-deploy-triggers'),
             [
                 'server' => $this->server,
                 'site' => $this->site,
@@ -49,6 +44,6 @@ class Build extends Component
                 ->accountsForUser(auth()->user());
         }
 
-        return view('livewire.sites.edge.workspace.build', $viewData);
+        return view('livewire.sites.edge.workspace.deploy-triggers', $viewData);
     }
 }

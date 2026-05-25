@@ -35,7 +35,7 @@
                     wire:navigate
                     class="text-xs font-semibold underline underline-offset-2"
                 >
-                    {{ __('Open Build settings →') }}
+                    {{ __('Open Build →') }}
                 </a>
             @endif
         </div>

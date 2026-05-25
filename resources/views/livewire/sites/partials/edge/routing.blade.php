@@ -46,7 +46,8 @@
 
     @if ($latestRouting === null)
         <div class="px-6 py-8 text-sm text-brand-moss sm:px-8">
-            {{ __('No deploy has shipped a :file yet. Drop one at the repo root with redirects / rewrites / headers blocks, then redeploy.', ['file' => 'dply.yaml']) }}
+            <p>{{ __('No deploy has shipped a :file yet. Drop one at the repo root with redirects / rewrites / headers blocks, then redeploy.', ['file' => 'dply.yaml']) }}</p>
+            @include('livewire.sites.partials.edge.dply-yaml-starter-examples')
         </div>
     @else
         <div class="grid grid-cols-1 gap-y-6 px-6 py-5 sm:px-8">

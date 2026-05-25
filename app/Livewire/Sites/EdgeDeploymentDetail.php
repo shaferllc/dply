@@ -73,6 +73,16 @@ class EdgeDeploymentDetail extends Component
             return $aliases;
         }
 
+        // Aliases are only materialized when publish succeeds. Do not
+        // preview would-be hostnames for failed or in-flight deploys.
+        if (! in_array($this->deployment->status, [EdgeDeployment::STATUS_LIVE, EdgeDeployment::STATUS_SUPERSEDED], true)) {
+            return [];
+        }
+
+        if ($this->deployment->published_at === null || $this->deployment->storage_prefix === null) {
+            return [];
+        }
+
         return app(EdgeDeploymentAliasGenerator::class)->aliasesFor($this->site, $this->deployment);
     }
 

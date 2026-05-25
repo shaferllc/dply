@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Enums\SiteType;
 use App\Livewire\Sites\Edge\Workspace\Build;
+use App\Livewire\Sites\Edge\Workspace\Delivery;
 use App\Livewire\Sites\Edge\Workspace\Deploys;
 use App\Livewire\Sites\Edge\Workspace\OverviewObservability;
 use App\Livewire\Sites\EdgeSettings;
@@ -40,7 +41,10 @@ test('edge site settings sidebar shows edge sections not byo runtime', function 
         ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertSee('Overview')
         ->assertSee('Deploys')
-        ->assertSee('Build settings')
+        ->assertSee('Build')
+        ->assertSee('Environment')
+        ->assertSee('Deploy triggers')
+        ->assertSee('Delivery')
         ->assertSee('Domains')
         ->assertSee('Billing & usage')
         ->assertSee('Traffic & analytics')
@@ -254,7 +258,7 @@ test('hybrid origin url and routes can be edited from build settings', function 
     [$user, $server, $site] = makeEdgeSiteForSettings(hybrid: true);
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Delivery::class, ['server' => $server, 'site' => $site])
         ->assertSet('buildForm.edge_origin_url', 'https://origin.example.com')
         ->assertSet('buildForm.edge_origin_routes', "/api/*\n/_next/data/*")
         ->set('buildForm.edge_origin_url', 'https://new-origin.example.com')
@@ -277,21 +281,21 @@ test('hybrid origin save rejects invalid routes and url', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings(hybrid: true);
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Delivery::class, ['server' => $server, 'site' => $site])
         ->set('buildForm.edge_origin_url', 'not-a-url')
         ->set('buildForm.edge_origin_routes', '/api/*')
         ->call('saveEdgeHybridOrigin')
         ->assertHasErrors(['buildForm.edge_origin_url']);
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Delivery::class, ['server' => $server, 'site' => $site])
         ->set('buildForm.edge_origin_url', 'https://origin.example.com')
         ->set('buildForm.edge_origin_routes', 'api/no-leading-slash')
         ->call('saveEdgeHybridOrigin')
         ->assertHasErrors(['buildForm.edge_origin_routes']);
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Delivery::class, ['server' => $server, 'site' => $site])
         ->set('buildForm.edge_origin_url', 'https://origin.example.com')
         ->set('buildForm.edge_origin_routes', '/api/with space')
         ->call('saveEdgeHybridOrigin')
@@ -302,7 +306,7 @@ test('hybrid origin save is rejected for static sites', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings();
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Delivery::class, ['server' => $server, 'site' => $site])
         ->set('buildForm.edge_origin_url', 'https://new-origin.example.com')
         ->set('buildForm.edge_origin_routes', '/api/*')
         ->call('saveEdgeHybridOrigin');

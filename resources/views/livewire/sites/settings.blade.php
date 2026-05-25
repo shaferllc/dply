@@ -28,7 +28,7 @@
             <x-page-header
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
-                doc-route="docs.index"
+                doc-contextual
                 toolbar
                 flush
                 class="mt-3"

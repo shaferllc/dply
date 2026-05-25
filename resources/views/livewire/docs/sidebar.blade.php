@@ -5,7 +5,38 @@
     <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Documentation') }}</p>
-            <h2 class="mt-1 truncate text-base font-semibold text-brand-ink dark:text-brand-cream">{{ $title }}</h2>
+            @if (count($breadcrumbs) > 1)
+                <nav aria-label="{{ __('Documentation breadcrumb') }}" class="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] leading-snug text-brand-moss">
+                    @foreach ($breadcrumbs as $index => $crumb)
+                        @if ($index > 0)
+                            <x-heroicon-m-chevron-right class="h-3 w-3 shrink-0 text-brand-mist/80" aria-hidden="true" />
+                        @endif
+                        @if ($index === count($breadcrumbs) - 1)
+                            <span class="font-medium text-brand-ink dark:text-brand-cream">{{ $crumb['label'] }}</span>
+                        @elseif (($crumb['slug'] ?? null) === 'docs-index')
+                            <button
+                                type="button"
+                                wire:click="showIndex"
+                                class="rounded-md px-0.5 font-medium text-brand-forest transition-colors hover:text-brand-sage hover:underline dark:text-brand-sage"
+                            >
+                                {{ $crumb['label'] }}
+                            </button>
+                        @elseif (is_string($crumb['slug'] ?? null) && $crumb['slug'] !== '')
+                            <button
+                                type="button"
+                                wire:click="loadGuide('{{ $crumb['slug'] }}')"
+                                class="rounded-md px-0.5 font-medium text-brand-forest transition-colors hover:text-brand-sage hover:underline dark:text-brand-sage"
+                            >
+                                {{ $crumb['label'] }}
+                            </button>
+                        @else
+                            <span>{{ $crumb['label'] }}</span>
+                        @endif
+                    @endforeach
+                </nav>
+            @else
+                <h2 class="mt-1 truncate text-base font-semibold text-brand-ink dark:text-brand-cream">{{ $title }}</h2>
+            @endif
         </div>
         <div class="flex shrink-0 items-center gap-1">
             @if ($fullPageUrl)
@@ -31,7 +62,7 @@
     </div>
 
     @if ($guideLinks !== [])
-        <div x-data="{ open: true }" class="border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
+        <div x-data="{ open: false }" class="border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
             <button
                 type="button"
                 x-on:click="open = !open"
@@ -62,7 +93,7 @@
     @endif
 
     @if ($headings !== [])
-        <div x-data="{ open: true }" class="border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
+        <div x-data="{ open: false }" class="border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
             <button
                 type="button"
                 x-on:click="open = !open"
@@ -117,7 +148,7 @@
                 </a>
             @endif
         @elseif ($html !== '')
-            <div class="docs-sidebar-prose text-sm leading-relaxed text-brand-moss
+            <div class="docs-markdown-prose docs-sidebar-prose text-sm leading-relaxed text-brand-moss
                 [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:text-brand-ink [&_h1]:mb-4 dark:[&_h1]:text-brand-cream
                 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-brand-ink [&_h2]:mt-6 [&_h2]:mb-2 dark:[&_h2]:text-brand-cream
                 [&_h3]:text-sm [&_h3]:font-medium [&_h3]:text-brand-ink [&_h3]:mt-4 [&_h3]:mb-2 dark:[&_h3]:text-brand-cream

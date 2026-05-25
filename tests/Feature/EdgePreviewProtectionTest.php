@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Livewire\Sites\Edge\Workspace\Build;
+use App\Livewire\Sites\Edge\Workspace\Previews;
 use App\Models\EdgeDeployment;
 use App\Models\EdgeSiteAccessRule;
 use App\Models\Organization;
@@ -21,7 +21,7 @@ test('edge build settings shows preview protection controls on parent sites', fu
     [$user, $server, $site] = makeEdgePreviewProtectionSite();
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Previews::class, ['server' => $server, 'site' => $site])
         ->assertSee('Preview protection')
         ->assertSee('Shared password')
         ->assertSee('Dply account');
@@ -33,7 +33,7 @@ test('save preview protection persists password mode and republishes host map', 
     [$user, $server, $site] = makeEdgePreviewProtectionSite(withLiveDeploy: true);
 
     Livewire::actingAs($user)
-        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->test(Previews::class, ['server' => $server, 'site' => $site])
         ->set('buildForm.edge_preview_protection_mode', EdgeSiteAccessRule::MODE_PASSWORD)
         ->set('buildForm.edge_preview_protection_password', 'review-only')
         ->call('saveEdgePreviewProtection')

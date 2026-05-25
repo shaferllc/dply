@@ -178,12 +178,12 @@ final class EdgeSiteViewData
 
     private static function sectionNeedsDeliveryWorker(string $section): bool
     {
-        return in_array($section, ['general', 'edge-build'], true);
+        return in_array($section, ['general', 'edge-delivery'], true);
     }
 
     private static function sectionNeedsDeliveryBanner(string $section): bool
     {
-        return in_array($section, ['general', 'edge-build'], true);
+        return in_array($section, ['general', 'edge-delivery'], true);
     }
 
     private static function deliveryBackendLabel(

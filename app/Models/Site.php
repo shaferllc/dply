@@ -1394,6 +1394,24 @@ class Site extends Model
         return $this->hasMany(EdgeSiteEnvVar::class)->orderBy('key');
     }
 
+    public function edgeSiteMembers(): HasMany
+    {
+        return $this->hasMany(EdgeSiteMember::class);
+    }
+
+    /**
+     * Returns the per-site role granted to $user on this Edge site,
+     * or null when the user has no direct grant. Org-level membership
+     * is checked separately by the policy.
+     */
+    public function edgeMemberRoleFor(User $user): ?string
+    {
+        return (string) EdgeSiteMember::query()
+            ->where('site_id', $this->id)
+            ->where('user_id', $user->id)
+            ->value('role') ?: null;
+    }
+
     /**
      * URL the container deployment is reachable at, set by the
      * provisioner once the backend reports an "ingress" hostname

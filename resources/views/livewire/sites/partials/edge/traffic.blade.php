@@ -203,9 +203,9 @@
                 </div>
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Invalidate') }}</p>
-                    <p class="mt-2 text-sm text-brand-ink">{{ __('Purge by Cache-Tag from Build settings.') }}</p>
+                    <p class="mt-2 text-sm text-brand-ink">{{ __('Purge by Cache-Tag from Delivery settings.') }}</p>
                     <a
-                        href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-build']) }}"
+                        href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-delivery']) }}"
                         wire:navigate
                         class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage"
                     >

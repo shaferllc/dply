@@ -9,6 +9,7 @@ use App\Models\EdgeDeployment;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Services\Cloudflare\CloudflareDnsService;
+use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -174,6 +175,31 @@ final class EdgeCustomDomainProvisioner
 
         if ($matches) {
             $this->publishReadyHostname($site->fresh(), $hostname);
+        }
+
+        // P9b: notify subscribers when verification flips state.
+        // Wrapped in try/catch — notification failures must not bubble
+        // out of the verify path; the caller treats this as the source
+        // of truth for the DNS row's status.
+        try {
+            $eventKey = $matches ? 'edge.domain.verified' : 'edge.domain.failing';
+            $title = $matches
+                ? sprintf('%s verified on %s', $hostname, $site->name)
+                : sprintf('%s failing verification on %s', $hostname, $site->name);
+            app(NotificationPublisher::class)->publish(
+                eventKey: $eventKey,
+                subject: $site->fresh(),
+                title: $title,
+                body: $entry['error'] ?? null,
+                url: route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'edge-domains']),
+                metadata: [
+                    'hostname' => $hostname,
+                    'expected_cname' => $expected,
+                    'resolved' => $resolved,
+                ],
+            );
+        } catch (Throwable) {
+            // Notification publish is best-effort.
         }
 
         return $entry;

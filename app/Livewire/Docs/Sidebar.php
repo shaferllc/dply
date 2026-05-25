@@ -11,6 +11,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class Sidebar extends Component
 {
+    /** @var list<array{label: string, slug: string|null}> */
+    public array $breadcrumbs = [];
+
     public bool $visible = false;
 
     public string $slug = 'docs-index';
@@ -91,6 +94,7 @@ class Sidebar extends Component
         $this->indexEntries = $resolver->indexEntries();
         $this->guideLinks = [];
         $this->guideGroupLabel = '';
+        $this->breadcrumbs = $resolver->breadcrumbsForSlug('docs-index');
     }
 
     private function loadSlug(ContextualDocResolver $resolver): void
@@ -102,6 +106,7 @@ class Sidebar extends Component
         $this->indexEntries = [];
         $this->guideLinks = $this->buildGuideLinks($resolver);
         $this->guideGroupLabel = $resolver->guideGroup($this->slug)['label'] ?? '';
+        $this->breadcrumbs = $resolver->breadcrumbsForSlug($this->slug);
 
         if ($this->isIndex) {
             $this->html = '';

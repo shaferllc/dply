@@ -151,13 +151,28 @@ final class SiteSettingsHeader
                 'icon' => 'heroicon-o-globe-alt',
             ],
             'edge-build' => [
-                'title' => __('Build settings'),
-                'description' => __('Repository, branch, build command, output directory, and GitHub webhook for automatic deploys.'),
+                'title' => __('Build'),
+                'description' => __('Build command, output directory, repo config overrides, routing rules, and deploy retention.'),
                 'icon' => 'heroicon-o-wrench-screwdriver',
+            ],
+            'edge-deploy-triggers' => [
+                'title' => __('Deploy triggers'),
+                'description' => __('Deploy hooks and GitHub auto-deploy webhooks.'),
+                'icon' => 'heroicon-o-bolt',
+            ],
+            'edge-environment' => [
+                'title' => __('Environment'),
+                'description' => __('Production secrets injected at build and runtime on each deploy.'),
+                'icon' => 'heroicon-o-command-line',
+            ],
+            'edge-delivery' => [
+                'title' => __('Delivery'),
+                'description' => __('Edge CDN backend, hybrid SSR origin, image optimization, and cache purge.'),
+                'icon' => 'heroicon-o-cloud',
             ],
             'edge-previews' => [
                 'title' => __('Previews'),
-                'description' => __('Branch preview deployments created from pull requests — each gets its own Edge URL.'),
+                'description' => __('Branch preview deployments, preview protection, and the review comment widget.'),
                 'icon' => 'heroicon-o-sparkles',
             ],
             'edge-billing' => [

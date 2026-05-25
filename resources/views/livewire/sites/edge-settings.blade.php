@@ -55,7 +55,7 @@
             <x-page-header
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
-                doc-route="docs.index"
+                doc-contextual
                 toolbar
                 flush
                 class="mt-3"
@@ -84,12 +84,22 @@
                         @livewire('sites.edge.workspace.domains', ['server' => $server, 'site' => $site], key('edge-section-domains-'.$site->id))
                     @elseif ($section === 'edge-build')
                         @livewire('sites.edge.workspace.build', ['server' => $server, 'site' => $site], key('edge-section-build-'.$site->id))
+                    @elseif ($section === 'edge-environment')
+                        @livewire('sites.edge.workspace.environment', ['server' => $server, 'site' => $site], key('edge-section-environment-'.$site->id))
                     @elseif ($section === 'edge-deploy-triggers')
                         @livewire('sites.edge.workspace.deploy-triggers', ['server' => $server, 'site' => $site], key('edge-section-deploy-triggers-'.$site->id))
                     @elseif ($section === 'edge-delivery')
                         @livewire('sites.edge.workspace.delivery', ['server' => $server, 'site' => $site], key('edge-section-delivery-'.$site->id))
                     @elseif ($section === 'edge-routing')
-                        @include('livewire.sites.partials.edge.routing')
+                        <div class="space-y-6">
+                            @include('livewire.sites.partials.edge.routing')
+                        </div>
+                    @elseif ($section === 'edge-audit')
+                        <div class="space-y-6">
+                            @include('livewire.sites.partials.edge.audit-log')
+                        </div>
+                    @elseif ($section === 'edge-members')
+                        @livewire('sites.edge.workspace.members', ['server' => $server, 'site' => $site], key('edge-section-members-'.$site->id))
                     @elseif ($section === 'edge-previews')
                         @livewire('sites.edge.workspace.previews', ['server' => $server, 'site' => $site], key('edge-section-previews-'.$site->id))
                     @elseif ($section === 'edge-billing')

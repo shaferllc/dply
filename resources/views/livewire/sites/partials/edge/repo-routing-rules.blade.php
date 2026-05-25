@@ -26,10 +26,12 @@
         <div class="px-6 py-8 text-sm text-brand-moss sm:px-8">
             <p>{{ __('No :file loaded yet. Commit a config file to your repository and deploy — rules appear here after the build parses it.', ['file' => 'dply.yaml']) }}</p>
             <p class="mt-2 text-xs">{{ __('Use `dply edge lint` locally or check the build log if a deploy fails on config validation.') }}</p>
+            @include('livewire.sites.partials.edge.dply-yaml-starter-examples')
         </div>
     @elseif (! $hasRules)
         <div class="px-6 py-8 text-sm text-brand-moss sm:px-8">
-            {{ __(':file was loaded on the last deploy, but it defines no redirects, rewrites, or header rules yet.', ['file' => $sourcePath]) }}
+            <p>{{ __(':file was loaded on the last deploy, but it defines no redirects, rewrites, or header rules yet.', ['file' => $sourcePath]) }}</p>
+            @include('livewire.sites.partials.edge.dply-yaml-starter-examples')
         </div>
     @else
         <div class="divide-y divide-brand-ink/8">

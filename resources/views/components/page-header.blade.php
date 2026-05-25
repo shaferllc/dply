@@ -10,6 +10,8 @@
     'docRoute' => null,
     /** When docRoute is docs.markdown, pass the slug (e.g. source-control). */
     'docSlug' => null,
+    /** Open the in-app docs panel for the current page (ContextualDocResolver). */
+    'docContextual' => false,
     'docLabel' => null,
 ])
 
@@ -55,12 +57,17 @@
             @endisset
         </div>
 
-        @if ($docRoute || isset($actions))
+        @if ($docRoute || $docContextual || isset($actions))
             <div @class([
                 'mt-4 flex flex-wrap items-center gap-2' => ! $toolbar,
                 'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,
             ])>
-                @if ($docRoute)
+                @if ($docContextual)
+                    <x-docs-link>
+                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ $docLinkLabel }}
+                    </x-docs-link>
+                @elseif ($docRoute)
                     <x-docs-link :doc-route="$docRoute" :doc-slug="$docSlug">
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ $docLinkLabel }}
