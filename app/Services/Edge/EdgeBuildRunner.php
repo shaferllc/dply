@@ -175,30 +175,49 @@ class EdgeBuildRunner
                 }
             }
 
-            // SSR mode: ignore the dashboard build command and output dir.
-            // OpenNext owns both — its build runs `next build` internally
-            // and writes assets to .open-next/assets + the Worker entry to
-            // .open-next/worker.js. Letting operators override either
-            // would just produce broken bundles.
+            // SSR mode: detect which framework adapter the repo uses
+            // and dispatch the build accordingly. Profile registry lives
+            // in app/Services/Edge/Ssr/ — adding Astro / SvelteKit /
+            // Remix / Next is a one-entry change there.
+            $ssrProfile = null;
             if ($runtimeMode === self::MODE_SSR) {
                 if (! is_file($checkout.'/package.json')) {
-                    throw new RuntimeException('SSR builds require a package.json with Next.js as a dependency.');
+                    throw new RuntimeException('SSR builds require a package.json declaring a supported framework + Cloudflare adapter.');
                 }
                 $packageJson = json_decode((string) file_get_contents($checkout.'/package.json'), true);
-                $hasNext = false;
-                foreach (['dependencies', 'devDependencies', 'peerDependencies'] as $section) {
-                    if (is_array($packageJson[$section] ?? null) && isset($packageJson[$section]['next'])) {
-                        $hasNext = true;
-                        break;
+                $packageJson = is_array($packageJson) ? $packageJson : [];
+
+                $ssrProfile = \App\Services\Edge\Ssr\EdgeSsrFrameworkRegistry::detectInProject($packageJson);
+                if ($ssrProfile === null) {
+                    throw new RuntimeException(
+                        'SSR Edge sites need one of: Next.js, Astro, SvelteKit, or Remix. '
+                        .'Add the framework + its Cloudflare adapter to package.json or pick static / hybrid mode.'
+                    );
+                }
+                if (! \App\Services\Edge\Ssr\EdgeSsrFrameworkRegistry::adapterInstalled($ssrProfile, $packageJson)) {
+                    throw new RuntimeException(sprintf(
+                        '%s needs `%s` in package.json before SSR builds work — install the adapter and redeploy.',
+                        $ssrProfile->label,
+                        $ssrProfile->adapterDependency,
+                    ));
+                }
+
+                $install = $this->detectInstallCommand($checkout) ?? 'npm install';
+                if ($ssrProfile->buildCommandOverride !== null) {
+                    $buildCommand = $install.' && '.$ssrProfile->buildCommandOverride;
+                } else {
+                    // Honor the user's build_command for adapters where
+                    // they own the build (Astro / SvelteKit / Remix —
+                    // they run `astro build` / `vite build` / `remix
+                    // vite:build` themselves). Just ensure dependencies
+                    // get installed first.
+                    $needsInstall = ! preg_match('/\b(npm|yarn|pnpm|bun)\s+(ci|install)\b/i', $buildCommand);
+                    if ($needsInstall) {
+                        $buildCommand = $install.' && '.$buildCommand;
                     }
                 }
-                if (! $hasNext) {
-                    throw new RuntimeException('SSR Edge sites currently support Next.js only — add next to package.json or pick static / hybrid mode.');
-                }
-                $install = $this->detectInstallCommand($checkout) ?? 'npm install';
-                $buildCommand = $install.' && npx --yes @opennextjs/cloudflare@latest build';
-                $outputDir = '.open-next/assets';
-                $this->appendBuildLog($buildLog, "SSR mode (Next.js) — overriding build with @opennextjs/cloudflare build pipeline.\n");
+                $outputDir = $ssrProfile->assetsPath;
+                $this->appendBuildLog($buildLog, sprintf("SSR mode (%s) — adapter detected, build = %s\n", $ssrProfile->label, $buildCommand));
             }
 
             // Build cache restore — best-effort. Cache key is derived
@@ -284,23 +303,17 @@ class EdgeBuildRunner
             File::ensureDirectoryExists($artifactDir);
             File::copyDirectory($resolvedOutput, $artifactDir);
 
-            if ($runtimeMode === self::MODE_SSR) {
-                // OpenNext writes the static assets layer + a single
-                // bundled Worker entry. The assets ship to R2 like any
-                // other deploy; the Worker entry is read into memory
-                // here so {@see EdgeSsrBundleUploader} can ship it to
-                // the dispatch namespace from the publish phase.
-                $workerPath = $checkout.'/.open-next/worker.js';
-                if (! is_file($workerPath)) {
-                    throw new RuntimeException('SSR build did not produce .open-next/worker.js — check the build log for OpenNext errors.');
-                }
-                $workerBytes = filesize($workerPath);
-                if ($workerBytes === false || $workerBytes > self::SSR_SCRIPT_MAX_BYTES) {
-                    throw new RuntimeException('SSR worker script exceeds the per-script size limit ('.number_format(self::SSR_SCRIPT_MAX_BYTES).' bytes).');
-                }
-                $workerSource = (string) file_get_contents($workerPath);
+            if ($runtimeMode === self::MODE_SSR && $ssrProfile !== null) {
+                $workerPath = $checkout.'/'.$ssrProfile->workerPath;
+                [$entryModule, $modules] = $this->collectSsrModules($workerPath, $ssrProfile->entryModule, $ssrProfile->label);
+                $totalBytes = array_sum(array_map('strlen', $modules));
                 $this->assertArtifactSize($artifactDir);
-                $this->appendBuildLog($buildLog, 'Build succeeded — SSR assets + worker.js ready ('.strlen($workerSource)." bytes).\n");
+                $this->appendBuildLog($buildLog, sprintf(
+                    "Build succeeded — %s assets + worker bundle ready (%d module(s), %d bytes).\n",
+                    $ssrProfile->label,
+                    count($modules),
+                    $totalBytes,
+                ));
 
                 return [
                     'artifact_dir' => $artifactDir,
@@ -309,8 +322,8 @@ class EdgeBuildRunner
                     'git_commit_subject' => $commitDetails['subject'] ?? null,
                     'git_commit_author' => $commitDetails['author'] ?? null,
                     'git_commit_at' => $commitDetails['committed_at'] ?? null,
-                    'ssr_entry_module' => 'worker.js',
-                    'ssr_modules' => ['worker.js' => $workerSource],
+                    'ssr_entry_module' => $entryModule,
+                    'ssr_modules' => $modules,
                 ];
             }
 
@@ -383,6 +396,73 @@ class EdgeBuildRunner
     private function appendBuildLog(string $path, string $chunk): void
     {
         File::append($path, $chunk);
+    }
+
+    /**
+     * Read the SSR adapter's worker output into the module map
+     * {@see EdgeSsrBundleUploader} ships to the dispatch namespace.
+     * Accepts either a single bundled file (Next.js / Remix style) or
+     * a directory of helper modules + entry (Astro / SvelteKit style).
+     *
+     * @return array{0: string, 1: array<string, string>} [entryModule, modules]
+     */
+    private function collectSsrModules(string $workerPath, string $configuredEntry, string $frameworkLabel): array
+    {
+        if (is_dir($workerPath)) {
+            $modules = [];
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($workerPath, \FilesystemIterator::SKIP_DOTS),
+            );
+            foreach ($iterator as $file) {
+                if (! $file->isFile()) {
+                    continue;
+                }
+                $ext = strtolower($file->getExtension());
+                if (! in_array($ext, ['js', 'mjs', 'wasm'], true)) {
+                    continue;
+                }
+                $relative = ltrim(str_replace($workerPath, '', $file->getPathname()), '/\\');
+                $modules[$relative] = (string) file_get_contents($file->getPathname());
+            }
+            if (! isset($modules[$configuredEntry])) {
+                throw new RuntimeException(sprintf(
+                    '%s build wrote %s/ but %s is missing — check the build log for adapter errors.',
+                    $frameworkLabel,
+                    $workerPath,
+                    $configuredEntry,
+                ));
+            }
+            $totalBytes = array_sum(array_map('strlen', $modules));
+            if ($totalBytes > self::SSR_SCRIPT_MAX_BYTES) {
+                throw new RuntimeException(sprintf(
+                    'SSR worker bundle (%s, %d modules) exceeds the per-script size limit (%s bytes).',
+                    $frameworkLabel,
+                    count($modules),
+                    number_format(self::SSR_SCRIPT_MAX_BYTES),
+                ));
+            }
+
+            return [$configuredEntry, $modules];
+        }
+
+        if (! is_file($workerPath)) {
+            throw new RuntimeException(sprintf(
+                '%s build did not produce %s — check the build log for adapter errors.',
+                $frameworkLabel,
+                $workerPath,
+            ));
+        }
+        $bytes = filesize($workerPath);
+        if ($bytes === false || $bytes > self::SSR_SCRIPT_MAX_BYTES) {
+            throw new RuntimeException(sprintf(
+                'SSR worker script (%s) exceeds the per-script size limit (%s bytes).',
+                $frameworkLabel,
+                number_format(self::SSR_SCRIPT_MAX_BYTES),
+            ));
+        }
+        $singleName = basename($workerPath);
+
+        return [$singleName, [$singleName => (string) file_get_contents($workerPath)]];
     }
 
     private function composeBuildScript(string $checkout, string $buildCommand): string

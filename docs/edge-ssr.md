@@ -35,7 +35,7 @@ an additional code path, not a replacement.
 
 - Workers Paid plan on the Cloudflare account
 - API token with the **Workers Scripts: Edit** + **Workers for Platforms: Edit** scopes (the bootstrap command spells out the exact scopes needed in its error output when missing)
-- Customer repo must list `next` in `package.json`
+- Customer repo must declare a supported framework + its Cloudflare adapter (see table below)
 
 ## Operator bootstrap
 
@@ -62,22 +62,33 @@ Verify:
 php artisan dply:edge:doctor --probe
 ```
 
-## Customer-side requirements
+## Supported frameworks
 
-The repository must produce a Next.js build that OpenNext can wrap:
+`EdgeBuildRunner` reads `app/Services/Edge/Ssr/EdgeSsrFrameworkRegistry`
+on every SSR deploy. Detection looks at `package.json` for the entries
+in the **Detected** column; the **Adapter** column is the package that
+must also be installed (or the build fails with a clear error).
 
-- `next` in `package.json` dependencies (sniffed by `EdgeBuildRunner`)
-- Standard Next.js project layout (`next.config.js`, `pages/` or `app/`)
-- No custom `next build` overrides that produce non-Node output
+| Framework | Detected | Adapter | dply runs | Worker output | Assets dir |
+| --- | --- | --- | --- | --- | --- |
+| Next.js | `next` | (built-in) | `npx --yes @opennextjs/cloudflare@latest build` | `.open-next/worker.js` | `.open-next/assets` |
+| SvelteKit | `@sveltejs/kit` | `@sveltejs/adapter-cloudflare` | your `build_command` | `.svelte-kit/cloudflare/_worker.js/` | `.svelte-kit/cloudflare` |
+| Astro | `astro` | `@astrojs/cloudflare` | your `build_command` | `dist/_worker.js/` | `dist` |
+| Remix | `@remix-run/cloudflare` | `@remix-run/cloudflare` | your `build_command` | `build/server/index.js` | `build/client` |
 
-dply ignores the dashboard `build.command` / `build.output_dir` for
-SSR sites — OpenNext owns both. Build command becomes:
+Only Next.js has its build command overridden — OpenNext owns the full
+pipeline there. For the other three, dply runs whatever `build_command`
+you configured (defaulting to `npm run build`) after `npm install` and
+expects the worker output file/dir to land at the path above.
 
-```
-<install>  &&  npx --yes @opennextjs/cloudflare@latest build
-```
+Multi-module worker bundles (Astro / SvelteKit dump a directory of
+helper modules alongside the entry) ship as one dispatch script with
+all `.js` / `.mjs` / `.wasm` modules attached. Total bundle is capped
+at 9 MB to stay under Cloudflare's Workers script limit.
 
-and the assets layer always lives at `.open-next/assets/`.
+Add a framework: drop a new `EdgeSsrFrameworkProfile` into the
+registry. No other changes needed — detection, build, and upload all
+read from there.
 
 ## What happens per deploy
 
@@ -144,5 +155,6 @@ orphans when sites are deleted. Failures are best-effort logged.
 | "SSR Edge sites need a Workers for Platforms dispatch namespace" on create | Bootstrap not run, or `DPLY_EDGE_CF_DISPATCH_NAMESPACE_ID` missing from `.env` |
 | Build fails with "SSR build did not produce .open-next/worker.js" | OpenNext build hit an error — read the build log for the underlying message (often `next build` failing) |
 | Browser sees "Service temporarily unavailable — SSR worker not reachable." | Platform Worker has no `DISPATCHER` binding — re-run `php artisan edge:worker:deploy` after bootstrap added the dispatch namespace |
-| Build fails with "SSR Edge sites currently support Next.js only" | Repo has no `next` in `package.json` — use static or hybrid mode |
+| Build fails with "SSR Edge sites need one of: Next.js, Astro, SvelteKit, or Remix" | Repo has none of the supported framework deps — use static or hybrid mode, or add the framework + its Cloudflare adapter |
+| Build fails with "X needs `@…/cloudflare` in package.json" | Framework is detected but the Cloudflare adapter isn't installed — `npm install @astrojs/cloudflare` (or whichever) and redeploy |
 | Dispatch namespace upload returns 403 | API token is missing the Workers for Platforms scope — generate a new token with **Account → Workers Scripts: Edit** + **Account → Workers for Platforms: Edit** |
