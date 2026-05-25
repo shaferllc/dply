@@ -7,6 +7,7 @@ namespace App\Services\Edge;
 use App\Models\EdgeDeployment;
 use App\Services\Edge\Config\EdgeRepoConfigLinter;
 use App\Services\Edge\Config\EdgeRepoConfigLoader;
+use App\Services\Edge\Ssr\EdgeSsrFrameworkRegistry;
 use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Support\Facades\File;
@@ -173,6 +174,30 @@ class EdgeBuildRunner
                 if (isset($repoConfig->build['output']) && $repoConfig->build['output'] !== '') {
                     $outputDir = $repoConfig->build['output'];
                 }
+
+                // build.env_files: load each repo-relative dotenv file
+                // and merge into $env. Dashboard-supplied env wins on
+                // conflict (it's already in $env when we get here, and
+                // we only set keys that aren't present).
+                foreach ($repoConfig->envFiles as $relative) {
+                    $path = $checkout.'/'.$relative;
+                    if (! is_file($path)) {
+                        $this->appendBuildLog($buildLog, '[dply.yaml] build.env_files: '.$relative." not found in checkout — skipping.\n");
+
+                        continue;
+                    }
+                    $loaded = $this->parseDotenvFile((string) file_get_contents($path));
+                    $added = 0;
+                    foreach ($loaded as $k => $v) {
+                        if (array_key_exists($k, $env)) {
+                            // Dashboard / production-scope env wins.
+                            continue;
+                        }
+                        $env[$k] = $v;
+                        $added++;
+                    }
+                    $this->appendBuildLog($buildLog, sprintf("[dply.yaml] build.env_files: %s → %d new key(s)\n", $relative, $added));
+                }
             }
 
             // SSR mode: detect which framework adapter the repo uses
@@ -187,14 +212,14 @@ class EdgeBuildRunner
                 $packageJson = json_decode((string) file_get_contents($checkout.'/package.json'), true);
                 $packageJson = is_array($packageJson) ? $packageJson : [];
 
-                $ssrProfile = \App\Services\Edge\Ssr\EdgeSsrFrameworkRegistry::detectInProject($packageJson);
+                $ssrProfile = EdgeSsrFrameworkRegistry::detectInProject($packageJson);
                 if ($ssrProfile === null) {
                     throw new RuntimeException(
                         'SSR Edge sites need one of: Next.js, Astro, SvelteKit, or Remix. '
                         .'Add the framework + its Cloudflare adapter to package.json or pick static / hybrid mode.'
                     );
                 }
-                if (! \App\Services\Edge\Ssr\EdgeSsrFrameworkRegistry::adapterInstalled($ssrProfile, $packageJson)) {
+                if (! EdgeSsrFrameworkRegistry::adapterInstalled($ssrProfile, $packageJson)) {
                     throw new RuntimeException(sprintf(
                         '%s needs `%s` in package.json before SSR builds work — install the adapter and redeploy.',
                         $ssrProfile->label,
@@ -396,6 +421,49 @@ class EdgeBuildRunner
     private function appendBuildLog(string $path, string $chunk): void
     {
         File::append($path, $chunk);
+    }
+
+    /**
+     * Minimal dotenv parser for build.env_files. Honors KEY=value,
+     * double-quoted values (\n + \t escapes), single-quoted (literal),
+     * # comments, blank lines, and `export KEY=value`. No interpolation.
+     *
+     * @return array<string, string>
+     */
+    private function parseDotenvFile(string $raw): array
+    {
+        $out = [];
+        foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '#')) {
+                continue;
+            }
+            $eq = strpos($trimmed, '=');
+            if ($eq === false || $eq === 0) {
+                continue;
+            }
+            $key = trim(substr($trimmed, 0, $eq));
+            if (str_starts_with($key, 'export ')) {
+                $key = trim(substr($key, 7));
+            }
+            if (preg_match('/^[A-Z_][A-Z0-9_]*$/', $key) !== 1) {
+                continue;
+            }
+            $value = trim(substr($trimmed, $eq + 1));
+            if (strlen($value) >= 2 && $value[0] === '"' && substr($value, -1) === '"') {
+                $value = str_replace(['\\n', '\\t', '\\"'], ["\n", "\t", '"'], substr($value, 1, -1));
+            } elseif (strlen($value) >= 2 && $value[0] === "'" && substr($value, -1) === "'") {
+                $value = substr($value, 1, -1);
+            } else {
+                $hash = strpos($value, ' #');
+                if ($hash !== false) {
+                    $value = rtrim(substr($value, 0, $hash));
+                }
+            }
+            $out[$key] = $value;
+        }
+
+        return $out;
     }
 
     /**

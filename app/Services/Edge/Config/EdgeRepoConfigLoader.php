@@ -95,6 +95,7 @@ class EdgeRepoConfigLoader
         return new EdgeRepoConfig(
             sourcePath: $sourcePath,
             build: $this->normalizeBuild($parsed['build'] ?? null, $warnings),
+            envFiles: $this->normalizeEnvFiles($parsed['build'] ?? null, $warnings),
             redirects: $this->normalizeRedirects($parsed['redirects'] ?? null, $warnings),
             rewrites: $this->normalizeRewrites($parsed['rewrites'] ?? null, $warnings),
             headers: $this->normalizeHeaders($parsed['headers'] ?? null, $warnings),
@@ -158,6 +159,46 @@ class EdgeRepoConfigLoader
         }
 
         return $build;
+    }
+
+    /**
+     * Parses `build.env_files: [".env.production", ...]` — paths
+     * relative to the checkout root that the build runner loads + merges
+     * into the env handed to Docker. Dashboard env vars win on conflict
+     * (handled by the runner, not here).
+     *
+     * @param  list<string>  $warnings
+     * @return list<string>
+     */
+    private function normalizeEnvFiles(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value) || ! isset($value['env_files'])) {
+            return [];
+        }
+        $raw = $value['env_files'];
+        if (! is_array($raw)) {
+            $warnings[] = 'build.env_files must be a list of repo-relative paths.';
+
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $index => $entry) {
+            if (! is_string($entry) || trim($entry) === '') {
+                $warnings[] = sprintf('build.env_files[%d] must be a non-empty string.', $index);
+
+                continue;
+            }
+            $path = trim($entry);
+            if (str_contains($path, '..') || str_starts_with($path, '/')) {
+                $warnings[] = sprintf('build.env_files[%d] %s — must be a repo-relative path (no ".." or leading "/").', $index, $path);
+
+                continue;
+            }
+            $out[] = $path;
+        }
+
+        return $out;
     }
 
     /**

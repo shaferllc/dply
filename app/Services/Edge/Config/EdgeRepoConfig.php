@@ -14,6 +14,7 @@ final class EdgeRepoConfig
 {
     /**
      * @param  array{command?: string, output?: string, root?: string, node?: string}  $build
+     * @param  list<string>  $envFiles  Repo-relative dotenv paths to load before the build runs.
      * @param  list<array{from: string, to: string, status: int}>  $redirects
      * @param  list<array{from: string, to: string}>  $rewrites
      * @param  list<array{for: string, values: array<string, string>}>  $headers
@@ -24,6 +25,7 @@ final class EdgeRepoConfig
     public function __construct(
         public readonly string $sourcePath,
         public readonly array $build = [],
+        public readonly array $envFiles = [],
         public readonly array $redirects = [],
         public readonly array $rewrites = [],
         public readonly array $headers = [],
@@ -36,6 +38,7 @@ final class EdgeRepoConfig
      * @return array{
      *     source_path: string,
      *     build: array<string, string>,
+     *     env_files: list<string>,
      *     redirects: list<array{from: string, to: string, status: int}>,
      *     rewrites: list<array{from: string, to: string}>,
      *     headers: list<array{for: string, values: array<string, string>}>,
@@ -49,6 +52,7 @@ final class EdgeRepoConfig
         return [
             'source_path' => $this->sourcePath,
             'build' => $this->build,
+            'env_files' => $this->envFiles,
             'redirects' => $this->redirects,
             'rewrites' => $this->rewrites,
             'headers' => $this->headers,
@@ -74,6 +78,7 @@ final class EdgeRepoConfig
     public function isEmpty(): bool
     {
         return $this->build === []
+            && $this->envFiles === []
             && $this->redirects === []
             && $this->rewrites === []
             && $this->headers === []
