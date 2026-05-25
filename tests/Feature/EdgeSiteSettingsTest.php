@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\SiteType;
+use App\Livewire\Sites\Edge\Workspace\Build;
+use App\Livewire\Sites\Edge\Workspace\Deploys;
+use App\Livewire\Sites\Edge\Workspace\OverviewObservability;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\AuditLog;
 use App\Models\EdgeDeployment;
@@ -89,7 +92,7 @@ test('edge deploys section refreshes after a git provider is linked', function (
     [$user, $server, $site] = makeEdgeSiteForSettings(withGithub: false);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-deploys'])
+        ->test(Deploys::class, ['server' => $server, 'site' => $site])
         ->assertSee('Connect GitHub to deploy a specific commit, branch tip, or tag.', false)
         ->assertDontSee('id="edge_deploy_commit_sha"', false);
 
@@ -101,7 +104,7 @@ test('edge deploys section refreshes after a git provider is linked', function (
     ]);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-deploys'])
+        ->test(Deploys::class, ['server' => $server, 'site' => $site])
         ->dispatch('source-control-linked')
         ->assertDontSee('Connect GitHub to deploy a specific commit, branch tip, or tag.', false)
         ->assertSee('id="edge_deploy_commit_sha"', false);
@@ -191,11 +194,11 @@ test('edge build settings can be updated on build settings section', function ()
     [$user, $server, $site] = makeEdgeSiteForSettings();
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-build'])
-        ->set('edge_build_command', 'pnpm install && pnpm build')
-        ->set('edge_output_dir', 'out')
-        ->set('edge_spa_fallback', false)
-        ->set('edge_deploy_on_push', false)
+        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->set('buildForm.edge_build_command', 'pnpm install && pnpm build')
+        ->set('buildForm.edge_output_dir', 'out')
+        ->set('buildForm.edge_spa_fallback', false)
+        ->set('buildForm.edge_deploy_on_push', false)
         ->call('saveEdgeBuildSettings')
         ->assertHasNoErrors();
 
@@ -234,7 +237,7 @@ test('edge deploy ref picker loads branches tags and commits from git provider',
     [$user, $server, $site] = makeEdgeSiteForSettings(withGithub: true);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-deploys'])
+        ->test(Deploys::class, ['server' => $server, 'site' => $site])
         ->call('openEdgeDeployRefPicker')
         ->assertSet('edge_deploy_ref_picker_open', true)
         ->assertSee('Fix homepage hero')
@@ -251,11 +254,11 @@ test('hybrid origin url and routes can be edited from build settings', function 
     [$user, $server, $site] = makeEdgeSiteForSettings(hybrid: true);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-build'])
-        ->assertSet('edge_origin_url', 'https://origin.example.com')
-        ->assertSet('edge_origin_routes', "/api/*\n/_next/data/*")
-        ->set('edge_origin_url', 'https://new-origin.example.com')
-        ->set('edge_origin_routes', "/api/*\n/graphql\n/webhook/*")
+        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->assertSet('buildForm.edge_origin_url', 'https://origin.example.com')
+        ->assertSet('buildForm.edge_origin_routes', "/api/*\n/_next/data/*")
+        ->set('buildForm.edge_origin_url', 'https://new-origin.example.com')
+        ->set('buildForm.edge_origin_routes', "/api/*\n/graphql\n/webhook/*")
         ->call('saveEdgeHybridOrigin')
         ->assertHasNoErrors();
 
@@ -274,34 +277,34 @@ test('hybrid origin save rejects invalid routes and url', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings(hybrid: true);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-build'])
-        ->set('edge_origin_url', 'not-a-url')
-        ->set('edge_origin_routes', '/api/*')
+        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->set('buildForm.edge_origin_url', 'not-a-url')
+        ->set('buildForm.edge_origin_routes', '/api/*')
         ->call('saveEdgeHybridOrigin')
-        ->assertHasErrors(['edge_origin_url']);
+        ->assertHasErrors(['buildForm.edge_origin_url']);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-build'])
-        ->set('edge_origin_url', 'https://origin.example.com')
-        ->set('edge_origin_routes', 'api/no-leading-slash')
+        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->set('buildForm.edge_origin_url', 'https://origin.example.com')
+        ->set('buildForm.edge_origin_routes', 'api/no-leading-slash')
         ->call('saveEdgeHybridOrigin')
-        ->assertHasErrors(['edge_origin_routes']);
+        ->assertHasErrors(['buildForm.edge_origin_routes']);
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-build'])
-        ->set('edge_origin_url', 'https://origin.example.com')
-        ->set('edge_origin_routes', '/api/with space')
+        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->set('buildForm.edge_origin_url', 'https://origin.example.com')
+        ->set('buildForm.edge_origin_routes', '/api/with space')
         ->call('saveEdgeHybridOrigin')
-        ->assertHasErrors(['edge_origin_routes']);
+        ->assertHasErrors(['buildForm.edge_origin_routes']);
 });
 
 test('hybrid origin save is rejected for static sites', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings();
 
     Livewire::actingAs($user)
-        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'edge-build'])
-        ->set('edge_origin_url', 'https://new-origin.example.com')
-        ->set('edge_origin_routes', '/api/*')
+        ->test(Build::class, ['server' => $server, 'site' => $site])
+        ->set('buildForm.edge_origin_url', 'https://new-origin.example.com')
+        ->set('buildForm.edge_origin_routes', '/api/*')
         ->call('saveEdgeHybridOrigin');
 
     $site->refresh();
@@ -311,9 +314,9 @@ test('hybrid origin save is rejected for static sites', function () {
 test('edge billing card links to the site organization analytics page', function () {
     [$user, $server, $site] = makeEdgeSiteForSettings();
 
-    $this->actingAs($user)
-        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']))
-        ->assertOk()
+    Livewire::actingAs($user)
+        ->test(OverviewObservability::class, ['server' => $server, 'site' => $site])
+        ->call('loadObservabilityCards')
         ->assertSee('View stats');
 });
 

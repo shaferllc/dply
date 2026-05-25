@@ -16,7 +16,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Concerns\ManagesEdgeSite;
+use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Livewire\Concerns\MountsSiteWorkspace;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
@@ -71,7 +71,7 @@ class Show extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
-    use ManagesEdgeSite;
+    use ManagesEdgeRedeploy;
     use ManagesServerlessRuntime;
     use MountsSiteWorkspace;
     use RefreshesLinkedSourceControlAccounts;

@@ -77,24 +77,23 @@
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
                     @if ($section === 'general')
-                        @include('livewire.sites.partials.edge.overview')
+                        @livewire('sites.edge.workspace.overview', ['server' => $server, 'site' => $site], key('edge-section-overview-'.$site->id))
                     @elseif ($section === 'edge-deploys')
-                        @include('livewire.sites.partials.edge.hero')
-                        @include('livewire.sites.partials.edge.deploys-table', ['compact' => false])
+                        @livewire('sites.edge.workspace.deploys', ['server' => $server, 'site' => $site], key('edge-section-deploys-'.$site->id))
                     @elseif ($section === 'edge-domains')
-                        @include('livewire.sites.partials.edge.domains')
+                        @livewire('sites.edge.workspace.domains', ['server' => $server, 'site' => $site], key('edge-section-domains-'.$site->id))
                     @elseif ($section === 'edge-build')
-                        @include('livewire.sites.partials.edge.build-settings')
+                        @livewire('sites.edge.workspace.build', ['server' => $server, 'site' => $site], key('edge-section-build-'.$site->id))
                     @elseif ($section === 'edge-previews')
-                        @include('livewire.sites.partials.edge.previews')
+                        @livewire('sites.edge.workspace.previews', ['server' => $server, 'site' => $site], key('edge-section-previews-'.$site->id))
                     @elseif ($section === 'edge-billing')
-                        @include('livewire.sites.partials.edge.billing')
+                        @livewire('sites.edge.workspace.billing', ['server' => $server, 'site' => $site], key('edge-section-billing-'.$site->id))
                     @elseif ($section === 'edge-traffic')
-                        @include('livewire.sites.partials.edge.traffic')
+                        @livewire('sites.edge.workspace.traffic', ['server' => $server, 'site' => $site], key('edge-section-traffic-'.$site->id))
                     @elseif ($section === 'edge-logs')
-                        @include('livewire.sites.partials.edge.logs')
+                        @livewire('sites.edge.workspace.logs', ['server' => $server, 'site' => $site], key('edge-section-logs-'.$site->id))
                     @elseif ($section === 'danger')
-                        @include('livewire.sites.partials.edge.danger')
+                        @livewire('sites.edge.workspace.danger', ['server' => $server, 'site' => $site], key('edge-section-danger-'.$site->id))
                     @endif
                 </div>
             </main>

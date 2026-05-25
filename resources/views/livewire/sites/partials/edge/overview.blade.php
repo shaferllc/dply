@@ -107,9 +107,7 @@
     </section>
 </div>
 
-@include('livewire.sites.partials.edge.traffic-card')
-
-@include('livewire.sites.partials.edge.billing-card')
+@livewire('sites.edge.workspace.overview-observability', ['server' => $server, 'site' => $site], key('edge-overview-observability-'.$site->id))
 
 @if ($edgeDeployments->isNotEmpty())
     @include('livewire.sites.partials.edge.deploys-table', ['compact' => true])

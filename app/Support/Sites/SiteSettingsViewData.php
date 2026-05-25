@@ -370,6 +370,34 @@ final class SiteSettingsViewData
     }
 
     /**
+     * Billing + traffic cards for the overview observability child (lazy wire:init).
+     *
+     * @return array{
+     *     edgeUsageBillingEnabled: bool,
+     *     edgeManagedFee: float|null,
+     *     edgeUsageRates: array<string, mixed>,
+     *     edgeSiteBilling: array<string, mixed>|null,
+     *     edgeSiteTraffic: array<string, mixed>|null,
+     * }
+     */
+    public static function edgeOverviewObservability(Site $site): array
+    {
+        $edgeUsageBillingEnabled = (bool) config('dply.edge.usage_billing.enabled', false);
+        $edgeManagedFee = ((int) config('subscription.standard.edge_cents', 0)) / 100;
+        $edgeUsageRates = app(ManagedProductCostEstimator::class)->edgeUsageRates();
+        $edgeSiteBilling = app(EdgeSiteBillingAnalytics::class)->forSite($site);
+        $edgeSiteTraffic = app(EdgeSiteTrafficAnalytics::class)->forSite($site, billing: $edgeSiteBilling);
+
+        return [
+            'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
+            'edgeManagedFee' => $edgeManagedFee,
+            'edgeUsageRates' => $edgeUsageRates,
+            'edgeSiteBilling' => $edgeSiteBilling,
+            'edgeSiteTraffic' => $edgeSiteTraffic,
+        ];
+    }
+
+    /**
      * Edge billing/traffic/access snapshots are section-scoped — avoid running
      * usage queries on every workspace tab (Deploys, Build, Domains, etc.).
      *
@@ -400,8 +428,8 @@ final class SiteSettingsViewData
         $edgeUsageBillingEnabled = (bool) config('dply.edge.usage_billing.enabled', false);
         $edgeManagedFee = ((int) config('subscription.standard.edge_cents', 0)) / 100;
 
-        $needsBillingSnapshot = in_array($section, ['general', 'edge-billing'], true);
-        $needsTrafficSnapshot = in_array($section, ['general', 'edge-traffic'], true);
+        $needsBillingSnapshot = $section === 'edge-billing';
+        $needsTrafficSnapshot = in_array($section, ['edge-traffic'], true);
         $needsAccessSnapshot = $section === 'edge-traffic';
 
         if (! $needsBillingSnapshot && ! $needsTrafficSnapshot && ! $needsAccessSnapshot) {

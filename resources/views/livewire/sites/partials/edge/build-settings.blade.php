@@ -167,12 +167,12 @@
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Build command') }}</span>
                 <input
                     type="text"
-                    wire:model="edge_build_command"
+                    wire:model="buildForm.edge_build_command"
                     autocomplete="off"
                     spellcheck="false"
                     class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                 />
-                @error('edge_build_command')
+                @error('buildForm.edge_build_command')
                     <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                 @enderror
             </label>
@@ -180,13 +180,13 @@
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Output directory') }}</span>
                 <input
                     type="text"
-                    wire:model="edge_output_dir"
+                    wire:model="buildForm.edge_output_dir"
                     autocomplete="off"
                     spellcheck="false"
                     placeholder="dist"
                     class="mt-1.5 w-full max-w-xs rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                 />
-                @error('edge_output_dir')
+                @error('buildForm.edge_output_dir')
                     <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                 @enderror
             </label>
@@ -194,27 +194,27 @@
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Repository root') }}</span>
                 <input
                     type="text"
-                    wire:model="edge_repo_root"
+                    wire:model="buildForm.edge_repo_root"
                     autocomplete="off"
                     spellcheck="false"
                     placeholder="apps/web"
                     class="mt-1.5 w-full max-w-md rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                 />
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Optional monorepo subdirectory. Builds run from this folder; GitHub auto-deploy only triggers when changed files touch this path or dply.toml/yaml at the repo root.') }}</p>
-                @error('edge_repo_root')
+                @error('buildForm.edge_repo_root')
                     <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                 @enderror
             </label>
             <div class="space-y-3">
                 <label class="flex items-start gap-3 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="edge_spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
+                    <input type="checkbox" wire:model="buildForm.edge_spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
                     <span>
                         <span class="font-medium">{{ __('SPA fallback') }}</span>
                         <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Unknown paths serve index.html after a 404.') }}</span>
                     </span>
                 </label>
                 <label class="flex items-start gap-3 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="edge_deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
+                    <input type="checkbox" wire:model="buildForm.edge_deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
                     <span>
                         <span class="font-medium">{{ __('Deploy on push') }}</span>
                         <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Pushes to :branch trigger builds when GitHub auto-deploy is connected.', ['branch' => $edgeBranch]) }}</span>
@@ -258,6 +258,69 @@
 </section>
 
 @if (! $site->isEdgePreview())
+    <section class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+            <h3 class="text-base font-semibold text-brand-ink">{{ __('Environment variables') }}</h3>
+            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Production-scope values. Encrypted at rest, written to the build container at deploy time, and injected as secret_text bindings on per-deployment middleware / SSR workers.') }}</p>
+        </div>
+
+        @can('update', $site)
+            <form wire:submit.prevent="saveEdgeEnvVar" class="grid gap-2 border-b border-brand-ink/10 px-6 py-4 sm:grid-cols-[minmax(10rem,1fr)_minmax(14rem,2fr)_auto] sm:px-8">
+                <label class="block">
+                    <span class="block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Key') }}</span>
+                    <input type="text"
+                           wire:model="edge_env_var_key"
+                           placeholder="DATABASE_URL"
+                           class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm uppercase text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
+                    @error('edge_env_var_key') <p class="mt-1 text-[11px] text-rose-700">{{ $message }}</p> @enderror
+                </label>
+                <label class="block">
+                    <span class="block text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Value') }}</span>
+                    <input type="password"
+                           wire:model="edge_env_var_value"
+                           autocomplete="off"
+                           class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900" />
+                </label>
+                <button type="submit" wire:loading.attr="disabled" wire:target="saveEdgeEnvVar" class="self-end rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60">
+                    {{ __('Set value') }}
+                </button>
+            </form>
+        @endcan
+
+        @php
+            $envKeys = $this->edgeEnvVarKeys();
+        @endphp
+        @if ($envKeys === [])
+            <div class="px-6 py-6 text-center text-xs text-brand-moss sm:px-8">{{ __('No env vars set.') }}</div>
+        @else
+            <ul class="divide-y divide-brand-ink/8">
+                @foreach ($envKeys as $envRow)
+                    <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8" wire:key="edge-env-{{ $envRow['key'] }}">
+                        <div class="min-w-0">
+                            <p class="font-mono text-sm text-brand-ink">{{ $envRow['key'] }}</p>
+                            <p class="mt-0.5 text-[11px] text-brand-moss">
+                                @if ($envRow['updated_at'])
+                                    {{ __('updated :when', ['when' => $envRow['updated_at']]) }}
+                                @else
+                                    {{ __('encrypted at rest · value is write-only') }}
+                                @endif
+                            </p>
+                        </div>
+                        @can('update', $site)
+                            <button
+                                type="button"
+                                wire:click="removeEdgeEnvVar('{{ $envRow['key'] }}')"
+                                wire:confirm="{{ __('Remove :key? It will be missing from the next deploy.', ['key' => $envRow['key']]) }}"
+                                class="text-xs font-medium text-rose-700 hover:text-rose-900 dark:text-rose-400">
+                                {{ __('Remove') }}
+                            </button>
+                        @endcan
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
+
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
             <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
@@ -341,7 +404,7 @@
                         type="number"
                         min="1"
                         max="50"
-                        wire:model="edge_releases_to_keep"
+                        wire:model="buildForm.edge_releases_to_keep"
                         class="mt-1.5 w-24 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900"
                     />
                 </label>
@@ -358,7 +421,7 @@
                 <span class="text-xs text-brand-moss">{{ __('Default: :default. Range 1–50.', ['default' => config('edge.retention.default_keep', 10)]) }}</span>
             </form>
         @else
-            <p class="text-sm text-brand-ink">{{ __('Releases to keep: :count', ['count' => $edge_releases_to_keep]) }}</p>
+            <p class="text-sm text-brand-ink">{{ __('Releases to keep: :count', ['count' => $buildForm->edge_releases_to_keep]) }}</p>
         @endcan
     </div>
 </section>
@@ -373,7 +436,7 @@
             <label class="block text-sm">
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Linked GitHub account') }}</span>
                 <select
-                    wire:model.live="edge_webhook_account_id"
+                    wire:model.live="buildForm.edge_webhook_account_id"
                     class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900"
                 >
                     <option value="">{{ __('Select a linked GitHub account…') }}</option>
@@ -475,14 +538,14 @@
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Existing origin URL') }}</span>
                     <input
                         type="url"
-                        wire:model="edge_convert_origin_url"
+                        wire:model="buildForm.edge_convert_origin_url"
                         autocomplete="off"
                         spellcheck="false"
                         placeholder="https://my-origin.dply.app"
                         class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                     />
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Default proxy routes: /api/*, /_next/data/*. Edit them after conversion.') }}</p>
-                    @error('edge_convert_origin_url')
+                    @error('buildForm.edge_convert_origin_url')
                         <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                 </label>
@@ -514,13 +577,13 @@
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Origin URL') }}</span>
                     <input
                         type="url"
-                        wire:model="edge_origin_url"
+                        wire:model="buildForm.edge_origin_url"
                         autocomplete="off"
                         spellcheck="false"
                         placeholder="https://my-origin.dply.app"
                         class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                     />
-                    @error('edge_origin_url')
+                    @error('buildForm.edge_origin_url')
                         <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                     @if (! empty($edgeOrigin['managed']))
@@ -530,14 +593,14 @@
                 <label class="block">
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Proxy routes') }}</span>
                     <textarea
-                        wire:model="edge_origin_routes"
+                        wire:model="buildForm.edge_origin_routes"
                         rows="5"
                         spellcheck="false"
                         placeholder="/api/*&#10;/_next/data/*"
                         class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                     ></textarea>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('One pattern per line. Use a leading / and * as a wildcard, e.g. /api/* or /_next/data/*.') }}</p>
-                    @error('edge_origin_routes')
+                    @error('buildForm.edge_origin_routes')
                         <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                 </label>
@@ -545,28 +608,28 @@
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Healthcheck path') }}</span>
                     <input
                         type="text"
-                        wire:model="edge_origin_healthcheck_path"
+                        wire:model="buildForm.edge_origin_healthcheck_path"
                         autocomplete="off"
                         spellcheck="false"
                         placeholder="/"
                         class="mt-1.5 w-full max-w-xs rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                     />
                     <p class="mt-1 text-xs text-brand-moss">{{ __('GET this path on the origin before flipping Edge LIVE. 2xx/3xx pass; anything else fails the deploy.') }}</p>
-                    @error('edge_origin_healthcheck_path')
+                    @error('buildForm.edge_origin_healthcheck_path')
                         <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                 </label>
                 <label class="block">
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Failover HTML (optional)') }}</span>
                     <textarea
-                        wire:model="edge_origin_failover_html"
+                        wire:model="buildForm.edge_origin_failover_html"
                         rows="6"
                         spellcheck="false"
                         placeholder="{{ __('Leave blank to use the built-in dply 503 page.') }}"
                         class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                     ></textarea>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Shown when the origin returns 5xx or times out (after one auto-retry). Limit 32 KB. Served as HTTP 503 with Retry-After: 30.') }}</p>
-                    @error('edge_origin_failover_html')
+                    @error('buildForm.edge_origin_failover_html')
                         <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                 </label>
@@ -589,7 +652,7 @@
                     <form wire:submit.prevent="purgeEdgeCacheByTag" class="mt-2 flex flex-wrap items-center gap-2">
                         <input
                             type="text"
-                            wire:model="edge_cache_purge_tag"
+                            wire:model="buildForm.edge_cache_purge_tag"
                             autocomplete="off"
                             spellcheck="false"
                             placeholder="article-42"
@@ -607,7 +670,7 @@
                             <span wire:loading wire:target="purgeEdgeCacheByTag">{{ __('Purging…') }}</span>
                         </button>
                     </form>
-                    @error('edge_cache_purge_tag')
+                    @error('buildForm.edge_cache_purge_tag')
                         <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                 </div>
@@ -674,7 +737,7 @@
             </div>
             <form wire:submit.prevent="saveEdgeCommentWidget" class="space-y-3 px-6 py-5 sm:px-8">
                 <label class="flex items-start gap-3 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="edge_comment_widget_enabled" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
+                    <input type="checkbox" wire:model="buildForm.edge_comment_widget_enabled" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
                     <span>
                         <span class="font-medium">{{ __('Inject widget on preview deploys') }}</span>
                         <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Worker adds a script tag before </body> on HTML responses for any PR preview of this site. Production traffic is never touched.') }}</span>
@@ -702,60 +765,60 @@
                 <fieldset class="space-y-3">
                     <legend class="sr-only">{{ __('Preview protection mode') }}</legend>
                     <label class="flex items-start gap-3 text-sm text-brand-ink">
-                        <input type="radio" wire:model="edge_preview_protection_mode" value="off" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <input type="radio" wire:model="buildForm.edge_preview_protection_mode" value="off" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                         <span>
                             <span class="font-medium">{{ __('Off') }}</span>
                             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Anyone with a preview or alias URL can view the deploy.') }}</span>
                         </span>
                     </label>
                     <label class="flex items-start gap-3 text-sm text-brand-ink">
-                        <input type="radio" wire:model="edge_preview_protection_mode" value="password" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <input type="radio" wire:model="buildForm.edge_preview_protection_mode" value="password" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                         <span>
                             <span class="font-medium">{{ __('Shared password') }}</span>
                             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Visitors enter one site-wide password at the edge before the preview loads.') }}</span>
                         </span>
                     </label>
                     <label class="flex items-start gap-3 text-sm text-brand-ink">
-                        <input type="radio" wire:model="edge_preview_protection_mode" value="dply_account" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <input type="radio" wire:model="buildForm.edge_preview_protection_mode" value="dply_account" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                         <span>
                             <span class="font-medium">{{ __('Dply account') }}</span>
                             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Visitors sign in to Dply; optionally restrict to specific email addresses.') }}</span>
                         </span>
                     </label>
-                    @error('edge_preview_protection_mode')
+                    @error('buildForm.edge_preview_protection_mode')
                         <p class="text-xs text-rose-700">{{ $message }}</p>
                     @enderror
                 </fieldset>
 
-                @if ($edge_preview_protection_mode === 'password')
+                @if ($buildForm->edge_preview_protection_mode === 'password')
                     <label class="block">
                         <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Preview password') }}</span>
                         <input
                             type="password"
-                            wire:model="edge_preview_protection_password"
+                            wire:model="buildForm.edge_preview_protection_password"
                             autocomplete="new-password"
                             placeholder="{{ __('Leave blank to keep the current password') }}"
                             class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                         />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Required when enabling password protection for the first time. Changing the password invalidates existing preview access cookies.') }}</p>
-                        @error('edge_preview_protection_password')
+                        @error('buildForm.edge_preview_protection_password')
                             <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                         @enderror
                     </label>
                 @endif
 
-                @if ($edge_preview_protection_mode === 'dply_account')
+                @if ($buildForm->edge_preview_protection_mode === 'dply_account')
                     <label class="block">
                         <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Allowed email addresses') }}</span>
                         <textarea
-                            wire:model="edge_preview_protection_allowed_emails"
+                            wire:model="buildForm.edge_preview_protection_allowed_emails"
                             rows="4"
                             spellcheck="false"
                             placeholder="reviewer@example.com&#10;pm@example.com"
                             class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                         ></textarea>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Optional. One email per line (commas also work). Leave empty to allow any signed-in Dply user who can view this site.') }}</p>
-                        @error('edge_preview_protection_allowed_emails')
+                        @error('buildForm.edge_preview_protection_allowed_emails')
                             <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                         @enderror
                     </label>
@@ -786,7 +849,7 @@
         </div>
         <form wire:submit.prevent="saveEdgeImageOptimization" class="space-y-5 px-6 py-5 sm:px-8">
             <label class="flex items-start gap-3 text-sm text-brand-ink">
-                <input type="checkbox" wire:model="edge_image_optimization_enabled" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
+                <input type="checkbox" wire:model="buildForm.edge_image_optimization_enabled" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40" />
                 <span>
                     <span class="font-medium">{{ __('Enable image optimization') }}</span>
                     <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Adds the /_dply/image route on this site\'s edge hostname. Requires Cloudflare Image Resizing on the zone.') }}</span>
@@ -796,14 +859,14 @@
             <label class="block">
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Allowed source hostnames') }}</span>
                 <textarea
-                    wire:model="edge_image_allowed_hosts"
+                    wire:model="buildForm.edge_image_allowed_hosts"
                     rows="4"
                     spellcheck="false"
                     placeholder="images.example.com&#10;cdn.example.org"
                     class="mt-1.5 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage dark:border-brand-mist/20 dark:bg-zinc-900"
                 ></textarea>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('One hostname per line. Only listed hosts may be used as ?url=… sources; otherwise the optimizer would proxy arbitrary images.') }}</p>
-                @error('edge_image_allowed_hosts')
+                @error('buildForm.edge_image_allowed_hosts')
                     <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                 @enderror
             </label>

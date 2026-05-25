@@ -71,7 +71,7 @@ test('edge deploys section skips delivery worker context', function () {
         ->and($payload['edgeAttachedDomains'])->toBeArray();
 });
 
-test('edge overview section loads billing and traffic snapshots', function () {
+test('edge overview section defers billing and traffic snapshots', function () {
     [$server, $site] = makeEdgeSiteForViewData();
 
     EdgeUsageSnapshot::query()->create([
@@ -96,9 +96,31 @@ test('edge overview section loads billing and traffic snapshots', function () {
         null,
     );
 
-    expect($payload['edgeSiteBilling'])->not->toBeNull()
-        ->and($payload['edgeSiteTraffic'])->not->toBeNull()
+    expect($payload['edgeSiteBilling'])->toBeNull()
+        ->and($payload['edgeSiteTraffic'])->toBeNull()
         ->and($payload['edgeSiteAccess'])->toBeNull();
+});
+
+test('edge overview observability helper loads billing and traffic snapshots', function () {
+    [$server, $site] = makeEdgeSiteForViewData();
+
+    EdgeUsageSnapshot::query()->create([
+        'organization_id' => $site->organization_id,
+        'site_id' => $site->id,
+        'period_start' => now()->subDay()->toDateString(),
+        'period_end' => now()->subDay()->toDateString(),
+        'requests' => 500,
+        'bytes_egress' => 1024,
+        'r2_storage_bytes' => 0,
+        'r2_class_a_ops' => 0,
+        'r2_class_b_ops' => 0,
+        'source' => 'manual',
+    ]);
+
+    $payload = SiteSettingsViewData::edgeOverviewObservability($site);
+
+    expect($payload['edgeSiteBilling'])->not->toBeNull()
+        ->and($payload['edgeSiteTraffic'])->not->toBeNull();
 });
 
 /**

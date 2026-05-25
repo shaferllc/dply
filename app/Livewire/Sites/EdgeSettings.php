@@ -7,12 +7,11 @@ namespace App\Livewire\Sites;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Concerns\ManagesEdgeSite;
+use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\ManagesEdgeSiteProvisioning;
 use App\Livewire\Concerns\MountsSiteWorkspace;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\Sites\EdgeProvisioningViewData;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\SiteSettingsSidebar;
@@ -28,7 +27,7 @@ class EdgeSettings extends Component
     use ConfirmsActionWithModal;
     use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
-    use ManagesEdgeSite;
+    use ManagesEdgeRedeploy;
     use ManagesEdgeSiteProvisioning;
     use MountsSiteWorkspace;
 
@@ -81,7 +80,6 @@ class EdgeSettings extends Component
         $this->section = $section;
 
         $this->mountSiteWorkspace($server, $site);
-        $this->mountEdgeWebhookAccount($section);
     }
 
     public function render(): View
@@ -98,51 +96,15 @@ class EdgeSettings extends Component
             ));
         }
 
-        $section = $this->section;
-
-        if ($section === 'edge-logs') {
-            $this->site->load([
-                'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(10),
-            ]);
-        } else {
-            $this->site->loadMissing($this->relationsForSection($section));
-        }
         $this->server->loadMissing('workspace');
 
-        $viewData = [];
-
-        if ($section === 'edge-build' && auth()->user() !== null) {
-            $viewData['linkedSourceControlAccounts'] = app(SourceControlRepositoryBrowser::class)
-                ->accountsForUser(auth()->user());
-        }
-
-        return view('livewire.sites.edge-settings', array_merge(
-            SiteSettingsViewData::for(
-                $this->server,
-                $this->site,
-                $section,
-                null,
-                [],
-                auth()->user(),
-            ),
-            $viewData,
+        return view('livewire.sites.edge-settings', SiteSettingsViewData::for(
+            $this->server,
+            $this->site,
+            $this->section,
+            null,
+            [],
+            auth()->user(),
         ));
-    }
-
-    /**
-     * @return list<string>|array<string, \Closure>
-     */
-    private function relationsForSection(string $section): array
-    {
-        $recentDeployments = [
-            'edgeDeployments' => fn ($query) => $query->orderByDesc('created_at')->limit(20),
-        ];
-
-        return match ($section) {
-            'general' => array_merge($recentDeployments, ['workspace']),
-            'edge-deploys', 'edge-traffic', 'edge-domains', 'edge-build' => $recentDeployments,
-            'edge-previews' => [],
-            default => [],
-        };
     }
 }
