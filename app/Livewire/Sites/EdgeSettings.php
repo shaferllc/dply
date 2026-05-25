@@ -100,7 +100,13 @@ class EdgeSettings extends Component
 
         $section = $this->section;
 
-        $this->site->loadMissing($this->relationsForSection($section));
+        if ($section === 'edge-logs') {
+            $this->site->load([
+                'edgeDeployments' => fn ($query) => $query->limit(10),
+            ]);
+        } else {
+            $this->site->loadMissing($this->relationsForSection($section));
+        }
         $this->server->loadMissing('workspace');
 
         $viewData = [];

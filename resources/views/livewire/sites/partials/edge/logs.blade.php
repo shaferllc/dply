@@ -15,7 +15,7 @@
         $hasBuilding = $edgeDeployments->contains(fn ($d) => in_array($d->status, [\App\Models\EdgeDeployment::STATUS_BUILDING, \App\Models\EdgeDeployment::STATUS_PUBLISHING], true));
     @endphp
 
-    <div @if ($hasBuilding) wire:poll.5s @endif>
+    <div @if ($hasBuilding) wire:poll.5s="refreshEdgeLogDeployments" @endif>
         @if ($edgeDeployments->isEmpty())
             <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-8">
                 {{ __('No activity yet — trigger a deploy from Overview.') }}
@@ -30,8 +30,8 @@
                             default => 'text-brand-moss',
                         };
                         $failureReason = $deployment->failure_reason;
-                        $loadedBuildLog = $edgeDeploymentBuildLogs[$deployment->id] ?? null;
-                        $buildLogLoaded = array_key_exists($deployment->id, $edgeDeploymentBuildLogs);
+                        $buildLogLoaded = isset($edgeDeploymentBuildLogsLoaded[$deployment->id]);
+                        $loadedBuildLog = $buildLogLoaded ? $this->edgeDeploymentBuildLog($deployment->id) : null;
                     @endphp
                     <li class="px-6 py-4 sm:px-8" wire:key="edge-log-{{ $deployment->id }}">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -98,5 +98,9 @@
     </div>
 </section>
 
-@include('livewire.sites.partials.edge.deploys-table', ['compact' => false])
+    <p class="text-right text-xs text-brand-moss">
+        <a href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-deploys']) }}" wire:navigate class="font-semibold text-brand-sage hover:underline">
+            {{ __('View full deploy history →') }}
+        </a>
+    </p>
 </div>
