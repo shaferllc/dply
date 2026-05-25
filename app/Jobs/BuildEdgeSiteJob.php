@@ -69,6 +69,17 @@ class BuildEdgeSiteJob implements ShouldQueue
             if (is_string($buildResult['git_commit'] ?? null) && $buildResult['git_commit'] !== '') {
                 $updates['git_commit'] = $buildResult['git_commit'];
             }
+            // Persist commit subject/author into deployment.meta so the
+            // previews row + deploy history can show "what is this".
+            $commitMeta = array_filter([
+                'subject' => $buildResult['git_commit_subject'] ?? null,
+                'author' => $buildResult['git_commit_author'] ?? null,
+                'committed_at' => $buildResult['git_commit_at'] ?? null,
+            ], fn ($value) => is_string($value) && $value !== '');
+            if ($commitMeta !== []) {
+                $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
+                $updates['meta'] = array_merge($existingMeta, ['commit' => $commitMeta]);
+            }
             $deployment->update($updates);
 
             if (! Site::query()->whereKey($site->id)->exists()) {

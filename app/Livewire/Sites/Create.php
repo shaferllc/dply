@@ -10,6 +10,7 @@ use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
@@ -36,6 +37,7 @@ use Livewire\Component;
 class Create extends Component
 {
     use DetectsRepositoryRuntime;
+    use RefreshesLinkedSourceControlAccounts;
 
     public Server $server;
 
@@ -1265,5 +1267,14 @@ class Create extends Component
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
+    }
+
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
+
+        if ($this->isContainerMode()) {
+            $this->refreshContainerRepositories(app(SourceControlRepositoryBrowser::class));
+        }
     }
 }

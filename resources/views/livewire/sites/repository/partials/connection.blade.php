@@ -144,5 +144,4 @@
         </div>
     </div>
 
-    <x-connect-provider-modal />
 </section>

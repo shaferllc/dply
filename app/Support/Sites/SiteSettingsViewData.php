@@ -183,23 +183,7 @@ final class SiteSettingsViewData
                 ['label' => __('Zero downtime'), 'value' => $site->deploy_strategy === 'atomic' ? __('Enabled') : __('Disabled')],
             ];
         $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
-        $edgeUsageBillingEnabled = $isEdgeWorkspace && (bool) config('dply.edge.usage_billing.enabled', false);
-        $edgeManagedFee = $isEdgeWorkspace
-            ? ((int) config('subscription.standard.edge_cents', 0)) / 100
-            : null;
-        $edgeUsageRates = $isEdgeWorkspace
-            ? app(ManagedProductCostEstimator::class)->edgeUsageRates()
-            : [];
-        $edgeSiteBilling = $isEdgeWorkspace
-            ? app(EdgeSiteBillingAnalytics::class)->forSite($site)
-            : null;
-        $edgeSiteTraffic = $isEdgeWorkspace
-            ? app(EdgeSiteTrafficAnalytics::class)->forSite($site)
-            : null;
-        $edgeSiteAccess = $isEdgeWorkspace
-            ? app(EdgeSiteAccessAnalytics::class)->forSite($site)
-            : null;
-
+        $edgeAnalytics = self::edgeAnalyticsForSection($site, $section);
         $edgeContext = $isEdgeWorkspace ? EdgeSiteViewData::context($site) : [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
@@ -280,15 +264,82 @@ final class SiteSettingsViewData
                 'sectionConsoleActionRun',
                 'generalRecentDeployments',
                 'isEdgeWorkspace',
-                'edgeUsageBillingEnabled',
-                'edgeManagedFee',
-                'edgeUsageRates',
-                'edgeSiteBilling',
-                'edgeSiteTraffic',
-                'edgeSiteAccess',
             ),
+            $edgeAnalytics,
             $edgeContext,
         );
+    }
+
+    /**
+     * Edge billing/traffic/access snapshots are section-scoped — avoid running
+     * usage queries on every workspace tab (Deploys, Build, Domains, etc.).
+     *
+     * @return array{
+     *     edgeUsageBillingEnabled: bool,
+     *     edgeManagedFee: float|null,
+     *     edgeUsageRates: array<string, mixed>,
+     *     edgeSiteBilling: array<string, mixed>|null,
+     *     edgeSiteTraffic: array<string, mixed>|null,
+     *     edgeSiteAccess: array<string, mixed>|null,
+     * }
+     */
+    private static function edgeAnalyticsForSection(Site $site, string $section): array
+    {
+        $empty = [
+            'edgeUsageBillingEnabled' => false,
+            'edgeManagedFee' => null,
+            'edgeUsageRates' => [],
+            'edgeSiteBilling' => null,
+            'edgeSiteTraffic' => null,
+            'edgeSiteAccess' => null,
+        ];
+
+        if (! $site->usesEdgeRuntime()) {
+            return $empty;
+        }
+
+        $edgeUsageBillingEnabled = (bool) config('dply.edge.usage_billing.enabled', false);
+        $edgeManagedFee = ((int) config('subscription.standard.edge_cents', 0)) / 100;
+
+        $needsBillingSnapshot = in_array($section, ['general', 'edge-billing'], true);
+        $needsTrafficSnapshot = in_array($section, ['general', 'edge-traffic'], true);
+        $needsAccessSnapshot = $section === 'edge-traffic';
+
+        if (! $needsBillingSnapshot && ! $needsTrafficSnapshot && ! $needsAccessSnapshot) {
+            return [
+                'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
+                'edgeManagedFee' => $edgeManagedFee,
+                'edgeUsageRates' => [],
+                'edgeSiteBilling' => null,
+                'edgeSiteTraffic' => null,
+                'edgeSiteAccess' => null,
+            ];
+        }
+
+        $edgeUsageRates = ($needsBillingSnapshot || $needsTrafficSnapshot)
+            ? app(ManagedProductCostEstimator::class)->edgeUsageRates()
+            : [];
+
+        $edgeSiteBilling = ($needsBillingSnapshot || $needsTrafficSnapshot)
+            ? app(EdgeSiteBillingAnalytics::class)->forSite($site)
+            : null;
+
+        $edgeSiteTraffic = $needsTrafficSnapshot
+            ? app(EdgeSiteTrafficAnalytics::class)->forSite($site, billing: $edgeSiteBilling)
+            : null;
+
+        $edgeSiteAccess = $needsAccessSnapshot
+            ? app(EdgeSiteAccessAnalytics::class)->forSite($site)
+            : null;
+
+        return [
+            'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
+            'edgeManagedFee' => $edgeManagedFee,
+            'edgeUsageRates' => $edgeUsageRates,
+            'edgeSiteBilling' => $edgeSiteBilling,
+            'edgeSiteTraffic' => $edgeSiteTraffic,
+            'edgeSiteAccess' => $edgeSiteAccess,
+        ];
     }
 
     /**

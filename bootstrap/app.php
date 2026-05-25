@@ -2,7 +2,7 @@
 
 use App\Console\Commands\CdnSyncMetricsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
-use App\Console\Commands\EdgePollStatusCommand;
+use App\Console\Commands\CloudPollStatusCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
@@ -245,6 +245,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'webhook/*',
             'webauthn/*',
             'fn/*',
+            // Preview-comment widget API is auth'd by per-site widget
+            // token in X-Dply-Preview-Widget; called cross-origin from
+            // *.dply.host preview hostnames.
+            'api/edge/preview-comments/*',
         ]);
 
         // Custom-domain short-circuit MUST run before the normal web stack

@@ -67,20 +67,38 @@
                 </section>
 
                 @if (($billing['daily'] ?? []) !== [])
+                    @php
+                        $billingDaily = $billing['daily'];
+                        $billingLastIdx = count($billingDaily) - 1;
+                        $billingMidIdx = (int) floor($billingLastIdx / 2);
+                    @endphp
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                        <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                             <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily requests (30d)') }}</h3>
+                            <span class="font-mono text-[11px] text-brand-moss">{{ __('max :n', ['n' => number_format((int) $maxRequests)]) }}</span>
                         </div>
                         <div class="px-6 py-5 sm:px-8">
-                            <div class="flex items-end gap-0.5 h-24" aria-hidden="true">
-                                @foreach ($billing['daily'] as $day)
-                                    <div class="group relative flex-1 min-w-0">
+                            <div class="flex items-end gap-0.5 h-24">
+                                @foreach ($billingDaily as $day)
+                                    <div class="group relative flex-1 min-w-0 h-full flex items-end cursor-help">
                                         <div
-                                            class="w-full rounded-t bg-brand-sage/70 hover:bg-brand-forest/80 transition-colors"
+                                            class="w-full rounded-t bg-brand-sage/70 transition-colors group-hover:bg-brand-forest"
                                             style="height: {{ max(4, round(($day['requests'] / $maxRequests) * 100)) }}%"
                                         ></div>
+                                        <div class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-brand-ink px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover:block">
+                                            <span class="font-semibold">{{ $day['label'] ?? '' }}</span> · {{ number_format($day['requests'] ?? 0) }} {{ __('requests') }}
+                                        </div>
                                     </div>
                                 @endforeach
+                            </div>
+                            <div class="mt-2 flex justify-between text-[10px] text-brand-moss">
+                                <span>{{ $billingDaily[0]['label'] ?? '' }}</span>
+                                @if ($billingMidIdx > 0 && $billingMidIdx < $billingLastIdx)
+                                    <span>{{ $billingDaily[$billingMidIdx]['label'] ?? '' }}</span>
+                                @endif
+                                @if ($billingLastIdx > 0)
+                                    <span>{{ $billingDaily[$billingLastIdx]['label'] ?? '' }}</span>
+                                @endif
                             </div>
                         </div>
                     </section>
@@ -95,20 +113,39 @@
             </div>
 
             @if (($billing['daily'] ?? []) !== [])
+                @php
+                    $billingDailyEg = $billing['daily'];
+                    $billingEgLastIdx = count($billingDailyEg) - 1;
+                    $billingEgMidIdx = (int) floor($billingEgLastIdx / 2);
+                    $maxEgressMb = ($maxEgress / (1024 ** 2));
+                @endphp
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily egress (30d)') }}</h3>
+                        <span class="font-mono text-[11px] text-brand-moss">{{ __('max :n MB', ['n' => number_format($maxEgressMb, 1)]) }}</span>
                     </div>
                     <div class="px-6 py-5 sm:px-8">
-                        <div class="flex items-end gap-0.5 h-20" aria-hidden="true">
-                            @foreach ($billing['daily'] as $day)
-                                <div class="flex-1 min-w-0">
+                        <div class="flex items-end gap-0.5 h-20">
+                            @foreach ($billingDailyEg as $day)
+                                <div class="group relative flex-1 min-w-0 h-full flex items-end cursor-help">
                                     <div
-                                        class="w-full rounded-t bg-brand-ink/15 hover:bg-brand-ink/30 transition-colors"
+                                        class="w-full rounded-t bg-sky-500/70 transition-colors group-hover:bg-sky-600"
                                         style="height: {{ max(4, round(($day['bytes_egress'] / $maxEgress) * 100)) }}%"
                                     ></div>
+                                    <div class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-brand-ink px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover:block">
+                                        <span class="font-semibold">{{ $day['label'] ?? '' }}</span> · {{ number_format(($day['bytes_egress'] ?? 0) / (1024 ** 2), 1) }} MB
+                                    </div>
                                 </div>
                             @endforeach
+                        </div>
+                        <div class="mt-2 flex justify-between text-[10px] text-brand-moss">
+                            <span>{{ $billingDailyEg[0]['label'] ?? '' }}</span>
+                            @if ($billingEgMidIdx > 0 && $billingEgMidIdx < $billingEgLastIdx)
+                                <span>{{ $billingDailyEg[$billingEgMidIdx]['label'] ?? '' }}</span>
+                            @endif
+                            @if ($billingEgLastIdx > 0)
+                                <span>{{ $billingDailyEg[$billingEgLastIdx]['label'] ?? '' }}</span>
+                            @endif
                         </div>
                     </div>
                 </section>

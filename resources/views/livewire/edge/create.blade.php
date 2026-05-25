@@ -60,8 +60,8 @@
                         <p class="mt-0.5 text-sm text-brand-moss">{{ __('Used in the Edge index, site workspace, and preview URLs.') }}</p>
                         <div class="mt-4">
                             <x-input-label for="name" :value="__('App name')" />
-                            <x-text-input id="name" wire:model.live="name" type="text" class="mt-1 block w-full" required placeholder="marketing-site" />
-                            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                            <x-text-input id="name" wire:model.live="form.name" type="text" class="mt-1 block w-full" required placeholder="marketing-site" />
+                            <x-input-error :messages="$errors->get('form.name')" class="mt-2" />
                         </div>
                     </div>
                 </div>
@@ -221,7 +221,7 @@
 
             {{-- 04 Build --}}
             <section
-                x-data="{ advancedOpen: @js($build_command !== '' || $output_dir !== '' && $output_dir !== 'dist') }"
+                x-data="{ advancedOpen: @js($form->build_command !== '' || $form->output_dir !== '' && $form->output_dir !== 'dist') }"
                 class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7 dark:border-brand-mist/20 dark:bg-zinc-900"
             >
                 <div class="flex items-start gap-4">
@@ -244,15 +244,15 @@
                         <div x-show="advancedOpen" x-collapse class="mt-4 space-y-4">
                             <div>
                                 <x-input-label for="build_command" :value="__('Build command override')" />
-                                <x-text-input id="build_command" wire:model="build_command" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="npm ci && npm run build" />
+                                <x-text-input id="build_command" wire:model="form.build_command" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="npm ci && npm run build" />
                                 <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank to use the detected command or the default npm build.') }}</p>
-                                <x-input-error :messages="$errors->get('build_command')" class="mt-2" />
+                                <x-input-error :messages="$errors->get('form.build_command')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="output_dir" :value="__('Output directory')" />
-                                <x-text-input id="output_dir" wire:model="output_dir" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
+                                <x-text-input id="output_dir" wire:model="form.output_dir" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="dist" />
                                 <p class="mt-1 text-xs text-brand-mist">{{ __('Folder containing the static assets after the build (e.g. dist, out, .output/public).') }}</p>
-                                <x-input-error :messages="$errors->get('output_dir')" class="mt-2" />
+                                <x-input-error :messages="$errors->get('form.output_dir')" class="mt-2" />
                             </div>
                         </div>
                         <p x-show="! advancedOpen" class="mt-3 rounded-xl border border-dashed border-brand-ink/12 bg-brand-cream/30 px-4 py-3 text-xs text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-800/40">
@@ -262,7 +262,7 @@
                         <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-cream/25 p-4 dark:border-brand-mist/20 dark:bg-zinc-800/40">
                             <p class="text-sm font-semibold text-brand-ink">{{ __('Delivery mode') }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Static sites serve everything from Edge. Hybrid keeps static assets on Edge and proxies dynamic routes to a long-running origin (dply Cloud or external URL).') }}</p>
-                            @if ($ssrDetected && trim($origin_url) === '')
+                            @if ($ssrDetected && trim($form->origin_url) === '')
                                 <div class="mt-4 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100">
                                     <p class="font-semibold">{{ __('Server-rendered app detected') }}</p>
                                     <p class="mt-1 leading-relaxed">
@@ -278,15 +278,15 @@
                             @endif
                             <div class="mt-3 flex flex-wrap gap-3">
                                 <label class="inline-flex items-center gap-2 text-sm">
-                                    <input type="radio" wire:model.live="runtime_mode" value="static" class="text-brand-sage focus:ring-brand-sage/40" />
+                                    <input type="radio" wire:model.live="form.runtime_mode" value="static" class="text-brand-sage focus:ring-brand-sage/40" />
                                     <span>{{ __('Static / SSG') }}</span>
                                 </label>
                                 <label class="inline-flex items-center gap-2 text-sm">
-                                    <input type="radio" wire:model.live="runtime_mode" value="hybrid" class="text-brand-sage focus:ring-brand-sage/40" />
+                                    <input type="radio" wire:model.live="form.runtime_mode" value="hybrid" class="text-brand-sage focus:ring-brand-sage/40" />
                                     <span>{{ __('Hybrid (static + origin SSR)') }}</span>
                                 </label>
                             </div>
-                            @if ($runtime_mode === 'hybrid')
+                            @if ($form->runtime_mode === 'hybrid')
                                 @if ($ssrDetected)
                                     <div class="mt-4 rounded-xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 text-xs text-brand-moss dark:border-brand-sage/25 dark:bg-brand-sage/10">
                                         {{ __('This repository looks server-rendered. Hybrid delivery is selected automatically — static assets on Edge, dynamic routes proxied to your origin.') }}
@@ -311,8 +311,8 @@
                                                 {{ __('Hybrid delivery needs a server-rendered origin — link an existing Cloud app below or enter its live URL.') }}
                                             </p>
                                         @endif
-                                        <x-text-input id="origin_url" wire:model.live="origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.ondigitalocean.app" required />
-                                        @if ($suggestedHybridOriginUrl !== '' && $origin_url === $suggestedHybridOriginUrl)
+                                        <x-text-input id="origin_url" wire:model.live="form.origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.ondigitalocean.app" required />
+                                        @if ($suggestedHybridOriginUrl !== '' && $form->origin_url === $suggestedHybridOriginUrl)
                                             <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
                                                 <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
                                                 {{ __('Auto-filled from Cloud app') }}
@@ -323,7 +323,7 @@
                                             <a href="{{ route('cloud.create') }}" wire:navigate class="font-medium text-brand-forest hover:underline dark:text-brand-sage">{{ __('Create a Cloud app') }}</a>
                                             {{ __('for server-rendered routes (e.g. ondigitalocean.app or your Cloud URL).') }}
                                         </p>
-                                        <x-input-error :messages="$errors->get('origin_url')" class="mt-2" />
+                                        <x-input-error :messages="$errors->get('form.origin_url')" class="mt-2" />
                                     @endif
                                 </div>
                                 @if ($orgCloudSites !== [])
@@ -331,7 +331,7 @@
                                         <summary class="cursor-pointer text-sm font-medium text-brand-ink">{{ __('Link an existing Cloud app instead') }}</summary>
                                         <div class="mt-3">
                                             <x-input-label for="origin_cloud_site_id" :value="__('dply Cloud app')" />
-                                            <select id="origin_cloud_site_id" wire:model.live="origin_cloud_site_id" class="dply-input mt-2 block w-full text-sm">
+                                            <select id="origin_cloud_site_id" wire:model.live="form.origin_cloud_site_id" class="dply-input mt-2 block w-full text-sm">
                                                 <option value="">{{ __('Use suggested URL from app name') }}</option>
                                                 @foreach ($orgCloudSites as $cloudSite)
                                                     <option value="{{ $cloudSite['id'] }}">
@@ -366,10 +366,10 @@
                         <div role="radiogroup" aria-label="{{ __('Edge delivery mode') }}" class="grid gap-3 sm:grid-cols-2">
                             <label @class([
                                 'relative flex cursor-pointer rounded-xl border p-4 transition-colors',
-                                'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' => $delivery_mode === 'managed',
-                                'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' => $delivery_mode !== 'managed',
+                                'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' => $form->delivery_mode === 'managed',
+                                'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' => $form->delivery_mode !== 'managed',
                             ])>
-                                <input type="radio" wire:model.live="delivery_mode" value="managed" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
+                                <input type="radio" wire:model.live="form.delivery_mode" value="managed" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
                                 <span class="ms-3">
                                     <span class="block text-sm font-semibold text-brand-ink">{{ __('Dply Edge (managed)') }}</span>
                                     <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Default — global delivery on dply\'s Cloudflare account. Usage billed through your dply plan.') }}</span>
@@ -377,10 +377,10 @@
                             </label>
                             <label @class([
                                 'relative flex cursor-pointer rounded-xl border p-4 transition-colors',
-                                'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' => $delivery_mode === 'byo',
-                                'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' => $delivery_mode !== 'byo',
+                                'border-brand-sage/40 bg-brand-sage/5 dark:border-brand-sage/35 dark:bg-brand-sage/10' => $form->delivery_mode === 'byo',
+                                'border-brand-ink/10 bg-brand-cream/30 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40' => $form->delivery_mode !== 'byo',
                             ])>
-                                <input type="radio" wire:model.live="delivery_mode" value="byo" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
+                                <input type="radio" wire:model.live="form.delivery_mode" value="byo" class="mt-0.5 text-brand-sage focus:ring-brand-sage/40" />
                                 <span class="ms-3">
                                     <span class="block text-sm font-semibold text-brand-ink">{{ __('Your Cloudflare account') }}</span>
                                     <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Deploy Worker, KV, and R2 in your Cloudflare account. You pay Cloudflare directly for delivery usage.') }}</span>
@@ -388,7 +388,7 @@
                             </label>
                         </div>
 
-                        @if ($delivery_mode === 'byo')
+                        @if ($form->delivery_mode === 'byo')
                             <div class="rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-4 dark:border-brand-sage/20 dark:bg-brand-sage/10">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
                                     <x-input-label for="edge_provider_credential_id" :value="__('Cloudflare account')" />
@@ -396,13 +396,13 @@
                                         {{ __('Connect Cloudflare') }} &rarr;
                                     </x-add-provider-credential-link>
                                 </div>
-                                <select id="edge_provider_credential_id" wire:model="edge_provider_credential_id" class="dply-input mt-2 block w-full" required>
+                                <select id="edge_provider_credential_id" wire:model="form.edge_provider_credential_id" class="dply-input mt-2 block w-full" required>
                                     <option value="">{{ __('Select a connected account…') }}</option>
                                     @foreach ($cloudflareCredentials as $credential)
                                         <option value="{{ $credential->id }}">{{ $credential->name }}</option>
                                     @endforeach
                                 </select>
-                                <x-input-error :messages="$errors->get('edge_provider_credential_id')" class="mt-2" />
+                                <x-input-error :messages="$errors->get('form.edge_provider_credential_id')" class="mt-2" />
                                 @if ($cloudflareCredentials->isEmpty())
                                     <p class="mt-2 text-xs text-brand-moss">{{ __('Connect Cloudflare with Workers, KV, and R2 permissions, then bootstrap Edge infra from the CLI.') }}</p>
                                 @endif
@@ -415,7 +415,7 @@
 
                         <div class="grid gap-3 sm:grid-cols-2">
                             <label class="group relative flex cursor-pointer rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 transition-colors has-[:checked]:border-brand-sage/40 has-[:checked]:bg-brand-sage/5 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40 dark:has-[:checked]:border-brand-sage/35 dark:has-[:checked]:bg-brand-sage/10">
-                                <input type="checkbox" wire:model="spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
+                                <input type="checkbox" wire:model="form.spa_fallback" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
                                 <span class="ms-3">
                                     <span class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                         <x-heroicon-o-arrows-right-left class="h-4 w-4 text-brand-sage" aria-hidden="true" />
@@ -425,7 +425,7 @@
                                 </span>
                             </label>
                             <label class="group relative flex cursor-pointer rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4 transition-colors has-[:checked]:border-brand-sage/40 has-[:checked]:bg-brand-sage/5 hover:border-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-800/40 dark:has-[:checked]:border-brand-sage/35 dark:has-[:checked]:bg-brand-sage/10">
-                                <input type="checkbox" wire:model="deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
+                                <input type="checkbox" wire:model="form.deploy_on_push" class="mt-0.5 rounded border-brand-ink/20 text-brand-sage shadow-sm focus:ring-brand-sage/40 dark:border-brand-mist/30" />
                                 <span class="ms-3">
                                     <span class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                         <x-heroicon-o-bolt class="h-4 w-4 text-brand-gold" aria-hidden="true" />
@@ -446,8 +446,8 @@
                 </a>
                 <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                     @php
-                        $deployBlocked = $ssrDetected && trim($origin_url) === '' && $runtime_mode !== 'hybrid';
-                        $hybridMissingOrigin = $runtime_mode === 'hybrid' && trim($origin_url) === '' && ! $autoProvisionHybridOrigin;
+                        $deployBlocked = $ssrDetected && trim($form->origin_url) === '' && $form->runtime_mode !== 'hybrid';
+                        $hybridMissingOrigin = $form->runtime_mode === 'hybrid' && trim($form->origin_url) === '' && ! $autoProvisionHybridOrigin;
                         $edgeDeployDisabled = $deployBlocked || $hybridMissingOrigin;
                         $deployLabel = $autoProvisionHybridOrigin ? __('Deploy hybrid stack') : __('Deploy edge app');
                     @endphp
@@ -474,7 +474,6 @@
         @include('livewire.edge.partials.create-sidebar', ['edgeFee' => $edgeFee])
     </form>
 
-    <x-connect-provider-modal />
     <livewire:credentials.add-provider-credential-modal capability="cdn" default-provider="cloudflare" />
 
     <x-modal
@@ -493,7 +492,7 @@
             </p>
             <ul class="mt-3 list-disc space-y-1 pl-5 text-xs text-brand-moss">
                 <li>{{ __('Cloud origin: server-rendered routes (:branch branch)', ['branch' => $branch]) }}</li>
-                <li>{{ __('Edge front: static build + CDN delivery for :name', ['name' => $name !== '' ? $name : __('your app')]) }}</li>
+                <li>{{ __('Edge front: static build + CDN delivery for :name', ['name' => $form->name !== '' ? $form->name : __('your app')]) }}</li>
                 <li>{{ __('Billing: Edge ($:edge/mo per site) + Cloud container tier ($:cloud/mo base)', ['edge' => number_format($edgeFee, 2), 'cloud' => number_format($cloudFee, 2)]) }}</li>
                 <li>{{ __('Origin URL is usually ready within a few minutes; Edge build starts automatically.') }}</li>
             </ul>

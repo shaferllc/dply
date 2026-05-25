@@ -78,6 +78,7 @@ class EdgeBuildRunner
             }
 
             $resolvedCommit = $this->resolveHead($checkout);
+            $commitDetails = $this->resolveHeadDetails($checkout);
 
             $dockerImage = (string) config('edge.build.docker_image', 'node:20-bookworm');
             $script = $this->composeBuildScript($checkout, $buildCommand);
@@ -111,6 +112,9 @@ class EdgeBuildRunner
                 'artifact_dir' => $artifactDir,
                 'build_log' => $buildLog,
                 'git_commit' => $resolvedCommit,
+                'git_commit_subject' => $commitDetails['subject'] ?? null,
+                'git_commit_author' => $commitDetails['author'] ?? null,
+                'git_commit_at' => $commitDetails['committed_at'] ?? null,
             ];
         } finally {
             if (is_dir($checkout)) {
@@ -129,6 +133,33 @@ class EdgeBuildRunner
         $sha = trim($result->output());
 
         return $sha === '' ? null : strtolower($sha);
+    }
+
+    /**
+     * Capture commit subject + author + iso date for the resolved HEAD so the
+     * preview row and deploy history can show what's actually deployed
+     * (especially useful for ad-hoc previews from tags / non-main branches
+     * where the SHA alone tells the operator nothing). Format uses %x1f
+     * (unit separator) so commit messages with newlines/pipes don't trip us.
+     *
+     * @return array{subject: ?string, author: ?string, committed_at: ?string}
+     */
+    private function resolveHeadDetails(string $checkout): array
+    {
+        $result = Process::timeout(10)->path($checkout)->run([
+            'git', 'log', '-1', '--pretty=format:%s%x1f%an%x1f%aI',
+        ]);
+        if (! $result->successful()) {
+            return ['subject' => null, 'author' => null, 'committed_at' => null];
+        }
+
+        $parts = explode("\x1f", trim($result->output()), 3);
+
+        return [
+            'subject' => isset($parts[0]) && $parts[0] !== '' ? mb_substr($parts[0], 0, 200) : null,
+            'author' => isset($parts[1]) && $parts[1] !== '' ? mb_substr($parts[1], 0, 120) : null,
+            'committed_at' => $parts[2] ?? null,
+        ];
     }
 
     private function appendBuildLog(string $path, string $chunk): void

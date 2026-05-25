@@ -7,7 +7,7 @@ namespace Tests\Feature\EdgeSiteDashboardTest;
 use App\Enums\SiteType;
 use App\Jobs\BuildEdgeSiteJob;
 use App\Jobs\TeardownEdgeSiteJob;
-use App\Livewire\Sites\Settings as SiteSettings;
+use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
@@ -23,7 +23,7 @@ test('dashboard renders edge panel for edge site', function () {
     [$user, $server, $site] = makeEdgeSite();
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertSee('Edge App')
         ->assertSee('https://edge-app.dply.host')
         ->assertSee('acme/web@main')
@@ -37,7 +37,7 @@ test('dashboard shows fake edge banner when fake mode enabled', function () {
     [$user, $server, $site] = makeEdgeSite();
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertSee('Fake edge — not Cloudflare Worker')
         ->assertSee('Dply Edge (local fake backend)');
 });
@@ -55,7 +55,7 @@ test('dashboard shows cloudflare delivery label when platform configured', funct
     [$user, $server, $site] = makeEdgeSite();
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->assertSee('Dply Edge (Cloudflare Worker)')
         ->assertSee('Live on Cloudflare Edge');
 });
@@ -65,7 +65,7 @@ test('redeploy button dispatches build job', function () {
     [$user, $server, $site] = makeEdgeSite();
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->call('redeployEdge');
 
     Queue::assertPushed(BuildEdgeSiteJob::class);
@@ -114,7 +114,7 @@ test('preview teardown dispatches job', function () {
     ]);
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $parent, 'section' => 'general'])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $parent, 'section' => 'general'])
         ->call('tearDownEdgePreview', $preview->id);
 
     Queue::assertPushed(TeardownEdgeSiteJob::class, fn (TeardownEdgeSiteJob $job): bool => $job->siteId === $preview->id);

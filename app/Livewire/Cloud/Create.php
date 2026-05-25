@@ -8,6 +8,7 @@ use App\Actions\Cloud\CreateCloudSite;
 use App\Actions\Cloud\CreateCloudSiteFromSource;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
@@ -31,6 +32,7 @@ class Create extends Component
 {
     use DetectsRepositoryRuntime;
     use DispatchesToastNotifications;
+    use RefreshesLinkedSourceControlAccounts;
 
     #[Url]
     public string $backend = 'auto';
@@ -358,6 +360,20 @@ class Create extends Component
         $this->availableRepositories = $account
             ? app(SourceControlRepositoryBrowser::class)->repositoriesForAccount($account)
             : [];
+    }
+
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        if ($this->linkedSourceControlAccounts === []) {
+            return;
+        }
+
+        if ($this->source_control_account_id === '') {
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+        }
+
+        $this->loadRepositoriesForSelectedAccount();
+        $this->repo_source = 'connected';
     }
 
     private function normalizeRepo(string $value): string

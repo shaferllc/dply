@@ -18,9 +18,12 @@ final class EdgeSiteTrafficAnalytics
     ) {}
 
     /**
+     * @param  array<string, mixed>|null  $billing  Pre-computed billing payload from {@see EdgeSiteBillingAnalytics::forSite()}.
+     *                                              Pass when the caller already fetched it to avoid re-running the same
+     *                                              two snapshot queries.
      * @return array<string, mixed>|null
      */
-    public function forSite(Site $site, int $dailyDays = 30): ?array
+    public function forSite(Site $site, int $dailyDays = 30, ?array $billing = null): ?array
     {
         if (! $site->usesEdgeRuntime() || $site->isEdgePreview()) {
             return null;
@@ -40,7 +43,7 @@ final class EdgeSiteTrafficAnalytics
             return null;
         }
 
-        $billing = $this->billingAnalytics->forSite($site, $dailyDays);
+        $billing ??= $this->billingAnalytics->forSite($site, $dailyDays);
         if ($billing === null) {
             return null;
         }

@@ -10,7 +10,7 @@ use App\Support\Edge\EdgeOrgCredentialConfig;
 class EdgeOrgInfraBootstrapper
 {
     /**
-     * @return array{bucket: string, kv_namespace_id: string, account_id: string}
+     * @return array{bucket: string, kv_namespace_id: string, cache_kv_namespace_id: string, account_id: string}
      */
     public function bootstrap(
         ProviderCredential $credential,
@@ -19,6 +19,7 @@ class EdgeOrgInfraBootstrapper
         string $kvTitle,
         string $zoneName,
         string $workerScriptName,
+        string $cacheKvTitle = EdgeDeliveryFeaturesEnsurer::CACHE_KV_TITLE,
     ): array {
         if ($credential->provider !== 'cloudflare') {
             throw new \InvalidArgumentException('Edge bootstrap requires a Cloudflare credential.');
@@ -46,12 +47,23 @@ class EdgeOrgInfraBootstrapper
             throw new \RuntimeException('Could not resolve KV namespace id after bootstrap.');
         }
 
+        $cacheKvId = $client->kvNamespaceIdByTitle($cacheKvTitle);
+        if ($cacheKvId === null) {
+            $createdCache = $client->createKvNamespace($cacheKvTitle);
+            $cacheKvId = is_string($createdCache['id'] ?? null) ? $createdCache['id'] : '';
+        }
+
+        if ($cacheKvId === '') {
+            throw new \RuntimeException('Could not resolve cache KV namespace id after bootstrap.');
+        }
+
         $routePattern = $zoneName !== '' ? '*.'.$zoneName.'/*' : '';
 
         EdgeOrgCredentialConfig::merge($credential, [
             'account_id' => $accountId,
             'r2_bucket' => $bucket,
             'kv_namespace_id' => $kvId,
+            'cache_kv_namespace_id' => $cacheKvId,
             'worker_script_name' => $workerScriptName,
             'worker_zone_name' => $zoneName,
             'worker_routes' => $routePattern !== '' ? [$routePattern] : [],
@@ -62,6 +74,7 @@ class EdgeOrgInfraBootstrapper
         return [
             'bucket' => $bucket,
             'kv_namespace_id' => $kvId,
+            'cache_kv_namespace_id' => $cacheKvId,
             'account_id' => $accountId,
         ];
     }

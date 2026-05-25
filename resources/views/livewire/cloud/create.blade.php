@@ -405,5 +405,4 @@
         </div>
     </form>
 
-    <x-connect-provider-modal />
 </div>

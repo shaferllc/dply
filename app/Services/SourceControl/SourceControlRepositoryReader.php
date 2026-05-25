@@ -80,6 +80,19 @@ final class SourceControlRepositoryReader
         Cache::increment($this->versionKey($site));
     }
 
+    /**
+     * Provider id (github / gitlab / bitbucket) detected from the site's
+     * configured Git remote — null if no remote is set or the host is not
+     * one we know how to browse. Lets UIs gate "browse refs" affordances
+     * before making any HTTP calls.
+     */
+    public function providerForSite(Site $site): ?string
+    {
+        $remote = $this->remoteForSite($site);
+
+        return is_array($remote) ? ($remote['provider'] ?? null) : null;
+    }
+
     /* ────────────────────── branches ────────────────────── */
 
     private function branchesUncached(Site $site, User $user): array

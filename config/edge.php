@@ -41,6 +41,14 @@ return [
         'account_id' => env('DPLY_EDGE_CF_ACCOUNT_ID'),
         'api_token' => env('DPLY_EDGE_CF_API_TOKEN'),
         'kv_namespace_id' => env('DPLY_EDGE_CF_KV_NAMESPACE_ID'),
+        /**
+         * Optional KV namespace ID for the EDGE_CACHE binding (hybrid
+         * origin response cache, see B1 in docs/edge-roadmap.md). Set
+         * to enable read-through caching for hybrid sites. When unset
+         * the Worker deploys without the binding and the cache is a
+         * silent no-op — safe to leave blank during rollout.
+         */
+        'cache_kv_namespace_id' => env('DPLY_EDGE_CF_CACHE_KV_NAMESPACE_ID'),
         'worker_script_name' => env('DPLY_EDGE_CF_WORKER_SCRIPT', 'dply-edge'),
         'worker_zone_name' => env('DPLY_EDGE_CF_ZONE_NAME'),
         'worker_routes' => array_values(array_filter(array_map(
@@ -106,6 +114,20 @@ return [
     */
     'retention' => [
         'default_keep' => (int) env('DPLY_EDGE_RETENTION_KEEP', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Origin healthcheck (hybrid sites)
+    |--------------------------------------------------------------------------
+    | Runs before flipping KV to point at a new deployment. Failing checks
+    | mark the deployment FAILED so an unhealthy origin never receives
+    | Worker-proxied traffic. See OriginHealthcheckRunner.
+    */
+    'origin_healthcheck' => [
+        'timeout_seconds' => (int) env('DPLY_EDGE_ORIGIN_HEALTHCHECK_TIMEOUT', 10),
+        'retries' => (int) env('DPLY_EDGE_ORIGIN_HEALTHCHECK_RETRIES', 3),
+        'retry_wait_ms' => (int) env('DPLY_EDGE_ORIGIN_HEALTHCHECK_RETRY_WAIT_MS', 1500),
     ],
 
     /*

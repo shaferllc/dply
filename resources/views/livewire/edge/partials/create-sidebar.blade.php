@@ -64,9 +64,9 @@
                 {{ __('Flat dply per-site fee once your edge app is live. Branch previews are free.') }}
             @endif
         </p>
-        <a href="{{ route('docs.index') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sage transition-colors hover:text-brand-forest dark:hover:text-brand-gold">
+        <x-docs-link doc-route="docs.markdown" doc-slug="edge-create" class="mt-4 !border-0 !bg-transparent !px-0 !py-0 !shadow-none text-xs font-semibold text-brand-sage transition-colors hover:text-brand-forest dark:hover:text-brand-gold">
             {{ __('Browse documentation') }}
             <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
-        </a>
+        </x-docs-link>
     </div>
 </aside>

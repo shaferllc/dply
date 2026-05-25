@@ -31,6 +31,13 @@ final readonly class EdgeDeliveryContext
         public array $workerRoutes,
         public string $diskName,
         public ?string $providerCredentialId = null,
+        /**
+         * Optional KV namespace ID for the EDGE_CACHE binding (origin
+         * response cache for hybrid sites). Empty string means the
+         * Worker will be deployed without the binding and caching is a
+         * no-op.
+         */
+        public string $cacheKvNamespaceId = '',
     ) {}
 
     public static function platform(): self
@@ -52,6 +59,7 @@ final readonly class EdgeDeliveryContext
             workerZoneName: trim((string) config('edge.cloudflare.worker_zone_name')),
             workerRoutes: EdgePlatformCredentials::workerRoutes(),
             diskName: (string) config('edge.disk.name', 'edge_r2'),
+            cacheKvNamespaceId: trim((string) config('edge.cloudflare.cache_kv_namespace_id', '')),
         );
     }
 
@@ -123,6 +131,7 @@ final readonly class EdgeDeliveryContext
             ))),
             diskName: 'edge_r2_org_'.$credential->id,
             providerCredentialId: (string) $credential->id,
+            cacheKvNamespaceId: trim((string) ($edge['cache_kv_namespace_id'] ?? '')),
         );
     }
 
@@ -143,6 +152,7 @@ final readonly class EdgeDeliveryContext
             workerRoutes: $workerRoutes,
             diskName: $this->diskName,
             providerCredentialId: $this->providerCredentialId,
+            cacheKvNamespaceId: $this->cacheKvNamespaceId,
         );
     }
 

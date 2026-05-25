@@ -50,14 +50,14 @@
                         </p>
                     </div>
                     <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                        <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                        <x-docs-link doc-route="docs.index">
                             <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('Documentation') }}
-                        </x-outline-link>
-                        <x-outline-link href="{{ route('docs.api') }}" wire:navigate>
+                        </x-docs-link>
+                        <x-docs-link doc-route="docs.api">
                             <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('HTTP API guide') }}
-                        </x-outline-link>
+                        </x-docs-link>
                     </div>
                 </div>
             </div>

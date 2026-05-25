@@ -215,6 +215,45 @@ describe('handleRequest', () => {
     expect(response.status).toBe(404);
   });
 
+  it('proxies hybrid origin routes before SPA fallback when index.html exists', async () => {
+    const hybridEntry: HostMapEntry = {
+      ...hostEntry,
+      origin_url: 'https://origin.example.test',
+      origin_routes: ['/api/*'],
+    };
+
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'hybrid.example.test': hybridEntry }),
+      ARTIFACTS: createMockR2({
+        'edge/site-1/deploy-9/index.html': {
+          body: '<!doctype html><html><body>spa shell</body></html>',
+          contentType: 'text/html; charset=utf-8',
+        },
+      }),
+    };
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      expect(url).toContain('origin.example.test');
+      expect(url).toContain('/api/users');
+
+      return new Response('{"ok":true}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as typeof fetch;
+
+    try {
+      const response = await handleRequest(new Request('https://hybrid.example.test/api/users'), env);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('{"ok":true}');
+      expect(response.headers.get('X-Dply-Origin-Proxy')).toBe('1');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it('proxies unmatched hybrid routes to the configured origin', async () => {
     const hybridEntry: HostMapEntry = {
       ...hostEntry,
@@ -244,6 +283,58 @@ describe('handleRequest', () => {
       expect(response.status).toBe(200);
       expect(await response.text()).toBe('{"ok":true}');
       expect(response.headers.get('X-Dply-Origin-Proxy')).toBe('1');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('indexes cached origin responses by X-Dply-Cache-Tag for purge-by-tag', async () => {
+    const tagPuts: string[] = [];
+    const edgeCache = {
+      get: async () => null,
+      put: async (key: string) => {
+        if (key.startsWith('edge_cache_tag:')) {
+          tagPuts.push(key);
+        }
+      },
+    } as KVNamespace;
+
+    const hybridEntry: HostMapEntry = {
+      ...hostEntry,
+      spa_fallback: false,
+      origin_url: 'https://origin.example.test',
+      origin_routes: ['/api/*'],
+    };
+
+    const env: Env = {
+      HOST_MAP: createMockKv({ 'hybrid.example.test': hybridEntry }),
+      ARTIFACTS: createMockR2({}),
+      EDGE_CACHE: edgeCache,
+    };
+
+    const pending: Promise<unknown>[] = [];
+    const ctx = {
+      waitUntil: (promise: Promise<unknown>) => {
+        pending.push(promise);
+      },
+    } as ExecutionContext;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response('{"article":42}', {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, s-maxage=3600',
+          'X-Dply-Cache-Tag': 'article-42,homepage',
+        },
+      })) as typeof fetch;
+
+    try {
+      await handleRequest(new Request('https://hybrid.example.test/api/article'), env, ctx);
+      await Promise.all(pending);
+      expect(tagPuts).toContain('edge_cache_tag:site-1:article-42');
+      expect(tagPuts).toContain('edge_cache_tag:site-1:homepage');
     } finally {
       globalThis.fetch = originalFetch;
     }

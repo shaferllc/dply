@@ -13,3 +13,10 @@ bucket_name = "dply-edge-artifacts"
 [[kv_namespaces]]
 binding = "HOST_MAP"
 id = "00000000000000000000000000000000"
+
+# Optional. When bound, the Worker uses this namespace to cache origin
+# GET responses with TTL from Cache-Control: s-maxage (see B1 in
+# docs/edge-roadmap.md). If unset, hybrid sites simply skip the cache.
+[[kv_namespaces]]
+binding = "EDGE_CACHE"
+id = "00000000000000000000000000000000"

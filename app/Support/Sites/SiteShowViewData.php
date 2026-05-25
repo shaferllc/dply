@@ -184,7 +184,7 @@ final class SiteShowViewData
                 $supportsReleaseRollback,
                 $previewDomain,
             )
-            : [];
+            : self::dashboardUnavailableDefaults();
 
         return array_merge(
             compact(
@@ -242,7 +242,14 @@ final class SiteShowViewData
     /**
      * @return array<string, mixed>
      */
-    private static function edgeProvisioningJourney(Site $site): array
+    /**
+     * Public so the ad-hoc previews tab can render its own inline progress
+     * card off a pending preview Site without going through the full
+     * site-show view-data pipeline.
+     *
+     * @return array<string, mixed>
+     */
+    public static function edgeProvisioningJourney(Site $site): array
     {
         $edgeMeta = $site->edgeMeta();
         $sourceSpec = is_array($edgeMeta['source'] ?? null) ? $edgeMeta['source'] : [];
@@ -373,6 +380,21 @@ final class SiteShowViewData
             'siteProgressPercent',
             'siteCurrentLabel',
         );
+    }
+
+    /**
+     * Safe defaults when {@see dashboard()} is skipped (provisioning / not ready).
+     *
+     * @return array<string, mixed>
+     */
+    private static function dashboardUnavailableDefaults(): array
+    {
+        return [
+            'atomicReleases' => false,
+            'showRuntimeTab' => false,
+            'showSslTab' => false,
+            'aliasHostnames' => collect(),
+        ];
     }
 
     /**

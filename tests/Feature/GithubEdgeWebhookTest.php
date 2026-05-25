@@ -22,7 +22,10 @@ test('pull request opened spawns preview', function () {
 
     $body = json_encode([
         'action' => 'opened',
-        'pull_request' => ['number' => 42, 'head' => ['ref' => 'feature/login']],
+        'pull_request' => [
+            'number' => 42,
+            'head' => ['ref' => 'feature/login', 'sha' => str_repeat('a', 40)],
+        ],
     ], JSON_UNESCAPED_SLASHES);
 
     $response = postWebhook($site, 'pull_request', $body);
@@ -31,27 +34,35 @@ test('pull request opened spawns preview', function () {
     expect(Site::query()
         ->whereJsonContains('meta->edge->preview_parent_site_id', $site->id)
         ->count())->toBe(1);
+    Queue::assertPushed(BuildEdgeSiteJob::class);
 });
 
-test('pull request synchronize returns existing preview', function () {
+test('pull request synchronize redeploys existing preview', function () {
     Queue::fake();
     $site = makeSourceSite();
 
     $body = json_encode([
         'action' => 'opened',
-        'pull_request' => ['number' => 9, 'head' => ['ref' => 'feature/x']],
+        'pull_request' => [
+            'number' => 9,
+            'head' => ['ref' => 'feature/x', 'sha' => str_repeat('b', 40)],
+        ],
     ]);
     postWebhook($site, 'pull_request', $body)->assertOk();
 
     $body2 = json_encode([
         'action' => 'synchronize',
-        'pull_request' => ['number' => 9, 'head' => ['ref' => 'feature/x']],
+        'pull_request' => [
+            'number' => 9,
+            'head' => ['ref' => 'feature/x', 'sha' => str_repeat('c', 40)],
+        ],
     ]);
     postWebhook($site, 'pull_request', $body2)->assertOk();
 
     expect(Site::query()
         ->whereJsonContains('meta->edge->preview_parent_site_id', $site->id)
         ->count())->toBe(1);
+    Queue::assertPushed(BuildEdgeSiteJob::class, 2);
 });
 
 test('pull request closed tears down preview', function () {

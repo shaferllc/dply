@@ -95,7 +95,8 @@ class EdgeInfraBootstrapOrgCommand extends Command
 
         $this->info('Bootstrapped Edge infra for credential '.$credential->id);
         $this->line('R2 bucket: '.$result['bucket']);
-        $this->line('KV namespace: '.$result['kv_namespace_id']);
+        $this->line('KV namespace (host map): '.$result['kv_namespace_id']);
+        $this->line('KV namespace (origin cache): '.$result['cache_kv_namespace_id']);
 
         $accessKey = trim((string) $this->option('r2-access-key'));
         $secret = trim((string) $this->option('r2-secret'));

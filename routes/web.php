@@ -7,6 +7,7 @@ use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
 use App\Http\Controllers\EdgeLogIngestController;
 use App\Http\Controllers\EdgeLogpushIngestController;
+use App\Http\Controllers\EdgePreviewCommentsController;
 use App\Http\Controllers\EdgeVitalsIngestController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\Dashboard as AdminDashboard;
@@ -107,20 +109,22 @@ use App\Livewire\Settings\SourceControl as SettingsSourceControl;
 use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Caching;
+use App\Livewire\Sites\Cdn;
 use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
+use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Files;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
+use App\Livewire\Sites\Resources;
 use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\ServerlessRouting;
-use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\Workers;
@@ -174,6 +178,17 @@ Route::post('/hooks/edge/{site}/vitals', EdgeVitalsIngestController::class)
 Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
     ->middleware(['throttle:function-log-ingest'])
     ->name('hooks.edge.logpush');
+
+// Preview-comment widget REST endpoints. Public (no Laravel session);
+// auth is per-parent widget token in X-Dply-Preview-Widget. CORS is
+// echoed for testing-domain origins.
+Route::match(['options'], '/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'options']);
+Route::get('/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'index'])
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('api.edge.preview-comments.index');
+Route::post('/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'store'])
+    ->middleware(['throttle:function-log-ingest'])
+    ->name('api.edge.preview-comments.store');
 
 // Friendly public URL for a serverless function — dply proxies it through
 // to the function's raw DigitalOcean Functions invocation URL.
@@ -414,6 +429,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
     Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
+    Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/queue-workers', WorkspaceQueueWorkers::class)->name('sites.queue-workers');
     // BACKGROUND group for container/serverless workspaces — engine-level
@@ -421,7 +437,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // future iterations).
     Route::livewire('servers/{server}/sites/{site}/schedule', Schedule::class)->name('sites.schedule');
     Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
-    Route::livewire('servers/{server}/sites/{site}/resources', \App\Livewire\Sites\Resources::class)->name('sites.resources');
+    Route::livewire('servers/{server}/sites/{site}/resources', Resources::class)->name('sites.resources');
     // NETWORKING group for serverless workspaces — manages the dply edge
     // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). Distinct from VM `routing` which edits nginx.
@@ -431,10 +447,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // tree, branches, and the connection config (account / repo /
     // deploy key / webhook). VM sites keep the legacy section partial
     // at `?section=repository`.
-    Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
-    Route::livewire('servers/{server}/sites/{site}/caching', \App\Livewire\Sites\Caching::class)->name('sites.caching');
-    Route::livewire('servers/{server}/sites/{site}/cdn', \App\Livewire\Sites\Cdn::class)->name('sites.cdn');
-    Route::livewire('servers/{server}/sites/{site}/files', \App\Livewire\Sites\Files::class)->name('sites.files');
+    Route::livewire('servers/{server}/sites/{site}/repository', Repository::class)->name('sites.repository');
+    Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
+    Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
+    Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to
@@ -459,7 +475,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             ...$query,
         ]);
     })->name('sites.settings');
-    Route::livewire('servers/{server}/sites/{site}/{section?}', SiteSettings::class)
+    Route::get('servers/{server}/sites/{site}/{section?}', SiteWorkspaceController::class)
         ->where('section', '[a-z0-9-]+')
         ->defaults('section', 'general')
         ->name('sites.show');

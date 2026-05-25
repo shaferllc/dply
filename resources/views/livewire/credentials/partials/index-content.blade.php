@@ -20,10 +20,10 @@
     toolbar
 >
     <x-slot name="actions">
-        <x-outline-link href="{{ route('docs.connect-provider') }}" wire:navigate>
+        <x-docs-link doc-route="docs.connect-provider">
             <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
             {{ __('Provider setup guide') }}
-        </x-outline-link>
+        </x-docs-link>
     </x-slot>
 </x-page-header>
 

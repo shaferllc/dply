@@ -25,6 +25,7 @@ test('bootstrap creates bucket and kv namespace', function () {
         'edge.cloudflare.account_id' => 'acct123',
         'edge.cloudflare.api_token' => 'token123',
         'edge.cloudflare.kv_namespace_id' => '',
+        'edge.cloudflare.cache_kv_namespace_id' => '',
         'edge.r2.bucket' => '',
     ]);
 
@@ -45,7 +46,11 @@ test('bootstrap creates bucket and kv namespace', function () {
             return Http::response(['success' => true, 'result' => []]);
         }
         if (str_contains($url, '/storage/kv/namespaces') && $method === 'POST') {
-            return Http::response(['success' => true, 'result' => ['id' => 'kv999', 'title' => 'dply-edge-host-map']]);
+            $body = json_decode($request->body(), true);
+            $title = is_array($body) ? (string) ($body['title'] ?? '') : '';
+            $id = $title === 'dply-edge-cache' ? 'cache-kv-id' : 'kv999';
+
+            return Http::response(['success' => true, 'result' => ['id' => $id, 'title' => $title]]);
         }
 
         return Http::response(['success' => false, 'errors' => [['message' => 'unexpected '.$method.' '.$url]]], 500);
@@ -57,7 +62,9 @@ test('bootstrap creates bucket and kv namespace', function () {
     ])
         ->expectsOutputToContain('Created R2 bucket')
         ->expectsOutputToContain('Created KV namespace: dply-edge-host-map (kv999)')
+        ->expectsOutputToContain('Created cache KV namespace: dply-edge-cache (cache-kv-id)')
         ->expectsOutputToContain('DPLY_EDGE_CF_KV_NAMESPACE_ID=kv999')
+        ->expectsOutputToContain('DPLY_EDGE_CF_CACHE_KV_NAMESPACE_ID=cache-kv-id')
         ->assertSuccessful();
 });
 

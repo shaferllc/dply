@@ -45,5 +45,124 @@ return [
             'file' => 'BYO_LOCAL_SETUP.md',
             'title' => 'Local development',
         ],
+        'edge-overview' => [
+            'file' => 'EDGE_OVERVIEW.md',
+            'title' => 'Edge overview',
+        ],
+        'edge-fleet' => [
+            'file' => 'EDGE_FLEET.md',
+            'title' => 'Edge fleet index',
+        ],
+        'edge-create' => [
+            'file' => 'EDGE_CREATE.md',
+            'title' => 'Create an Edge app',
+        ],
+        'edge-site-overview' => [
+            'file' => 'EDGE_SITE_OVERVIEW.md',
+            'title' => 'Edge site overview',
+        ],
+        'edge-deploys' => [
+            'file' => 'EDGE_DEPLOYS.md',
+            'title' => 'Edge deploys',
+        ],
+        'edge-domains' => [
+            'file' => 'EDGE_DOMAINS.md',
+            'title' => 'Edge domains',
+        ],
+        'edge-build' => [
+            'file' => 'EDGE_BUILD.md',
+            'title' => 'Edge build settings',
+        ],
+        'edge-previews' => [
+            'file' => 'EDGE_PREVIEWS.md',
+            'title' => 'Edge previews',
+        ],
+        'edge-traffic' => [
+            'file' => 'EDGE_TRAFFIC.md',
+            'title' => 'Edge traffic & analytics',
+        ],
+        'edge-billing' => [
+            'file' => 'EDGE_BILLING.md',
+            'title' => 'Edge billing & usage',
+        ],
+        'edge-logs' => [
+            'file' => 'EDGE_LOGS.md',
+            'title' => 'Edge build & deploy logs',
+        ],
+        'edge-danger' => [
+            'file' => 'EDGE_DANGER.md',
+            'title' => 'Delete an Edge site',
+        ],
+        'edge-preview-comments' => [
+            'file' => 'EDGE_PREVIEW_COMMENTS.md',
+            'title' => 'Edge preview comments',
+        ],
+    ],
+
+    /**
+     * Pages with dedicated routes or markdown aliases for the docs sidebar.
+     */
+    'virtual' => [
+        'api' => [
+            'file' => 'HTTP_API.md',
+            'title' => 'HTTP API',
+            'route' => 'docs.api',
+        ],
+        'connect-provider' => [
+            'title' => 'Connect a cloud provider',
+            'summary' => 'Get an API token from DigitalOcean or Hetzner and add it under Server providers.',
+            'route' => 'docs.connect-provider',
+        ],
+        'create-first-server' => [
+            'title' => 'Create your first server',
+            'summary' => 'Choose provider, region, size, optional setup script; then deploy.',
+            'route' => 'docs.create-first-server',
+        ],
+    ],
+
+    /**
+     * Product-scoped guide lists for the docs sidebar jump nav.
+     *
+     * @var array<string, array{label: string, slugs: list<string>}>
+     */
+    'groups' => [
+        'edge' => [
+            'label' => 'Edge guides',
+            'slugs' => [
+                'edge-overview',
+                'edge-fleet',
+                'edge-create',
+                'edge-site-overview',
+                'edge-deploys',
+                'edge-domains',
+                'edge-build',
+                'edge-previews',
+                'edge-traffic',
+                'edge-billing',
+                'edge-logs',
+                'edge-danger',
+                'edge-preview-comments',
+            ],
+        ],
+        'sites' => [
+            'label' => 'Sites & servers',
+            'slugs' => [
+                'create-first-server',
+                'connect-provider',
+                'sites-and-deploy',
+                'server-workspace',
+                'local-development',
+            ],
+        ],
+        'organization' => [
+            'label' => 'Organization',
+            'slugs' => [
+                'org-roles-and-limits',
+                'billing-and-plans',
+                'credentials',
+                'source-control',
+                'api',
+            ],
+        ],
     ],
 ];

@@ -52,6 +52,10 @@
 
         <x-marketing-footer />
 
+        @auth
+            <livewire:settings.connect-provider-modal :key="'global-connect-provider-modal'" />
+        @endauth
+
         {{ $modals ?? '' }}
 
         <div x-bind:class="regionClass" aria-live="polite">

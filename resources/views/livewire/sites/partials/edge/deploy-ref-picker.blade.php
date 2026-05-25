@@ -39,19 +39,34 @@
                 </div>
             @endif
             <div class="relative flex-1">
-                <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" />
+                <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-moss" aria-hidden="true" />
                 <input
-                    type="search"
+                    type="text"
                     wire:model.live.debounce.300ms="edge_deploy_ref_search"
                     placeholder="{{ __('Search…') }}"
-                    class="w-full rounded-lg border border-brand-ink/15 bg-white py-2 pl-9 pr-3 text-sm text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage"
+                    class="block w-full rounded-lg border border-brand-ink/15 bg-white py-2 pl-9 pr-3 text-sm leading-5 text-brand-ink placeholder:text-brand-mist focus:border-brand-sage focus:ring-1 focus:ring-brand-sage"
                 />
             </div>
         </div>
     </div>
 
     <div class="max-h-72 overflow-y-auto">
-        @if ($edge_deploy_ref_error)
+        @if ($edge_deploy_ref_needs_provider)
+            @php
+                $providerLabel = match ($edge_deploy_ref_needs_provider) {
+                    'github' => 'GitHub',
+                    'gitlab' => 'GitLab',
+                    'bitbucket' => 'Bitbucket',
+                    default => ucfirst($edge_deploy_ref_needs_provider),
+                };
+            @endphp
+            <div class="flex flex-col items-start gap-2 px-4 py-5 text-sm text-brand-moss">
+                <p>{{ __('You haven\'t linked a :provider account yet — connect one to browse this repo.', ['provider' => $providerLabel]) }}</p>
+                <x-connect-provider-link class="!text-sm">
+                    {{ __('Connect :provider', ['provider' => $providerLabel]) }} &rarr;
+                </x-connect-provider-link>
+            </div>
+        @elseif ($edge_deploy_ref_error)
             <p class="px-4 py-6 text-sm text-rose-700 dark:text-rose-300">{{ $edge_deploy_ref_error }}</p>
         @elseif ($edge_deploy_ref_results === [])
             <p class="px-4 py-6 text-sm text-brand-moss">{{ __('No matching refs found.') }}</p>

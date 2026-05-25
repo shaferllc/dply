@@ -417,5 +417,4 @@
         </div>
     </div>
 
-    <x-connect-provider-modal />
 </div>

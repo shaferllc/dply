@@ -79,6 +79,8 @@ class WorkspaceSettings extends Component
     {
         $this->authorize('view', $this->server);
 
+        set_time_limit(45);
+
         if ($this->server->status !== Server::STATUS_READY || empty($this->server->ip_address)) {
             $this->testConnectionResult = [
                 'ok' => false,

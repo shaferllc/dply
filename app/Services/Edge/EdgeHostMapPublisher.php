@@ -98,6 +98,24 @@ class EdgeHostMapPublisher
     {
         $edgeMeta = $site->edgeMeta();
         $routing = is_array($edgeMeta['routing'] ?? null) ? $edgeMeta['routing'] : [];
+        $isPreview = ! empty($edgeMeta['preview_parent_site_id']);
+        $widgetMeta = is_array($edgeMeta['comment_widget'] ?? null) ? $edgeMeta['comment_widget'] : [];
+        $widgetEnabled = $isPreview && (bool) ($widgetMeta['enabled'] ?? false);
+        // Inherit widget config from the parent site so a single toggle
+        // on the parent applies to every PR preview spawned from it.
+        if ($isPreview && ! $widgetEnabled) {
+            $parentId = $edgeMeta['preview_parent_site_id'] ?? null;
+            if (is_string($parentId)) {
+                $parent = Site::query()->find($parentId);
+                $parentMeta = $parent?->edgeMeta() ?? [];
+                $parentWidget = is_array($parentMeta['comment_widget'] ?? null) ? $parentMeta['comment_widget'] : [];
+                if ((bool) ($parentWidget['enabled'] ?? false)) {
+                    $widgetEnabled = true;
+                    $widgetMeta = array_merge($parentWidget, $widgetMeta);
+                }
+            }
+        }
+
         $payload = [
             'storage_prefix' => $deployment->storage_prefix,
             'deployment_id' => $deployment->id,
@@ -105,7 +123,34 @@ class EdgeHostMapPublisher
             'organization_id' => (string) $site->organization_id,
             'spa_fallback' => (bool) ($routing['spa_fallback'] ?? true),
             'headers' => is_array($routing['headers'] ?? null) ? $routing['headers'] : [],
+            'is_preview' => $isPreview,
+            'comment_widget_enabled' => $widgetEnabled,
         ];
+
+        if ($widgetEnabled) {
+            $token = is_string($widgetMeta['token'] ?? null) ? trim((string) $widgetMeta['token']) : '';
+            if ($token !== '') {
+                $payload['comment_widget_token'] = $token;
+            }
+            $apiBase = rtrim((string) config('app.url'), '/');
+            if ($apiBase !== '') {
+                $payload['comment_widget_api_base'] = $apiBase;
+            }
+        }
+
+        // Image optimization is independent of runtime mode — applies
+        // to both static and hybrid sites. The Worker only enables the
+        // /_dply/image route when a signing secret is present.
+        $images = is_array($edgeMeta['images'] ?? null) ? $edgeMeta['images'] : [];
+        $imageSecret = is_string($images['signing_secret'] ?? null) ? trim((string) $images['signing_secret']) : '';
+        if ($imageSecret !== '') {
+            $payload['image_signing_secret'] = $imageSecret;
+            $allowed = is_array($images['allowed_hosts'] ?? null) ? $images['allowed_hosts'] : [];
+            $payload['image_allowed_hosts'] = array_values(array_filter(array_map(
+                fn ($host) => is_string($host) && $host !== '' ? strtolower($host) : null,
+                $allowed,
+            )));
+        }
 
         if (($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid') {
             $origin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : [];
@@ -117,6 +162,14 @@ class EdgeHostMapPublisher
                     fn ($route) => is_string($route) ? $route : null,
                     $routes,
                 )));
+                $authSecret = is_string($origin['auth_secret'] ?? null) ? trim((string) $origin['auth_secret']) : '';
+                if ($authSecret !== '') {
+                    $payload['origin_auth_secret'] = $authSecret;
+                }
+                $failover = is_string($origin['failover_html'] ?? null) ? (string) $origin['failover_html'] : '';
+                if ($failover !== '') {
+                    $payload['origin_failover_html'] = $failover;
+                }
             }
         }
 

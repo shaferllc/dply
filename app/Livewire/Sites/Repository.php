@@ -17,6 +17,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -80,6 +81,12 @@ class Repository extends Component
         $this->connectionRepositoryUrl = (string) ($site->git_repository_url ?? '');
         $this->connectionBranch = (string) ($site->git_branch ?? '');
         $this->connectionAccountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
+    }
+
+    #[On('source-control-linked')]
+    public function onSourceControlLinked(): void
+    {
+        // Re-render loads fresh accounts in renderConnectionPayload().
     }
 
     /* ──────────── Files navigation ──────────── */

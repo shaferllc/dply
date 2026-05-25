@@ -44,7 +44,14 @@ final class EdgePerformanceHourlyRollup
             $row->status_5xx = (int) $row->status_5xx + 1;
         }
 
-        if (str_contains(strtolower($cacheStatus), 'hit')) {
+        // A "hit" for ratio purposes covers anything served from the
+        // edge cache without round-tripping the origin: fresh hits
+        // (`cache-hit`, Cloudflare `HIT`), stale-while-revalidate
+        // serves (`cache-stale`), and any future "served from edge"
+        // status. Misses, origin pass-throughs, and revalidations do
+        // not count.
+        $lc = strtolower($cacheStatus);
+        if (str_contains($lc, 'hit') || str_contains($lc, 'stale')) {
             $row->cache_hits = (int) $row->cache_hits + 1;
         }
 

@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
  */
 class DeployEdgeCommit
 {
-    public function handle(Site $site, string $commitSha): EdgeDeployment
+    public function handle(Site $site, string $commitSha, ?string $branchOverride = null): EdgeDeployment
     {
         if (! $site->usesEdgeRuntime()) {
             throw new \RuntimeException('Site is not an Edge delivery site.');
@@ -46,7 +46,13 @@ class DeployEdgeCommit
 
         $edge = $site->edgeMeta();
         $source = is_array($edge['source'] ?? null) ? $edge['source'] : [];
-        $branch = (string) ($source['branch'] ?? 'main');
+        // Caller-provided branch wins so the EdgeDeployment row reflects the
+        // branch the operator actually picked in the ref browser. Falls back
+        // to the site's stored default for typed-SHA / API callers.
+        $branchOverride = $branchOverride !== null ? trim($branchOverride) : null;
+        $branch = ($branchOverride !== null && $branchOverride !== '')
+            ? $branchOverride
+            : (string) ($source['branch'] ?? 'main');
 
         $prefix = trim((string) config('edge.r2.key_prefix', 'edge/'), '/')
             .'/'.$site->organization_id.'/'.$site->id.'/'.Str::ulid();

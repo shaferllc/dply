@@ -39,10 +39,10 @@
                             </p>
                         </div>
                         <div class="lg:col-span-5 flex flex-wrap items-start justify-end gap-3">
-                            <x-outline-link href="{{ route('docs.markdown', ['slug' => 'billing-and-plans']) }}" wire:navigate>
+                            <x-docs-link doc-route="docs.markdown" doc-slug="billing-and-plans">
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Billing docs') }}
-                            </x-outline-link>
+                            </x-docs-link>
                             <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
                                 <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Billing analytics') }}

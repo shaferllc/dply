@@ -9,16 +9,120 @@ export interface HostMapEntry {
   headers?: Record<string, string>;
   origin_url?: string;
   origin_routes?: string[];
+  /**
+   * Shared secret the Worker attaches as `X-Dply-Origin-Auth` on every
+   * proxied request. Origin apps SHOULD reject requests without a matching
+   * value so anything that bypasses the Edge (resolving the origin URL
+   * directly) does not return real content.
+   */
+  origin_auth_secret?: string;
+  /**
+   * HTML body the Worker returns when the origin proxy fails (5xx or
+   * timeout) after one retry. If unset, a built-in default page is used.
+   * Status is 503 with `Retry-After: 30` either way.
+   */
+  origin_failover_html?: string;
+  /**
+   * HMAC signing secret for /_dply/image requests. When present, the
+   * Worker enforces `sig=` query param matching HMAC-SHA256(secret,
+   * canonical params). Empty/missing disables image optimization for
+   * this site.
+   */
+  image_signing_secret?: string;
+  /**
+   * Hostnames the image optimizer is allowed to fetch source images
+   * from. Sources outside this list are rejected with 403 to prevent
+   * the Worker from being used as an open image proxy.
+   */
+  image_allowed_hosts?: string[];
+  /**
+   * When true, the Worker injects the dply preview-comment widget
+   * script before `</body>` on HTML responses for *preview* sites.
+   * Requires `comment_widget_token` and `comment_widget_api_base` to
+   * be set; the Worker bails (no injection) if either is missing.
+   */
+  comment_widget_enabled?: boolean;
+  /** Per-parent HMAC token the widget includes in API calls for auth. */
+  comment_widget_token?: string;
+  /** dply backend base URL the widget POSTs/GETs comments against. */
+  comment_widget_api_base?: string;
+  /**
+   * True when this site is a preview deploy (has a preview_parent).
+   * Set by the publisher so the Worker can gate behavior to previews
+   * without an extra lookup. The comment widget only renders on
+   * preview hostnames so production traffic stays clean.
+   */
+  is_preview?: boolean;
 }
+
+const DEFAULT_ORIGIN_FAILOVER_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>503 — Origin temporarily unavailable</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f5ef; color: #1a1a1a; }
+  @media (prefers-color-scheme: dark) { body { background: #111; color: #f6f5ef; } }
+  main { max-width: 32rem; padding: 2rem; text-align: center; }
+  h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+  p { margin: .25rem 0; color: #555; }
+  @media (prefers-color-scheme: dark) { p { color: #999; } }
+  code { font-family: ui-monospace, monospace; font-size: .85em; opacity: .7; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Service temporarily unavailable</h1>
+  <p>The site origin did not respond. Refresh in a moment.</p>
+  <p><code>HTTP 503 · dply edge</code></p>
+</main>
+</body>
+</html>
+`;
 
 export interface Env {
   ARTIFACTS: R2Bucket;
   HOST_MAP: KVNamespace;
+  /**
+   * Optional read-through cache for hybrid origin GET responses. When
+   * bound, the Worker stores 2xx GET responses with a Cache-Control
+   * `s-maxage` (or `max-age` with `public`) into KV and serves them
+   * from cache on subsequent matching requests until TTL expiry. When
+   * unset, every dynamic request goes to the origin.
+   */
+  EDGE_CACHE?: KVNamespace;
   EDGE_ANALYTICS?: AnalyticsEngineDataset;
   ENVIRONMENT?: string;
   LOG_INGEST_BASE_URL?: string;
   LOG_INGEST_KEY?: string;
 }
+
+/** Path the image optimizer answers on. Reserved — sites cannot publish here. */
+const EDGE_IMAGE_PATH = '/_dply/image';
+/** Hard cap on Image Resizing width to avoid wasting CPU on huge requests. */
+const EDGE_IMAGE_MAX_WIDTH = 4096;
+
+/** Lower bound on s-maxage we'll honor — anything smaller round-trips. */
+const EDGE_CACHE_MIN_TTL_SECONDS = 5;
+/** Upper bound — KV TTL has a min of 60s and supports up to a year, but
+ * we cap so misconfigured origins don't pin stale content forever. */
+const EDGE_CACHE_MAX_TTL_SECONDS = 60 * 60 * 24; // 24h
+/** KV value limit is 25 MB; cap entries to avoid silent write failures. */
+const EDGE_CACHE_MAX_BODY_BYTES = 8 * 1024 * 1024; // 8 MB
+/** Headers we never persist (per-connection / per-request metadata). */
+const EDGE_CACHE_HOP_BY_HOP = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'set-cookie',
+]);
 
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'X-Content-Type-Options': 'nosniff',
@@ -142,6 +246,13 @@ export async function handleRequest(
     return handleVitalsBeacon(request, env, ctx, hostEntry, url);
   }
 
+  if (url.pathname === EDGE_IMAGE_PATH) {
+    const response = await handleEdgeImage(request, url, hostEntry);
+    recordRequest(ctx, env, request, response, hostEntry, url, EDGE_IMAGE_PATH, started, 'image');
+
+    return response;
+  }
+
   let requestPath: string;
 
   try {
@@ -157,21 +268,52 @@ export async function handleRequest(
   const objectKey = buildObjectKey(hostEntry.storage_prefix, requestPath);
   let object = await env.ARTIFACTS.get(objectKey);
 
+  // Hybrid: match origin routes before SPA fallback so /api/* and
+  // /_next/data/* reach the SSR origin even when index.html exists in R2.
+  if (!object && hostEntry.origin_url && hostEntry.origin_routes?.length) {
+    if (pathMatchesOriginRoute(requestPath, hostEntry.origin_routes)) {
+      const cached = await readEdgeCache(env, hostEntry, request);
+      if (cached) {
+        if (cached.stale) {
+          // Stale-while-revalidate: serve stale immediately, kick off
+          // a background refetch that updates the cache for the next
+          // request. ctx.waitUntil keeps the Worker alive past the
+          // response so the revalidation completes.
+          ctx.waitUntil(revalidateEdgeCache(env, hostEntry, request));
+          recordRequest(ctx, env, request, cached.response, hostEntry, url, requestPath, started, 'cache-stale');
+        } else {
+          recordRequest(ctx, env, request, cached.response, hostEntry, url, requestPath, started, 'cache-hit');
+        }
+
+        return cached.response;
+      }
+
+      const response = await proxyToOriginWithFailover(
+        request,
+        hostEntry.origin_url,
+        hostEntry.origin_auth_secret,
+        hostEntry.origin_failover_html,
+      );
+
+      // Tee the body into the cache without blocking the response. The
+      // Workers runtime keeps the write alive via ctx.waitUntil.
+      const [forClient, forCache] = teeIfCacheable(response, request);
+      if (forCache) {
+        ctx.waitUntil(writeEdgeCache(env, hostEntry, request, forCache));
+      }
+
+      recordRequest(ctx, env, request, forClient, hostEntry, url, requestPath, started, 'cache-miss');
+
+      return forClient;
+    }
+  }
+
   if (!object && hostEntry.spa_fallback && requestPath !== 'index.html') {
     const fallbackKey = buildObjectKey(hostEntry.storage_prefix, 'index.html');
     const fallbackObject = await env.ARTIFACTS.get(fallbackKey);
     if (fallbackObject) {
       object = fallbackObject;
       requestPath = 'index.html';
-    }
-  }
-
-  if (!object && hostEntry.origin_url && hostEntry.origin_routes?.length) {
-    if (pathMatchesOriginRoute(requestPath, hostEntry.origin_routes)) {
-      const response = await proxyToOrigin(request, hostEntry.origin_url);
-      recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'origin');
-
-      return response;
     }
   }
 
@@ -210,8 +352,18 @@ export async function handleRequest(
 
   let response: Response;
 
-  if (isHtml && shouldInjectRum(requestPath, hasIngest)) {
-    const html = injectRumScript(await object.text());
+  const shouldInjectComments = isHtml
+    && hostEntry.is_preview === true
+    && hostEntry.comment_widget_enabled === true;
+
+  if (isHtml && (shouldInjectRum(requestPath, hasIngest) || shouldInjectComments)) {
+    let html = await object.text();
+    if (shouldInjectRum(requestPath, hasIngest)) {
+      html = injectRumScript(html);
+    }
+    if (shouldInjectComments) {
+      html = injectCommentWidget(html, hostEntry);
+    }
     headers.delete('Content-Length');
     response = new Response(html, { status: 200, headers });
   } else {
@@ -402,16 +554,115 @@ async function hmacSha256Hex(message: string, secret: string): Promise<string> {
   return [...new Uint8Array(signature)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function proxyToOrigin(request: Request, originUrl: string): Promise<Response> {
+/**
+ * Wraps proxyToOrigin with one automatic retry on a network error or 5xx
+ * and a configurable failover HTML response when both attempts fail.
+ * GET / HEAD requests are safe to retry; for non-idempotent methods we
+ * only retry on a true network error (no response received) so we don't
+ * double-submit a POST.
+ *
+ * Streaming support matrix (see docs/edge-hybrid-streaming.md):
+ *   - SSE (text/event-stream): works via `upstream.body` passthrough — no
+ *     special path needed; Cloudflare Workers stream the ReadableStream
+ *     end-to-end.
+ *   - Chunked HTTP responses: same path as SSE.
+ *   - WebSockets: routed through proxyWebSocket() below — Worker forwards
+ *     the Upgrade handshake and pipes both directions.
+ */
+async function proxyToOriginWithFailover(
+  request: Request,
+  originUrl: string,
+  authSecret?: string,
+  failoverHtml?: string,
+): Promise<Response> {
+  // WebSocket upgrades cannot be retried — once a socket pair is created,
+  // it's owned by the runtime and either succeeds or fails. Skip the
+  // failover wrapper entirely for these.
+  if (isWebSocketUpgrade(request)) {
+    return proxyWebSocket(request, originUrl, authSecret);
+  }
+
+  const method = request.method.toUpperCase();
+  const idempotent = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+
+  let response: Response | null = null;
+  let networkError: unknown = null;
+
+  // Clone before the first attempt so we can replay the body on retry.
+  const replayable = request.clone();
+
+  try {
+    response = await proxyToOrigin(request, originUrl, authSecret);
+  } catch (err) {
+    networkError = err;
+  }
+
+  const firstAttemptFailed =
+    networkError !== null || (response !== null && response.status >= 500);
+  const safeToRetry = networkError !== null || idempotent;
+
+  if (firstAttemptFailed && safeToRetry) {
+    try {
+      response = await proxyToOrigin(replayable, originUrl, authSecret);
+      networkError = null;
+    } catch (err) {
+      networkError = err;
+    }
+  }
+
+  if (networkError !== null || (response !== null && response.status >= 500)) {
+    return failoverResponse(failoverHtml);
+  }
+
+  return response as Response;
+}
+
+function failoverResponse(failoverHtml?: string): Response {
+  const headers = new Headers({
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Retry-After': '30',
+    'X-Dply-Edge-Failover': '1',
+  });
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+
+  return new Response(failoverHtml && failoverHtml.trim() !== '' ? failoverHtml : DEFAULT_ORIGIN_FAILOVER_HTML, {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers,
+  });
+}
+
+async function proxyToOrigin(
+  request: Request,
+  originUrl: string,
+  authSecret?: string,
+): Promise<Response> {
   const target = new URL(request.url);
   const origin = new URL(originUrl);
   target.protocol = origin.protocol;
   target.hostname = origin.hostname;
   target.port = origin.port;
 
-  const upstream = await fetch(new Request(target.toString(), request));
+  // Attach the shared secret so the origin can reject anything that
+  // bypasses the Edge. Strip any value the client tried to inject
+  // first — origin should never trust a client-supplied auth header.
+  const upstreamRequest = new Request(target.toString(), request);
+  upstreamRequest.headers.delete('X-Dply-Origin-Auth');
+  if (authSecret) {
+    upstreamRequest.headers.set('X-Dply-Origin-Auth', authSecret);
+  }
+
+  const upstream = await fetch(upstreamRequest);
 
   const headers = new Headers(upstream.headers);
+  // Cloudflare may strip Cache-Tag on subrequests — preserve for B2 indexing.
+  const cacheTag = upstream.headers.get('Cache-Tag');
+  if (cacheTag && !headers.has('X-Dply-Cache-Tag')) {
+    headers.set('X-Dply-Cache-Tag', cacheTag);
+  }
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     headers.set(name, value);
   }
@@ -421,6 +672,531 @@ async function proxyToOrigin(request: Request, originUrl: string): Promise<Respo
     status: upstream.status,
     statusText: upstream.statusText,
     headers,
+  });
+}
+
+/**
+ * Cache key for a GET request. Includes the site id (so two sites can't
+ * collide if a future operator binds the same KV namespace across
+ * deployments), the path, and the sorted query string. Vary handling is
+ * deliberately skipped in v1 — origins that vary by Accept-Language or
+ * cookie should set Cache-Control: private to skip caching entirely.
+ */
+function edgeCacheKey(hostEntry: HostMapEntry, request: Request): string {
+  const url = new URL(request.url);
+  const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const qs = params.length === 0
+    ? ''
+    : '?' + params.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+
+  return `edge_cache:${hostEntry.site_id}:${url.pathname}${qs}`;
+}
+
+interface CachedEntry {
+  status: number;
+  headers: Record<string, string>;
+  body: string; // base64
+  stored_at: number;
+  /** Epoch ms — entry is fresh while now < expires_at. */
+  expires_at: number;
+  /** Epoch ms — entry can be served stale while expires_at <= now < swr_until. */
+  swr_until: number;
+}
+
+interface CacheReadResult {
+  response: Response;
+  /** True when the entry is past `expires_at` but inside the SWR window. */
+  stale: boolean;
+  /** Original cache entry (only set when stale, to drive revalidation). */
+  entry?: CachedEntry;
+}
+
+async function readEdgeCache(
+  env: Env,
+  hostEntry: HostMapEntry,
+  request: Request,
+): Promise<CacheReadResult | null> {
+  if (!env.EDGE_CACHE) return null;
+  if (request.method.toUpperCase() !== 'GET') return null;
+
+  const key = edgeCacheKey(hostEntry, request);
+  const raw = await env.EDGE_CACHE.get(key, { type: 'json' });
+  if (!raw) return null;
+
+  const entry = raw as CachedEntry;
+  const now = Date.now();
+  const isStale = now >= entry.expires_at;
+  if (isStale && now >= entry.swr_until) {
+    // Past the SWR window — treat as miss; the natural TTL will reap it.
+    return null;
+  }
+
+  const headers = new Headers(entry.headers);
+  headers.set('X-Dply-Edge-Cache', isStale ? 'STALE' : 'HIT');
+  headers.set('Age', String(Math.max(0, Math.floor((now - entry.stored_at) / 1000))));
+
+  // Body was stored as base64 so binary responses round-trip cleanly.
+  const bin = atob(entry.body);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+  return {
+    response: new Response(bytes, {
+      status: entry.status,
+      headers,
+    }),
+    stale: isStale,
+    entry: isStale ? entry : undefined,
+  };
+}
+
+/**
+ * Returns a tuple of (responseForClient, responseForCache). If the
+ * response is not cacheable, the second slot is null. Caller is
+ * responsible for writing the cache response into KV (typically via
+ * ctx.waitUntil so it doesn't block the client).
+ */
+function teeIfCacheable(
+  response: Response,
+  request: Request,
+): [Response, Response | null] {
+  if (request.method.toUpperCase() !== 'GET') return [response, null];
+  if (response.status !== 200) return [response, null];
+  if (response.headers.has('Set-Cookie')) return [response, null];
+  if (resolveCacheFreshness(response.headers) === null) return [response, null];
+  if (!response.body) return [response, null];
+
+  // tee() lets us read the body twice — once to send to the client,
+  // once to persist into KV.
+  const [a, b] = response.body.tee();
+
+  return [
+    new Response(a, { status: response.status, headers: response.headers }),
+    new Response(b, { status: response.status, headers: response.headers }),
+  ];
+}
+
+async function writeEdgeCache(
+  env: Env,
+  hostEntry: HostMapEntry,
+  request: Request,
+  response: Response,
+): Promise<void> {
+  if (!env.EDGE_CACHE) return;
+  const freshness = resolveCacheFreshness(response.headers);
+  if (freshness === null) return;
+
+  const buf = await response.arrayBuffer();
+  if (buf.byteLength > EDGE_CACHE_MAX_BODY_BYTES) return;
+
+  const persistedHeaders: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    if (!EDGE_CACHE_HOP_BY_HOP.has(key.toLowerCase())) {
+      persistedHeaders[key] = value;
+    }
+  });
+
+  // Encode as base64 for KV JSON storage so binary content (images,
+  // wasm, etc.) doesn't get mangled by UTF-8 round-tripping.
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const body = btoa(binary);
+
+  const key = edgeCacheKey(hostEntry, request);
+  const now = Date.now();
+  const expiresAt = now + freshness.ttl * 1000;
+  const swrUntil = expiresAt + freshness.swr * 1000;
+  // KV expirationTtl needs to cover the full SWR window so the entry
+  // can still be read once stale. KV minimum is 60s.
+  const expirationTtl = Math.max(60, freshness.ttl + freshness.swr);
+
+  const entry: CachedEntry = {
+    status: response.status,
+    headers: persistedHeaders,
+    body,
+    stored_at: now,
+    expires_at: expiresAt,
+    swr_until: swrUntil,
+  };
+
+  await env.EDGE_CACHE.put(key, JSON.stringify(entry), { expirationTtl });
+
+  // Index by Cache-Tag for B2 — purge-by-tag from the dashboard / API
+  // reads these indexes to know which entries to delete. Each tag maps
+  // to the *latest* cache key; on subsequent writes with the same tag,
+  // we overwrite. This is approximate (older entries with the same tag
+  // remain until natural TTL expiry) but avoids unbounded index growth.
+  // Per-site prefix keeps tags scoped — two sites can use the same tag
+  // string without colliding.
+  const tags = cacheTagsFromHeaders(response.headers);
+  for (const tag of tags) {
+    await env.EDGE_CACHE.put(edgeCacheTagKey(hostEntry, tag), key, { expirationTtl });
+  }
+}
+
+/** Tags for B2 purge — `Cache-Tag` (standard) and `X-Dply-Cache-Tag` (survives CF origin fetch). */
+function cacheTagsFromHeaders(headers: Headers): string[] {
+  const combined = [
+    headers.get('Cache-Tag'),
+    headers.get('X-Dply-Cache-Tag'),
+  ]
+    .filter((value): value is string => value !== null && value.trim() !== '')
+    .join(',');
+
+  return parseCacheTags(combined === '' ? null : combined);
+}
+
+function parseCacheTags(header: string | null): string[] {
+  if (!header) return [];
+
+  return header
+    .split(',')
+    .map((part) => part.trim())
+    .filter((tag) => tag !== '' && tag.length <= 128 && /^[A-Za-z0-9._-]+$/.test(tag));
+}
+
+function edgeCacheTagKey(hostEntry: HostMapEntry, tag: string): string {
+  return `edge_cache_tag:${hostEntry.site_id}:${tag}`;
+}
+
+/**
+ * Pulls a freshness window from Cache-Control. Honors `s-maxage` first
+ * (Edge-specific), then falls back to `max-age` when `public` is set.
+ * `stale-while-revalidate=N` extends the entry past `ttl` by N more
+ * seconds during which a stale hit serves immediately + revalidates
+ * in the background.
+ *
+ * Returns null when the response is uncacheable (no-store, private,
+ * no max-age).
+ */
+function resolveCacheFreshness(headers: Headers): { ttl: number; swr: number } | null {
+  const cc = headers.get('Cache-Control');
+  if (!cc) return null;
+
+  const directives = new Map<string, string | true>();
+  for (const part of cc.split(',')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) {
+      directives.set(trimmed.toLowerCase(), true);
+    } else {
+      directives.set(trimmed.slice(0, eq).toLowerCase().trim(), trimmed.slice(eq + 1).trim());
+    }
+  }
+
+  if (directives.has('no-store') || directives.has('private')) return null;
+
+  let ttlRaw: number | null = null;
+  const sMax = directives.get('s-maxage');
+  if (typeof sMax === 'string') {
+    const n = parseInt(sMax, 10);
+    if (Number.isFinite(n) && n > 0) ttlRaw = n;
+  }
+  if (ttlRaw === null && directives.has('public')) {
+    const max = directives.get('max-age');
+    if (typeof max === 'string') {
+      const n = parseInt(max, 10);
+      if (Number.isFinite(n) && n > 0) ttlRaw = n;
+    }
+  }
+  if (ttlRaw === null) return null;
+
+  const ttl = clampTtl(ttlRaw);
+  if (ttl === null) return null;
+
+  let swr = 0;
+  const swrRaw = directives.get('stale-while-revalidate');
+  if (typeof swrRaw === 'string') {
+    const n = parseInt(swrRaw, 10);
+    if (Number.isFinite(n) && n > 0) {
+      swr = Math.min(n, EDGE_CACHE_MAX_TTL_SECONDS);
+    }
+  }
+
+  return { ttl, swr };
+}
+
+function clampTtl(seconds: number): number | null {
+  if (seconds < EDGE_CACHE_MIN_TTL_SECONDS) return null;
+
+  return Math.min(seconds, EDGE_CACHE_MAX_TTL_SECONDS);
+}
+
+/**
+ * Background revalidation for SWR — re-fetch the origin and overwrite
+ * the cache entry so the next request gets a fresh hit. Errors are
+ * swallowed; the stale entry continues serving until SWR expires.
+ */
+async function revalidateEdgeCache(
+  env: Env,
+  hostEntry: HostMapEntry,
+  request: Request,
+): Promise<void> {
+  if (!hostEntry.origin_url) return;
+
+  try {
+    const response = await proxyToOrigin(request, hostEntry.origin_url, hostEntry.origin_auth_secret);
+    if (response.status !== 200) return;
+    const [, forCache] = teeIfCacheable(response, request);
+    if (forCache) {
+      await writeEdgeCache(env, hostEntry, request, forCache);
+    }
+  } catch {
+    // Stale-serve survives errors — natural SWR expiry will reap it.
+  }
+}
+
+/**
+ * Image optimization via Cloudflare Image Resizing.
+ *
+ * GET /_dply/image?url=<src>&w=<width>&q=<quality>&fmt=<format>&sig=<hmac>
+ *
+ * - `url` (required): absolute source URL; host must be in `image_allowed_hosts`.
+ * - `w` (optional): width in pixels, 1..EDGE_IMAGE_MAX_WIDTH.
+ * - `q` (optional): quality 1..100 (defaults to Cloudflare's automatic).
+ * - `fmt` (optional): one of `auto|avif|webp|jpeg|png` (defaults to `auto`).
+ * - `sig` (required when `image_signing_secret` is set): hex HMAC-SHA256
+ *   of the canonical query string (sorted, lowercased keys, sig excluded).
+ *
+ * Returns the resized image with strong cache headers so the response
+ * itself caches at the edge via the Cloudflare cache layer (separate
+ * from the EDGE_CACHE KV used for origin proxy responses).
+ */
+async function handleEdgeImage(
+  request: Request,
+  url: URL,
+  hostEntry: HostMapEntry,
+): Promise<Response> {
+  if (request.method.toUpperCase() !== 'GET') {
+    return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'GET' } });
+  }
+
+  const secret = hostEntry.image_signing_secret ?? '';
+  if (secret === '') {
+    return new Response('Image optimization not enabled for this site.', { status: 404 });
+  }
+
+  const source = url.searchParams.get('url') ?? '';
+  const sig = url.searchParams.get('sig') ?? '';
+  if (source === '' || sig === '') {
+    return new Response('Missing url or sig parameter.', { status: 400 });
+  }
+
+  // Canonical signing payload: every param except sig, sorted by key.
+  const canonical = [...url.searchParams.entries()]
+    .filter(([k]) => k !== 'sig')
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k.toLowerCase()}=${v}`)
+    .join('&');
+
+  const expected = await hmacSha256Hex(canonical, secret);
+  if (!timingSafeEqual(expected, sig.toLowerCase())) {
+    return new Response('Bad signature.', { status: 403 });
+  }
+
+  let sourceUrl: URL;
+  try {
+    sourceUrl = new URL(source);
+  } catch {
+    return new Response('Invalid source URL.', { status: 400 });
+  }
+  if (sourceUrl.protocol !== 'https:' && sourceUrl.protocol !== 'http:') {
+    return new Response('Source URL must be http(s).', { status: 400 });
+  }
+
+  const allowedHosts = hostEntry.image_allowed_hosts ?? [];
+  if (allowedHosts.length === 0 || !allowedHosts.includes(sourceUrl.hostname)) {
+    return new Response('Source host is not in the allow list.', { status: 403 });
+  }
+
+  const widthParam = url.searchParams.get('w');
+  const width = widthParam ? Math.min(EDGE_IMAGE_MAX_WIDTH, Math.max(1, parseInt(widthParam, 10) || 0)) : undefined;
+  const qualityParam = url.searchParams.get('q');
+  const quality = qualityParam ? Math.min(100, Math.max(1, parseInt(qualityParam, 10) || 0)) : undefined;
+  const fmtParam = (url.searchParams.get('fmt') ?? 'auto').toLowerCase();
+  const validFmts = ['auto', 'avif', 'webp', 'jpeg', 'png'] as const;
+  type ImageFormat = (typeof validFmts)[number];
+  const format: ImageFormat = (validFmts as readonly string[]).includes(fmtParam) ? (fmtParam as ImageFormat) : 'auto';
+
+  const imageOpts: Record<string, unknown> = { format };
+  if (width !== undefined) imageOpts.width = width;
+  if (quality !== undefined) imageOpts.quality = quality;
+
+  // Cloudflare Image Resizing: pass cf.image on the fetch. Errors fall
+  // through to a generic 502 — Image Resizing returns its own 4xx on
+  // bad input (oversized source, unsupported MIME, etc.).
+  let upstream: Response;
+  try {
+    upstream = await fetch(sourceUrl.toString(), {
+      cf: { image: imageOpts } as unknown as RequestInitCfProperties,
+    });
+  } catch {
+    return new Response('Image fetch failed.', { status: 502 });
+  }
+  if (!upstream.ok) {
+    return new Response('Image source returned ' + upstream.status, { status: 502 });
+  }
+
+  const headers = new Headers(upstream.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value);
+  }
+  // Resized images are stable for a given URL — long browser cache + Cloudflare cache.
+  headers.set('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
+  headers.set('X-Dply-Edge-Image', '1');
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    statusText: upstream.statusText,
+    headers,
+  });
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+
+  return diff === 0;
+}
+
+/**
+ * Inject the dply preview-comment widget on a preview hostname. The
+ * injected `<script>` tag contains a self-contained IIFE that renders
+ * a floating button + sidebar, fetches existing comments, and POSTs
+ * new ones to the dply backend with the per-parent widget token in
+ * `X-Dply-Preview-Widget`.
+ *
+ * Bails (returns html unchanged) when either the token or the API
+ * base is missing — both come from KV via the publisher.
+ */
+function injectCommentWidget(html: string, hostEntry: HostMapEntry): string {
+  const token = (hostEntry.comment_widget_token ?? '').trim();
+  const apiBase = (hostEntry.comment_widget_api_base ?? '').trim();
+  if (token === '' || apiBase === '') return html;
+
+  const config = JSON.stringify({
+    siteId: hostEntry.site_id ?? '',
+    deploymentId: hostEntry.deployment_id ?? '',
+    token,
+    apiBase: apiBase.replace(/\/+$/, ''),
+  });
+
+  const tag =
+    `<script data-dply-preview-widget="1">` +
+    `(function(){if(window.__dplyPreviewWidget)return;window.__dplyPreviewWidget=1;` +
+    `var C=${config};` +
+    PREVIEW_WIDGET_SOURCE +
+    `})();</script>`;
+
+  const closing = '</body>';
+  const idx = html.lastIndexOf(closing);
+  if (idx === -1) {
+    return html + tag;
+  }
+
+  return html.slice(0, idx) + tag + html.slice(idx);
+}
+
+/**
+ * Self-contained widget. Reads `C` (config object set by the wrapping
+ * IIFE), renders a floating bottom-right button, opens a sidebar with
+ * the comment list + a new-comment form, and talks to dply.
+ *
+ * Style-wise: no external dependencies, no framework, scoped class
+ * prefix (`dpc-`) so it does not collide with the host page. Sized to
+ * fit comfortably in a single script tag (~5 KB minified).
+ */
+const PREVIEW_WIDGET_SOURCE = `
+var H=function(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML;};
+var s=document.createElement('style');
+s.textContent='.dpc-btn{position:fixed;right:16px;bottom:16px;z-index:2147483646;background:#1a1a1a;color:#fff;border:none;border-radius:9999px;padding:10px 14px;font:600 12px ui-sans-serif,system-ui,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer}.dpc-btn:hover{opacity:.92}.dpc-panel{position:fixed;right:16px;bottom:64px;width:360px;max-height:70vh;z-index:2147483647;background:#fff;color:#1a1a1a;border:1px solid rgba(0,0,0,.1);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:none;font:13px ui-sans-serif,system-ui,sans-serif;overflow:hidden}.dpc-panel.dpc-open{display:flex;flex-direction:column}.dpc-h{padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.08);display:flex;justify-content:space-between;align-items:center}.dpc-h b{font-size:13px}.dpc-h .dpc-x{background:none;border:none;cursor:pointer;font-size:18px;line-height:1;color:#666}.dpc-list{flex:1;overflow-y:auto;padding:8px 14px}.dpc-c{padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06)}.dpc-c:last-child{border-bottom:none}.dpc-c .m{font-size:11px;color:#888;display:flex;gap:8px;align-items:baseline}.dpc-c .b{margin-top:4px;white-space:pre-line}.dpc-empty{color:#888;padding:24px 0;text-align:center;font-size:12px}.dpc-form{padding:10px 14px;border-top:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;gap:6px}.dpc-form input,.dpc-form textarea{font:inherit;color:inherit;border:1px solid rgba(0,0,0,.15);border-radius:6px;padding:6px 8px;background:#fafafa}.dpc-form textarea{resize:vertical;min-height:60px}.dpc-form button{background:#1a1a1a;color:#fff;border:none;border-radius:6px;padding:7px 10px;font:600 12px ui-sans-serif;cursor:pointer}.dpc-form button:disabled{opacity:.5;cursor:wait}@media(prefers-color-scheme:dark){.dpc-panel{background:#1a1a1a;color:#f6f5ef;border-color:rgba(255,255,255,.1)}.dpc-h{border-color:rgba(255,255,255,.08)}.dpc-c{border-color:rgba(255,255,255,.06)}.dpc-form{border-color:rgba(255,255,255,.08)}.dpc-form input,.dpc-form textarea{background:#0d0d0d;border-color:rgba(255,255,255,.15)}.dpc-empty,.dpc-c .m{color:#999}}';
+document.head.appendChild(s);
+var btn=document.createElement('button');btn.className='dpc-btn';btn.type='button';btn.textContent='\u{1F4AC} Comments';
+var panel=document.createElement('div');panel.className='dpc-panel';
+panel.innerHTML='<div class="dpc-h"><b>Preview comments</b><button class="dpc-x" type="button">&times;</button></div><div class="dpc-list"></div><form class="dpc-form"><input name="name" placeholder="Your name (optional)" /><textarea name="body" placeholder="Leave a comment…" required></textarea><button type="submit">Add comment</button></form>';
+document.body.appendChild(btn);document.body.appendChild(panel);
+var list=panel.querySelector('.dpc-list');
+var form=panel.querySelector('.dpc-form');
+var close=panel.querySelector('.dpc-x');
+btn.onclick=function(){panel.classList.toggle('dpc-open');if(panel.classList.contains('dpc-open'))load();};
+close.onclick=function(){panel.classList.remove('dpc-open');};
+function load(){
+ fetch(C.apiBase+'/api/edge/preview-comments/'+encodeURIComponent(C.siteId),{headers:{'X-Dply-Preview-Widget':C.token}})
+  .then(function(r){return r.ok?r.json():{comments:[]};})
+  .then(function(d){
+   var cs=(d&&d.comments)||[];
+   if(!cs.length){list.innerHTML='<div class="dpc-empty">No comments yet on this preview.</div>';return;}
+   list.innerHTML=cs.map(function(c){
+    var when=c.created_at?new Date(c.created_at).toLocaleString():'';
+    return '<div class="dpc-c"><div class="m"><b>'+H(c.author||'Guest')+'</b><span>'+H(c.url_path||'/')+'</span><span>'+H(when)+'</span></div><div class="b">'+H(c.body)+'</div></div>';
+   }).join('');
+  })
+  .catch(function(){list.innerHTML='<div class="dpc-empty">Could not load comments.</div>';});
+}
+form.onsubmit=function(e){
+ e.preventDefault();
+ var btn2=form.querySelector('button');btn2.disabled=true;
+ var name=form.name.value;var body=form.body.value;
+ fetch(C.apiBase+'/api/edge/preview-comments/'+encodeURIComponent(C.siteId),{
+  method:'POST',
+  headers:{'Content-Type':'application/json','X-Dply-Preview-Widget':C.token},
+  body:JSON.stringify({author_label:name,body:body,url_path:location.pathname||'/',viewport_width:window.innerWidth})
+ }).then(function(r){return r.ok?r.json():null;})
+  .then(function(){form.body.value='';load();})
+  .catch(function(){})
+  .then(function(){btn2.disabled=false;});
+};
+`;
+
+function isWebSocketUpgrade(request: Request): boolean {
+  const upgrade = request.headers.get('Upgrade');
+
+  return upgrade !== null && upgrade.toLowerCase() === 'websocket';
+}
+
+/**
+ * WebSocket passthrough. The Worker forwards the upgrade request to the
+ * origin and, if accepted, returns the upstream socket back to the client.
+ * The auth secret is attached just like a normal request so origins can
+ * enforce it for both HTTP and WebSocket traffic.
+ *
+ * Cloudflare Worker fetch() on a ws upgrade returns a Response with a
+ * `webSocket` property when status is 101; we return that socket pair to
+ * the client.
+ */
+async function proxyWebSocket(
+  request: Request,
+  originUrl: string,
+  authSecret?: string,
+): Promise<Response> {
+  const target = new URL(request.url);
+  const origin = new URL(originUrl);
+  target.protocol = origin.protocol;
+  target.hostname = origin.hostname;
+  target.port = origin.port;
+
+  const upstreamRequest = new Request(target.toString(), request);
+  upstreamRequest.headers.delete('X-Dply-Origin-Auth');
+  if (authSecret) {
+    upstreamRequest.headers.set('X-Dply-Origin-Auth', authSecret);
+  }
+
+  const upstream = await fetch(upstreamRequest);
+  if (upstream.status !== 101 || !upstream.webSocket) {
+    return new Response('WebSocket upgrade failed at origin.', {
+      status: 502,
+      headers: { 'X-Dply-Edge-WebSocket': 'origin-rejected' },
+    });
+  }
+
+  upstream.webSocket.accept();
+
+  return new Response(null, {
+    status: 101,
+    webSocket: upstream.webSocket,
   });
 }
 

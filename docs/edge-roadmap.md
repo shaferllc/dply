@@ -59,6 +59,10 @@ See **[edge-production-setup.md](edge-production-setup.md)** for the full runboo
 - Queue workers with Docker for builds
 - Env: `DPLY_EDGE_*` (see `config/edge.php`); validate with `php artisan dply:edge:doctor --probe`
 
+## Next phases
+
+See **[edge-roadmap-next.md](edge-roadmap-next.md)** for planned Phases 5–12 (CLI + API, `dply.toml`, rollback/promote UI, password-protected previews, monorepo + build cache, live logs, edge middleware/bindings, import from Vercel/Netlify/Pages, team roles).
+
 ## Related
 
 - [edge-product-boundary ADR](adr/edge-product-boundary.md)

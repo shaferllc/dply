@@ -69,9 +69,9 @@ test('ssr detection auto selects hybrid and name from repo when no cloud app', f
             $method->setAccessible(true);
             $method->invoke($component->instance());
         })
-        ->assertSet('runtime_mode', 'hybrid')
-        ->assertSet('name', 'Next App')
-        ->assertSet('origin_url', '');
+        ->assertSet('form.runtime_mode', 'hybrid')
+        ->assertSet('form.name', 'Next App')
+        ->assertSet('form.origin_url', '');
 });
 
 test('ssr detection auto fills origin from matching cloud app repo', function () {
@@ -93,11 +93,11 @@ test('ssr detection auto fills origin from matching cloud app repo', function ()
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
+        ->set('form.name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
-        ->set('runtime_mode', 'hybrid')
-        ->assertSet('origin_url', 'https://next-api.ondigitalocean.app');
+        ->set('form.runtime_mode', 'hybrid')
+        ->assertSet('form.origin_url', 'https://next-api.ondigitalocean.app');
 });
 
 test('rejects ssr-looking detection on deploy when hybrid origin missing', function () {
@@ -105,10 +105,10 @@ test('rejects ssr-looking detection on deploy when hybrid origin missing', funct
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
+        ->set('form.name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
-        ->set('runtime_mode', 'static')
+        ->set('form.runtime_mode', 'static')
         ->set('runtimeModeTouched', true)
         ->set('detectedPlan', [
             'framework' => 'next',
@@ -126,11 +126,11 @@ test('hybrid mode leaves origin empty when no cloud app matches', function () {
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('runtime_mode', 'hybrid')
-        ->set('name', 'My App')
-        ->assertSet('origin_url', '')
-        ->set('name', 'SSR App')
-        ->assertSet('origin_url', '');
+        ->set('form.runtime_mode', 'hybrid')
+        ->set('form.name', 'My App')
+        ->assertSet('form.origin_url', '')
+        ->set('form.name', 'SSR App')
+        ->assertSet('form.origin_url', '');
 });
 
 test('hybrid mode uses live cloud app url when one is linked manually', function () {
@@ -152,10 +152,10 @@ test('hybrid mode uses live cloud app url when one is linked manually', function
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
-        ->set('runtime_mode', 'hybrid')
-        ->set('origin_cloud_site_id', (string) $cloudSite->id)
-        ->assertSet('origin_url', 'https://next-api.ondigitalocean.app');
+        ->set('form.name', 'SSR App')
+        ->set('form.runtime_mode', 'hybrid')
+        ->set('form.origin_cloud_site_id', (string) $cloudSite->id)
+        ->assertSet('form.origin_url', 'https://next-api.ondigitalocean.app');
 });
 
 test('shows manual entry when no git accounts linked', function () {
@@ -241,7 +241,7 @@ test('auto detects when a complete manual repo is entered', function () {
         ->set('repo_source', 'manual')
         ->set('repo', '11ty/eleventy-base-blog')
         ->assertSet('detectedPlan.framework', 'eleventy')
-        ->assertSet('output_dir', '_site');
+        ->assertSet('form.output_dir', '_site');
 });
 
 test('does not auto detect for incomplete manual repo slug', function () {
@@ -261,10 +261,10 @@ test('ssr without origin shows auto provision messaging when cloud available', f
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
+        ->set('form.name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
-        ->set('runtime_mode', 'hybrid')
+        ->set('form.runtime_mode', 'hybrid')
         ->set('detectedPlan', [
             'framework' => 'next',
             'start_command' => 'next start',
@@ -282,10 +282,10 @@ test('deploy auto provisions hybrid stack when ssr detected and cloud available'
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
+        ->set('form.name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
-        ->set('runtime_mode', 'hybrid')
+        ->set('form.runtime_mode', 'hybrid')
         ->set('detectedPlan', [
             'framework' => 'next',
             'start_command' => 'next start',
@@ -304,7 +304,7 @@ test('deploy hybrid stack redirects to cloud workspace', function () {
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
+        ->set('form.name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
         ->set('detectedPlan', [
@@ -340,15 +340,15 @@ test('hybrid stack auto provision hidden when origin auto filled', function () {
 
     Livewire::actingAs($user)
         ->test(Create::class)
-        ->set('name', 'SSR App')
+        ->set('form.name', 'SSR App')
         ->set('repo', 'acme/next-app')
         ->set('branch', 'main')
         ->set('detectedPlan', [
             'framework' => 'next',
             'start_command' => 'next start',
         ])
-        ->set('runtime_mode', 'hybrid')
-        ->assertSet('origin_url', 'https://next-api.ondigitalocean.app')
+        ->set('form.runtime_mode', 'hybrid')
+        ->assertSet('form.origin_url', 'https://next-api.ondigitalocean.app')
         ->assertSee('SSR origin URL')
         ->assertSee('Deploy edge app');
 });

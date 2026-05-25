@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Contracts\SourceControl\GitIdentity;
+use App\Models\Concerns\AvoidsGitIdentityAttributeRecursion;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SocialAccount extends Model implements GitIdentity
 {
+    use AvoidsGitIdentityAttributeRecursion;
     use HasUlids;
 
     protected $fillable = [
@@ -31,24 +33,14 @@ class SocialAccount extends Model implements GitIdentity
         return $this->belongsTo(User::class);
     }
 
-    public function id(): string
-    {
-        return (string) $this->getKey();
-    }
-
-    public function provider(): string
-    {
-        return (string) $this->provider;
-    }
-
     public function accessToken(): string
     {
-        return trim((string) $this->access_token);
+        return trim((string) ($this->attributes['access_token'] ?? ''));
     }
 
     public function displayLabel(): string
     {
-        $provider = ucfirst((string) $this->provider);
+        $provider = ucfirst($this->provider());
         $nickname = trim((string) ($this->label ?: $this->nickname ?: $this->provider_id));
 
         return $provider.($nickname !== '' ? ' - '.$nickname : '');
@@ -56,7 +48,7 @@ class SocialAccount extends Model implements GitIdentity
 
     public function apiBaseUrl(): string
     {
-        return match ($this->provider) {
+        return match ($this->provider()) {
             'github' => 'https://api.github.com',
             'gitlab' => 'https://gitlab.com',
             'bitbucket' => 'https://api.bitbucket.org',

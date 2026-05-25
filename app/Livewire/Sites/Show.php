@@ -18,6 +18,8 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesEdgeSite;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
+use App\Livewire\Concerns\MountsSiteWorkspace;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
 use App\Models\Server;
@@ -71,6 +73,8 @@ class Show extends Component
     use DispatchesToastNotifications;
     use ManagesEdgeSite;
     use ManagesServerlessRuntime;
+    use MountsSiteWorkspace;
+    use RefreshesLinkedSourceControlAccounts;
 
     public Server $server;
 
@@ -331,31 +335,23 @@ class Show extends Component
 
     public function mount(Server $server, Site $site): void
     {
-        if ($site->server_id !== $server->id) {
-            abort(404);
-        }
-        $currentOrganization = request()->user()?->currentOrganization();
-        if ($server->organization_id !== $currentOrganization?->id) {
-            abort(404);
-        }
-
-        // Reuse route-bound models during policy checks to avoid lazy re-queries.
-        $site->setRelation('server', $server);
-        if ($currentOrganization !== null && $site->organization_id === $currentOrganization->id) {
-            $server->setRelation('organization', $currentOrganization);
-            $site->setRelation('organization', $currentOrganization);
-        }
-
-        $this->authorize('view', $site);
-        $this->server = $server;
-        $this->site = $site;
+        $this->mountSiteWorkspace($server, $site);
         $this->syncFormFromSite();
+
+        if ($this->site->usesEdgeRuntime()) {
+            return;
+        }
+
         $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
         $this->refreshFunctionsDetection();
     }
 
     protected function syncFormFromSite(): void
     {
+        if ($this->site->usesEdgeRuntime()) {
+            return;
+        }
+
         $functionsConfig = $this->site->functionsConfig();
         $this->git_repository_url = (string) ($this->site->git_repository_url ?? '');
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
@@ -2871,5 +2867,10 @@ class Show extends Component
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
+    }
+
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
     }
 }

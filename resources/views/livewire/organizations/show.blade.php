@@ -17,14 +17,14 @@
                             </p>
                         </div>
                         <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                            <x-outline-link href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate>
+                            <x-docs-link doc-route="docs.markdown" doc-slug="org-roles-and-limits">
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Roles & limits') }}
-                            </x-outline-link>
-                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                            </x-docs-link>
+                            <x-docs-link doc-route="docs.index">
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Documentation') }}
-                            </x-outline-link>
+                            </x-docs-link>
                             @if ($organization->hasAdminAccess(auth()->user()))
                                 <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-transparent bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md hover:bg-brand-forest transition-colors">{{ __('Billing & plan') }}</a>
                             @endif

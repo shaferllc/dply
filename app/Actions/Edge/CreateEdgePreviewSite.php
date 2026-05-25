@@ -9,23 +9,36 @@ use App\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Edge\EdgeGithubCheckRunService;
+use App\Services\Edge\EdgeGithubPullRequestCommenter;
 use App\Support\Edge\EdgeTestingDomains;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
  * Spawn a preview deployment for a source-mode Edge site.
  *
- * Idempotent on (parent, branch) — re-running CI on the same PR returns
- * the existing preview row instead of duplicating.
+ * Two flavors:
+ * - PR-driven ({@see handle()}): idempotent on (parent, branch). The GitHub
+ *   webhook calls this on PR open/sync — re-running CI on the same PR returns
+ *   the existing preview row instead of duplicating. Mirrors a Check Run +
+ *   summary comment back to the PR.
+ * - Ad-hoc ({@see handleAdhoc()}): idempotent on (parent, commit). User
+ *   clicks "Create preview" with a picked SHA. No PR, no GitHub side effects.
  */
 class CreateEdgePreviewSite
 {
+    public const KIND_PR = 'pr';
+
+    public const KIND_ADHOC = 'adhoc';
+
     public function handle(
         Site $parent,
         string $branch,
         ?int $prNumber = null,
+        ?string $headSha = null,
     ): Site {
         $parentSource = $parent->edgeMeta()['source'] ?? null;
         if (! is_array($parentSource) || ! is_string($parentSource['repo'] ?? null)) {
@@ -41,16 +54,20 @@ class CreateEdgePreviewSite
 
         $existing = self::findExisting($parent, $branch);
         if ($existing !== null) {
-            return $existing;
+            return $this->refreshExistingPreview($existing, $prNumber, $headSha);
         }
 
         $slug = $this->previewSlug($parent->slug ?? Str::slug($parent->name), $branch, $prNumber);
         $name = $this->previewName($parent->name, $branch, $prNumber);
-        $testingDomain = EdgeTestingDomains::defaultApex();
+        $testingDomain = self::apexForParent($parent);
         $hostname = $slug.'.'.$testingDomain;
 
         $parentBuild = is_array($parent->edgeMeta()['build'] ?? null) ? $parent->edgeMeta()['build'] : [];
         $parentRouting = is_array($parent->edgeMeta()['routing'] ?? null) ? $parent->edgeMeta()['routing'] : [];
+        // Hybrid previews must inherit the parent's origin/auth/routes or the
+        // build's healthcheck step fails with "No origin URL configured."
+        // Inherit verbatim so previews proxy the same backend as the parent.
+        $parentOrigin = is_array($parent->edgeMeta()['origin'] ?? null) ? $parent->edgeMeta()['origin'] : null;
 
         $server = Server::query()->create([
             'user_id' => $parent->user_id,
@@ -68,6 +85,24 @@ class CreateEdgePreviewSite
             'deploy_on_push' => true,
         ];
 
+        $edgeMeta = [
+            'runtime_mode' => $parent->edgeMeta()['runtime_mode'] ?? 'static',
+            'source' => $sourceSpec,
+            'build' => $parentBuild,
+            'routing' => array_merge($parentRouting, [
+                'hostname' => $hostname,
+            ]),
+            'live_url' => 'https://'.$hostname,
+            'preview_parent_site_id' => $parent->id,
+            'preview_kind' => self::KIND_PR,
+            'preview_branch' => $branch,
+            'preview_pr_number' => $prNumber,
+            'preview_head_sha' => is_string($headSha) && $headSha !== '' ? $headSha : null,
+        ];
+        if ($parentOrigin !== null) {
+            $edgeMeta['origin'] = $parentOrigin;
+        }
+
         $site = Site::query()->create([
             'server_id' => $server->id,
             'user_id' => $parent->user_id,
@@ -83,18 +118,7 @@ class CreateEdgePreviewSite
             'webhook_secret' => Str::random(48),
             'meta' => [
                 'runtime_profile' => 'edge_web',
-                'edge' => [
-                    'runtime_mode' => $parent->edgeMeta()['runtime_mode'] ?? 'static',
-                    'source' => $sourceSpec,
-                    'build' => $parentBuild,
-                    'routing' => array_merge($parentRouting, [
-                        'hostname' => $hostname,
-                    ]),
-                    'live_url' => 'https://'.$hostname,
-                    'preview_parent_site_id' => $parent->id,
-                    'preview_branch' => $branch,
-                    'preview_pr_number' => $prNumber,
-                ],
+                'edge' => $edgeMeta,
             ],
         ]);
 
@@ -111,13 +135,237 @@ class CreateEdgePreviewSite
 
         BuildEdgeSiteJob::dispatch($deployment->id);
 
-        return $site;
+        if (is_string($headSha) && $headSha !== '') {
+            $this->mirrorPreviewOntoGithub($site->fresh());
+        }
+
+        return $site->fresh();
+    }
+
+    /**
+     * Ad-hoc preview from a picked commit (no PR). Dedups by commit SHA so
+     * clicking Create twice with the same SHA returns the existing preview
+     * instead of building a duplicate. A different SHA from the same branch
+     * creates a new preview (each commit gets its own URL).
+     */
+    public function handleAdhoc(Site $parent, string $branch, string $headSha, ?string $refKind = null): Site
+    {
+        $parentSource = $parent->edgeMeta()['source'] ?? null;
+        if (! is_array($parentSource) || ! is_string($parentSource['repo'] ?? null)) {
+            throw new \RuntimeException(
+                'Parent site has no source spec — only git-connected Edge sites can spawn previews.',
+            );
+        }
+
+        $branch = trim($branch);
+        if ($branch === '') {
+            throw new \InvalidArgumentException('Branch is required to create an ad-hoc preview.');
+        }
+
+        $headSha = strtolower(trim($headSha));
+        if (preg_match('/^[a-f0-9]{7,40}$/', $headSha) !== 1) {
+            throw new \InvalidArgumentException('Commit SHA must be 7–40 hex characters.');
+        }
+
+        $existing = self::findExistingByCommit($parent, $headSha);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $slug = $this->adhocPreviewSlug($parent->slug ?? Str::slug($parent->name), $headSha);
+        $name = sprintf('%s preview (%s)', $parent->name, substr($headSha, 0, 7));
+        $testingDomain = self::apexForParent($parent);
+        $hostname = $slug.'.'.$testingDomain;
+
+        $parentBuild = is_array($parent->edgeMeta()['build'] ?? null) ? $parent->edgeMeta()['build'] : [];
+        $parentRouting = is_array($parent->edgeMeta()['routing'] ?? null) ? $parent->edgeMeta()['routing'] : [];
+        $parentOrigin = is_array($parent->edgeMeta()['origin'] ?? null) ? $parent->edgeMeta()['origin'] : null;
+
+        $server = Server::query()->create([
+            'user_id' => $parent->user_id,
+            'organization_id' => $parent->organization_id,
+            'name' => 'edge-'.$slug,
+            'status' => Server::STATUS_READY,
+            'meta' => [
+                'host_kind' => Server::HOST_KIND_DPLY_EDGE,
+            ],
+        ]);
+
+        $sourceSpec = [
+            'repo' => (string) $parentSource['repo'],
+            'branch' => $branch,
+            // Ad-hoc previews freeze on the picked commit — auto-deploy on
+            // future branch pushes would defeat the "this URL is that SHA"
+            // contract the operator is asking for.
+            'deploy_on_push' => false,
+        ];
+
+        // Normalize ref kind so the view can branch on it safely. Anything
+        // outside the known set falls back to null (renders like a branch).
+        $refKind = in_array($refKind, ['branch', 'tag', 'commit'], true) ? $refKind : null;
+
+        $edgeMeta = [
+            'runtime_mode' => $parent->edgeMeta()['runtime_mode'] ?? 'static',
+            'source' => $sourceSpec,
+            'build' => $parentBuild,
+            'routing' => array_merge($parentRouting, [
+                'hostname' => $hostname,
+            ]),
+            'live_url' => 'https://'.$hostname,
+            'preview_parent_site_id' => $parent->id,
+            'preview_kind' => self::KIND_ADHOC,
+            'preview_branch' => $branch,
+            'preview_ref_kind' => $refKind,
+            'preview_pr_number' => null,
+            'preview_head_sha' => $headSha,
+        ];
+        if ($parentOrigin !== null) {
+            // Hybrid parents: previews share the same origin/auth/routes so
+            // proxied routes hit the same backend and the build's origin
+            // healthcheck has a URL to probe.
+            $edgeMeta['origin'] = $parentOrigin;
+        }
+
+        $site = Site::query()->create([
+            'server_id' => $server->id,
+            'user_id' => $parent->user_id,
+            'organization_id' => $parent->organization_id,
+            'name' => $name,
+            'slug' => $slug,
+            'type' => SiteType::Static,
+            'runtime' => null,
+            'document_root' => null,
+            'repository_path' => null,
+            'edge_backend' => $parent->edge_backend,
+            'status' => Site::STATUS_EDGE_PROVISIONING,
+            'webhook_secret' => Str::random(48),
+            'meta' => [
+                'runtime_profile' => 'edge_web',
+                'edge' => $edgeMeta,
+            ],
+        ]);
+
+        $prefix = trim((string) config('edge.r2.key_prefix', 'edge/'), '/')
+            .'/'.$parent->organization_id.'/'.$site->id.'/'.Str::ulid();
+
+        $deployment = EdgeDeployment::query()->create([
+            'site_id' => $site->id,
+            'organization_id' => $parent->organization_id,
+            'status' => EdgeDeployment::STATUS_BUILDING,
+            'git_branch' => $branch,
+            'git_commit' => $headSha,
+            'storage_prefix' => $prefix,
+        ]);
+
+        BuildEdgeSiteJob::dispatch($deployment->id, $headSha);
+
+        return $site->fresh();
+    }
+
+    /**
+     * PR synchronize on an existing preview — redeploy the new head SHA and
+     * refresh the GitHub Check Run + PR summary comment.
+     */
+    private function refreshExistingPreview(
+        Site $preview,
+        ?int $prNumber,
+        ?string $headSha,
+    ): Site {
+        $headSha = is_string($headSha) && $headSha !== '' ? $headSha : null;
+        $edge = $preview->edgeMeta();
+        $metaUpdates = [];
+
+        if ($prNumber !== null && $prNumber > 0) {
+            $metaUpdates['preview_pr_number'] = $prNumber;
+        }
+        if ($headSha !== null) {
+            $metaUpdates['preview_head_sha'] = $headSha;
+            // Each commit gets its own Check Run — drop the stale id.
+            $metaUpdates['github_check_run_id'] = null;
+        }
+
+        if ($metaUpdates !== []) {
+            $preview->mergeEdgeMeta($metaUpdates);
+            $preview->save();
+            $preview->refresh();
+        }
+
+        if ($headSha === null) {
+            return $preview;
+        }
+
+        $prefix = trim((string) config('edge.r2.key_prefix', 'edge/'), '/')
+            .'/'.$preview->organization_id.'/'.$preview->id.'/'.Str::ulid();
+
+        $deployment = EdgeDeployment::query()->create([
+            'site_id' => $preview->id,
+            'organization_id' => $preview->organization_id,
+            'status' => EdgeDeployment::STATUS_BUILDING,
+            'git_branch' => (string) ($edge['preview_branch'] ?? $preview->edgeMeta()['preview_branch'] ?? 'main'),
+            'git_commit' => $headSha,
+            'storage_prefix' => $prefix,
+        ]);
+
+        $preview->update(['status' => Site::STATUS_EDGE_PROVISIONING]);
+
+        BuildEdgeSiteJob::dispatch($deployment->id);
+
+        $this->mirrorPreviewOntoGithub($preview->fresh());
+
+        return $preview->fresh();
+    }
+
+    private function mirrorPreviewOntoGithub(Site $preview): void
+    {
+        $headSha = trim((string) ($preview->edgeMeta()['preview_head_sha'] ?? ''));
+        if ($headSha === '') {
+            return;
+        }
+
+        try {
+            app(EdgeGithubCheckRunService::class)->create($preview);
+        } catch (\Throwable $e) {
+            Log::warning('Edge preview check-run create failed', [
+                'site_id' => (string) $preview->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            app(EdgeGithubPullRequestCommenter::class)->upsert($preview, 'building');
+        } catch (\Throwable $e) {
+            Log::warning('Edge preview PR comment create failed', [
+                'site_id' => (string) $preview->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public static function findExisting(Site $parent, string $branch): ?Site
     {
         return self::livePreviewQuery($parent)
             ->whereJsonContains('meta->edge->preview_branch', $branch)
+            ->first();
+    }
+
+    /**
+     * Ad-hoc dedup key — same parent + same commit returns the existing
+     * preview. PR previews are excluded so a webhook-driven preview on the
+     * same branch can't accidentally satisfy an ad-hoc create request.
+     * Failed previews are also excluded so the operator can retry a busted
+     * SHA by clicking Create again without first tearing it down.
+     */
+    public static function findExistingByCommit(Site $parent, string $headSha): ?Site
+    {
+        $headSha = strtolower(trim($headSha));
+        if ($headSha === '') {
+            return null;
+        }
+
+        return self::livePreviewQuery($parent)
+            ->where('status', '!=', Site::STATUS_EDGE_FAILED)
+            ->whereJsonContains('meta->edge->preview_kind', self::KIND_ADHOC)
+            ->whereJsonContains('meta->edge->preview_head_sha', $headSha)
             ->first();
     }
 
@@ -154,6 +402,18 @@ class CreateEdgePreviewSite
         return Str::slug('preview-'.$branchSlug.'-'.$parentSlug);
     }
 
+    /**
+     * Short-SHA-keyed slug for ad-hoc previews. Each commit gets its own
+     * hostname so two ad-hoc previews from the same branch don't collide.
+     */
+    private function adhocPreviewSlug(string $parentSlug, string $headSha): string
+    {
+        $parentSlug = $parentSlug !== '' ? $parentSlug : 'app';
+        $shortSha = substr(strtolower(trim($headSha)), 0, 7);
+
+        return Str::slug('adhoc-'.$shortSha.'-'.$parentSlug);
+    }
+
     private function previewName(string $parentName, string $branch, ?int $prNumber): string
     {
         if ($prNumber !== null && $prNumber > 0) {
@@ -161,5 +421,26 @@ class CreateEdgePreviewSite
         }
 
         return sprintf('%s preview (%s)', $parentName, $branch);
+    }
+
+    /**
+     * Pick the apex the preview hostname should live on. Strips the parent's
+     * own slug off its routing hostname so previews share the parent's zone —
+     * if the parent runs on dply.host, the preview does too, regardless of
+     * what the current DPLY_EDGE_TESTING_DOMAINS default has been changed to.
+     * Falls back to the configured default only when the parent has no
+     * usable hostname yet (brand-new sites before first publish).
+     */
+    private static function apexForParent(Site $parent): string
+    {
+        $hostname = strtolower(trim((string) ($parent->edgeMeta()['routing']['hostname'] ?? '')));
+        if ($hostname !== '' && str_contains($hostname, '.')) {
+            $apex = substr($hostname, strpos($hostname, '.') + 1);
+            if ($apex !== '' && str_contains($apex, '.')) {
+                return $apex;
+            }
+        }
+
+        return EdgeTestingDomains::defaultApex();
     }
 }

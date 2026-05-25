@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Docs\MarkdownDocRenderer;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class DocsController extends Controller
 {
+    public function __construct(
+        private readonly MarkdownDocRenderer $markdownDocRenderer,
+    ) {}
+
     public function index(): View
     {
         return view('docs.index');
@@ -29,7 +32,7 @@ class DocsController extends Controller
      */
     public function apiDocumentation(): View
     {
-        return $this->markdownFromDocsPath('HTTP_API.md', 'HTTP API');
+        return $this->markdownView('api');
     }
 
     /**
@@ -37,33 +40,20 @@ class DocsController extends Controller
      */
     public function markdown(string $slug): View
     {
-        $pages = config('docs.markdown', []);
-        $page = $pages[$slug] ?? null;
-        if (! is_array($page)) {
-            throw new NotFoundHttpException;
-        }
-
-        $filename = $page['file'] ?? null;
-        $title = $page['title'] ?? null;
-        if (! is_string($filename) || $filename === '' || ! is_string($title) || $title === '') {
-            throw new NotFoundHttpException;
-        }
-
-        return $this->markdownFromDocsPath($filename, $title);
+        return $this->markdownView($slug);
     }
 
-    private function markdownFromDocsPath(string $filename, string $title): View
+    private function markdownView(string $slug): View
     {
-        $path = base_path('docs/'.$filename);
-        if (! File::isFile($path)) {
+        try {
+            $rendered = $this->markdownDocRenderer->render($slug);
+        } catch (NotFoundHttpException) {
             throw new NotFoundHttpException;
         }
 
-        $html = Str::markdown(File::get($path));
-
         return view('docs.markdown-doc', [
-            'title' => $title,
-            'html' => $html,
+            'title' => $rendered['title'],
+            'html' => $rendered['html'],
         ]);
     }
 }

@@ -7,8 +7,11 @@ namespace App\Jobs;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Services\Edge\EdgeDeploymentPruner;
+use App\Services\Edge\EdgeGithubCheckRunService;
+use App\Services\Edge\EdgeGithubPullRequestCommenter;
 use App\Services\Edge\EdgeRouter;
 use App\Services\Edge\EdgeTestingHostnameProvisioner;
+use App\Services\Edge\OriginHealthcheckRunner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -52,6 +55,20 @@ class PublishEdgeDeploymentJob implements ShouldQueue
 
         $deployment->update(['status' => EdgeDeployment::STATUS_PUBLISHING]);
 
+        // Atomic gate for hybrid sites: confirm the origin answers before
+        // we flip KV to point at this deployment. Without this, an unhealthy
+        // origin would start receiving Worker-proxied traffic the moment KV
+        // propagates. Static sites bypass — there's nothing to healthcheck.
+        if (($site->edgeMeta()['runtime_mode'] ?? 'static') === 'hybrid') {
+            $health = app(OriginHealthcheckRunner::class)->run($site->fresh());
+            if (! $health['ok']) {
+                $this->markFailed($site, $deployment, $health['message']);
+                $this->cleanupLocalArtifact();
+
+                return;
+            }
+        }
+
         try {
             $result = $backend->publishDeployment($deployment, $site, $this->localArtifactDir);
 
@@ -94,14 +111,34 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             } catch (Throwable) {
                 // Pruning is best-effort — old artifacts will be retried next publish.
             }
+
+            // Mark the matching GitHub Check Run + update the PR
+            // comment with the live URL. Wrapped — GitHub flake must
+            // not fail a successful publish.
+            $liveUrl = is_string($result['live_url'] ?? null) ? (string) $result['live_url'] : null;
+            try {
+                app(EdgeGithubCheckRunService::class)->complete($site->fresh(), 'success', $liveUrl);
+            } catch (Throwable) {
+                // Check Run update is best-effort.
+            }
+            try {
+                app(EdgeGithubPullRequestCommenter::class)->upsert($site->fresh(), 'success', $liveUrl);
+            } catch (Throwable) {
+                // PR comment update is best-effort.
+            }
         } catch (Throwable $e) {
             $this->markFailed($site, $deployment, $e->getMessage());
 
             throw $e;
         } finally {
-            if (is_dir($this->localArtifactDir) && str_contains($this->localArtifactDir, sys_get_temp_dir())) {
-                File::deleteDirectory(dirname($this->localArtifactDir));
-            }
+            $this->cleanupLocalArtifact();
+        }
+    }
+
+    private function cleanupLocalArtifact(): void
+    {
+        if (is_dir($this->localArtifactDir) && str_contains($this->localArtifactDir, sys_get_temp_dir())) {
+            File::deleteDirectory(dirname($this->localArtifactDir));
         }
     }
 
@@ -119,5 +156,16 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             'failed_at' => now(),
             'failure_reason' => $message,
         ]);
+
+        try {
+            app(EdgeGithubCheckRunService::class)->complete($site->fresh(), 'failure');
+        } catch (Throwable) {
+            // Check Run update is best-effort.
+        }
+        try {
+            app(EdgeGithubPullRequestCommenter::class)->upsert($site->fresh(), 'failure');
+        } catch (Throwable) {
+            // PR comment update is best-effort.
+        }
     }
 }

@@ -37,7 +37,7 @@ test('edge active site shows workspace not provisioning journey', function () {
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site]))
         ->assertOk()
-        ->assertSee('Site workspace')
+        ->assertSee('Edge site')
         ->assertSee('Dply Edge')
         ->assertDontSee('Edge build (')
         ->assertDontSee('Site provisioning');

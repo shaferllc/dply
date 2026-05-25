@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
             tailwindcss(),
             laravel({
                 input: ['resources/css/app.css', 'resources/js/app.js'],
-                refresh: true,
+                refresh: false,
             }),
         ],
         ...(server ? { server } : {}),

@@ -57,13 +57,14 @@ class GithubEdgeWebhookController extends Controller
         $pr = is_array($payload['pull_request'] ?? null) ? $payload['pull_request'] : [];
         $branch = is_string($pr['head']['ref'] ?? null) ? (string) $pr['head']['ref'] : '';
         $prNumber = is_int($pr['number'] ?? null) ? (int) $pr['number'] : null;
+        $headSha = is_string($pr['head']['sha'] ?? null) ? (string) $pr['head']['sha'] : null;
 
         if ($branch === '') {
             return response()->json(['ok' => false, 'reason' => 'no_branch'], 200);
         }
 
         if (in_array($action, ['opened', 'reopened', 'synchronize'], true)) {
-            $preview = (new CreateEdgePreviewSite)->handle($site, $branch, $prNumber);
+            $preview = (new CreateEdgePreviewSite)->handle($site, $branch, $prNumber, $headSha);
             $this->touchWebhookLastEvent($site);
 
             return response()->json([

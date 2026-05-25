@@ -34,48 +34,80 @@
 
     @unless ($compact)
         @can('update', $site)
-            <div class="border-b border-brand-ink/10 px-6 py-3 sm:px-8">
-                <form wire:submit.prevent="deployEdgeCommit" class="space-y-0">
-                    <div class="flex flex-wrap items-end gap-2">
-                        <div class="min-w-[16rem] flex-1">
-                            <label for="edge_deploy_commit_sha" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
-                                {{ __('Deploy ref') }}
-                            </label>
-                            <div class="mt-1 flex gap-2">
-                                <input
-                                    id="edge_deploy_commit_sha"
-                                    type="text"
-                                    wire:model="edge_deploy_commit_sha"
-                                    placeholder="{{ __('Commit SHA, or browse below') }}"
-                                    autocomplete="off"
-                                    spellcheck="false"
-                                    class="min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage"
-                                />
-                                <button
-                                    type="button"
-                                    wire:click="openEdgeDeployRefPicker"
-                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/60"
-                                >
-                                    <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
-                                    {{ __('Browse') }}
-                                </button>
+            @php
+                $edgeDeployRefMissingProvider = $this->edgeDeployRefMissingProvider();
+            @endphp
+            @if ($edgeDeployRefMissingProvider === null)
+                <div class="border-b border-brand-ink/10 px-6 py-3 sm:px-8">
+                    <form wire:submit.prevent="deployEdgeCommit" class="space-y-0">
+                        <div class="flex flex-wrap items-end gap-2">
+                            <div class="min-w-[16rem] flex-1">
+                                <label for="edge_deploy_commit_sha" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                                    {{ __('Deploy ref') }}
+                                </label>
+                                <div class="mt-1 flex gap-2">
+                                    <input
+                                        id="edge_deploy_commit_sha"
+                                        type="text"
+                                        wire:model="edge_deploy_commit_sha"
+                                        placeholder="{{ __('Commit SHA, or browse below') }}"
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        class="min-w-0 flex-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink focus:border-brand-sage focus:ring-1 focus:ring-brand-sage"
+                                    />
+                                    <button
+                                        type="button"
+                                        wire:click="openEdgeDeployRefPicker"
+                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/60"
+                                    >
+                                        <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
+                                        {{ __('Browse') }}
+                                    </button>
+                                </div>
                             </div>
+                            <button
+                                type="submit"
+                                wire:loading.attr="disabled"
+                                wire:target="deployEdgeCommit"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                            >
+                                {{ __('Deploy') }}
+                            </button>
                         </div>
-                        <button
-                            type="submit"
-                            wire:loading.attr="disabled"
-                            wire:target="deployEdgeCommit"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
-                        >
-                            {{ __('Deploy') }}
-                        </button>
-                    </div>
-                    <p class="mt-2 text-xs text-brand-moss">{{ __('Pick a commit, branch tip, or tag from your connected Git provider. Re-flips KV if we already built that commit; otherwise rebuilds from that ref.') }}</p>
-                    @if ($edge_deploy_ref_picker_open)
-                        @include('livewire.sites.partials.edge.deploy-ref-picker')
-                    @endif
-                </form>
-            </div>
+                        @if ($edge_deploy_commit_branch !== null)
+                            <p class="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-brand-moss">
+                                <span>{{ __('Will deploy on branch') }}</span>
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-ink">
+                                    {{ $edge_deploy_commit_branch }}
+                                    <button type="button" wire:click="$set('edge_deploy_commit_branch', null)" class="text-brand-mist hover:text-brand-ink" title="{{ __('Clear branch override (deploy will record the site default).') }}">
+                                        <x-heroicon-m-x-mark class="h-3 w-3" aria-hidden="true" />
+                                    </button>
+                                </span>
+                            </p>
+                        @else
+                            <p class="mt-2 text-xs text-brand-moss">{{ __('Pick a commit, branch tip, or tag from your connected Git provider. Re-flips KV if we already built that commit; otherwise rebuilds from that ref.') }}</p>
+                        @endif
+                        @if ($edge_deploy_ref_picker_open)
+                            @include('livewire.sites.partials.edge.deploy-ref-picker')
+                        @endif
+                    </form>
+                </div>
+            @else
+                @php
+                    $missingProviderLabel = match ($edgeDeployRefMissingProvider) {
+                        'github' => 'GitHub',
+                        'gitlab' => 'GitLab',
+                        'bitbucket' => 'Bitbucket',
+                        default => ucfirst($edgeDeployRefMissingProvider),
+                    };
+                @endphp
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-3 text-sm text-brand-moss sm:px-8">
+                    <p>{{ __('Connect :provider to deploy a specific commit, branch tip, or tag.', ['provider' => $missingProviderLabel]) }}</p>
+                    <x-connect-provider-link class="!text-sm">
+                        {{ __('Connect :provider', ['provider' => $missingProviderLabel]) }} &rarr;
+                    </x-connect-provider-link>
+                </div>
+            @endif
         @endcan
     @endunless
 

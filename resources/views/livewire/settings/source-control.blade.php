@@ -22,10 +22,10 @@
                 </div>
                 <div class="lg:col-span-8 space-y-4">
                     <div>
-                        <x-outline-link href="{{ route('docs.markdown', ['slug' => 'source-control']) }}" wire:navigate>
+                        <x-docs-link doc-route="docs.markdown" doc-slug="source-control">
                             <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('Source control docs') }}
-                        </x-outline-link>
+                        </x-docs-link>
                     </div>
                     @if (auth()->user()->currentOrganization())
                         <p class="text-sm text-brand-moss leading-relaxed">

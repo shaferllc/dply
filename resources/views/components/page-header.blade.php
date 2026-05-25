@@ -61,13 +61,10 @@
                 'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,
             ])>
                 @if ($docRoute)
-                    <x-outline-link
-                        href="{{ $docSlug !== null ? route($docRoute, ['slug' => $docSlug]) : route($docRoute) }}"
-                        wire:navigate
-                    >
+                    <x-docs-link :doc-route="$docRoute" :doc-slug="$docSlug">
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ $docLinkLabel }}
-                    </x-outline-link>
+                    </x-docs-link>
                 @endif
                 @isset($actions)
                     {{ $actions }}

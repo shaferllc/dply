@@ -6,7 +6,7 @@ namespace Tests\Feature\EdgeProvisioningCancelTest;
 
 use App\Enums\SiteType;
 use App\Jobs\TeardownEdgeSiteJob;
-use App\Livewire\Sites\Show as SitesShow;
+use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
@@ -27,7 +27,7 @@ test('cancel build during edge provisioning tears down site and edge server', fu
     $deploymentId = EdgeDeployment::query()->where('site_id', $siteId)->value('id');
 
     Livewire::actingAs($user)
-        ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->call('cancelProvisioning')
         ->assertRedirect(route('edge.index'));
 
@@ -40,7 +40,7 @@ test('open cancel modal uses edge copy for edge sites', function () {
     [$user, $server, $site] = makeProvisioningEdgeSite();
 
     Livewire::actingAs($user)
-        ->test(SitesShow::class, ['server' => $server, 'site' => $site])
+        ->test(EdgeSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])
         ->call('openCancelProvisioningModal')
         ->assertSet('confirmActionModalTitle', __('Cancel Edge build?'))
         ->assertSet('confirmActionModalConfirmLabel', __('Cancel and remove site'));

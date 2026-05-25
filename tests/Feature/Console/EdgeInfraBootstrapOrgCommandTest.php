@@ -30,7 +30,11 @@ test('bootstrap org command creates bucket and kv metadata', function () {
         }
 
         if (str_contains($url, '/storage/kv/namespaces') && $request->method() === 'POST') {
-            return Http::response(['success' => true, 'result' => ['id' => 'kv-new']], 200);
+            $body = json_decode($request->body(), true);
+            $title = is_array($body) ? (string) ($body['title'] ?? '') : '';
+            $id = $title === 'dply-edge-cache' ? 'cache-kv-new' : 'kv-new';
+
+            return Http::response(['success' => true, 'result' => ['id' => $id, 'title' => $title]], 200);
         }
 
         if (str_contains($url, '/r2/buckets') && $request->method() === 'GET') {
@@ -60,6 +64,7 @@ test('bootstrap org command creates bucket and kv metadata', function () {
         ->and($edge['r2_bucket'] ?? null)->toBe('dply-edge-test')
         ->and($edge['worker_zone_name'] ?? null)->toBe('example.com')
         ->and($edge['kv_namespace_id'] ?? null)->toBe('kv-new')
+        ->and($edge['cache_kv_namespace_id'] ?? null)->toBe('cache-kv-new')
         ->and($edge['r2_access_key'] ?? null)->toBe('access-key');
 });
 

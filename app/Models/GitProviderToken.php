@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Contracts\SourceControl\GitIdentity;
+use App\Models\Concerns\AvoidsGitIdentityAttributeRecursion;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class GitProviderToken extends Model implements GitIdentity
 {
+    use AvoidsGitIdentityAttributeRecursion;
     use HasUlids;
 
     protected $fillable = [
@@ -46,24 +48,18 @@ class GitProviderToken extends Model implements GitIdentity
         return $this->belongsTo(User::class);
     }
 
-    public function id(): string
-    {
-        return (string) $this->getKey();
-    }
-
-    public function provider(): string
-    {
-        return (string) $this->provider;
-    }
-
     public function accessToken(): string
     {
-        return trim((string) $this->access_token);
+        $token = array_key_exists('access_token', $this->attributes)
+            ? $this->castAttribute('access_token', $this->attributes['access_token'])
+            : null;
+
+        return trim((string) $token);
     }
 
     public function displayLabel(): string
     {
-        $provider = ucfirst((string) $this->provider);
+        $provider = ucfirst($this->provider());
         $name = trim((string) ($this->label ?: $this->nickname ?: $this->provider_id));
 
         return $provider.' token'.($name !== '' ? ' - '.$name : '');
@@ -76,7 +72,7 @@ class GitProviderToken extends Model implements GitIdentity
             return rtrim($custom, '/');
         }
 
-        return match ($this->provider) {
+        return match ($this->provider()) {
             'github' => 'https://api.github.com',
             'gitlab' => 'https://gitlab.com',
             'bitbucket' => 'https://api.bitbucket.org',

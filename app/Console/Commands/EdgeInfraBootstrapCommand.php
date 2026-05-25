@@ -19,7 +19,8 @@ class EdgeInfraBootstrapCommand extends Command
 {
     protected $signature = 'dply:edge:infra:bootstrap
                             {--bucket= : R2 bucket name (default: dply-edge-artifacts)}
-                            {--kv-title=dply-edge-host-map : KV namespace title}
+                            {--kv-title=dply-edge-host-map : KV namespace title for host map}
+                            {--cache-kv-title=dply-edge-cache : KV namespace title for hybrid origin cache}
                             {--dry-run : Print planned actions without calling Cloudflare}';
 
     protected $description = 'Create Edge R2 bucket and KV namespace via Cloudflare API';
@@ -37,12 +38,14 @@ class EdgeInfraBootstrapCommand extends Command
 
         $bucket = (string) ($this->option('bucket') ?: config('edge.r2.bucket') ?: 'dply-edge-artifacts');
         $kvTitle = (string) $this->option('kv-title');
+        $cacheKvTitle = (string) $this->option('cache-kv-title');
 
         if ($this->option('dry-run')) {
             $this->info('[dry-run] Would verify Cloudflare token');
             $this->line('[dry-run] R2 bucket: '.$bucket);
-            $this->line('[dry-run] KV namespace title: '.$kvTitle);
-            $this->printEnvTemplate($bucket, (string) config('edge.cloudflare.kv_namespace_id'), $accountId);
+            $this->line('[dry-run] KV namespace title (host map): '.$kvTitle);
+            $this->line('[dry-run] KV namespace title (origin cache): '.$cacheKvTitle);
+            $this->printEnvTemplate($bucket, (string) config('edge.cloudflare.kv_namespace_id'), $accountId, (string) config('edge.cloudflare.cache_kv_namespace_id'));
 
             return self::SUCCESS;
         }
@@ -74,11 +77,27 @@ class EdgeInfraBootstrapCommand extends Command
                 $this->line('Using configured KV namespace id: '.$kvId);
             }
 
+            $cacheKvId = (string) config('edge.cloudflare.cache_kv_namespace_id');
+            if ($cacheKvId === '') {
+                $existingCache = $client->kvNamespaceIdByTitle($cacheKvTitle);
+                if ($existingCache !== null) {
+                    $cacheKvId = $existingCache;
+                    $this->line('Cache KV namespace already exists: '.$cacheKvTitle.' ('.$cacheKvId.')');
+                } else {
+                    $createdCache = $client->createKvNamespace($cacheKvTitle);
+                    $cacheKvId = is_string($createdCache['id'] ?? null) ? $createdCache['id'] : '';
+                    $this->info('Created cache KV namespace: '.$cacheKvTitle.' ('.$cacheKvId.')');
+                }
+            } else {
+                $this->line('Using configured cache KV namespace id: '.$cacheKvId);
+            }
+
             $this->newLine();
-            $this->printEnvTemplate($bucket, $kvId, $accountId);
+            $this->printEnvTemplate($bucket, $kvId, $accountId, $cacheKvId);
             $this->newLine();
             $this->warn('Create an R2 API token in Cloudflare (R2 → Manage R2 API tokens) with read/write on this bucket.');
             $this->line('Then run: php artisan dply:edge:doctor --probe');
+            $this->line('Ensure delivery features: php artisan dply:edge:ensure-delivery-features');
             $this->line('Deploy worker: php artisan edge:worker:deploy');
 
             return self::SUCCESS;
@@ -89,7 +108,7 @@ class EdgeInfraBootstrapCommand extends Command
         }
     }
 
-    private function printEnvTemplate(string $bucket, string $kvId, string $accountId): void
+    private function printEnvTemplate(string $bucket, string $kvId, string $accountId, string $cacheKvId = ''): void
     {
         $endpoint = EdgePlatformCredentials::r2Endpoint() ?: 'https://'.$accountId.'.r2.cloudflarestorage.com';
         $routes = EdgePlatformCredentials::workerRoutes();
@@ -108,6 +127,9 @@ class EdgeInfraBootstrapCommand extends Command
         $this->line('DPLY_EDGE_CF_API_TOKEN=<same or dedicated Workers/KV token>');
         if ($kvId !== '') {
             $this->line('DPLY_EDGE_CF_KV_NAMESPACE_ID='.$kvId);
+        }
+        if ($cacheKvId !== '') {
+            $this->line('DPLY_EDGE_CF_CACHE_KV_NAMESPACE_ID='.$cacheKvId);
         }
         $this->line('DPLY_EDGE_CF_WORKER_SCRIPT=dply-edge');
         if ($zone !== '' && $routes !== []) {

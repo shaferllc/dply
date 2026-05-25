@@ -12,7 +12,6 @@ use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
-use App\Livewire\Concerns\ManagesEdgeSite;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -50,11 +49,9 @@ use App\Services\Sites\SiteSystemdProvisioner;
 use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
-use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
-use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -67,7 +64,6 @@ class Settings extends Show
 {
     use DismissesConsoleActionRun;
     use ManagesContainerSite;
-    use ManagesEdgeSite;
     use StreamsRemoteSshLivewire;
 
     protected function consoleActionSubject(): Model
@@ -337,6 +333,10 @@ class Settings extends Show
             abort(404);
         }
 
+        if ($site->usesEdgeRuntime()) {
+            abort(404);
+        }
+
         // Section is a path segment (servers/{server}/sites/{site}/{section}).
         // Default to 'general' so /sites/{site} (no trailing segment) still
         // resolves.
@@ -395,9 +395,7 @@ class Settings extends Show
             return;
         }
 
-        $allowed = $site->usesEdgeRuntime()
-            ? array_column(SiteSettingsSidebar::items($site, $server), 'id')
-            : array_keys(config('site_settings.workspace_tabs', []));
+        $allowed = array_keys(config('site_settings.workspace_tabs', []));
 
         if (! in_array($section, $allowed, true)) {
             abort(404);
@@ -424,10 +422,8 @@ class Settings extends Show
             $this->loadLaravelArtisanDiscovery(false);
         }
 
-        $this->loadSiteNotificationPreferences();
-
-        if ($this->site->usesEdgeRuntime()) {
-            $this->mountEdgeWebhookAccount();
+        if ($this->section === 'notifications') {
+            $this->loadSiteNotificationPreferences();
         }
 
         if ($this->section === 'repository') {
@@ -3190,11 +3186,6 @@ class Settings extends Show
                 ->get();
         }
 
-        if ($section === 'edge-build' && auth()->user() !== null) {
-            $viewData['linkedSourceControlAccounts'] = app(SourceControlRepositoryBrowser::class)
-                ->accountsForUser(auth()->user());
-        }
-
         return view('livewire.sites.settings', array_merge(
             SiteSettingsViewData::for(
                 $this->server,
@@ -3216,10 +3207,7 @@ class Settings extends Show
         $shared = ['certificates', 'certificates.previewDomain'];
 
         $sectionRelations = match ($section) {
-            'general' => $this->site->usesEdgeRuntime()
-                ? ['edgeDeployments', 'workspace']
-                : ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
-            'edge-deploys', 'edge-logs', 'edge-traffic', 'edge-domains', 'edge-build', 'edge-previews' => ['edgeDeployments'],
+            'general' => ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
             'settings' => ['workspace', 'workspace.variables'],
             'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains'],
             'dns' => ['dnsProviderCredential', 'domains', 'previewDomains'],

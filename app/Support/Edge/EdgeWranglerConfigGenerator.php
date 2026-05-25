@@ -60,6 +60,15 @@ class EdgeWranglerConfigGenerator
             'id = '.json_encode($context->kvNamespaceId, JSON_UNESCAPED_SLASHES),
         ]);
 
+        if ($context->cacheKvNamespaceId !== '') {
+            $lines = array_merge($lines, [
+                '',
+                '[[kv_namespaces]]',
+                'binding = "EDGE_CACHE"',
+                'id = '.json_encode($context->cacheKvNamespaceId, JSON_UNESCAPED_SLASHES),
+            ]);
+        }
+
         if ($context->workerRoutes !== []) {
             $lines[] = '';
             foreach ($context->workerRoutes as $pattern) {

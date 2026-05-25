@@ -9,6 +9,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -125,6 +126,115 @@ class EdgeCloudflareClient
         }
 
         return null;
+    }
+
+    /**
+     * Resolve an existing KV namespace by title or create it.
+     */
+    public function ensureKvNamespace(string $title): string
+    {
+        $existing = $this->kvNamespaceIdByTitle($title);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $created = $this->createKvNamespace($title);
+        $id = is_string($created['id'] ?? null) ? trim($created['id']) : '';
+        if ($id === '') {
+            throw new RuntimeException('Cloudflare did not return an id when creating KV namespace '.$title.'.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function zoneSetting(string $zoneId, string $settingId): ?array
+    {
+        $response = Http::withToken($this->apiToken)->get(
+            self::BASE.'/zones/'.$zoneId.'/settings/'.$settingId,
+        );
+
+        $payload = $response->json();
+        if (! is_array($payload) || ($payload['success'] ?? false) !== true) {
+            return null;
+        }
+
+        $result = $payload['result'] ?? null;
+
+        return is_array($result) ? $result : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function patchZoneSetting(string $zoneId, string $settingId, string $value): array
+    {
+        return $this->decode(
+            Http::withToken($this->apiToken)->patch(
+                self::BASE.'/zones/'.$zoneId.'/settings/'.$settingId,
+                ['value' => $value],
+            ),
+        );
+    }
+
+    /**
+     * Enable Cloudflare Image Resizing on a zone when the plan allows it.
+     *
+     * @return array{ok: bool, zone: string, value: ?string, detail: string}
+     */
+    public function ensureImageResizingEnabled(string $zoneName): array
+    {
+        $zoneName = strtolower(trim($zoneName));
+        if ($zoneName === '') {
+            return [
+                'ok' => false,
+                'zone' => '',
+                'value' => null,
+                'detail' => 'Zone name is empty.',
+            ];
+        }
+
+        $zoneId = $this->activeZoneId($zoneName);
+        if ($zoneId === null) {
+            return [
+                'ok' => false,
+                'zone' => $zoneName,
+                'value' => null,
+                'detail' => 'Zone is not active on Cloudflare.',
+            ];
+        }
+
+        $current = $this->zoneSetting($zoneId, 'image_resizing');
+        $value = is_string($current['value'] ?? null) ? strtolower($current['value']) : '';
+        if (in_array($value, ['on', 'open'], true)) {
+            return [
+                'ok' => true,
+                'zone' => $zoneName,
+                'value' => $value,
+                'detail' => 'Image Resizing already enabled ('.$value.').',
+            ];
+        }
+
+        try {
+            $result = $this->patchZoneSetting($zoneId, 'image_resizing', 'on');
+            $newValue = is_string($result['value'] ?? null) ? (string) $result['value'] : 'on';
+
+            return [
+                'ok' => true,
+                'zone' => $zoneName,
+                'value' => $newValue,
+                'detail' => 'Image Resizing enabled.',
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'ok' => false,
+                'zone' => $zoneName,
+                'value' => $value !== '' ? $value : null,
+                'detail' => $e->getMessage(),
+            ];
+        }
     }
 
     public function canCollectAnalytics(): bool
@@ -373,7 +483,7 @@ class EdgeCloudflareClient
                 limit: 100
                 filter: { datetime_geq: $since, datetime_leq: $until, bucketName: $bucket }
               ) {
-                max { storedBytes }
+                max { payloadSize, metadataSize }
               }
               r2OperationsAdaptiveGroups(
                 limit: 1000
@@ -400,16 +510,31 @@ class EdgeCloudflareClient
 
         $json = $response->json();
         if (! is_array($json) || ! empty($json['errors'])) {
-            throw new RuntimeException('Cloudflare R2 GraphQL request failed.');
+            // Surface the real cause — HTTP status for transport failures,
+            // Cloudflare's errors[] for auth/permission/schema problems.
+            $detail = is_array($json['errors'] ?? null)
+                ? json_encode($json['errors'], JSON_UNESCAPED_SLASHES)
+                : Str::limit((string) $response->body(), 500);
+
+            throw new RuntimeException(sprintf(
+                'Cloudflare R2 GraphQL request failed (HTTP %d): %s',
+                $response->status(),
+                $detail !== '' ? $detail : 'no response body',
+            ));
         }
 
         $storageGroups = data_get($json, 'data.viewer.accounts.0.r2StorageAdaptiveGroups', []);
         $operationGroups = data_get($json, 'data.viewer.accounts.0.r2OperationsAdaptiveGroups', []);
 
+        // Cloudflare's R2 storage dataset reports max{payloadSize, metadataSize}
+        // per sample. Billed storage = payload + metadata (object headers count
+        // against quota), so sum them per group before taking the peak.
         $storedBytes = 0;
         if (is_array($storageGroups)) {
             foreach ($storageGroups as $group) {
-                $storedBytes = max($storedBytes, (int) data_get($group, 'max.storedBytes', 0));
+                $groupBytes = (int) data_get($group, 'max.payloadSize', 0)
+                    + (int) data_get($group, 'max.metadataSize', 0);
+                $storedBytes = max($storedBytes, $groupBytes);
             }
         }
 

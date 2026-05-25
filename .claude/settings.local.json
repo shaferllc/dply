@@ -26,7 +26,11 @@
       "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/ServerWorkspaceSshKeysTest.php --filter test_add_key_writes_audit_event)",
       "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/ServerWorkspaceSshKeysTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/SyncAuthorizedKeysJobTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/SshKeysTest.php)",
       "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/WorkspaceFirewallTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/ApplyFirewallJobTest.php /Users/tomshafer/Projects/Apps/dply/tests/Unit/Services/ServerFirewallProvisionerTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/Api/FirewallApiTest.php)",
-      "mcp__context7__resolve-library-id"
+      "mcp__context7__resolve-library-id",
+      "Bash(./vendor/bin/pest tests/Feature/EdgeSiteSettingsTest.php --filter=\"hybrid origin\")",
+      "Bash(./vendor/bin/pest --version)",
+      "Bash(./vendor/bin/pest --testsuite=Edge)",
+      "Bash(./vendor/bin/pest --testsuite=Edge --stop-on-failure)"
     ]
   }
 }

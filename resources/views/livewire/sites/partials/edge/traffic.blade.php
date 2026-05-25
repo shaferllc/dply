@@ -73,41 +73,71 @@
         </div>
 
         @if (($traffic['daily'] ?? []) !== [])
+            @php
+                $tDaily = $traffic['daily'];
+                $tLastIdx = count($tDaily) - 1;
+                $tMidIdx = (int) floor($tLastIdx / 2);
+                $tMaxEgressMb = ($maxEgress / (1024 ** 2));
+            @endphp
             <div class="grid gap-6 lg:grid-cols-2">
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily requests (30d)') }}</h3>
+                        <span class="font-mono text-[11px] text-brand-moss">{{ __('max :n', ['n' => number_format((int) $maxRequests)]) }}</span>
                     </div>
                     <div class="px-6 py-5 sm:px-8">
-                        <div class="flex h-28 items-end gap-0.5" aria-hidden="true">
-                            @foreach ($traffic['daily'] as $day)
-                                <div class="group relative min-w-0 flex-1">
+                        <div class="flex h-28 items-end gap-0.5">
+                            @foreach ($tDaily as $day)
+                                <div class="group relative min-w-0 flex-1 h-full flex items-end cursor-help">
                                     <div
-                                        class="w-full rounded-t bg-brand-sage/70 transition-colors hover:bg-brand-forest/80"
+                                        class="w-full rounded-t bg-brand-sage/70 transition-colors group-hover:bg-brand-forest"
                                         style="height: {{ max(4, round(($day['requests'] / $maxRequests) * 100)) }}%"
-                                        title="{{ ($day['label'] ?? '') . ': ' . number_format($day['requests'] ?? 0) }}"
                                     ></div>
+                                    <div class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-brand-ink px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover:block">
+                                        <span class="font-semibold">{{ $day['label'] ?? '' }}</span> · {{ number_format($day['requests'] ?? 0) }} {{ __('requests') }}
+                                    </div>
                                 </div>
                             @endforeach
+                        </div>
+                        <div class="mt-2 flex justify-between text-[10px] text-brand-moss">
+                            <span>{{ $tDaily[0]['label'] ?? '' }}</span>
+                            @if ($tMidIdx > 0 && $tMidIdx < $tLastIdx)
+                                <span>{{ $tDaily[$tMidIdx]['label'] ?? '' }}</span>
+                            @endif
+                            @if ($tLastIdx > 0)
+                                <span>{{ $tDaily[$tLastIdx]['label'] ?? '' }}</span>
+                            @endif
                         </div>
                     </div>
                 </section>
 
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily bandwidth (30d)') }}</h3>
+                        <span class="font-mono text-[11px] text-brand-moss">{{ __('max :n MB', ['n' => number_format($tMaxEgressMb, 1)]) }}</span>
                     </div>
                     <div class="px-6 py-5 sm:px-8">
-                        <div class="flex h-28 items-end gap-0.5" aria-hidden="true">
-                            @foreach ($traffic['daily'] as $day)
-                                <div class="min-w-0 flex-1">
+                        <div class="flex h-28 items-end gap-0.5">
+                            @foreach ($tDaily as $day)
+                                <div class="group relative min-w-0 flex-1 h-full flex items-end cursor-help">
                                     <div
-                                        class="w-full rounded-t bg-brand-ink/15 transition-colors hover:bg-brand-ink/30"
+                                        class="w-full rounded-t bg-sky-500/70 transition-colors group-hover:bg-sky-600"
                                         style="height: {{ max(4, round(($day['bytes_egress'] / $maxEgress) * 100)) }}%"
-                                        title="{{ ($day['label'] ?? '') . ': ' . number_format(($day['bytes_egress'] ?? 0) / (1024 ** 2), 1) . ' MB' }}"
                                     ></div>
+                                    <div class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-brand-ink px-2 py-1 text-[11px] font-medium text-white shadow-lg group-hover:block">
+                                        <span class="font-semibold">{{ $day['label'] ?? '' }}</span> · {{ number_format(($day['bytes_egress'] ?? 0) / (1024 ** 2), 1) }} MB
+                                    </div>
                                 </div>
                             @endforeach
+                        </div>
+                        <div class="mt-2 flex justify-between text-[10px] text-brand-moss">
+                            <span>{{ $tDaily[0]['label'] ?? '' }}</span>
+                            @if ($tMidIdx > 0 && $tMidIdx < $tLastIdx)
+                                <span>{{ $tDaily[$tMidIdx]['label'] ?? '' }}</span>
+                            @endif
+                            @if ($tLastIdx > 0)
+                                <span>{{ $tDaily[$tLastIdx]['label'] ?? '' }}</span>
+                            @endif
                         </div>
                     </div>
                 </section>
@@ -131,7 +161,61 @@
         $recentLogs = is_array($access['recent_logs'] ?? null) ? $access['recent_logs'] : [];
         $hasWorkerLogs = (bool) ($access['has_worker_logs'] ?? false);
         $hasWebVitals = (bool) ($access['has_web_vitals'] ?? false);
+        $cacheHitRatio = $perf['cache_hit_ratio'] ?? null;
+        $cacheHitPercent = $cacheHitRatio !== null ? (float) $cacheHitRatio * 100 : null;
+        $isHybridForCache = (string) (($edgeRuntimeMode ?? null) ?? 'static') === 'hybrid';
     @endphp
+
+    @if ($isHybridForCache)
+        <section class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                <div class="flex items-center gap-2">
+                    <x-heroicon-o-cube-transparent class="h-5 w-5 text-brand-moss/70" />
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge cache') }}</h3>
+                </div>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Origin GET responses with Cache-Control s-maxage are stored in KV and served from the edge until expiry. Stale-while-revalidate keeps responses fresh without blocking the request.') }}</p>
+            </div>
+            <div class="grid gap-4 px-6 py-5 sm:grid-cols-3 sm:px-8">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Hit ratio (7d)') }}</p>
+                    @if ($cacheHitPercent !== null)
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-brand-ink">{{ number_format($cacheHitPercent, 1) }}%</p>
+                        <div class="mt-2 h-1.5 w-full rounded-full bg-brand-ink/10">
+                            <div class="h-1.5 rounded-full bg-brand-sage" style="width: {{ min(100, max(0, $cacheHitPercent)) }}%"></div>
+                        </div>
+                    @else
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-brand-ink">—</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Waiting for traffic — needs Worker log ingest enabled.') }}</p>
+                    @endif
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Requests served from edge') }}</p>
+                    @if ($cacheHitPercent !== null)
+                        @php
+                            $reqs7d = (int) ($perf['requests_7d'] ?? 0);
+                            $hits = (int) round($reqs7d * ($cacheHitPercent / 100));
+                        @endphp
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-brand-ink">{{ number_format($hits) }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('of :total worker requests last 7d', ['total' => number_format($reqs7d)]) }}</p>
+                    @else
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-brand-ink">—</p>
+                    @endif
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Invalidate') }}</p>
+                    <p class="mt-2 text-sm text-brand-ink">{{ __('Purge by Cache-Tag from Build settings.') }}</p>
+                    <a
+                        href="{{ route('sites.show', ['server' => $server ?? $site->server, 'site' => $site, 'section' => 'edge-build']) }}"
+                        wire:navigate
+                        class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage"
+                    >
+                        {{ __('Open cache controls') }}
+                        <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
+                    </a>
+                </div>
+            </div>
+        </section>
+    @endif
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
