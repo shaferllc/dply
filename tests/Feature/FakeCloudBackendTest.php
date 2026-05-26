@@ -34,7 +34,7 @@ test('router returns real backend when credential exists', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -60,7 +60,7 @@ test('credential for synthesizes placeholder in fake mode', function () {
 
     expect($credential)->not->toBeNull();
     expect($credential->organization_id)->toBe($org->id);
-    expect($credential->provider)->toBe('digitalocean_app_platform');
+    expect($credential->provider)->toBe('digitalocean');
 
     // Placeholder is not persisted — id will be null/empty.
     expect($credential->id)->toBeNull();

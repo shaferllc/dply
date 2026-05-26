@@ -48,8 +48,8 @@ test('backend for returns null for unknown backend', function () {
 });
 test('credential for prefers meta credential id when set', function () {
     [$user, $org, $server] = scaffold();
-    $cred1 = makeCredential($user, $org, 'digitalocean_app_platform', 'First');
-    $cred2 = makeCredential($user, $org, 'digitalocean_app_platform', 'Second');
+    $cred1 = makeCredential($user, $org, 'digitalocean', 'First');
+    $cred2 = makeCredential($user, $org, 'digitalocean', 'Second');
     $site = Site::factory()->create([
         'server_id' => $server->id,
         'user_id' => $user->id,
@@ -77,7 +77,7 @@ test('pick auto backend prefers do over aws', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
-    makeCredential($user, $org, 'digitalocean_app_platform', 'DO');
+    makeCredential($user, $org, 'digitalocean', 'DO');
     makeCredential($user, $org, 'aws_app_runner', 'AWS');
 
     expect(CloudRouter::pickAutoBackend($org->id))->toBe('digitalocean_app_platform');

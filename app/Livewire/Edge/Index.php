@@ -88,14 +88,53 @@ class Index extends Component
             ->orderByDesc('created_at')
             ->get();
 
-        $isPreview = fn (Site $s) => ! empty($s->edgeMeta()['preview_parent_site_id'] ?? null);
+        $parentOf = fn (Site $s) => $s->edgeMeta()['preview_parent_site_id'] ?? null;
+        $isPreview = fn (Site $s) => ! empty($parentOf($s));
 
-        $sites = match ($this->filter) {
+        $filtered = match ($this->filter) {
             'failed' => $allSites->where('status', Site::STATUS_EDGE_FAILED)->values(),
             'provisioning' => $allSites->where('status', Site::STATUS_EDGE_PROVISIONING)->values(),
             'previews' => $allSites->filter($isPreview)->values(),
             default => $allSites,
         };
+
+        // Nest previews under their parent so the table reads as a tree:
+        // each parent's preview children get hoisted up to sit immediately
+        // beneath it. Skip nesting in the previews-only filter — there
+        // are no parents in scope to nest under.
+        $previewChildIds = [];
+        if ($this->filter !== 'previews') {
+            $previewsByParent = $filtered->filter($isPreview)->groupBy(fn (Site $s) => (string) $parentOf($s));
+            $assignedChildIds = [];
+            $ordered = collect();
+
+            foreach ($filtered as $site) {
+                if ($isPreview($site)) {
+                    continue;
+                }
+                $ordered->push($site);
+                $children = $previewsByParent->get((string) $site->id, collect());
+                foreach ($children as $child) {
+                    $ordered->push($child);
+                    $previewChildIds[] = (string) $child->id;
+                    $assignedChildIds[$child->id] = true;
+                }
+            }
+
+            // Orphan previews (parent not in the filtered set — e.g.
+            // parent deleted, or cross-org) get tacked on at the end so
+            // they don't silently disappear.
+            foreach ($filtered as $site) {
+                if (! $isPreview($site) || isset($assignedChildIds[$site->id])) {
+                    continue;
+                }
+                $ordered->push($site);
+            }
+
+            $sites = $ordered->values();
+        } else {
+            $sites = $filtered;
+        }
 
         $deleteCandidate = null;
         if (is_string($this->confirmingDeleteSiteId) && $this->confirmingDeleteSiteId !== '') {
@@ -146,6 +185,7 @@ class Index extends Component
             'org' => $org,
             'edgeEnabled' => true,
             'sites' => $sites,
+            'previewChildIds' => array_flip($previewChildIds),
             'deleteCandidate' => $deleteCandidate,
             'quickLookSite' => $quickLookSite,
             'quickLookDeploymentId' => $quickLookDeploymentId,

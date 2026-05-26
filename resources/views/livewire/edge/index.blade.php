@@ -150,8 +150,13 @@
                         $hostname = parse_url((string) $liveUrl, PHP_URL_HOST);
                         $rowPreviewBranch = $edgeMeta['preview_branch'] ?? null;
                         $rowPreviewPr = $edgeMeta['preview_pr_number'] ?? null;
+                        $isPreviewChild = isset(($previewChildIds ?? [])[$site->id]);
                     @endphp
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
+                    <article @class([
+                        'rounded-2xl border p-4 shadow-sm',
+                        'border-brand-ink/10 bg-white' => ! $isPreviewChild,
+                        'ml-6 border-brand-ink/8 bg-brand-sand/15' => $isPreviewChild,
+                    ])>
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="text-sm font-semibold text-brand-ink hover:underline">{{ $site->name }}</a>
@@ -249,19 +254,25 @@
                                 $hostname = parse_url((string) $liveUrl, PHP_URL_HOST);
                                 $rowPreviewBranch = $edgeMeta['preview_branch'] ?? null;
                                 $rowPreviewPr = $edgeMeta['preview_pr_number'] ?? null;
+                                $isPreviewChild = isset(($previewChildIds ?? [])[$site->id]);
                             @endphp
-                            <tr>
+                            <tr @class(['bg-brand-sand/10' => $isPreviewChild])>
                                 <td class="px-4 py-3.5">
-                                    <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ $site->name }}</a>
-                                    @if ($rowPreviewBranch)
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-forest dark:bg-brand-sage/20 dark:text-brand-sage">
-                                            @if ($rowPreviewPr)
-                                                PR #{{ $rowPreviewPr }}
-                                            @else
-                                                {{ __('Preview') }}
-                                            @endif
-                                        </span>
-                                    @endif
+                                    <div @class(['flex items-center gap-2', 'pl-6' => $isPreviewChild])>
+                                        @if ($isPreviewChild)
+                                            <span class="inline-flex select-none text-brand-mist" aria-hidden="true">↳</span>
+                                        @endif
+                                        <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate @class(['hover:underline', 'font-medium text-brand-ink' => ! $isPreviewChild, 'text-sm text-brand-moss' => $isPreviewChild])>{{ $site->name }}</a>
+                                        @if ($rowPreviewBranch)
+                                            <span class="inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-forest dark:bg-brand-sage/20 dark:text-brand-sage">
+                                                @if ($rowPreviewPr)
+                                                    PR #{{ $rowPreviewPr }}
+                                                @else
+                                                    {{ __('Preview') }}
+                                                @endif
+                                            </span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3.5 font-mono text-xs text-brand-moss">
                                     @if ($sourceSpec)

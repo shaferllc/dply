@@ -147,7 +147,7 @@ function doCredential(Site $site): void
     ProviderCredential::query()->create([
         'user_id' => $site->user_id,
         'organization_id' => $site->organization_id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);

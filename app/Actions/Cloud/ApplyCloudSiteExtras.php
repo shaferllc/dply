@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Cloud;
 
 use App\Models\CloudDatabase;
+use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\Organization;
 use App\Models\Site;
@@ -39,8 +40,102 @@ class ApplyCloudSiteExtras
         $this->applyAutoscaling($site, $payload['autoscaling'] ?? null);
         $this->applyHealthCheck($site, $payload['health_check'] ?? null);
         $this->applyWorkers($site, $payload['workers'] ?? null);
+        $this->applyDeployTasks($site, $payload['deploy_tasks'] ?? null);
+        $this->applyAlerts($site, $payload['alerts'] ?? null);
         $this->applyDatabase($site, $payload['database'] ?? null);
         $this->applyDomains($site, $payload['domains'] ?? null);
+    }
+
+    /**
+     * Persist per-site alert overrides on meta.container.alerts. Stored
+     * in the same shape CloudAlerts::forSite reads, with array_replace_
+     * recursive layering it over the defaults. Skips backends that
+     * don't support alerts.
+     */
+    private function applyAlerts(Site $site, mixed $input): void
+    {
+        if (! is_array($input) || $input === []) {
+            return;
+        }
+
+        $backend = CloudRouter::backendFor($site);
+        if ($backend === null || ! $backend->supportsAlerts()) {
+            return;
+        }
+
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $container = is_array($meta['container'] ?? null) ? $meta['container'] : [];
+        $container['alerts'] = $input;
+        $meta['container'] = $container;
+        $site->update(['meta' => $meta]);
+    }
+
+    /**
+     * Persist deploy-task rows from the create payload. Each entry is
+     * a normalized assoc with `trigger`, `name`, `command`, and an
+     * optional `size` (defaults to small). The first-class migrations
+     * field and the extras repeater both feed into this same list.
+     */
+    private function applyDeployTasks(Site $site, mixed $input): void
+    {
+        if (! is_array($input) || $input === []) {
+            return;
+        }
+
+        $backend = CloudRouter::backendFor($site);
+        if ($backend === null || ! $backend->supportsDeployTasks()) {
+            throw new InvalidArgumentException(
+                'This site\'s backend does not support deploy tasks. '
+                .'Use a DigitalOcean App Platform site for migrations and other deploy-lifecycle commands.',
+            );
+        }
+
+        $validTriggers = array_keys(CloudDeployTask::DO_KIND_MAP);
+        $namesSeen = [];
+
+        foreach ($input as $raw) {
+            if (! is_array($raw)) {
+                continue;
+            }
+
+            $trigger = strtolower(trim((string) ($raw['trigger'] ?? CloudDeployTask::TRIGGER_PRE_DEPLOY)));
+            if (! in_array($trigger, $validTriggers, true)) {
+                throw new InvalidArgumentException('Unknown deploy task trigger: '.$trigger);
+            }
+
+            $command = trim((string) ($raw['command'] ?? ''));
+            if ($command === '') {
+                // Skip silently — the UI's first-class migrations field
+                // can land here as an empty row when the user leaves it
+                // unticked. No reason to error out on it.
+                continue;
+            }
+
+            $name = trim((string) ($raw['name'] ?? ''));
+            if ($name === '') {
+                $name = $trigger === CloudDeployTask::TRIGGER_PRE_DEPLOY
+                    ? CloudDeployTask::NAME_MIGRATE
+                    : 'task-'.(count($namesSeen) + 1);
+            }
+            if (isset($namesSeen[$name])) {
+                throw new InvalidArgumentException('Duplicate deploy task name: '.$name);
+            }
+            $namesSeen[$name] = true;
+
+            $size = strtolower(trim((string) ($raw['size'] ?? 'small')));
+            if (! array_key_exists($size, CloudDeployTask::SIZE_TIERS)) {
+                $size = 'small';
+            }
+
+            CloudDeployTask::query()->create([
+                'site_id' => $site->id,
+                'trigger' => $trigger,
+                'name' => $name,
+                'command' => $command,
+                'size' => $size,
+                'status' => CloudDeployTask::STATUS_CONFIGURED,
+            ]);
+        }
     }
 
     private function applyAutoscaling(Site $site, mixed $input): void

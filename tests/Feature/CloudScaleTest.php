@@ -164,7 +164,7 @@ function credential(): ProviderCredential
     return ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'Test',
         'credentials' => ['api_token' => 'dop_v1_test'],
     ]);

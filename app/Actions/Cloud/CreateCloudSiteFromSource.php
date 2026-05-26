@@ -45,7 +45,7 @@ class CreateCloudSiteFromSource
         $port = (int) ($payload['port'] ?? 8080);
         $instances = max(1, (int) ($payload['instances'] ?? 1));
         $sizeTier = (string) ($payload['size_tier'] ?? 'small');
-        if (! in_array($sizeTier, ['small', 'medium', 'large', 'xlarge'], true)) {
+        if (! array_key_exists($sizeTier, \App\Models\CloudDeployTask::SIZE_TIERS)) {
             $sizeTier = 'small';
         }
         $region = (string) ($payload['region'] ?? '');
@@ -87,6 +87,11 @@ class CreateCloudSiteFromSource
             $sourceSpec['dockerfile_path'] = $dockerfilePath;
         }
 
+        // Brand-canonical hostname for this site. Same generation as
+        // the image-mode CreateCloudSite path; stays consistent if the
+        // app ever moves between backends.
+        $dplySubdomain = Site::generateDplyCloudSubdomain($name, Str::random(8));
+
         $site = Site::query()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
@@ -109,9 +114,15 @@ class CreateCloudSiteFromSource
                     'source' => $sourceSpec,
                     'instance_count' => $instances,
                     'size_tier' => $sizeTier,
+                    'dply_subdomain' => $dplySubdomain,
                 ],
             ],
         ]);
+
+        $payload['domains'] = array_values(array_unique(array_merge(
+            [$dplySubdomain],
+            is_array($payload['domains'] ?? null) ? $payload['domains'] : [],
+        )));
 
         (new ApplyCloudSiteExtras)->handle($site, $payload);
 

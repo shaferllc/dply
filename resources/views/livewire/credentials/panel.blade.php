@@ -2,13 +2,17 @@
     $link = 'text-brand-sage hover:text-brand-ink underline underline-offset-2';
     $hint = 'mt-1 text-sm text-brand-moss leading-relaxed';
     $code = 'rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-xs font-mono text-brand-ink';
+    // Capability chips share one neutral pill (brand-cream + ink ring) and use
+    // a small colored leading dot for differentiation, so the row stays calm
+    // even when a credential picks up several capabilities.
     $capabilityChip = function (string $cap): array {
         return match ($cap) {
-            'compute' => ['label' => __('compute'), 'class' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10'],
-            'dns' => ['label' => __('DNS'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
-            'cdn' => ['label' => __('CDN'), 'class' => 'bg-sky-100 text-sky-900 ring-sky-200'],
-            'import' => ['label' => __('import'), 'class' => 'bg-amber-100 text-amber-900 ring-amber-200'],
-            default => ['label' => $cap, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
+            'compute' => ['label' => __('Compute'), 'dot' => 'bg-brand-moss'],
+            'dns' => ['label' => __('DNS'), 'dot' => 'bg-brand-sage'],
+            'cdn' => ['label' => __('CDN'), 'dot' => 'bg-sky-500'],
+            'app_platform' => ['label' => __('App Platform'), 'dot' => 'bg-violet-500'],
+            'import' => ['label' => __('Import'), 'dot' => 'bg-amber-500'],
+            default => ['label' => ucfirst(str_replace('_', ' ', $cap)), 'dot' => 'bg-brand-mist'],
         };
     };
 @endphp
@@ -30,42 +34,54 @@
         </div>
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($credentials as $cred)
-                <li class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-4" wire:key="cred-{{ $cred->id }}">
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="font-medium text-brand-ink">{{ $cred->name }}</span>
-                            <span class="text-brand-mist font-mono text-xs">{{ $cred->provider }}</span>
-                            @foreach ($cred->capabilities() as $cap)
-                                @php $chip = $capabilityChip($cap); @endphp
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chip['class'] }}">{{ $chip['label'] }}</span>
-                            @endforeach
+                @php $verifyingThis = $verifyingCredentialId === (string) $cred->id; @endphp
+                <li
+                    class="group flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-brand-cream/30 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+                    wire:key="cred-{{ $cred->id }}"
+                >
+                    <div class="min-w-0 flex-1 space-y-1.5">
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                            <span class="truncate font-semibold text-brand-ink">{{ $cred->name }}</span>
+                            <span class="font-mono text-[11px] uppercase tracking-wide text-brand-mist">{{ $cred->provider }}</span>
                         </div>
+                        @if (count($cred->capabilities()))
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                @foreach ($cred->capabilities() as $cap)
+                                    @php $chip = $capabilityChip($cap); @endphp
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-cream/70 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                        <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
+                                        {{ $chip['label'] }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 shrink-0">
+                    <div class="flex shrink-0 items-center gap-1">
                         @if ($this->canVerifyCredentialProvider($cred->provider))
-                            @php $verifyingThis = $verifyingCredentialId === (string) $cred->id; @endphp
                             <button
                                 type="button"
                                 wire:click="verifyCredential('{{ $cred->id }}')"
                                 @if ($verifyingCredentialId !== null) disabled @endif
-                                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink disabled:pointer-events-none disabled:opacity-60"
+                                title="{{ __('Verify with provider') }}"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-moss transition hover:bg-brand-sand/40 hover:text-brand-ink disabled:pointer-events-none disabled:opacity-50"
                             >
                                 @if ($verifyingThis)
-                                    <span class="inline-flex items-center gap-2">
-                                        <x-spinner variant="forest" size="sm" />
-                                        {{ __('Verifying…') }}
-                                    </span>
+                                    <x-spinner variant="forest" size="sm" />
+                                    <span>{{ __('Verifying…') }}</span>
                                 @else
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                        {{ __('Verify with provider') }}
-                                    </span>
+                                    <x-heroicon-o-check-badge class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span class="hidden sm:inline">{{ __('Verify') }}</span>
                                 @endif
                             </button>
                         @endif
-                        <button type="button" wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 hover:text-red-900">
-                            <x-heroicon-o-trash class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Remove') }}
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)"
+                            title="{{ __('Remove credential') }}"
+                            aria-label="{{ __('Remove credential') }}"
+                            class="inline-flex items-center justify-center rounded-lg p-1.5 text-brand-mist transition hover:bg-red-50 hover:text-red-700 focus-visible:bg-red-50 focus-visible:text-red-700"
+                        >
+                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                         </button>
                     </div>
                 </li>
@@ -91,7 +107,7 @@
                     </div>
                     <p class="text-xs text-brand-mist text-center">{{ __('or use an API token') }}</p>
                 @else
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Paste a read/write token from DigitalOcean. We verify it before saving.') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Paste a read/write token from DigitalOcean. We verify it before saving. The same token powers Droplets, DNS, and App Platform — dply uses it everywhere DigitalOcean is selected.') }}</p>
                 @endif
                 <div class="space-y-5">
                     <div>
@@ -441,30 +457,6 @@
         </div>
         @break
 
-    @case('digitalocean_app_platform')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a DigitalOcean API token (the same one as DigitalOcean droplets — both APIs share scopes). Dply uses this to deploy your container apps to DigitalOcean App Platform.') }}</p>
-                </div>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="do_app_platform_name" :value="__('Label (optional)')" />
-                        <x-text-input id="do_app_platform_name" wire:model="do_app_platform_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="do_app_platform_api_token" :value="__('API token')" />
-                        <x-text-input id="do_app_platform_api_token" wire:model="do_app_platform_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create at :link with read+write scope.', ['link' => '<a href="https://cloud.digitalocean.com/account/api/tokens" target="_blank" rel="noopener" class="'.$link.'">DigitalOcean → API → Tokens</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('do_app_platform_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeDigitalOceanAppPlatform" wire:loading.attr="disabled" wire:target="storeDigitalOceanAppPlatform">{{ __('Save credential') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
     @case('aws_app_runner')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
@@ -494,6 +486,35 @@
                         <x-input-error :messages="$errors->get('aws_app_runner_region')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeAwsAppRunner" wire:loading.attr="disabled" wire:target="storeAwsAppRunner">{{ __('Save credential') }}</x-primary-button>
+                </div>
+            </div>
+        </div>
+        @break
+
+    @case('ghcr')
+        <div class="dply-card overflow-hidden">
+            <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Private images') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Pull private images from GitHub Container Registry (ghcr.io) when deploying Cloud apps. Use a GitHub Personal Access Token with read:packages scope.') }}</p>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <x-input-label for="ghcr_name" :value="__('Label (optional)')" />
+                        <x-text-input id="ghcr_name" wire:model="ghcr_name" type="text" class="mt-1 block w-full" placeholder="GHCR — acme" />
+                    </div>
+                    <div>
+                        <x-input-label for="ghcr_username" :value="__('GitHub username')" />
+                        <x-text-input id="ghcr_username" wire:model="ghcr_username" type="text" class="mt-1 block w-full font-mono" required autocomplete="off" placeholder="acme-bot" />
+                        <x-input-error :messages="$errors->get('ghcr_username')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ghcr_token" :value="__('Personal access token')" />
+                        <x-text-input id="ghcr_token" wire:model="ghcr_token" type="password" class="mt-1 block w-full" required autocomplete="off" placeholder="ghp_…" />
+                        <p class="{{ $hint }}">{!! __('Create at :link with read:packages scope.', ['link' => '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener" class="'.$link.'">GitHub → Settings → Developer settings</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('ghcr_token')" class="mt-2" />
+                    </div>
+                    <x-primary-button type="button" wire:click="storeGhcr" wire:loading.attr="disabled" wire:target="storeGhcr">{{ __('Save credential') }}</x-primary-button>
                 </div>
             </div>
         </div>

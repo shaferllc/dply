@@ -26,34 +26,33 @@ uses(WithFeatures::class);
 
 usesFeatures('surface.cloud');
 
-test('page renders with no backends connected warning', function () {
+test('page renders empty-state when no cloud account connected', function () {
     config(['server_provision_fake.env_flag' => false]);
     $user = ownerWithOrg();
 
     $response = $this->actingAs($user)->get(route('cloud.create'));
 
     $response->assertOk()
-        ->assertSee('Deploy a container app')
-        ->assertSee('No container backend connected')
-        ->assertSee('Connect DigitalOcean')
-        ->assertSee('Connect AWS App Runner');
+        ->assertSee('Deploy an app')
+        ->assertSee('Connect a cloud account to deploy')
+        ->assertSee('Connect DigitalOcean');
 });
-test('page shows fake cloud notice instead of warning when no creds and fake on', function () {
+test('page shows sandbox notice when no creds and fake mode on', function () {
     config(['server_provision_fake.env_flag' => true]);
     $user = ownerWithOrg();
 
     $response = $this->actingAs($user)->get(route('cloud.create'));
 
     $response->assertOk()
-        ->assertSee('Fake-cloud mode is on')
-        ->assertDontSee('No container backend connected');
+        ->assertSee('Sandbox mode is on')
+        ->assertDontSee('Connect a cloud account to deploy');
 });
-test('page hides warning when backend connected', function () {
+test('page hides empty-state when a cloud account is connected', function () {
     $user = ownerWithOrg();
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $user->currentOrganization()->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -61,7 +60,7 @@ test('page hides warning when backend connected', function () {
     $response = $this->actingAs($user)->get(route('cloud.create'));
 
     $response->assertOk()
-        ->assertDontSee('No container backend connected');
+        ->assertDontSee('Connect a cloud account to deploy');
 });
 test('changing backend resets region to first available', function () {
     $user = ownerWithOrg();
@@ -79,7 +78,7 @@ test('deploy dispatches provision job and redirects', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $user->currentOrganization()->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -151,7 +150,7 @@ test('source mode warns when aws lacks github connection', function () {
         ->test(CloudCreate::class)
         ->set('mode', 'source')
         ->set('backend', 'aws_app_runner')
-        ->assertSee('AWS App Runner needs a GitHub connection');
+        ->assertSee('Repository builds need GitHub authorized on your cloud account');
 });
 test('source mode skips warning when aws has github connection', function () {
     $user = ownerWithOrg();
@@ -171,7 +170,7 @@ test('source mode skips warning when aws has github connection', function () {
         ->test(CloudCreate::class)
         ->set('mode', 'source')
         ->set('backend', 'aws_app_runner')
-        ->assertDontSee('AWS App Runner needs a GitHub connection');
+        ->assertDontSee('Repository builds need GitHub authorized on your cloud account');
 });
 test('source tab shows only manual entry when no accounts linked', function () {
     $user = ownerWithOrg();
@@ -258,7 +257,7 @@ test('source mode dispatches provision with source meta', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $user->currentOrganization()->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -325,7 +324,7 @@ test('source mode detection failure does not block deploy', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $user->currentOrganization()->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);

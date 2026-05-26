@@ -17,6 +17,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AwsAppRunnerService;
 use App\Services\Cloud\AwsAppRunnerBackend;
+use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\CloudScalingConfig;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use Aws\AppRunner\AppRunnerClient;
@@ -513,8 +514,9 @@ function makeContainerSite(array $overrides = []): Site
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
+    $backend = $overrides['container_backend'] ?? 'digitalocean_app_platform';
     ProviderCredential::query()->firstOrCreate(
-        ['organization_id' => $org->id, 'provider' => $overrides['container_backend'] ?? 'digitalocean_app_platform'],
+        ['organization_id' => $org->id, 'provider' => CloudRouter::credentialProviderFor($backend)],
         ['user_id' => $user->id, 'name' => 'cred', 'credentials' => ['api_token' => 'tok', 'access_key_id' => 'k', 'secret_access_key' => 's', 'github_connection_arn' => 'arn:x']],
     );
     $server = Server::factory()->create([
@@ -553,7 +555,7 @@ function makeDashboardSite(string $backend = 'digitalocean_app_platform'): array
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => $backend,
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => ['api_token' => 'tok', 'access_key_id' => 'k', 'secret_access_key' => 's', 'github_connection_arn' => 'arn:x'],
     ]);
@@ -581,7 +583,7 @@ function makeDashboardSite(string $backend = 'digitalocean_app_platform'): array
 }
 function credential(): ProviderCredential
 {
-    return ProviderCredential::query()->where('provider', 'digitalocean_app_platform')->firstOrFail();
+    return ProviderCredential::query()->where('provider', 'digitalocean')->firstOrFail();
 }
 function awsCredential(): ProviderCredential
 {

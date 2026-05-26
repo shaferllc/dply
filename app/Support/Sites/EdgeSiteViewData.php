@@ -263,12 +263,11 @@ final class EdgeSiteViewData
             ];
         }
 
+        // Active sites no longer get a "Live on dply Edge" banner — the
+        // hero + status badges already communicate this and the extra
+        // green band was just visual noise on a healthy workspace.
         if ($siteStatus === Site::STATUS_EDGE_ACTIVE) {
-            return [
-                'tone' => 'emerald',
-                'title' => __('Live on dply Edge'),
-                'message' => __('Builds publish to edge storage. Traffic is served by the edge network — not this Laravel app.'),
-            ];
+            return null;
         }
 
         // Backend is configured but the site has no recognized active state

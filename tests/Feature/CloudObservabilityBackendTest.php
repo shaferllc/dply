@@ -213,7 +213,7 @@ function makeSite(string $backend, ?string $backendId, array $credentials): arra
     $credential = ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => $backend,
+        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => $credentials,
     ]);

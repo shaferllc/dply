@@ -115,6 +115,30 @@ trait ManagesContainerSite
      */
     public ?array $container_runtime_logs_result = null;
 
+    /**
+     * Live-tail mode. When true, the dashboard's wire:poll directive
+     * fires pollContainerRuntimeLogs() every couple seconds to refresh
+     * the line buffer. State stays local to the workspace component.
+     */
+    public bool $container_log_tail_active = false;
+
+    /**
+     * Hashes of log lines already pushed onto the live buffer — keeps
+     * the diff between polls de-duplicated.
+     *
+     * @var array<string, bool>
+     */
+    public array $container_log_tail_seen = [];
+
+    /**
+     * Rolling buffer of live-tail log lines, oldest first. Capped so
+     * long tail sessions don't grow Livewire's serialized state without
+     * bound.
+     *
+     * @var list<string>
+     */
+    public array $container_log_tail_lines = [];
+
     public function bootManagesContainerSite(): void
     {
         if ($this->container_image_input === '' && isset($this->site)) {
@@ -439,6 +463,83 @@ trait ManagesContainerSite
                 'available' => false,
                 'note' => __('Failed to fetch runtime logs: :err', ['err' => $e->getMessage()]),
             ];
+        }
+    }
+
+    /**
+     * Toggle the live-tail mode. The dashboard partial drives the
+     * poll cadence with `wire:poll.2s` while $container_log_tail_active
+     * is true; turning it off pauses polling and freezes the buffer.
+     */
+    public function toggleContainerLogTail(): void
+    {
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('view', $this->site);
+
+        $this->container_log_tail_active = ! $this->container_log_tail_active;
+
+        if ($this->container_log_tail_active) {
+            // Fresh session — reset the diff state so a stop+start
+            // doesn't show stale dedup.
+            $this->container_log_tail_seen = [];
+            $this->container_log_tail_lines = [];
+            $this->pollContainerRuntimeLogs();
+        }
+    }
+
+    /**
+     * Wire:poll target — fetches the latest runtime log lines from the
+     * backend and appends anything new to the live-tail buffer. Each
+     * call is one normal Livewire round-trip; the dashboard partial
+     * controls cadence (typically 2s).
+     */
+    public function pollContainerRuntimeLogs(): void
+    {
+        if (! $this->container_log_tail_active) {
+            return;
+        }
+        if (! $this->site->usesContainerRuntime()) {
+            return;
+        }
+        $this->authorize('view', $this->site);
+
+        $backend = CloudRouter::backendFor($this->site);
+        $credential = CloudRouter::credentialFor($this->site);
+        if ($backend === null || $credential === null) {
+            $this->container_log_tail_active = false;
+
+            return;
+        }
+
+        try {
+            $result = $backend->runtimeLogs($this->site, $credential, 200);
+        } catch (\Throwable $e) {
+            $this->container_log_tail_active = false;
+
+            return;
+        }
+
+        $lines = is_array($result['lines'] ?? null) ? $result['lines'] : [];
+        foreach ($lines as $line) {
+            $text = is_array($line) ? (string) ($line['text'] ?? json_encode($line)) : (string) $line;
+            $hash = md5($text);
+            if (isset($this->container_log_tail_seen[$hash])) {
+                continue;
+            }
+            $this->container_log_tail_seen[$hash] = true;
+            $this->container_log_tail_lines[] = $text;
+        }
+
+        // Cap state size — Livewire serializes the whole component on
+        // every poll, so unbounded growth is a real concern. Trim the
+        // dedup set + the visible buffer to recent history.
+        if (count($this->container_log_tail_lines) > 600) {
+            $this->container_log_tail_lines = array_slice($this->container_log_tail_lines, -400);
+        }
+        if (count($this->container_log_tail_seen) > 1500) {
+            $this->container_log_tail_seen = array_slice($this->container_log_tail_seen, -800, null, true);
         }
     }
 

@@ -37,6 +37,8 @@ class Organization extends Model
         'database_workspace_settings',
         'insights_preferences',
         'services_preferences',
+        'alert_slack_webhook_url',
+        'alert_extra_emails',
     ];
 
     protected function casts(): array
@@ -52,6 +54,7 @@ class Organization extends Model
             'database_workspace_settings' => 'array',
             'insights_preferences' => 'array',
             'services_preferences' => 'array',
+            'alert_extra_emails' => 'array',
         ];
     }
 

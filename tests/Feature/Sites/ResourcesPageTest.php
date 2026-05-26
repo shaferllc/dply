@@ -35,7 +35,7 @@ function resourcesFixture(string $backend = 'digitalocean_app_platform'): array
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => $backend,
+        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
         'name' => 'cloud',
         'credentials' => ['api_token' => 'tok'],
     ]);

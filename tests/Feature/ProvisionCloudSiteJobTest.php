@@ -30,7 +30,7 @@ test('provisions via do app platform and persists backend id', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -53,7 +53,7 @@ test('marks failed on backend error', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -97,7 +97,7 @@ test('source mode calls create app from source', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);

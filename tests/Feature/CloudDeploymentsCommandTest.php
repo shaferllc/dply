@@ -30,7 +30,7 @@ test('lists do deployments via http fake', function () {
     ProviderCredential::query()->create([
         'user_id' => $site->user_id,
         'organization_id' => $site->organization_id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -64,7 +64,7 @@ test('limit clamps to 100', function () {
     ProviderCredential::query()->create([
         'user_id' => $site->user_id,
         'organization_id' => $site->organization_id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
@@ -95,7 +95,7 @@ test('human output empty state', function () {
     ProviderCredential::query()->create([
         'user_id' => $site->user_id,
         'organization_id' => $site->organization_id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);

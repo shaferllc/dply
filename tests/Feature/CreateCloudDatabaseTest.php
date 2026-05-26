@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
-function orgWithDoCredential(string $provider = 'digitalocean'): Organization
+function orgWithDoCredential(): Organization
 {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -23,7 +23,7 @@ function orgWithDoCredential(string $provider = 'digitalocean'): Organization
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => $provider,
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 'tok'],
     ]);
@@ -49,17 +49,6 @@ test('creates provisioning row and dispatches job', function () {
     expect($db->provider_credential_id)->not->toBeNull();
 
     Bus::assertDispatched(ProvisionCloudDatabaseJob::class, fn ($j) => $j->cloudDatabaseId === $db->id);
-});
-test('accepts app platform credential as fallback', function () {
-    Bus::fake();
-    $org = orgWithDoCredential('digitalocean_app_platform');
-
-    $db = (new CreateCloudDatabase)->handle($org, [
-        'name' => 'fallback-db',
-        'engine' => 'mysql',
-    ]);
-
-    expect($db->provider_credential_id)->not->toBeNull();
 });
 test('rejects unknown engine', function () {
     $org = orgWithDoCredential();

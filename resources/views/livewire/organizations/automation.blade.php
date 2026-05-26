@@ -98,6 +98,33 @@
                 <div class="dply-card overflow-hidden">
                     <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                         <div class="lg:col-span-4">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Cloud alert destinations') }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Where dply sends deploy-failed, restart, CPU, and memory alerts for Cloud apps in this organization. Org owners are always notified at their login emails — the fields below add extra recipients.') }}</p>
+                        </div>
+                        <form wire:submit="saveAlertDestinations" class="lg:col-span-8 space-y-5">
+                            <div>
+                                <x-input-label for="alert_slack_webhook_url" :value="__('Slack webhook URL')" />
+                                <x-text-input id="alert_slack_webhook_url" wire:model="alert_slack_webhook_url" type="url" class="mt-1 block w-full font-mono text-xs" placeholder="https://hooks.slack.com/services/T.../B.../..." />
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Create an Incoming Webhook in your Slack workspace; paste the URL here.') }}</p>
+                                <x-input-error :messages="$errors->get('alert_slack_webhook_url')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="alert_extra_emails_input" :value="__('Additional recipient emails')" />
+                                <textarea id="alert_extra_emails_input" wire:model="alert_extra_emails_input" rows="3" class="mt-1 block w-full rounded-md border-brand-mist font-mono text-xs shadow-sm" placeholder="oncall@example.com&#10;ops@example.com"></textarea>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('One email per line (or comma-separated). Org owners are already included automatically.') }}</p>
+                                <x-input-error :messages="$errors->get('alert_extra_emails_input')" class="mt-2" />
+                            </div>
+                            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveAlertDestinations">
+                                <span wire:loading.remove wire:target="saveAlertDestinations">{{ __('Save destinations') }}</span>
+                                <span wire:loading wire:target="saveAlertDestinations">{{ __('Saving…') }}</span>
+                            </x-primary-button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="dply-card overflow-hidden">
+                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                        <div class="lg:col-span-4">
                             <h3 class="text-lg font-semibold text-brand-ink">{{ __('API tokens') }}</h3>
                             <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Create scoped organization tokens for CI/CD and automation. The secret is shown once in a dialog after you create it.') }}</p>
                         </div>

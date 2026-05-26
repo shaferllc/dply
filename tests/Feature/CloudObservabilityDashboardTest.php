@@ -121,7 +121,7 @@ function scaffoldSite(string $backend, ?string $backendId = null, bool $withCred
         ProviderCredential::query()->create([
             'user_id' => $user->id,
             'organization_id' => $org->id,
-            'provider' => $backend,
+            'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
             'name' => 'cred',
             'credentials' => $backend === 'aws_app_runner'
                 ? ['access_key_id' => 'k', 'secret_access_key' => 's', 'region' => 'us-east-1']

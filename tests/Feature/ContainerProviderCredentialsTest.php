@@ -18,33 +18,26 @@ uses(WithFeatures::class);
 
 usesFeatures('provider.aws_app_runner');
 
-test('panels visible only when provider is enabled', function () {
-    config([
-        'server_providers.enabled.digitalocean_app_platform' => false,
-        'server_providers.enabled.aws_app_runner' => false,
-    ]);
+test('aws app runner panel hidden when provider disabled', function () {
+    config(['server_providers.enabled.aws_app_runner' => false]);
     $user = ownerWithOrg();
     $org = $user->currentOrganization();
 
     $response = $this->actingAs($user)->get(route('organizations.credentials', $org));
 
-    $response->assertOk()
-        ->assertDontSee('DigitalOcean App Platform')
-        ->assertDontSee('AWS App Runner');
+    $response->assertOk()->assertDontSee('AWS App Runner');
 });
-test('do app platform panel renders value prop', function () {
-    config(['server_providers.enabled.digitalocean_app_platform' => true]);
+test('digitalocean credential panel surfaces app platform support', function () {
+    config(['server_providers.enabled.digitalocean' => true]);
     $user = ownerWithOrg();
     $org = $user->currentOrganization();
 
     $response = $this->actingAs($user)->get(route('organizations.credentials', [
         'organization' => $org,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
     ]));
 
-    $response->assertOk()
-        ->assertSee('Container backend')
-        ->assertSee('DigitalOcean App Platform');
+    $response->assertOk()->assertSee('App Platform');
 });
 test('aws app runner panel renders value prop', function () {
     config(['server_providers.enabled.aws_app_runner' => true]);
@@ -59,23 +52,6 @@ test('aws app runner panel renders value prop', function () {
     $response->assertOk()
         ->assertSee('Container backend')
         ->assertSee('App Runner');
-});
-test('store do app platform credential', function () {
-    config(['server_providers.enabled.digitalocean_app_platform' => true]);
-    $user = ownerWithOrg();
-
-    Livewire::actingAs($user)
-        ->test(CredentialsIndex::class)
-        ->set('active_provider', 'digitalocean_app_platform')
-        ->set('do_app_platform_name', 'Production')
-        ->set('do_app_platform_api_token', 'dop_v1_abcdef')
-        ->call('storeDigitalOceanAppPlatform');
-
-    $this->assertDatabaseHas('provider_credentials', [
-        'user_id' => $user->id,
-        'provider' => 'digitalocean_app_platform',
-        'name' => 'Production',
-    ]);
 });
 test('store aws app runner credential', function () {
     config(['server_providers.enabled.aws_app_runner' => true]);

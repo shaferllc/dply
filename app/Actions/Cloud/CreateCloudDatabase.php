@@ -29,14 +29,13 @@ class CreateCloudDatabase
     ];
 
     /**
-     * DO provider keys that can authenticate against the Managed
-     * Databases API, in preference order. The plain `digitalocean`
-     * credential is the canonical one; the App Platform credential is
-     * accepted as a fallback since it carries the same API token.
+     * DO provider keys that can authenticate against the Managed Databases
+     * API. Just `digitalocean` now — the old App Platform credential type
+     * was unified into this one.
      *
      * @var list<string>
      */
-    private const DO_PROVIDERS = ['digitalocean', 'digitalocean_app_platform'];
+    private const DO_PROVIDERS = ['digitalocean'];
 
     /**
      * @param  array<string, mixed>  $payload
@@ -60,7 +59,8 @@ class CreateCloudDatabase
             $size = 'small';
         }
 
-        $region = trim((string) ($payload['region'] ?? '')) ?: 'nyc1';
+        $inputRegion = trim((string) ($payload['region'] ?? ''));
+        $region = $inputRegion !== '' ? self::normalizeRegionForManagedDb($inputRegion) : 'nyc1';
         $version = trim((string) ($payload['version'] ?? ''));
 
         $credential = $this->resolveCredential($organization);
@@ -101,5 +101,45 @@ class CreateCloudDatabase
         }
 
         return null;
+    }
+
+    /**
+     * App Platform exposes short region codes (`ams`, `nyc`, `fra`); the
+     * Managed Databases API requires numbered slugs (`ams3`, `nyc3`,
+     * `fra1`). When a Cloud-site-with-DB deploy flows the App Platform
+     * region straight through to the DB create call, DO 400s with
+     * "region 'ams' is not valid for 'PG' cluster type". Normalize here
+     * so all callers (Cloud site extras, standalone DB page, CLI) end up
+     * with the slug DO actually accepts. Slugs that are already in the
+     * DB taxonomy (e.g. `ams3` from the standalone form) pass through.
+     *
+     * For NYC and SFO the canonical Managed DB region uses the newer
+     * datacenter (`nyc3`, `sfo3`) — both engines we ship (postgres,
+     * mysql, redis) run there, while `nyc1` is older and only supports
+     * a subset.
+     *
+     * Source: https://docs.digitalocean.com/products/regional-availability/
+     */
+    private static function normalizeRegionForManagedDb(string $region): string
+    {
+        $region = strtolower(trim($region));
+
+        // Already a DB-style slug (e.g. "ams3", "nyc1") — pass through.
+        if (preg_match('/^[a-z]{3}[0-9]$/', $region) === 1) {
+            return $region;
+        }
+
+        return match ($region) {
+            'ams' => 'ams3',
+            'nyc' => 'nyc3',
+            'fra' => 'fra1',
+            'sfo' => 'sfo3',
+            'sgp' => 'sgp1',
+            'lon' => 'lon1',
+            'tor' => 'tor1',
+            'blr' => 'blr1',
+            'syd' => 'syd1',
+            default => $region,
+        };
     }
 }

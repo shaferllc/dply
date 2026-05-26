@@ -29,6 +29,38 @@ class CloudRouter
         ];
     }
 
+    /**
+     * Map a backend slug (the value stored in sites.container_backend) to
+     * the provider_credentials.provider key that holds the API token.
+     *
+     * DO App Platform and DO compute share one PAT, so both use 'digitalocean'.
+     * AWS App Runner uses its own access-key credential row for now.
+     */
+    public static function credentialProviderFor(string $backend): string
+    {
+        return match ($backend) {
+            'digitalocean_app_platform' => 'digitalocean',
+            default => $backend,
+        };
+    }
+
+    /**
+     * Inverse of credentialProviderFor — credential provider keys
+     * that satisfy any cloud backend. Used by existence checks and
+     * UI links that need to know "which credentials count as connected".
+     *
+     * @return list<string>
+     */
+    public static function credentialProviderKeys(): array
+    {
+        $keys = array_values(array_unique(array_map(
+            fn (string $backend) => self::credentialProviderFor($backend),
+            array_keys(self::backends()),
+        )));
+
+        return $keys;
+    }
+
     public static function backendFor(Site $site): ?CloudBackend
     {
         $key = $site->container_backend;
@@ -58,7 +90,7 @@ class CloudRouter
 
         return ProviderCredential::query()
             ->where('organization_id', $site->organization_id)
-            ->where('provider', $site->container_backend)
+            ->where('provider', self::credentialProviderFor($site->container_backend))
             ->exists();
     }
 
@@ -85,7 +117,7 @@ class CloudRouter
 
         $resolved = ProviderCredential::query()
             ->where('organization_id', $site->organization_id)
-            ->where('provider', $site->container_backend)
+            ->where('provider', self::credentialProviderFor($site->container_backend))
             ->orderBy('created_at')
             ->first();
 
@@ -95,7 +127,7 @@ class CloudRouter
         if ($resolved === null && FakeCloudProvision::enabled()) {
             $placeholder = new ProviderCredential;
             $placeholder->organization_id = $site->organization_id;
-            $placeholder->provider = (string) $site->container_backend;
+            $placeholder->provider = self::credentialProviderFor((string) $site->container_backend);
             $placeholder->name = 'fake-cloud (no real credential)';
             $placeholder->credentials = [];
 
@@ -117,16 +149,17 @@ class CloudRouter
     public static function pickAutoBackend(string $organizationId): ?string
     {
         $preferred = ['digitalocean_app_platform', 'aws_app_runner'];
-        $available = ProviderCredential::query()
+        $availableCredentialProviders = ProviderCredential::query()
             ->where('organization_id', $organizationId)
-            ->whereIn('provider', $preferred)
+            ->whereIn('provider', self::credentialProviderKeys())
             ->pluck('provider')
             ->unique()
             ->all();
 
-        foreach ($preferred as $provider) {
-            if (in_array($provider, $available, true)) {
-                return $provider;
+        foreach ($preferred as $backend) {
+            $credProvider = self::credentialProviderFor($backend);
+            if (in_array($credProvider, $availableCredentialProviders, true)) {
+                return $backend;
             }
         }
 

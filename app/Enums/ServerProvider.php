@@ -123,6 +123,19 @@ enum ServerProvider: string
     }
 
     /**
+     * Whether this provider's credential satisfies a managed container backend
+     * (the "cloud apps" surface). DO uses one PAT for Droplets + Apps; AWS's
+     * App Runner has its own credential row and isn't covered here.
+     */
+    public function supportsAppPlatform(): bool
+    {
+        return match ($this) {
+            self::DigitalOcean => true,
+            default => false,
+        };
+    }
+
+    /**
      * Capability tags for badge rendering on credential rows.
      *
      * @return list<string>
@@ -138,6 +151,9 @@ enum ServerProvider: string
         }
         if ($this->supportsCdn()) {
             $caps[] = 'cdn';
+        }
+        if ($this->supportsAppPlatform()) {
+            $caps[] = 'app_platform';
         }
         if ($this->supportsImport()) {
             $caps[] = 'import';

@@ -183,6 +183,30 @@ interface CloudBackend
     public function supportsWorkers(): bool;
 
     /**
+     * Whether the backend can run one-shot deploy tasks tied to the
+     * deploy lifecycle (migrations on PRE_DEPLOY, cache warm on
+     * POST_DEPLOY, etc). DigitalOcean App Platform supports `jobs`
+     * components in the spec; AWS App Runner has no equivalent.
+     */
+    public function supportsDeployTasks(): bool;
+
+    /**
+     * Whether the backend can route DEPLOYMENT_FAILED / CPU / MEM /
+     * RESTART alerts to dply's destinations (Slack + emails).
+     * DigitalOcean App Platform supports first-class `alerts` blocks
+     * in the spec and a per-alert destinations endpoint; AWS App
+     * Runner uses CloudWatch which we don't bridge yet.
+     */
+    public function supportsAlerts(): bool;
+
+    /**
+     * Cancel the site's currently-in-progress deploy if any. Returns
+     * true when a deploy was actually canceled, false when there was
+     * nothing in progress to cancel.
+     */
+    public function cancelInProgressDeployment(Site $site, ProviderCredential $credential): bool;
+
+    /**
      * Whether the backend can apply dply's autoscaling rules (CPU-target
      * based min/max instance counts) and HTTP health-check configuration.
      *

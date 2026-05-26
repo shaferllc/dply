@@ -122,10 +122,6 @@ trait ManagesProviderCredentials
 
     public string $oracle_api_token = '';
 
-    public string $do_app_platform_name = '';
-
-    public string $do_app_platform_api_token = '';
-
     public string $aws_app_runner_name = '';
 
     public string $aws_app_runner_access_key_id = '';
@@ -157,6 +153,48 @@ trait ManagesProviderCredentials
     public string $vercel_dns_api_token = '';
 
     public string $vercel_dns_team_id = '';
+
+    public string $ghcr_name = '';
+
+    public string $ghcr_username = '';
+
+    public string $ghcr_token = '';
+
+    public function storeGhcr(): void
+    {
+        if (! $this->ensureProviderEnabled('ghcr')) {
+            return;
+        }
+        $this->validate([
+            'ghcr_name' => 'nullable|string|max:255',
+            'ghcr_username' => 'required|string|max:255',
+            'ghcr_token' => 'required|string',
+        ], [], [
+            'ghcr_username' => 'GitHub username',
+            'ghcr_token' => 'Personal access token',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'ghcr',
+            'name' => trim($this->ghcr_name) ?: 'GitHub Container Registry',
+            // Stored encrypted by the model cast. DO wants the
+            // `username:token` form when we attach it to the image spec.
+            'credentials' => [
+                'username' => $this->ghcr_username,
+                'token' => $this->ghcr_token,
+            ],
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset('ghcr_name', 'ghcr_username', 'ghcr_token');
+        $this->notifyProviderCredentialStored('ghcr');
+    }
 
     public function storeDigitalOcean(): void
     {
@@ -476,25 +514,6 @@ trait ManagesProviderCredentials
         $this->toastSuccess('Provider connected.');
         $this->reset('fly_io_name', 'fly_io_api_token', 'fly_io_org_slug');
         $this->notifyProviderCredentialStored('fly_io');
-    }
-
-    public function storeDigitalOceanAppPlatform(): void
-    {
-        if (! $this->ensureProviderEnabled('digitalocean_app_platform')) {
-            return;
-        }
-        $this->validate([
-            'do_app_platform_name' => 'nullable|string|max:255',
-            'do_app_platform_api_token' => 'required|string',
-        ], [], ['do_app_platform_api_token' => 'API token']);
-        if ($this->storeProviderCredential(
-            'digitalocean_app_platform',
-            $this->do_app_platform_name,
-            $this->do_app_platform_api_token,
-            'do_app_platform_api_token',
-        )) {
-            $this->reset('do_app_platform_name', 'do_app_platform_api_token');
-        }
     }
 
     public function storeAwsAppRunner(): void
@@ -826,7 +845,7 @@ trait ManagesProviderCredentials
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
                 ForgeImportDriver::for($credential)->validateConnection();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform', 'gandi'], true)) {
+            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'gandi', 'ghcr'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");

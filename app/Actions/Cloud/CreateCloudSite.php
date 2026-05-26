@@ -34,7 +34,7 @@ class CreateCloudSite
         $port = (int) ($payload['port'] ?? 8080);
         $instances = max(1, (int) ($payload['instances'] ?? 1));
         $sizeTier = (string) ($payload['size_tier'] ?? 'small');
-        if (! in_array($sizeTier, ['small', 'medium', 'large', 'xlarge'], true)) {
+        if (! array_key_exists($sizeTier, \App\Models\CloudDeployTask::SIZE_TIERS)) {
             $sizeTier = 'small';
         }
         $region = (string) ($payload['region'] ?? '');
@@ -69,6 +69,36 @@ class CreateCloudSite
             ],
         ]);
 
+        // Stable on-dply.cloud subdomain that travels with the site even
+        // if we migrate it between backends. Derived from the slug +
+        // short random suffix so collisions are negligible.
+        $dplySubdomain = Site::generateDplyCloudSubdomain($name, Str::random(8));
+
+        // GHCR images need a `ghcr` ProviderCredential attached so the
+        // backend can pass `username:token` into the App Platform image
+        // spec. Pick the org's first GHCR credential automatically; if
+        // none exists, leave it null — DO will reject the spec with a
+        // clear "image does not exist or is private" message at create
+        // time, which is the surface the user already sees in propose.
+        $imageCredentialId = null;
+        if (str_starts_with(strtolower((string) ($payload['image'] ?? '')), 'ghcr.io/')) {
+            $ghcr = \App\Models\ProviderCredential::query()
+                ->where('organization_id', $organization->id)
+                ->where('provider', 'ghcr')
+                ->orderBy('created_at')
+                ->first();
+            $imageCredentialId = $ghcr?->id;
+        }
+
+        $containerMeta = [
+            'instance_count' => $instances,
+            'size_tier' => $sizeTier,
+            'dply_subdomain' => $dplySubdomain,
+        ];
+        if ($imageCredentialId !== null) {
+            $containerMeta['image_credential_id'] = $imageCredentialId;
+        }
+
         $site = Site::query()->create([
             'server_id' => $server->id,
             'user_id' => $user->id,
@@ -86,13 +116,16 @@ class CreateCloudSite
             'env_file_content' => $envFile,
             'status' => Site::STATUS_PENDING,
             'webhook_secret' => Str::random(48),
-            'meta' => [
-                'container' => [
-                    'instance_count' => $instances,
-                    'size_tier' => $sizeTier,
-                ],
-            ],
+            'meta' => ['container' => $containerMeta],
         ]);
+
+        // Prepend the dply subdomain to the user's domains list so the
+        // existing pending_domains/attach flow registers it on DO as a
+        // PRIMARY custom domain alongside any user-supplied domains.
+        $payload['domains'] = array_values(array_unique(array_merge(
+            [$dplySubdomain],
+            is_array($payload['domains'] ?? null) ? $payload['domains'] : [],
+        )));
 
         (new ApplyCloudSiteExtras)->handle($site, $payload);
 

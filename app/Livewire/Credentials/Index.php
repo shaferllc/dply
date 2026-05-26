@@ -135,8 +135,8 @@ class Index extends Component
                 'label' => __('Platforms'),
                 'items' => [
                     ['id' => 'fly_io', 'label' => 'Fly.io'],
-                    ['id' => 'digitalocean_app_platform', 'label' => 'DigitalOcean App Platform'],
                     ['id' => 'aws_app_runner', 'label' => 'AWS App Runner'],
+                    ['id' => 'ghcr', 'label' => __('GitHub Container Registry')],
                     ['id' => 'render', 'label' => 'Render'],
                     ['id' => 'railway', 'label' => 'Railway'],
                     ['id' => 'coolify', 'label' => 'Coolify'],

@@ -8,6 +8,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
+use App\Services\Cloud\CloudRouter;
 use Illuminate\Console\Command;
 
 /**
@@ -62,7 +63,7 @@ class FleetSummaryCommand extends Command
             ->all();
         $cloudPreviewCount = $cloudSites->filter(fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id']))->count();
         $cloudBackendCredentials = ProviderCredential::query()
-            ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
+            ->whereIn('provider', CloudRouter::credentialProviderKeys())
             ->get(['provider'])
             ->groupBy('provider')
             ->map->count()

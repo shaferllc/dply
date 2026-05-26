@@ -27,9 +27,9 @@ test('empty state with warning when no credentials', function () {
     $response = $this->actingAs($user)->get(route('cloud.index'));
 
     $response->assertOk()
-        ->assertSee('Cloud sites')
-        ->assertSee('No container backend connected')
-        ->assertSee('No cloud sites found');
+        ->assertSee('Cloud apps')
+        ->assertSee('Connect a cloud account to deploy')
+        ->assertSee('Ship your first app in minutes');
 });
 test('lists only container sites for current org', function () {
     $user = ownerWithOrg();
@@ -47,17 +47,18 @@ test('lists only container sites for current org', function () {
         ->assertDontSee('Other Org Container')
         ->assertDontSee('PHP Site');
 });
-test('filter by backend', function () {
+test('filter by source mode', function () {
     $user = ownerWithOrg();
     $org = $user->currentOrganization();
-    makeContainerSite($user, $org, 'DO Site', 'digitalocean_app_platform');
-    makeContainerSite($user, $org, 'AWS Site', 'aws_app_runner');
+    makeContainerSite($user, $org, 'Image App', 'digitalocean_app_platform');
+    $sourceApp = makeContainerSite($user, $org, 'Repo App', 'digitalocean_app_platform');
+    $sourceApp->update(['meta' => ['container' => ['source' => ['repo' => 'acme/api', 'branch' => 'main']]]]);
 
     Livewire::actingAs($user)
         ->test(CloudIndex::class)
-        ->set('filter', 'aws_app_runner')
-        ->assertSee('AWS Site')
-        ->assertDontSee('DO Site');
+        ->set('filter', 'source')
+        ->assertSee('Repo App')
+        ->assertDontSee('Image App');
 });
 test('filter by failed status', function () {
     $user = ownerWithOrg();
@@ -79,7 +80,7 @@ test('status pill renders for active site with live url', function () {
 
     $response = $this->actingAs($user)->get(route('cloud.index'));
 
-    $response->assertSee('Active')
+    $response->assertSee('Live')
         ->assertSee('live-app.ondigitalocean.app');
 });
 test('warning hides when a backend credential is connected', function () {
@@ -88,14 +89,14 @@ test('warning hides when a backend credential is connected', function () {
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => 'digitalocean_app_platform',
+        'provider' => 'digitalocean',
         'name' => 'DO',
         'credentials' => ['api_token' => 't'],
     ]);
 
     $response = $this->actingAs($user)->get(route('cloud.index'));
 
-    $response->assertDontSee('No container backend connected');
+    $response->assertDontSee('Connect a cloud account to deploy');
 });
 test('lists source mode site with repo branch', function () {
     $user = ownerWithOrg();
@@ -126,8 +127,7 @@ test('lists source mode site with repo branch', function () {
 
     $response->assertOk()
         ->assertSee('Source Site')
-        ->assertSee('acme/api@main')
-        ->assertSee('Image / source');
+        ->assertSee('acme/api@main');
 });
 test('lists preview with pr badge', function () {
     $user = ownerWithOrg();
@@ -261,8 +261,6 @@ test('filter counts match actual sites', function () {
     Livewire::actingAs($user)
         ->test(CloudIndex::class)
         ->assertViewHas('totals', fn ($t): bool => $t['all'] === 3
-            && $t['digitalocean_app_platform'] === 2
-            && $t['aws_app_runner'] === 1
             && $t['failed'] === 1
             && $t['provisioning'] === 1);
 });

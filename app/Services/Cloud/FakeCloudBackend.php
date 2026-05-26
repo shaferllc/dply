@@ -41,6 +41,28 @@ class FakeCloudBackend implements CloudBackend
         return true;
     }
 
+    public function supportsDeployTasks(): bool
+    {
+        // Mirror DO App Platform so dev installs exercise the
+        // deploy-task UI end to end without a real cloud account.
+        return true;
+    }
+
+    public function supportsAlerts(): bool
+    {
+        // Mirror DO App Platform — surfaces the alerts UI in dev
+        // without needing a real cloud account or live destinations.
+        return true;
+    }
+
+    public function cancelInProgressDeployment(Site $site, ProviderCredential $credential): bool
+    {
+        // Fake backend doesn't track in-progress deploys, so cancel
+        // is a no-op success — the UI flow still exercises end-to-end
+        // without a real cloud account.
+        return true;
+    }
+
     public function syncWorkers(Site $site, ProviderCredential $credential): void
     {
         // No-op — CloudWorker rows live in the dply database; there's

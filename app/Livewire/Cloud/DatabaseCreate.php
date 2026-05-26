@@ -129,7 +129,7 @@ class DatabaseCreate extends Component
         $org = auth()->user()?->currentOrganization();
         $hasDoCredential = $org !== null && ProviderCredential::query()
             ->where('organization_id', $org->id)
-            ->whereIn('provider', ['digitalocean', 'digitalocean_app_platform'])
+            ->where('provider', 'digitalocean')
             ->exists();
 
         return view('livewire.cloud.database-create', [

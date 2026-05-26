@@ -26,7 +26,7 @@ function containerSite(string $backend = 'digitalocean_app_platform'): Site
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => $backend,
+        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => ['api_token' => 'tok', 'github_connection_arn' => 'arn:x'],
     ]);

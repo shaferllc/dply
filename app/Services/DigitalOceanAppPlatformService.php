@@ -70,6 +70,9 @@ class DigitalOceanAppPlatformService
         array $workers = [],
         ?array $autoscaling = null,
         ?array $healthCheck = null,
+        array $jobs = [],
+        array $alerts = [],
+        ?string $registryCredentials = null,
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -79,15 +82,9 @@ class DigitalOceanAppPlatformService
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
 
-        [, $repository, $tag] = $this->parseImageRef($image);
-
         $service = [
             'name' => 'web',
-            'image' => [
-                'registry_type' => 'DOCKER_HUB',
-                'repository' => $repository,
-                'tag' => $tag,
-            ],
+            'image' => self::imageSpecBlock($image, $registryCredentials),
             'http_port' => $port,
             'instance_size_slug' => $instanceSizeSlug,
             'envs' => $envSpec,
@@ -111,6 +108,12 @@ class DigitalOceanAppPlatformService
         if ($workers !== []) {
             $spec['workers'] = array_values($workers);
         }
+        if ($jobs !== []) {
+            $spec['jobs'] = array_values($jobs);
+        }
+        if ($alerts !== []) {
+            $spec['alerts'] = array_values($alerts);
+        }
 
         $response = $this->request('post', '/apps', ['spec' => $spec]);
         $this->assertSuccess($response, 'create app');
@@ -119,6 +122,7 @@ class DigitalOceanAppPlatformService
         return [
             'id' => (string) ($data['id'] ?? ''),
             'default_ingress' => $data['default_ingress'] ?? null,
+            'alerts' => is_array($data['spec']['alerts'] ?? null) ? $data['spec']['alerts'] : [],
         ];
     }
 
@@ -154,6 +158,8 @@ class DigitalOceanAppPlatformService
         array $workers = [],
         ?array $autoscaling = null,
         ?array $healthCheck = null,
+        array $jobs = [],
+        array $alerts = [],
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -197,6 +203,12 @@ class DigitalOceanAppPlatformService
         if ($workers !== []) {
             $spec['workers'] = array_values($workers);
         }
+        if ($jobs !== []) {
+            $spec['jobs'] = array_values($jobs);
+        }
+        if ($alerts !== []) {
+            $spec['alerts'] = array_values($alerts);
+        }
 
         $response = $this->request('post', '/apps', ['spec' => $spec]);
         $this->assertSuccess($response, 'create app from source');
@@ -205,6 +217,60 @@ class DigitalOceanAppPlatformService
         return [
             'id' => (string) ($data['id'] ?? ''),
             'default_ingress' => $data['default_ingress'] ?? null,
+            'alerts' => is_array($data['spec']['alerts'] ?? null) ? $data['spec']['alerts'] : [],
+        ];
+    }
+
+    /**
+     * Update the destinations for an existing alert. DO assigns each
+     * alert in the app spec a generated ID; pass that here along with
+     * the slack_webhooks/emails block to wire notifications. Called
+     * after createApp returns the alert IDs.
+     *
+     * @param  array{slack_webhooks?: list<array{url: string, channel?: string}>, emails?: list<string>}  $destinations
+     */
+    public function updateAlertDestinations(string $appId, string $alertId, array $destinations): void
+    {
+        $response = $this->request(
+            'post',
+            '/apps/'.$appId.'/alerts/'.$alertId.'/destinations',
+            $destinations,
+        );
+        $this->assertSuccess($response, 'update alert destinations');
+    }
+
+    /**
+     * POST /apps/propose — run a spec through DO's validators and get
+     * back the estimated monthly cost without actually creating the
+     * app. Used by the dply Cloud Create form to show live cost and
+     * to catch spec mismatches (autoscaling-on-Basic, invalid regions,
+     * missing image creds) before the user submits.
+     *
+     * Returns {ok, app_cost, error?} so the form can render either
+     * a price or an inline error message.
+     *
+     * @param  array<string, mixed>  $spec
+     * @return array{ok: bool, app_cost: ?float, error: ?string}
+     */
+    public function proposeApp(array $spec): array
+    {
+        $response = $this->request('post', '/apps/propose', ['spec' => $spec]);
+
+        if ($response->status() >= 400) {
+            $body = $response->json();
+            $message = is_array($body) && is_string($body['message'] ?? null)
+                ? $body['message']
+                : $response->body();
+
+            return ['ok' => false, 'app_cost' => null, 'error' => $message];
+        }
+
+        $cost = $response->json('app_cost');
+
+        return [
+            'ok' => true,
+            'app_cost' => is_numeric($cost) ? (float) $cost : null,
+            'error' => null,
         ];
     }
 
@@ -221,6 +287,38 @@ class DigitalOceanAppPlatformService
         $deployments = $response->json('deployments') ?? [];
 
         return is_array($deployments) ? array_values($deployments) : [];
+    }
+
+    /**
+     * Fetch a single deployment by id — phases, per-component progress,
+     * created/started/finished timestamps. Used by the dply deploy
+     * detail page to show the full rollout story.
+     *
+     * @return array<string, mixed>
+     */
+    public function getDeployment(string $appId, string $deploymentId): array
+    {
+        $response = $this->request('get', '/apps/'.$appId.'/deployments/'.$deploymentId);
+        $this->assertSuccess($response, 'get deployment');
+        $deployment = $response->json('deployment') ?? [];
+
+        return is_array($deployment) ? $deployment : [];
+    }
+
+    /**
+     * Cancel an in-progress deployment. Idempotent — DO returns 422
+     * for deployments that already terminated (success/failure), so
+     * we treat 2xx and 422 both as a no-op success.
+     */
+    public function cancelDeployment(string $appId, string $deploymentId): void
+    {
+        $response = $this->request('post', '/apps/'.$appId.'/deployments/'.$deploymentId.'/cancel', []);
+
+        if ($response->status() === 422) {
+            // Already terminal — nothing to cancel. Don't error.
+            return;
+        }
+        $this->assertSuccess($response, 'cancel deployment');
     }
 
     /**
@@ -502,6 +600,14 @@ class DigitalOceanAppPlatformService
      */
     public function parseImageRef(string $image): array
     {
+        return self::parseImageRefStatic($image);
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    public static function parseImageRefStatic(string $image): array
+    {
         // The tag, if present, is after the last `:` — but only when
         // that colon is *after* the last `/` (otherwise it's a port
         // on the registry host, e.g. "localhost:5000/img").
@@ -524,6 +630,66 @@ class DigitalOceanAppPlatformService
         }
 
         return [$registry, $repository, $tag];
+    }
+
+    /**
+     * Build DO App Platform's `image` block for a Docker image ref.
+     * DO requires `registry` (account/namespace) and `repository` (image
+     * name) as separate fields — packing the namespace into `repository`
+     * trips "Image does not exist or is private" at create time.
+     *
+     *   "nginxdemos/hello:latest"              → DOCKER_HUB, registry=nginxdemos, repository=hello
+     *   "nginx:1.27"                           → DOCKER_HUB, repository=library/nginx
+     *   "ghcr.io/acme/api:v1"                  → GHCR, registry=acme, repository=api
+     *   "registry.digitalocean.com/acme/api:v1" → DOCR, registry=acme, repository=api
+     *
+     * When `$registryCredentials` is supplied it's threaded into the
+     * spec verbatim (DO accepts a `username:token` string for GHCR
+     * and Docker Hub private repos). DOCR doesn't need credentials —
+     * the app's DO PAT authenticates against DOCR transparently when
+     * its scope covers `registry:read`.
+     *
+     * @return array<string, string>
+     */
+    public static function imageSpecBlock(string $image, ?string $registryCredentials = null): array
+    {
+        [$registryHost, $repository, $tag] = self::parseImageRefStatic($image);
+
+        $registryType = match (true) {
+            $registryHost === 'registry.digitalocean.com' => 'DOCR',
+            $registryHost === 'ghcr.io' => 'GHCR',
+            str_ends_with($registryHost, 'docker.io') => 'DOCKER_HUB',
+            default => 'DOCKER_HUB',
+        };
+
+        $block = [
+            'registry_type' => $registryType,
+            'repository' => $repository,
+            'tag' => $tag,
+        ];
+
+        // For registries that namespace by account (DOCR, GHCR, Docker
+        // Hub user repos), DO wants `registry` (account) and
+        // `repository` (image name) split. The Docker Hub `library/*`
+        // namespace is special-cased — DO accepts the packed form for
+        // those and the explicit split for everything else.
+        if (in_array($registryType, ['DOCR', 'GHCR'], true) && str_contains($repository, '/')) {
+            [$namespace, $name] = explode('/', $repository, 2);
+            $block['registry'] = $namespace;
+            $block['repository'] = $name;
+        } elseif ($registryType === 'DOCKER_HUB' && str_contains($repository, '/')) {
+            [$namespace, $name] = explode('/', $repository, 2);
+            if ($namespace !== 'library') {
+                $block['registry'] = $namespace;
+                $block['repository'] = $name;
+            }
+        }
+
+        if (is_string($registryCredentials) && $registryCredentials !== '') {
+            $block['registry_credentials'] = $registryCredentials;
+        }
+
+        return $block;
     }
 
     /**

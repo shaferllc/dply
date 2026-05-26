@@ -52,6 +52,14 @@ class AttachCloudDomainJob implements ShouldQueue
             'validation_records' => $records,
         ];
         $meta['container']['domains'] = $domains;
+
+        // Flip the canonical live_url to the on-dply.cloud subdomain
+        // once that specific hostname's been registered on the backend.
+        // containerLiveUrl() picks this up.
+        if ($this->hostname === ($meta['container']['dply_subdomain'] ?? null)) {
+            $meta['container']['dply_subdomain_attached'] = true;
+        }
+
         $site->update(['meta' => $meta]);
     }
 }

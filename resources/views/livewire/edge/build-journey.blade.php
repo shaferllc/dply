@@ -155,7 +155,19 @@
                 @endforeach
             </ol>
 
-            <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 text-right sm:px-8">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-8">
+                @if ($polling && ! $journey['hasFailed'] && ! $journey['isDone'])
+                    <button
+                        type="button"
+                        wire:click="confirmRestartFrozenBuild"
+                        class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 hover:underline"
+                    >
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                        {{ __('Restart build') }}
+                    </button>
+                @else
+                    <span></span>
+                @endif
                 <a
                     href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'log']) }}"
                     wire:navigate
@@ -165,5 +177,7 @@
                 </a>
             </div>
         </section>
+
+        @include('livewire.partials.confirm-action-modal')
     @endif
 </div>

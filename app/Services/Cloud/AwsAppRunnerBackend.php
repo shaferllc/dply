@@ -25,6 +25,32 @@ class AwsAppRunnerBackend implements CloudBackend
         return false;
     }
 
+    public function supportsDeployTasks(): bool
+    {
+        // App Runner has no job/task concept either — only the HTTP
+        // service. Deploy-task creation is blocked at the form layer
+        // when the resolved backend is App Runner.
+        return false;
+    }
+
+    public function supportsAlerts(): bool
+    {
+        // App Runner emits metrics into CloudWatch with its own alarm
+        // model; dply doesn't bridge that yet, so we report false and
+        // the alerts UI hides itself for App Runner sites.
+        return false;
+    }
+
+    public function cancelInProgressDeployment(Site $site, ProviderCredential $credential): bool
+    {
+        // App Runner does support StopDeployment but the request shape
+        // and idempotency story differ enough that dply hasn't wired
+        // it yet. Return false so the cancel UI surfaces a clear
+        // "not available on this backend" rather than silently
+        // succeeding without actually stopping the deploy.
+        return false;
+    }
+
     public function syncWorkers(Site $site, ProviderCredential $credential): void
     {
         throw new \RuntimeException(
@@ -515,10 +541,14 @@ class AwsAppRunnerBackend implements CloudBackend
         $meta = is_array($site->meta) ? $site->meta : [];
         $tier = (string) ($meta['container']['size_tier'] ?? 'small');
 
+        // AWS App Runner has one compute axis (CPU + RAM combo) and no
+        // Basic/Pro split — the dply Pro suffix is a DO concept. We map
+        // each `*-pro` value to the same CPU/RAM combo as its Basic peer
+        // so swapping backends doesn't accidentally change AWS sizing.
         return match ($tier) {
-            'medium' => ['512', '1024'],
-            'large' => ['1024', '2048'],
-            'xlarge' => ['2048', '4096'],
+            'medium', 'medium-pro' => ['512', '1024'],
+            'large', 'large-pro' => ['1024', '2048'],
+            'xlarge', 'xlarge-pro' => ['2048', '4096'],
             default => ['256', '512'],
         };
     }

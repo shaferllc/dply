@@ -32,7 +32,14 @@
       "Bash(./vendor/bin/pest --testsuite=Edge)",
       "Bash(./vendor/bin/pest --testsuite=Edge --stop-on-failure)",
       "Bash(grep -n 'edgeSiteAccessRule\\\\|mount\\\\|$site\\\\b' app/Livewire/Concerns/ManagesEdgeDeploymentLifecycle.php)",
-      "Bash(grep -nE \"sites\\\\..*audit|sites/\\\\{|sites\\\\..*export\" routes/web.php)"
+      "Bash(grep -nE \"sites\\\\..*audit|sites/\\\\{|sites\\\\..*export\" routes/web.php)",
+      "Bash(gh auth *)",
+      "Bash(composer --version)",
+      "Read(//Users/tomshafer/Projects/Apps/**)",
+      "Bash(composer create-project *)",
+      "Bash(composer update *)",
+      "Bash(./dply --version)",
+      "Bash(/opt/homebrew/bin/gh repo *)"
     ]
   }
 }

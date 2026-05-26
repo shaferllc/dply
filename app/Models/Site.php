@@ -1503,9 +1503,38 @@ class Site extends Model
     public function containerLiveUrl(): ?string
     {
         $meta = is_array($this->meta) ? $this->meta : [];
+
+        // Prefer the branded dply subdomain (e.g. `acme-api-x4k2p.on-dply.cloud`)
+        // once it's attached as a PRIMARY domain on the backend. While the
+        // domain is still pending validation/cert issuance, fall back to the
+        // backend's default ingress (e.g. `*.ondigitalocean.app`) so users
+        // can hit the app immediately.
+        $subdomain = $meta['container']['dply_subdomain'] ?? null;
+        $subdomainAttached = (bool) ($meta['container']['dply_subdomain_attached'] ?? false);
+        if ($subdomainAttached && is_string($subdomain) && $subdomain !== '') {
+            return 'https://'.$subdomain;
+        }
+
         $url = $meta['container']['live_url'] ?? null;
 
         return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    /**
+     * Generate a stable, brand-canonical hostname for a cloud site
+     * (e.g. `acme-api-x4k2p.on-dply.cloud`). All dply cloud apps land
+     * under `on-dply.cloud` regardless of which backend (DO App
+     * Platform / AWS App Runner) actually runs them, so the public
+     * URL stays consistent if we migrate a site between backends.
+     */
+    public static function generateDplyCloudSubdomain(string $name, string $id): string
+    {
+        $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $name));
+        $slug = trim($slug, '-');
+        $slug = $slug === '' ? 'app' : substr($slug, 0, 32);
+        $shortId = strtolower(substr($id, -5));
+
+        return $slug.'-'.$shortId.'.on-dply.cloud';
     }
 
     /**

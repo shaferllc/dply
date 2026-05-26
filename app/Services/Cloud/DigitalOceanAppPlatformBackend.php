@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Cloud;
 
+use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\ProviderCredential;
 use App\Models\Site;
@@ -25,6 +26,136 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
         // App Platform supports `workers` components — long-running,
         // no HTTP — in the same app spec as the web service.
         return true;
+    }
+
+    public function supportsDeployTasks(): bool
+    {
+        // App Platform supports `jobs` components keyed by PRE_DEPLOY /
+        // POST_DEPLOY / FAILED_DEPLOY / MANUAL in the same app spec.
+        return true;
+    }
+
+    public function supportsAlerts(): bool
+    {
+        // App Platform has first-class `alerts` in the spec plus a
+        // per-alert destinations endpoint (Slack webhook + emails).
+        return true;
+    }
+
+    public function cancelInProgressDeployment(Site $site, ProviderCredential $credential): bool
+    {
+        if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
+            return false;
+        }
+
+        $service = new DigitalOceanAppPlatformService($credential);
+        $app = $service->getApp($site->container_backend_id);
+
+        $inProgress = $app['in_progress_deployment'] ?? null;
+        if (! is_array($inProgress) || ! is_string($inProgress['id'] ?? null) || $inProgress['id'] === '') {
+            return false;
+        }
+
+        $service->cancelDeployment($site->container_backend_id, $inProgress['id']);
+
+        return true;
+    }
+
+    /**
+     * Resolve `username:token` for the registry credential attached to
+     * the site (if any), so DO can pull private images at deploy time.
+     *
+     * Only GHCR currently flows through here. DOCR uses the app's DO
+     * PAT transparently (no separate creds needed) and Docker Hub
+     * private repos can be added the same way as GHCR when we ship
+     * that credential type.
+     */
+    public static function imageRegistryCredentialsFor(Site $site): ?string
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $credId = $meta['container']['image_credential_id'] ?? null;
+        if (! is_string($credId) || $credId === '') {
+            return null;
+        }
+
+        $cred = \App\Models\ProviderCredential::query()->find($credId);
+        if ($cred === null || $cred->organization_id !== $site->organization_id) {
+            return null;
+        }
+
+        $body = is_array($cred->credentials) ? $cred->credentials : [];
+        $username = (string) ($body['username'] ?? '');
+        $token = (string) ($body['token'] ?? $body['api_token'] ?? '');
+        if ($username === '' || $token === '') {
+            return null;
+        }
+
+        return $username.':'.$token;
+    }
+
+    /**
+     * Build a minimal spec body from a payload (NOT a saved Site) for
+     * pre-submit validation via /apps/propose. Mirrors the shape
+     * createApp/createAppFromSource emit; intentionally skips workers/
+     * jobs/alerts since those don't affect propose's cost-or-error
+     * outcome materially and would require persisted child rows.
+     *
+     * The form calls this with its own state to get a cost estimate
+     * and to catch spec validation errors before the user submits.
+     *
+     * @param  array{name: string, region: string, size_tier_slug: string, instances: int, port: int, mode: string, image?: string, repo?: string, branch?: string, dockerfile_path?: ?string, autoscaling?: ?array, health_check?: ?array}  $payload
+     * @return array<string, mixed>
+     */
+    public static function buildProposeSpecFromPayload(array $payload): array
+    {
+        $service = [
+            'name' => 'web',
+            'http_port' => (int) $payload['port'],
+            'instance_size_slug' => (string) $payload['size_tier_slug'],
+        ];
+
+        if (($payload['mode'] ?? 'image') === 'source') {
+            $service['github'] = [
+                'repo' => (string) ($payload['repo'] ?? ''),
+                'branch' => (string) ($payload['branch'] ?? 'main'),
+                'deploy_on_push' => true,
+            ];
+            $dockerfile = $payload['dockerfile_path'] ?? null;
+            if (is_string($dockerfile) && $dockerfile !== '') {
+                $service['dockerfile_path'] = $dockerfile;
+            }
+        } else {
+            $service['image'] = DigitalOceanAppPlatformService::imageSpecBlock((string) ($payload['image'] ?? ''));
+        }
+
+        $autoscaling = $payload['autoscaling'] ?? null;
+        if (is_array($autoscaling) && ($autoscaling['enabled'] ?? false)) {
+            $service['autoscaling'] = [
+                'min_instance_count' => (int) ($autoscaling['min_instances'] ?? 1),
+                'max_instance_count' => (int) ($autoscaling['max_instances'] ?? 3),
+                'metrics' => [
+                    'cpu' => ['percent' => (int) ($autoscaling['cpu_percent'] ?? 75)],
+                ],
+            ];
+        } else {
+            $service['instance_count'] = max(1, (int) $payload['instances']);
+        }
+
+        $health = $payload['health_check'] ?? null;
+        if (is_array($health) && ($health['enabled'] ?? false)) {
+            $service['health_check'] = [
+                'http_path' => (string) ($health['http_path'] ?? '/'),
+                'period_seconds' => (int) ($health['period_seconds'] ?? 30),
+                'timeout_seconds' => (int) ($health['timeout_seconds'] ?? 5),
+                'failure_threshold' => (int) ($health['failure_threshold'] ?? 3),
+            ];
+        }
+
+        return [
+            'name' => (string) $payload['name'] ?: 'dply-propose-probe',
+            'region' => (string) $payload['region'] ?: 'nyc',
+            'services' => [$service],
+        ];
     }
 
     public function supportsAutoscaling(): bool
@@ -52,7 +183,12 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             workers: $this->workerComponentsFor($site, $env, $buildEnv),
             autoscaling: CloudScalingConfig::doAutoscalingBlock($site),
             healthCheck: CloudScalingConfig::doHealthCheckBlock($site),
+            jobs: $this->jobComponentsFor($site, $env, $buildEnv),
+            alerts: CloudAlerts::doAlertsBlock($site),
+            registryCredentials: self::imageRegistryCredentialsFor($site),
         );
+
+        $this->applyAlertDestinations($service, $result, $site);
 
         return [
             'backend_id' => $result['id'],
@@ -82,12 +218,57 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             workers: $this->workerComponentsFor($site, $env, $buildEnv, $source),
             autoscaling: CloudScalingConfig::doAutoscalingBlock($site),
             healthCheck: CloudScalingConfig::doHealthCheckBlock($site),
+            jobs: $this->jobComponentsFor($site, $env, $buildEnv, $source),
+            alerts: CloudAlerts::doAlertsBlock($site),
         );
+
+        $this->applyAlertDestinations($service, $result, $site);
 
         return [
             'backend_id' => $result['id'],
             'live_url' => $result['default_ingress'],
         ];
+    }
+
+    /**
+     * After createApp returns, DO has assigned IDs to each alert in the
+     * spec. PUT destinations for each one (Slack + emails) so the
+     * notifications actually land. Failures don't abort provision —
+     * the app is up; alerts can be retried via syncAlerts later.
+     *
+     * @param  array{id: string, default_ingress: ?string, alerts: list<array<string, mixed>>}  $result
+     */
+    private function applyAlertDestinations(DigitalOceanAppPlatformService $service, array $result, Site $site): void
+    {
+        $alerts = is_array($result['alerts'] ?? null) ? $result['alerts'] : [];
+        if ($alerts === []) {
+            return;
+        }
+
+        $organization = $site->organization;
+        if ($organization === null) {
+            return;
+        }
+
+        $destinations = CloudAlerts::destinationsFor($site, $organization);
+        if ($destinations['slack_webhooks'] === [] && $destinations['emails'] === []) {
+            return;
+        }
+
+        foreach ($alerts as $alert) {
+            $alertId = (string) ($alert['id'] ?? '');
+            if ($alertId === '') {
+                continue;
+            }
+            try {
+                $service->updateAlertDestinations((string) $result['id'], $alertId, $destinations);
+            } catch (\Throwable $e) {
+                // Soft-fail — the app is provisioned; one alert without
+                // wired destinations is recoverable. The error lands in
+                // the dply log; future syncAlerts() can retry.
+                report($e);
+            }
+        }
     }
 
     /**
@@ -138,9 +319,10 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             return;
         }
 
-        [, $repository, $tag] = $service->parseImageRef($image);
-        $spec['services'][0]['image']['repository'] = $repository;
-        $spec['services'][0]['image']['tag'] = $tag;
+        $spec['services'][0]['image'] = DigitalOceanAppPlatformService::imageSpecBlock(
+            $image,
+            self::imageRegistryCredentialsFor($site),
+        );
         // Re-emit the autoscaling / health-check blocks and the workers
         // array so an image bump never silently drops them.
         $spec = $this->applyScalingToSpec($spec, $site);
@@ -352,12 +534,10 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
                 $sourceBlock['dockerfile_path'] = $sourceSpec['dockerfile_path'];
             }
         } else {
-            [, $repository, $tag] = $this->parseImageRef((string) ($site->container_image ?? ''));
-            $sourceBlock = ['image' => [
-                'registry_type' => 'DOCKER_HUB',
-                'repository' => $repository,
-                'tag' => $tag,
-            ]];
+            $sourceBlock = ['image' => DigitalOceanAppPlatformService::imageSpecBlock(
+                (string) ($site->container_image ?? ''),
+                self::imageRegistryCredentialsFor($site),
+            )];
         }
 
         return $this->buildWorkerComponents($site, $env, $buildEnv, $sourceBlock);
@@ -433,6 +613,91 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
 
         // Collision — append a short suffix from the ulid.
         $suffix = strtolower(substr((string) $worker->id, -5));
+
+        return substr($name, 0, 22).'-'.$suffix;
+    }
+
+    /**
+     * Build the DO `jobs` components array for a site. Mirrors the
+     * worker pair but emits `kind` (PRE_DEPLOY / POST_DEPLOY /
+     * FAILED_DEPLOY / MANUAL) instead of a long-running instance count.
+     *
+     * @param  array<string, string>  $env
+     * @param  array<string, string>  $buildEnv
+     * @param  array{repo: string, branch: string, dockerfile_path: ?string, deploy_on_push: bool}|null  $sourceSpec
+     * @return list<array<string, mixed>>
+     */
+    private function jobComponentsFor(Site $site, array $env, array $buildEnv, ?array $sourceSpec = null): array
+    {
+        if ($sourceSpec !== null) {
+            $sourceBlock = ['github' => [
+                'repo' => $sourceSpec['repo'],
+                'branch' => $sourceSpec['branch'],
+                'deploy_on_push' => $sourceSpec['deploy_on_push'],
+            ]];
+            if (is_string($sourceSpec['dockerfile_path']) && $sourceSpec['dockerfile_path'] !== '') {
+                $sourceBlock['dockerfile_path'] = $sourceSpec['dockerfile_path'];
+            }
+        } else {
+            $sourceBlock = ['image' => DigitalOceanAppPlatformService::imageSpecBlock(
+                (string) ($site->container_image ?? ''),
+                self::imageRegistryCredentialsFor($site),
+            )];
+        }
+
+        $tasks = CloudDeployTask::query()
+            ->where('site_id', $site->id)
+            ->orderBy('created_at')
+            ->get();
+
+        if ($tasks->isEmpty()) {
+            return [];
+        }
+
+        $envSpec = [];
+        foreach ($env as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'RUN_TIME'];
+        }
+        foreach ($buildEnv as $k => $v) {
+            $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
+        }
+
+        $components = [];
+        $used = [];
+        foreach ($tasks as $task) {
+            $name = $this->jobComponentName($task, $used);
+            $used[$name] = true;
+
+            $components[] = array_merge($sourceBlock, [
+                'name' => $name,
+                'kind' => $task->doKind(),
+                'run_command' => $task->command,
+                'instance_count' => 1,
+                'instance_size_slug' => $task->backendSizeSlug(),
+                'envs' => $envSpec,
+            ]);
+        }
+
+        return $components;
+    }
+
+    /**
+     * A DO-safe, app-unique component name for a job row.
+     *
+     * @param  array<string, bool>  $used
+     */
+    private function jobComponentName(CloudDeployTask $task, array $used): string
+    {
+        $slug = strtolower((string) preg_replace('/[^a-z0-9-]/i', '-', (string) $task->name));
+        $slug = trim($slug, '-');
+        $name = $slug !== '' ? 'job-'.$slug : 'job';
+        $name = substr($name, 0, 28);
+
+        if (! isset($used[$name])) {
+            return $name;
+        }
+
+        $suffix = strtolower(substr((string) $task->id, -5));
 
         return substr($name, 0, 22).'-'.$suffix;
     }
@@ -704,9 +969,15 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
     }
 
     /**
-     * Map the site's portable size_tier (small / medium / large /
-     * xlarge) to DO App Platform's instance_size_slug. Operators
-     * set the tier via dply:cloud:resize; default is "small".
+     * Map the site's portable size_tier to DO App Platform's
+     * instance_size_slug. Basic tiers map to `basic-*` slugs (the
+     * default, cheapest path). The Pro variants (`*-pro`) map to
+     * `apps-d-*` Professional slugs and are required when CPU
+     * autoscaling is enabled — Basic tier rejects autoscaling at
+     * spec-validation time on DO's side. Operators opt into Pro
+     * deliberately via the size selector or `dply:cloud:resize`;
+     * we never auto-upgrade behind their back because the cost
+     * delta is significant.
      */
     private function siteSizeSlugForDo(Site $site): string
     {
@@ -717,6 +988,10 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             'medium' => 'basic-xs',
             'large' => 'basic-s',
             'xlarge' => 'basic-m',
+            'small-pro' => 'apps-d-1vcpu-0.5gb',
+            'medium-pro' => 'apps-d-1vcpu-1gb',
+            'large-pro' => 'apps-d-1vcpu-2gb',
+            'xlarge-pro' => 'apps-d-2vcpu-4gb',
             default => 'basic-xxs',
         };
     }

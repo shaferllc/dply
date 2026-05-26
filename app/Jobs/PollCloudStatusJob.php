@@ -103,6 +103,18 @@ class PollCloudStatusJob implements ShouldQueue
         foreach ($pendingDomains as $hostname) {
             AttachCloudDomainJob::dispatch((string) $site->id, $hostname);
         }
+
+        // Once a deploy reaches a terminal phase, fan out the per-job
+        // sync so cloud_deploy_task_runs reflects what DO actually ran.
+        // Re-runs are idempotent so polling against an already-synced
+        // deploy is cheap (one extra GET + a uniqueness check).
+        $isTerminal = in_array($newStatus ?? '', [
+            Site::STATUS_CONTAINER_ACTIVE,
+            Site::STATUS_CONTAINER_FAILED,
+        ], true);
+        if ($isTerminal) {
+            SyncCloudDeployTaskRunsJob::dispatch((string) $site->id);
+        }
     }
 
     private function mapPhase(string $phase): ?string

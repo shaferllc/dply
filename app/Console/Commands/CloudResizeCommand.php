@@ -26,11 +26,11 @@ use Illuminate\Console\Command;
  */
 class CloudResizeCommand extends Command
 {
-    private const TIERS = ['small', 'medium', 'large', 'xlarge'];
+    private const TIERS = ['small', 'medium', 'large', 'xlarge', 'small-pro', 'medium-pro', 'large-pro', 'xlarge-pro'];
 
     protected $signature = 'dply:cloud:resize
         {site : Site ID, slug, or name}
-        {--size= : Compute tier — small, medium, large, or xlarge}
+        {--size= : Compute tier — small, medium, large, xlarge (Basic) or *-pro for Professional}
         {--no-redeploy : Persist the change only, do not queue a redeploy}';
 
     protected $description = 'Resize an cloud container site to a different compute tier.';

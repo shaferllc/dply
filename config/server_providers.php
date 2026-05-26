@@ -10,7 +10,6 @@ return [
         'digitalocean' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN', true), // https://www.digitalocean.com/
         'digitalocean_functions' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_FUNCTIONS', true), // https://www.digitalocean.com/products/functions/
         'digitalocean_kubernetes' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_KUBERNETES', true), // https://www.digitalocean.com/products/kubernetes/
-        'digitalocean_app_platform' => env('DPLY_SERVER_PROVIDER_DIGITALOCEAN_APP_PLATFORM', false), // https://www.digitalocean.com/products/app-platform/
         'hetzner' => env('DPLY_SERVER_PROVIDER_HETZNER', true), // https://www.hetzner.com/cloud
         'linode' => env('DPLY_SERVER_PROVIDER_LINODE', true), // https://www.linode.com/
         'vultr' => env('DPLY_SERVER_PROVIDER_VULTR', true), // https://www.vultr.com/
@@ -32,6 +31,7 @@ return [
         'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', true), // https://www.namecheap.com/
         'vercel_dns' => env('DPLY_SERVER_PROVIDER_VERCEL_DNS', true), // https://vercel.com/docs/projects/domains
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
+        'ghcr' => env('DPLY_SERVER_PROVIDER_GHCR', true), // GitHub Container Registry — image pull creds for Cloud apps
         'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/
         'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // https://cloud.google.com/compute
         'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false), // https://azure.microsoft.com/en-us/products/virtual-machines/

@@ -7,24 +7,24 @@ namespace App\Livewire\Cloud;
 use App\Enums\SiteType;
 use App\Models\ProviderCredential;
 use App\Models\Site;
+use App\Services\Cloud\CloudRouter;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * Org-scoped index of cloud container sites. Distinct from
- * /sites (which is the merged VM + container view) because
- * the columns operators care about for cloud are very different
- * (backend, region, image tag, live URL) — a separate page
- * keeps the cognitive load low for both surfaces.
+ * Org-scoped index of cloud apps. Distinct from /sites (the merged
+ * VM + container view) — Cloud is the app-first PaaS surface where
+ * the underlying container backend is hidden as an implementation
+ * detail. Columns reflect what app operators care about: region,
+ * source, status, live URL.
  */
 class Index extends Component
 {
     /**
      * Filter the table by one of:
      *   - 'all': everything
-     *   - backend slug ('digitalocean_app_platform' / 'aws_app_runner')
      *   - status ('failed' / 'provisioning')
      *   - mode ('source' / 'image')
      *   - 'previews': only ephemeral preview deploys
@@ -59,7 +59,6 @@ class Index extends Component
         $isPreview = fn (Site $s) => ! empty($s->meta['container']['preview_parent_site_id'] ?? null);
 
         $sites = match ($this->filter) {
-            'digitalocean_app_platform', 'aws_app_runner' => $allSites->where('container_backend', $this->filter)->values(),
             'failed' => $allSites->where('status', Site::STATUS_CONTAINER_FAILED)->values(),
             'provisioning' => $allSites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->values(),
             'source' => $allSites->filter($isSource)->values(),
@@ -70,18 +69,14 @@ class Index extends Component
 
         $hasAnyBackendCredential = ProviderCredential::query()
             ->where('organization_id', $org->id)
-            ->whereIn('provider', ['digitalocean_app_platform', 'aws_app_runner'])
+            ->whereIn('provider', CloudRouter::credentialProviderKeys())
             ->exists();
-
-        $byBackend = $allSites->groupBy('container_backend')->map->count()->all();
 
         return view('livewire.cloud.index', [
             'org' => $org,
             'sites' => $sites,
             'totals' => [
                 'all' => $allSites->count(),
-                'digitalocean_app_platform' => $byBackend['digitalocean_app_platform'] ?? 0,
-                'aws_app_runner' => $byBackend['aws_app_runner'] ?? 0,
                 'failed' => $allSites->where('status', Site::STATUS_CONTAINER_FAILED)->count(),
                 'provisioning' => $allSites->where('status', Site::STATUS_CONTAINER_PROVISIONING)->count(),
                 'source' => $allSites->filter($isSource)->count(),

@@ -656,17 +656,49 @@
         @endif
 
         {{-- Runtime (RUN) logs viewer --}}
-        <div class="rounded-xl border border-slate-200 bg-white p-3">
+        <div class="rounded-xl border border-slate-200 bg-white p-3" @if ($container_log_tail_active) wire:poll.2s="pollContainerRuntimeLogs" @endif>
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <p class="text-xs font-semibold text-slate-700">{{ __('Runtime logs') }}</p>
-                    <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Live application (RUN) output — last 200 lines.') }}</p>
+                    <p class="mt-0.5 text-[11px] text-slate-500">{{ __('Last 200 lines on demand, or live-tail new ones as they arrive.') }}</p>
                 </div>
-                <button type="button" wire:click="fetchContainerRuntimeLogs" wire:loading.attr="disabled" wire:target="fetchContainerRuntimeLogs" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
-                    <span wire:loading.remove wire:target="fetchContainerRuntimeLogs">{{ is_array($container_runtime_logs_result) ? __('Refresh logs') : __('Fetch runtime logs') }}</span>
-                    <span wire:loading wire:target="fetchContainerRuntimeLogs">{{ __('Fetching…') }}</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    @if ($container_log_tail_active)
+                        <button type="button" wire:click="toggleContainerLogTail" class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100">
+                            <span class="relative inline-flex h-2 w-2">
+                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-60"></span>
+                                <span class="relative inline-flex h-2 w-2 rounded-full bg-rose-500"></span>
+                            </span>
+                            {{ __('Stop tail') }}
+                        </button>
+                    @else
+                        <button type="button" wire:click="toggleContainerLogTail" class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100">
+                            <span class="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                            {{ __('Live tail') }}
+                        </button>
+                    @endif
+                    <button type="button" wire:click="fetchContainerRuntimeLogs" wire:loading.attr="disabled" wire:target="fetchContainerRuntimeLogs" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50">
+                        <span wire:loading.remove wire:target="fetchContainerRuntimeLogs">{{ is_array($container_runtime_logs_result) ? __('Refresh') : __('Fetch') }}</span>
+                        <span wire:loading wire:target="fetchContainerRuntimeLogs">{{ __('Fetching…') }}</span>
+                    </button>
+                </div>
             </div>
+
+            {{-- Live tail panel — only rendered while tailing or when buffer has lines --}}
+            @if ($container_log_tail_active || ! empty($container_log_tail_lines))
+                <div class="mt-3">
+                    <pre class="max-h-72 overflow-auto rounded-lg border border-emerald-200 bg-slate-900 p-3 font-mono text-[11px] leading-5 text-emerald-50">{{ $container_log_tail_lines !== [] ? implode("\n", $container_log_tail_lines) : __('Waiting for log lines…') }}</pre>
+                    @if ($container_log_tail_active)
+                        <p class="mt-1 inline-flex items-center gap-1.5 text-[11px] text-emerald-700">
+                            <span class="relative inline-flex h-1.5 w-1.5">
+                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                                <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                            </span>
+                            {{ __('Tailing — refreshing every 2s.') }}
+                        </p>
+                    @endif
+                </div>
+            @endif
             @if (is_array($container_runtime_logs_result))
                 @php
                     $runtimeLines = is_array($container_runtime_logs_result['lines'] ?? null) ? $container_runtime_logs_result['lines'] : [];
@@ -750,7 +782,12 @@
                         @endphp
                         <li class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
                             <div class="min-w-0 flex-1">
-                                <p class="font-mono text-[11px] text-slate-900">{{ substr((string) ($deployment['id'] ?? '—'), 0, 12) }}</p>
+                                @php $depId = (string) ($deployment['id'] ?? ''); @endphp
+                                @if ($depId !== '' && $site->container_backend === 'digitalocean_app_platform')
+                                    <a href="{{ route('sites.cloud.deploys.show', ['server' => $site->server, 'site' => $site, 'deploy' => $depId]) }}" wire:navigate class="font-mono text-[11px] text-sky-700 hover:underline">{{ substr($depId, 0, 12) }}</a>
+                                @else
+                                    <p class="font-mono text-[11px] text-slate-900">{{ substr($depId ?: '—', 0, 12) }}</p>
+                                @endif
                                 @if ($deployment['started_at'] ?? null)
                                     <p class="mt-0.5 text-[10px] text-slate-500">{{ __('Started :at', ['at' => $deployment['started_at']]) }}{{ ($deployment['cause'] ?? null) ? ' · '.$deployment['cause'] : '' }}</p>
                                 @endif
