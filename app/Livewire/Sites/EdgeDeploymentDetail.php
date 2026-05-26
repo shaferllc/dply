@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\Edge\EdgeDeploymentAliasGenerator;
 use App\Support\Sites\SiteSettingsViewData;
+use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -102,6 +103,17 @@ class EdgeDeploymentDetail extends Component
                 : null
         );
 
+        // Poll while the deployment is mid-flight so the status badge, journey
+        // card, and (on the log tab) build log update without a manual refresh.
+        $isInProgress = in_array($this->deployment->status, [
+            EdgeDeployment::STATUS_BUILDING,
+            EdgeDeployment::STATUS_PUBLISHING,
+        ], true);
+
+        $deploymentJourney = $isInProgress
+            ? SiteShowViewData::edgeDeploymentJourney($this->deployment)
+            : null;
+
         return view('livewire.sites.edge-deployment-detail', array_merge(
             SiteSettingsViewData::for(
                 $this->server,
@@ -120,6 +132,8 @@ class EdgeDeploymentDetail extends Component
                 'commitMeta' => $commitMeta,
                 'buildLog' => $buildLog,
                 'buildLogForLint' => $buildLogForLint,
+                'isInProgress' => $isInProgress,
+                'deploymentJourney' => $deploymentJourney,
             ],
         ));
     }

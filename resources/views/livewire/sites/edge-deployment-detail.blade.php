@@ -1,4 +1,7 @@
-<div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+<div
+    class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8"
+    @if ($isInProgress) wire:poll.5s @endif
+>
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
@@ -77,6 +80,13 @@
 
             <div class="mt-6 space-y-6">
                 @if ($tab === 'overview')
+                    @if ($deploymentJourney !== null)
+                        @include('livewire.sites.partials.edge.deployment-journey-card', [
+                            'journey' => $deploymentJourney,
+                            'deployment' => $deployment,
+                        ])
+                    @endif
+
                     <section class="dply-card overflow-hidden">
                         <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Deployment details') }}</h2>

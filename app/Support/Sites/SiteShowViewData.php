@@ -314,6 +314,65 @@ final class SiteShowViewData
         );
     }
 
+    /**
+     * Journey shape scoped to a single deployment (build → publish → live),
+     * without leaning on the parent Site's status. Used by the deployment
+     * detail page so the progress card reflects THIS build even when the
+     * site as a whole is already live on a different deployment.
+     *
+     * @return array<string, mixed>
+     */
+    public static function edgeDeploymentJourney(EdgeDeployment $deployment): array
+    {
+        $state = match ($deployment->status) {
+            EdgeDeployment::STATUS_BUILDING => 'building',
+            EdgeDeployment::STATUS_PUBLISHING => 'publishing',
+            EdgeDeployment::STATUS_LIVE, EdgeDeployment::STATUS_SUPERSEDED => 'live',
+            EdgeDeployment::STATUS_FAILED => 'failed',
+            default => 'queued',
+        };
+
+        $statusSteps = [
+            'queued' => __('Queued / cloning repository'),
+            'building' => __('Installing dependencies & building'),
+            'publishing' => __('Publishing to Edge CDN'),
+            'live' => __('Live'),
+            'failed' => __('Needs attention'),
+        ];
+        $stepKeys = array_keys($statusSteps);
+        $currentStepIndex = array_search($state, $stepKeys, true);
+        $currentStepIndex = $currentStepIndex === false ? 0 : $currentStepIndex;
+
+        $hasFailed = $state === 'failed';
+        $isDone = $state === 'live';
+        $visibleSteps = collect($statusSteps)->except('failed');
+        $totalSteps = $visibleSteps->count();
+        $completedSteps = $hasFailed
+            ? max(0, $currentStepIndex)
+            : ($isDone ? $totalSteps : max(0, $currentStepIndex));
+        $progressPercent = $totalSteps > 0
+            ? (int) round(($completedSteps / $totalSteps) * 100)
+            : 0;
+        $currentLabel = $statusSteps[$state] ?? str_replace('_', ' ', $state);
+
+        return [
+            'state' => $state,
+            'statusSteps' => $statusSteps,
+            'stepKeys' => $stepKeys,
+            'visibleSteps' => $visibleSteps,
+            'currentStepIndex' => $currentStepIndex,
+            'totalSteps' => $totalSteps,
+            'completedSteps' => $completedSteps,
+            'progressPercent' => $progressPercent,
+            'currentLabel' => $currentLabel,
+            'hasFailed' => $hasFailed,
+            'isDone' => $isDone,
+            'error' => is_string($deployment->failure_reason) && $deployment->failure_reason !== ''
+                ? $deployment->failure_reason
+                : null,
+        ];
+    }
+
     private static function resolveEdgeProvisioningState(Site $site, ?EdgeDeployment $deployment): string
     {
         if ($site->status === Site::STATUS_EDGE_FAILED
