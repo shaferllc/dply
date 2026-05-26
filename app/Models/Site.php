@@ -812,18 +812,39 @@ class Site extends Model
 
     public function isReadyForWorkspace(): bool
     {
-        return $this->isReadyForTraffic()
-            || in_array($this->status, [
-                self::STATUS_DOCKER_CONFIGURED,
-                self::STATUS_KUBERNETES_CONFIGURED,
-                self::STATUS_FUNCTIONS_CONFIGURED,
-                self::STATUS_CONTAINER_PROVISIONING,
-                self::STATUS_CONTAINER_ACTIVE,
-                self::STATUS_CONTAINER_FAILED,
-                self::STATUS_CUSTOM_ACTIVE,
-                self::STATUS_EDGE_ACTIVE,
-                self::STATUS_EDGE_FAILED,
-            ], true);
+        if ($this->isReadyForTraffic()) {
+            return true;
+        }
+
+        if (in_array($this->status, [
+            self::STATUS_DOCKER_CONFIGURED,
+            self::STATUS_KUBERNETES_CONFIGURED,
+            self::STATUS_FUNCTIONS_CONFIGURED,
+            self::STATUS_CONTAINER_PROVISIONING,
+            self::STATUS_CONTAINER_ACTIVE,
+            self::STATUS_CONTAINER_FAILED,
+            self::STATUS_CUSTOM_ACTIVE,
+            self::STATUS_EDGE_ACTIVE,
+        ], true)) {
+            return true;
+        }
+
+        // Subsequent redeploys flip the site to STATUS_EDGE_PROVISIONING /
+        // STATUS_EDGE_FAILED. Without this carve-out a failed-first-deploy
+        // would land in the workspace showing a misleading "Open live site"
+        // header (no site ever went live). Both transient + failed states
+        // stay in the provisioning shell until a deploy actually publishes
+        // — `active_deployment_id` is only set by PublishEdgeDeploymentJob
+        // on a successful publish, so it's a reliable "has ever been live"
+        // signal that persists across re-deploys.
+        if (in_array($this->status, [self::STATUS_EDGE_PROVISIONING, self::STATUS_EDGE_FAILED], true)) {
+            $activeDeploymentId = $this->edgeMeta()['active_deployment_id'] ?? null;
+            if (is_string($activeDeploymentId) && $activeDeploymentId !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function isCustom(): bool
@@ -1216,6 +1237,38 @@ class Site extends Model
         return is_string($url) && $url !== '' ? $url : null;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function edgeGuardrail(): ?array
+    {
+        $guardrail = $this->edgeMeta()['guardrail'] ?? null;
+
+        return is_array($guardrail) && $guardrail !== [] ? $guardrail : null;
+    }
+
+    /**
+     * Merge a new guardrail meta blob into edgeMeta and persist. Returns the
+     * previous state ('ok'|'warn'|'over') so the caller can detect a
+     * transition before/after the write (used by the evaluator cron to
+     * decide whether to fan out a notification).
+     *
+     * @param  array<string, mixed>  $guardrail
+     */
+    public function updateEdgeGuardrail(array $guardrail): ?string
+    {
+        $previous = $this->edgeGuardrail()['state'] ?? null;
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $edge = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        $edge['guardrail'] = $guardrail;
+        $meta['edge'] = $edge;
+
+        $this->update(['meta' => $meta]);
+
+        return is_string($previous) ? $previous : null;
+    }
+
     public function edgeHostname(): string
     {
         $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
@@ -1397,19 +1450,6 @@ class Site extends Model
     public function edgeSiteMembers(): HasMany
     {
         return $this->hasMany(EdgeSiteMember::class);
-    }
-
-    /**
-     * Returns the per-site role granted to $user on this Edge site,
-     * or null when the user has no direct grant. Org-level membership
-     * is checked separately by the policy.
-     */
-    public function edgeMemberRoleFor(User $user): ?string
-    {
-        return (string) EdgeSiteMember::query()
-            ->where('site_id', $this->id)
-            ->where('user_id', $user->id)
-            ->value('role') ?: null;
     }
 
     /**

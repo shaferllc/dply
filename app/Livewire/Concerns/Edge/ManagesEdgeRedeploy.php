@@ -23,7 +23,7 @@ trait ManagesEdgeRedeploy
         $this->authorize('update', $this->site);
 
         try {
-            $deployment = (new RedeployEdgeSite)->handle($this->site);
+            (new RedeployEdgeSite)->handle($this->site);
         } catch (\Throwable $e) {
             if (method_exists($this, 'toastError')) {
                 $this->toastError($e->getMessage());
@@ -32,13 +32,12 @@ trait ManagesEdgeRedeploy
             return;
         }
 
-        // Send the user to the live deployment-detail page so they see
-        // the build log streaming + status transitions instead of being
-        // left on the form with just a toast.
-        $this->redirectRoute('sites.edge.deployments.show', [
-            'server' => $this->site->server_id,
-            'site' => $this->site->id,
-            'deployment' => $deployment->id,
-        ], navigate: true);
+        // Stay on the current workspace page (overview / deploys list).
+        // The overview live-progress card and the deploys list both
+        // wire:poll, so the new build's status shows up in place —
+        // no need to bounce the user to the deployment-detail page.
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Deploy queued.'));
+        }
     }
 }

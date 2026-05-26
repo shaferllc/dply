@@ -18,7 +18,7 @@
                         <span class="font-mono text-xs text-brand-ink">{{ $edgeSourceRef }}</span>
                     @endif
                 </p>
-                @if ($edgeLiveUrl)
+                @if ($edgeLiveUrl && ! empty($edgeActiveDeploymentId))
                     <div class="mt-3 flex flex-wrap items-center gap-2" x-data="{ copied: false }">
                         <a href="{{ $edgeLiveUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-brand-forest/25 bg-brand-forest/8 px-3 py-1 font-mono text-[11px] text-brand-forest hover:bg-brand-forest/15 dark:border-brand-sage/30 dark:bg-brand-sage/10 dark:text-brand-sage">
                             <x-heroicon-m-globe-alt class="h-3.5 w-3.5 shrink-0" />
@@ -35,13 +35,15 @@
                             <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                         </button>
                     </div>
+                @elseif ($site->status === \App\Models\Site::STATUS_EDGE_FAILED && empty($edgeActiveDeploymentId))
+                    <p class="mt-2 text-sm text-rose-700">{{ __('First deploy did not publish. Once a build succeeds, the live URL appears here.') }}</p>
                 @else
                     <p class="mt-2 text-sm text-brand-moss">{{ __('Live URL pending — complete the first build to publish.') }}</p>
                 @endif
             </div>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
-            @if ($edgeLiveUrl)
+            @if ($edgeLiveUrl && ! empty($edgeActiveDeploymentId))
                 <a href="{{ $edgeLiveUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900">
                     <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
                     {{ __('Open live site') }}
@@ -89,9 +91,7 @@
     </div>
 </section>
 
-@if (! empty($edgeMeta['last_error']))
-    <div class="rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
-        <p class="font-semibold">{{ __('Last error') }}</p>
-        <p class="mt-1 break-words text-rose-800 dark:text-rose-300">{{ $edgeMeta['last_error'] }}</p>
-    </div>
-@endif
+{{-- "Last error" callout removed — the delivery banner at the top of
+     the workspace already surfaces the failure reason in a more visible
+     spot, so showing both made the same message appear twice on the
+     overview. The banner copy is computed in EdgeSiteViewData::deliveryBanner. --}}

@@ -281,9 +281,14 @@ final class SiteShowViewData
         $edgeJourneyIsDone = $edgeProvisioningState === 'live';
         $edgeVisibleSteps = collect($edgeStatusSteps)->except('failed');
         $edgeTotalSteps = $edgeVisibleSteps->count();
+        // Count the IN-FLIGHT step as the current step number — operators
+        // read "(3/4)" as "we're on step 3", not "3 done and not started 4".
+        // Done = totalSteps; failed = the step that died (currentStepIndex
+        // stays at the live-time index since state flips to 'failed' only
+        // after the failing step is set).
         $edgeCompletedSteps = $edgeJourneyHasFailed
-            ? max(0, $edgeCurrentStepIndex)
-            : ($edgeJourneyIsDone ? $edgeTotalSteps : max(0, $edgeCurrentStepIndex));
+            ? max(1, min($edgeTotalSteps, $edgeCurrentStepIndex))
+            : ($edgeJourneyIsDone ? $edgeTotalSteps : max(1, min($edgeTotalSteps, $edgeCurrentStepIndex + 1)));
         $edgeProgressPercent = $edgeTotalSteps > 0
             ? (int) round(($edgeCompletedSteps / $edgeTotalSteps) * 100)
             : 0;
@@ -347,9 +352,11 @@ final class SiteShowViewData
         $isDone = $state === 'live';
         $visibleSteps = collect($statusSteps)->except('failed');
         $totalSteps = $visibleSteps->count();
+        // "(X/N)" reads as "currently on step X" — count the in-flight step
+        // as the current number, not the count of finished ones.
         $completedSteps = $hasFailed
-            ? max(0, $currentStepIndex)
-            : ($isDone ? $totalSteps : max(0, $currentStepIndex));
+            ? max(1, min($totalSteps, $currentStepIndex))
+            : ($isDone ? $totalSteps : max(1, min($totalSteps, $currentStepIndex + 1)));
         $progressPercent = $totalSteps > 0
             ? (int) round(($completedSteps / $totalSteps) * 100)
             : 0;

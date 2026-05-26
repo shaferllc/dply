@@ -69,6 +69,8 @@
             </x-page-header>
 
             <main class="min-w-0 space-y-6 mt-8">
+                @include('livewire.sites.partials.edge.guardrail-banner')
+
                 @if ($sectionConsoleActionKinds !== [])
                     @include('livewire.partials.console-action-banner-static', [
                         'run' => $sectionConsoleActionRun,

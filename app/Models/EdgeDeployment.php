@@ -87,6 +87,53 @@ class EdgeDeployment extends Model
         return $this->status === self::STATUS_LIVE;
     }
 
+    /**
+     * Live-tail helper for the in-flight build log. While the build is
+     * still running the log is on the queue worker's local filesystem
+     * (path stashed in meta.local_build_log_path); after publish, the
+     * runner deletes the local copy and persists to the remote disk
+     * — at which point this method just returns an empty body so the
+     * Livewire poller stops appending.
+     *
+     * Returns the new bytes since `$offset` (capped at `$maxBytes`) plus
+     * the new offset the caller should use on the next poll.
+     *
+     * @return array{body: string, offset: int, exists: bool}
+     */
+    public function readLocalBuildLogSince(int $offset, int $maxBytes = 32_000): array
+    {
+        $path = $this->meta['local_build_log_path'] ?? null;
+        if (! is_string($path) || $path === '' || ! is_file($path) || ! is_readable($path)) {
+            return ['body' => '', 'offset' => $offset, 'exists' => false];
+        }
+
+        $size = @filesize($path);
+        if ($size === false || $size <= $offset) {
+            return ['body' => '', 'offset' => $offset, 'exists' => true];
+        }
+
+        $bytesAvailable = $size - $offset;
+        $bytesToRead = (int) min($bytesAvailable, max(1, $maxBytes));
+        $handle = @fopen($path, 'rb');
+        if ($handle === false) {
+            return ['body' => '', 'offset' => $offset, 'exists' => true];
+        }
+        try {
+            if (@fseek($handle, $offset) !== 0) {
+                return ['body' => '', 'offset' => $offset, 'exists' => true];
+            }
+            $body = (string) @fread($handle, $bytesToRead);
+        } finally {
+            @fclose($handle);
+        }
+
+        return [
+            'body' => $body,
+            'offset' => $offset + strlen($body),
+            'exists' => true,
+        ];
+    }
+
     public function readBuildLog(?Site $site = null): ?string
     {
         if (! is_string($this->build_log_path) || $this->build_log_path === '') {

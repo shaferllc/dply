@@ -137,15 +137,25 @@ class CreateEdgeSite
         $prefix = trim((string) config('edge.r2.key_prefix', 'edge/'), '/')
             .'/'.$organization->id.'/'.$site->id.'/'.Str::ulid();
 
+        // Optional commit pin from the create form — when ref_kind=commit
+        // the form moves the SHA into git_commit + sets branch back to the
+        // default, so the deployment row records the actual ref we'll
+        // check out and the build runner does a full-history clone +
+        // checkout instead of a shallow branch clone.
+        $gitCommit = is_string($payload['git_commit'] ?? null) && $payload['git_commit'] !== ''
+            ? trim($payload['git_commit'])
+            : null;
+
         $deployment = EdgeDeployment::query()->create([
             'site_id' => $site->id,
             'organization_id' => $organization->id,
             'status' => EdgeDeployment::STATUS_BUILDING,
             'git_branch' => $branch,
+            'git_commit' => $gitCommit,
             'storage_prefix' => $prefix,
         ]);
 
-        BuildEdgeSiteJob::dispatch($deployment->id);
+        BuildEdgeSiteJob::dispatch($deployment->id, $gitCommit);
 
         return $site;
     }

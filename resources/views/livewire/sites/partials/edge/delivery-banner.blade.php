@@ -3,11 +3,37 @@
         $tone = $edgeDeliveryBanner['tone'] ?? 'amber';
         $bannerClass = match ($tone) {
             'emerald' => 'border-emerald-200 bg-emerald-50/80 text-emerald-950 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-200',
+            'rose' => 'border-rose-200 bg-rose-50/80 text-rose-950 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200',
+            'sky' => 'border-sky-200 bg-sky-50/80 text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200',
             default => 'border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200',
         };
+        $copyButtonClass = match ($tone) {
+            'emerald' => 'text-emerald-900/70 hover:text-emerald-700',
+            'rose' => 'text-rose-900/70 hover:text-rose-700',
+            'sky' => 'text-sky-900/70 hover:text-sky-700',
+            default => 'text-amber-900/70 hover:text-amber-700',
+        };
     @endphp
-    <div class="rounded-2xl border px-4 py-3 text-sm {{ $bannerClass }}">
-        <p class="font-semibold">{{ $edgeDeliveryBanner['title'] }}</p>
-        <p class="mt-1 leading-relaxed opacity-90">{{ $edgeDeliveryBanner['message'] }}</p>
+    <div
+        x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($edgeDeliveryBanner['message'])); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
+        class="rounded-2xl border px-4 py-3 text-sm {{ $bannerClass }}"
+    >
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <p class="font-semibold">{{ $edgeDeliveryBanner['title'] }}</p>
+                <p class="mt-1 break-words leading-relaxed opacity-90">{{ $edgeDeliveryBanner['message'] }}</p>
+            </div>
+            <button
+                type="button"
+                x-on:click="copy()"
+                class="shrink-0 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $copyButtonClass }}"
+                :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy message') }}'"
+            >
+                <x-heroicon-o-clipboard x-show="!copied" class="h-3.5 w-3.5" />
+                <x-heroicon-s-check x-show="copied" x-cloak class="h-3.5 w-3.5" />
+                <span x-show="!copied">{{ __('Copy') }}</span>
+                <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+            </button>
+        </div>
     </div>
 @endif

@@ -1,6 +1,6 @@
 <div
     class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8"
-    @if ($isInProgress) wire:poll.5s @endif
+    @if ($isInProgress) wire:poll.2s @endif
 >
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
@@ -212,18 +212,83 @@
                             ])
                         </div>
                     @endif
+
+                    @if ($isInProgress)
+                        {{-- Live: render the journey component (progress +
+                             per-step streaming log). The static archived-log
+                             section below also stays — but it's only populated
+                             once the publish path persists the log to R2. --}}
+                        @livewire('edge.build-journey', ['deploymentId' => $deployment->id], key('edge-detail-log-tab-journey-'.$deployment->id))
+                    @endif
+
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Build log') }}</h2>
+                        <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                            <h2 class="text-base font-semibold text-brand-ink">
+                                {{ $isInProgress ? __('Archived build log') : __('Build log') }}
+                            </h2>
+                            @if (! $isInProgress && $buildLog !== null && $buildLog !== '')
+                                <span class="text-[10px] uppercase tracking-wide text-brand-mist">{{ number_format(strlen($buildLog)) }} bytes</span>
+                            @endif
                         </div>
                         @if ($buildLog === null || $buildLog === '')
                             <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">
-                                {{ __('No build log stored for this deployment.') }}
+                                {{ $isInProgress
+                                    ? __('The archived log appears here once publish finishes — for now, follow the live stream above.')
+                                    : __('No build log stored for this deployment.') }}
                             </div>
                         @else
                             <pre class="max-h-[32rem] overflow-auto bg-brand-ink px-6 py-4 font-mono text-xs leading-relaxed text-brand-cream sm:px-8">{{ $buildLog }}</pre>
                         @endif
                     </section>
+
+                    @if (! empty($recentDeployments))
+                        <section class="dply-card overflow-hidden">
+                            <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h2>
+                                <a
+                                    href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}"
+                                    wire:navigate
+                                    class="text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage"
+                                >
+                                    {{ __('All deploys →') }}
+                                </a>
+                            </div>
+                            <ul class="divide-y divide-brand-ink/8">
+                                @foreach ($recentDeployments as $row)
+                                    @php
+                                        $isThis = $row->id === $deployment->id;
+                                        $statusTone = match ($row->status) {
+                                            \App\Models\EdgeDeployment::STATUS_LIVE => 'bg-emerald-100 text-emerald-800',
+                                            \App\Models\EdgeDeployment::STATUS_FAILED => 'bg-rose-100 text-rose-800',
+                                            \App\Models\EdgeDeployment::STATUS_BUILDING, \App\Models\EdgeDeployment::STATUS_PUBLISHING => 'bg-sky-100 text-sky-800',
+                                            default => 'bg-brand-sand/60 text-brand-moss',
+                                        };
+                                    @endphp
+                                    <li class="px-6 py-3 sm:px-8 {{ $isThis ? 'bg-brand-sand/30' : '' }}">
+                                        <div class="flex flex-wrap items-center justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <a
+                                                    href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $row, 'tab' => 'log']) }}"
+                                                    wire:navigate
+                                                    class="font-mono text-xs text-brand-ink hover:underline {{ $isThis ? 'font-semibold' : '' }}"
+                                                >
+                                                    {{ substr($row->id, -10) }}
+                                                </a>
+                                                <p class="mt-0.5 text-[11px] text-brand-moss">
+                                                    {{ $row->git_commit ? substr($row->git_commit, 0, 7) : '—' }}
+                                                    · {{ $row->git_branch ?? 'main' }}
+                                                    · {{ $row->created_at?->diffForHumans() }}
+                                                </p>
+                                            </div>
+                                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusTone }}">
+                                                {{ str_replace('_', ' ', (string) $row->status) }}
+                                            </span>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </section>
+                    @endif
                 @endif
             </div>
         </div>

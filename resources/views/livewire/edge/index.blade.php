@@ -20,6 +20,10 @@
         </x-slot>
         @if ($edgeEnabled)
             <x-slot name="actions">
+                <a href="{{ route('edge.usage') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Usage') }}
+                </a>
                 <a href="{{ route('edge.templates') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                     <x-heroicon-o-rectangle-stack class="h-3.5 w-3.5" aria-hidden="true" />
                     {{ __('Templates') }}
@@ -152,7 +156,7 @@
                             <div>
                                 <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="text-sm font-semibold text-brand-ink hover:underline">{{ $site->name }}</a>
                                 @if ($rowPreviewBranch)
-                                    <span class="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                    <span class="ml-1 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-forest dark:bg-brand-sage/20 dark:text-brand-sage">
                                         @if ($rowPreviewPr)
                                             PR #{{ $rowPreviewPr }}
                                         @else
@@ -185,6 +189,14 @@
                         </dl>
 
                         <div class="mt-4 flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                wire:click="openQuickLookModal('{{ $site->id }}')"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-o-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('Status') }}
+                            </button>
                             <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">
                                 <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" />
                                 {{ __('Open') }}
@@ -242,7 +254,7 @@
                                 <td class="px-4 py-3.5">
                                     <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ $site->name }}</a>
                                     @if ($rowPreviewBranch)
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300">
+                                        <span class="ml-1 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-forest dark:bg-brand-sage/20 dark:text-brand-sage">
                                             @if ($rowPreviewPr)
                                                 PR #{{ $rowPreviewPr }}
                                             @else
@@ -282,6 +294,15 @@
                                 </td>
                                 <td class="px-4 py-3.5 text-right">
                                     <div class="inline-flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            wire:click="openQuickLookModal('{{ $site->id }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
+                                            title="{{ __('Peek at the live build/provisioning status without leaving this list.') }}"
+                                        >
+                                            <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Status') }}
+                                        </button>
                                         <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">
                                             <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
                                             {{ __('Open') }}
@@ -386,6 +407,127 @@
                 </span>
                 <span wire:loading wire:target="deleteSite">{{ __('Deleting…') }}</span>
             </x-danger-button>
+        </div>
+    </x-modal>
+
+    {{-- Quick-look modal — peek at the live BuildJourney for any site in the
+         list without bouncing into its workspace. Polls itself via the
+         nested BuildJourney component (1s log tail), and the link in the
+         footer takes you to the full workspace if you want to go deeper. --}}
+    <x-modal name="quick-look-edge-site" :show="false" maxWidth="3xl" overlayClass="bg-brand-ink/30" panelClass="dply-modal-panel" focusable>
+        <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-6 py-4">
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Quick look') }}</p>
+                <h2 class="mt-1 text-base font-semibold text-brand-ink truncate">
+                    {{ $quickLookSite?->name ?? __('Edge site') }}
+                </h2>
+                @if ($quickLookSite && $quickLookSite->edgeLiveUrl())
+                    <a
+                        href="{{ $quickLookSite->edgeLiveUrl() }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="mt-0.5 inline-flex items-center gap-1 font-mono text-[11px] text-brand-moss hover:text-brand-ink"
+                    >
+                        {{ preg_replace('#^https?://#', '', $quickLookSite->edgeLiveUrl()) }}
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 opacity-70" />
+                    </a>
+                @endif
+            </div>
+            <button type="button" wire:click="closeQuickLookModal" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink" title="{{ __('Close') }}">
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
+        </div>
+        <div class="px-6 py-5">
+            @if ($quickLookSite === null)
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
+                    {{ __('Site not found.') }}
+                </div>
+            @elseif ($quickLookDeploymentId === null)
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
+                    {{ __('No deployments yet for this site.') }}
+                </div>
+            @elseif ($quickLookStats !== null)
+                {{-- Stats mode — site is past the in-flight build phase, so
+                     mounting the live journey would be a noisy distraction.
+                     Show the headline counts + last-deploy metadata. --}}
+                @php
+                    $latest = $quickLookStats['latest'];
+                    $latestStatusTone = match ($latest?->status ?? null) {
+                        \App\Models\EdgeDeployment::STATUS_LIVE => 'bg-emerald-100 text-emerald-800',
+                        \App\Models\EdgeDeployment::STATUS_FAILED => 'bg-rose-100 text-rose-800',
+                        \App\Models\EdgeDeployment::STATUS_SUPERSEDED => 'bg-brand-sand/60 text-brand-moss',
+                        default => 'bg-sky-100 text-sky-800',
+                    };
+                @endphp
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Status') }}</p>
+                        <p class="mt-1 text-sm font-semibold capitalize text-brand-ink">{{ str_replace('_', ' ', (string) $quickLookSite->status) }}</p>
+                    </div>
+                    <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Total deploys') }}</p>
+                        <p class="mt-1 text-sm font-semibold tabular-nums text-brand-ink">{{ number_format($quickLookStats['total_deploys']) }}</p>
+                    </div>
+                    <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Live') }}</p>
+                        <p class="mt-1 text-sm font-semibold tabular-nums text-emerald-700">{{ number_format($quickLookStats['live_deploys']) }}</p>
+                    </div>
+                    <div class="rounded-xl border border-brand-ink/10 bg-white/60 px-4 py-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Failed') }}</p>
+                        <p class="mt-1 text-sm font-semibold tabular-nums {{ $quickLookStats['failed_deploys'] > 0 ? 'text-rose-700' : 'text-brand-mist' }}">{{ number_format($quickLookStats['failed_deploys']) }}</p>
+                    </div>
+                </div>
+
+                @if ($latest !== null)
+                    <section class="dply-card mt-4 overflow-hidden">
+                        <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-5 py-3">
+                            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Latest deployment') }}</h3>
+                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $latestStatusTone }}">
+                                {{ str_replace('_', ' ', (string) $latest->status) }}
+                            </span>
+                        </div>
+                        <dl class="grid grid-cols-1 gap-3 px-5 py-3 text-sm sm:grid-cols-2">
+                            <div>
+                                <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Commit') }}</dt>
+                                <dd class="mt-0.5 font-mono text-xs text-brand-ink break-all">{{ $latest->git_commit ? substr($latest->git_commit, 0, 12) : '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Branch') }}</dt>
+                                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $latest->git_branch ?? '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Published') }}</dt>
+                                <dd class="mt-0.5 text-xs text-brand-ink">{{ $latest->published_at ? $latest->published_at->diffForHumans() : '—' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Created') }}</dt>
+                                <dd class="mt-0.5 text-xs text-brand-ink">{{ $latest->created_at?->diffForHumans() }}</dd>
+                            </div>
+                        </dl>
+                        @if ($latest->status === \App\Models\EdgeDeployment::STATUS_FAILED && $latest->failure_reason)
+                            <div class="border-t border-brand-ink/10 bg-rose-50/60 px-5 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-rose-700">{{ __('Failure') }}</p>
+                                <p class="mt-1 break-words font-mono text-[11px] leading-5 text-rose-900">{{ $latest->failure_reason }}</p>
+                            </div>
+                        @endif
+                    </section>
+                @endif
+            @else
+                {{-- In-flight build — surface the live journey card. --}}
+                @livewire('edge.build-journey', ['deploymentId' => $quickLookDeploymentId], key('quick-look-journey-'.$quickLookDeploymentId))
+            @endif
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3">
+            <span class="text-[11px] text-brand-mist">{{ __('Live — updates every second while the build is running.') }}</span>
+            @if ($quickLookSite)
+                <a
+                    href="{{ route('sites.show', ['server' => $quickLookSite->server, 'site' => $quickLookSite]) }}"
+                    wire:navigate
+                    class="text-xs font-semibold text-brand-forest hover:underline dark:text-brand-sage"
+                >
+                    {{ __('Open workspace →') }}
+                </a>
+            @endif
         </div>
     </x-modal>
 </div>

@@ -341,6 +341,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
         Route::livewire('edge/import', Import::class)->name('edge.import');
         Route::livewire('edge/templates', Templates::class)->name('edge.templates');
+        Route::livewire('edge/usage', \App\Livewire\Edge\Usage::class)->name('edge.usage');
     });
     Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
     Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');

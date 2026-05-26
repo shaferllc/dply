@@ -15,13 +15,24 @@ class EdgeCreateForm extends Form
 
     public string $name = '';
 
+    /**
+     * Git reference type the user is targeting — 'branch' (default), 'tag'
+     * (clone via --branch <tag>), or 'commit' (full clone + checkout SHA).
+     * The single ref text input writes to {@see \App\Livewire\Edge\Create::$branch}
+     * regardless; the deploy step interprets the value based on this kind.
+     */
+    public string $ref_kind = 'branch';
+
     public string $build_command = '';
 
     public string $output_dir = '';
 
     public bool $spa_fallback = true;
 
-    public bool $deploy_on_push = true;
+    // Off by default — operators have to opt in on the create form so a
+    // freshly connected repo doesn't silently auto-deploy on every push
+    // (especially noisy for forks, scratch repos, and `main`-pushed work).
+    public bool $deploy_on_push = false;
 
     public string $runtime_mode = 'static';
 
@@ -43,6 +54,7 @@ class EdgeCreateForm extends Form
     {
         return [
             'name' => ['required', 'string', 'max:80'],
+            'ref_kind' => ['required', 'in:branch,tag,commit'],
             'build_command' => ['nullable', 'string', 'max:500'],
             'output_dir' => ['nullable', 'string', 'max:200'],
             'spa_fallback' => ['boolean'],
@@ -74,10 +86,23 @@ class EdgeCreateForm extends Form
      */
     public function createEdgeSitePayload(string $framework, string $repo, string $branch): array
     {
+        // ref_kind=commit means $branch was actually a SHA — promote it to
+        // git_commit and reset branch to the conventional default so the
+        // deployment record + UI labels stay sensible. The build runner
+        // does a full clone + checkout the SHA when git_commit is set.
+        $gitCommit = null;
+        $effectiveBranch = $branch;
+        if ($this->ref_kind === 'commit') {
+            $gitCommit = trim($branch);
+            $effectiveBranch = 'main';
+        }
+
         return [
             'name' => $this->name,
             'repo' => $repo,
-            'branch' => $branch,
+            'branch' => $effectiveBranch,
+            'ref_kind' => $this->ref_kind,
+            'git_commit' => $gitCommit,
             'build_command' => $this->resolvedBuildCommand(),
             'output_dir' => $this->resolvedOutputDir(),
             'spa_fallback' => $this->spa_fallback,
@@ -115,13 +140,99 @@ class EdgeCreateForm extends Form
         ];
     }
 
+    /**
+     * Canonicalize a user-pasted repo reference.
+     *
+     * GitHub collapses to `owner/name` shorthand — that's unambiguous
+     * because GitHub doesn't support nested groups, and the shorthand is
+     * what the rest of the create flow (and {@see EdgeRepoBindingTranslator})
+     * expects to see persisted.
+     *
+     * GitLab and Bitbucket normalize to a *cleaned full URL* — host kept,
+     * `.git` suffix and `/-/tree/<branch>` (GitLab) or `/src/<branch>`
+     * (Bitbucket) tail segments dropped, trailing slash dropped. We
+     * don't shorten them because GitLab supports nested groups
+     * (`group/sub/project`) so `owner/name` shorthand is ambiguous off
+     * GitHub.
+     *
+     * Accepted shapes for each host:
+     *   GitHub
+     *     - https://github.com/owner/name(.git)?
+     *     - https://github.com/owner/name/tree|blob|commit(s)/<branch>[/...]
+     *     - github.com/owner/name(.git)?
+     *     - git@github.com:owner/name(.git)?
+     *     - owner/name                              (passthrough)
+     *   GitLab (nested subgroups supported — any depth of `group/.../project`)
+     *     - https://gitlab.com/group/[...subgroups/]project(.git)?
+     *     - https://gitlab.com/group/[...subgroups/]project/-/tree|blob|commit(s)/<branch>[/...]
+     *     - git@gitlab.com:group/[...subgroups/]project(.git)?
+     *   Bitbucket
+     *     - https://bitbucket.org/owner/name(.git)?
+     *     - https://bitbucket.org/owner/name/src|branch|commits/<branch>[/...]
+     *     - git@bitbucket.org:owner/name(.git)?
+     */
     public static function normalizeRepo(string $value): string
     {
         $value = trim($value);
-        if (preg_match('#^https?://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#i', $value, $m) === 1) {
+        if ($value === '') {
+            return '';
+        }
+
+        // ── GitHub ─────────────────────────────────────────────────────────
+        if (preg_match('#^git@github\.com:([^/]+/[^/]+?)(?:\.git)?/?$#i', $value, $m) === 1) {
+            return $m[1];
+        }
+        if (preg_match('#^https?://github\.com/([^/]+)/([^/.]+(?:\.[^/]+)*?)(?:\.git)?(?:/(?:tree|blob|commits?)/[^/]+(?:/.*)?)?/?$#i', $value, $m) === 1) {
+            return $m[1].'/'.$m[2];
+        }
+        if (preg_match('#^github\.com/([^/]+/[^/]+?)(?:\.git)?/?$#i', $value, $m) === 1) {
             return $m[1];
         }
 
+        // ── GitLab (nested groups allowed) ─────────────────────────────────
+        if (preg_match('#^git@gitlab\.com:([^:].*?)(?:\.git)?/?$#i', $value, $m) === 1 && str_contains($m[1], '/')) {
+            return 'https://gitlab.com/'.trim($m[1], '/');
+        }
+        if (preg_match('#^https?://gitlab\.com/(.+?)(?:\.git)?(?:/-/(?:tree|blob|commits?)/[^/]+(?:/.*)?)?/?$#i', $value, $m) === 1 && str_contains($m[1], '/')) {
+            return 'https://gitlab.com/'.trim($m[1], '/');
+        }
+
+        // ── Bitbucket ──────────────────────────────────────────────────────
+        if (preg_match('#^git@bitbucket\.org:([^/]+/[^/]+?)(?:\.git)?/?$#i', $value, $m) === 1) {
+            return 'https://bitbucket.org/'.$m[1];
+        }
+        if (preg_match('#^https?://bitbucket\.org/([^/]+/[^/.]+(?:\.[^/]+)*?)(?:\.git)?(?:/(?:src|branch|commits?)/[^/]+(?:/.*)?)?/?$#i', $value, $m) === 1) {
+            return 'https://bitbucket.org/'.$m[1];
+        }
+
         return trim($value, '/');
+    }
+
+    /**
+     * Pull a branch hint out of a host's "view a branch" URL so pasting
+     * a URL with a branch in the path can prefill the branch field too.
+     *
+     *   GitHub:    /tree|blob|commit(s)/<branch>
+     *   GitLab:    /-/tree|blob|commit(s)/<branch>
+     *   Bitbucket: /src|branch|commits/<branch>
+     */
+    public static function branchHintFromUrl(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('~^https?://github\.com/[^/]+/[^/]+?(?:\.git)?/(?:tree|blob|commits?)/([^/?#]+)~i', $value, $m) === 1) {
+            return $m[1] !== '' ? $m[1] : null;
+        }
+        if (preg_match('~^https?://gitlab\.com/.+?(?:\.git)?/-/(?:tree|blob|commits?)/([^/?#]+)~i', $value, $m) === 1) {
+            return $m[1] !== '' ? $m[1] : null;
+        }
+        if (preg_match('~^https?://bitbucket\.org/[^/]+/[^/]+?(?:\.git)?/(?:src|branch|commits?)/([^/?#]+)~i', $value, $m) === 1) {
+            return $m[1] !== '' ? $m[1] : null;
+        }
+
+        return null;
     }
 }

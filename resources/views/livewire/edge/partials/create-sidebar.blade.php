@@ -55,10 +55,11 @@
         </p>
         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
             @if ($edgeUsageBillingEnabled)
-                {{ __(':fee/mo platform fee per live site, plus metered delivery for traffic above :requests requests and :egress GB egress per site.', [
+                {{ __(':fee/mo platform fee per live site. Each site includes :requests requests, :egress GB egress, and :storage GB R2 storage per month — usage beyond that, plus R2 read/write operations, are billed by the unit.', [
                     'fee' => '$'.number_format($edgeFee, 2),
                     'requests' => number_format($edgeUsageRates['included_requests_per_site']),
                     'egress' => number_format($edgeUsageRates['included_egress_gb_per_site']),
+                    'storage' => number_format($edgeUsageRates['included_r2_storage_gb_per_site'] ?? 1),
                 ]) }}
             @else
                 {{ __('Flat dply per-site fee once your edge app is live. Branch previews are free.') }}

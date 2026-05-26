@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Models\EdgeSiteMember;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
@@ -17,11 +16,8 @@ class SitePolicy
     public function view(User $user, Site $site): bool
     {
         $server = $this->resolveServer($site);
-        if ($server !== null && $user->can('view', $server)) {
-            return true;
-        }
 
-        return $this->edgeMemberRank($site, $user) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_VIEWER);
+        return $server !== null && $user->can('view', $server);
     }
 
     public function create(User $user): bool
@@ -50,11 +46,8 @@ class SitePolicy
         }
 
         $server = $this->resolveServer($site);
-        if ($server !== null && $user->can('update', $server)) {
-            return true;
-        }
 
-        return $this->edgeMemberRank($site, $user) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_DEPLOYER);
+        return $server !== null && $user->can('update', $server);
     }
 
     public function clone(User $user, Site $site): bool
@@ -65,41 +58,31 @@ class SitePolicy
     public function delete(User $user, Site $site): bool
     {
         $server = $this->resolveServer($site);
-        if ($server !== null && $user->can('view', $server)) {
-            if ($site->organization_id !== null) {
-                if ($site->organization->hasAdminAccess($user)) {
-                    return true;
-                }
-            } elseif ($site->user_id === $user->id) {
-                return true;
-            }
+        if ($server === null || ! $user->can('view', $server)) {
+            return false;
         }
 
-        return $this->edgeMemberRank($site, $user) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_ADMIN);
+        if ($site->organization_id !== null) {
+            return $site->organization->hasAdminAccess($user);
+        }
+
+        return $site->user_id === $user->id;
     }
 
     /**
-     * Manage per-site team members on an Edge site. Org admin or
-     * site-level admin grant. Used by the Members workspace tab.
+     * Manage per-site team members on an Edge site. Org admin only.
+     * The per-site members feature (edge_site_members) was deprecated
+     * along with the Members workspace tab — kept as a method for
+     * backwards-compat with any lingering Gate checks.
      */
     public function manageMembers(User $user, Site $site): bool
     {
         $server = $this->resolveServer($site);
-        if ($server !== null
+
+        return $server !== null
             && $user->can('view', $server)
             && $site->organization_id !== null
-            && $site->organization->hasAdminAccess($user)) {
-            return true;
-        }
-
-        return $this->edgeMemberRank($site, $user) >= EdgeSiteMember::rankFor(EdgeSiteMember::ROLE_ADMIN);
-    }
-
-    private function edgeMemberRank(Site $site, User $user): int
-    {
-        $role = $site->edgeMemberRoleFor($user);
-
-        return $role === null ? 0 : EdgeSiteMember::rankFor($role);
+            && $site->organization->hasAdminAccess($user);
     }
 
     private function resolveServer(Site $site): ?Server

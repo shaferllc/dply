@@ -41,6 +41,28 @@ class Index extends Component
 
     public string $scheduledDeleteAt = '';
 
+    /**
+     * When non-null, the quick-look modal renders with the BuildJourney for
+     * this site's latest deployment. Lets operators peek at a site's current
+     * provisioning/build state without leaving the Edge index.
+     */
+    public ?string $quickLookSiteId = null;
+
+    public function openQuickLookModal(string $siteId): void
+    {
+        $this->quickLookSiteId = $siteId;
+        // x-modal is event-driven (listens for window-level `open-modal` with
+        // a `name` payload). Setting the state alone doesn't toggle the
+        // panel's `show` flag.
+        $this->dispatch('open-modal', 'quick-look-edge-site');
+    }
+
+    public function closeQuickLookModal(): void
+    {
+        $this->quickLookSiteId = null;
+        $this->dispatch('close-modal', 'quick-look-edge-site');
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -80,11 +102,54 @@ class Index extends Component
             $deleteCandidate = $allSites->firstWhere('id', $this->confirmingDeleteSiteId);
         }
 
+        // Resolve the quick-look target's latest deployment so the modal can
+        // mount the BuildJourney component without a second round-trip. For
+        // a fully-provisioned site we also pull a small stats bundle so the
+        // modal shows useful info (last deploy, recent build counts) instead
+        // of a static "already live" message.
+        $quickLookSite = null;
+        $quickLookDeployment = null;
+        $quickLookDeploymentId = null;
+        $quickLookStats = null;
+        if (is_string($this->quickLookSiteId) && $this->quickLookSiteId !== '') {
+            $quickLookSite = $allSites->firstWhere('id', $this->quickLookSiteId);
+            if ($quickLookSite !== null) {
+                $quickLookDeployment = \App\Models\EdgeDeployment::query()
+                    ->where('site_id', $quickLookSite->id)
+                    ->orderByDesc('created_at')
+                    ->first(['id', 'status', 'git_branch', 'git_commit', 'published_at', 'failed_at', 'failure_reason', 'created_at']);
+                $quickLookDeploymentId = $quickLookDeployment?->id;
+
+                $isInFlight = $quickLookDeployment !== null && in_array($quickLookDeployment->status, [
+                    \App\Models\EdgeDeployment::STATUS_BUILDING,
+                    \App\Models\EdgeDeployment::STATUS_PUBLISHING,
+                ], true);
+
+                if (! $isInFlight) {
+                    $counts = \App\Models\EdgeDeployment::query()
+                        ->where('site_id', $quickLookSite->id)
+                        ->selectRaw('COUNT(*) AS total')
+                        ->selectRaw("COUNT(CASE WHEN status = ? THEN 1 END) AS live", [\App\Models\EdgeDeployment::STATUS_LIVE])
+                        ->selectRaw("COUNT(CASE WHEN status = ? THEN 1 END) AS failed", [\App\Models\EdgeDeployment::STATUS_FAILED])
+                        ->first();
+                    $quickLookStats = [
+                        'total_deploys' => (int) ($counts->total ?? 0),
+                        'live_deploys' => (int) ($counts->live ?? 0),
+                        'failed_deploys' => (int) ($counts->failed ?? 0),
+                        'latest' => $quickLookDeployment,
+                    ];
+                }
+            }
+        }
+
         return view('livewire.edge.index', [
             'org' => $org,
             'edgeEnabled' => true,
             'sites' => $sites,
             'deleteCandidate' => $deleteCandidate,
+            'quickLookSite' => $quickLookSite,
+            'quickLookDeploymentId' => $quickLookDeploymentId,
+            'quickLookStats' => $quickLookStats,
             'totals' => [
                 'all' => $allSites->count(),
                 'active' => $allSites->where('status', Site::STATUS_EDGE_ACTIVE)->count(),

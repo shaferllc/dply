@@ -66,6 +66,19 @@ class EdgeBuildRunner
         $buildLog = $workRoot.'/build.log';
         File::put($buildLog, '=== dply Edge build '.$deployment->id." ===\n");
 
+        // Expose the in-flight log path so the dashboard can tail it live
+        // from the local filesystem while the build is running. Cleared by
+        // the publish job once the log gets persisted to the remote disk.
+        //
+        // Caveat: assumes the queue worker and web process share a
+        // filesystem (true for single-host dply deployments). Multi-host
+        // setups will want a DB/Redis chunk stream instead — same UI on
+        // top, different backing store.
+        $existingMeta = is_array($deployment->meta) ? $deployment->meta : [];
+        $deployment->update([
+            'meta' => array_merge($existingMeta, ['local_build_log_path' => $buildLog]),
+        ]);
+
         try {
             if (FakeEdgeProvision::enabled()) {
                 File::ensureDirectoryExists($artifactDir);
@@ -96,27 +109,19 @@ class EdgeBuildRunner
 
             $this->assertDockerAvailable();
 
-            if ($commitOverride !== null) {
-                $this->appendBuildLog($buildLog, "Cloning {$repoUrl} (full history) for commit {$commitOverride}\n");
-                $clone = Process::timeout(300)->run(['git', 'clone', $repoUrl, $checkout]);
-                $this->appendBuildLog($buildLog, $clone->output().$clone->errorOutput());
-                if (! $clone->successful()) {
-                    throw new RuntimeException('Git clone failed: '.$clone->errorOutput());
-                }
-                $checkoutResult = Process::timeout(60)->path($checkout)->run(['git', 'checkout', $commitOverride]);
-                $this->appendBuildLog($buildLog, $checkoutResult->output().$checkoutResult->errorOutput());
-                if (! $checkoutResult->successful()) {
-                    throw new RuntimeException('Build failed: commit "'.$commitOverride.'" not found in repository.');
-                }
-            } else {
-                $this->appendBuildLog($buildLog, "Cloning {$repoUrl} @ {$branch}\n");
-                $clone = Process::timeout(300)->run([
-                    'git', 'clone', '--depth', '1', '--branch', $branch, $repoUrl, $checkout,
-                ]);
-                $this->appendBuildLog($buildLog, $clone->output().$clone->errorOutput());
-                if (! $clone->successful()) {
-                    throw new RuntimeException('Git clone failed: '.$clone->errorOutput());
-                }
+            // Step marker for the live BuildJourney UI — splits the
+            // streamed log into per-step sections so the operator sees
+            // clone output under "Cloning repository" and build output
+            // under "Installing & building".
+            $this->appendBuildLog($buildLog, "[dply:step] clone\n");
+
+            // Delegated to EdgeRepoCloner so we get a per-repo mirror cache
+            // (skips re-downloading the whole history on repeat builds) and
+            // retry-on-transient-failure (TCP timeouts no longer kill the
+            // build outright).
+            $cloneLog = app(EdgeRepoCloner::class)->clone($repoUrl, $branch, $checkout, $commitOverride);
+            foreach ($cloneLog as $line) {
+                $this->appendBuildLog($buildLog, $line."\n");
             }
 
             $resolvedCommit = $this->resolveHead($checkout);
@@ -406,21 +411,70 @@ class EdgeBuildRunner
                 }
             }
 
-            $dockerImage = (string) config('edge.build.docker_image', 'node:20-bookworm');
+            // Pick the Node image from the repo's own version hints
+            // (engines.node / .nvmrc / .node-version / packageManager). Falls
+            // back to the env-configured default when nothing is declared, so
+            // operators can still pin globally via DPLY_EDGE_BUILD_IMAGE if
+            // they want a hard override.
+            $detection = app(NodeVersionDetector::class)->detect($checkout);
+            if ($detection['detected']) {
+                $dockerImage = $detection['image'];
+                $this->appendBuildLog($buildLog, sprintf(
+                    "[node] Detected Node %d from %s (\"%s\") — using %s\n",
+                    $detection['major'],
+                    $detection['source'],
+                    $detection['raw'] ?? '',
+                    $dockerImage,
+                ));
+            } else {
+                $dockerImage = (string) config('edge.build.docker_image', $detection['image']);
+                $this->appendBuildLog($buildLog, sprintf(
+                    "[node] No version hints in repo — using default %s\n",
+                    $dockerImage,
+                ));
+            }
+
+            // Step marker — everything after this line is the install +
+            // build phase, rendered under "Installing & building" in the
+            // BuildJourney UI.
+            $this->appendBuildLog($buildLog, "[dply:step] build\n");
+
             $script = $this->composeBuildScript($checkout, $buildCommand);
+
+            // Pre-pull the image as its own step so the first build (cold
+            // Docker cache) shows pull progress live in the log instead of
+            // sitting silent for 30-90s while docker run does the implicit
+            // pull. `--quiet` would hide layer progress; we want it visible.
+            $this->appendBuildLog($buildLog, "Pulling image {$dockerImage}…\n");
+            $pull = Process::timeout(900)
+                ->run(
+                    ['docker', 'pull', $dockerImage],
+                    fn (string $type, string $chunk) => $this->appendBuildLog($buildLog, $chunk),
+                );
+            if (! $pull->successful()) {
+                $detail = trim($pull->errorOutput()) !== '' ? trim($pull->errorOutput()) : trim($pull->output());
+                $detail = $detail !== '' ? $detail : 'no output from docker pull (exit '.$pull->exitCode().')';
+                throw new RuntimeException('Docker pull failed for '.$dockerImage.': '.$detail);
+            }
+
             $this->appendBuildLog($buildLog, "Running build in {$dockerImage}: {$script}\n");
             $build = Process::timeout((int) config('edge.build.timeout_seconds', 900))
-                ->run([
-                    'docker', 'run', '--rm',
-                    '-v', $checkout.':/src',
-                    '-w', '/src',
-                    ...$this->dockerEnvFlags($env),
-                    $dockerImage,
-                    'bash', '-lc', $script,
-                ]);
-            $this->appendBuildLog($buildLog, $build->output().$build->errorOutput());
+                ->run(
+                    [
+                        'docker', 'run', '--rm',
+                        '-v', $checkout.':/src',
+                        '-w', '/src',
+                        ...$this->dockerEnvFlags($env),
+                        $dockerImage,
+                        'bash', '-lc', $script,
+                    ],
+                    // Stream stdout/stderr into the build log as it arrives so
+                    // the live tail in the BuildJourney UI shows pnpm install
+                    // / vite build chatter in real time, not in a final dump.
+                    fn (string $type, string $chunk) => $this->appendBuildLog($buildLog, $chunk),
+                );
             if (! $build->successful()) {
-                throw new RuntimeException('Build failed: '.$build->errorOutput());
+                throw new RuntimeException($this->summarizeBuildFailure($build, $buildLog));
             }
 
             // Middleware bundling — runs in a separate docker
@@ -674,6 +728,65 @@ class EdgeBuildRunner
         return [$singleName, [$singleName => (string) file_get_contents($workerPath)]];
     }
 
+    /**
+     * Build a useful failure message even when docker run exited non-zero
+     * with empty stderr (common when the container's failing process wrote
+     * everything to stdout — pnpm, npm, vite, etc.). Falls back through:
+     * stderr → stdout tail → tail of build.log → bare exit code so the
+     * "Build failed:" callout in the UI is never empty.
+     */
+    private function summarizeBuildFailure(\Illuminate\Process\ProcessResult $build, string $buildLogPath): string
+    {
+        $exit = $build->exitCode();
+
+        $stderr = trim($build->errorOutput());
+        if ($stderr !== '') {
+            return 'Build failed (exit '.$exit.'): '.$this->tailLines($stderr, 12);
+        }
+
+        $stdout = trim($build->output());
+        if ($stdout !== '') {
+            return 'Build failed (exit '.$exit.'): '.$this->tailLines($stdout, 12);
+        }
+
+        // Last resort — read the persisted build log file so we don't ship
+        // a literal "Build failed:" with no detail.
+        if (is_file($buildLogPath) && is_readable($buildLogPath)) {
+            $tail = @file_get_contents($buildLogPath);
+            if (is_string($tail) && trim($tail) !== '') {
+                return 'Build failed (exit '.$exit.'): '.$this->tailLines($tail, 12);
+            }
+        }
+
+        return 'Build failed with exit code '.$exit.' and no captured output. The build process likely crashed before printing anything — check the container image and the script.';
+    }
+
+    private function tailLines(string $text, int $maxLines): string
+    {
+        $lines = preg_split('/\r?\n/', trim($text)) ?: [];
+        if (count($lines) <= $maxLines) {
+            return implode("\n", $lines);
+        }
+
+        return '… ('.(count($lines) - $maxLines)." earlier lines)\n".implode("\n", array_slice($lines, -$maxLines));
+    }
+
+    /**
+     * Compose the bash script that runs inside the build container.
+     *
+     * Strategy:
+     *   1. Always use the install step we detected from the repo's lockfile
+     *      (pnpm install on pnpm-lock.yaml, yarn install on yarn.lock, etc.).
+     *      The user's `build_command` often starts with a default `npm ci`
+     *      they never explicitly chose — running that on a pnpm repo
+     *      either fails (no package-lock.json) or installs into the wrong
+     *      layout (npm ignores pnpm's symlinks → `sh: astro: not found`).
+     *   2. Strip any leading `<pm> install/ci && ` from the build command
+     *      so we don't install twice.
+     *   3. Translate `npm run X` / `npm exec X` to the active PM
+     *      (`pnpm run X` / `yarn run X`) so the build script finds the
+     *      binaries that pnpm/yarn put in their own bin paths.
+     */
     private function composeBuildScript(string $checkout, string $buildCommand): string
     {
         $install = $this->detectInstallCommand($checkout);
@@ -681,23 +794,75 @@ class EdgeBuildRunner
             return $buildCommand;
         }
 
-        $needle = strtolower($buildCommand);
-        if (str_contains($needle, 'npm ci') || str_contains($needle, 'npm install')
-            || str_contains($needle, 'pnpm install') || str_contains($needle, 'yarn install')
-            || str_contains($needle, 'bun install')) {
-            return $buildCommand;
+        $pmName = $this->detectPackageManagerName($checkout);
+
+        // Strip a leading install prefix added by the create-form default
+        // (`npm ci && X`, `pnpm install && X`, etc.) so we don't run install
+        // twice with possibly-conflicting commands.
+        $stripped = preg_replace(
+            '#^\s*(?:npm\s+(?:ci|install)|pnpm\s+install|yarn\s+install|bun\s+install)\s*&&\s*#i',
+            '',
+            $buildCommand,
+            1,
+        );
+        $rest = is_string($stripped) ? trim($stripped) : trim($buildCommand);
+
+        // Re-target `npm run`/`npm exec` to the actual package manager so
+        // bin lookups (astro, vite, next, etc.) work on the right tree.
+        if ($pmName !== 'npm') {
+            $rewritten = preg_replace(
+                '/\bnpm\s+(run|exec)\b/i',
+                $pmName.' $1',
+                $rest,
+            );
+            if (is_string($rewritten)) {
+                $rest = $rewritten;
+            }
         }
 
-        return $install.' && '.$buildCommand;
+        // Add --if-present to any `<pm> run <script>` invocation so a repo
+        // without a "build" script (or whichever named script) doesn't
+        // hard-fail with ERR_PNPM_NO_SCRIPT / npm ERR! missing-script.
+        // It's still surfaced in the log ("[script not present]" or
+        // similar) so the operator can see what was skipped.
+        $rest = preg_replace_callback(
+            '/\b(npm|pnpm|yarn|bun)\s+run\s+(\S+)/i',
+            function (array $m): string {
+                // Skip if --if-present already specified.
+                if (str_contains($m[0], '--if-present')) {
+                    return $m[0];
+                }
+
+                return $m[1].' run --if-present '.$m[2];
+            },
+            $rest,
+        ) ?? $rest;
+
+        return $install.' && '.$rest;
+    }
+
+    private function detectPackageManagerName(string $checkout): string
+    {
+        if (is_file($checkout.'/pnpm-lock.yaml')) {
+            return 'pnpm';
+        }
+        if (is_file($checkout.'/yarn.lock')) {
+            return 'yarn';
+        }
+        if (is_file($checkout.'/bun.lockb') || is_file($checkout.'/bun.lock')) {
+            return 'bun';
+        }
+
+        return 'npm';
     }
 
     private function detectInstallCommand(string $checkout): ?string
     {
         if (is_file($checkout.'/pnpm-lock.yaml')) {
-            return 'corepack enable && pnpm install --frozen-lockfile';
+            return $this->corepackPnpmInstall($checkout);
         }
         if (is_file($checkout.'/yarn.lock')) {
-            return 'corepack enable && yarn install --frozen-lockfile';
+            return $this->corepackYarnInstall($checkout);
         }
         if (is_file($checkout.'/bun.lockb') || is_file($checkout.'/bun.lock')) {
             return 'npm install -g bun && bun install --frozen-lockfile';
@@ -710,6 +875,131 @@ class EdgeBuildRunner
         }
 
         return null;
+    }
+
+    /**
+     * Build a pnpm install command that handles two compatibility traps
+     * gracefully:
+     *
+     *   1. pnpm 11+ requires Node ≥ 22.13. Running pnpm 11 on Node 20
+     *      crashes on `require('node:sqlite')`.
+     *   2. pnpm 10 can't read a pnpm-11-generated lockfile
+     *      (`ERR_PNPM_LOCKFILE_BREAKING_CHANGE`). So pinning pnpm@10
+     *      unconditionally breaks modern repos.
+     *
+     * The fix: detect Node major IN the container and match a pnpm
+     * version that (a) runs on that Node and (b) understands the
+     * lockfile format that Node line typically produces:
+     *
+     *   Node 22+ → pnpm@latest  (handles lockfile v10)
+     *   Node 20  → pnpm@10      (handles lockfile v9)
+     *   Node 18  → pnpm@9
+     *
+     * When the repo pins `packageManager`, honor it — that's the most
+     * explicit signal we have and a repo author knows their lockfile.
+     */
+    private function corepackPnpmInstall(string $checkout): string
+    {
+        $env = 'export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_DEFAULT_TO_LATEST=0';
+
+        // Run install with two pnpm-11-specific safety nets:
+        //
+        //  1. Pre-approve build scripts. pnpm 11 errors with
+        //     ERR_PNPM_IGNORED_BUILDS when ANY package wants to run an
+        //     install script (sharp, esbuild, etc.) and isn't on the
+        //     allowlist. pnpm 11.3 *removed* the `pnpm.onlyBuiltDependencies`
+        //     field from package.json (the install warns "The 'pnpm' field
+        //     in package.json is no longer read"). The new home is `.npmrc`
+        //     via `only-built-dependencies[]=<name>` entries. We append
+        //     the usual native-binary suspects + every direct dep so the
+        //     CI build downloads + compiles binaries cleanly.
+        //
+        //  2. --frozen-lockfile first; fall back to --no-frozen-lockfile
+        //     only on ERR_PNPM_LOCKFILE_BREAKING_CHANGE (lockfile newer
+        //     than the running pnpm). Other failures still exit loudly.
+        //
+        // Wrapped in `{ ...; }` so the whole block is a single statement
+        // the upstream `&&` chain can short-circuit through.
+        // `set -o pipefail` makes `pnpm … | tee` reflect pnpm's exit.
+        // Build-script approval is now passed via pnpm's CLI config flag
+        // rather than written into pnpm-workspace.yaml. The file
+        // approach broke on non-workspace repos because the file's
+        // mere presence flipped pnpm into workspace-detection mode
+        // (`Scope: all 6 workspace projects`), which then conflicted
+        // with transitive deps' `neverBuiltDependencies` and triggered
+        // ERR_PNPM_CONFIG_CONFLICT_BUILT_DEPENDENCIES.
+        //
+        // `--config.dangerouslyAllowAllBuilds=true` is the same setting,
+        // applied at command time only, no on-disk state. The previous
+        // ERR_PNPM_IGNORED_BUILDS case still gets suppressed.
+        $allowlistScript = 'echo "[pnpm] dangerouslyAllowAllBuilds enabled via CLI flag"';
+        $pnpmFlags = '--config.dangerouslyAllowAllBuilds=true';
+
+        $install = '{ set -o pipefail; '.$allowlistScript.'; PNPM_LOG=$(mktemp);'
+            .' if pnpm install --frozen-lockfile '.$pnpmFlags.' 2>&1 | tee "$PNPM_LOG"; then :;'
+            .' elif grep -q ERR_PNPM_LOCKFILE_BREAKING_CHANGE "$PNPM_LOG"; then'
+            .' echo "[pnpm] lockfile is newer than the installed pnpm — falling back to --no-frozen-lockfile";'
+            .' pnpm install --no-frozen-lockfile '.$pnpmFlags.';'
+            .' else exit 1; fi; }';
+
+        if ($this->packageJsonHasPackageManager($checkout)) {
+            return $env." && corepack enable && corepack prepare --activate && {$install}";
+        }
+
+        // pnpm version resolution at container runtime:
+        //   - Ask npm what the actual latest pnpm version is (corepack
+        //     ships with a stale bundled `latest` map that resolves to
+        //     buggy 11.3.0, and corepack rejects partial semver pins
+        //     like `pnpm@11.4`, so we need a real semver). `npm view`
+        //     hits the registry and returns whatever the current
+        //     dist-tag points to — same source corepack would use if
+        //     its map weren't stale.
+        //   - Older Node majors get a fixed semver compatible with
+        //     their runtime and lockfile expectations.
+        //   - If npm view fails (offline, registry down) fall back to a
+        //     known-good 11.x semver.
+        $pickPnpm = 'NODE_MAJOR=$(node -e "console.log(process.versions.node.split(\".\")[0])")'
+            .'; if [ "$NODE_MAJOR" -ge 22 ]; then'
+            .' PNPM_PIN=$(npm view pnpm@latest version 2>/dev/null);'
+            .' [ -z "$PNPM_PIN" ] && PNPM_PIN=11.5.0;'
+            .' elif [ "$NODE_MAJOR" -ge 20 ]; then PNPM_PIN=10.0.0;'
+            .' else PNPM_PIN=9.15.0; fi'
+            .'; echo "[pnpm] Using pnpm@${PNPM_PIN} on Node ${NODE_MAJOR}"';
+
+        return $env." && {$pickPnpm} && corepack enable && corepack prepare pnpm@\${PNPM_PIN} --activate && {$install}";
+    }
+
+    private function corepackYarnInstall(string $checkout): string
+    {
+        $env = 'export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_DEFAULT_TO_LATEST=0';
+
+        if ($this->packageJsonHasPackageManager($checkout)) {
+            return $env." && corepack enable && corepack prepare --activate && yarn install --frozen-lockfile";
+        }
+
+        // Yarn 4 runs on Node ≥ 18 — no version-specific traps as severe
+        // as pnpm's. Pin to yarn@4 broadly; modern lockfiles need v4+.
+        return $env." && corepack enable && corepack prepare yarn@4 --activate && yarn install --frozen-lockfile";
+    }
+
+    private function packageJsonHasPackageManager(string $checkout): bool
+    {
+        $path = $checkout.'/package.json';
+        if (! is_file($path) || ! is_readable($path)) {
+            return false;
+        }
+
+        $raw = @file_get_contents($path);
+        if ($raw === false || $raw === '') {
+            return false;
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return false;
+        }
+
+        return is_string($decoded['packageManager'] ?? null) && $decoded['packageManager'] !== '';
     }
 
     private function assertDockerAvailable(): void

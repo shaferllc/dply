@@ -125,6 +125,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);
 
+        // Re-evaluate per-site monthly usage guardrails once today's usage
+        // collection has landed. Fires the `edge.usage.over_budget`
+        // notification on transitions into warn/over.
+        $schedule->command(\App\Console\Commands\EvaluateEdgeGuardrailsCommand::class)
+            ->dailyAt('02:45')
+            ->withoutOverlapping();
+
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
 
         $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();

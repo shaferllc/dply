@@ -196,6 +196,13 @@ return [
             'included_requests_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_REQUESTS_PER_SITE', 5_000_000),
             'included_egress_gb_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_EGRESS_GB_PER_SITE', 100),
             'included_r2_storage_gb_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_STORAGE_GB_PER_SITE', 5),
+            // R2 operations included allowances — keep small sites at $0.
+            // Class A = writes (PUT/POST/LIST/COPY); Class B = reads (GET/HEAD).
+            // Cloudflare's free tier is 1M Class A + 10M Class B per month
+            // org-wide; we allocate generous per-site allowances so a typical
+            // static deploy never accrues ops charges.
+            'included_r2_class_a_ops_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_CLASS_A_OPS_PER_SITE', 100_000),
+            'included_r2_class_b_ops_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_CLASS_B_OPS_PER_SITE', 1_000_000),
         ],
     ],
 

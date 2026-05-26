@@ -37,7 +37,19 @@ class RedeployEdgeSite
             'storage_prefix' => $prefix,
         ]);
 
-        $site->update(['status' => Site::STATUS_EDGE_PROVISIONING]);
+        // Clear the lingering `last_error` from the previous failed deploy.
+        // It's noisy to keep showing a red "Last error" banner on the hero
+        // once the operator has kicked off a fresh build — if THIS build
+        // fails, markFailed() will repopulate the field.
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $edgeMeta = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        unset($edgeMeta['last_error'], $edgeMeta['last_error_at']);
+        $meta['edge'] = $edgeMeta;
+
+        $site->update([
+            'status' => Site::STATUS_EDGE_PROVISIONING,
+            'meta' => $meta,
+        ]);
 
         BuildEdgeSiteJob::dispatch($deployment->id);
 

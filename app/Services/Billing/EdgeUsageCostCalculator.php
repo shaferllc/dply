@@ -35,15 +35,19 @@ class EdgeUsageCostCalculator
         $includedRequests = $edgeSiteCount * max(0, (int) config('dply.edge.usage_billing.included_requests_per_site', 0));
         $includedEgress = $edgeSiteCount * $this->includedEgressBytesPerSite();
         $includedStorage = $edgeSiteCount * $this->includedR2StorageBytesPerSite();
+        $includedClassA = $edgeSiteCount * max(0, (int) config('dply.edge.usage_billing.included_r2_class_a_ops_per_site', 0));
+        $includedClassB = $edgeSiteCount * max(0, (int) config('dply.edge.usage_billing.included_r2_class_b_ops_per_site', 0));
 
         $billableRequests = max(0, $usage->requests - $includedRequests);
         $billableEgress = max(0, $usage->bytesEgress - $includedEgress);
         $billableStorage = max(0, $usage->r2StorageBytes - $includedStorage);
+        $billableClassA = max(0, $usage->r2ClassAOps - $includedClassA);
+        $billableClassB = max(0, $usage->r2ClassBOps - $includedClassB);
 
         $requestCents = $this->requestsCents($billableRequests);
         $egressCents = $this->egressCents($billableEgress);
         $storageCents = $this->storageCents($billableStorage);
-        $r2OpsCents = $this->r2OpsCents($usage->r2ClassAOps, $usage->r2ClassBOps);
+        $r2OpsCents = $this->r2OpsCents($billableClassA, $billableClassB);
 
         $subtotal = $requestCents + $egressCents + $storageCents + $r2OpsCents;
         $subtotal = $this->applyMarkup($subtotal);
@@ -53,9 +57,13 @@ class EdgeUsageCostCalculator
             'billable_requests' => $billableRequests,
             'billable_bytes_egress' => $billableEgress,
             'billable_r2_storage_bytes' => $billableStorage,
+            'billable_r2_class_a_ops' => $billableClassA,
+            'billable_r2_class_b_ops' => $billableClassB,
             'included_requests' => $includedRequests,
             'included_bytes_egress' => $includedEgress,
             'included_r2_storage_bytes' => $includedStorage,
+            'included_r2_class_a_ops' => $includedClassA,
+            'included_r2_class_b_ops' => $includedClassB,
         ];
     }
 

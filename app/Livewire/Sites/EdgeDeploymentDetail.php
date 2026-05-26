@@ -114,6 +114,15 @@ class EdgeDeploymentDetail extends Component
             ? SiteShowViewData::edgeDeploymentJourney($this->deployment)
             : null;
 
+        // Recent-deployments sidebar for the log tab — small list (10) of
+        // sibling deployments so operators can pivot between builds
+        // without bouncing to the deploys list.
+        $recentDeployments = EdgeDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get(['id', 'site_id', 'status', 'git_commit', 'git_branch', 'created_at']);
+
         return view('livewire.sites.edge-deployment-detail', array_merge(
             SiteSettingsViewData::for(
                 $this->server,
@@ -134,6 +143,7 @@ class EdgeDeploymentDetail extends Component
                 'buildLogForLint' => $buildLogForLint,
                 'isInProgress' => $isInProgress,
                 'deploymentJourney' => $deploymentJourney,
+                'recentDeployments' => $recentDeployments,
             ],
         ));
     }

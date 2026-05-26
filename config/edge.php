@@ -120,9 +120,19 @@ return [
     |--------------------------------------------------------------------------
     */
     'build' => [
-        'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:20-bookworm'),
+        // Node 22 (current LTS) — Node 20 EOL is April 2026 and the latest
+        // pnpm/Vite/Astro toolchains now require >=22.13. Override per-env
+        // with DPLY_EDGE_BUILD_IMAGE if you need to pin older Node for a
+        // specific deploy.
+        'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
         'timeout_seconds' => (int) env('DPLY_EDGE_BUILD_TIMEOUT', 900),
         'artifact_max_bytes' => (int) env('DPLY_EDGE_ARTIFACT_MAX_BYTES', 524_288_000),
+        // Persistent --mirror clone per repo so repeated builds skip
+        // re-downloading the full history. Set git_cache_enabled=false
+        // to bypass the mirror and clone directly (slower, but useful
+        // when debugging a stale cache).
+        'git_cache_enabled' => filter_var(env('DPLY_EDGE_BUILD_GIT_CACHE', true), FILTER_VALIDATE_BOOLEAN),
+        'git_cache_dir' => env('DPLY_EDGE_BUILD_GIT_CACHE_DIR', storage_path('app/edge-git-cache')),
     ],
 
     /*
@@ -196,6 +206,26 @@ return [
     */
     'disk' => [
         'name' => 'edge_r2',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Usage guardrail
+    |--------------------------------------------------------------------------
+    | Soft cap on requests + egress per calendar month, per site. Evaluator
+    | reads EdgeUsageSnapshot rows and computes a state (ok / warn / over).
+    | Transitions fan out via the `edge.usage.over_budget` notification key
+    | (already declared in config/notification_events.php). v1 does NOT
+    | actually pause traffic at the Worker — it surfaces a banner and an
+    | optional notification so flat-rate sites can't silently bleed margin.
+    */
+    'guardrail' => [
+        'requests_per_month' => (int) env('DPLY_EDGE_GUARDRAIL_REQUESTS', 1_000_000),
+        'bytes_per_month' => (int) env('DPLY_EDGE_GUARDRAIL_BYTES', 50 * 1024 * 1024 * 1024),
+        'warn_at_percent' => max(1, min(99, (int) env('DPLY_EDGE_GUARDRAIL_WARN_PCT', 80))),
+        // Reserved for a future cut — when true, sites in `over` state get
+        // their deploy button disabled. Not consulted by the v1 evaluator.
+        'auto_pause' => filter_var(env('DPLY_EDGE_GUARDRAIL_AUTO_PAUSE', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
 ];

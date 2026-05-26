@@ -36,6 +36,8 @@ final class EdgeSiteViewData
                 $context['edgeUsesManagedBackend'],
                 $context['edgeUsesByoCloudflare'],
                 $context['edgePlatformReady'],
+                (string) $site->status,
+                (string) ($site->edgeMeta()['last_error'] ?? ''),
             );
         } else {
             $context['edgeDeliveryBanner'] = null;
@@ -212,6 +214,8 @@ final class EdgeSiteViewData
         bool $usesManagedBackend,
         bool $usesByoCloudflare,
         bool $platformReady,
+        string $siteStatus = '',
+        string $lastError = '',
     ): ?array {
         if ($fakeMode) {
             $hint = EdgeLocalDevDiagnostics::fakeModeBannerHint();
@@ -233,7 +237,33 @@ final class EdgeSiteViewData
             ];
         }
 
-        if ($usesManagedBackend || $usesByoCloudflare) {
+        if (! ($usesManagedBackend || $usesByoCloudflare)) {
+            return null;
+        }
+
+        // Site-status-aware copy — the previous unconditional "Live on dply
+        // Edge" was misleading when the latest deploy actually failed or
+        // the site never went live, because the banner only checked
+        // backend config, not real serving state.
+        if ($siteStatus === Site::STATUS_EDGE_FAILED) {
+            return [
+                'tone' => 'rose',
+                'title' => __('Last deploy failed'),
+                'message' => $lastError !== ''
+                    ? __('Edge is wired up, but the most recent build did not publish. Reason: :err', ['err' => $lastError])
+                    : __('Edge is wired up, but the most recent build did not publish. Retry from the Deploys tab.'),
+            ];
+        }
+
+        if ($siteStatus === Site::STATUS_EDGE_PROVISIONING) {
+            return [
+                'tone' => 'sky',
+                'title' => __('Edge build in progress'),
+                'message' => __('Builds publish to edge storage. The site goes live once this deploy reaches the publish step.'),
+            ];
+        }
+
+        if ($siteStatus === Site::STATUS_EDGE_ACTIVE) {
             return [
                 'tone' => 'emerald',
                 'title' => __('Live on dply Edge'),
@@ -241,6 +271,12 @@ final class EdgeSiteViewData
             ];
         }
 
-        return null;
+        // Backend is configured but the site has no recognized active state
+        // yet — surface a neutral tone instead of falsely claiming "Live".
+        return [
+            'tone' => 'amber',
+            'title' => __('Edge delivery ready'),
+            'message' => __('Edge backend is configured. Trigger a deploy to publish content to the edge network.'),
+        ];
     }
 }

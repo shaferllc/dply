@@ -79,6 +79,15 @@ trait DetectsRepositoryRuntime
             return;
         }
 
+        // Detection clones the repo (or pulls package.json) — for giant
+        // monorepos like withastro/starlight this can blow past PHP's
+        // 30s default and crash the whole Livewire request. Bump the
+        // wall-clock cap so the worst case is a slow detect (not a
+        // 500 page that the operator has to refresh out of).
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(90);
+        }
+
         try {
             $plan = app(RepositoryRuntimePreview::class)->fromUrl($url, $branch);
         } catch (GitCloneException|Throwable $e) {
