@@ -33,9 +33,25 @@
                     {{ __('Who changed what on this Edge site — env vars, domains, deploys, rollbacks, promotes, access rules, deploy hooks.') }}
                 </p>
             </div>
-            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                {{ __('Read-only · last 100') }}
-            </span>
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                    {{ __('Read-only · last 100') }}
+                </span>
+                <a
+                    href="{{ route('sites.edge.audit.export', ['server' => $site->server_id, 'site' => $site->id, 'format' => 'csv']) }}"
+                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                    {{ __('CSV') }}
+                </a>
+                <a
+                    href="{{ route('sites.edge.audit.export', ['server' => $site->server_id, 'site' => $site->id, 'format' => 'json']) }}"
+                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                    {{ __('JSON') }}
+                </a>
+            </div>
         </div>
     </div>
 

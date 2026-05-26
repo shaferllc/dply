@@ -70,13 +70,26 @@ class EdgeCloudflareClient
     /**
      * @return array<string, mixed>
      */
-    public function createR2Bucket(string $name): array
+    public function createR2Bucket(string $name, ?string $locationHint = null, ?string $jurisdiction = null): array
     {
+        // Cloudflare R2 jurisdictions: "default", "eu", "fedramp".
+        // locationHint: a hub like "weur", "eeur", "apac", "wnam", "enam".
+        // When both are unset, the bucket is created with default
+        // settings (Cloudflare picks the location).
+        $body = ['name' => $name];
+        if ($locationHint !== null && $locationHint !== '') {
+            $body['locationHint'] = $locationHint;
+        }
+
+        $headers = [];
+        if ($jurisdiction !== null && $jurisdiction !== '' && $jurisdiction !== 'default') {
+            $headers['cf-r2-jurisdiction'] = $jurisdiction;
+        }
+
         return $this->decode(
             Http::withToken($this->apiToken)
-                ->post(self::BASE.'/accounts/'.$this->accountId.'/r2/buckets', [
-                    'name' => $name,
-                ]),
+                ->withHeaders($headers)
+                ->post(self::BASE.'/accounts/'.$this->accountId.'/r2/buckets', $body),
         );
     }
 

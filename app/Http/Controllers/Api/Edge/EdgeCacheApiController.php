@@ -20,13 +20,38 @@ class EdgeCacheApiController extends EdgeApiController
 
         try {
             $data = $request->validate([
-                'tag' => ['required', 'string', 'max:128', 'regex:/^[A-Za-z0-9._-]+$/'],
+                'tag' => ['nullable', 'string', 'max:128', 'regex:/^[A-Za-z0-9._-]+$/'],
+                'paths' => ['nullable', 'array', 'max:100'],
+                'paths.*' => ['string', 'max:2048'],
             ]);
         } catch (ValidationException $e) {
             return response()->json(['message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         }
 
-        $result = app(EdgeCachePurger::class)->purgeByTag($found->fresh(), (string) $data['tag']);
+        $tag = isset($data['tag']) ? trim((string) $data['tag']) : '';
+        $paths = isset($data['paths']) && is_array($data['paths']) ? $data['paths'] : [];
+
+        if ($tag === '' && $paths === []) {
+            return response()->json([
+                'message' => 'Either `tag` or `paths` is required.',
+                'errors' => ['tag' => ['Either `tag` or `paths` is required.']],
+            ], 422);
+        }
+
+        $purger = app(EdgeCachePurger::class);
+        $fresh = $found->fresh();
+
+        if ($tag !== '') {
+            $result = $purger->purgeByTag($fresh, $tag);
+            if (($result['ok'] ?? false) && $fresh->organization_id) {
+                audit_log($fresh->organization, $request->user(), 'site.edge.cache.purge_tag', $fresh, null, ['tag' => $tag]);
+            }
+        } else {
+            $result = $purger->purgeByPaths($fresh, $paths);
+            if (($result['ok'] ?? false) && $fresh->organization_id) {
+                audit_log($fresh->organization, $request->user(), 'site.edge.cache.purge_paths', $fresh, null, ['paths' => array_values($paths)]);
+            }
+        }
 
         return response()->json([
             'data' => [
@@ -34,6 +59,6 @@ class EdgeCacheApiController extends EdgeApiController
                 'purged_keys' => $result['purged_keys'] ?? [],
                 'message' => $result['message'] ?? null,
             ],
-        ], $result['ok'] ?? false ? 200 : 422);
+        ], ($result['ok'] ?? false) ? 200 : 422);
     }
 }

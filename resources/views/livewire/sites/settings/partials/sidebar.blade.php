@@ -93,9 +93,11 @@
                     @php
                         $isChild = ! empty($item['parent'] ?? null);
                         if (! empty($item['route'] ?? null)) {
-                            $routeArgs = ($item['route_params'] ?? null) === 'server_only'
-                                ? ['server' => $server]
-                                : ['server' => $server, 'site' => $site];
+                            $routeArgs = match ($item['route_params'] ?? null) {
+                                'server_only' => ['server' => $server],
+                                'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
+                                default => ['server' => $server, 'site' => $site],
+                            };
                             $href = route($item['route'], $routeArgs);
                         } else {
                             $href = route('sites.show', array_merge([

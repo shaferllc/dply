@@ -76,6 +76,28 @@
                 <div class="dply-card overflow-hidden">
                     <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
                         <div class="lg:col-span-4">
+                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Edge data region') }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Preferred Cloudflare R2 region for buckets created on behalf of this organization. Existing buckets stay where they are; this setting only applies to future Edge bootstraps.') }}</p>
+                        </div>
+                        <div class="lg:col-span-8 space-y-3">
+                            <select wire:model.live="edge_data_region" class="block w-full rounded-md border-brand-mist text-sm focus:border-brand-forest focus:ring-brand-forest">
+                                <option value="default">{{ __('Default — Cloudflare picks the region') }}</option>
+                                <option value="eu">{{ __('EU — strict EU jurisdiction (R2 EU jurisdiction)') }}</option>
+                                <option value="weur">{{ __('Western Europe (weur)') }}</option>
+                                <option value="eeur">{{ __('Eastern Europe (eeur)') }}</option>
+                                <option value="wnam">{{ __('Western North America (wnam)') }}</option>
+                                <option value="enam">{{ __('Eastern North America (enam)') }}</option>
+                                <option value="apac">{{ __('Asia-Pacific (apac)') }}</option>
+                                <option value="oc">{{ __('Oceania (oc)') }}</option>
+                            </select>
+                            <p class="text-xs text-brand-moss">{{ __('Selecting "EU" creates buckets in Cloudflare\'s EU jurisdiction — data is stored in the EU and the EU jurisdiction header is set on every request.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dply-card overflow-hidden">
+                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                        <div class="lg:col-span-4">
                             <h3 class="text-lg font-semibold text-brand-ink">{{ __('API tokens') }}</h3>
                             <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Create scoped organization tokens for CI/CD and automation. The secret is shown once in a dialog after you create it.') }}</p>
                         </div>

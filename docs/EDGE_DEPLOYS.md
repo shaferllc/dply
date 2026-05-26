@@ -37,7 +37,7 @@ For a previous successful deploy, choose **Roll back** to make that artifact liv
 
 ## Hybrid sites
 
-Hybrid deploys publish static assets to Edge. SSR requests continue to route to the configured **origin** in Build settings. Check origin health if pages render but dynamic routes fail.
+Hybrid deploys publish static assets to Edge. SSR requests continue to route to the configured **origin** in **Delivery**. Check origin health if pages render but dynamic routes fail.
 
 ## Failed deploys
 

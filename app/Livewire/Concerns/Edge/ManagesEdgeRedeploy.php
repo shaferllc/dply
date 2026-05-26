@@ -23,7 +23,7 @@ trait ManagesEdgeRedeploy
         $this->authorize('update', $this->site);
 
         try {
-            (new RedeployEdgeSite)->handle($this->site);
+            $deployment = (new RedeployEdgeSite)->handle($this->site);
         } catch (\Throwable $e) {
             if (method_exists($this, 'toastError')) {
                 $this->toastError($e->getMessage());
@@ -32,8 +32,13 @@ trait ManagesEdgeRedeploy
             return;
         }
 
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Edge redeploy queued.'));
-        }
+        // Send the user to the live deployment-detail page so they see
+        // the build log streaming + status transitions instead of being
+        // left on the form with just a toast.
+        $this->redirectRoute('sites.edge.deployments.show', [
+            'server' => $this->site->server_id,
+            'site' => $this->site->id,
+            'deployment' => $deployment->id,
+        ], navigate: true);
     }
 }

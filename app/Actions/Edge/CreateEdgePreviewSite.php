@@ -135,6 +135,12 @@ class CreateEdgePreviewSite
             'storage_prefix' => $prefix,
         ]);
 
+        // Apply dply.yaml-declared preview protection (if any) so the
+        // freshly-created preview comes up gated from the start. The
+        // dashboard's per-preview override flow still takes precedence
+        // once the user touches it.
+        $this->applyDplyPreviewProtection($parent, $site);
+
         BuildEdgeSiteJob::dispatch($deployment->id);
 
         if (is_string($headSha) && $headSha !== '') {
@@ -142,6 +148,53 @@ class CreateEdgePreviewSite
         }
 
         return $site->fresh();
+    }
+
+    /**
+     * Reads `previews.protection` from the parent's most recent live
+     * deployment's repo_config and creates an EdgeSiteAccessRule on
+     * the new preview when present. Best-effort — never fails the
+     * preview creation.
+     */
+    private function applyDplyPreviewProtection(Site $parent, Site $preview): void
+    {
+        try {
+            $parentLive = EdgeDeployment::query()
+                ->where('site_id', $parent->id)
+                ->where('status', EdgeDeployment::STATUS_LIVE)
+                ->latest('id')
+                ->first();
+            $previews = is_array($parentLive?->repo_config['previews'] ?? null) ? $parentLive->repo_config['previews'] : [];
+            $protection = is_array($previews['protection'] ?? null) ? $previews['protection'] : [];
+            $mode = is_string($protection['mode'] ?? null) ? $protection['mode'] : '';
+            if ($mode === '' || $mode === 'none') {
+                return;
+            }
+
+            $modeMap = [
+                'password' => \App\Models\EdgeSiteAccessRule::MODE_PASSWORD,
+                'dply-account' => \App\Models\EdgeSiteAccessRule::MODE_DPLY_ACCOUNT,
+                'email' => \App\Models\EdgeSiteAccessRule::MODE_DPLY_ACCOUNT, // email gating piggybacks on dply_account + allowed_emails
+            ];
+            $resolvedMode = $modeMap[$mode] ?? null;
+            if ($resolvedMode === null) {
+                return;
+            }
+
+            $rule = \App\Models\EdgeSiteAccessRule::query()->firstOrNew(['site_id' => $preview->id]);
+            $rule->mode = $resolvedMode;
+            $rule->cookie_secret = $rule->cookie_secret ?: \Illuminate\Support\Str::random(48);
+            if ($mode === 'email' && is_array($protection['allowed_emails'] ?? null)) {
+                $rule->allowed_emails = array_values(array_filter(array_map('strval', $protection['allowed_emails'])));
+            }
+            $rule->save();
+        } catch (\Throwable $e) {
+            Log::warning('dply.yaml preview protection apply failed', [
+                'parent_id' => $parent->id,
+                'preview_id' => $preview->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

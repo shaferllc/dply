@@ -12,11 +12,16 @@
     'docSlug' => null,
     /** Open the in-app docs panel for the current page (ContextualDocResolver). */
     'docContextual' => false,
+    /** Pre-resolved markdown slug for docContextual (avoids stale route context after wire:navigate). */
+    'contextualDocSlug' => null,
     'docLabel' => null,
 ])
 
 @php
     $docLinkLabel = $docLabel ?? __('Documentation');
+    $resolvedContextualDocSlug = $docContextual
+        ? ($contextualDocSlug ?? app(\App\Support\Docs\ContextualDocResolver::class)->resolve())
+        : null;
 @endphp
 
 <header {{ $attributes->class([
@@ -63,7 +68,7 @@
                 'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,
             ])>
                 @if ($docContextual)
-                    <x-docs-link>
+                    <x-docs-link :slug="$resolvedContextualDocSlug">
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ $docLinkLabel }}
                     </x-docs-link>

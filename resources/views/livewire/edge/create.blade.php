@@ -331,7 +331,7 @@
                                     <input type="radio" wire:model.live="form.runtime_mode" value="hybrid" class="text-brand-sage focus:ring-brand-sage/40" />
                                     <span>{{ __('Hybrid (static + origin SSR)') }}</span>
                                 </label>
-                                <label class="inline-flex items-center gap-2 text-sm @if (! $ssrAvailable) opacity-60 @endif" title="{{ $ssrAvailable ? __('Bundle the app to a per-deployment Cloudflare Worker via OpenNext.') : __('SSR is unavailable — operator needs to bootstrap the dispatch namespace.') }}">
+                                <label class="inline-flex items-center gap-2 text-sm @if (! $ssrAvailable) opacity-60 @endif" title="{{ $ssrAvailable ? __('Bundle the app for edge SSR via OpenNext.') : __('SSR is unavailable — operator needs to bootstrap the dispatch namespace.') }}">
                                     <input type="radio" wire:model.live="form.runtime_mode" value="ssr" class="text-brand-sage focus:ring-brand-sage/40" @disabled(! $ssrAvailable) />
                                     <span>{{ __('Worker-native SSR (Next.js)') }}</span>
                                 </label>

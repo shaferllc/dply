@@ -1,7 +1,7 @@
 # Edge — image optimization
 
 Resize and reformat images at the edge via Cloudflare Image Resizing.
-Enabled per Edge site from **Build settings → Image optimization**.
+Enabled per Edge site from **Delivery → Image optimization**.
 
 ## How it works
 
@@ -83,6 +83,6 @@ invalidation = change the source filename or vary the URL.
 
 ## Rotating the signing secret
 
-Build settings → Image optimization → Rotate. Any pre-rendered signed
+**Delivery → Image optimization → Rotate**. Any pre-rendered signed
 URLs return 403 until re-signed. The KV host map is republished
 immediately so the change is live within ~60s of propagation.

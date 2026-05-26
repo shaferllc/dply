@@ -99,10 +99,75 @@ class EdgeRepoConfigLoader
             redirects: $this->normalizeRedirects($parsed['redirects'] ?? null, $warnings),
             rewrites: $this->normalizeRewrites($parsed['rewrites'] ?? null, $warnings),
             headers: $this->normalizeHeaders($parsed['headers'] ?? null, $warnings),
-            bindings: $this->normalizeBindings($parsed['bindings'] ?? null, $warnings),
             crons: $this->normalizeCrons($parsed['crons'] ?? null, $warnings),
+            firewall: $this->normalizeFirewall($parsed['firewall'] ?? null, $warnings),
+            origin: $this->normalizeOrigin($parsed['origin'] ?? null, $warnings),
+            images: $this->normalizeImages($parsed['images'] ?? null, $warnings),
+            bindings: $this->normalizeBindings($parsed['bindings'] ?? null, $warnings),
+            errorPages: $this->normalizeErrorPages($parsed['error_pages'] ?? null, $warnings),
+            maintenance: $this->normalizeMaintenance($parsed['maintenance'] ?? null, $warnings),
+            domains: $this->normalizeDomains($parsed['domains'] ?? null, $warnings),
+            previews: $this->normalizePreviews($parsed['previews'] ?? null, $warnings),
+            commentWidget: $this->normalizeCommentWidget($parsed['comment_widget'] ?? null, $warnings),
+            env: $this->normalizeEnv($parsed['env'] ?? null, $warnings),
             warnings: $warnings,
         );
+    }
+
+    /**
+     * Bindings declarations in dply.yaml. Co-equal alternative to
+     * `wrangler.toml` for users who don't use wrangler; both formats
+     * are accepted and merged at build time (see EdgeBuildRunner).
+     *
+     *   bindings:
+     *     kv:
+     *       SESSIONS: "<namespace_id>"
+     *     r2:
+     *       UPLOADS: "my-bucket"
+     *     d1:
+     *       MAIN_DB: "<database_id>"
+     *     queues:
+     *       JOBS: "queue-name"
+     *
+     * Names must be ALL_CAPS_WITH_UNDERSCORES (CF binding convention).
+     * Values can be CF resource ids or titles — the auto-resolver
+     * creates the resource on first use when given a title.
+     *
+     * @param  list<string>  $warnings
+     * @return array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>}
+     */
+    private function normalizeBindings(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        foreach (['kv', 'r2', 'd1', 'queues'] as $kind) {
+            $bucket = $value[$kind] ?? null;
+            if (! is_array($bucket) || $bucket === []) {
+                continue;
+            }
+            $clean = [];
+            foreach ($bucket as $name => $target) {
+                if (! is_string($name) || preg_match('/^[A-Z][A-Z0-9_]{0,63}$/', $name) !== 1) {
+                    $warnings[] = sprintf('bindings.%s.%s — names must be ALL_CAPS_WITH_UNDERSCORES.', $kind, (string) $name);
+
+                    continue;
+                }
+                if (! is_string($target) || trim($target) === '') {
+                    $warnings[] = sprintf('bindings.%s.%s — value must be a non-empty string.', $kind, $name);
+
+                    continue;
+                }
+                $clean[$name] = trim($target);
+            }
+            if ($clean !== []) {
+                $out[$kind] = $clean;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -315,55 +380,323 @@ class EdgeRepoConfigLoader
     }
 
     /**
-     * Bindings declarations for per-deployment Worker scripts
-     * (middleware + SSR). Schema:
-     *
-     *   bindings:
-     *     kv:
-     *       SESSIONS: namespace_id_here
-     *     r2:
-     *       UPLOADS: bucket-name
-     *     d1:
-     *       MAIN_DB: database_id
-     *     queues:
-     *       JOBS: queue_name
-     *
-     * Names must be ALL_CAPS_WITH_UNDERSCORES (Worker binding
-     * convention). Values vary per backend — KV / D1 are CF resource
-     * UUIDs; R2 / queues are bucket / queue names.
+     * Custom error-page HTML for 404 and 500. Each can be inlined as
+     * `html_404` / `html_500` (string) or referenced as a repo-relative
+     * file via `html_404_path` / `html_500_path`. The build runner
+     * resolves paths to inline HTML before persisting on edgeMeta.
      *
      * @param  list<string>  $warnings
-     * @return array{kv?: array<string, string>, r2?: array<string, string>, d1?: array<string, string>, queues?: array<string, string>}
+     * @return array{html_404?: string, html_500?: string, html_404_path?: string, html_500_path?: string}
      */
-    private function normalizeBindings(mixed $value, array &$warnings): array
+    private function normalizeErrorPages(mixed $value, array &$warnings): array
     {
         if (! is_array($value)) {
             return [];
         }
 
         $out = [];
-        foreach (['kv', 'r2', 'd1', 'queues'] as $kind) {
-            $bucket = $value[$kind] ?? null;
-            if (! is_array($bucket) || $bucket === []) {
+        foreach (['html_404', 'html_500'] as $key) {
+            if (isset($value[$key])) {
+                if (is_string($value[$key])) {
+                    $out[$key] = $value[$key];
+                } else {
+                    $warnings[] = "error_pages.{$key} must be an HTML string.";
+                }
+            }
+        }
+        foreach (['html_404_path', 'html_500_path'] as $key) {
+            if (isset($value[$key])) {
+                if (is_string($value[$key]) && trim($value[$key]) !== '') {
+                    $out[$key] = trim($value[$key]);
+                } else {
+                    $warnings[] = "error_pages.{$key} must be a repo-relative file path.";
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Maintenance mode: `enabled` (bool) + `html` (string) or
+     * `html_path` (repo-relative file). When enabled, the worker
+     * short-circuits every request with 503 + the configured HTML.
+     *
+     * @param  list<string>  $warnings
+     * @return array{enabled?: bool, html?: string, html_path?: string}
+     */
+    private function normalizeMaintenance(mixed $value, array &$warnings): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['enabled'])) {
+            $out['enabled'] = (bool) $value['enabled'];
+        }
+        if (isset($value['html'])) {
+            if (is_string($value['html'])) {
+                $out['html'] = $value['html'];
+            } else {
+                $warnings[] = 'maintenance.html must be an HTML string.';
+            }
+        }
+        if (isset($value['html_path'])) {
+            if (is_string($value['html_path']) && trim($value['html_path']) !== '') {
+                $out['html_path'] = trim($value['html_path']);
+            } else {
+                $warnings[] = 'maintenance.html_path must be a repo-relative file path.';
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Custom domains declared by the repo. On deploy, dply ensures each
+     * listed hostname is attached to the site (no-op when already
+     * attached). Removing a hostname from `domains:` does NOT detach
+     * — detaches are explicit only, via dashboard or API.
+     *
+     * @param  list<string>  $warnings
+     * @return list<string>
+     */
+    private function normalizeDomains(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'domains: must be a list of hostnames.';
+
+            return [];
+        }
+
+        $out = [];
+        foreach ($value as $idx => $entry) {
+            if (! is_string($entry)) {
+                $warnings[] = sprintf('domains[%d] must be a string hostname.', $idx);
+
+                continue;
+            }
+            $host = strtolower(trim($entry));
+            $host = (string) preg_replace('#^https?://#', '', $host);
+            $host = rtrim($host, '/');
+            if ($host === '' || preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i', $host) !== 1) {
+                $warnings[] = sprintf('domains[%d] does not look like a valid hostname: %s', $idx, $entry);
+
+                continue;
+            }
+            $out[$host] = true;
+        }
+
+        return array_keys($out);
+    }
+
+    /**
+     * Preview-deploy gating. When `enabled: false`, no previews are
+     * ever created. When `pr_only: true` (default), only `pull_request`
+     * webhooks create previews; bare branch pushes are ignored. The
+     * `branches` whitelist allows specific branch names to ALSO deploy
+     * previews even outside a PR (e.g. "staging"). `exclude_branches`
+     * is a blacklist applied after the whitelist — useful for the
+     * production branch you never want previewed.
+     *
+     * @param  list<string>  $warnings
+     * @return array{enabled?: bool, pr_only?: bool, branches?: list<string>, exclude_branches?: list<string>}
+     */
+    private function normalizePreviews(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'previews: must be a map of options.';
+
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['enabled'])) {
+            $out['enabled'] = (bool) $value['enabled'];
+        }
+        if (isset($value['pr_only'])) {
+            $out['pr_only'] = (bool) $value['pr_only'];
+        }
+        foreach (['branches' => 'branches', 'exclude_branches' => 'exclude_branches'] as $key => $field) {
+            if (! isset($value[$key])) {
+                continue;
+            }
+            if (! is_array($value[$key])) {
+                $warnings[] = "previews.{$key} must be a list of branch names.";
+
                 continue;
             }
             $clean = [];
-            foreach ($bucket as $name => $target) {
-                if (! is_string($name) || preg_match('/^[A-Z][A-Z0-9_]{0,63}$/', $name) !== 1) {
-                    $warnings[] = sprintf('bindings.%s.%s — names must be ALL_CAPS_WITH_UNDERSCORES.', $kind, (string) $name);
-
+            foreach ($value[$key] as $branch) {
+                if (! is_string($branch) || trim($branch) === '') {
                     continue;
                 }
-                if (! is_string($target) || trim($target) === '') {
-                    $warnings[] = sprintf('bindings.%s.%s — value must be a non-empty string.', $kind, $name);
-
-                    continue;
-                }
-                $clean[$name] = trim($target);
+                $clean[trim($branch)] = true;
             }
             if ($clean !== []) {
-                $out[$kind] = $clean;
+                $out[$field] = array_keys($clean);
             }
+        }
+
+        // previews.protection — default access gate for every new
+        // preview deploy. Passwords are NOT accepted via the file
+        // (committing a password is a leak vector); set the value in
+        // the dashboard / `edge env` and dply seeds it on creation.
+        $proto = $value['protection'] ?? null;
+        if (is_array($proto)) {
+            $protOut = [];
+            $mode = is_string($proto['mode'] ?? null) ? strtolower(trim($proto['mode'])) : '';
+            if (in_array($mode, ['none', 'password', 'dply-account', 'email'], true)) {
+                $protOut['mode'] = $mode;
+            } elseif ($mode !== '') {
+                $warnings[] = 'previews.protection.mode must be one of: none, password, dply-account, email.';
+            }
+            if (isset($proto['allowed_emails'])) {
+                if (! is_array($proto['allowed_emails'])) {
+                    $warnings[] = 'previews.protection.allowed_emails must be a list of email addresses.';
+                } else {
+                    $emails = [];
+                    foreach ($proto['allowed_emails'] as $email) {
+                        if (! is_string($email)) {
+                            continue;
+                        }
+                        $clean = strtolower(trim($email));
+                        if ($clean !== '' && filter_var($clean, FILTER_VALIDATE_EMAIL)) {
+                            $emails[$clean] = true;
+                        }
+                    }
+                    if ($emails !== []) {
+                        $protOut['allowed_emails'] = array_keys($emails);
+                    }
+                }
+            }
+            if (isset($proto['password'])) {
+                $warnings[] = 'previews.protection.password is ignored in dply.yaml — set it via the dashboard so it stays out of your repo.';
+            }
+            if ($protOut !== []) {
+                $out['protection'] = $protOut;
+            }
+        } elseif ($proto !== null) {
+            $warnings[] = 'previews.protection must be a map (mode + optional allowed_emails).';
+        }
+
+        return $out;
+    }
+
+    /**
+     * Env vars declared in dply.yaml.
+     *
+     *   env:
+     *     public:                # safe-to-commit: NEXT_PUBLIC_*, NODE_VERSION, feature flags
+     *       NODE_VERSION: "20"
+     *       NEXT_PUBLIC_API: "https://api.example.com"
+     *     secret:                # NAMES ONLY — values set via dashboard
+     *       - DATABASE_URL
+     *       - STRIPE_SECRET_KEY
+     *
+     * Paranoia: keys in `public` matching common secret patterns
+     * (*_KEY, *_SECRET, *_TOKEN, *_PASSWORD, *_PASS) produce a
+     * warning. The value isn't dropped — the user might genuinely
+     * have a public key — but they get nudged.
+     *
+     * @param  list<string>  $warnings
+     * @return array{public?: array<string, string>, secret?: list<string>}
+     */
+    private function normalizeEnv(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'env: must be a map with optional `public:` + `secret:` blocks.';
+
+            return [];
+        }
+
+        $out = [];
+
+        $public = $value['public'] ?? null;
+        if (is_array($public)) {
+            $publicOut = [];
+            foreach ($public as $name => $raw) {
+                if (! is_string($name) || preg_match('/^[A-Z_][A-Z0-9_]*$/', $name) !== 1) {
+                    $warnings[] = sprintf('env.public.%s — names must be ALL_CAPS_WITH_UNDERSCORES.', (string) $name);
+
+                    continue;
+                }
+                if (! is_string($raw) && ! is_numeric($raw) && ! is_bool($raw)) {
+                    $warnings[] = sprintf('env.public.%s — value must be a string, number, or boolean.', $name);
+
+                    continue;
+                }
+                if (preg_match('/_(KEY|SECRET|TOKEN|PASSWORD|PASS|CREDENTIALS?|PRIVATE)$/', $name) === 1) {
+                    $warnings[] = sprintf('env.public.%s — looks like a secret. Move to `env.secret:` and set the value via the dashboard so it stays out of your repo.', $name);
+                }
+                $publicOut[$name] = is_bool($raw) ? ($raw ? 'true' : 'false') : (string) $raw;
+            }
+            if ($publicOut !== []) {
+                $out['public'] = $publicOut;
+            }
+        } elseif ($public !== null) {
+            $warnings[] = 'env.public must be a map of NAME: value pairs.';
+        }
+
+        $secret = $value['secret'] ?? null;
+        if (is_array($secret)) {
+            $secretOut = [];
+            foreach ($secret as $idx => $name) {
+                if (! is_string($name)) {
+                    $warnings[] = sprintf('env.secret[%d] must be a string (variable name).', $idx);
+
+                    continue;
+                }
+                $clean = trim($name);
+                if (preg_match('/^[A-Z_][A-Z0-9_]*$/', $clean) !== 1) {
+                    $warnings[] = sprintf('env.secret[%d] — names must be ALL_CAPS_WITH_UNDERSCORES.', $idx);
+
+                    continue;
+                }
+                $secretOut[$clean] = true;
+            }
+            if ($secretOut !== []) {
+                $out['secret'] = array_keys($secretOut);
+            }
+        } elseif ($secret !== null) {
+            $warnings[] = 'env.secret must be a list of variable names (values stay in the dashboard).';
+        }
+
+        return $out;
+    }
+
+    /**
+     * Preview comment widget — boolean toggle. The token + api_base
+     * are generated server-side on enable; the file only expresses
+     * intent.
+     *
+     * @param  list<string>  $warnings
+     * @return array{enabled?: bool}
+     */
+    private function normalizeCommentWidget(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'comment_widget: must be a map of options.';
+
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['enabled'])) {
+            $out['enabled'] = (bool) $value['enabled'];
         }
 
         return $out;
@@ -419,6 +752,145 @@ class EdgeRepoConfigLoader
             }
 
             $out[] = $normalized;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<string>  $warnings
+     * @return array{country_mode?: string, countries?: list<string>}
+     */
+    private function normalizeFirewall(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'firewall: must be a map of options.';
+
+            return [];
+        }
+
+        $out = [];
+        $rawMode = $value['country_mode'] ?? null;
+        if (is_string($rawMode)) {
+            $mode = strtolower(trim($rawMode));
+            if (! in_array($mode, ['off', 'allow', 'block'], true)) {
+                $warnings[] = 'firewall.country_mode must be one of: off, allow, block.';
+            } else {
+                $out['country_mode'] = $mode;
+            }
+        }
+
+        $countries = $value['countries'] ?? null;
+        if (is_array($countries)) {
+            $cleaned = [];
+            foreach ($countries as $c) {
+                if (! is_string($c)) {
+                    continue;
+                }
+                $upper = strtoupper(trim($c));
+                if (preg_match('/^[A-Z]{2}$/', $upper) === 1) {
+                    $cleaned[$upper] = true;
+                }
+            }
+            if ($cleaned !== []) {
+                $out['countries'] = array_keys($cleaned);
+            }
+        } elseif ($countries !== null) {
+            $warnings[] = 'firewall.countries must be a list of ISO 3166 alpha-2 codes.';
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<string>  $warnings
+     * @return array{url?: string, routes?: list<string>, failover_html?: string}
+     */
+    private function normalizeOrigin(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'origin: must be a map of options.';
+
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['url'])) {
+            if (is_string($value['url']) && filter_var(trim($value['url']), FILTER_VALIDATE_URL)) {
+                $out['url'] = trim($value['url']);
+            } else {
+                $warnings[] = 'origin.url must be a valid URL (https://...).';
+            }
+        }
+        if (isset($value['routes'])) {
+            if (is_array($value['routes'])) {
+                $routes = [];
+                foreach ($value['routes'] as $route) {
+                    if (is_string($route) && trim($route) !== '') {
+                        $routes[] = trim($route);
+                    }
+                }
+                if ($routes !== []) {
+                    $out['routes'] = $routes;
+                }
+            } else {
+                $warnings[] = 'origin.routes must be a list of path patterns (e.g. ["/api/*"]).';
+            }
+        }
+        if (isset($value['failover_html'])) {
+            if (is_string($value['failover_html'])) {
+                $out['failover_html'] = $value['failover_html'];
+            } else {
+                $warnings[] = 'origin.failover_html must be an HTML string.';
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<string>  $warnings
+     * @return array{allowed_hosts?: list<string>}
+     */
+    private function normalizeImages(mixed $value, array &$warnings): array
+    {
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'images: must be a map of options.';
+
+            return [];
+        }
+
+        $out = [];
+        if (isset($value['allowed_hosts'])) {
+            if (! is_array($value['allowed_hosts'])) {
+                $warnings[] = 'images.allowed_hosts must be a list of hostnames.';
+            } else {
+                $hosts = [];
+                foreach ($value['allowed_hosts'] as $host) {
+                    if (! is_string($host)) {
+                        continue;
+                    }
+                    $clean = strtolower(trim($host));
+                    if ($clean !== '' && preg_match('/^[a-z0-9.\-]+$/', $clean)) {
+                        $hosts[$clean] = true;
+                    }
+                }
+                if ($hosts !== []) {
+                    $out['allowed_hosts'] = array_keys($hosts);
+                }
+            }
+        }
+        if (isset($value['signing_secret'])) {
+            $warnings[] = 'images.signing_secret is ignored in dply.yaml — set it via the dashboard so it stays out of your repo.';
         }
 
         return $out;

@@ -166,10 +166,47 @@
             @endif
 
             @if ($projectPreview['custom_domains'] !== [])
+                @php
+                    $providerLabel = match ($provider) {
+                        'vercel' => 'Vercel',
+                        'netlify' => 'Netlify',
+                        'cloudflare_pages' => 'Cloudflare Pages',
+                        default => __('your source provider'),
+                    };
+                    $currentTargetHint = match ($provider) {
+                        'vercel' => 'cname.vercel-dns.com',
+                        'netlify' => 'apex-loadbalancer.netlify.com',
+                        'cloudflare_pages' => '<project>.pages.dev',
+                        default => '(provider host)',
+                    };
+                @endphp
                 <div class="border-t border-brand-ink/10 px-6 py-3 text-xs text-brand-moss">
-                    <p class="font-semibold uppercase tracking-wide">{{ __('Custom domains') }}</p>
+                    <p class="font-semibold uppercase tracking-wide">{{ __('Custom domains — DNS swap runbook') }}</p>
                     <p class="mt-1 font-mono">{{ implode(', ', $projectPreview['custom_domains']) }}</p>
-                    <p class="mt-2 text-[11px] text-brand-mist">{{ __('Attach these to your Edge site after the first deploy via the Domains tab — DNS swap instructions per provider land in a later phase.') }}</p>
+
+                    <ol class="mt-3 space-y-2 text-[11px] leading-relaxed">
+                        <li>
+                            <span class="font-semibold text-brand-ink">{{ __('1. Deploy first.') }}</span>
+                            {{ __('Continue to Create, ship one deploy on the dply edge subdomain (we provision one for free). Validate the live site works before swapping DNS.') }}
+                        </li>
+                        <li>
+                            <span class="font-semibold text-brand-ink">{{ __('2. Attach each domain in the Edge → Domains tab.') }}</span>
+                            {{ __('dply will show you a per-domain target hostname like') }} <code class="font-mono text-brand-ink">your-site.dply.app</code>. {{ __('Note it down.') }}
+                        </li>
+                        <li>
+                            <span class="font-semibold text-brand-ink">{{ __('3. Lower TTL at your DNS provider.') }}</span>
+                            {{ __('Drop existing CNAME TTLs to 60s and wait one full TTL so the swap propagates quickly.') }}
+                        </li>
+                        <li>
+                            <span class="font-semibold text-brand-ink">{{ __('4. Update the CNAME.') }}</span>
+                            {{ __('Change the record currently pointing at :from to point at :to.', ['from' => $currentTargetHint, 'to' => '(target shown in dply Domains tab)']) }}
+                        </li>
+                        <li>
+                            <span class="font-semibold text-brand-ink">{{ __('5. Verify and decommission.') }}</span>
+                            {{ __('Hit each domain through dply (Domains tab shows when the certificate is live), then remove the old custom-domain entry on :provider so it stops billing or holding the hostname.', ['provider' => $providerLabel]) }}
+                        </li>
+                    </ol>
+                    <p class="mt-2 text-[10px] text-brand-mist">{{ __('Apex (root) domains: most providers require ALIAS/ANAME or a flattening CNAME — dply provides the same target host you point a CNAME at.') }}</p>
                 </div>
             @endif
 

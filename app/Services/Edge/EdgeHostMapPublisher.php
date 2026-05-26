@@ -138,6 +138,31 @@ class EdgeHostMapPublisher
                 }
             }
         }
+        // Repo override: when dply.yaml `comment_widget.enabled: true`
+        // is declared on the parent's most recent live deployment, the
+        // widget activates on every preview without requiring the
+        // dashboard toggle. Dashboard toggle still wins when set.
+        if ($isPreview && ! $widgetEnabled) {
+            $parentId = $edgeMeta['preview_parent_site_id'] ?? null;
+            if (is_string($parentId)) {
+                $parentLive = \App\Models\EdgeDeployment::query()
+                    ->where('site_id', $parentId)
+                    ->where('status', \App\Models\EdgeDeployment::STATUS_LIVE)
+                    ->latest('id')
+                    ->first();
+                $repoCommentCfg = is_array($parentLive?->repo_config['comment_widget'] ?? null) ? $parentLive->repo_config['comment_widget'] : [];
+                if ((bool) ($repoCommentCfg['enabled'] ?? false)) {
+                    $widgetEnabled = true;
+                    // Need a token to actually inject — pull whatever the
+                    // parent has on edgeMeta (the dashboard generates it
+                    // on first enable; surface it transparently here).
+                    $parent = $parent ?? Site::query()->find($parentId);
+                    $parentMeta = $parent?->edgeMeta() ?? [];
+                    $parentWidget = is_array($parentMeta['comment_widget'] ?? null) ? $parentMeta['comment_widget'] : [];
+                    $widgetMeta = array_merge($parentWidget, $widgetMeta);
+                }
+            }
+        }
 
         $payload = [
             'storage_prefix' => $deployment->storage_prefix,
@@ -151,6 +176,29 @@ class EdgeHostMapPublisher
             'comment_widget_enabled' => $widgetEnabled,
         ];
 
+        // Skew protection (P51). Surface the last few SUPERSEDED
+        // deploys' R2 prefixes so the Worker can fall back through
+        // them when a hashed-asset URL 404s in the current prefix.
+        // Old tabs that loaded HTML from deploy N keep working when
+        // they request chunk files that only exist under deploy N's
+        // storage_prefix. Pruner default keeps 10 superseded artifacts
+        // alive — we expose the most recent 5 to keep KV payload small.
+        $recentPrefixes = EdgeDeployment::query()
+            ->where('site_id', $site->id)
+            ->where('status', EdgeDeployment::STATUS_SUPERSEDED)
+            ->whereNotNull('storage_prefix')
+            ->where('id', '!=', $deployment->id)
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->limit(5)
+            ->pluck('storage_prefix')
+            ->filter(fn ($p): bool => is_string($p) && $p !== '')
+            ->values()
+            ->all();
+        if ($recentPrefixes !== []) {
+            $payload['recent_storage_prefixes'] = $recentPrefixes;
+        }
+
         if (! $isProduction) {
             $accessGate = app(EdgeAccessGate::class)->kvPayloadForSite($site);
             if ($accessGate !== null) {
@@ -158,26 +206,21 @@ class EdgeHostMapPublisher
             }
         }
 
-        // Per-deploy config from dply.yaml — redirects/rewrites/headers
-        // travel with the build so reverting a deploy reverts the
-        // routing rules atomically. The Worker applies redirects first
-        // (308/301/etc.), then rewrites (to internal paths), then layers
-        // matching header rules onto the final response.
-        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : null;
-        if (is_array($repoConfig)) {
-            $redirects = is_array($repoConfig['redirects'] ?? null) ? $repoConfig['redirects'] : [];
-            $rewrites = is_array($repoConfig['rewrites'] ?? null) ? $repoConfig['rewrites'] : [];
-            $headerRules = is_array($repoConfig['headers'] ?? null) ? $repoConfig['headers'] : [];
-
-            if ($redirects !== []) {
-                $payload['repo_redirects'] = array_values($redirects);
-            }
-            if ($rewrites !== []) {
-                $payload['repo_rewrites'] = array_values($rewrites);
-            }
-            if ($headerRules !== []) {
-                $payload['repo_header_rules'] = array_values($headerRules);
-            }
+        // Routing rules — merge dply.yaml + dashboard overrides via
+        // EdgeEffectiveRouting. Repo rules come first; dashboard
+        // appends run after. The Worker applies redirects first
+        // (308/301/etc.), then rewrites (to internal paths), then
+        // layers matching header rules onto the final response.
+        $effRouting = \App\Support\Edge\EdgeEffectiveRouting::for($site, $deployment);
+        $stripSource = static fn (array $r): array => array_diff_key($r, ['source' => true]);
+        if ($effRouting['redirects'] !== []) {
+            $payload['repo_redirects'] = array_map($stripSource, $effRouting['redirects']);
+        }
+        if ($effRouting['rewrites'] !== []) {
+            $payload['repo_rewrites'] = array_map($stripSource, $effRouting['rewrites']);
+        }
+        if ($effRouting['headers'] !== []) {
+            $payload['repo_header_rules'] = array_map($stripSource, $effRouting['headers']);
         }
 
         if ($widgetEnabled) {
@@ -194,15 +237,13 @@ class EdgeHostMapPublisher
         // Image optimization is independent of runtime mode — applies
         // to both static and hybrid sites. The Worker only enables the
         // /_dply/image route when a signing secret is present.
-        $images = is_array($edgeMeta['images'] ?? null) ? $edgeMeta['images'] : [];
-        $imageSecret = is_string($images['signing_secret'] ?? null) ? trim((string) $images['signing_secret']) : '';
-        if ($imageSecret !== '') {
-            $payload['image_signing_secret'] = $imageSecret;
-            $allowed = is_array($images['allowed_hosts'] ?? null) ? $images['allowed_hosts'] : [];
-            $payload['image_allowed_hosts'] = array_values(array_filter(array_map(
-                fn ($host) => is_string($host) && $host !== '' ? strtolower($host) : null,
-                $allowed,
-            )));
+        // Allowed-hosts list merges repo (dply.yaml `images.allowed_hosts`)
+        // with the dashboard list via EdgeEffectiveImages; the signing
+        // secret stays dashboard-only (never round-trips to dply.yaml).
+        $effImages = \App\Support\Edge\EdgeEffectiveImages::for($site, $deployment);
+        if ($effImages['enabled']) {
+            $payload['image_signing_secret'] = $effImages['signing_secret'];
+            $payload['image_allowed_hosts'] = $effImages['allowed_hosts'];
         }
 
         // SSR: surface the per-deployment worker script name so the
@@ -247,23 +288,49 @@ class EdgeHostMapPublisher
             }
         }
 
+        // Geo-block firewall (P55). Country list + allow/block mode
+        // travel with the host map so the Worker rejects requests
+        // before any other processing. Merges repo-declared rules
+        // (dply.yaml `firewall:`) with dashboard overrides via
+        // EdgeEffectiveFirewall.
+        $effFirewall = \App\Support\Edge\EdgeEffectiveFirewall::for($site, $deployment);
+        if ($effFirewall['country_mode'] !== 'off' && $effFirewall['countries'] !== []) {
+            $payload['firewall_country_mode'] = $effFirewall['country_mode'];
+            $payload['firewall_countries'] = $effFirewall['countries'];
+        }
+
+        // Custom error pages + maintenance (P52, P55-followup). Merges
+        // repo-declared (dply.yaml) values with dashboard overrides via
+        // EdgeEffectiveErrorPages — dashboard wins on conflict so an
+        // operator can adjust during an incident without a redeploy.
+        $effErrors = \App\Support\Edge\EdgeEffectiveErrorPages::for($site, $deployment);
+        if (is_string($effErrors['html_404'])) {
+            $payload['error_404_html'] = $effErrors['html_404'];
+        }
+        if (is_string($effErrors['html_500'])) {
+            $payload['error_500_html'] = $effErrors['html_500'];
+        }
+        if (is_string($effErrors['maintenance_html'])) {
+            $payload['maintenance_html'] = $effErrors['maintenance_html'];
+        }
+        if ($effErrors['maintenance_enabled']) {
+            $payload['maintenance_mode'] = true;
+        }
+
         if (($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid') {
-            $origin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : [];
-            $originUrl = trim((string) ($origin['url'] ?? ''));
-            if ($originUrl !== '') {
-                $payload['origin_url'] = $originUrl;
-                $routes = is_array($origin['routes'] ?? null) ? $origin['routes'] : [];
-                $payload['origin_routes'] = array_values(array_filter(array_map(
-                    fn ($route) => is_string($route) ? $route : null,
-                    $routes,
-                )));
-                $authSecret = is_string($origin['auth_secret'] ?? null) ? trim((string) $origin['auth_secret']) : '';
-                if ($authSecret !== '') {
-                    $payload['origin_auth_secret'] = $authSecret;
+            // Hybrid origin (P55-followup): repo-declared `origin:` from
+            // dply.yaml merges with dashboard origin meta via the
+            // EdgeEffectiveOrigin helper. Dashboard wins for url +
+            // failover_html (commonly env-specific); routes are unioned.
+            $effOrigin = \App\Support\Edge\EdgeEffectiveOrigin::for($site, $deployment);
+            if (is_string($effOrigin['url']) && $effOrigin['url'] !== '') {
+                $payload['origin_url'] = $effOrigin['url'];
+                $payload['origin_routes'] = $effOrigin['routes'];
+                if (is_string($effOrigin['auth_secret']) && $effOrigin['auth_secret'] !== '') {
+                    $payload['origin_auth_secret'] = $effOrigin['auth_secret'];
                 }
-                $failover = is_string($origin['failover_html'] ?? null) ? (string) $origin['failover_html'] : '';
-                if ($failover !== '') {
-                    $payload['origin_failover_html'] = $failover;
+                if (is_string($effOrigin['failover_html']) && $effOrigin['failover_html'] !== '') {
+                    $payload['origin_failover_html'] = $effOrigin['failover_html'];
                 }
             }
         }

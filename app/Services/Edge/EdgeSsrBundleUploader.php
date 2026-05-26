@@ -101,7 +101,7 @@ class EdgeSsrBundleUploader
             ],
         );
 
-        $this->syncCronSchedules($client, $context->dispatchNamespaceName, $scriptName, $deployment);
+        $this->syncCronSchedules($client, $context->dispatchNamespaceName, $scriptName, $site, $deployment);
 
         $this->persistScriptName($deployment, $scriptName);
     }
@@ -111,16 +111,9 @@ class EdgeSsrBundleUploader
      * script. Empty list clears schedules when a redeploy removes the
      * crons block. Best-effort — never throws.
      */
-    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, EdgeDeployment $deployment): void
+    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, \App\Models\Site $site, EdgeDeployment $deployment): void
     {
-        $repoConfig = is_array($deployment->repo_config) ? $deployment->repo_config : null;
-        $crons = is_array($repoConfig['crons'] ?? null) ? $repoConfig['crons'] : [];
-        $schedules = array_values(array_filter(array_map(
-            static fn ($entry): ?string => is_array($entry) && is_string($entry['schedule'] ?? null) && $entry['schedule'] !== ''
-                ? $entry['schedule']
-                : null,
-            $crons,
-        )));
+        $schedules = \App\Support\Edge\EdgeEffectiveCrons::schedulesFor($site, $deployment);
 
         try {
             $client->setDispatchScriptSchedules($namespace, $scriptName, $schedules);

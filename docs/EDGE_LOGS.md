@@ -25,7 +25,7 @@ While a deploy status is **building**, logs refresh automatically so you can wat
 When a deploy fails:
 
 1. Scroll to the end of the log for the error message.
-2. Fix the repository, environment, or **Build settings** (command/output dir).
+2. Fix the repository, **Environment** vars, or **Build** settings (command/output dir).
 3. **Redeploy** from the Deploys section.
 
 Common failures: wrong output directory, missing build script, Node version mismatch.

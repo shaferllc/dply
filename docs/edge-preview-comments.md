@@ -44,7 +44,7 @@ fails a deploy.
 
 ## Enabling the on-page widget (C3)
 
-Off by default. Toggle from **Build settings → Preview comment widget**
+Off by default. Toggle from **Previews → Preview comment widget**
 on the parent site. Enabling generates a widget token (stored in
 `meta.edge.comment_widget.token`) and re-publishes the host map so
 every preview descended from this parent picks up the widget on the

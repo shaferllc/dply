@@ -31,25 +31,29 @@
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('Preview protection') }}</h3>
                 <p class="mt-0.5 text-sm text-brand-moss">{{ __('Require a password or Dply sign-in before anyone can view PR previews and deploy aliases. Your live production URL and custom domains stay public.') }}</p>
             </div>
-            <form wire:submit.prevent="saveEdgePreviewProtection" class="space-y-5 px-6 py-5 sm:px-8">
+            <form
+                wire:submit.prevent="saveEdgePreviewProtection"
+                x-data="{ mode: @entangle('buildForm.edge_preview_protection_mode').defer }"
+                class="space-y-5 px-6 py-5 sm:px-8"
+            >
                 <fieldset class="space-y-3">
                     <legend class="sr-only">{{ __('Preview protection mode') }}</legend>
                     <label class="flex items-start gap-3 text-sm text-brand-ink">
-                        <input type="radio" wire:model="buildForm.edge_preview_protection_mode" value="off" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <input type="radio" x-model="mode" value="off" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                         <span>
                             <span class="font-medium">{{ __('Off') }}</span>
                             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Anyone with a preview or alias URL can view the deploy.') }}</span>
                         </span>
                     </label>
                     <label class="flex items-start gap-3 text-sm text-brand-ink">
-                        <input type="radio" wire:model="buildForm.edge_preview_protection_mode" value="password" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <input type="radio" x-model="mode" value="password" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                         <span>
                             <span class="font-medium">{{ __('Shared password') }}</span>
                             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Visitors enter one site-wide password at the edge before the preview loads.') }}</span>
                         </span>
                     </label>
                     <label class="flex items-start gap-3 text-sm text-brand-ink">
-                        <input type="radio" wire:model="buildForm.edge_preview_protection_mode" value="dply_account" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
+                        <input type="radio" x-model="mode" value="dply_account" class="mt-0.5 border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                         <span>
                             <span class="font-medium">{{ __('Dply account') }}</span>
                             <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Visitors sign in to Dply; optionally restrict to specific email addresses.') }}</span>
@@ -60,7 +64,7 @@
                     @enderror
                 </fieldset>
 
-                @if ($buildForm->edge_preview_protection_mode === 'password')
+                <div x-show="mode === 'password'" x-cloak>
                     <label class="block">
                         <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Preview password') }}</span>
                         <input
@@ -75,9 +79,9 @@
                             <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                         @enderror
                     </label>
-                @endif
+                </div>
 
-                @if ($buildForm->edge_preview_protection_mode === 'dply_account')
+                <div x-show="mode === 'dply_account'" x-cloak>
                     <label class="block">
                         <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Allowed email addresses') }}</span>
                         <textarea
@@ -92,7 +96,7 @@
                             <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
                         @enderror
                     </label>
-                @endif
+                </div>
 
                 <button
                     type="submit"

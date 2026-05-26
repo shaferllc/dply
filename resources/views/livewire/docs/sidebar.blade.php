@@ -2,17 +2,17 @@
     wire:ignore.self
     class="flex h-full flex-col bg-brand-cream text-brand-ink dark:bg-zinc-950 dark:text-brand-cream"
 >
-    <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
-        <div class="min-w-0">
+    <div class="flex min-w-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
+        <div class="min-w-0 flex-1">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Documentation') }}</p>
             @if (count($breadcrumbs) > 1)
-                <nav aria-label="{{ __('Documentation breadcrumb') }}" class="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] leading-snug text-brand-moss">
+                <nav aria-label="{{ __('Documentation breadcrumb') }}" class="docs-sidebar-breadcrumb mt-1.5 flex min-w-0 items-center gap-1 overflow-x-auto text-[11px] leading-snug text-brand-moss [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     @foreach ($breadcrumbs as $index => $crumb)
                         @if ($index > 0)
                             <x-heroicon-m-chevron-right class="h-3 w-3 shrink-0 text-brand-mist/80" aria-hidden="true" />
                         @endif
                         @if ($index === count($breadcrumbs) - 1)
-                            <span class="font-medium text-brand-ink dark:text-brand-cream">{{ $crumb['label'] }}</span>
+                            <span class="min-w-0 truncate font-medium text-brand-ink dark:text-brand-cream">{{ $crumb['label'] }}</span>
                         @elseif (($crumb['slug'] ?? null) === 'docs-index')
                             <button
                                 type="button"

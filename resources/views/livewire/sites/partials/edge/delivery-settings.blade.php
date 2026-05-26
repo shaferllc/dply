@@ -27,9 +27,6 @@
             </div>
         @endif
     </dl>
-    <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-3 text-xs text-brand-moss sm:px-8">
-        {{ __('Delivery backend is fixed after the first publish in v1. Create a new Edge site to switch between managed and BYO Cloudflare.') }}
-    </div>
 </section>
 
 @if (($edgeRuntimeMode ?? 'static') !== 'hybrid')

@@ -187,8 +187,6 @@ Wrangler config is generated from the credential's `credentials.edge` metadata (
 
 On **Edge → Create**, choose **Your Cloudflare account** and pick the bootstrapped credential. Default hostnames use `{slug}.{zone-name}` when `--zone-name` was set during bootstrap.
 
-**Note:** Delivery backend is fixed after the first publish in v1 — create a new Edge site to switch modes.
-
 ### Billing
 
 BYO Edge sites still incur the dply **platform fee** per live site where applicable, but **Cloudflare delivery usage is billed by Cloudflare directly** — not through dply's metered Edge usage line item (which applies to managed `dply_edge` sites only).

@@ -29,6 +29,7 @@
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
                 doc-contextual
+                :contextual-doc-slug="$contextualDocSlug"
                 toolbar
                 flush
                 class="mt-3"

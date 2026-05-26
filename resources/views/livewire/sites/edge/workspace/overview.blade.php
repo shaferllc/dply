@@ -108,6 +108,8 @@
         </section>
     </div>
 
+    @include('livewire.sites.partials.edge.runtime-bindings')
+
     @livewire('sites.edge.workspace.overview-observability', ['server' => $server, 'site' => $site], key('edge-overview-observability-'.$site->id))
 
     @if ($edgeDeployments->isNotEmpty())

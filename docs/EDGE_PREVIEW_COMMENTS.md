@@ -10,7 +10,7 @@ If the page 404s, confirm you are on a preview deployment, not the parent produc
 
 ## Enable the widget
 
-On the **parent** site → **Build settings**, enable **Preview comment widget**. Without this, the dashboard still lists comments but the on-page overlay widget may not appear on preview URLs yet.
+On the **parent** site → **Previews**, enable **Preview comment widget**. Without this, the dashboard still lists comments but the on-page overlay widget may not appear on preview URLs yet.
 
 ## Add a comment
 
@@ -35,7 +35,7 @@ A banner may note when the embeddable on-page widget is not yet shipped. Until t
 
 ## API access
 
-Preview comment storage exposes an HTTP API for widget integrations (used by edge Worker routes). Operators configure widgets via Build settings; end users interact on the preview URL when enabled.
+Preview comment storage exposes an HTTP API for widget integrations (used by edge Worker routes). Operators configure widgets via **Previews**; end users interact on the preview URL when enabled.
 
 ## Best practices
 

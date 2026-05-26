@@ -156,8 +156,108 @@ class EdgeBuildRunner
                     count($repoConfig->rewrites),
                     count($repoConfig->headers),
                 ));
-                $deployment->update(['repo_config' => $repoConfig->toArray()]);
 
+                // Wrangler config discovery — pull bindings out of an
+                // existing wrangler.toml / wrangler.jsonc in the repo so
+                // users with a working Cloudflare Workers project don't
+                // have to also write dply.yaml. dply.yaml entries take
+                // precedence (explicit > implicit) when both declare the
+                // same binding name.
+                $wranglerBindings = app(WranglerBindingsExtractor::class)->extract($checkout);
+                $repoArr = $repoConfig->toArray();
+                $yamlBindings = is_array($repoArr['bindings'] ?? null) ? $repoArr['bindings'] : [];
+
+                // Merge dply.yaml `bindings:` + wrangler.toml discoveries.
+                // Both are co-equal declarative sources; on conflict
+                // wrangler.toml wins (it's the CF-native format and
+                // typically more current for Workers projects).
+                $merged = $yamlBindings;
+                foreach ($wranglerBindings as $kind => $entries) {
+                    if (! is_array($entries) || $entries === []) {
+                        continue;
+                    }
+                    $existing = is_array($merged[$kind] ?? null) ? $merged[$kind] : [];
+                    foreach ($entries as $bindingName => $value) {
+                        $existing[$bindingName] = $value; // wrangler wins
+                    }
+                    $merged[$kind] = $existing;
+                }
+
+                if ($merged !== []) {
+                    $repoArr['bindings'] = $merged;
+                }
+
+                foreach ($yamlBindings as $kind => $entries) {
+                    if (! is_array($entries)) {
+                        continue;
+                    }
+                    foreach ($entries as $bindingName => $value) {
+                        $this->appendBuildLog($buildLog, "[bindings] dply.yaml: {$kind}.{$bindingName} → '{$value}'\n");
+                    }
+                }
+                foreach ($wranglerBindings as $kind => $entries) {
+                    if (! is_array($entries)) {
+                        continue;
+                    }
+                    foreach ($entries as $bindingName => $value) {
+                        $this->appendBuildLog($buildLog, "[bindings] wrangler.toml: {$kind}.{$bindingName} → '{$value}'\n");
+                    }
+                }
+                // Resolve `error_pages.html_404_path` / `html_500_path` /
+                // `maintenance.html_path` to inline HTML so downstream
+                // consumers (host map publisher) don't need filesystem
+                // access. Skip + warn when the file is missing.
+                foreach (['error_pages', 'maintenance'] as $section) {
+                    if (! is_array($repoArr[$section] ?? null)) {
+                        continue;
+                    }
+                    foreach (['html_404_path' => 'html_404', 'html_500_path' => 'html_500', 'html_path' => 'html'] as $pathKey => $htmlKey) {
+                        if (! isset($repoArr[$section][$pathKey])) {
+                            continue;
+                        }
+                        $rel = (string) $repoArr[$section][$pathKey];
+                        $abs = $checkout.'/'.ltrim($rel, '/');
+                        if (! is_file($abs)) {
+                            $this->appendBuildLog($buildLog, "[dply.yaml] {$section}.{$pathKey}: '{$rel}' not found — skipped.\n");
+
+                            continue;
+                        }
+                        $body = (string) file_get_contents($abs);
+                        if (strlen($body) > 200000) {
+                            $body = substr($body, 0, 200000);
+                            $this->appendBuildLog($buildLog, "[dply.yaml] {$section}.{$pathKey}: truncated to 200000 bytes.\n");
+                        }
+                        $repoArr[$section][$htmlKey] = $body;
+                        unset($repoArr[$section][$pathKey]);
+                        $this->appendBuildLog($buildLog, "[dply.yaml] Resolved {$section}.{$pathKey} → {$section}.{$htmlKey} (".strlen($body)." bytes)\n");
+                    }
+                }
+
+                $deployment->update(['repo_config' => $repoArr]);
+            } else {
+                // No dply.yaml at all — still pick up wrangler bindings
+                // and persist a minimal repo_config so the bundle
+                // uploaders can wire them onto the worker script.
+                $wranglerBindings = app(WranglerBindingsExtractor::class)->extract($checkout);
+                if ($wranglerBindings !== []) {
+                    $deployment->update([
+                        'repo_config' => [
+                            'source_path' => 'wrangler.toml',
+                            'bindings' => $wranglerBindings,
+                        ],
+                    ]);
+                    foreach ($wranglerBindings as $kind => $entries) {
+                        if (! is_array($entries)) {
+                            continue;
+                        }
+                        foreach ($entries as $bindingName => $value) {
+                            $this->appendBuildLog($buildLog, "[bindings] Discovered wrangler.toml: {$kind}.{$bindingName} → '{$value}'\n");
+                        }
+                    }
+                }
+            }
+
+            if ($repoConfig !== null) {
                 if (isset($repoConfig->build['root'])) {
                     $candidate = $checkout.'/'.trim($repoConfig->build['root'], '/');
                     if (is_dir($candidate)) {
@@ -197,6 +297,47 @@ class EdgeBuildRunner
                         $added++;
                     }
                     $this->appendBuildLog($buildLog, sprintf("[dply.yaml] build.env_files: %s → %d new key(s)\n", $relative, $added));
+                }
+
+                // env.public — safe-to-commit values declared in
+                // dply.yaml. Dashboard-supplied env still wins on
+                // conflict (operators may override per-environment).
+                $envPublic = is_array($repoConfig->env['public'] ?? null) ? $repoConfig->env['public'] : [];
+                $addedPublic = 0;
+                foreach ($envPublic as $k => $v) {
+                    if (! is_string($k) || ! is_string($v)) {
+                        continue;
+                    }
+                    if (array_key_exists($k, $env)) {
+                        continue; // dashboard wins
+                    }
+                    $env[$k] = $v;
+                    $addedPublic++;
+                }
+                if ($addedPublic > 0) {
+                    $this->appendBuildLog($buildLog, "[dply.yaml] env.public: {$addedPublic} new key(s) merged into build env.\n");
+                }
+
+                // env.secret — names the repo promises will exist at
+                // runtime. Validate against dashboard storage; missing
+                // names get a warning but never fail the build.
+                $envSecretNames = is_array($repoConfig->env['secret'] ?? null) ? $repoConfig->env['secret'] : [];
+                if ($envSecretNames !== []) {
+                    $dashKnown = array_flip(array_keys($env));
+                    $missing = [];
+                    foreach ($envSecretNames as $name) {
+                        if (! is_string($name)) {
+                            continue;
+                        }
+                        if (! isset($dashKnown[$name])) {
+                            $missing[] = $name;
+                        }
+                    }
+                    if ($missing !== []) {
+                        $this->appendBuildLog($buildLog, "[dply.yaml] env.secret: missing dashboard values for ".implode(', ', $missing).". Set them in Edge → Environment before the next deploy.\n");
+                    } else {
+                        $this->appendBuildLog($buildLog, '[dply.yaml] env.secret: all '.count($envSecretNames).' name(s) present in dashboard storage.'."\n");
+                    }
                 }
             }
 

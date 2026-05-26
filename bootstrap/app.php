@@ -132,6 +132,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
+        $schedule->command(\App\Console\Commands\PruneAuditLogsCommand::class)->dailyAt('03:20');
+        $schedule->command(\App\Console\Commands\CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');

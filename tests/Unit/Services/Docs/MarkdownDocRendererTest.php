@@ -77,8 +77,9 @@ test('markdown doc renderer transforms edge previews comparison table', function
     $result = $renderer->render('edge-previews');
 
     expect($result['html'])
-        ->toContain('docs-spec-card__title')
-        ->toContain('Branch')
+        ->toContain('docs-compare-card__matrix')
         ->toContain('Production site')
-        ->toContain('Preview child');
+        ->toContain('Preview child')
+        ->toContain('Promote to production')
+        ->toContain('Split traffic');
 });

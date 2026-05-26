@@ -192,13 +192,13 @@ final class EdgeSiteViewData
         bool $fakeMode,
     ): string {
         if ($usesByoCloudflare) {
-            return __('Your Cloudflare account (Cloudflare Worker)');
+            return __('Your Cloudflare account');
         }
 
         if ($usesManagedBackend) {
             return $fakeMode
                 ? __('Dply Edge (local fake backend)')
-                : __('Dply Edge (Cloudflare Worker)');
+                : __('Dply Edge (managed)');
         }
 
         return __('Unknown delivery backend');
@@ -218,8 +218,8 @@ final class EdgeSiteViewData
 
             return [
                 'tone' => 'amber',
-                'title' => __('Fake edge — not Cloudflare Worker'),
-                'message' => __('Local dev mode serves hostnames through this app. Deploys write to disk/cache only — not platform R2/KV. Set DPLY_FAKE_EDGE=false and redeploy for real Cloudflare delivery.')
+                'title' => __('Fake edge — local mode'),
+                'message' => __('Local dev mode serves hostnames through this app. Deploys write to disk/cache only — not platform edge storage. Set DPLY_FAKE_EDGE=false and redeploy for real edge delivery.')
                     .' '
                     .$hint['message'],
             ];
@@ -228,7 +228,7 @@ final class EdgeSiteViewData
         if ($usesManagedBackend && ! $platformReady) {
             return [
                 'tone' => 'amber',
-                'title' => __('Cloudflare platform not configured'),
+                'title' => __('Platform edge not configured'),
                 'message' => __('Platform Edge credentials are incomplete. Run php artisan dply:edge:bootstrap, deploy the worker, then set DPLY_FAKE_EDGE=false and redeploy this site.'),
             ];
         }
@@ -236,8 +236,8 @@ final class EdgeSiteViewData
         if ($usesManagedBackend || $usesByoCloudflare) {
             return [
                 'tone' => 'emerald',
-                'title' => __('Live on Cloudflare Edge'),
-                'message' => __('Builds publish to R2 and KV. Traffic is served by the dply Edge Worker — not this Laravel app.'),
+                'title' => __('Live on dply Edge'),
+                'message' => __('Builds publish to edge storage. Traffic is served by the edge network — not this Laravel app.'),
             ];
         }
 

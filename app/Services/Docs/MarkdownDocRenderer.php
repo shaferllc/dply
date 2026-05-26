@@ -220,6 +220,10 @@ final class MarkdownDocRenderer
             return null;
         }
 
+        if ($this->isMatrixComparison($headers, $rows)) {
+            return $this->buildMatrixComparison($document, $headers, $rows);
+        }
+
         if ($columnCount === 2 && $this->isTransposedComparison($headers, $rows)) {
             return $this->buildTransposedComparison($document, $headers, $rows);
         }
@@ -362,6 +366,84 @@ final class MarkdownDocRenderer
         }
 
         return trim($html);
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  list<list<string>>  $rows
+     */
+    private function isMatrixComparison(array $headers, array $rows): bool
+    {
+        if (count($headers) < 3 || $rows === []) {
+            return false;
+        }
+
+        if ($this->cellPlainText($headers[0]) !== '') {
+            return false;
+        }
+
+        foreach ($rows as $row) {
+            if (count($row) !== count($headers)) {
+                return false;
+            }
+
+            if ($this->cellPlainText($row[0] ?? '') === '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  list<list<string>>  $rows
+     */
+    private function buildMatrixComparison(\DOMDocument $document, array $headers, array $rows): \DOMElement
+    {
+        $wrapper = $document->createElement('div');
+        $wrapper->setAttribute('class', 'docs-compare-list');
+
+        $columns = $document->createElement('div');
+        $columns->setAttribute('class', 'docs-compare-columns');
+
+        for ($columnIndex = 1; $columnIndex < count($headers); $columnIndex++) {
+            $card = $document->createElement('article');
+            $card->setAttribute('class', 'docs-compare-card');
+
+            $title = $document->createElement('h4');
+            $title->setAttribute('class', 'docs-compare-card__title');
+            $this->appendHtmlFragment($document, $title, $headers[$columnIndex]);
+            $card->appendChild($title);
+
+            $dl = $document->createElement('dl');
+            $dl->setAttribute('class', 'docs-compare-card__matrix');
+
+            foreach ($rows as $row) {
+                $value = $row[$columnIndex] ?? '';
+                if ($this->cellPlainText($value) === '') {
+                    continue;
+                }
+
+                $dt = $document->createElement('dt');
+                $this->appendHtmlFragment($document, $dt, $row[0]);
+                $dl->appendChild($dt);
+
+                $dd = $document->createElement('dd');
+                $this->appendHtmlFragment($document, $dd, $value);
+                $dl->appendChild($dd);
+            }
+
+            if ($dl->hasChildNodes()) {
+                $card->appendChild($dl);
+            }
+
+            $columns->appendChild($card);
+        }
+
+        $wrapper->appendChild($columns);
+
+        return $wrapper;
     }
 
     /**

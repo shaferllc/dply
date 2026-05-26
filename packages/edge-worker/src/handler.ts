@@ -133,6 +133,60 @@ export interface HostMapEntry {
   is_production?: boolean;
   /** Preview protection rule copied from the parent Edge site. */
   access_gate?: AccessGateConfig;
+  /**
+   * Custom HTML body returned with status 404 when no asset/route matches.
+   * When unset, the Worker falls back to a minimal built-in 404 page.
+   */
+  error_404_html?: string;
+  /**
+   * Custom HTML body returned with status 500 when origin / SSR returns 5xx
+   * after retry. Hybrid sites with `origin_failover_html` set keep using
+   * that for origin proxy errors (more specific); this covers static and
+   * non-origin failure modes.
+   */
+  error_500_html?: string;
+  /**
+   * Custom HTML body returned with status 503 when `maintenance_mode` is
+   * on. When unset, the Worker uses a built-in default.
+   */
+  maintenance_html?: string;
+  /**
+   * When true, the Worker short-circuits every request (except the
+   * RUM beacon) with status 503 + `Retry-After: 120` and the
+   * `maintenance_html` body. Use to take a site offline without
+   * redeploying.
+   */
+  maintenance_mode?: boolean;
+  /**
+   * Geo-block firewall (P55). When `firewall_country_mode` is "allow"
+   * only the listed country codes (ISO 3166 alpha-2, uppercase) are
+   * permitted; when "block" the listed codes are rejected. Country
+   * is sourced from `request.cf.country` (Cloudflare-provided). If
+   * the country is unknown ("XX"/"T1") and mode is allow, request is
+   * denied (fail-closed). All denials return 403.
+   */
+  firewall_country_mode?: 'allow' | 'block';
+  firewall_countries?: string[];
+  /**
+   * Skew protection (P51). Storage prefixes of the most recent
+   * superseded deploys, newest first. When the current deploy returns
+   * a 404 for a request that looks like a hashed asset URL (extension
+   * other than .html), the Worker walks this list and serves the
+   * object from the first matching prior deploy. This keeps old tabs
+   * functional during/after a deploy that re-hashed chunk URLs.
+   */
+  recent_storage_prefixes?: string[];
+}
+
+function looksLikeAssetPath(requestPath: string): boolean {
+  // Strip query already done upstream; we just need the extension.
+  const lastDot = requestPath.lastIndexOf('.');
+  if (lastDot < 0) return false;
+  const ext = requestPath.slice(lastDot + 1).toLowerCase();
+  if (ext === '' || ext === 'html' || ext === 'htm') return false;
+  // Sanity: extensions are <=8 chars in practice (e.g. "woff2", "webp").
+  // Anything longer is probably part of a path segment, not an extension.
+  return ext.length <= 8 && /^[a-z0-9]+$/.test(ext);
 }
 
 const DEFAULT_ORIGIN_FAILOVER_HTML = `<!doctype html>
@@ -367,7 +421,41 @@ export async function handleRequest(
   let hostEntry = await env.HOST_MAP.get<HostMapEntry>(hostname, 'json');
 
   if (!hostEntry?.storage_prefix) {
-    return notFound('Host not configured.');
+    return notFound('Host not configured.', undefined);
+  }
+
+  try {
+    return await handleRequestInner(request, env, ctx, started, url, hostEntry);
+  } catch (err) {
+    return internalServerError(hostEntry, err);
+  }
+}
+
+async function handleRequestInner(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext | undefined,
+  started: number,
+  url: URL,
+  hostEntryInitial: HostMapEntry,
+): Promise<Response> {
+  let hostEntry = hostEntryInitial;
+
+  // Maintenance short-circuit (P52). Run before everything else so an
+  // operator can take the site offline even when the access gate is
+  // open. The RUM beacon still works so any tabs already loaded keep
+  // reporting vitals.
+  if (hostEntry.maintenance_mode && url.pathname !== VITALS_BEACON_PATH) {
+    return maintenanceResponse(hostEntry);
+  }
+
+  // Geo-block firewall (P55). Run after maintenance (so an operator
+  // can take the site offline globally) but before everything else.
+  // Skip the vitals beacon so already-loaded tabs in blocked regions
+  // can still report final metrics before they navigate away.
+  if (hostEntry.firewall_country_mode && url.pathname !== VITALS_BEACON_PATH) {
+    const decision = checkGeoFirewall(request, hostEntry);
+    if (decision) return decision;
   }
 
   // Split-traffic (P10d) — pick a variant before everything else so
@@ -479,6 +567,22 @@ export async function handleRequest(
   const objectKey = buildObjectKey(hostEntry.storage_prefix, requestPath);
   let object = await env.ARTIFACTS.get(objectKey);
 
+  // Skew protection (P51). When the requested path looks like a
+  // hashed asset (has an extension other than .html), fall back
+  // through recent superseded deploys' R2 prefixes. Old tabs that
+  // loaded HTML from a prior deploy stay functional because their
+  // chunk URLs still resolve. Limited to non-HTML extensions so we
+  // never serve a stale page in place of a fresh one.
+  if (!object && hostEntry.recent_storage_prefixes?.length && looksLikeAssetPath(requestPath)) {
+    for (const prefix of hostEntry.recent_storage_prefixes) {
+      const fallback = await env.ARTIFACTS.get(buildObjectKey(prefix, requestPath));
+      if (fallback) {
+        object = fallback;
+        break;
+      }
+    }
+  }
+
   // Hybrid: match origin routes before SPA fallback so /api/* and
   // /_next/data/* reach the SSR origin even when index.html exists in R2.
   if (!object && hostEntry.origin_url && hostEntry.origin_routes?.length) {
@@ -490,7 +594,7 @@ export async function handleRequest(
           // a background refetch that updates the cache for the next
           // request. ctx.waitUntil keeps the Worker alive past the
           // response so the revalidation completes.
-          ctx.waitUntil(revalidateEdgeCache(env, hostEntry, request));
+          ctx?.waitUntil(revalidateEdgeCache(env, hostEntry, request));
           recordRequest(ctx, env, request, cached.response, hostEntry, url, requestPath, started, 'cache-stale');
         } else {
           recordRequest(ctx, env, request, cached.response, hostEntry, url, requestPath, started, 'cache-hit');
@@ -510,7 +614,7 @@ export async function handleRequest(
       // Workers runtime keeps the write alive via ctx.waitUntil.
       const [forClient, forCache] = teeIfCacheable(response, request);
       if (forCache) {
-        ctx.waitUntil(writeEdgeCache(env, hostEntry, request, forCache));
+        ctx?.waitUntil(writeEdgeCache(env, hostEntry, request, forCache));
       }
 
       recordRequest(ctx, env, request, forClient, hostEntry, url, requestPath, started, 'cache-miss');
@@ -529,7 +633,7 @@ export async function handleRequest(
   }
 
   if (!object) {
-    const response = notFound('Object not found.');
+    const response = notFound('Object not found.', hostEntry);
     recordRequest(ctx, env, request, response, hostEntry, url, requestPath, started, 'miss');
 
     return response;
@@ -1654,7 +1758,17 @@ async function proxyWebSocket(
   });
 }
 
-function notFound(message: string): Response {
+function notFound(message: string, hostEntry: HostMapEntry | undefined): Response {
+  const custom = hostEntry?.error_404_html;
+  if (custom && custom.trim() !== '') {
+    return new Response(custom, {
+      status: 404,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        ...SECURITY_HEADERS,
+      },
+    });
+  }
   return new Response(message, {
     status: 404,
     headers: {
@@ -1663,3 +1777,86 @@ function notFound(message: string): Response {
     },
   });
 }
+
+function internalServerError(hostEntry: HostMapEntry, err: unknown): Response {
+  const detail = err instanceof Error ? err.message : String(err ?? 'unknown');
+  console.error('edge-worker handleRequest threw', detail);
+  const body = (hostEntry.error_500_html ?? '').trim() || `Internal Server Error\n${detail}`;
+  const isHtml = (hostEntry.error_500_html ?? '').trim() !== '';
+  return new Response(body, {
+    status: 500,
+    headers: {
+      'Content-Type': isHtml ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store, max-age=0',
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
+function checkGeoFirewall(request: Request, hostEntry: HostMapEntry): Response | null {
+  const mode = hostEntry.firewall_country_mode;
+  const list = hostEntry.firewall_countries ?? [];
+  if (!mode || list.length === 0) return null;
+
+  // request.cf.country is set by Cloudflare to the ISO-3166 alpha-2
+  // country code, or "T1" / undefined when geo-location failed.
+  const cf = (request as Request & { cf?: { country?: string } }).cf;
+  const country = typeof cf?.country === 'string' ? cf.country.toUpperCase() : '';
+  const allowed = list.includes(country);
+
+  if (mode === 'allow' && !allowed) {
+    return geoBlockedResponse(country);
+  }
+  if (mode === 'block' && allowed) {
+    return geoBlockedResponse(country);
+  }
+  return null;
+}
+
+function geoBlockedResponse(country: string): Response {
+  return new Response(`Forbidden — content is not available in this region (${country || 'unknown'}).`, {
+    status: 403,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store, max-age=0',
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
+function maintenanceResponse(hostEntry: HostMapEntry): Response {
+  const body = (hostEntry.maintenance_html ?? '').trim() || DEFAULT_MAINTENANCE_HTML;
+  return new Response(body, {
+    status: 503,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Retry-After': '120',
+      'Cache-Control': 'no-store, max-age=0',
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
+const DEFAULT_MAINTENANCE_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>503 — Site under maintenance</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f5ef; color: #1a1a1a; }
+  @media (prefers-color-scheme: dark) { body { background: #111; color: #f6f5ef; } }
+  main { max-width: 32rem; padding: 2rem; text-align: center; }
+  h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+  p { margin: 0; color: #4b5563; }
+  @media (prefers-color-scheme: dark) { p { color: #cbd5e1; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>We&rsquo;ll be right back.</h1>
+  <p>This site is temporarily offline for maintenance. Please check back shortly.</p>
+</main>
+</body>
+</html>`;

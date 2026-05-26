@@ -20,6 +20,8 @@ class EdgeOrgInfraBootstrapper
         string $zoneName,
         string $workerScriptName,
         string $cacheKvTitle = EdgeDeliveryFeaturesEnsurer::CACHE_KV_TITLE,
+        ?string $r2LocationHint = null,
+        ?string $r2Jurisdiction = null,
     ): array {
         if ($credential->provider !== 'cloudflare') {
             throw new \InvalidArgumentException('Edge bootstrap requires a Cloudflare credential.');
@@ -34,7 +36,7 @@ class EdgeOrgInfraBootstrapper
         $client->verifyToken();
 
         if (! $client->r2BucketExists($bucket)) {
-            $client->createR2Bucket($bucket);
+            $client->createR2Bucket($bucket, $r2LocationHint, $r2Jurisdiction);
         }
 
         $kvId = $client->kvNamespaceIdByTitle($kvTitle);

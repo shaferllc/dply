@@ -65,6 +65,19 @@ class GithubEdgeWebhookController extends Controller
         }
 
         if (in_array($action, ['opened', 'reopened', 'synchronize'], true)) {
+            // Gate against the repo's `previews:` policy in dply.yaml.
+            // Disabled globally or branch on the exclude list → skip.
+            if (! \App\Support\Edge\EdgePreviewPolicy::shouldCreatePreview($site, \App\Support\Edge\EdgePreviewPolicy::EVENT_PULL_REQUEST, $branch)) {
+                $this->touchWebhookLastEvent($site);
+
+                return response()->json([
+                    'ok' => true,
+                    'queued' => false,
+                    'reason' => 'preview_disabled_by_dply_yaml',
+                    'branch' => $branch,
+                ]);
+            }
+
             $preview = (new CreateEdgePreviewSite)->handle($site, $branch, $prNumber, $headSha);
             $this->touchWebhookLastEvent($site);
 

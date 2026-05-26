@@ -37,7 +37,63 @@ final class ContextualDocResolver
             }
         }
 
+        $fromSiteContext = $this->resolveFromSiteContext();
+        if ($fromSiteContext !== null) {
+            return $fromSiteContext;
+        }
+
         return $this->defaultFallbackSlug();
+    }
+
+    /**
+     * Resolve a doc slug from a site workspace section without relying on the current route.
+     */
+    public function resolveForSiteSection(Site $site, string $section): string
+    {
+        foreach (config('contextual-docs.routes', []) as $entry) {
+            if (! is_array($entry) || ($entry['route'] ?? null) !== 'sites.show') {
+                continue;
+            }
+
+            $params = $entry['params'] ?? [];
+            if (($params['section'] ?? null) !== $section) {
+                continue;
+            }
+
+            if (! $this->matchesWhenForSite($entry['when'] ?? null, $site)) {
+                continue;
+            }
+
+            $slug = $entry['slug'] ?? null;
+            if (is_string($slug) && $slug !== '') {
+                return $slug;
+            }
+        }
+
+        if ($site->usesEdgeRuntime()) {
+            foreach (config('contextual-docs.routes', []) as $entry) {
+                if (! is_array($entry) || ($entry['route'] ?? null) !== 'sites.show') {
+                    continue;
+                }
+
+                if (($entry['params'] ?? []) !== []) {
+                    continue;
+                }
+
+                if (! $this->matchesWhenForSite($entry['when'] ?? null, $site)) {
+                    continue;
+                }
+
+                $slug = $entry['slug'] ?? null;
+                if (is_string($slug) && $slug !== '') {
+                    return $slug;
+                }
+            }
+
+            return (string) config('contextual-docs.fallbacks.edge', 'edge-overview');
+        }
+
+        return (string) config('contextual-docs.fallbacks.sites', 'sites-and-deploy');
     }
 
     /**
@@ -311,6 +367,43 @@ final class ContextualDocResolver
         $site = ($this->request ?? request())->route('site');
 
         return $site instanceof Site ? $site : null;
+    }
+
+    private function resolveFromSiteContext(): ?string
+    {
+        $site = $this->routeSite();
+        if (! $site instanceof Site) {
+            return null;
+        }
+
+        $section = $this->sectionFromRequestPath()
+            ?? ($this->request ?? request())->route('section');
+
+        if (! is_string($section) || $section === '') {
+            $section = 'general';
+        }
+
+        return $this->resolveForSiteSection($site, $section);
+    }
+
+    private function sectionFromRequestPath(): ?string
+    {
+        $path = trim(($this->request ?? request())->path(), '/');
+
+        if (preg_match('#^servers/[^/]+/sites/[^/]+/([^/?]+)#', $path, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    private function matchesWhenForSite(mixed $when, Site $site): bool
+    {
+        return match ($when) {
+            'edge_site' => $site->usesEdgeRuntime() && $site->isReadyForWorkspace(),
+            'edge_site_provisioning' => $site->usesEdgeRuntime() && ! $site->isReadyForWorkspace(),
+            default => true,
+        };
     }
 
     private function defaultFallbackSlug(): string

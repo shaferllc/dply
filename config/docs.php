@@ -71,7 +71,23 @@ return [
         ],
         'edge-build' => [
             'file' => 'EDGE_BUILD.md',
-            'title' => 'Edge build settings',
+            'title' => 'Edge build',
+        ],
+        'edge-environment' => [
+            'file' => 'EDGE_ENVIRONMENT.md',
+            'title' => 'Edge environment variables',
+        ],
+        'edge-deploy-triggers' => [
+            'file' => 'EDGE_DEPLOY_TRIGGERS.md',
+            'title' => 'Edge deploy triggers',
+        ],
+        'edge-delivery' => [
+            'file' => 'EDGE_DELIVERY.md',
+            'title' => 'Edge delivery',
+        ],
+        'edge-routing' => [
+            'file' => 'EDGE_ROUTING.md',
+            'title' => 'Edge routing',
         ],
         'edge-previews' => [
             'file' => 'EDGE_PREVIEWS.md',
@@ -136,6 +152,10 @@ return [
                 'edge-deploys',
                 'edge-domains',
                 'edge-build',
+                'edge-environment',
+                'edge-deploy-triggers',
+                'edge-delivery',
+                'edge-routing',
                 'edge-previews',
                 'edge-traffic',
                 'edge-billing',

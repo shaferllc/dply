@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\SiteType;
 use App\Livewire\Docs\Sidebar;
+use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -43,11 +44,21 @@ test('docs sidebar opens contextual edge previews guide with breadcrumbs', funct
         ],
     ]);
 
+    EdgeDeployment::query()->create([
+        'site_id' => $site->id,
+        'organization_id' => $org->id,
+        'status' => EdgeDeployment::STATUS_LIVE,
+        'storage_prefix' => 'edge/test/prefix',
+        'published_at' => now(),
+    ]);
+
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-previews']))
-        ->assertOk();
+        ->assertOk()
+        ->assertSee('dply-docs-open', false)
+        ->assertSee('edge-previews', false);
 
-    expect(app(ContextualDocResolver::class)->resolve())->toBe('edge-previews');
+    expect(app(ContextualDocResolver::class)->resolveForSiteSection($site, 'edge-previews'))->toBe('edge-previews');
 
     Livewire::actingAs($user)
         ->test(Sidebar::class)
@@ -56,10 +67,12 @@ test('docs sidebar opens contextual edge previews guide with breadcrumbs', funct
         ->assertSet('visible', true)
         ->assertSee('Edge guides', false)
         ->assertSee('Edge previews', false)
-        ->assertSee('Where previews appear', false);
+        ->assertSee('Promote to production', false)
+        ->assertSee('Split traffic', false)
+        ->assertSee('docs-sidebar-breadcrumb', false);
 });
 
-test('edge previews doc renders markdown tables as stacked spec cards', function () {
+test('edge previews doc renders markdown tables as side by side compare cards', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
@@ -67,8 +80,8 @@ test('edge previews doc renders markdown tables as stacked spec cards', function
         ->call('open', 'edge-previews')
         ->assertSee('Production site', false)
         ->assertSee('Preview child', false)
-        ->assertSee('docs-spec-list', false)
-        ->assertSee('docs-spec-card', false)
+        ->assertSee('docs-compare-list', false)
+        ->assertSee('docs-compare-card__matrix', false)
         ->assertDontSee('docs-table-scroll', false);
 });
 
@@ -80,7 +93,7 @@ test('docs sidebar loads edge build guide', function () {
         ->call('open', 'edge-build')
         ->assertSet('slug', 'edge-build')
         ->assertSet('visible', true)
-        ->assertSee('Edge build settings')
+        ->assertSee('Edge build')
         ->assertSee('Build command');
 });
 

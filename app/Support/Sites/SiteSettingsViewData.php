@@ -16,6 +16,7 @@ use App\Services\Billing\EdgeSiteBillingAnalytics;
 use App\Services\Billing\EdgeSiteTrafficAnalytics;
 use App\Services\Billing\ManagedProductCostEstimator;
 use App\Support\Deployment\DeploymentContract;
+use App\Support\Docs\ContextualDocResolver;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Support\Collection;
@@ -194,6 +195,7 @@ final class SiteSettingsViewData
         $generalRecentDeployments = $section === 'general'
             ? self::recentDeploymentsWithPhaseResults($site)
             : collect();
+        $contextualDocSlug = app(ContextualDocResolver::class)->resolveForSiteSection($site, $section);
 
         return array_merge(
             compact(
@@ -268,6 +270,7 @@ final class SiteSettingsViewData
                 'sectionConsoleActionRun',
                 'generalRecentDeployments',
                 'isEdgeWorkspace',
+                'contextualDocSlug',
             ),
             $edgeAnalytics,
             $edgeContext,
@@ -299,6 +302,7 @@ final class SiteSettingsViewData
         $edgeContext = EdgeSiteViewData::context($site, $section);
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
+        $contextualDocSlug = app(ContextualDocResolver::class)->resolveForSiteSection($site, $section);
 
         return array_merge(
             compact(
@@ -312,6 +316,7 @@ final class SiteSettingsViewData
                 'settingsBreadcrumbs',
                 'sectionConsoleActionKinds',
                 'sectionConsoleActionRun',
+                'contextualDocSlug',
             ),
             $header,
             [

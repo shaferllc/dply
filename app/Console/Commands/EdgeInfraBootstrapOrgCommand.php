@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\ProviderCredential;
 use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
+use App\Services\Edge\EdgeDeliveryFeaturesEnsurer;
 use App\Services\Edge\EdgeOrgInfraBootstrapper;
 use App\Support\Edge\EdgeOrgCredentialConfig;
 use Illuminate\Console\Command;
@@ -78,6 +79,13 @@ class EdgeInfraBootstrapOrgCommand extends Command
             return self::FAILURE;
         }
 
+        // Per-org data residency (P57). Map the org's preferred region
+        // to R2 jurisdiction + location hint. CF jurisdictions:
+        //   default | eu | fedramp.
+        // Location hints: weur | eeur | wnam | enam | apac | oc.
+        $region = (string) ($credential->organization?->edge_data_region ?? 'default');
+        [$jurisdiction, $locationHint] = $this->mapRegion($region);
+
         try {
             $result = $bootstrapper->bootstrap(
                 $credential,
@@ -86,6 +94,9 @@ class EdgeInfraBootstrapOrgCommand extends Command
                 $kvTitle,
                 $zoneName,
                 $workerScript,
+                EdgeDeliveryFeaturesEnsurer::CACHE_KV_TITLE,
+                $locationHint,
+                $jurisdiction,
             );
         } catch (\Throwable $e) {
             $this->error($e->getMessage());
@@ -121,5 +132,25 @@ class EdgeInfraBootstrapOrgCommand extends Command
         $this->line('Deploy worker: php artisan edge:worker:deploy --credential='.$credential->id);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Map an organization's `edge_data_region` to the
+     * (jurisdiction, locationHint) tuple R2 expects.
+     *
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function mapRegion(string $region): array
+    {
+        return match (strtolower(trim($region))) {
+            'eu', 'eu-strict' => ['eu', 'weur'],
+            'wnam' => [null, 'wnam'],
+            'enam' => [null, 'enam'],
+            'weur' => [null, 'weur'],
+            'eeur' => [null, 'eeur'],
+            'apac' => [null, 'apac'],
+            'oc' => [null, 'oc'],
+            default => [null, null],
+        };
     }
 }

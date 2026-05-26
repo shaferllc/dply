@@ -146,6 +146,16 @@ class PublishEdgeDeploymentJob implements ShouldQueue
                 // Pruning is best-effort — old artifacts will be retried next publish.
             }
 
+            // Auto-attach any custom domains declared in dply.yaml's
+            // `domains:` block that aren't attached yet. Removing a
+            // domain from the file does NOT detach — detaches are
+            // explicit only (dashboard / API).
+            try {
+                app(\App\Services\Edge\EnsureEdgeRepoDomains::class)->ensure($site->fresh(), $deployment->fresh());
+            } catch (Throwable) {
+                // Best-effort; declared domains can be retried on next deploy.
+            }
+
             // Mark the matching GitHub Check Run + update the PR
             // comment with the live URL. Wrapped — GitHub flake must
             // not fail a successful publish.

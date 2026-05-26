@@ -54,6 +54,17 @@ test('contextual doc resolver maps edge site previews section', function () {
     expect(app(ContextualDocResolver::class)->resolve())->toBe('edge-previews');
 });
 
+test('contextual doc resolver maps site section without route params', function () {
+    [$user, $server, $site] = makeEdgeSiteForDocs();
+
+    $resolver = app(ContextualDocResolver::class);
+
+    expect($resolver->resolveForSiteSection($site, 'edge-previews'))->toBe('edge-previews')
+        ->and($resolver->resolveForSiteSection($site, 'edge-build'))->toBe('edge-build')
+        ->and($resolver->resolveForSiteSection($site, 'edge-delivery'))->toBe('edge-delivery')
+        ->and($resolver->resolveForSiteSection($site, 'edge-environment'))->toBe('edge-environment');
+});
+
 test('contextual doc resolver builds documentation breadcrumbs', function () {
     $resolver = app(ContextualDocResolver::class);
 

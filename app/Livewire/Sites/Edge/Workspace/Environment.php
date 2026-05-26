@@ -8,6 +8,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Livewire\Forms\EdgeBuildSettingsForm;
+use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Support\Sites\EdgeSiteViewData;
@@ -30,11 +31,39 @@ class Environment extends Component
 
     public function render(): View
     {
+        $latest = EdgeDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', EdgeDeployment::STATUS_LIVE)
+            ->latest('id')
+            ->first()
+            ?: EdgeDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->whereNotNull('repo_config')
+                ->latest('id')
+                ->first();
+
+        $repoEnv = is_array($latest?->repo_config['env'] ?? null) ? $latest->repo_config['env'] : [];
+        $sourcePath = is_array($latest?->repo_config) && is_string($latest->repo_config['source_path'] ?? null)
+            ? (string) $latest->repo_config['source_path']
+            : 'dply.yaml';
+
+        // Detect missing secrets (declared in repo, no dashboard value)
+        // so we can warn the user inline.
+        $declaredSecretNames = is_array($repoEnv['secret'] ?? null) ? $repoEnv['secret'] : [];
+        $dashboardKeys = $this->site->edgeEnvVars()->pluck('key')->all();
+        $missingSecrets = array_values(array_filter(
+            $declaredSecretNames,
+            static fn ($name): bool => is_string($name) && ! in_array($name, $dashboardKeys, true),
+        ));
+
         return view('livewire.sites.edge.workspace.environment', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-environment'),
             [
                 'server' => $this->server,
                 'site' => $this->site,
+                'repoEnv' => $repoEnv,
+                'sourcePath' => $sourcePath,
+                'missingSecrets' => $missingSecrets,
             ],
         ));
     }

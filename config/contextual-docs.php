@@ -68,7 +68,7 @@ return [
         ],
         [
             'route' => 'sites.show',
-            'slug' => 'edge-build',
+            'slug' => 'edge-environment',
             'group' => 'edge',
             'when' => 'edge_site',
             'params' => [
@@ -77,7 +77,7 @@ return [
         ],
         [
             'route' => 'sites.show',
-            'slug' => 'edge-build',
+            'slug' => 'edge-deploy-triggers',
             'group' => 'edge',
             'when' => 'edge_site',
             'params' => [
@@ -86,7 +86,7 @@ return [
         ],
         [
             'route' => 'sites.show',
-            'slug' => 'edge-build',
+            'slug' => 'edge-delivery',
             'group' => 'edge',
             'when' => 'edge_site',
             'params' => [
@@ -95,7 +95,7 @@ return [
         ],
         [
             'route' => 'sites.show',
-            'slug' => 'edge-build',
+            'slug' => 'edge-routing',
             'group' => 'edge',
             'when' => 'edge_site',
             'params' => [

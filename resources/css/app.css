@@ -139,6 +139,18 @@ html.dark {
         @apply mt-2.5 list-disc space-y-1.5 pl-4 text-sm leading-snug text-brand-moss dark:text-brand-mist/90;
     }
 
+    .docs-markdown-prose .docs-compare-card__matrix {
+        @apply mt-2.5 space-y-2.5;
+    }
+
+    .docs-markdown-prose .docs-compare-card__matrix dt {
+        @apply text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist;
+    }
+
+    .docs-markdown-prose .docs-compare-card__matrix dd {
+        @apply mt-0.5 text-sm leading-snug text-brand-moss dark:text-brand-mist/90;
+    }
+
     /* Global "this button is talking to the server" affordance, toggled by
        the click handler in app.js for any wire:click element.
        Approach: hide the button's contents during the round-trip (so the

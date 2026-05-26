@@ -56,29 +56,19 @@
                         <x-heroicon-o-document-text class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
                         {{ __('Managed by :file', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml']) }}
                     </h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Build, redirects, rewrites, and header rules from the repo override the dashboard settings below on each deploy.') }}</p>
+                    <p class="mt-0.5 text-sm text-brand-moss">
+                        {{ __('Build settings from :file override the dashboard form below on each deploy. Redirects / rewrites / headers live on the :routing tab.', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml', 'routing' => __('Routing')]) }}
+                    </p>
                 </div>
                 <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
                     {{ __('Repo config') }}
                 </span>
             </div>
         </div>
-        <dl class="grid grid-cols-2 gap-y-3 gap-x-6 px-6 py-4 text-sm sm:grid-cols-4 sm:px-8">
+        <dl class="px-6 py-4 text-sm sm:px-8">
             <div>
                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Build overrides') }}</dt>
                 <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ empty($latestRepoConfig['build']) ? __('—') : count($latestRepoConfig['build']).' '.__('keys') }}</dd>
-            </div>
-            <div>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Redirects') }}</dt>
-                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ count((array) ($latestRepoConfig['redirects'] ?? [])) }}</dd>
-            </div>
-            <div>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Rewrites') }}</dt>
-                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ count((array) ($latestRepoConfig['rewrites'] ?? [])) }}</dd>
-            </div>
-            <div>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Header rules') }}</dt>
-                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ count((array) ($latestRepoConfig['headers'] ?? [])) }}</dd>
             </div>
         </dl>
         @php
@@ -118,8 +108,6 @@
         @endif
     </section>
 @endif
-
-@include('livewire.sites.partials.edge.repo-routing-rules')
 
 <section id="edge-build-configuration" class="scroll-mt-24 dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">

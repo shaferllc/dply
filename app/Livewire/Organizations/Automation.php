@@ -54,6 +54,8 @@ class Automation extends Component
 
     public bool $deploy_email_notifications_enabled = true;
 
+    public string $edge_data_region = 'default';
+
     public bool $email_server_credentials_enabled = false;
 
     public bool $email_database_credentials_enabled = false;
@@ -83,6 +85,32 @@ class Automation extends Component
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
         $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
+        $this->edge_data_region = (string) ($this->organization->edge_data_region ?: 'default');
+    }
+
+    public function updatedEdgeDataRegion(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $allowed = ['default', 'eu', 'weur', 'eeur', 'wnam', 'enam', 'apac', 'oc'];
+        if (! in_array($this->edge_data_region, $allowed, true)) {
+            $this->edge_data_region = 'default';
+        }
+
+        $previous = (string) ($this->organization->edge_data_region ?: 'default');
+        $this->organization->update(['edge_data_region' => $this->edge_data_region]);
+
+        audit_log(
+            $this->organization,
+            auth()->user(),
+            'organization.edge_data_region_updated',
+            null,
+            ['edge_data_region' => $previous],
+            ['edge_data_region' => $this->edge_data_region],
+        );
+
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Edge data region updated.');
     }
 
     public function updatedDeployEmailNotificationsEnabled(): void

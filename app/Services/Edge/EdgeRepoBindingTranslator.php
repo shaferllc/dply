@@ -5,19 +5,26 @@ declare(strict_types=1);
 namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
+use App\Models\Site;
 
 /**
- * Translates the `bindings:` section of a deployment's snapshotted
- * dply.yaml (P10c) into Cloudflare binding descriptors the Workers
- * for Platforms script-upload API accepts.
+ * Builds the list of Cloudflare binding descriptors uploaded with
+ * each Edge worker script.
  *
+ * Two sources:
+ *   1. The per-site default `env.KV` namespace (always injected, lazily
+ *      provisioned in the user's CF account by EnsureDefaultEdgeBindings)
+ *   2. Bindings declared in the repo's `wrangler.toml` (discovered at
+ *      build time by WranglerBindingsExtractor; values can be titles
+ *      that EdgeBindingsAutoResolver creates on first use)
+ *
+ * Declared bindings override the default if they collide on name.
  * Used by both {@see EdgeSsrBundleUploader} and
- * {@see EdgeMiddlewareBundleUploader} so middleware and SSR scripts
- * see the same KV / R2 / D1 / Queues bindings the user declared.
+ * {@see EdgeMiddlewareBundleUploader}.
  */
 class EdgeRepoBindingTranslator
 {
-    /** Names dply already injects on every script — repo declarations conflicting with these are dropped. */
+    /** Names the platform Worker already injects — repo + defaults are dropped if they collide. */
     private const RESERVED_NAMES = [
         'HOST_MAP',
         'ASSETS',
@@ -28,17 +35,40 @@ class EdgeRepoBindingTranslator
         'DISPATCHER',
     ];
 
+    public function __construct(
+        private readonly EdgeBindingsAutoResolver $autoResolver,
+        private readonly EnsureDefaultEdgeBindings $defaultBindings,
+    ) {}
+
     /**
      * @return list<array<string, mixed>>
      */
     public function bindingsFor(EdgeDeployment $deployment): array
     {
-        $config = is_array($deployment->repo_config) ? $deployment->repo_config : null;
-        if (! is_array($config) || ! is_array($config['bindings'] ?? null)) {
-            return [];
+        $config = is_array($deployment->repo_config) ? $deployment->repo_config : [];
+        $site = $deployment->site;
+
+        // Resolve wrangler-declared bindings (titles → CF IDs, with
+        // auto-create on first use). The dply.yaml `bindings:` schema
+        // is no longer parsed; everything declarative comes through
+        // wrangler.toml via WranglerBindingsExtractor at build time.
+        $declared = [];
+        if (is_array($config['bindings'] ?? null) && $site instanceof Site) {
+            $declared = $this->autoResolver->resolve($site, $deployment) ?: $config['bindings'];
+        } elseif (is_array($config['bindings'] ?? null)) {
+            $declared = $config['bindings'];
         }
-        $declared = $config['bindings'];
+
+        $declaredNames = $this->collectDeclaredNames($declared);
+
         $out = [];
+
+        // env.KV — per-site default. Skipped when declared overrides it
+        // or when the platform reserves the name (defensive).
+        $defaultKvId = $site instanceof Site ? $this->defaultBindings->ensure($site)['kv'] : null;
+        if (is_string($defaultKvId) && ! in_array('KV', $declaredNames, true) && ! in_array('KV', self::RESERVED_NAMES, true)) {
+            $out[] = ['name' => 'KV', 'type' => 'kv_namespace', 'namespace_id' => $defaultKvId];
+        }
 
         foreach ((array) ($declared['kv'] ?? []) as $name => $namespaceId) {
             if (! $this->isUsableName($name) || ! is_string($namespaceId)) {
@@ -66,6 +96,28 @@ class EdgeRepoBindingTranslator
         }
 
         return $out;
+    }
+
+    /**
+     * @param  array<string, array<string, string>>  $declared
+     * @return list<string>
+     */
+    private function collectDeclaredNames(array $declared): array
+    {
+        $names = [];
+        foreach (['kv', 'r2', 'd1', 'queues'] as $kind) {
+            $bucket = $declared[$kind] ?? null;
+            if (! is_array($bucket)) {
+                continue;
+            }
+            foreach (array_keys($bucket) as $name) {
+                if (is_string($name)) {
+                    $names[] = $name;
+                }
+            }
+        }
+
+        return $names;
     }
 
     private function isUsableName(mixed $name): bool

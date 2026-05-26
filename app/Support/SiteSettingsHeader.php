@@ -152,18 +152,23 @@ final class SiteSettingsHeader
             ],
             'edge-build' => [
                 'title' => __('Build'),
-                'description' => __('Build command, output directory, repo config overrides, routing rules, and deploy retention.'),
+                'description' => __('Build command, output directory, repo config snapshot, and deploy retention.'),
                 'icon' => 'heroicon-o-wrench-screwdriver',
+            ],
+            'edge-routing' => [
+                'title' => __('Routing'),
+                'description' => __('Redirects, rewrites, and headers from dply.yaml (read-only).'),
+                'icon' => 'heroicon-o-arrows-right-left',
+            ],
+            'edge-environment' => [
+                'title' => __('Environment'),
+                'description' => __('Production secrets injected at build and runtime.'),
+                'icon' => 'heroicon-o-command-line',
             ],
             'edge-deploy-triggers' => [
                 'title' => __('Deploy triggers'),
                 'description' => __('Deploy hooks and GitHub auto-deploy webhooks.'),
                 'icon' => 'heroicon-o-bolt',
-            ],
-            'edge-environment' => [
-                'title' => __('Environment'),
-                'description' => __('Production secrets injected at build and runtime on each deploy.'),
-                'icon' => 'heroicon-o-command-line',
             ],
             'edge-delivery' => [
                 'title' => __('Delivery'),

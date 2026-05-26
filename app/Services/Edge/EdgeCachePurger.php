@@ -91,6 +91,59 @@ class EdgeCachePurger
         ];
     }
 
+    /**
+     * Purge cache entries for a specific path (ISR on-demand
+     * revalidation, P53). Deletes the direct `edge_cache:{site}:{path}`
+     * KV key — the next request for that path re-fetches from origin
+     * and re-warms cache.
+     *
+     * @param  list<string>  $paths
+     * @return array{ok: bool, purged_keys: list<string>, message: string}
+     */
+    public function purgeByPaths(Site $site, array $paths): array
+    {
+        $paths = array_values(array_unique(array_filter(array_map(
+            fn ($p): string => is_string($p) ? trim($p) : '',
+            $paths,
+        ), fn (string $p): bool => $p !== '')));
+
+        if ($paths === []) {
+            return ['ok' => false, 'purged_keys' => [], 'message' => 'No paths supplied.'];
+        }
+        foreach ($paths as $p) {
+            if (strlen($p) > 2048 || preg_match('/[\r\n\t]/', $p) === 1) {
+                return ['ok' => false, 'purged_keys' => [], 'message' => 'Invalid path: '.$p];
+            }
+        }
+
+        $context = $this->contextResolver->forSite($site);
+        if ($context->cacheKvNamespaceId === '') {
+            return ['ok' => false, 'purged_keys' => [], 'message' => 'Edge cache namespace not configured for this site.'];
+        }
+
+        $siteId = (string) $site->id;
+        $purged = [];
+        foreach ($paths as $path) {
+            $normalized = '/'.ltrim($path, '/');
+            $key = "edge_cache:{$siteId}:{$normalized}";
+            $del = $this->http
+                ->withToken($context->apiToken)
+                ->timeout(10)
+                ->delete($this->kvValueUrl($context->accountId, $context->cacheKvNamespaceId, $key));
+            if ($del->successful() || $del->status() === 404) {
+                $purged[] = $key;
+            } else {
+                Log::warning('EdgeCachePurger: path delete failed', ['site' => $siteId, 'key' => $key, 'status' => $del->status()]);
+            }
+        }
+
+        return [
+            'ok' => true,
+            'purged_keys' => $purged,
+            'message' => sprintf('Purged %d of %d path(s).', count($purged), count($paths)),
+        ];
+    }
+
     private function kvValueUrl(string $accountId, string $namespaceId, string $key): string
     {
         return self::BASE

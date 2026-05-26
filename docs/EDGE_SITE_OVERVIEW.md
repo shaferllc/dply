@@ -24,7 +24,7 @@ Use this to confirm the site is on the expected backend before sharing URLs.
 
 Shows the connected Git repository, production **branch**, and framework type (**Static / SSG** or hybrid indicator).
 
-Link **View build settings & webhook** to edit build command, deploy-on-push, or hybrid origin settings.
+Link **View build & deploy settings** to open **Build**, **Deploy triggers**, or **Delivery** as needed.
 
 ## Custom domains card
 

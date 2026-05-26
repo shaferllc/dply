@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Models\Server;
 use App\Models\Site;
@@ -13,6 +14,7 @@ use Livewire\Component;
 
 class Overview extends Component
 {
+    use ManagesEdgeRedeploy;
     use MountsEdgeWorkspaceSection;
 
     public function mount(Server $server, Site $site): void

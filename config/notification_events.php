@@ -39,6 +39,7 @@ return [
                 'edge.domain.verified' => 'Custom domain verified',
                 'edge.domain.failing' => 'Custom domain verification failing (action required)',
                 'edge.usage.over_budget' => 'Edge usage over budget (action required)',
+                'edge.rum.breach' => 'Real-user metric threshold breached (action required)',
             ],
         ],
         'backup' => [

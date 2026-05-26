@@ -499,11 +499,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             ...$query,
         ]);
     })->name('sites.settings');
-    // P10c bindings UI ships as its own Livewire page so the URL is
-    // tab-addressable (?kind=kv/r2/d1) without polluting EdgeSettings'
-    // section dispatcher. Register before the catch-all so it wins.
-    Route::livewire('servers/{server}/sites/{site}/edge-bindings', \App\Livewire\Sites\EdgeBindings::class)
-        ->name('sites.edge-bindings');
 
     // Edge access log CSV download — session-authed (Gate view-checked
     // inside the controller) so the dashboard "Download CSV" button
@@ -511,6 +506,17 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // dispatcher because the .csv extension wouldn't match.
     Route::get('servers/{server}/sites/{site}/edge/logs.csv', \App\Http\Controllers\Edge\EdgeLogCsvDownloadController::class)
         ->name('sites.edge.logs.csv');
+
+    // Per-site audit-log export (CSV/JSON) — session-authed, no row cap,
+    // mirrors the on-screen Audit log panel filters.
+    Route::get('servers/{server}/sites/{site}/edge/audit.export', \App\Http\Controllers\Edge\EdgeAuditLogExportController::class)
+        ->name('sites.edge.audit.export');
+
+    // Generate dply.yaml from the site's current declarative config
+    // (redirects / rewrites / headers / crons). Lets a user export
+    // dashboard-managed state to a repo-checked file.
+    Route::get('servers/{server}/sites/{site}/edge/dply.yaml', \App\Http\Controllers\Edge\EdgeRepoConfigYamlDownloadController::class)
+        ->name('sites.edge.dply-yaml');
 
     Route::get('servers/{server}/sites/{site}/{section?}', SiteWorkspaceController::class)
         ->where('section', '[a-z0-9-]+')

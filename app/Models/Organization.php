@@ -33,6 +33,7 @@ class Organization extends Model
         'cron_maintenance_until',
         'cron_maintenance_note',
         'firewall_settings',
+        'edge_data_region',
         'database_workspace_settings',
         'insights_preferences',
         'services_preferences',
