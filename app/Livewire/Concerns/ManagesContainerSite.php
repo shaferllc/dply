@@ -139,6 +139,15 @@ trait ManagesContainerSite
      */
     public array $container_log_tail_lines = [];
 
+    /**
+     * DO component name being tailed. 'web' by default; user can pick
+     * any worker or non-MANUAL job component from the dropdown. Names
+     * are derived from CloudWorker/CloudDeployTask rows using the same
+     * slug logic the backend uses when building the spec, so the
+     * picker stays in sync with what's actually deployed.
+     */
+    public string $container_log_tail_component = 'web';
+
     public function bootManagesContainerSite(): void
     {
         if ($this->container_image_input === '' && isset($this->site)) {
@@ -490,6 +499,53 @@ trait ManagesContainerSite
     }
 
     /**
+     * Reset the tail buffer when the user switches components — old
+     * lines belong to the previous component and would be confusing.
+     */
+    public function updatedContainerLogTailComponent(): void
+    {
+        $this->container_log_tail_seen = [];
+        $this->container_log_tail_lines = [];
+        if ($this->container_log_tail_active) {
+            $this->pollContainerRuntimeLogs();
+        }
+    }
+
+    /**
+     * Build the list of DO component names available for this site:
+     * `web` (always present), plus each long-running worker, plus
+     * each non-MANUAL deploy task. MANUAL tasks fire on-demand and
+     * don't have persistent runtime logs to tail.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public function containerLogTailComponentChoices(): array
+    {
+        $choices = [['value' => 'web', 'label' => __('Web service')]];
+
+        foreach (\App\Models\CloudWorker::query()->where('site_id', $this->site->id)->get() as $worker) {
+            $slug = strtolower((string) preg_replace('/[^a-z0-9-]/i', '-', (string) $worker->name));
+            $slug = trim($slug, '-');
+            $base = $worker->isScheduler() ? 'scheduler' : 'worker';
+            $name = substr(($slug !== '' ? $base.'-'.$slug : $base), 0, 28);
+            $choices[] = ['value' => $name, 'label' => __(':label · :name', ['label' => $worker->isScheduler() ? 'Scheduler' : 'Worker', 'name' => $worker->name])];
+        }
+
+        $tasks = \App\Models\CloudDeployTask::query()
+            ->where('site_id', $this->site->id)
+            ->where('trigger', '!=', \App\Models\CloudDeployTask::TRIGGER_MANUAL)
+            ->get();
+        foreach ($tasks as $task) {
+            $slug = strtolower((string) preg_replace('/[^a-z0-9-]/i', '-', (string) $task->name));
+            $slug = trim($slug, '-');
+            $name = substr(($slug !== '' ? 'job-'.$slug : 'job'), 0, 28);
+            $choices[] = ['value' => $name, 'label' => __('Job · :name', ['name' => $task->name])];
+        }
+
+        return $choices;
+    }
+
+    /**
      * Wire:poll target — fetches the latest runtime log lines from the
      * backend and appends anything new to the live-tail buffer. Each
      * call is one normal Livewire round-trip; the dashboard partial
@@ -514,7 +570,7 @@ trait ManagesContainerSite
         }
 
         try {
-            $result = $backend->runtimeLogs($this->site, $credential, 200);
+            $result = $backend->runtimeLogs($this->site, $credential, 200, $this->container_log_tail_component ?: 'web');
         } catch (\Throwable $e) {
             $this->container_log_tail_active = false;
 

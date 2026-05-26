@@ -416,7 +416,7 @@ class AwsAppRunnerBackend implements CloudBackend
      * v1 does not tail them through the CloudWatch Logs SDK — the
      * operator opens the CloudWatch console via the returned link.
      */
-    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
         $serviceName = $this->backendServiceName($site);
 

@@ -228,7 +228,7 @@ class FakeCloudBackend implements CloudBackend
      * set of Laravel-shaped request lines so dev installs and tests
      * see a populated RUN log viewer.
      */
-    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
         $lines = max(1, min(2000, $lines));
         $samples = [

@@ -834,9 +834,16 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
      * archive download are cached for 60s. Failures degrade to
      * available:false.
      */
-    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array
     {
         $lines = max(1, min(2000, $lines));
+
+        // Lock the component value to DO-safe characters; anything else
+        // falls back to "web" so a bad query string can't be used to
+        // probe arbitrary paths on DO's API.
+        $component = preg_match('/^[a-z0-9-]+$/', $component) === 1
+            ? substr($component, 0, 60)
+            : 'web';
 
         if (! is_string($site->container_backend_id) || $site->container_backend_id === '') {
             return [
@@ -847,14 +854,14 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
         }
 
         return Cache::remember(
-            self::runtimeLogsCacheKey($site, $lines),
+            self::runtimeLogsCacheKey($site, $lines).':'.$component,
             self::CACHE_TTL_SECONDS,
-            function () use ($site, $credential, $lines): array {
+            function () use ($site, $credential, $lines, $component): array {
                 $appId = (string) $site->container_backend_id;
 
                 try {
                     $service = new DigitalOceanAppPlatformService($credential);
-                    $result = $service->getRuntimeLogs($appId, 'web');
+                    $result = $service->getRuntimeLogs($appId, $component);
                 } catch (\Throwable $e) {
                     return [
                         'lines' => [],

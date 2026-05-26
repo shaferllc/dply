@@ -168,7 +168,7 @@ interface CloudBackend
      *
      * @return array{lines: list<string>, available: bool, url?: string, note?: string}
      */
-    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200): array;
+    public function runtimeLogs(Site $site, ProviderCredential $credential, int $lines = 200, string $component = 'web'): array;
 
     /**
      * Whether the backend can run background processes (queue workers,
