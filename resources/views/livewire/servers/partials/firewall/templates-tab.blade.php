@@ -1,6 +1,6 @@
                 <div class="{{ $card }} p-6 sm:p-8 space-y-8">
                     <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Bundled templates') }}</h2>
                         <p class="mt-2 text-sm text-brand-moss">{{ __('Adds rules to this server’s list (does not replace existing rows). Already-applied bundles are dimmed — re-applying is a no-op.') }}</p>
                         <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             @foreach ($bundledTemplates as $bKey => $b)
@@ -45,7 +45,7 @@
 
                     @if ($savedTemplates->isNotEmpty())
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Saved templates') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Saved templates') }}</h2>
                             <p class="mt-2 text-sm text-brand-moss">{{ __('Organization or server-scoped templates.') }}</p>
                             <ul class="mt-4 space-y-2">
                                 @foreach ($savedTemplates as $tpl)
@@ -72,7 +72,7 @@
                     @endif
 
                     <div class="border-t border-brand-ink/10 pt-6">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Save current rules as template') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Save current rules as template') }}</h2>
                         <form wire:submit="saveCurrentRulesAsTemplate" class="mt-4 grid gap-3 sm:max-w-lg">
                             <div>
                                 <x-input-label for="tpl-name" :value="__('Name')" />

@@ -9,70 +9,76 @@
                  Profile/Paste/Generate form — keeps the page from being dominated by a 165-line
                  form when the operator is just here to sync or review drift. --}}
             <div class="{{ $card }} overflow-hidden">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                            <x-heroicon-o-key class="h-5 w-5" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Add an SSH key') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                {{ __('Authorize a key, then click Sync to push it to the server\'s authorized_keys.') }}
-                                <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
-                            </p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                    {{ trans_choice('{0} no keys tracked|{1} :count key tracked|[2,*] :count keys tracked', $trackedKeyCount, ['count' => $trackedKeyCount]) }}
-                                </span>
-                                @if ($lastSyncFinishedAt && in_array($lastSyncStatus, ['completed', 'failed'], true))
-                                    <span class="text-brand-mist/60">·</span>
-                                    <span class="inline-flex items-center gap-1">
-                                        @if ($lastSyncStatus === 'completed')
-                                            <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
-                                            {{ __('synced :time', ['time' => \Illuminate\Support\Carbon::parse($lastSyncFinishedAt)->diffForHumans()]) }}
-                                        @else
-                                            <x-heroicon-o-exclamation-triangle class="h-3 w-3 text-rose-600" />
-                                            {{ __('last sync failed :time', ['time' => \Illuminate\Support\Carbon::parse($lastSyncFinishedAt)->diffForHumans()]) }}
-                                        @endif
+                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Authorized keys') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add an SSH key') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Authorize a key, then click Sync to push it to the server\'s authorized_keys.') }}
+                                    <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
+                                </p>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-brand-ink/10 bg-white px-2 py-0.5">
+                                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                        <span class="font-mono tabular-nums text-brand-ink">{{ $trackedKeyCount }}</span>
+                                        {{ trans_choice('{0} keys tracked|{1} key tracked|[2,*] keys tracked', $trackedKeyCount) }}
                                     </span>
-                                @else
-                                    <span class="text-brand-mist/60">·</span>
-                                    <span>{{ __('not yet synced') }}</span>
-                                @endif
+                                    @if ($lastSyncFinishedAt && in_array($lastSyncStatus, ['completed', 'failed'], true))
+                                        @if ($lastSyncStatus === 'completed')
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
+                                                <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('synced :time', ['time' => \Illuminate\Support\Carbon::parse($lastSyncFinishedAt)->diffForHumans()]) }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-rose-700">
+                                                <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('last sync failed :time', ['time' => \Illuminate\Support\Carbon::parse($lastSyncFinishedAt)->diffForHumans()]) }}
+                                            </span>
+                                        @endif
+                                    @else
+                                        <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-brand-moss">
+                                            <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                            {{ __('not yet synced') }}
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            x-on:click="$dispatch('open-modal', 'add-ssh-key-modal')"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
-                        >
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
-                            {{ __('Add a key') }}
-                        </button>
-                        <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
-                        <button
-                            type="button"
-                            wire:click="requestSyncAuthorizedKeys"
-                            wire:loading.attr="disabled"
-                            wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
-                            @disabled($syncBusy)
-                            title="{{ $syncBusy ? __('A sync is already running. Wait for it to finish.') : '' }}"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" />
-                            <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" class="inline-flex h-3.5 w-3.5 items-center justify-center">
-                                <x-spinner variant="forest" size="sm" />
-                            </span>
-                            <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
-                            <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
-                        </button>
-                        <button type="button" wire:click="setSshWorkspaceTab('preview')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
-                            {{ __('Review drift') }}
-                        </button>
+                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                x-on:click="$dispatch('open-modal', 'add-ssh-key-modal')"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                            >
+                                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Add a key') }}
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="requestSyncAuthorizedKeys"
+                                wire:loading.attr="disabled"
+                                wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys"
+                                @disabled($syncBusy)
+                                title="{{ $syncBusy ? __('A sync is already running. Wait for it to finish.') : '' }}"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" aria-hidden="true" />
+                                <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <x-spinner variant="forest" size="sm" />
+                                </span>
+                                <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
+                                <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
+                            </button>
+                            <button type="button" wire:click="setSshWorkspaceTab('preview')" class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                <x-heroicon-m-magnifying-glass class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Review drift') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -231,7 +237,7 @@
 
             @if ($orgKeys->isNotEmpty() || $teamKeys->isNotEmpty())
                 <div class="{{ $card }} mt-6 p-6 sm:p-8">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Organization & team keys') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Organization & team keys') }}</h2>
                     <p class="mt-2 text-sm text-brand-moss">{{ __('Use saved organization or team keys when you want a shared key on this server without pasting it again.') }}</p>
                     <div class="mt-4 grid gap-6 lg:grid-cols-2">
                         @if ($orgKeys->isNotEmpty())
@@ -295,7 +301,7 @@
             <div class="{{ $card }} mt-6 overflow-hidden">
                 <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                     <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Keys on this server') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Keys on this server') }}</h2>
                         <p class="mt-1 text-sm text-brand-moss">{{ __('Fingerprints, rotation dates, removal — applied on the next sync.') }}</p>
                     </div>
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">

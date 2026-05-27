@@ -39,7 +39,7 @@
                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                         <x-heroicon-o-server-stack class="h-7 w-7 shrink-0" aria-hidden="true" />
                     </span>
-                    <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Servers') }}</h3>
+                    <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('Servers') }}</h3>
                     <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
                         {{ __('SSH-managed VMs, droplets, and clusters you operate directly.') }}
                     </p>
@@ -62,7 +62,7 @@
                         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                             <x-heroicon-o-cube class="h-7 w-7 shrink-0" aria-hidden="true" />
                         </span>
-                        <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Cloud apps') }}</h3>
+                        <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('Cloud apps') }}</h3>
                         <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
                             {{ __('DO App Platform, AWS App Runner, and other managed container backends.') }}
                         </p>
@@ -87,7 +87,7 @@
                         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">
                             <x-heroicon-o-cube class="h-7 w-7 shrink-0 opacity-80" aria-hidden="true" />
                         </span>
-                        <h3 id="infrastructure-cloud-soon" class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Cloud apps') }}</h3>
+                        <h3 id="infrastructure-cloud-soon" class="mt-4 text-base font-semibold text-brand-ink">{{ __('Cloud apps') }}</h3>
                         <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
                             {{ __('DO App Platform, AWS App Runner, and other managed container backends.') }}
                         </p>
@@ -104,7 +104,7 @@
                     <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                         <x-heroicon-o-bolt class="h-7 w-7 shrink-0" aria-hidden="true" />
                     </span>
-                    <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Serverless') }}</h3>
+                    <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('Serverless') }}</h3>
                     <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
                         {{ __('HTTP-triggered functions on DigitalOcean Functions and AWS Lambda.') }}
                     </p>
@@ -125,7 +125,7 @@
                         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                             <x-heroicon-o-globe-alt class="h-7 w-7 shrink-0" aria-hidden="true" />
                         </span>
-                        <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Edge') }}</h3>
+                        <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('Edge') }}</h3>
                         <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
                             {{ __('JavaScript frameworks, static sites, previews, and CDN-style delivery.') }}
                         </p>
@@ -149,7 +149,7 @@
                         <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">
                             <x-heroicon-o-globe-alt class="h-7 w-7 shrink-0 opacity-80" aria-hidden="true" />
                         </span>
-                        <h3 id="infrastructure-edge-soon" class="mt-4 text-lg font-semibold text-brand-ink">{{ __('Edge') }}</h3>
+                        <h3 id="infrastructure-edge-soon" class="mt-4 text-base font-semibold text-brand-ink">{{ __('Edge') }}</h3>
                         <p class="mt-2 flex-1 text-sm leading-6 text-brand-moss">
                             {{ __('JavaScript frameworks, static sites, previews, and CDN-style delivery.') }}
                         </p>

@@ -33,7 +33,7 @@
             </div>
 
             <x-section-card tone="subtle">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Projects are for day-two operations, not just grouping') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Projects are for day-two operations, not just grouping') }}</h3>
                 <p class="mt-2 text-sm leading-6 text-brand-moss">
                     {{ __('Use a project as the shared operating surface for one app, customer, or environment family. Keep runbooks, health, release context, notification routing, and shared variables here so recovery and change management do not depend on one person remembering the setup.') }}
                 </p>

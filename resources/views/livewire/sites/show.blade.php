@@ -123,15 +123,25 @@
             @endif
 
             @if (is_array($sitePhpData) && $site->type === \App\Enums\SiteType::Php && ! empty($sitePhpData['mismatch_version']))
-                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    <p class="font-medium">{{ __('PHP version mismatch') }}</p>
-                    <p class="mt-1 text-amber-800">{{ __('This site references PHP :version, but that version is not currently installed on this server.', ['version' => $sitePhpData['mismatch_version']]) }}</p>
-                    <p class="mt-2">
-                        <a href="{{ $sitePhpData['server_php_workspace_url'] }}" wire:navigate class="font-medium text-amber-900 underline">
-                            {{ __('Install or switch versions on the server PHP page') }}
-                        </a>
-                    </p>
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP version mismatch') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This site references PHP :version, but that version is not currently installed on this server.', ['version' => $sitePhpData['mismatch_version']]) }}</p>
+                                <p class="mt-2 text-sm">
+                                    <a href="{{ $sitePhpData['server_php_workspace_url'] }}" wire:navigate class="font-medium text-amber-900 underline">
+                                        {{ __('Install or switch versions on the server PHP page') }}
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             @endif
 
             @if (! $readyForWorkspace)

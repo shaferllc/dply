@@ -40,7 +40,7 @@
                                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                                     <x-dynamic-component :component="$iconComponent" class="h-7 w-7 shrink-0" aria-hidden="true" />
                                 </span>
-                                <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ $option['title'] }}</h3>
+                                <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ $option['title'] }}</h3>
                                 <p class="mt-3 flex-1 text-sm leading-6 text-brand-moss">{{ $option['description'] }}</p>
                                 <p class="mt-5 text-sm font-semibold text-brand-sage group-hover:text-brand-ink">{{ __('Open path') }} →</p>
                             </a>
@@ -57,7 +57,7 @@
                                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-ink/[0.04] text-brand-mist ring-1 ring-brand-ink/10">
                                     <x-dynamic-component :component="$iconComponent" class="h-7 w-7 shrink-0 opacity-80" aria-hidden="true" />
                                 </span>
-                                <h3 id="launch-soon-{{ $option['id'] }}" class="mt-4 text-lg font-semibold text-brand-ink">{{ $option['title'] }}</h3>
+                                <h3 id="launch-soon-{{ $option['id'] }}" class="mt-4 text-base font-semibold text-brand-ink">{{ $option['title'] }}</h3>
                                 <p class="mt-3 flex-1 text-sm leading-6 text-brand-moss">{{ $option['description'] }}</p>
                                 <p class="mt-5 text-sm font-medium text-brand-mist">{{ __('Not available yet') }}</p>
                             </div>

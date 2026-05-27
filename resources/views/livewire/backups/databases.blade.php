@@ -44,18 +44,28 @@
             </section>
         </div>
 
-        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-brand-sand/50 px-5 py-4 shadow-sm">
-            <p class="text-sm font-semibold text-brand-ink">{{ __('What a trustworthy database backup setup includes') }}</p>
-            <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
-                <li>{{ __('A storage destination with retention you can explain to the team.') }}</li>
-                <li>{{ __('A restore owner and a runbook for the most important production databases.') }}</li>
-                <li>{{ __('A simple way to confirm where the latest dump should land before you need it in an incident.') }}</li>
-            </ul>
-        </div>
+        <section class="dply-card overflow-hidden mb-6">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+                        <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Checklist') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What a trustworthy database backup setup includes') }}</h3>
+                        <ul class="mt-1 max-w-2xl space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
+                            <li>{{ __('A storage destination with retention you can explain to the team.') }}</li>
+                            <li>{{ __('A restore owner and a runbook for the most important production databases.') }}</li>
+                            <li>{{ __('A simple way to confirm where the latest dump should land before you need it in an incident.') }}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <div class="grid gap-4 lg:grid-cols-3 mb-6">
             <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm lg:col-span-2">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Available storage destinations') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Available storage destinations') }}</h2>
                 @if ($storageDestinations->isEmpty())
                     <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                         {{ __('No storage destinations yet. Add one before you rely on scheduled exports or manual recovery.') }}
@@ -83,7 +93,7 @@
                 @endif
             </section>
             <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Restore checklist') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Restore checklist') }}</h2>
                 <ul class="mt-3 space-y-2 text-sm leading-relaxed text-brand-moss list-disc list-inside">
                     <li>{{ __('Pick the storage destination before scheduling exports.') }}</li>
                     <li>{{ __('Record the import command or UI path in a runbook.') }}</li>
@@ -94,7 +104,7 @@
 
         <div class="dply-card overflow-hidden">
             <div class="px-4 py-3 sm:px-6 border-b border-brand-ink/10 bg-brand-sand/30">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
                 <p class="text-xs text-brand-moss mt-0.5">{{ __('Use each site to define the intended database backup path, storage destination, and restore notes for its primary data.') }}</p>
             </div>
             @if ($sites->isEmpty())

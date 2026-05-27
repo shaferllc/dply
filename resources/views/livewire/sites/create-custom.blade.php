@@ -13,7 +13,7 @@
 
             <form wire:submit="store" class="space-y-8">
                 <section class="rounded-3xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-7">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site details') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Site details') }}</h2>
                     <p class="mt-0.5 text-sm text-brand-moss">{{ __('Leave the repository fields blank for a no-repo deploy target (CI rsyncs code, dply runs your script).') }}</p>
 
                     <div class="mt-5 grid gap-5 sm:grid-cols-2">

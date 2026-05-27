@@ -32,7 +32,7 @@
     :title="__('Activity')"
     :description="__('Audit events for this server and its sites — who did what, when, and what changed.')"
 >
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('Every mutating action across this workspace writes one row to the audit log: firewall edits, cron saves, SSH key changes, insight fixes, deploys. This page is a read-only view of that log scoped to this server (and its sites).') }}</p>
         <p>{{ __('No collector, no queue — events are written from inline calls to audit_log() at the moment each action runs, and rolled up here on read.') }}</p>
     </x-explainer>
@@ -113,7 +113,7 @@
                         <x-heroicon-o-clock class="h-5 w-5" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent activity') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Server, site, deploy, and insight events — chronologically. Click "Show" on a row to see the before/after diff.') }}
                         </p>
@@ -253,7 +253,7 @@
                         <x-heroicon-o-chart-bar class="h-5 w-5" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Events per day') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Events per day') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Stacked by category. Hover any bar for the per-category breakdown.') }}
                         </p>

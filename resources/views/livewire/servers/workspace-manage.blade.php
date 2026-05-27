@@ -43,7 +43,15 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="warn">
+    @php
+        $tonePalette = [
+            'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+            'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+            'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+        ];
+    @endphp
+
+    <x-explainer tone="warn">
         <p>{{ __('The Manage workspace covers server-level operations that don\'t fit other tabs: web server (nginx/caddy/apache) controls, system updates, the auto-update schedule, and dangerous actions (reboot, disable swap, etc.).') }}</p>
         <p>{{ __('Most actions run via SSH and are queued — the page stays responsive while they run. Dangerous actions all confirm first; every one writes to the server\'s audit log.') }}</p>
     </x-explainer>
@@ -63,15 +71,37 @@
         />
 
         @if ($isDeployer)
-            <div class="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-5 py-4 text-sm text-amber-950">
-                {{ __('Deployers can view this page but cannot run SSH actions or change manage settings.') }}
-            </div>
+            <section class="dply-card overflow-hidden border-amber-200">
+                <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                            <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deployers can view this page but cannot run SSH actions or change manage settings.') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
         @endif
 
         @if (! $opsReady)
-            <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-                {{ __('Provisioning and SSH must be ready before previews and service actions work.') }}
-            </div>
+            <section class="dply-card overflow-hidden border-amber-200">
+                <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before previews and service actions work.') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
         @endif
 
         @switch ($section)
@@ -116,60 +146,61 @@
         @if ($clone_open)
             <x-modal
                 name="clone-server-modal"
-                maxWidth="lg"
-                overlayClass="bg-brand-ink/40"
-                panelClass="dply-modal-panel overflow-hidden shadow-xl"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
+                focusable
             >
-                <div class="border-b border-brand-ink/10 px-6 py-5">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Clone server') }}</p>
-                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Clone :name?', ['name' => $server->name]) }}</h2>
-                </div>
-
-                <form wire:submit.prevent="confirmCloneServer" class="space-y-5 px-6 py-6">
-                    <div>
-                        <label for="clone-name" class="block text-sm font-medium text-brand-ink">{{ __('New server name') }}</label>
-                        <input
-                            id="clone-name"
-                            type="text"
-                            wire:model="clone_name"
-                            required
-                            minlength="2"
-                            maxlength="120"
-                            class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30"
-                        />
-                        @error('clone_name')
-                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
-                        @enderror
+                <form wire:submit.prevent="confirmCloneServer" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Clone') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Clone :name?', ['name' => $server->name]) }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Region and size mirror the source. To change them, edit on the provider after the clone completes — or resize via the standard server settings.') }}</p>
+                        </div>
                     </div>
 
-                    <dl class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-xs sm:grid-cols-2">
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
                         <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
-                            <dd class="mt-1 font-mono text-brand-ink">{{ $server->region ?: '—' }}</dd>
+                            <label for="clone-name" class="block text-sm font-medium text-brand-ink">{{ __('New server name') }}</label>
+                            <input
+                                id="clone-name"
+                                type="text"
+                                wire:model="clone_name"
+                                required
+                                minlength="2"
+                                maxlength="120"
+                                class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2.5 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30"
+                            />
+                            @error('clone_name')
+                                <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                            @enderror
                         </div>
-                        <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
-                            <dd class="mt-1 font-mono text-brand-ink">{{ $server->size ?: '—' }}</dd>
-                        </div>
-                    </dl>
 
-                    <p class="text-xs leading-relaxed text-brand-moss">
-                        {{ __('Region and size mirror the source. To change them, edit on DigitalOcean after the clone completes — or resize via the standard server settings.') }}
-                    </p>
+                        <dl class="grid grid-cols-2 gap-2">
+                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                                <dd class="mt-0.5 truncate font-mono text-sm font-semibold text-brand-ink">{{ $server->region ?: '—' }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                                <dd class="mt-0.5 truncate font-mono text-sm font-semibold text-brand-ink">{{ $server->size ?: '—' }}</dd>
+                            </div>
+                        </dl>
+                    </div>
 
-                    <div class="flex flex-wrap justify-end gap-2">
-                        <button
-                            type="button"
-                            wire:click="cancelCloneServer"
-                            class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-cream"
-                        >
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                        <x-secondary-button type="button" wire:click="cancelCloneServer">
                             {{ __('Cancel') }}
-                        </button>
+                        </x-secondary-button>
                         <button
                             type="submit"
-                            class="{{ $btnPrimary }}"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
                         >
-                            <x-heroicon-o-document-duplicate class="h-4 w-4" />
+                            <x-heroicon-o-document-duplicate class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Start clone') }}
                         </button>
                     </div>

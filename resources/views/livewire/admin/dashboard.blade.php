@@ -160,7 +160,7 @@
 
     <div class="mb-8 grid gap-6 lg:grid-cols-2">
         <div class="{{ $card }} space-y-1">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Runtime & optimization') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Runtime & optimization') }}</h2>
             <div class="{{ $kv }}">
                 <span class="text-brand-moss">{{ __('PHP') }}</span>
                 <span class="font-mono text-xs text-brand-ink">{{ $system['php'] }}</span>
@@ -212,7 +212,7 @@
         </div>
 
         <div class="{{ $card }} space-y-1">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Connectivity & drivers') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Connectivity & drivers') }}</h2>
             <div class="{{ $kv }}">
                 <span class="text-brand-moss">{{ __('Database') }}</span>
                 @if ($system['db_ok'])
@@ -261,7 +261,7 @@
 
     <div class="mb-8 grid gap-6 lg:grid-cols-2">
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Server status mix') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Server status mix') }}</h2>
             <ul class="space-y-2 text-sm">
                 @forelse ($serverByStatus as $status => $c)
                     <li class="flex justify-between gap-2 border-b border-brand-ink/5 pb-2 last:border-0">
@@ -274,7 +274,7 @@
             </ul>
         </div>
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Site status mix') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Site status mix') }}</h2>
             <ul class="space-y-2 text-sm">
                 @forelse ($siteByStatus as $status => $c)
                     <li class="flex justify-between gap-2 border-b border-brand-ink/5 pb-2 last:border-0">
@@ -290,7 +290,7 @@
 
     <div class="mb-8 grid gap-6 lg:grid-cols-2">
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Application schedule (in-app)') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Application schedule (in-app)') }}</h2>
             <ul class="space-y-3 text-sm text-brand-moss">
                 @foreach ($scheduleEntries as $row)
                     <li class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2">
@@ -302,7 +302,7 @@
             <p class="mt-3 text-xs text-brand-mist">{{ __('Ensure the platform cron entry runs `php artisan schedule:run` every minute in production.') }}</p>
         </div>
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Top organizations by servers') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Top organizations by servers') }}</h2>
             <ul class="divide-y divide-brand-ink/10 text-sm">
                 @forelse ($topOrganizations as $org)
                     <li class="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
@@ -318,7 +318,7 @@
 
     <div class="mb-8 grid gap-6 lg:grid-cols-2">
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Data exports') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Data exports') }}</h2>
             <p class="text-sm text-brand-moss">{{ __('Download CSV snapshots for compliance review or offline analysis.') }}</p>
             <div class="mt-4 flex flex-wrap gap-2">
                 <button
@@ -356,7 +356,7 @@
             </div>
         </div>
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Cache maintenance') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Cache maintenance') }}</h2>
             <p class="text-sm text-brand-moss">{{ __('Runs on the app host. Use after deployments or when config changes are not visible.') }}</p>
             <div class="mt-4 flex flex-wrap gap-2">
                 <button
@@ -402,7 +402,7 @@
         <div class="{{ $card }}">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h2 id="surface-flags-heading" class="text-sm font-semibold text-brand-ink">{{ __('Surface flags') }}</h2>
+                    <h2 id="surface-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('Surface flags') }}</h2>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Enable VM-launch-gated product surfaces (Cloud, Edge, Serverless) for a specific organization.') }}</p>
                 </div>
             </div>
@@ -458,7 +458,7 @@
 
     @if ($recentFailedJobs->isNotEmpty())
         <section class="mb-8" aria-labelledby="failed-jobs-heading">
-            <h2 id="failed-jobs-heading" class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Recent failed queue jobs') }}</h2>
+            <h2 id="failed-jobs-heading" class="mb-3 text-base font-semibold text-brand-ink">{{ __('Recent failed queue jobs') }}</h2>
             <div class="overflow-hidden rounded-xl border border-brand-ink/10">
                 <div class="max-h-[16rem] overflow-y-auto">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-left text-xs">
@@ -488,7 +488,7 @@
     @endif
 
     <section class="mb-8" aria-labelledby="log-tail-heading">
-        <h2 id="log-tail-heading" class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Application log tail') }}</h2>
+        <h2 id="log-tail-heading" class="mb-3 text-base font-semibold text-brand-ink">{{ __('Application log tail') }}</h2>
         @if ($logTail)
             <pre class="max-h-[18rem] overflow-auto rounded-xl border border-brand-ink/10 bg-zinc-950 p-4 font-mono text-[11px] leading-relaxed text-zinc-100">{{ $logTail }}</pre>
             <p class="mt-2 text-xs text-brand-mist">{{ __('Last lines of storage/logs/laravel.log (truncated for safety).') }}</p>
@@ -499,7 +499,7 @@
 
     <div class="grid gap-8 lg:grid-cols-2">
         <section aria-labelledby="recent-audit-heading">
-            <h2 id="recent-audit-heading" class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Recent audit log') }}</h2>
+            <h2 id="recent-audit-heading" class="mb-3 text-base font-semibold text-brand-ink">{{ __('Recent audit log') }}</h2>
             <div class="overflow-hidden rounded-xl border border-brand-ink/10">
                 <div class="max-h-[28rem] overflow-y-auto">
                     <table class="min-w-full divide-y divide-brand-ink/10 text-left text-xs">
@@ -531,7 +531,7 @@
         </section>
 
         <section aria-labelledby="recent-users-heading">
-            <h2 id="recent-users-heading" class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Newest users') }}</h2>
+            <h2 id="recent-users-heading" class="mb-3 text-base font-semibold text-brand-ink">{{ __('Newest users') }}</h2>
             <div class="overflow-hidden rounded-xl border border-brand-ink/10">
                 <ul class="divide-y divide-brand-ink/10 bg-white text-sm">
                     @forelse ($recentUsers as $u)

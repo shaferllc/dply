@@ -67,7 +67,7 @@
                 <section class="{{ $card }}">
                     <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                         <div>
-                            <h2 class="text-sm font-semibold text-brand-ink">{{ __('Function activity') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Function activity') }}</h2>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Invocations, errors, latency and cold starts — every recorded call to this function.') }}</p>
                         </div>
                         <div class="flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-1">
@@ -135,7 +135,7 @@
                             <x-heroicon-o-signal class="h-5 w-5" />
                         </span>
                         <div class="min-w-0">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Pick a label, optional path, and a probe-region label. The first check runs immediately.') }}
                             </p>
@@ -239,7 +239,7 @@
 
             <section class="{{ $card }}">
                 <div class="flex items-center justify-between border-b border-brand-ink/10 px-6 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Monitors') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Monitors') }}</h2>
                     @if ($monitorCount > 0)
                         <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[11px] font-semibold text-brand-ink">{{ $monitorCount }}</span>
                     @endif

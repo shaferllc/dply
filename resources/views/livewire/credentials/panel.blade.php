@@ -20,7 +20,7 @@
 @if ($credentials->isNotEmpty())
     <section class="dply-card overflow-hidden">
         <div class="px-5 py-4 border-b border-brand-ink/10 bg-brand-cream/50 flex flex-wrap items-center justify-between gap-2">
-            <h3 class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
+            <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
                 <x-heroicon-o-archive-box class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
                 {{ __('Saved in this organization') }}
             </h3>
@@ -380,9 +380,20 @@
     @case('ovh')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                    {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Coming soon') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stored for future use') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="ovh_name" :value="__('Label (optional)')" />
@@ -402,9 +413,20 @@
     @case('rackspace')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                    {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Coming soon') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stored for future use') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="rackspace_name" :value="__('Label (optional)')" />
@@ -813,10 +835,20 @@
     @case('forge')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-                    <p class="font-semibold">{{ __('Migrate sites from Laravel Forge to dply') }}</p>
-                    <p class="mt-1 leading-relaxed">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrate sites from Laravel Forge to dply') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="forge_name" :value="__('Label (optional)')" />
@@ -844,10 +876,20 @@
     @case('ploi')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-                    <p class="font-semibold">{{ __('Migrate sites from Ploi to dply') }}</p>
-                    <p class="mt-1 leading-relaxed">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrate sites from Ploi to dply') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="ploi_name" :value="__('Label (optional)')" />

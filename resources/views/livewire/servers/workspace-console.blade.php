@@ -13,7 +13,7 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="warn">
+    <x-explainer tone="warn">
         <p>{{ __('A lightweight shell prompt for poking at the server: type a command, hit Enter, output appears below. History is kept per session so you can scroll back through recent runs.') }}</p>
         <p>{{ __('Each command runs as the dply SSH user with full shell access — same blast radius as the Run page. Output is captured up to 16KB; for streaming/long-running jobs use Run.') }}</p>
     </x-explainer>
@@ -324,7 +324,7 @@
             >
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
                     <div class="flex items-center justify-between gap-2">
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Commands') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Commands') }}</h3>
                         <button
                             type="button"
                             x-on:click="toggle()"
@@ -383,9 +383,20 @@
             <a href="{{ route('servers.run', $server) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Run page') }}</a>.
         </p>
     @else
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before you can use the console.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use the console.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @endif
 
     <x-slot name="modals">

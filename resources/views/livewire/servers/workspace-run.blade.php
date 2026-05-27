@@ -12,7 +12,7 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="warn">
+    <x-explainer tone="warn">
         <p>{{ __('Run server-level shell commands over SSH from the workspace: ad-hoc one-offs, saved presets, and library snippets (Laravel artisan, php-fpm restart, etc.). Output streams back into the page.') }}</p>
         <p>{{ __('This is full root-equivalent shell access via the dply SSH key. Treat it like a terminal: command goes in, output comes back, no row-level safety net. Saved commands persist on this server only.') }}</p>
         <p>{{ __('Site deploys are NOT run from here — each site\'s page has its own deploy button so deploys can run with site-scoped context. The banner below points at the right surfaces.') }}</p>
@@ -50,7 +50,7 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
                         <p class="mt-1 text-sm text-brand-moss">
                             {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
                         </p>
@@ -175,7 +175,7 @@
                 <div class="{{ $card }} p-6 sm:p-8">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">
+                            <h2 class="text-base font-semibold text-brand-ink">
                                 {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
                             </h2>
                             <p class="mt-1 text-sm text-brand-moss">
@@ -233,7 +233,7 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
                         <p class="mt-1 text-sm text-brand-moss">
                             {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
                         </p>
@@ -263,9 +263,20 @@
             </div>
         </div>
     @else
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before you can use this section.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use this section.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @endif
 
     <x-slot name="modals">

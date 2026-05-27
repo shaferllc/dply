@@ -5,7 +5,7 @@
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Default chain policies') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Default chain policies') }}</h2>
                         <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ __('What UFW does with traffic that doesn\'t match any rule. "Use UFW default" leaves the host\'s current setting alone; a chosen value is pushed on the next Apply.') }}</p>
                         @if ($defaultPolicies === [])
                             <p class="mt-1 text-[11px] text-brand-mist">{{ __('No overrides set — UFW defaults (deny incoming, allow outgoing, deny routed) apply.') }}</p>
@@ -77,7 +77,7 @@
                                 <x-heroicon-o-shield-check class="h-5 w-5" />
                             </span>
                             <div class="min-w-0">
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Firewall rules') }}</h2>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply, applied to the server with UFW.') }}</p>
                                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                                     <span class="inline-flex items-center gap-1">

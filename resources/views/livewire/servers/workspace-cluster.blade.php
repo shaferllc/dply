@@ -184,7 +184,7 @@
              render as a single "waiting for data" line. --}}
         <section class="{{ $card }} p-6">
             <div class="flex items-baseline justify-between gap-3">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Node pools') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Node pools') }}</h3>
                 @if ($lastPolledAt !== '')
                     <p class="text-xs text-brand-mist">{{ __('Updated :time', ['time' => \Carbon\Carbon::parse($lastPolledAt)->diffForHumans()]) }}</p>
                 @endif
@@ -245,7 +245,7 @@
         @if ($phase === 'ready')
             {{-- Kubeconfig panel --}}
             <section class="{{ $card }} p-6">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Kubeconfig') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Kubeconfig') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Authenticates kubectl against this cluster. Treat it like a password — anyone with this file can manage workloads.') }}</p>
 
                 @if ($hasKubeconfig)
@@ -265,7 +265,7 @@
 
             {{-- Workloads (sites) --}}
             <section class="{{ $card }} p-6">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Workloads') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Workloads') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Container sites deployed to this cluster.') }}</p>
 
                 @if ($sites->isEmpty())

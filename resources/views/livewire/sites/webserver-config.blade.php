@@ -167,7 +167,7 @@
 
             <div class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss leading-relaxed">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
                 </div>
 

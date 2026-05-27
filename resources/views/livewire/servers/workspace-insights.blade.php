@@ -20,23 +20,37 @@
 
     @include('livewire.servers.partials.workspace-flashes')
 
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('Insights runs a battery of read-only health checks against the server (config sanity, package versions, log signals, resource pressure) and groups the findings into a prioritized list. Each finding may have an associated "Apply fix" action that dply can run for you over SSH.') }}</p>
         <p>{{ __('"Run checks now" re-runs the full battery on demand. Otherwise checks run on a slow background cadence so the page stays responsive — opening this tab uses the most recent cached results.') }}</p>
     </x-explainer>
 
     @if ($server->workspace)
         @feature('surface.projects')
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-                <p class="font-semibold">{{ __('Project insight context') }}</p>
-                <p class="mt-1 leading-relaxed text-brand-moss">
-                    {{ __('These findings are scoped to this server. For shared incident context, runbooks, and grouped notifications, use the linked project pages for the broader project view.') }}
-                </p>
-                <div class="mt-3 flex flex-wrap gap-3">
-                    <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
-                    <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project access') }}</a>
+            <section class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+                            <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Project') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Project insight context') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('These findings are scoped to this server. For shared incident context, runbooks, and grouped notifications, use the linked project pages for the broader project view.') }}</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Open project operations') }}
+                                </a>
+                                <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                    <x-heroicon-m-shield-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Open project access') }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
         @endfeature
     @endif
 
@@ -228,7 +242,7 @@
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-5 py-4">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Server-scoped open findings appear here. Site-specific items are on each site’s Insights page.') }}</p>
             </div>
             @if ($findings->isEmpty())
@@ -363,7 +377,7 @@
         @if ($suggestionFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Tuning suggestions based on observed signals. Nothing is broken — these are opportunities to improve.') }}</p>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
@@ -427,7 +441,7 @@
         @if ($recentlyAppliedFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Fixes Dply applied where an on-disk backup is still recorded. Revert reads the backup, validates the prior config, and reloads the affected service.') }}</p>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
@@ -476,7 +490,7 @@
         @if ($dismissedFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Findings you acknowledged. Silenced from the banner and Overview. Restore one to bring it back to the open list.') }}</p>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
@@ -531,7 +545,7 @@
         @if ($ignoredSuggestions->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">

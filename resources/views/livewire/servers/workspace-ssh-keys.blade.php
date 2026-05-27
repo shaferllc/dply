@@ -7,7 +7,7 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="warn">
+    <x-explainer tone="warn">
         <p>{{ __('Manages the authorized_keys file for the dply system user on this server. Dply tracks what should be there; "Sync" reconciles the file on the box to match. Anything in authorized_keys that\'s NOT tracked here gets removed when you sync.') }}</p>
         <p>{{ __('Drift preview shows what would change before you sync — the diff between the file currently on the server and what dply expects. The audit log records every sync with a hash of the key set so you can trace which key was added/removed when.') }}</p>
         <p>{{ __('Locking out the dply system user is a real risk if its key gets dropped from this list. Always keep at least one key for the dply user; the workspace warns if you\'re about to sync with no keys.') }}</p>

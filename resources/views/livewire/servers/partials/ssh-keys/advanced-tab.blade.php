@@ -1,5 +1,5 @@
             <div class="{{ $card }} p-6 sm:p-8 space-y-6">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Advanced') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Advanced') }}</h2>
                 <form wire:submit="requestSaveAdvancedSettings" class="space-y-4 max-w-xl">
                     <div class="flex items-start gap-3">
                         <input id="adv_disable" type="checkbox" wire:model.boolean="advanced_disable_sync" class="mt-1 rounded border-brand-ink/20" />

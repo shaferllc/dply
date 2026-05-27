@@ -26,25 +26,31 @@
             />
 
             @if ($secretMismatchDetected)
-                <section class="rounded-2xl border border-amber-300 bg-amber-50 p-5">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
-                        <div class="min-w-0 flex-1">
-                            <h2 class="text-base font-semibold text-amber-950">{{ __('Function holds a stale command secret') }}</h2>
-                            <p class="mt-1 text-sm text-amber-900">
-                                {{ __('The latest tick was rejected by the function with "invalid command secret" — its baked DPLY_COMMAND_SECRET doesn\'t match what dply is signing requests with. Redeploy once to bake the current secret into the function; ticks succeed from there on.') }}
-                            </p>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div class="flex items-start gap-3 min-w-0 flex-1">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function holds a stale command secret') }}</h3>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The latest tick was rejected by the function with "invalid command secret" — its baked DPLY_COMMAND_SECRET doesn\'t match what dply is signing requests with. Redeploy once to bake the current secret into the function; ticks succeed from there on.') }}</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="redeployToRefreshSecret"
+                                wire:loading.attr="disabled"
+                                wire:target="redeployToRefreshSecret"
+                                class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="redeployToRefreshSecret" />
+                                <span wire:loading.remove wire:target="redeployToRefreshSecret">{{ __('Redeploy to refresh secret') }}</span>
+                                <span wire:loading wire:target="redeployToRefreshSecret">{{ __('Queueing…') }}</span>
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            wire:click="redeployToRefreshSecret"
-                            wire:loading.attr="disabled"
-                            wire:target="redeployToRefreshSecret"
-                            class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-amber-50 shadow-sm hover:bg-amber-950 disabled:cursor-wait disabled:opacity-60"
-                        >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="redeployToRefreshSecret" />
-                            <span wire:loading.remove wire:target="redeployToRefreshSecret">{{ __('Redeploy to refresh secret') }}</span>
-                            <span wire:loading wire:target="redeployToRefreshSecret">{{ __('Queueing…') }}</span>
-                        </button>
                     </div>
                 </section>
             @endif

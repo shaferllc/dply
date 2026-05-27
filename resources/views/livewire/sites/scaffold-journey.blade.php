@@ -47,7 +47,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" />
                 </span>
                 <div class="min-w-0 flex-1">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Scaffold failed') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Scaffold failed') }}</h2>
                     @if ($failedStep)
                         <p class="mt-1 text-sm text-brand-moss">{{ __('Stopped at step ":step". Retry will destroy server-side artifacts and start over.', ['step' => $failedStep['label'] ?? $failedStep['key']]) }}</p>
                     @endif
@@ -84,7 +84,7 @@
                     <x-heroicon-o-sparkles class="h-5 w-5" />
                 </span>
                 <div class="min-w-0 flex-1">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Scaffold complete') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Scaffold complete') }}</h2>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Your :framework install is up. The admin password is shown only once — save it now.', ['framework' => ucfirst($site->meta['scaffold']['framework'] ?? 'site')]) }}</p>
 
                     <dl class="mt-5 space-y-3 text-sm">

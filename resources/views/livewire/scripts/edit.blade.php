@@ -29,7 +29,7 @@
             <section class="dply-card overflow-hidden">
                 <div class="grid md:grid-cols-12 gap-6 p-6 sm:p-8">
                     <div class="md:col-span-4">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Script') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Script') }}</h2>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Use non-interactive flags so execution does not hang over SSH.') }}</p>
                     </div>
                     <div class="md:col-span-8 space-y-5">
@@ -62,7 +62,7 @@
             <section class="dply-card overflow-hidden">
                 <div class="grid md:grid-cols-12 gap-6 p-6 sm:p-8">
                     <div class="md:col-span-4">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run script') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Run script') }}</h2>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Select servers to run this script on. Requires SSH access from Dply.') }}</p>
                     </div>
                     <div class="md:col-span-8 space-y-4">

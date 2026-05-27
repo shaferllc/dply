@@ -40,11 +40,21 @@
             @enderror
 
             @if (! $canCreateServer && $billingUrl)
-                <div class="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
-                    <p class="font-medium">{{ __('Server limit reached for your plan.') }}</p>
-                    <p class="mt-1 text-sm">{{ __('Upgrade to add more servers.') }}</p>
-                    <a href="{{ $billingUrl }}" class="mt-4 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">{{ __('Go to billing') }}</a>
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200 mb-8">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server limit reached for your plan.') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Upgrade to add more servers.') }}</p>
+                                <a href="{{ $billingUrl }}" class="mt-3 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">{{ __('Go to billing') }}</a>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             @endif
 
             <div class="@if (! $canCreateServer) pointer-events-none opacity-60 @endif space-y-8">

@@ -1,6 +1,6 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Drift preview') }}</h2>
                     <div class="flex flex-wrap gap-2">
                         <button
                             type="button"

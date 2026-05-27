@@ -20,15 +20,26 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="info">
+    <x-explainer tone="info">
         <p>{{ __('Each row is a Linux user the server already has in /etc/passwd. The site count shows how many Dply-managed sites are currently set to run as that user — those sites must be reassigned before you can remove the account.') }}</p>
         <p>{{ __('root, dply, and the configured deploy user are protected — Dply refuses to remove them. UID below 1000 (system accounts) is also blocked.') }}</p>
     </x-explainer>
 
     @if (! $opsReady)
-        <div class="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-            {{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @else
         <div class="space-y-6">
             {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
@@ -45,7 +56,7 @@
                             <x-heroicon-o-users class="h-5 w-5" />
                         </span>
                         <div class="min-w-0">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Loaded from /etc/passwd over SSH. Click a row to expand UID, home, shell, groups, and assigned sites.') }}
                             </p>

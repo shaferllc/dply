@@ -132,7 +132,7 @@
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 px-5 py-4">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
             </div>
             @if ($findings->isEmpty())
                 <p class="px-5 py-10 text-sm text-brand-moss text-center">{{ __('No findings yet.') }}</p>

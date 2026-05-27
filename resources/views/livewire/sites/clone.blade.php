@@ -15,7 +15,7 @@
 
     <div class="grid gap-8 lg:grid-cols-2">
         <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-            <h2 class="text-sm font-semibold text-brand-ink">{{ __('What happens') }}</h2>
+            <h2 class="text-base font-semibold text-brand-ink">{{ __('What happens') }}</h2>
             <p class="text-sm leading-6 text-brand-moss">
                 {{ __('You can clone this site to another server in your organization, or to the same server with a new domain. The job runs in the background; time depends on site size.') }}
             </p>
