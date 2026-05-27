@@ -1,3 +1,14 @@
+@php
+    $tonePalette = [
+        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
+        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
+        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+        'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+    ];
+@endphp
+
 <x-server-workspace-layout
     :server="$server"
     active="daemons"
@@ -8,42 +19,101 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('This workspace manages long-running supervisord-supervised processes for this server (queue workers, websocket servers, custom long-running PHP/Node binaries). Each daemon is a config file in /etc/supervisor/conf.d that dply rewrites in full on every change; supervisorctl reread + update applies the change.') }}</p>
         <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. Restart, stop, and start map to the matching supervisorctl verbs. The audit log records every change.') }}</p>
     </x-explainer>
 
     {{-- At-a-glance counts. Match the Background-group convention used by Backups,
          Schedule, and Queue workers. Numbers reflect the visible (filtered) program set. --}}
-    <section class="mb-4 grid gap-3 sm:grid-cols-4">
-        <div class="dply-card p-4">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Programs') }}</p>
-            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $daemonsStats['total'] }}</p>
+    <section class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+                    <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Supervisor') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Programs at a glance') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Counts across the dply-managed supervisord block on this server.') }}</p>
+                </div>
+            </div>
         </div>
-        <div class="dply-card p-4">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active') }}</p>
-            <p class="mt-1 text-2xl font-semibold text-brand-forest">{{ $daemonsStats['active'] }}</p>
-        </div>
-        <div class="dply-card p-4">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</p>
-            <p class="mt-1 text-2xl font-semibold {{ $daemonsStats['inactive'] > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $daemonsStats['inactive'] }}</p>
-        </div>
-        <div class="dply-card p-4">
-            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total processes') }}</p>
-            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $daemonsStats['total_processes'] }}</p>
-        </div>
+        <dl class="grid grid-cols-2 gap-2 p-6 sm:grid-cols-4 sm:p-7">
+            <div @class([
+                'rounded-2xl border px-4 py-3 shadow-sm',
+                'border-brand-sage/30 bg-brand-sage/8' => $daemonsStats['total'] > 0,
+                'border-brand-ink/10 bg-white' => $daemonsStats['total'] === 0,
+            ])>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Programs') }}</dt>
+                <dd class="mt-1 flex items-baseline gap-1.5">
+                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['total'] }}</span>
+                    <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $daemonsStats['total']) }}</span>
+                </dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Configured units') }}</p>
+            </div>
+            <div @class([
+                'rounded-2xl border px-4 py-3 shadow-sm',
+                'border-emerald-200 bg-emerald-50/60' => $daemonsStats['active'] > 0,
+                'border-brand-ink/10 bg-white' => $daemonsStats['active'] === 0,
+            ])>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Active') }}</dt>
+                <dd class="mt-1 flex items-baseline gap-1.5">
+                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['active'] }}</span>
+                    <span class="text-[11px] text-brand-moss">{{ trans_choice('running|running', $daemonsStats['active']) }}</span>
+                </dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Currently supervised') }}</p>
+            </div>
+            <div @class([
+                'rounded-2xl border px-4 py-3 shadow-sm',
+                'border-amber-200 bg-amber-50/60' => $daemonsStats['inactive'] > 0,
+                'border-brand-ink/10 bg-white' => $daemonsStats['inactive'] === 0,
+            ])>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inactive') }}</dt>
+                <dd class="mt-1 flex items-baseline gap-1.5">
+                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['inactive'] }}</span>
+                    <span class="text-[11px] text-brand-moss">{{ trans_choice('stopped|stopped', $daemonsStats['inactive']) }}</span>
+                </dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Not currently running') }}</p>
+            </div>
+            <div @class([
+                'rounded-2xl border px-4 py-3 shadow-sm',
+                'border-brand-sage/30 bg-brand-sage/8' => $daemonsStats['total_processes'] > 0,
+                'border-brand-ink/10 bg-white' => $daemonsStats['total_processes'] === 0,
+            ])>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Processes') }}</dt>
+                <dd class="mt-1 flex items-baseline gap-1.5">
+                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $daemonsStats['total_processes'] }}</span>
+                    <span class="text-[11px] text-brand-moss">{{ trans_choice('worker|workers', $daemonsStats['total_processes']) }}</span>
+                </dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Sum of numprocs') }}</p>
+            </div>
+        </dl>
     </section>
 
     @if ($siteContextUnavailable)
-        <div class="rounded-2xl border border-amber-300/80 bg-amber-50/90 px-5 py-6 text-sm text-amber-950">
-            <p class="font-semibold">{{ __('Supervisor workers are not available for this site’s runtime') }}</p>
-            <p class="mt-2 leading-relaxed text-amber-900/90">
-                {{ __('Managed SSH Supervisor applies to VM-hosted sites. For container or serverless runtimes, run workers on that platform instead.') }}
-            </p>
-            @if ($contextSiteModel)
-                <a href="{{ route('sites.show', [$server, $contextSiteModel]) }}" wire:navigate class="mt-4 inline-flex font-medium text-amber-950 underline">{{ __('Back to site') }}</a>
-            @endif
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                        <x-heroicon-o-no-symbol class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Unavailable') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Supervisor workers are not available for this site’s runtime') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Managed SSH Supervisor applies to VM-hosted sites. For container or serverless runtimes, run workers on that platform instead.') }}
+                        </p>
+                        @if ($contextSiteModel)
+                            <a href="{{ route('sites.show', [$server, $contextSiteModel]) }}" wire:navigate class="mt-3 inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                <x-heroicon-m-arrow-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Back to site') }}
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </section>
     @elseif ($opsReady)
         <div @if ($server->supervisor_package_status === null) wire:init="refreshSupervisorInstallStatus" @endif>
             @include('livewire.servers.partials.daemons._banner')

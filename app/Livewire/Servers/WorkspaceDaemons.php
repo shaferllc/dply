@@ -605,6 +605,7 @@ class WorkspaceDaemons extends Component
             ]);
             $this->toastSuccess(__('Program updated. Sync Supervisor on the server to apply changes.'));
             $this->cancelEditProgram();
+            $this->dispatch('close-modal', 'daemon-program-modal');
         } else {
             $type = $this->new_sv_type;
             $nproc = $this->new_sv_numprocs;
@@ -627,6 +628,7 @@ class WorkspaceDaemons extends Component
                 $msg .= ' '.__('Note: Many queue workers are often better as separate programs or Horizon.');
             }
             $this->toastSuccess($msg);
+            $this->dispatch('close-modal', 'daemon-program-modal');
         }
 
     }
@@ -693,6 +695,7 @@ class WorkspaceDaemons extends Component
         }
         $this->new_sv_env_lines = implode("\n", $lines);
         $this->queue_builder_mode = 'advanced';
+        $this->dispatch('open-modal', 'daemon-program-modal');
         $this->toastSuccess(__('Editing — change fields and save.'));
     }
 
@@ -704,6 +707,21 @@ class WorkspaceDaemons extends Component
         $this->resetDefaultsForNewProgramForm();
         $this->new_sv_env_lines = '';
         $this->resetExpertFormFields();
+    }
+
+    public function openCreateDaemonModal(): void
+    {
+        $this->authorize('update', $this->server);
+        $this->resetErrorBag();
+        $this->cancelEditProgram();
+        $this->dispatch('open-modal', 'daemon-program-modal');
+    }
+
+    public function closeCreateDaemonModal(): void
+    {
+        $this->resetErrorBag();
+        $this->cancelEditProgram();
+        $this->dispatch('close-modal', 'daemon-program-modal');
     }
 
     public function saveOrgTemplate(): void
