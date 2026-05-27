@@ -76,11 +76,13 @@
     @endif
 >
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail :items="array_values(array_filter([
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
+            multi_surface_active()
+                ? ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group']
+                : null,
             ['label' => __('Servers'), 'icon' => 'server-stack'],
-        ]" />
+        ]))" />
 
         @if (session('success'))
             <x-alert tone="success">{{ session('success') }}</x-alert>
@@ -198,6 +200,28 @@
                 @endcan
             </x-slot>
         </x-page-header>
+
+        @feature('surface.fleet')
+            <nav class="-mt-2 flex flex-wrap items-center gap-1.5 text-sm" aria-label="{{ __('Fleet ops') }}">
+                <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss me-1">{{ __('Fleet ops') }}</span>
+                @foreach ([
+                    ['route' => 'fleet.health', 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
+                    ['route' => 'fleet.deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
+                    ['route' => 'fleet.domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
+                    ['route' => 'fleet.env-search', 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
+                    ['route' => 'fleet.env-drift', 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
+                ] as $fleetTile)
+                    <a
+                        href="{{ route($fleetTile['route']) }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
+                    >
+                        <x-dynamic-component :component="$fleetTile['icon']" class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ $fleetTile['label'] }}
+                    </a>
+                @endforeach
+            </nav>
+        @endfeature
 
         @php
             $summaryStats = [

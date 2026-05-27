@@ -44,6 +44,7 @@ use App\Livewire\Edge\Templates;
 use App\Livewire\Edge\Usage;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
+use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Imports\Forge\Inventory;
@@ -296,9 +297,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->name('edge.preview-access');
     Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
     Route::middleware('feature:surface.fleet')->group(function (): void {
+        Route::redirect('/fleet', '/fleet/health')->name('fleet.index');
         Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
         Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
         Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
+        Route::livewire('/fleet/env-drift', FleetEnvDrift::class)->name('fleet.env-drift');
         Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
     });
     Route::livewire('/admin', AdminDashboard::class)
