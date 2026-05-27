@@ -32,6 +32,13 @@
                     </span>
                 </x-slot>
                 <x-slot name="actions">
+                    <a
+                        href="{{ route('organizations.compliance-export', $organization) }}"
+                        class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-archive-box-arrow-down class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Compliance export') }}
+                    </a>
                     @if ($family !== '' || $search !== '')
                         <button
                             type="button"

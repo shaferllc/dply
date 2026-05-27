@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Models\User;
 use App\Services\Certificates\CertificateRequestService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -60,6 +61,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             $certificateRequestService->execute($certificate);
             $emit->success('certificate request executed', 'ssl');
             $this->completeConsoleAction();
+            $this->recordAudit($certificate, 'site.ssl.issued', null);
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'ssl');
             $this->failConsoleAction($e->getMessage());
@@ -68,7 +70,29 @@ class ExecuteSiteCertificateJob implements ShouldQueue
                 'site_id' => $certificate->site_id,
                 'error' => $e->getMessage(),
             ]);
+            $this->recordAudit($certificate, 'site.ssl.failed', $e->getMessage());
             throw $e;
         }
+    }
+
+    private function recordAudit(SiteCertificate $certificate, string $action, ?string $errorMessage): void
+    {
+        $site = $certificate->site;
+        $org = $site?->organization;
+        if ($org === null) {
+            return;
+        }
+        $user = $this->userId ? User::query()->find($this->userId) : null;
+        $certificate->refresh();
+
+        audit_log($org, $user, $action, $certificate, null, array_filter([
+            'site' => $site->name,
+            'site_id' => (string) $site->id,
+            'certificate_id' => (string) $certificate->id,
+            'domains' => is_array($certificate->domains ?? null) ? $certificate->domains : null,
+            'engine' => $certificate->engine ?? null,
+            'expires_at' => $certificate->expires_at?->toIso8601String(),
+            'error' => $errorMessage,
+        ], fn ($v) => $v !== null));
     }
 }

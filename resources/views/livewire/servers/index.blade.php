@@ -202,17 +202,30 @@
         </x-page-header>
 
         @feature('surface.fleet')
+            @php
+                $serversPillOrg = auth()->user()?->currentOrganization();
+                $serversPillCanTimeline = $serversPillOrg !== null && $serversPillOrg->hasAdminAccess(auth()->user());
+                $serversPillTiles = [
+                    ['url' => route('fleet.health'), 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
+                    ['url' => route('fleet.deploys'), 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
+                    ['url' => route('fleet.domains'), 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
+                    ['url' => route('fleet.env-search'), 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
+                    ['url' => route('fleet.env-drift'), 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
+                    ['url' => route('fleet.intelligence'), 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
+                ];
+                if ($serversPillCanTimeline) {
+                    $serversPillTiles[] = [
+                        'url' => route('organizations.activity', $serversPillOrg),
+                        'label' => __('Timeline'),
+                        'icon' => 'heroicon-o-clock',
+                    ];
+                }
+            @endphp
             <nav class="-mt-2 flex flex-wrap items-center gap-1.5 text-sm" aria-label="{{ __('Fleet ops') }}">
                 <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss me-1">{{ __('Fleet ops') }}</span>
-                @foreach ([
-                    ['route' => 'fleet.health', 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
-                    ['route' => 'fleet.deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
-                    ['route' => 'fleet.domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
-                    ['route' => 'fleet.env-search', 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
-                    ['route' => 'fleet.env-drift', 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
-                ] as $fleetTile)
+                @foreach ($serversPillTiles as $fleetTile)
                     <a
-                        href="{{ route($fleetTile['route']) }}"
+                        href="{{ $fleetTile['url'] }}"
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
                     >

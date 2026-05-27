@@ -203,11 +203,27 @@
                                 'title' => __('Env drift'),
                                 'desc' => __('Compare env across BYO + Cloud + Edge sites that share a Git repo.'),
                             ],
+                            [
+                                'route' => 'fleet.intelligence',
+                                'icon' => 'heroicon-o-light-bulb',
+                                'title' => __('Intelligence'),
+                                'desc' => __('Proactive alerts — slow builds, expiring TLS, preview/prod env drift.'),
+                            ],
                         ];
+
+                        $opsTimelineOrg = auth()->user()?->currentOrganization();
+                        if ($opsTimelineOrg !== null && $opsTimelineOrg->hasAdminAccess(auth()->user())) {
+                            $fleetTiles[] = [
+                                'route_url' => route('organizations.activity', $opsTimelineOrg),
+                                'icon' => 'heroicon-o-clock',
+                                'title' => __('Ops timeline'),
+                                'desc' => __('Org-wide audit trail — deploys, domains, env, members across every product line.'),
+                            ];
+                        }
                     @endphp
                     @foreach ($fleetTiles as $tile)
                         <a
-                            href="{{ route($tile['route']) }}"
+                            href="{{ $tile['route_url'] ?? route($tile['route']) }}"
                             wire:navigate
                             class="group flex flex-col rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-sage/45 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
                         >

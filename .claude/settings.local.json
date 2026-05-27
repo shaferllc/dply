@@ -39,7 +39,8 @@
       "Bash(composer create-project *)",
       "Bash(composer update *)",
       "Bash(./dply --version)",
-      "Bash(/opt/homebrew/bin/gh repo *)"
+      "Bash(/opt/homebrew/bin/gh repo *)",
+      "Bash(grep -nE 'protected \\\\$fillable' /Users/tomshafer/Projects/Apps/dply/app/Models/ForgeSite.php /Users/tomshafer/Projects/Apps/dply/app/Models/PloiSite.php /Users/tomshafer/Projects/Apps/dply/app/Models/PloiServer.php)"
     ]
   }
 }
