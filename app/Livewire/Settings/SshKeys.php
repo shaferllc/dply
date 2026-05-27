@@ -257,7 +257,17 @@ class SshKeys extends Component
 
         $serverIds = $key->serverAuthorizedKeys()->pluck('server_id')->unique()->values()->all();
 
+        $snapshot = [
+            'name' => $key->name,
+            'key_id' => (string) $key->getKey(),
+            'server_count' => count($serverIds),
+        ];
+
         $key->delete();
+
+        if ($org = Auth::user()->currentOrganization()) {
+            audit_log($org, Auth::user(), 'user.ssh_key_removed', null, $snapshot, null);
+        }
 
         foreach ($serverIds as $serverId) {
             SyncServerAuthorizedKeysJob::dispatch($serverId);

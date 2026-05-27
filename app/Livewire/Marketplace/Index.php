@@ -114,6 +114,15 @@ class Index extends Component
 
         $importService->importDeployCommand($user, $item, $server);
 
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'marketplace.deploy_command_imported', $item, null, [
+                'item_id' => (string) $item->id,
+                'item_name' => $item->name,
+                'server_id' => (string) $server->id,
+                'server_name' => $server->name,
+            ]);
+        }
+
         $this->closeServerImportModal();
         $this->toastSuccess(__('Deploy command imported to :server.', ['server' => $server->name]));
     }
@@ -145,6 +154,15 @@ class Index extends Component
 
         $importService->importServerRecipe($user, $item, $server);
 
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'marketplace.server_recipe_imported', $item, null, [
+                'item_id' => (string) $item->id,
+                'item_name' => $item->name,
+                'server_id' => (string) $server->id,
+                'server_name' => $server->name,
+            ]);
+        }
+
         $this->closeServerImportModal();
         $this->toastSuccess(__('Saved command imported to :server.', ['server' => $server->name]));
     }
@@ -164,6 +182,13 @@ class Index extends Component
         }
 
         $org = $user->currentOrganization();
+        if ($org) {
+            audit_log($org, $user, 'marketplace.webserver_template_imported', $item, null, [
+                'item_id' => (string) $item->id,
+                'item_name' => $item->name,
+            ]);
+        }
+
         session()->flash('success', __('Webserver template saved to your organization.'));
         if ($org) {
             $this->redirect(route('organizations.webserver-templates', $org), navigate: true);

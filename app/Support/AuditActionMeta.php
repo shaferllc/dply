@@ -82,9 +82,13 @@ final class AuditActionMeta
             str_starts_with($action, 'billing.') => 'billing',
             str_starts_with($action, 'api_token.'),
             str_starts_with($action, 'invitation.'),
-            str_starts_with($action, 'notification_channel.') => 'security',
+            str_starts_with($action, 'notification_channel.'),
+            str_starts_with($action, 'user.'),
+            str_starts_with($action, 'credential.') => 'security',
             str_starts_with($action, 'organization.') => 'org',
             str_starts_with($action, 'import.') => 'import',
+            str_starts_with($action, 'marketplace.') => 'import',
+            str_starts_with($action, 'script.') => 'other',
             default => 'other',
         };
     }
@@ -158,6 +162,9 @@ final class AuditActionMeta
             'site.webserver_config.restored' => ['label' => 'Webserver config restored', 'icon' => 'heroicon-o-arrow-uturn-left', 'tone' => 'info'],
 
             // Edge
+            'site.edge.created' => ['label' => 'Edge site created', 'icon' => 'heroicon-o-plus-circle', 'tone' => 'success'],
+            'site.edge.deleted' => ['label' => 'Edge site deleted', 'icon' => 'heroicon-o-trash', 'tone' => 'danger'],
+            'site.edge.deletion_scheduled' => ['label' => 'Edge site deletion scheduled', 'icon' => 'heroicon-o-clock', 'tone' => 'warning'],
             'site.edge.deployment.cancelled' => ['label' => 'Edge deployment cancelled', 'icon' => 'heroicon-o-x-circle', 'tone' => 'warning'],
             'site.edge.preview.promoted' => ['label' => 'Preview promoted', 'icon' => 'heroicon-o-arrow-up-circle', 'tone' => 'success'],
             'site.edge.deploy_hook.created' => ['label' => 'Deploy hook created', 'icon' => 'heroicon-o-link', 'tone' => 'success'],
@@ -200,6 +207,21 @@ final class AuditActionMeta
             'invitation.sent' => ['label' => 'Invitation sent', 'icon' => 'heroicon-o-envelope', 'tone' => 'info'],
             'invitation.cancelled' => ['label' => 'Invitation cancelled', 'icon' => 'heroicon-o-no-symbol', 'tone' => 'warning'],
             'notification_channel.created' => ['label' => 'Notification channel created', 'icon' => 'heroicon-o-bell-alert', 'tone' => 'success'],
+            'user.password_changed' => ['label' => 'Password changed', 'icon' => 'heroicon-o-lock-closed', 'tone' => 'warning'],
+            'user.passkey_removed' => ['label' => 'Passkey removed', 'icon' => 'heroicon-o-finger-print', 'tone' => 'danger'],
+            'user.oauth_unlinked' => ['label' => 'OAuth account unlinked', 'icon' => 'heroicon-o-link-slash', 'tone' => 'warning'],
+            'user.two_factor_enabled' => ['label' => 'Two-factor enabled', 'icon' => 'heroicon-o-shield-check', 'tone' => 'success'],
+            'user.two_factor_disabled' => ['label' => 'Two-factor disabled', 'icon' => 'heroicon-o-shield-exclamation', 'tone' => 'warning'],
+            'user.ssh_key_added' => ['label' => 'SSH key added', 'icon' => 'heroicon-o-key', 'tone' => 'success'],
+            'user.ssh_key_updated' => ['label' => 'SSH key updated', 'icon' => 'heroicon-o-pencil-square', 'tone' => 'info'],
+            'user.ssh_key_removed' => ['label' => 'SSH key removed', 'icon' => 'heroicon-o-key', 'tone' => 'danger'],
+            'user.profile_updated' => ['label' => 'Profile updated', 'icon' => 'heroicon-o-user-circle', 'tone' => 'info'],
+            'user.email_changed' => ['label' => 'Email address changed', 'icon' => 'heroicon-o-envelope', 'tone' => 'warning'],
+            'user.account_deleted' => ['label' => 'Account deleted', 'icon' => 'heroicon-o-user-minus', 'tone' => 'danger'],
+            'credential.created' => ['label' => 'Provider credential added', 'icon' => 'heroicon-o-key', 'tone' => 'success'],
+            'credential.verified' => ['label' => 'Provider credential verified', 'icon' => 'heroicon-o-check-badge', 'tone' => 'success'],
+            'credential.verify_failed' => ['label' => 'Provider credential verify failed', 'icon' => 'heroicon-o-exclamation-triangle', 'tone' => 'danger'],
+            'credential.deleted' => ['label' => 'Provider credential removed', 'icon' => 'heroicon-o-trash', 'tone' => 'danger'],
 
             // Org
             'organization.created' => ['label' => 'Organization created', 'icon' => 'heroicon-o-building-office-2', 'tone' => 'success'],
@@ -214,7 +236,20 @@ final class AuditActionMeta
             'billing.subscription_canceled' => ['label' => 'Subscription canceled', 'icon' => 'heroicon-o-x-circle', 'tone' => 'danger'],
             'billing.subscription_resumed' => ['label' => 'Subscription resumed', 'icon' => 'heroicon-o-check-circle', 'tone' => 'success'],
 
+            // Scripts
+            'script.created' => ['label' => 'Script created', 'icon' => 'heroicon-o-command-line', 'tone' => 'success'],
+            'script.updated' => ['label' => 'Script updated', 'icon' => 'heroicon-o-pencil-square', 'tone' => 'info'],
+            'script.deleted' => ['label' => 'Script deleted', 'icon' => 'heroicon-o-trash', 'tone' => 'danger'],
+
+            // Marketplace
+            'marketplace.deploy_command_imported' => ['label' => 'Deploy command imported', 'icon' => 'heroicon-o-arrow-down-tray', 'tone' => 'success'],
+            'marketplace.server_recipe_imported' => ['label' => 'Server recipe imported', 'icon' => 'heroicon-o-arrow-down-tray', 'tone' => 'success'],
+            'marketplace.webserver_template_imported' => ['label' => 'Webserver template imported', 'icon' => 'heroicon-o-arrow-down-tray', 'tone' => 'success'],
+
             // Backups
+            'backup.destination.created' => ['label' => 'Backup destination added', 'icon' => 'heroicon-o-plus', 'tone' => 'success'],
+            'backup.destination.updated' => ['label' => 'Backup destination updated', 'icon' => 'heroicon-o-pencil-square', 'tone' => 'info'],
+            'backup.destination.deleted' => ['label' => 'Backup destination removed', 'icon' => 'heroicon-o-trash', 'tone' => 'danger'],
             'backup.schedule.created' => ['label' => 'Backup schedule created', 'icon' => 'heroicon-o-calendar', 'tone' => 'success'],
             'backup.schedule.deleted' => ['label' => 'Backup schedule deleted', 'icon' => 'heroicon-o-trash', 'tone' => 'danger'],
             'backup.schedule.run_now' => ['label' => 'Backup ran now', 'icon' => 'heroicon-o-play', 'tone' => 'info'],

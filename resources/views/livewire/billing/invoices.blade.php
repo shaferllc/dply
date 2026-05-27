@@ -1,3 +1,13 @@
+@php
+    // Shared section-header chrome (matches billing.show + analytics + automation).
+    $tonePalette = [
+        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
+        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+    ];
+@endphp
+
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-organization-shell :organization="$organization" section="invoices">
@@ -9,202 +19,301 @@
                 ['label' => __('Invoices'), 'icon' => 'document-text'],
             ]" />
 
-            <div class="space-y-8">
-                <div class="dply-card overflow-hidden">
-                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-                        <div class="lg:col-span-4">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Invoices') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Stripe invoices for :org.', ['org' => $organization->name]) }}
-                            </p>
-                        </div>
-                        <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-outline-link>
-                        </div>
-                    </div>
-                </div>
-
-                @if (! $hasStripeCustomer)
-                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        {{ __('No Stripe customer is linked to this organization yet. Subscribe to a plan from billing to generate invoices.') }}
-                    </div>
-                @else
-                    <div
-                        class="dply-card overflow-hidden border-brand-mist/60"
-                        x-data="{ showColumns: false }"
-                    >
-                        <div class="flex flex-col gap-3 border-b border-brand-mist/60 bg-brand-sand/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="relative">
-                                <button
-                                    type="button"
-                                    @click="showColumns = !showColumns"
-                                    @click.outside="showColumns = false"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                                >
-                                    <x-heroicon-o-eye class="h-4 w-4 text-brand-moss" aria-hidden="true" />
-                                    {{ __('Columns') }}
-                                </button>
-                                <div
-                                    x-show="showColumns"
-                                    x-cloak
-                                    x-transition
-                                    class="absolute left-0 z-20 mt-1 w-56 dply-flyout-panel py-2"
-                                >
-                                    <p class="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Visible columns') }}</p>
-                                    @foreach (['number' => __('Number'), 'description' => __('Description'), 'status' => __('Status'), 'total' => __('Total'), 'date' => __('Date'), 'actions' => __('Actions')] as $key => $label)
-                                        <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-brand-ink hover:bg-brand-sand/40">
-                                            <input type="checkbox" wire:model.live="columns.{{ $key }}" class="rounded border-brand-mist text-brand-ink" />
-                                            {{ $label }}
-                                        </label>
-                                    @endforeach
-                                </div>
+            {{-- Hero: positioning + at-a-glance counts. Cross-links into the
+                 sibling billing screens so an admin can pivot quickly. --}}
+            <section class="dply-card overflow-hidden">
+                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+                    <div class="lg:col-span-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-document-text class="h-6 w-6" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Billing') }}</p>
+                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Invoices') }}</h2>
+                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Stripe invoices for :org. Search, sort, and open the PDF for any line item.', ['org' => $organization->name]) }}
+                                </p>
                             </div>
-                            <div class="w-full sm:max-w-md sm:ml-auto">
-                                <label for="invoice-search" class="sr-only">{{ __('Search') }}</label>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                            <x-outline-link href="{{ route('billing.show', $organization) }}" wire:navigate>
+                                <x-heroicon-o-credit-card class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Billing & plan') }}
+                            </x-outline-link>
+                            <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
+                                <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Analytics') }}
+                            </x-outline-link>
+                            <x-docs-link doc-route="docs.markdown" doc-slug="billing-and-plans">
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Docs') }}
+                            </x-docs-link>
+                        </div>
+                    </div>
+                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+                        @php
+                            $total = $rows->total();
+                            $currentPage = $rows->currentPage();
+                            $lastPage = max(1, $rows->lastPage());
+                            $perPage = (int) ($perPage ?? $rows->perPage());
+                        @endphp
+                        <div @class([
+                            'rounded-2xl border px-4 py-3 shadow-sm',
+                            'border-brand-sage/30 bg-brand-sage/8' => $hasStripeCustomer,
+                            'border-brand-ink/10 bg-white' => ! $hasStripeCustomer,
+                        ])>
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Stripe') }}</dt>
+                            <dd class="mt-1 flex items-center gap-1.5">
+                                @if ($hasStripeCustomer)
+                                    <span class="inline-block h-2 w-2 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                    <span class="text-sm font-semibold text-brand-ink">{{ __('Linked') }}</span>
+                                @else
+                                    <span class="inline-block h-2 w-2 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
+                                    <span class="text-sm font-semibold text-brand-ink">{{ __('No customer') }}</span>
+                                @endif
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Customer record') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Invoices') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $total }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $total) }}</span>
+                            </dd>
+                            @if ($total > 0 && $search !== '')
+                                <p class="mt-1 truncate text-[11px] text-brand-mist" title="{{ __('Filtered by :q', ['q' => $search]) }}">{{ __('Filtered') }}</p>
+                            @endif
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Page') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $currentPage }}</span>
+                                <span class="text-[11px] text-brand-moss">/ {{ $lastPage }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n per page|:n per page', $perPage, ['n' => $perPage]) }}</p>
+                        </div>
+                    </dl>
+                </div>
+            </section>
+
+            @unless ($hasStripeCustomer)
+                <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <span class="inline-flex items-center gap-2">
+                        <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('No Stripe customer is linked to this organization yet.') }}
+                    </span>
+                    <a href="{{ route('billing.show', $organization) }}" wire:navigate class="ms-2 font-semibold underline underline-offset-2 hover:no-underline">
+                        {{ __('Subscribe to a plan') }} →
+                    </a>
+                </div>
+            @endunless
+
+            @if ($hasStripeCustomer)
+                <section class="dply-card mt-6 overflow-hidden" x-data="{ showColumns: false }">
+                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                                <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('All invoices') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Search by number or description, sort any column, and toggle visibility on a per-column basis.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Toolbar: search + column toggle. Same sandy strip
+                         tone the activity / member-directory pages use, so
+                         the page reads as part of the same family. --}}
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-6 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                        <div class="relative">
+                            <button
+                                type="button"
+                                @click="showColumns = !showColumns"
+                                @click.outside="showColumns = false"
+                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-o-view-columns class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                                {{ __('Columns') }}
+                                <x-heroicon-m-chevron-down class="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />
+                            </button>
+                            <div
+                                x-show="showColumns"
+                                x-cloak
+                                x-transition
+                                class="absolute left-0 z-20 mt-1 w-56 rounded-xl border border-brand-ink/10 bg-white py-2 shadow-lg"
+                            >
+                                <p class="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-brand-mist">{{ __('Visible columns') }}</p>
+                                @foreach (['number' => __('Number'), 'description' => __('Description'), 'status' => __('Status'), 'total' => __('Total'), 'date' => __('Date'), 'actions' => __('Actions')] as $key => $label)
+                                    <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-brand-ink hover:bg-brand-sand/40">
+                                        <input type="checkbox" wire:model.live="columns.{{ $key }}" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                                        {{ $label }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div class="w-full sm:max-w-sm sm:ml-auto">
+                            <label for="invoice-search" class="sr-only">{{ __('Search') }}</label>
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-brand-mist">
+                                    <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
+                                </span>
                                 <input
                                     id="invoice-search"
                                     type="search"
                                     wire:model.live.debounce.300ms="search"
-                                    placeholder="{{ __('Search…') }}"
-                                    class="w-full rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
+                                    placeholder="{{ __('Search by number or description…') }}"
+                                    class="w-full rounded-lg border-brand-ink/15 bg-white py-2 ps-9 pe-3 text-sm text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                 />
                             </div>
                         </div>
+                    </div>
 
+                    @if ($rows->isEmpty())
+                        <div class="px-6 py-12 text-center sm:px-7">
+                            <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-inbox class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <p class="mt-3 text-sm font-medium text-brand-ink">
+                                {{ $search !== '' ? __('No invoices match this search.') : __('No invoices found.') }}
+                            </p>
+                            @if ($search !== '')
+                                <button type="button" wire:click="$set('search', '')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">{{ __('Clear search') }}</button>
+                            @endif
+                        </div>
+                    @else
                         <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-brand-mist/60 text-left text-sm">
-                                <thead class="bg-brand-cream/50 text-xs font-semibold uppercase tracking-wide text-brand-moss">
+                            <table class="min-w-full divide-y divide-brand-ink/5 text-left text-sm">
+                                <thead class="bg-brand-sand/35 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
                                         @if ($columns['number'])
-                                            <th scope="col" class="px-4 py-3">
-                                                <button type="button" wire:click="sortBy('number')" class="inline-flex items-center gap-1 font-semibold text-brand-ink hover:text-brand-sage">
+                                            <th scope="col" class="px-6 py-2 sm:px-7">
+                                                <button type="button" wire:click="sortBy('number')" class="inline-flex items-center gap-1 font-semibold text-brand-moss hover:text-brand-ink">
                                                     {{ __('Number') }}
-                                                    <span class="text-brand-mist" aria-hidden="true">⇅</span>
+                                                    <span aria-hidden="true" class="opacity-70">⇅</span>
                                                 </button>
                                             </th>
                                         @endif
                                         @if ($columns['description'])
-                                            <th scope="col" class="px-4 py-3">
-                                                <button type="button" wire:click="sortBy('description')" class="inline-flex items-center gap-1 font-semibold text-brand-ink hover:text-brand-sage">
+                                            <th scope="col" class="px-4 py-2">
+                                                <button type="button" wire:click="sortBy('description')" class="inline-flex items-center gap-1 font-semibold text-brand-moss hover:text-brand-ink">
                                                     {{ __('Description') }}
-                                                    <span class="text-brand-mist" aria-hidden="true">⇅</span>
+                                                    <span aria-hidden="true" class="opacity-70">⇅</span>
                                                 </button>
                                             </th>
                                         @endif
                                         @if ($columns['status'])
-                                            <th scope="col" class="px-4 py-3">{{ __('Status') }}</th>
+                                            <th scope="col" class="px-4 py-2">{{ __('Status') }}</th>
                                         @endif
                                         @if ($columns['total'])
-                                            <th scope="col" class="px-4 py-3">
-                                                <button type="button" wire:click="sortBy('total')" class="inline-flex items-center gap-1 font-semibold text-brand-ink hover:text-brand-sage">
+                                            <th scope="col" class="px-4 py-2 text-right">
+                                                <button type="button" wire:click="sortBy('total')" class="inline-flex items-center gap-1 font-semibold text-brand-moss hover:text-brand-ink">
                                                     {{ __('Total') }}
-                                                    <span class="text-brand-mist" aria-hidden="true">⇅</span>
+                                                    <span aria-hidden="true" class="opacity-70">⇅</span>
                                                 </button>
                                             </th>
                                         @endif
                                         @if ($columns['date'])
-                                            <th scope="col" class="px-4 py-3">
-                                                <button type="button" wire:click="sortBy('date')" class="inline-flex items-center gap-1 font-semibold text-brand-ink hover:text-brand-sage">
+                                            <th scope="col" class="px-4 py-2">
+                                                <button type="button" wire:click="sortBy('date')" class="inline-flex items-center gap-1 font-semibold text-brand-moss hover:text-brand-ink">
                                                     {{ __('Date') }}
-                                                    <span class="text-brand-mist" aria-hidden="true">⇅</span>
+                                                    <span aria-hidden="true" class="opacity-70">⇅</span>
                                                 </button>
                                             </th>
                                         @endif
                                         @if ($columns['actions'])
-                                            <th scope="col" class="px-4 py-3 text-end">{{ __('Actions') }}</th>
+                                            <th scope="col" class="px-6 py-2 text-end sm:px-7">{{ __('Actions') }}</th>
                                         @endif
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-brand-mist/40 bg-white">
-                                    @forelse ($rows as $row)
-                                        <tr class="hover:bg-brand-sand/20">
+                                <tbody class="divide-y divide-brand-ink/5 bg-white">
+                                    @foreach ($rows as $row)
+                                        @php
+                                            $status = strtolower((string) ($row['status'] ?? ''));
+                                            $statusClasses = match (true) {
+                                                in_array($status, ['paid', 'succeeded'], true) => 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                                                in_array($status, ['open', 'draft'], true) => 'border-sky-200 bg-sky-50 text-sky-700',
+                                                in_array($status, ['uncollectible', 'void', 'failed'], true) => 'border-red-200 bg-red-50 text-red-700',
+                                                default => 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss',
+                                            };
+                                        @endphp
+                                        <tr class="transition-colors hover:bg-brand-sand/15">
                                             @if ($columns['number'])
-                                                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-brand-ink">{{ $row['number'] }}</td>
+                                                <td class="whitespace-nowrap px-6 py-3 font-mono text-xs text-brand-ink sm:px-7">{{ $row['number'] }}</td>
                                             @endif
                                             @if ($columns['description'])
                                                 <td class="max-w-md px-4 py-3 text-brand-ink">{{ $row['description'] }}</td>
                                             @endif
                                             @if ($columns['status'])
                                                 <td class="whitespace-nowrap px-4 py-3">
-                                                    <span class="inline-flex rounded-md bg-brand-sand/80 px-2 py-0.5 text-xs font-medium text-brand-ink">
+                                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusClasses }}">
                                                         {{ $row['status_label'] }}
                                                     </span>
                                                 </td>
                                             @endif
                                             @if ($columns['total'])
-                                                <td class="whitespace-nowrap px-4 py-3 tabular-nums text-brand-ink">{{ $row['total'] }}</td>
+                                                <td class="whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums font-semibold text-brand-ink">{{ $row['total'] }}</td>
                                             @endif
                                             @if ($columns['date'])
-                                                <td class="whitespace-nowrap px-4 py-3 text-brand-moss tabular-nums">{{ $row['date']->format('Y-m-d H:i:s') }}</td>
+                                                <td class="whitespace-nowrap px-4 py-3 font-mono tabular-nums text-brand-moss">{{ $row['date']->format('Y-m-d H:i') }}</td>
                                             @endif
                                             @if ($columns['actions'])
-                                                <td class="whitespace-nowrap px-4 py-3 text-end">
+                                                <td class="whitespace-nowrap px-6 py-3 text-end sm:px-7">
                                                     @if (! empty($row['pdf_url']))
                                                         <a
                                                             href="{{ $row['pdf_url'] }}"
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            class="text-sm font-medium text-brand-sage hover:text-brand-ink"
+                                                            class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sage hover:text-brand-ink"
                                                         >
-                                                            {{ ! empty($row['is_pdf']) ? __('View PDF') : __('View invoice') }}
+                                                            @if (! empty($row['is_pdf']))
+                                                                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                                {{ __('PDF') }}
+                                                            @else
+                                                                <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                                {{ __('View') }}
+                                                            @endif
                                                         </a>
                                                     @else
-                                                        <span class="text-sm text-brand-mist">—</span>
+                                                        <span class="text-xs text-brand-mist">—</span>
                                                     @endif
                                                 </td>
                                             @endif
                                         </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="{{ max(1, collect($columns)->filter()->count()) }}" class="px-4 py-8 text-center text-sm text-brand-moss">
-                                                {{ __('No invoices found.') }}
-                                            </td>
-                                        </tr>
-                                    @endforelse
+                                    @endforeach
                                 </tbody>
                             </table>
                         </div>
 
-                        @if ($rows->hasPages())
-                            <div class="flex flex-col gap-3 border-t border-brand-mist/60 bg-brand-sand/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div class="flex items-center gap-2 text-sm text-brand-moss">
-                                    <label for="per-page" class="whitespace-nowrap">{{ __('Rows per page') }}</label>
-                                    <select
-                                        id="per-page"
-                                        wire:model.live="perPage"
-                                        class="rounded-lg border border-brand-mist bg-white px-2 py-1 text-sm text-brand-ink focus:border-brand-sage focus:ring-brand-sage"
-                                    >
-                                        @foreach ([10, 15, 25, 50] as $n)
-                                            <option value="{{ $n }}">{{ $n }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <p class="text-center text-sm text-brand-moss">
-                                    {{ __('Page :current of :last', ['current' => $rows->currentPage(), 'last' => max(1, $rows->lastPage())]) }}
-                                </p>
-                                <div class="flex justify-end">
-                                    {{ $rows->links() }}
-                                </div>
-                            </div>
-                        @else
-                            <div class="flex flex-wrap items-center gap-3 border-t border-brand-mist/60 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
-                                <span>{{ __('Rows per page') }}</span>
+                        {{-- Pagination footer. Sandy strip mirroring the
+                             toolbar — page selector on the left, page count
+                             centered, pagination links on the right. --}}
+                        <div class="flex flex-col items-stretch gap-4 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-7">
+                            <label class="inline-flex items-center gap-2 text-xs text-brand-moss" for="per-page">
+                                <span class="whitespace-nowrap">{{ __('Rows per page') }}</span>
                                 <select
+                                    id="per-page"
                                     wire:model.live="perPage"
-                                    class="rounded-lg border border-brand-mist bg-white px-2 py-1 text-sm text-brand-ink"
+                                    class="rounded-lg border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                                 >
                                     @foreach ([10, 15, 25, 50] as $n)
                                         <option value="{{ $n }}">{{ $n }}</option>
                                     @endforeach
                                 </select>
-                            </div>
-                        @endif
-                    </div>
-                @endif
-            </div>
+                            </label>
+                            @if ($rows->hasPages())
+                                <div class="flex-1">
+                                    {{ $rows->links() }}
+                                </div>
+                            @else
+                                <span class="text-end text-xs tabular-nums text-brand-moss">{{ trans_choice(':n result|:n results', $rows->total(), ['n' => $rows->total()]) }}</span>
+                            @endif
+                        </div>
+                    @endif
+                </section>
+            @endif
         </x-organization-shell>
     </div>
 </div>

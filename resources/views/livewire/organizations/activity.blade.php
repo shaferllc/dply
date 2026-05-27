@@ -217,11 +217,33 @@
                         @endforeach
                     </ul>
 
-                    @if ($this->auditLogs->count() >= 200)
-                        <p class="border-t border-brand-ink/10 bg-brand-cream/30 px-5 py-3 text-center text-[11px] text-brand-mist">
-                            {{ __('Showing the 200 most recent entries. Refine with filters above to see older activity.') }}
-                        </p>
-                    @endif
+                    <div class="flex flex-col items-stretch gap-4 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-7">
+                        {{-- Per-page picker. Padding right is generous so the
+                             native chevron sits clear of the digits. --}}
+                        <label class="inline-flex items-center gap-2 text-xs text-brand-moss" for="activity-per-page">
+                            <span class="whitespace-nowrap">{{ __('Rows per page') }}</span>
+                            <select
+                                id="activity-per-page"
+                                wire:model.live="perPage"
+                                class="rounded-lg border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            >
+                                @foreach ([10, 25, 50, 100] as $n)
+                                    <option value="{{ $n }}">{{ $n }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        @if ($this->auditLogs->hasPages())
+                            {{-- flex-1 lets Livewire's built-in justify-between
+                                 actually push "Showing X to Y" away from the
+                                 prev/next buttons; without it the block hugs
+                                 the right edge and the two collapse together. --}}
+                            <div class="flex-1">
+                                {{ $this->auditLogs->links() }}
+                            </div>
+                        @else
+                            <span class="text-end text-xs tabular-nums text-brand-moss">{{ __(':n total', ['n' => $this->auditLogs->total()]) }}</span>
+                        @endif
+                    </div>
                 @endif
             </div>
         </x-organization-shell>

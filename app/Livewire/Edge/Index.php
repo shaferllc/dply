@@ -6,6 +6,7 @@ namespace App\Livewire\Edge;
 
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\EdgeDeployment;
 use App\Models\Organization;
 use App\Models\Site;
 use App\Services\Edge\EdgeSiteCanceller;
@@ -137,23 +138,23 @@ class Index extends Component
         if (is_string($this->quickLookSiteId) && $this->quickLookSiteId !== '') {
             $quickLookSite = $allSites->firstWhere('id', $this->quickLookSiteId);
             if ($quickLookSite !== null) {
-                $quickLookDeployment = \App\Models\EdgeDeployment::query()
+                $quickLookDeployment = EdgeDeployment::query()
                     ->where('site_id', $quickLookSite->id)
                     ->orderByDesc('created_at')
                     ->first(['id', 'status', 'git_branch', 'git_commit', 'published_at', 'failed_at', 'failure_reason', 'created_at']);
                 $quickLookDeploymentId = $quickLookDeployment?->id;
 
                 $isInFlight = $quickLookDeployment !== null && in_array($quickLookDeployment->status, [
-                    \App\Models\EdgeDeployment::STATUS_BUILDING,
-                    \App\Models\EdgeDeployment::STATUS_PUBLISHING,
+                    EdgeDeployment::STATUS_BUILDING,
+                    EdgeDeployment::STATUS_PUBLISHING,
                 ], true);
 
                 if (! $isInFlight) {
-                    $counts = \App\Models\EdgeDeployment::query()
+                    $counts = EdgeDeployment::query()
                         ->where('site_id', $quickLookSite->id)
                         ->selectRaw('COUNT(*) AS total')
-                        ->selectRaw("COUNT(CASE WHEN status = ? THEN 1 END) AS live", [\App\Models\EdgeDeployment::STATUS_LIVE])
-                        ->selectRaw("COUNT(CASE WHEN status = ? THEN 1 END) AS failed", [\App\Models\EdgeDeployment::STATUS_FAILED])
+                        ->selectRaw('COUNT(CASE WHEN status = ? THEN 1 END) AS live', [EdgeDeployment::STATUS_LIVE])
+                        ->selectRaw('COUNT(CASE WHEN status = ? THEN 1 END) AS failed', [EdgeDeployment::STATUS_FAILED])
                         ->first();
                     $quickLookStats = [
                         'total_deploys' => (int) ($counts->total ?? 0),
@@ -228,9 +229,16 @@ class Index extends Component
         $this->authorize('delete', $site);
 
         $siteName = $site->name;
+        $org = $site->organization;
         if ($this->deleteMode === 'in_30') {
             $scheduledFor = now()->addMinutes(30);
             $this->scheduleEdgeSiteDeletion($site, $scheduledFor);
+            if ($org) {
+                audit_log($org, auth()->user(), 'site.edge.deletion_scheduled', $site, null, [
+                    'site_name' => $siteName,
+                    'scheduled_for' => $scheduledFor->toIso8601String(),
+                ]);
+            }
             $this->closeDeleteSiteModal();
             $this->toastSuccess(__(':name will be deleted in 30 minutes.', ['name' => $siteName]));
             $this->redirect(route('edge.index'), navigate: true);
@@ -251,6 +259,12 @@ class Index extends Component
             }
 
             $this->scheduleEdgeSiteDeletion($site, $scheduledFor);
+            if ($org) {
+                audit_log($org, auth()->user(), 'site.edge.deletion_scheduled', $site, null, [
+                    'site_name' => $siteName,
+                    'scheduled_for' => $scheduledFor->toIso8601String(),
+                ]);
+            }
             $this->closeDeleteSiteModal();
             $this->toastSuccess(__(':name is scheduled for deletion on :date.', [
                 'name' => $siteName,
@@ -261,7 +275,14 @@ class Index extends Component
             return;
         }
 
+        $snapshot = [
+            'site_id' => (string) $site->id,
+            'site_name' => $siteName,
+        ];
         $canceller->cancel($site);
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.edge.deleted', null, $snapshot, null);
+        }
         $this->closeDeleteSiteModal();
         $this->toastSuccess(__('Deleted Edge site ":name".', ['name' => $siteName]));
         $this->redirect(route('edge.index'), navigate: true);

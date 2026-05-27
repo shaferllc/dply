@@ -180,15 +180,30 @@ class ProviderOAuthController extends Controller
             'credentials' => $credentials,
         ]);
 
+        audit_log($org, $user, 'credential.created', $credential, null, [
+            'provider' => 'digitalocean',
+            'name' => $name,
+            'auth' => 'oauth',
+        ]);
+
         try {
             (new DigitalOceanService($credential))->getDroplets();
         } catch (\Throwable $e) {
+            audit_log($org, $user, 'credential.verify_failed', $credential, null, [
+                'provider' => 'digitalocean',
+                'error' => $e->getMessage(),
+            ]);
             $credential->delete();
 
             return redirect()
                 ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])
                 ->with('error', __('Connected account could not use the API: :message', ['message' => $e->getMessage()]));
         }
+
+        audit_log($org, $user, 'credential.verified', $credential, null, [
+            'provider' => 'digitalocean',
+            'auth' => 'oauth',
+        ]);
 
         return redirect()
             ->route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'])

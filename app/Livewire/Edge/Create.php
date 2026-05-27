@@ -6,6 +6,7 @@ namespace App\Livewire\Edge;
 
 use App\Actions\Edge\CreateEdgeSite;
 use App\Actions\Edge\CreateHybridEdgeStack;
+use App\Jobs\DetectRepositoryRuntimeJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
@@ -17,16 +18,18 @@ use App\Services\Billing\ManagedProductCostEstimator;
 use App\Services\Cloud\CloudRouter;
 use App\Services\Edge\EdgeMonorepoDetector;
 use App\Services\Edge\Frameworks\EdgeFrameworkPresetRegistry;
-use App\Jobs\DetectRepositoryRuntimeJob;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use App\Support\Edge\EdgeSsrDetection;
 use App\Support\Edge\FakeEdgeProvision;
 use App\Support\Edge\HybridEdgeOriginMatcher;
 use App\Support\Servers\FakeCloudProvision;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
@@ -400,7 +403,7 @@ class Create extends Component
         return null;
     }
 
-    private function githubHttpClient(): \Illuminate\Http\Client\PendingRequest
+    private function githubHttpClient(): PendingRequest
     {
         $client = Http::baseUrl('https://api.github.com')
             ->acceptJson()
@@ -629,7 +632,7 @@ class Create extends Component
         // actually running. Grep storage/logs/laravel.log for this
         // string — if it's missing during a slow request, opcache is
         // serving stale code and `valet restart` is required.
-        \Illuminate\Support\Facades\Log::info('[edge.create.runDetection]', [
+        Log::info('[edge.create.runDetection]', [
             'url' => $url, 'branch' => $branch, 'pid' => getmypid(),
         ]);
 
@@ -912,7 +915,7 @@ class Create extends Component
             return false;
         }
         try {
-            $ts = \Carbon\Carbon::parse($dispatchedAt);
+            $ts = Carbon::parse($dispatchedAt);
         } catch (\Throwable) {
             return true;
         }
@@ -1345,6 +1348,15 @@ class Create extends Component
 
             return;
         }
+
+        audit_log($org, auth()->user(), 'site.edge.created', $site, null, [
+            'site_id' => (string) $site->id,
+            'site_name' => $site->name,
+            'repo' => $this->repo,
+            'branch' => $this->branch,
+            'framework' => (string) ($this->detectedPlan['framework'] ?? ''),
+            'runtime_mode' => $this->form->runtime_mode,
+        ]);
 
         $importedCount = $this->persistImportedEnvVars($site);
         if ($importedCount > 0) {

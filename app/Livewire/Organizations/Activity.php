@@ -6,15 +6,18 @@ use App\Models\Organization;
 use App\Support\AuditActionMeta;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 #[Layout('layouts.app')]
 class Activity extends Component
 {
+    use WithPagination;
+
     public Organization $organization;
 
     /** Active family filter id from {@see AuditActionMeta::FAMILIES} (`''` = no filter). */
@@ -24,6 +27,10 @@ class Activity extends Component
     /** Optional free-text search against `action` / `subject_summary`. */
     #[Url(as: 'q', except: '')]
     public string $search = '';
+
+    /** Rows per page. URL-synced so deep-links round-trip the picker too. */
+    #[Url(as: 'per', except: 25)]
+    public int $perPage = 25;
 
     /**
      * Audit log row IDs the operator has expanded inline to view the
@@ -45,12 +52,25 @@ class Activity extends Component
     {
         $valid = array_column(AuditActionMeta::FAMILIES, 'id');
         $this->family = in_array($family, $valid, true) ? $family : '';
+        $this->resetPage();
     }
 
     public function clearFilters(): void
     {
         $this->family = '';
         $this->search = '';
+        $this->resetPage();
+    }
+
+    /** Reset pagination when filters change so we don't land on an empty page. */
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->resetPage();
     }
 
     public function toggleRow(int $id): void
@@ -65,17 +85,16 @@ class Activity extends Component
     }
 
     /**
-     * Latest 200 audit rows for this org, filtered by family + free-text
+     * Paginated audit rows for this org, filtered by family + free-text
      * search. The family filter applies a set of action-prefix predicates
      * via {@see AuditActionMeta::family} so the resolver and the query
      * stay in sync (one source of truth for "what counts as `server`").
      */
-    public function getAuditLogsProperty(): Collection
+    public function getAuditLogsProperty(): LengthAwarePaginator
     {
         $query = $this->organization->auditLogs()
             ->with('user')
-            ->latest()
-            ->limit(200);
+            ->latest();
 
         $this->applyFamilyFilter($query, $this->family);
 
@@ -87,7 +106,9 @@ class Activity extends Component
             });
         }
 
-        return $query->get();
+        $perPage = max(10, min(100, $this->perPage));
+
+        return $query->paginate($perPage);
     }
 
     /**

@@ -78,10 +78,22 @@ class Edit extends Component
             'run_as_user' => __('Run as user'),
         ]);
 
+        $before = [
+            'name' => $this->script->name,
+            'run_as_user' => $this->script->run_as_user,
+            'content_length' => strlen((string) $this->script->content),
+        ];
+
         $this->script->update([
             'name' => $this->name,
             'content' => $this->content,
             'run_as_user' => $this->run_as_user !== '' ? $this->run_as_user : null,
+        ]);
+
+        audit_log($org, Auth::user(), 'script.updated', $this->script, $before, [
+            'name' => $this->script->name,
+            'run_as_user' => $this->script->run_as_user,
+            'content_length' => strlen((string) $this->script->content),
         ]);
 
         $this->syncDefaultForNewSites($org);
@@ -120,7 +132,18 @@ class Edit extends Component
             $org->update(['default_site_script_id' => null]);
         }
 
+        $snapshot = [
+            'script_id' => (string) $this->script->id,
+            'name' => $this->script->name,
+            'run_as_user' => $this->script->run_as_user,
+        ];
+
+        $auditOrg = $this->script->organization;
         $this->script->delete();
+
+        if ($auditOrg) {
+            audit_log($auditOrg, Auth::user(), 'script.deleted', null, $snapshot, null);
+        }
 
         return $this->redirect(route('scripts.index'), navigate: true);
     }

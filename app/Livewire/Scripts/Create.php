@@ -56,6 +56,11 @@ class Create extends Component
             'marketplace_key' => null,
         ]);
 
+        audit_log($org, Auth::user(), 'script.created', $script, null, [
+            'name' => $script->name,
+            'run_as_user' => $script->run_as_user,
+        ]);
+
         return $this->redirect(route('scripts.edit', $script), navigate: true);
     }
 

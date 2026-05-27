@@ -47,11 +47,16 @@ class BackupConfigurations extends Component
         $this->validate($this->destinationFormRules('createForm', $this->createForm['provider'] ?? ''));
         $this->validateDestinationFormExtras('createForm', $this->createForm);
 
-        $org->backupConfigurations()->create([
+        $config = $org->backupConfigurations()->create([
             'name' => $this->createForm['name'],
             'provider' => $this->createForm['provider'],
             'config' => $this->extractDestinationConfig($this->createForm),
             'created_by_user_id' => Auth::id(),
+        ]);
+
+        audit_log($org, Auth::user(), 'backup.destination.created', $config, null, [
+            'name' => $config->name,
+            'provider' => $config->provider,
         ]);
 
         $this->createForm = $this->emptyDestinationForm();
@@ -91,11 +96,23 @@ class BackupConfigurations extends Component
         $this->validate($this->destinationFormRules('editForm', $this->editForm['provider'] ?? ''));
         $this->validateDestinationFormExtras('editForm', $this->editForm);
 
+        $before = [
+            'name' => $model->name,
+            'provider' => $model->provider,
+        ];
+
         $model->update([
             'name' => $this->editForm['name'],
             'provider' => $this->editForm['provider'],
             'config' => $this->extractDestinationConfig($this->editForm),
         ]);
+
+        if ($org = $model->organization ?? Auth::user()?->currentOrganization()) {
+            audit_log($org, Auth::user(), 'backup.destination.updated', $model, $before, [
+                'name' => $model->name,
+                'provider' => $model->provider,
+            ]);
+        }
 
         $this->cancelEdit();
         $this->toastSuccess(__('Backup destination updated.'));
@@ -107,7 +124,18 @@ class BackupConfigurations extends Component
 
         $this->authorize('delete', $config);
 
+        $org = $config->organization ?? Auth::user()?->currentOrganization();
+        $snapshot = [
+            'configuration_id' => (string) $config->id,
+            'name' => $config->name,
+            'provider' => $config->provider,
+        ];
+
         $config->delete();
+
+        if ($org) {
+            audit_log($org, Auth::user(), 'backup.destination.deleted', null, $snapshot, null);
+        }
 
         if ($this->editing_id === $id) {
             $this->cancelEdit();

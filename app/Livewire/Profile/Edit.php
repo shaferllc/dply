@@ -102,10 +102,24 @@ class Edit extends Component
             'locale' => $this->profileForm->locale,
             'timezone' => $this->profileForm->timezone,
         ]);
-        if ($user->isDirty('email')) {
+        $emailChanged = $user->isDirty('email');
+        $before = [];
+        $after = [];
+        foreach (['name', 'email', 'country_code', 'locale', 'timezone'] as $field) {
+            if ($user->isDirty($field)) {
+                $before[$field] = $user->getOriginal($field);
+                $after[$field] = $user->getAttribute($field);
+            }
+        }
+        if ($emailChanged) {
             $user->email_verified_at = null;
         }
         $user->save();
+
+        if ($after !== [] && ($org = $user->currentOrganization())) {
+            $action = $emailChanged && count($after) === 1 ? 'user.email_changed' : 'user.profile_updated';
+            audit_log($org, $user, $action, $user, $before, $after);
+        }
 
         $this->toastSuccess(__('Profile details saved.'));
         $this->dispatch('profile-updated');

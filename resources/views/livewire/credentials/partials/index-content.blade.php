@@ -114,21 +114,82 @@
         </div>
     </section>
 
+    {{-- First-run nudge. When the org has zero credentials anywhere,
+         surface a single "Connect your first provider" card above the grid
+         so an empty workspace doesn't read as a wall of greyed-out tiles. --}}
+    @if ($credentials->isEmpty())
+        <section class="rounded-2xl border border-brand-sage/30 bg-brand-sage/5 p-5 sm:p-6">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
+                    <x-heroicon-o-link class="h-6 w-6" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your first provider') }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a provider below to link an API token. Tokens are encrypted before they hit disk and verified when possible.') }}</p>
+                </div>
+                <button
+                    type="button"
+                    x-on:click="$dispatch('open-add-provider-credential-modal')"
+                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Connect a provider') }}
+                </button>
+            </div>
+        </section>
+    @endif
+
     {{-- Provider grid. Replaces the dense sidebar with tappable cards laid
          out by category. Each card shows capability dots, a count badge,
          and a clear connect / manage state — clicking sets the active
          provider and the panel below jumps in to take over. --}}
     <section aria-label="{{ __('Pick a provider') }}" class="space-y-6">
         @foreach ($providerNav as $group)
+            @php
+                $groupItems = $group['items'];
+                $groupTotal = count($groupItems);
+                $groupAvailable = collect($groupItems)->reject(fn ($i) => ! empty($i['comingSoon']))->count();
+                $groupConnected = collect($groupItems)->filter(fn ($i) => empty($i['comingSoon']) && $this->credentialCountFor($i['id']) > 0)->count();
+                $groupIcon = match (strtolower((string) $group['label'])) {
+                    default => 'heroicon-o-cube',
+                };
+                if (str_contains(strtolower((string) $group['label']), 'vps') || str_contains(strtolower((string) $group['label']), 'cloud')) {
+                    $groupIcon = 'heroicon-o-cloud';
+                } elseif (str_contains(strtolower((string) $group['label']), 'dns')) {
+                    $groupIcon = 'heroicon-o-globe-alt';
+                } elseif (str_contains(strtolower((string) $group['label']), 'cdn') || str_contains(strtolower((string) $group['label']), 'edge')) {
+                    $groupIcon = 'heroicon-o-bolt';
+                } elseif (str_contains(strtolower((string) $group['label']), 'registr') || str_contains(strtolower((string) $group['label']), 'image')) {
+                    $groupIcon = 'heroicon-o-archive-box';
+                } elseif (str_contains(strtolower((string) $group['label']), 'import')) {
+                    $groupIcon = 'heroicon-o-arrow-down-tray';
+                }
+            @endphp
             <div>
-                <h3 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ $group['label'] }}</h3>
+                {{-- Group header. Tightened with an icon + connected/total
+                     chip — gives quick read on how much of each family is
+                     already wired up without scanning every card. --}}
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">
+                        <x-dynamic-component :component="$groupIcon" class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
+                        {{ $group['label'] }}
+                    </h3>
+                    <span class="text-[10px] font-semibold tabular-nums text-brand-mist">
+                        @if ($groupConnected > 0)
+                            <span class="text-brand-forest">{{ $groupConnected }}</span><span class="text-brand-mist"> / {{ $groupAvailable }} {{ __('connected') }}</span>
+                        @else
+                            {{ $groupAvailable }} {{ __('available') }}
+                        @endif
+                    </span>
+                </div>
                 <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    @foreach ($group['items'] as $item)
+                    @foreach ($groupItems as $item)
                         @php
                             $count = $this->credentialCountFor($item['id']);
                             $isComing = ! empty($item['comingSoon']);
                             $isActive = $active_provider === $item['id'];
-                            $sampleCaps = $credentials->firstWhere('provider', $item['id'])?->capabilities() ?? [];
+                            $firstCred = $credentials->firstWhere('provider', $item['id']);
+                            $sampleCaps = $firstCred?->capabilities() ?? [];
                         @endphp
                         <li>
                             <button
@@ -170,6 +231,10 @@
                                             {{ __('Not connected') }}
                                         @else
                                             {{ trans_choice(':n credential|:n credentials', $count, ['n' => $count]) }}
+                                            @if ($firstCred?->created_at)
+                                                <span class="text-brand-mist"> · </span>
+                                                <span title="{{ $firstCred->created_at->toDayDateTimeString() }}">{{ __('added :time', ['time' => $firstCred->created_at->diffForHumans()]) }}</span>
+                                            @endif
                                         @endif
                                     </p>
                                 </div>

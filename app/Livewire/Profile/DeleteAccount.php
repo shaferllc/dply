@@ -20,6 +20,13 @@ class DeleteAccount extends Component
         ], [], ['delete_password' => __('password')]);
 
         $user = auth()->user();
+        $org = $user->currentOrganization();
+        $snapshot = ['user_id' => (string) $user->id, 'email' => $user->email, 'name' => $user->name];
+
+        if ($org) {
+            audit_log($org, $user, 'user.account_deleted', null, $snapshot, null);
+        }
+
         Auth::logout();
         $user->delete();
         Session::invalidate();
