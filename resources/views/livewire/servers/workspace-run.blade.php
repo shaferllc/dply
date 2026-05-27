@@ -35,9 +35,11 @@
                     {{ __('Open Sites') }}
                 </a>
                 @if ($server->workspace)
-                    <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
-                        {{ __('Open Project delivery') }}
-                    </a>
+                    @feature('surface.projects')
+                        <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
+                            {{ __('Open Project delivery') }}
+                        </a>
+                    @endfeature
                 @endif
             </div>
         </div>

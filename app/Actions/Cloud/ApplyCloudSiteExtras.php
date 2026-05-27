@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Cloud;
 
+use App\Models\CloudBucket;
 use App\Models\CloudDatabase;
 use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
@@ -42,7 +43,15 @@ class ApplyCloudSiteExtras
         $this->applyWorkers($site, $payload['workers'] ?? null);
         $this->applyDeployTasks($site, $payload['deploy_tasks'] ?? null);
         $this->applyAlerts($site, $payload['alerts'] ?? null);
-        $this->applyDatabase($site, $payload['database'] ?? null);
+        // 'databases' (array) is the multi-database path used by the create
+        // form. 'database' (single dict) is kept for any other caller that
+        // still passes one — internal compatibility, removable later.
+        if (isset($payload['databases'])) {
+            $this->applyDatabases($site, $payload['databases']);
+        } else {
+            $this->applyDatabase($site, $payload['database'] ?? null);
+        }
+        $this->applyBuckets($site, $payload['buckets'] ?? null);
         $this->applyDomains($site, $payload['domains'] ?? null);
     }
 
@@ -251,9 +260,13 @@ class ApplyCloudSiteExtras
             ),
         };
 
+        $prefix = (string) ($input['env_prefix'] ?? $database->defaultEnvPrefix());
+
         // Pivot first so the relationship exists even if the DB is still
-        // provisioning when initial provision runs.
-        $database->sites()->syncWithoutDetaching([$site->id]);
+        // provisioning when initial provision runs. The pivot row carries
+        // the per-attachment env_prefix so AttachCloudDatabaseJob can find
+        // exactly which keys to inject/strip on later events.
+        $database->sites()->syncWithoutDetaching([$site->id => ['env_prefix' => $prefix]]);
 
         // Merge connection env vars synchronously — when the DB is already
         // active these land in env_file_content before the provision job
@@ -262,10 +275,71 @@ class ApplyCloudSiteExtras
         // AttachCloudDatabaseJob to every pivoted site on activation, so
         // the env vars + redeploy land automatically later.
         $vars = $this->parseEnvLines((string) ($site->env_file_content ?? ''));
-        foreach ($database->connectionEnvVars() as $key => $value) {
+        foreach ($database->connectionEnvVars($prefix) as $key => $value) {
             $vars[$key] = $value;
         }
         $site->update(['env_file_content' => $this->serializeEnvLines($vars)]);
+    }
+
+    /**
+     * Many-database equivalent of applyDatabase — drives one applyDatabase
+     * call per entry. Returns early if the input isn't a list of dicts.
+     *
+     * @param  array<int, mixed>|mixed  $input
+     */
+    private function applyDatabases(Site $site, mixed $input): void
+    {
+        if (! is_array($input)) {
+            return;
+        }
+        foreach ($input as $entry) {
+            $this->applyDatabase($site, $entry);
+        }
+    }
+
+    /**
+     * Create a CloudBucket row + pivot for each entry the form submitted.
+     * Real provider provisioning (DO Spaces / S3 / R2) lands in a follow-
+     * up PR; for now we materialize the record with status='pending' so
+     * the canvas + manage surface have something to display, and the
+     * pivot's env_prefix is set so a future AttachCloudBucketJob can
+     * inject the right env-var keys.
+     *
+     * @param  array<int, mixed>|mixed  $input
+     */
+    private function applyBuckets(Site $site, mixed $input): void
+    {
+        if (! is_array($input)) {
+            return;
+        }
+        foreach ($input as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $name = trim((string) ($entry['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $prefix = strtoupper((string) ($entry['env_prefix'] ?? 'S3'));
+            $region = trim((string) ($entry['region'] ?? ''));
+
+            // Org-uniqueness on name is enforced by a DB constraint;
+            // we still firstOrCreate so re-submitting the same payload
+            // (re-deploy after edit) reuses the existing record.
+            $bucket = CloudBucket::query()->firstOrCreate(
+                [
+                    'organization_id' => $site->organization_id,
+                    'name' => $name,
+                ],
+                [
+                    'backend' => (string) ($entry['backend'] ?? CloudBucket::BACKEND_DIGITALOCEAN_SPACES),
+                    'region' => $region !== '' ? $region : null,
+                    'status' => CloudBucket::STATUS_PENDING,
+                ],
+            );
+
+            $bucket->sites()->syncWithoutDetaching([$site->id => ['env_prefix' => $prefix]]);
+        }
     }
 
     /**

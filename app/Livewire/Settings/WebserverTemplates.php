@@ -114,10 +114,17 @@ NGINX;
             $template = WebserverTemplate::query()
                 ->where('organization_id', $this->organization->id)
                 ->findOrFail($this->editingId);
+            $before = ['label' => $template->label];
             $template->update($payload);
+            audit_log($this->organization, $user, 'webserver_template.updated', $template, $before, [
+                'label' => $template->label,
+            ]);
             $this->toastSuccess(__('Template updated.'));
         } else {
-            $this->organization->webserverTemplates()->create($payload);
+            $template = $this->organization->webserverTemplates()->create($payload);
+            audit_log($this->organization, $user, 'webserver_template.created', $template, null, [
+                'label' => $template->label,
+            ]);
             $this->toastSuccess(__('Template created.'));
         }
 

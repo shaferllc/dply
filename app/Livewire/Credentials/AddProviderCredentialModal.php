@@ -93,12 +93,30 @@ class AddProviderCredentialModal extends Component
 
     public function render(): View
     {
+        // Load the org's existing credentials for the selected provider so
+        // the modal can show "Saved in this organization" alongside the add
+        // form (the credentials index page no longer has its own list — the
+        // modal owns provider management end-to-end).
+        $orgId = auth()->user()?->currentOrganization()?->id;
+        $credentials = $orgId !== null
+            ? ProviderCredential::query()
+                ->where('organization_id', $orgId)
+                ->where('provider', $this->active_provider)
+                ->latest()
+                ->get()
+            : auth()->user()?->providerCredentials()
+                ->whereNull('organization_id')
+                ->where('provider', $this->active_provider)
+                ->latest()
+                ->get() ?? collect();
+
         return view('livewire.credentials.add-provider-credential-modal', [
             'providerNav' => Index::credentialProviderNav($this->capability),
             'activeProviderLabel' => Index::providerLabel($this->active_provider),
             'digitalOceanOAuthConfigured' => filled(config('services.digitalocean_oauth.client_id'))
                 && filled(config('services.digitalocean_oauth.client_secret')),
             'providerPickerLocked' => $this->defaultProvider !== null,
+            'credentials' => $credentials,
         ]);
     }
 }

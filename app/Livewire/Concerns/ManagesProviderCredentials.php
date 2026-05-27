@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
 use App\Services\AwsEc2ServiceFactory;
@@ -859,6 +860,13 @@ trait ManagesProviderCredentials
             return false;
         }
 
+        if ($org) {
+            audit_log($org, auth()->user(), 'credential.created', $credential, null, [
+                'provider' => $provider,
+                'name' => $credential->name,
+            ]);
+        }
+
         $this->toastSuccess('Provider connected.');
         $this->notifyProviderCredentialStored($provider);
 
@@ -883,6 +891,10 @@ trait ManagesProviderCredentials
     public function verifyCredential(string $id): void
     {
         $this->verifyingCredentialId = $id;
+
+        $credential = null;
+        $ok = false;
+        $error = null;
 
         try {
             $credential = ProviderCredential::findOrFail($id);
@@ -913,11 +925,25 @@ trait ManagesProviderCredentials
                 default => throw new \RuntimeException(__('Unknown provider.')),
             };
 
+            $ok = true;
             $this->toastSuccess(__('Credentials verified with the provider API.'));
         } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+            $error = $e->getMessage();
+            $this->toastError($error);
         } finally {
             $this->verifyingCredentialId = null;
+        }
+
+        if ($credential !== null) {
+            $org = $credential->organization_id
+                ? Organization::find($credential->organization_id)
+                : auth()->user()?->currentOrganization();
+            if ($org) {
+                audit_log($org, auth()->user(), $ok ? 'credential.verified' : 'credential.verify_failed', $credential, null, [
+                    'provider' => $credential->provider,
+                    'error' => $error,
+                ]);
+            }
         }
     }
 
@@ -925,7 +951,22 @@ trait ManagesProviderCredentials
     {
         $credential = ProviderCredential::findOrFail($id);
         $this->authorize('delete', $credential);
+
+        $snapshot = [
+            'provider' => $credential->provider,
+            'name' => $credential->name,
+        ];
+
+        $org = $credential->organization_id
+            ? Organization::find($credential->organization_id)
+            : auth()->user()?->currentOrganization();
+
         $credential->delete();
+
+        if ($org) {
+            audit_log($org, auth()->user(), 'credential.deleted', null, $snapshot, null);
+        }
+
         $this->toastSuccess('Credential removed.');
     }
 }

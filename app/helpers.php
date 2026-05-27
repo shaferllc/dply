@@ -120,6 +120,31 @@ if (! function_exists('server_workspace_nav_for_server')) {
     }
 }
 
+if (! function_exists('multi_surface_active')) {
+    /**
+     * True when the current org has at least one non-VM product surface
+     * enabled (Cloud / Edge / Serverless). Used to gate the Infrastructure
+     * dashboard and the Launchpad — those screens are designed to triage
+     * across multiple surfaces and become noise when only Servers exist.
+     *
+     * Optional $organization scopes the check to a specific org (admin
+     * tooling); omit to use Pennant's default scope (current org).
+     */
+    function multi_surface_active(?Organization $organization = null): bool
+    {
+        foreach (['surface.cloud', 'surface.edge', 'surface.serverless'] as $flag) {
+            $active = $organization === null
+                ? Feature::active($flag)
+                : Feature::for($organization)->active($flag);
+            if ($active) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.

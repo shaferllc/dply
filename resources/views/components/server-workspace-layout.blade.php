@@ -37,7 +37,7 @@
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
-        if ($server->workspace) {
+        if ($server->workspace && \Laravel\Pennant\Feature::active('surface.projects')) {
             $workspaceBreadcrumbs[] = [
                 'label' => $server->workspace->name,
                 'href' => route('projects.resources', $server->workspace),
@@ -90,9 +90,11 @@
                     {{ $headerActions }}
                 @endisset
                 @if ($server->workspace)
-                    <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                        {{ __('Open project workspace') }}
-                    </a>
+                    @feature('surface.projects')
+                        <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                            {{ __('Open project workspace') }}
+                        </a>
+                    @endfeature
                 @endif
             </x-slot>
         @endif

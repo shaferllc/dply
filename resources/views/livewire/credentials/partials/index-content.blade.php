@@ -1,3 +1,30 @@
+@php
+    // Lightweight summary stats — pulled inline so this redesign doesn't
+    // require touching the Livewire component or its renderer signature.
+    $connectedProviders = $credentials->pluck('provider')->unique();
+    $verifiedCredentials = $credentials->filter(fn ($c) => ! empty($c->verified_at ?? null));
+
+    $capabilityTabs = [
+        ['id' => 'all', 'label' => __('All'), 'icon' => 'heroicon-o-squares-2x2'],
+        ['id' => 'server', 'label' => __('Compute'), 'icon' => 'heroicon-o-cpu-chip'],
+        ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-globe-alt'],
+        ['id' => 'cdn', 'label' => __('CDN'), 'icon' => 'heroicon-o-bolt'],
+    ];
+
+    // Capability dots for the provider cards — the existing panel.blade.php
+    // uses the same vocabulary, so cards and panel speak the same language.
+    $capabilityDot = function (string $cap): array {
+        return match ($cap) {
+            'compute' => ['label' => __('Compute'), 'dot' => 'bg-brand-moss'],
+            'dns' => ['label' => __('DNS'), 'dot' => 'bg-brand-sage'],
+            'cdn' => ['label' => __('CDN'), 'dot' => 'bg-sky-500'],
+            'app_platform' => ['label' => __('App Platform'), 'dot' => 'bg-violet-500'],
+            'import' => ['label' => __('Import'), 'dot' => 'bg-amber-500'],
+            default => ['label' => ucfirst(str_replace('_', ' ', $cap)), 'dot' => 'bg-brand-mist'],
+        };
+    };
+@endphp
+
 <x-livewire-validation-errors />
 
 @if ($organization)
@@ -14,136 +41,175 @@
     ]" />
 @endif
 
-<x-page-header
-    :title="__('Providers')"
-    :description="__('Store encrypted API keys for the cloud providers your organization uses. Tokens are validated when possible.')"
-    toolbar
->
-    <x-slot name="actions">
-        <x-docs-link doc-route="docs.connect-provider">
-            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-            {{ __('Provider setup guide') }}
-        </x-docs-link>
-    </x-slot>
-</x-page-header>
-
 <div class="space-y-6">
-    {{-- Mobile: capability filter + jump to provider --}}
-    <div class="lg:hidden space-y-3">
-        <nav class="flex flex-wrap gap-2" aria-label="{{ __('Capability tabs') }}">
-            @foreach ([
-                ['id' => 'all', 'label' => __('All')],
-                ['id' => 'server', 'label' => __('Server')],
-                ['id' => 'dns', 'label' => __('DNS')],
-                ['id' => 'cdn', 'label' => __('CDN')],
-            ] as $tabItem)
+    {{-- Hero: positioning + at-a-glance counts. The right-hand stat strip
+         replaces the previous "stored encrypted" pill scattered inside the
+         panel, so the reassurance is visible the moment the page opens. --}}
+    <section class="dply-card overflow-hidden">
+        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+            <div class="lg:col-span-7">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
+                <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Providers') }}</h2>
+                <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Store API tokens for the clouds, registrars, and CDNs your organization uses. Tokens are encrypted at rest and validated against the provider when we can.') }}
+                </p>
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <x-docs-link doc-route="docs.connect-provider">
+                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Provider setup guide') }}
+                    </x-docs-link>
+                    <a href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage underline decoration-brand-sage/35 underline-offset-2 transition hover:text-brand-ink hover:decoration-brand-ink/30">
+                        {{ __('Roles & limits') }}
+                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                    </a>
+                </div>
+            </div>
+            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $connectedProviders->count() }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ __('connected') }}</span>
+                    </dd>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Credentials') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $credentials->count() }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $credentials->count()) }}</span>
+                    </dd>
+                </div>
+                <div class="rounded-2xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest/80">{{ __('Storage') }}</dt>
+                    <dd class="mt-1 flex items-center gap-1.5">
+                        <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                        <span class="text-[11px] font-medium text-brand-forest">{{ __('Encrypted at rest') }}</span>
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    </section>
+
+    {{-- Capability filter. Replaces the legacy mobile-pills + desktop-tablist
+         duplication with one responsive segmented control that works at every
+         breakpoint. Wires to the same $tab property. --}}
+    <section aria-label="{{ __('Capability filter') }}">
+        <div role="tablist" class="inline-flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
+            @foreach ($capabilityTabs as $tabItem)
                 <button
                     type="button"
+                    role="tab"
+                    aria-selected="{{ $tab === $tabItem['id'] ? 'true' : 'false' }}"
                     wire:click="$set('tab', '{{ $tabItem['id'] }}')"
                     @class([
-                        'inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium transition',
-                        'bg-brand-ink text-brand-cream shadow-sm shadow-brand-ink/10' => $tab === $tabItem['id'],
-                        'border border-brand-ink/15 bg-white text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $tab !== $tabItem['id'],
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                        'bg-brand-ink text-brand-cream shadow-sm' => $tab === $tabItem['id'],
+                        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $tab !== $tabItem['id'],
                     ])
                 >
+                    <x-dynamic-component :component="$tabItem['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ $tabItem['label'] }}
                 </button>
             @endforeach
-        </nav>
-        <div>
-            <x-input-label for="credentials_provider_picker" :value="__('Provider')" />
-            <x-select id="credentials_provider_picker" wire:model.live="active_provider">
-                @foreach ($providerNav as $group)
-                    <optgroup label="{{ $group['label'] }}">
-                        @foreach ($group['items'] as $item)
-                            <option value="{{ $item['id'] }}">{{ $item['label'] }}@if (! empty($item['comingSoon'])) — {{ __('coming soon') }}@endif</option>
-                        @endforeach
-                    </optgroup>
-                @endforeach
-            </x-select>
         </div>
-    </div>
+    </section>
 
-    <div class="lg:grid lg:grid-cols-12 lg:gap-6 items-start">
-        <aside class="hidden lg:block lg:col-span-4">
-            <div class="sticky top-24 dply-card overflow-hidden max-h-[calc(100vh-8rem)] flex flex-col">
-                {{-- Capability filter lives in the sidebar header because it filters this list.
-                     Dual-capability providers (DigitalOcean, AWS) appear in both Server and DNS. --}}
-                <div class="border-b border-brand-ink/10 bg-brand-sand/30 px-3 py-2.5">
-                    <div role="tablist" aria-label="{{ __('Capability filter') }}" class="inline-flex w-full gap-1 rounded-lg bg-white/70 p-1 ring-1 ring-brand-ink/10">
-                        @foreach ([
-                            ['id' => 'all', 'label' => __('All')],
-                            ['id' => 'server', 'label' => __('Server')],
-                            ['id' => 'dns', 'label' => __('DNS')],
-                            ['id' => 'cdn', 'label' => __('CDN')],
-                        ] as $tabItem)
+    {{-- Provider grid. Replaces the dense sidebar with tappable cards laid
+         out by category. Each card shows capability dots, a count badge,
+         and a clear connect / manage state — clicking sets the active
+         provider and the panel below jumps in to take over. --}}
+    <section aria-label="{{ __('Pick a provider') }}" class="space-y-6">
+        @foreach ($providerNav as $group)
+            <div>
+                <h3 class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ $group['label'] }}</h3>
+                <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    @foreach ($group['items'] as $item)
+                        @php
+                            $count = $this->credentialCountFor($item['id']);
+                            $isComing = ! empty($item['comingSoon']);
+                            $isActive = $active_provider === $item['id'];
+                            $sampleCaps = $credentials->firstWhere('provider', $item['id'])?->capabilities() ?? [];
+                        @endphp
+                        <li>
                             <button
                                 type="button"
-                                role="tab"
-                                aria-selected="{{ $tab === $tabItem['id'] ? 'true' : 'false' }}"
-                                wire:click="$set('tab', '{{ $tabItem['id'] }}')"
+                                @if (! $isComing)
+                                    x-on:click="$dispatch('open-add-provider-credential-modal', { provider: @js($item['id']) })"
+                                @endif
+                                @disabled($isComing)
                                 @class([
-                                    'flex-1 rounded-md px-2 py-1 text-xs font-semibold transition',
-                                    'bg-brand-ink text-brand-cream shadow-sm' => $tab === $tabItem['id'],
-                                    'text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink' => $tab !== $tabItem['id'],
+                                    'group relative flex w-full flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
+                                    'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing && $count === 0,
+                                    'border-brand-sage/35 hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md' => ! $isComing && $count > 0,
+                                    'border-brand-ink/10 cursor-not-allowed opacity-65' => $isComing,
                                 ])
                             >
-                                {{ $tabItem['label'] }}
-                            </button>
-                        @endforeach
-                    </div>
-                </div>
-                <nav class="overflow-y-auto px-2 py-2 space-y-1 text-sm" aria-label="{{ __('Cloud providers') }}">
-                    @foreach ($providerNav as $group)
-                        <div class="{{ ! $loop->first ? 'pt-3' : '' }}">
-                            <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-brand-mist">{{ $group['label'] }}</p>
-                            <ul class="space-y-0.5">
-                                @foreach ($group['items'] as $item)
-                                    @php
-                                        $count = $this->credentialCountFor($item['id']);
-                                        $isComing = ! empty($item['comingSoon']);
-                                    @endphp
-                                    <li>
-                                        <button
-                                            type="button"
-                                            wire:click="$set('active_provider', '{{ $item['id'] }}')"
-                                            title="{{ $item['label'] }}"
-                                            @class([
-                                                'w-full text-left rounded-lg px-3 py-1.5 transition-colors flex items-center justify-between gap-2',
-                                                'bg-brand-sand/60 text-brand-ink font-medium' => $active_provider === $item['id'],
-                                                'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active_provider !== $item['id'] && ! $isComing,
-                                                'text-brand-mist hover:bg-brand-sand/40 hover:text-brand-moss' => $active_provider !== $item['id'] && $isComing,
-                                            ])
-                                        >
-                                            <span class="flex min-w-0 flex-1 items-center gap-2">
-                                                <x-credentials-provider-icon :provider="$item['id']" />
-                                                <span class="truncate">{{ $item['label'] }}</span>
+                                <div class="flex w-full items-start justify-between gap-2">
+                                    <span @class([
+                                        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-brand-ink/10',
+                                        'bg-brand-sage/12 text-brand-forest' => $count > 0 && ! $isComing,
+                                        'bg-brand-sand/45 text-brand-forest group-hover:bg-brand-sand/70' => $count === 0 || $isComing,
+                                    ])>
+                                        <x-credentials-provider-icon :provider="$item['id']" class="h-5 w-5" />
+                                    </span>
+                                    @if ($isComing)
+                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                    @elseif ($count > 0)
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                                            <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
+                                            {{ $count }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
+                                    <p class="mt-0.5 text-[11px] text-brand-moss">
+                                        @if ($isComing)
+                                            {{ __('Coming soon') }}
+                                        @elseif ($count === 0)
+                                            {{ __('Not connected') }}
+                                        @else
+                                            {{ trans_choice(':n credential|:n credentials', $count, ['n' => $count]) }}
+                                        @endif
+                                    </p>
+                                </div>
+                                @if (! empty($sampleCaps))
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        @foreach ($sampleCaps as $cap)
+                                            @php $chip = $capabilityDot($cap); @endphp
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
+                                                {{ $chip['label'] }}
                                             </span>
-                                            @if ($isComing)
-                                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('soon') }}</span>
-                                            @elseif ($count > 0)
-                                                <span class="shrink-0 text-[10px] font-semibold tabular-nums rounded-full bg-brand-sage/25 text-brand-ink px-1.5 py-0.5">{{ $count }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                {{-- Trailing action hint. Visually a button-shaped
+                                     chip, semantically a span — the whole card IS the
+                                     trigger so we don't nest <button>s. --}}
+                                @unless ($isComing)
+                                    <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
+                                        <span class="inline-flex items-center gap-1.5">
+                                            @if ($count > 0)
+                                                <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                {{ __('Manage') }}
+                                            @else
+                                                <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                {{ __('Add new') }}
                                             @endif
-                                        </button>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
+                                        </span>
+                                        <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
+                                    </span>
+                                @endunless
+                            </button>
+                        </li>
                     @endforeach
-                </nav>
+                </ul>
             </div>
-        </aside>
+        @endforeach
+    </section>
 
-        <div class="lg:col-span-8 min-w-0 space-y-6">
-            <h2 class="inline-flex items-center gap-2 text-lg font-semibold text-brand-ink">
-                <x-credentials-provider-icon :provider="$active_provider" class="h-5 w-5 opacity-95" />
-                {{ $activeProviderLabel }}
-            </h2>
-
-            @include('livewire.credentials.panel', [
-                'credentials' => $credentials,
-                'digitalOceanOAuthConfigured' => filled(config('services.digitalocean_oauth.client_id')) && filled(config('services.digitalocean_oauth.client_secret')),
-            ])
-        </div>
-    </div>
+    {{-- Provider management lives in a modal now (opened per-card). Keeps
+         the index focused on connection state at a glance. --}}
 </div>

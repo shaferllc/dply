@@ -160,14 +160,25 @@
             </x-slot>
             <x-slot name="actions">
                 @can('create', App\Models\Server::class)
-                    <a
-                        href="{{ route('launches.create') }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Open launchpad') }}
-                    </a>
+                    @if (multi_surface_active())
+                        <a
+                            href="{{ route('launches.create') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Open launchpad') }}
+                        </a>
+                    @else
+                        <a
+                            href="{{ route('servers.create') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Create a server') }}
+                        </a>
+                    @endif
                     <a
                         href="{{ route('docs.create-first-server') }}"
                         wire:navigate
@@ -304,22 +315,24 @@
                                     {{ __('Fast path to provision when credentials are ready.') }}
                                 </span>
                             </li>
-                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                                <x-heroicon-o-rectangle-group class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span>
-                                    <span class="font-semibold text-brand-ink">{{ __('Browse infrastructure') }}</span>
-                                    <span class="text-brand-mist"> — </span>
-                                    {{ __('See servers, cloud apps, and serverless in one place.') }}
-                                </span>
-                            </li>
-                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                                <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span>
-                                    <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
-                                    <span class="text-brand-mist"> — </span>
-                                    {{ __('Explore BYO, Docker, serverless, Kubernetes, and more.') }}
-                                </span>
-                            </li>
+                            @if (multi_surface_active())
+                                <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                    <x-heroicon-o-rectangle-group class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                    <span>
+                                        <span class="font-semibold text-brand-ink">{{ __('Browse infrastructure') }}</span>
+                                        <span class="text-brand-mist"> — </span>
+                                        {{ __('See servers, cloud apps, and serverless in one place.') }}
+                                    </span>
+                                </li>
+                                <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                    <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                    <span>
+                                        <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
+                                        <span class="text-brand-mist"> — </span>
+                                        {{ __('Explore BYO, Docker, serverless, Kubernetes, and more.') }}
+                                    </span>
+                                </li>
+                            @endif
                             <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                                 <x-heroicon-o-link class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span>
@@ -434,12 +447,14 @@
                                                         <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
                                                     </div>
                                                     @if ($server->workspace)
-                                                        <p class="mt-1 text-xs text-brand-moss">
-                                                            {{ __('Project:') }}
-                                                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
-                                                                {{ $server->workspace->name }}
-                                                            </a>
-                                                        </p>
+                                                        @feature('surface.projects')
+                                                            <p class="mt-1 text-xs text-brand-moss">
+                                                                {{ __('Project:') }}
+                                                                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
+                                                                    {{ $server->workspace->name }}
+                                                                </a>
+                                                            </p>
+                                                        @endfeature
                                                     @endif
                                                     @if ($server->scheduled_deletion_at)
                                                         <p class="mt-1 text-xs font-medium text-amber-800">
@@ -509,11 +524,13 @@
                                                     <p class="mt-1 text-sm text-brand-moss">
                                                         {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
                                                         @if ($server->workspace)
-                                                            <span class="text-brand-mist"> · </span>
-                                                            {{ __('Project:') }}
-                                                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
-                                                                {{ $server->workspace->name }}
-                                                            </a>
+                                                            @feature('surface.projects')
+                                                                <span class="text-brand-mist"> · </span>
+                                                                {{ __('Project:') }}
+                                                                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
+                                                                    {{ $server->workspace->name }}
+                                                                </a>
+                                                            @endfeature
                                                         @endif
                                                         @if ($isFullyReady($server))
                                                             <span class="text-brand-mist"> · </span>

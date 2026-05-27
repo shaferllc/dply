@@ -9,6 +9,11 @@
         @include('livewire.credentials.partials.index-content')
     @endif
 
+    {{-- One shared "Add a credential" modal for the entire page. Each
+         provider card dispatches `open-add-provider-credential-modal`
+         with its provider id; the modal listens window-wide. --}}
+    <livewire:credentials.add-provider-credential-modal />
+
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
     </x-slot>

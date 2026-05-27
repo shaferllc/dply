@@ -81,9 +81,14 @@ class Security extends Component
             'password' => __('new password'),
         ]);
 
-        $this->user()->update([
+        $user = $this->user();
+        $user->update([
             'password' => Hash::make($this->password),
         ]);
+
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'user.password_changed', $user);
+        }
 
         $this->reset(['current_password', 'password', 'password_confirmation']);
         $this->dispatch('password-updated');
@@ -106,7 +111,12 @@ class Security extends Component
         }
 
         $credential = $user->passkeys()->whereKey($credentialId)->firstOrFail();
+        $snapshot = ['name' => $credential->name, 'credential_id' => (string) $credential->getKey()];
         $credential->delete();
+
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'user.passkey_removed', null, $snapshot, null);
+        }
 
         unset($this->passkeyAliases[$credentialId]);
     }
@@ -115,7 +125,7 @@ class Security extends Component
     {
         $user = $this->user();
 
-        SocialAccount::query()
+        $account = SocialAccount::query()
             ->where('user_id', $user->id)
             ->whereKey($accountId)
             ->firstOrFail();
@@ -126,10 +136,16 @@ class Security extends Component
             return;
         }
 
+        $snapshot = ['provider' => $account->provider, 'account_id' => (string) $account->getKey()];
+
         SocialAccount::query()
             ->where('user_id', $user->id)
             ->whereKey($accountId)
             ->delete();
+
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'user.oauth_unlinked', null, $snapshot, null);
+        }
     }
 
     public function render(): View

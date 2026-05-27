@@ -117,17 +117,19 @@
                 </div>
 
                 @if ($site->workspace)
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                        <p class="text-sm font-semibold text-brand-ink">{{ __('Current project') }}</p>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
-                        </p>
-                        <div class="mt-3 flex flex-wrap gap-3 text-sm">
-                            <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project resources') }}</a>
-                            <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project operations') }}</a>
-                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project delivery') }}</a>
+                    @feature('surface.projects')
+                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                            <p class="text-sm font-semibold text-brand-ink">{{ __('Current project') }}</p>
+                            <p class="mt-1 text-sm text-brand-moss">
+                                {{ __('This site currently rolls up into :project.', ['project' => $site->workspace->name]) }}
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-3 text-sm">
+                                <a href="{{ route('projects.resources', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project resources') }}</a>
+                                <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project operations') }}</a>
+                                <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open project delivery') }}</a>
+                            </div>
                         </div>
-                    </div>
+                    @endfeature
                 @endif
             </div>
         </div>

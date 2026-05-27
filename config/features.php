@@ -83,10 +83,15 @@ return [
 
     /*
     | Whole non-workspace product surfaces. Each is a top-level route group.
+    |
+    | VM-only launch: cloud / edge / serverless are off by default; per-org
+    | overrides (Admin Dashboard → Surface flags) let design partners and
+    | internal dogfooders opt in without redeploying. Webhooks + scheduled
+    | jobs stay live regardless of the flag — gating is UI/route-only.
     */
     'surface' => [
-        // exit: shipped — container/cloud index, create, and databases are live
-        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
+        // exit: VM launch is dark; flip to true once container/cloud surface is GA
+        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
         // exit: ship once cross-server views have a saved-view persistence model
         'fleet' => env('FEATURE_SURFACE_FLEET', false),
         // exit: ship after a curated v1 marketplace catalog is approved
@@ -99,6 +104,8 @@ return [
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
         'edge' => env('FEATURE_SURFACE_EDGE', false),
+        // exit: ship once OpenWhisk multi-language adapters + billing are GA
+        'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
     ],
 
     /*

@@ -8,16 +8,13 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
- * Pivot model for the cloud_database_site table.
- *
- * Carries a ULID primary key, so it needs HasUlids — a plain Eloquent
- * pivot would not populate the `id` column on insert.
+ * Pivot model for the cloud_bucket_site table. Mirrors {@see CloudDatabaseSite}.
  */
-class CloudDatabaseSite extends Pivot
+class CloudBucketSite extends Pivot
 {
     use HasUlids;
 
-    protected $table = 'cloud_database_site';
+    protected $table = 'cloud_bucket_site';
 
     public $incrementing = false;
 

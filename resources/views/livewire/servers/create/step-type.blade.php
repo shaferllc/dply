@@ -39,32 +39,42 @@
                 <h2 class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('How are you adding this server?') }}</h2>
                 <span class="text-xs font-medium text-brand-mist">{{ __('Pick one') }}</span>
             </div>
-            <div class="grid gap-4 sm:grid-cols-2">
+            {{-- Selection is driven by Alpine so the visual switch is
+                 instant — `wire:click` had a perceptible flash while the
+                 Livewire round-trip re-morphed the cards. We mirror
+                 $form->mode → Alpine on mount, then push back to the
+                 server via $wire.set so persistence still happens. --}}
+            <div
+                class="grid gap-4 sm:grid-cols-2"
+                x-data="{ mode: @js($form->mode) }"
+                x-init="$watch('$wire.form.mode', value => mode = value)"
+            >
                 <button
                     type="button"
-                    wire:click="chooseProviderMode"
-                    @class([
-                        'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
-                        'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->mode === 'provider',
-                        'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->mode !== 'provider',
-                    ])
+                    @click="mode = 'provider'; $wire.chooseProviderMode()"
+                    :aria-pressed="mode === 'provider' ? 'true' : 'false'"
+                    :class="mode === 'provider'
+                        ? 'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream'
+                        : 'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md'"
+                    class="group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all"
                 >
                     <div class="flex items-start justify-between gap-3">
-                        <span @class([
-                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
-                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->mode === 'provider',
-                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->mode !== 'provider',
-                        ])>
+                        <span
+                            :class="mode === 'provider'
+                                ? 'bg-brand-sage text-white shadow-md shadow-brand-sage/20'
+                                : 'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15'"
+                            class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors"
+                        >
                             <x-heroicon-o-cloud-arrow-up class="h-6 w-6" />
                         </span>
-                        <span @class([
-                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                            'border-brand-sage bg-brand-sage text-white' => $form->mode === 'provider',
-                            'border-brand-ink/20 bg-white' => $form->mode !== 'provider',
-                        ])>
-                            @if ($form->mode === 'provider')
+                        <span
+                            :class="mode === 'provider' ? 'border-brand-sage bg-brand-sage text-white' : 'border-brand-ink/20 bg-white'"
+                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
+                        >
+                            {{-- Wrapper span (not the SVG) holds x-show so toggle is reliable; x-show on the heroicon SVG had stale display on switch. --}}
+                            <span x-show="mode === 'provider'" x-cloak class="inline-flex">
                                 <x-heroicon-s-check class="h-4 w-4" />
-                            @endif
+                            </span>
                         </span>
                     </div>
                     <span class="mt-4 block text-base font-semibold text-brand-ink">{{ __('Provision with a provider') }}</span>
@@ -81,29 +91,29 @@
 
                 <button
                     type="button"
-                    wire:click="chooseCustomMode"
-                    @class([
-                        'group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all',
-                        'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream' => $form->mode === 'custom',
-                        'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $form->mode !== 'custom',
-                    ])
+                    @click="mode = 'custom'; $wire.chooseCustomMode()"
+                    :aria-pressed="mode === 'custom' ? 'true' : 'false'"
+                    :class="mode === 'custom'
+                        ? 'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-brand-cream'
+                        : 'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md'"
+                    class="group relative flex flex-col rounded-2xl border-2 p-6 text-left shadow-sm transition-all"
                 >
                     <div class="flex items-start justify-between gap-3">
-                        <span @class([
-                            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors',
-                            'bg-brand-sage text-white shadow-md shadow-brand-sage/20' => $form->mode === 'custom',
-                            'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15' => $form->mode !== 'custom',
-                        ])>
+                        <span
+                            :class="mode === 'custom'
+                                ? 'bg-brand-sage text-white shadow-md shadow-brand-sage/20'
+                                : 'bg-brand-sand/40 text-brand-forest group-hover:bg-brand-sage/15'"
+                            class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-colors"
+                        >
                             <x-heroicon-o-server-stack class="h-6 w-6" />
                         </span>
-                        <span @class([
-                            'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                            'border-brand-sage bg-brand-sage text-white' => $form->mode === 'custom',
-                            'border-brand-ink/20 bg-white' => $form->mode !== 'custom',
-                        ])>
-                            @if ($form->mode === 'custom')
+                        <span
+                            :class="mode === 'custom' ? 'border-brand-sage bg-brand-sage text-white' : 'border-brand-ink/20 bg-white'"
+                            class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors"
+                        >
+                            <span x-show="mode === 'custom'" x-cloak class="inline-flex">
                                 <x-heroicon-s-check class="h-4 w-4" />
-                            @endif
+                            </span>
                         </span>
                     </div>
                     <span class="mt-4 block text-base font-semibold text-brand-ink">{{ __('Custom server (BYO)') }}</span>

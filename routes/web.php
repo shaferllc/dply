@@ -336,16 +336,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('cloud/databases', CloudDatabaseIndex::class)->name('cloud.databases.index');
         Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
     });
-    Route::livewire('edge', EdgeIndex::class)->name('edge.index');
     Route::middleware('feature:surface.edge')->group(function (): void {
+        Route::livewire('edge', EdgeIndex::class)->name('edge.index');
         Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
         Route::livewire('edge/import', Import::class)->name('edge.import');
         Route::livewire('edge/templates', Templates::class)->name('edge.templates');
         Route::livewire('edge/usage', \App\Livewire\Edge\Usage::class)->name('edge.usage');
     });
-    Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
-    Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
-    Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
+    Route::middleware('feature:surface.serverless')->group(function (): void {
+        Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
+        Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
+        Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
+    });
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
     Route::livewire('imports/ploi/migrations/{migration}', MigrationProgress::class)->name('imports.ploi.migration.progress');
     Route::livewire('imports/forge', Inventory::class)->name('imports.forge.inventory');
@@ -368,7 +370,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // container via /servers/{id}/sites/create container mode). This route is kept for
     // one release as a 302 to the wizard so external bookmarks don't 404.
     Route::redirect('launches/containers/create', '/servers/create?host_target=docker', 302)->name('launches.containers.create');
-    Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
+    Route::middleware('feature:surface.serverless')->group(function (): void {
+        Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
+    });
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
 

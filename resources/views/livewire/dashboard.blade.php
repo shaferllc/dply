@@ -17,12 +17,12 @@
             'href' => route('sites.index'),
             'cta' => __('Open sites'),
         ],
-        [
+        ...(\Laravel\Pennant\Feature::active('surface.projects') ? [[
             'title' => __('Projects'),
             'description' => __('Track workspaces and organize app delivery across your infrastructure footprint.'),
             'href' => route('projects.index'),
             'cta' => __('Open projects'),
-        ],
+        ]] : []),
         [
             'title' => __('Organizations'),
             'description' => __('Review teams, limits, and the operational context behind your current workspace.'),
@@ -120,9 +120,15 @@
                         </p>
 
                         <div class="mt-8 flex flex-wrap gap-3">
-                            <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
-                                {{ __('Open launchpad') }}
-                            </a>
+                            @if (multi_surface_active())
+                                <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
+                                    {{ __('Open launchpad') }}
+                                </a>
+                            @else
+                                <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-gold px-5 py-3 text-sm font-semibold text-brand-ink shadow-lg shadow-brand-gold/20 transition hover:bg-[#d4b24d]">
+                                    {{ __('Add a server') }}
+                                </a>
+                            @endif
                             <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/12">
                                 {{ __('Provider credentials') }}
                             </a>
@@ -307,14 +313,27 @@
 
                 @if ($servers->isEmpty())
                     <div class="mt-6 rounded-[1.5rem] border border-brand-ink/10 bg-brand-cream/65 p-6">
-                        <p class="text-base font-medium text-brand-ink">{{ __('No servers yet. Choose a launch path to get started.') }}</p>
-                        <p class="mt-2 text-sm leading-6 text-brand-moss">
-                            {{ __('Start with the launchpad, then continue into BYO, local Docker, remote Docker, serverless, Kubernetes, edge, or cloud network setup as the workspace grows.') }}
-                        </p>
+                        @if (multi_surface_active())
+                            <p class="text-base font-medium text-brand-ink">{{ __('No servers yet. Choose a launch path to get started.') }}</p>
+                            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                {{ __('Start with the launchpad, then continue into BYO, local Docker, remote Docker, serverless, Kubernetes, edge, or cloud network setup as the workspace grows.') }}
+                            </p>
+                        @else
+                            <p class="text-base font-medium text-brand-ink">{{ __('No servers yet.') }}</p>
+                            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                {{ __('Spin up your first server — bring your own host or provision a VM from a connected cloud provider.') }}
+                            </p>
+                        @endif
                         <div class="mt-5 flex flex-wrap gap-3 text-sm">
-                            <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 font-semibold text-brand-cream transition hover:bg-brand-forest">
-                                {{ __('Open launchpad') }}
-                            </a>
+                            @if (multi_surface_active())
+                                <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 font-semibold text-brand-cream transition hover:bg-brand-forest">
+                                    {{ __('Open launchpad') }}
+                                </a>
+                            @else
+                                <a href="{{ route('servers.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-brand-ink px-4 py-2.5 font-semibold text-brand-cream transition hover:bg-brand-forest">
+                                    {{ __('Add a server') }}
+                                </a>
+                            @endif
                             <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 font-semibold text-brand-ink transition hover:bg-brand-cream">
                                 {{ __('New? Read the guide') }}
                             </a>

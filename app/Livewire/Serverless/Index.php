@@ -6,6 +6,7 @@ namespace App\Livewire\Serverless;
 
 use App\Models\Site;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -20,6 +21,11 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    public function mount(): void
+    {
+        abort_unless(Feature::active('surface.serverless'), 404);
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();

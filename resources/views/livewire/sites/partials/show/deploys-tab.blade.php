@@ -55,7 +55,9 @@
                     <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                         <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h3>
                         @if ($site->workspace)
-                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">{{ __('Project delivery') }}</a>
+                            @feature('surface.projects')
+                                <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">{{ __('Project delivery') }}</a>
+                            @endfeature
                         @endif
                     </div>
                     <div class="px-6 py-5 sm:px-8">

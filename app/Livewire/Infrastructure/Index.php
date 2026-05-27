@@ -20,6 +20,15 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    public function mount(): void
+    {
+        // Infrastructure dashboard is the cross-surface triage view; when
+        // only VM is active for the org, it's noise — /servers is the
+        // single source of truth. Reappears the moment any non-VM surface
+        // is enabled (admin toggle, env override).
+        abort_unless(multi_surface_active(), 404);
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -79,6 +88,7 @@ class Index extends Component
             ],
             'cloudEnabled' => Feature::active('surface.cloud'),
             'edgeEnabled' => Feature::active('surface.edge'),
+            'serverlessEnabled' => Feature::active('surface.serverless'),
             'fleetEnabled' => Feature::active('surface.fleet'),
         ]);
     }

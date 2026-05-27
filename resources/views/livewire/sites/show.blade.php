@@ -70,10 +70,12 @@
                         </button>
                     @endcan
                 @elseif ($readyForWorkspace && $site->workspace)
-                    <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
-                        <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Open project') }}
-                    </x-outline-link>
+                    @feature('surface.projects')
+                        <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
+                            <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                            {{ __('Open project') }}
+                        </x-outline-link>
+                    @endfeature
                 @endif
                 @if ($showWebserverConfigEditor && ! $site->isCustom() && ! $site->usesEdgeRuntime())
                     <x-outline-link :href="route('sites.webserver-config', [$server, $site])" wire:navigate>

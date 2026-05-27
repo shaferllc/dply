@@ -88,7 +88,18 @@ class CloudDatabase extends Model
     {
         return $this->belongsToMany(Site::class, 'cloud_database_site')
             ->using(CloudDatabaseSite::class)
+            ->withPivot('env_prefix')
             ->withTimestamps();
+    }
+
+    /**
+     * Default env-var prefix for this engine. Used when a caller doesn't
+     * pass a per-pivot prefix — preserves the original singleton behavior
+     * (Postgres/MySQL → DB_*, Redis → REDIS_*).
+     */
+    public function defaultEnvPrefix(): string
+    {
+        return $this->engine === self::ENGINE_REDIS ? 'REDIS' : 'DB';
     }
 
     public function isActive(): bool
@@ -127,8 +138,10 @@ class CloudDatabase extends Model
      *
      * @return array<string, string>
      */
-    public function connectionEnvVars(): array
+    public function connectionEnvVars(?string $prefix = null): array
     {
+        $prefix = $prefix ?? $this->defaultEnvPrefix();
+
         // NB: read via getAttribute(), not $this->connection — the
         // latter collides with Eloquent's protected $connection property
         // (the DB connection name) when accessed from inside the model.
@@ -144,19 +157,19 @@ class CloudDatabase extends Model
 
         if ($this->engine === self::ENGINE_REDIS) {
             return [
-                'REDIS_HOST' => $host,
-                'REDIS_PORT' => $port,
-                'REDIS_PASSWORD' => $password,
+                $prefix.'_HOST' => $host,
+                $prefix.'_PORT' => $port,
+                $prefix.'_PASSWORD' => $password,
             ];
         }
 
         return [
-            'DB_CONNECTION' => $this->engine === self::ENGINE_MYSQL ? 'mysql' : 'pgsql',
-            'DB_HOST' => $host,
-            'DB_PORT' => $port,
-            'DB_DATABASE' => (string) ($connection['database'] ?? ''),
-            'DB_USERNAME' => (string) ($connection['username'] ?? ''),
-            'DB_PASSWORD' => $password,
+            $prefix.'_CONNECTION' => $this->engine === self::ENGINE_MYSQL ? 'mysql' : 'pgsql',
+            $prefix.'_HOST' => $host,
+            $prefix.'_PORT' => $port,
+            $prefix.'_DATABASE' => (string) ($connection['database'] ?? ''),
+            $prefix.'_USERNAME' => (string) ($connection['username'] ?? ''),
+            $prefix.'_PASSWORD' => $password,
         ];
     }
 
@@ -166,12 +179,14 @@ class CloudDatabase extends Model
      *
      * @return list<string>
      */
-    public function connectionEnvKeys(): array
+    public function connectionEnvKeys(?string $prefix = null): array
     {
+        $prefix = $prefix ?? $this->defaultEnvPrefix();
+
         if ($this->engine === self::ENGINE_REDIS) {
-            return ['REDIS_HOST', 'REDIS_PORT', 'REDIS_PASSWORD'];
+            return [$prefix.'_HOST', $prefix.'_PORT', $prefix.'_PASSWORD'];
         }
 
-        return ['DB_CONNECTION', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD'];
+        return [$prefix.'_CONNECTION', $prefix.'_HOST', $prefix.'_PORT', $prefix.'_DATABASE', $prefix.'_USERNAME', $prefix.'_PASSWORD'];
     }
 }

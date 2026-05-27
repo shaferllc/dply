@@ -9,6 +9,15 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Create extends Component
 {
+    public function mount(): void
+    {
+        // Launchpad is the multi-surface chooser; with VM as the only
+        // active surface, the chooser collapses to a single option and the
+        // /servers/create wizard is the obvious entry point. Re-enable
+        // automatically the moment Cloud/Edge/Serverless light up.
+        abort_unless(multi_surface_active(), 404);
+    }
+
     /**
      * @return list<array{id: string, title: string, description: string, enabled: bool, icon: string, href?: string}>
      */

@@ -395,6 +395,67 @@
         </div>
     </div>
 
+    {{-- Surface flags: VM-only launch keeps Cloud / Edge / Serverless dark
+         by default. This panel lets a platform admin opt specific orgs in
+         (design partners, internal dogfooding) without redeploying. --}}
+    <section class="mb-8" aria-labelledby="surface-flags-heading">
+        <div class="{{ $card }}">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h2 id="surface-flags-heading" class="text-sm font-semibold text-brand-ink">{{ __('Surface flags') }}</h2>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Enable VM-launch-gated product surfaces (Cloud, Edge, Serverless) for a specific organization.') }}</p>
+                </div>
+            </div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,18rem),1fr]">
+                <div>
+                    <label for="surface-flag-org" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Organization') }}</label>
+                    <select
+                        id="surface-flag-org"
+                        wire:model.live="flagOrgId"
+                        class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                    >
+                        <option value="">{{ __('Pick an organization…') }}</option>
+                        @foreach ($surfaceFlagPanel['orgs'] as $org)
+                            <option value="{{ $org->id }}">{{ $org->name }}</option>
+                        @endforeach
+                    </select>
+                    @if ($surfaceFlagPanel['org'] !== null)
+                        <p class="mt-2 text-[11px] text-brand-mist">{{ __('Toggling writes a per-org Pennant override; unchecking clears it (falls back to config default).') }}</p>
+                    @endif
+                </div>
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Surfaces') }}</p>
+                    <ul class="mt-1 space-y-2">
+                        @foreach ($surfaceFlagPanel['flags'] as $flag)
+                            <li>
+                                <label class="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2.5 text-sm shadow-sm transition hover:border-brand-ink/15 has-[:checked]:border-brand-sage/50 has-[:checked]:bg-brand-sage/5 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+                                    <span class="flex items-center gap-2">
+                                        @if ($flag['active'])
+                                            <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                        @else
+                                            <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
+                                        @endif
+                                        <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
+                                        <code class="font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
+                                    </span>
+                                    <input
+                                        type="checkbox"
+                                        wire:click="toggleSurfaceFlag('{{ $flag['key'] }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="toggleSurfaceFlag"
+                                        @checked($flag['active'])
+                                        @disabled($surfaceFlagPanel['org'] === null)
+                                        class="h-4 w-4 rounded border-brand-ink/30 text-brand-sage focus:ring-brand-sage"
+                                    />
+                                </label>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
     @if ($recentFailedJobs->isNotEmpty())
         <section class="mb-8" aria-labelledby="failed-jobs-heading">
             <h2 id="failed-jobs-heading" class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Recent failed queue jobs') }}</h2>

@@ -19,16 +19,18 @@
     </x-explainer>
 
     @if ($server->workspace)
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-            <p class="font-semibold">{{ __('Project health shortcut') }}</p>
-            <p class="mt-1 leading-relaxed text-brand-moss">
-                {{ __('Metrics here are server-specific. Open the project operations page when you want to review grouped health, recent activity, and runbooks alongside the rest of this project.') }}
-            </p>
-            <div class="mt-3 flex flex-wrap gap-3">
-                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
-                <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project overview') }}</a>
+        @feature('surface.projects')
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+                <p class="font-semibold">{{ __('Project health shortcut') }}</p>
+                <p class="mt-1 leading-relaxed text-brand-moss">
+                    {{ __('Metrics here are server-specific. Open the project operations page when you want to review grouped health, recent activity, and runbooks alongside the rest of this project.') }}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-3">
+                    <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
+                    <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project overview') }}</a>
+                </div>
             </div>
-        </div>
+        @endfeature
     @endif
 
     @if ($opsReady && $probePending)

@@ -1,13 +1,15 @@
                 @if ($site->workspace)
-                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm text-brand-moss">
-                        <p class="font-medium text-brand-ink">{{ __('Project context') }}</p>
-                        <p class="mt-1">
-                            {{ __('Rolls up into the :project project.', ['project' => $site->workspace->name]) }}
-                            <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Operations') }}</a>
-                            ·
-                            <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Delivery') }}</a>
-                        </p>
-                    </div>
+                    @feature('surface.projects')
+                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm text-brand-moss">
+                            <p class="font-medium text-brand-ink">{{ __('Project context') }}</p>
+                            <p class="mt-1">
+                                {{ __('Rolls up into the :project project.', ['project' => $site->workspace->name]) }}
+                                <a href="{{ route('projects.operations', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Operations') }}</a>
+                                ·
+                                <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('Delivery') }}</a>
+                            </p>
+                        </div>
+                    @endfeature
                 @endif
 
                 <div class="grid gap-6 lg:grid-cols-2">

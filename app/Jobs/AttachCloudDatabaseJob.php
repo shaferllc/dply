@@ -49,15 +49,33 @@ class AttachCloudDatabaseJob implements ShouldQueue
 
         $vars = $this->parseEnvLines((string) ($site->env_file_content ?? ''));
 
+        // Each pivot row carries its own env_prefix — that's what makes
+        // multi-database attachments possible without env-var collisions.
+        // On attach we read the pivot that ApplyCloudSiteExtras already
+        // wrote; on detach we read it before removing the row, so we
+        // know which exact keys to strip.
+        $pivotPrefix = function () use ($database, $site): ?string {
+            $row = $database->sites()
+                ->wherePivot('site_id', $site->id)
+                ->first();
+
+            return $row?->pivot?->env_prefix;
+        };
+
         if ($this->detach) {
-            foreach ($database->connectionEnvKeys() as $key) {
+            $prefix = $pivotPrefix();
+            foreach ($database->connectionEnvKeys($prefix) as $key) {
                 unset($vars[$key]);
             }
             $database->sites()->detach($site->id);
         } else {
-            foreach ($database->connectionEnvVars() as $key => $value) {
+            $prefix = $pivotPrefix();
+            foreach ($database->connectionEnvVars($prefix) as $key => $value) {
                 $vars[$key] = $value;
             }
+            // syncWithoutDetaching with no pivot data preserves whatever
+            // env_prefix is already on the row; the caller (ApplyCloudSiteExtras
+            // or attach-extras flow) is responsible for writing the prefix.
             $database->sites()->syncWithoutDetaching([$site->id]);
         }
 

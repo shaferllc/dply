@@ -38,7 +38,7 @@
             @endunless
 
             @include('livewire.credentials.panel', [
-                'credentials' => collect(),
+                'credentials' => $credentials,
                 'digitalOceanOAuthConfigured' => $digitalOceanOAuthConfigured,
             ])
         </div>

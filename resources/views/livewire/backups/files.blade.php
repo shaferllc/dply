@@ -101,7 +101,11 @@
                 <div class="px-6 py-12 text-center">
                     <p class="text-sm text-brand-moss">{{ __('No sites yet. Create a server and add a site to enable file backups.') }}</p>
                     <div class="mt-4 flex flex-wrap justify-center gap-3">
-                        <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Open launchpad') }}</a>
+                        @if (multi_surface_active())
+                            <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Open launchpad') }}</a>
+                        @else
+                            <a href="{{ route('servers.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Add a server') }}</a>
+                        @endif
                         <span class="text-brand-mist" aria-hidden="true">·</span>
                         <a href="{{ route('sites.index') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View sites') }}</a>
                     </div>

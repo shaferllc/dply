@@ -13,6 +13,7 @@ use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Serverless\ServerlessCostEstimator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Throwable;
@@ -39,6 +40,8 @@ class Create extends Component
      */
     public function mount(): void
     {
+        abort_unless(Feature::active('surface.serverless'), 404);
+
         $org = auth()->user()?->currentOrganization();
         if ($org === null) {
             return;

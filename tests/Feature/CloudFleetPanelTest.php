@@ -16,7 +16,9 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
-usesFeatures('surface.fleet');
+// The fleet panel renders Cloud-specific cards only when surface.cloud is
+// active. Post-VM-launch the flag defaults off, so opt in for these tests.
+usesFeatures('surface.fleet', 'surface.cloud');
 
 test('panel hidden when no cloud sites', function () {
     $user = ownerWithOrg();

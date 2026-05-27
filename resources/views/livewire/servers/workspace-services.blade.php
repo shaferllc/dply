@@ -41,16 +41,18 @@
     </x-explainer>
 
     @if ($server->workspace)
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-            <p class="font-semibold">{{ __('Project operations shortcut') }}</p>
-            <p class="mt-1 leading-relaxed text-brand-moss">
-                {{ __('Service changes here may affect the wider project. Use the project operations page to review runbooks, recent activity, and alert routing when this server is part of a larger grouped stack.') }}
-            </p>
-            <div class="mt-3 flex flex-wrap gap-3">
-                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
-                <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Review project access') }}</a>
+        @feature('surface.projects')
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+                <p class="font-semibold">{{ __('Project operations shortcut') }}</p>
+                <p class="mt-1 leading-relaxed text-brand-moss">
+                    {{ __('Service changes here may affect the wider project. Use the project operations page to review runbooks, recent activity, and alert routing when this server is part of a larger grouped stack.') }}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-3">
+                    <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
+                    <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Review project access') }}</a>
+                </div>
             </div>
-        </div>
+        @endfeature
     @endif
 
     @if ($isDeployer && ($deployerSystemdLocked ?? true))

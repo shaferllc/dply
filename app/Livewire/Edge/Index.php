@@ -12,15 +12,14 @@ use App\Services\Edge\EdgeSiteCanceller;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
  * Org-scoped index of dply Edge sites — static/SSG apps on the
  * managed edge delivery plane (git → build → R2 + CF Worker).
- * When {@see surface.edge} is inactive, renders a coming-soon shell
- * so Browse nav can link here without a 404.
+ * The route group gates on {@see surface.edge}, so the off-state is a
+ * straight 404; this component only runs when Edge is active for the org.
  */
 class Index extends Component
 {
@@ -67,21 +66,6 @@ class Index extends Component
     {
         $org = auth()->user()?->currentOrganization();
         abort_if($org === null, 403);
-
-        if (! Feature::active('surface.edge')) {
-            return view('livewire.edge.index', [
-                'org' => $org,
-                'edgeEnabled' => false,
-                'sites' => collect(),
-                'deleteCandidate' => null,
-                'totals' => [
-                    'all' => 0,
-                    'failed' => 0,
-                    'provisioning' => 0,
-                    'previews' => 0,
-                ],
-            ])->layout('layouts.app');
-        }
 
         $allSites = $this->edgeSitesQuery($org)
             ->with('server:id,name')

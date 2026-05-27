@@ -28,9 +28,11 @@
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $sidebarPrimaryHostname }}</p>
                     @if ($server->workspace)
-                        <p class="mt-0.5 truncate text-xs text-brand-moss">
-                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
-                        </p>
+                        @feature('surface.projects')
+                            <p class="mt-0.5 truncate text-xs text-brand-moss">
+                                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
+                            </p>
+                        @endfeature
                     @endif
                 </div>
             </div>

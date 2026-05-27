@@ -192,6 +192,11 @@ test('servers create requires organization', function () {
 });
 
 test('launchpad is displayed with organization', function () {
+    // surface.cloud is off post VM-launch; this test asserts the launches
+    // page lists the Cloud tile + cloud.create URL, so opt in locally.
+    \Laravel\Pennant\Feature::define('surface.cloud', fn (): bool => true);
+    \Laravel\Pennant\Feature::flushCache();
+
     $user = userWithOrganization();
 
     $response = $this->actingAs($user)->get(route('launches.create'));
