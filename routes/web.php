@@ -245,6 +245,34 @@ Route::get('/features', function () {
     return view('features');
 })->name('features');
 
+Route::get('/migrate', function () {
+    return view('migrate.index', [
+        'sources' => config('migration_sources', []),
+    ]);
+})->name('migrate.index');
+
+Route::get('/deploy', function (\Illuminate\Http\Request $request) {
+    $allowed = ['repo', 'branch', 'name', 'runtime_mode', 'build_command', 'output_dir'];
+    $query = array_filter(
+        $request->only($allowed),
+        static fn ($v): bool => is_string($v) && $v !== '',
+    );
+
+    return redirect()->route('edge.create', $query);
+})->name('deploy.shortlink');
+
+Route::get('/migrate/{slug}', function (string $slug) {
+    $source = config('migration_sources.'.$slug);
+
+    abort_unless($source, 404);
+
+    return view('migrate.show', [
+        'slug' => $slug,
+        'source' => $source,
+    ]);
+})->whereIn('slug', array_keys(config('migration_sources', [])))
+    ->name('migrate.show');
+
 Route::livewire('/coming-soon', MarketingComingSoonSignup::class)
     ->name('coming-soon');
 

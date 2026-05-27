@@ -125,6 +125,10 @@
                         </li>
                         <li class="flex items-start gap-3">
                             <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                            Public REST API + <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">@dply/cli</code> — script every deploy.
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             14-day free trial. No credit card to start.
                         </li>
                     </ul>
@@ -243,6 +247,10 @@
                 [
                     'q' => 'How do you handle Enterprise / large fleets?',
                     'a' => 'Talk to us. Above ~20 servers most teams want a contract, volume pricing, SSO, and an MSA. We do that as a custom Enterprise plan rather than a higher self-serve tier.',
+                ],
+                [
+                    'q' => 'Is there an API or CLI?',
+                    'a' => 'Yes — both are included on every plan, no add-on fee. The Edge REST API has a public OpenAPI 3 spec at /openapi/edge.json. The dply CLI ships as @dply/cli on npm and uses OAuth device flow to authenticate. Org-scoped tokens have granular abilities so CI pipelines stay narrowly permissioned.',
                 ],
             ];
         @endphp

@@ -58,6 +58,7 @@
                     <a href="#serverpilot" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">ServerPilot</a>
                     <a href="#coverage" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Coverage</a>
                     <a href="#plans-and-account" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Plans &amp; account</a>
+                    <a href="#api-cli" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">API &amp; CLI</a>
                     <a href="#security" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Security</a>
                 </nav>
             </div>
@@ -654,6 +655,51 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </section>
+
+        {{-- API + CLI: Edge OpenAPI + dply CLI; "everything the dashboard does is scriptable" --}}
+        <section id="api-cli" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/70 to-brand-sand/20 scroll-mt-24">
+            <div class="mx-auto max-w-7xl">
+                <div class="max-w-3xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Scriptable platform</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">An API and a CLI — everything the dashboard does</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">
+                        {{ config('app.name') }} ships a <strong class="text-brand-forest font-medium">public REST API</strong> with an
+                        <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">OpenAPI 3 spec</a>
+                        and a <strong class="text-brand-forest font-medium">zero-dependency Node CLI</strong> — <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">@dply/cli</code> — so CI pipelines, AI agents, and scripts can do the same operations the panel does, against the same org and the same audit trail.
+                    </p>
+                </div>
+
+                <ul class="mt-12 grid gap-6 lg:grid-cols-3">
+                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink flex items-center gap-2">
+                            <x-heroicon-o-code-bracket class="h-5 w-5 text-brand-sage" aria-hidden="true" />
+                            OpenAPI 3 spec
+                        </h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Wave A Edge endpoints — sites, deployments, previews, domains, aliases, cache purge, usage, logs, lint — described in a single <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">spec file</a>. Generate clients in any language, mock for tests, drop into Postman or Bruno.</p>
+                    </li>
+                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink flex items-center gap-2">
+                            <x-heroicon-o-command-line class="h-5 w-5 text-brand-sage" aria-hidden="true" />
+                            <code class="text-sm">dply</code> CLI
+                        </h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Install with <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">npm i -g @dply/cli</code>. <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply login</code> uses OAuth device flow (the GitHub-CLI / Stripe-CLI pattern). Then <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply deploy</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">promote</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">rollback</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">domains</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">usage</code>. Node 18+, no native deps.</p>
+                    </li>
+                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
+                        <h3 class="font-semibold text-brand-ink flex items-center gap-2">
+                            <x-heroicon-o-key class="h-5 w-5 text-brand-sage" aria-hidden="true" />
+                            Org-scoped tokens
+                        </h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">API tokens are issued per organization with <strong class="text-brand-forest font-medium">granular abilities</strong> (<code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">edge.read</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">edge.deploy</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">edge.write</code>). Mint from <strong class="text-brand-forest font-medium">Settings → API tokens</strong>; revoke any time. The CLI stores tokens in your OS keyring, never in plaintext config.</p>
+                    </li>
+                </ul>
+
+                <div class="mt-10 rounded-2xl border border-brand-ink/10 bg-brand-ink text-brand-cream px-6 py-6 sm:px-10">
+                    <p class="text-sm font-medium text-brand-sand/90 leading-relaxed max-w-3xl">
+                        <span class="text-brand-gold font-semibold">Same operations, three surfaces:</span> the dashboard calls the same API the CLI calls. A signed webhook from GitHub triggers the same code path as <code class="text-xs bg-white/10 px-1.5 py-0.5 rounded">dply deploy</code>. There is no "dashboard-only" feature you have to give up if you script your way through the platform.
+                    </p>
                 </div>
             </div>
         </section>
