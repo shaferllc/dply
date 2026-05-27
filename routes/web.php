@@ -553,7 +553,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
-    Route::livewire('servers/{server}/queue-workers', WorkspaceQueueWorkers::class)->middleware('server.service.installed')->name('servers.queue-workers');
     Route::middleware('feature:workspace.schedule')->group(function (): void {
         Route::livewire('servers/{server}/schedule', WorkspaceSchedule::class)->name('servers.schedule');
     });

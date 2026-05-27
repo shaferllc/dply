@@ -214,23 +214,6 @@ test('backups delete schedule removes cron entry', function () {
     expect(ServerBackupSchedule::find($schedule->id))->toBeNull();
     expect(ServerCronJob::find($cronId))->toBeNull();
 });
-test('queue workers route renders via http', function () {
-    $user = actingOrgUser();
-    $server = readyServer($user);
-
-    // Supervisor install status is irrelevant for the route gate — the page now
-    // self-handles the not-installed case with an Install CTA. We mark it
-    // installed here so the worker management surface renders (Add a worker,
-    // Active workers panel) rather than the install prompt.
-    $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
-
-    $this->actingAs($user)
-        ->get(route('servers.queue-workers', $server))
-        ->assertOk()
-        ->assertSee('Queue workers', false)
-        ->assertSee('Active workers', false)
-        ->assertSee('Add a worker', false);
-});
 test('schedule route renders via http', function () {
     // Stable markers post milestone-2A rewrite: page heading + the
     // description copy that ships in every render regardless of whether
@@ -297,21 +280,6 @@ test('backups route 404s when no database tag present', function () {
     $this->actingAs($user)
         ->get(route('servers.backups', $server))
         ->assertNotFound();
-});
-test('queue workers route renders when supervisor missing', function () {
-    // The supervisor gate was dropped so the page is reachable before install —
-    // the page itself surfaces the Install Supervisor CTA. Verify the route
-    // serves the page (not a 404) and the install banner is present.
-    $user = actingOrgUser();
-    $server = readyServer($user);
-    $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
-    setExpectedServices($server, ['nginx', 'php-fpm']);
-
-    $this->actingAs($user)
-        ->get(route('servers.queue-workers', $server))
-        ->assertOk()
-        ->assertSee('Supervisor is not installed', false)
-        ->assertSee('Go to Daemons to install', false);
 });
 test('site queue workers route shows install banner when supervisor missing', function () {
     $user = actingOrgUser();
