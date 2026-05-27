@@ -92,8 +92,10 @@ return [
     'surface' => [
         // exit: VM launch is dark; flip to true once container/cloud surface is GA
         'cloud' => env('FEATURE_SURFACE_CLOUD', false),
-        // exit: ship once cross-server views have a saved-view persistence model
-        'fleet' => env('FEATURE_SURFACE_FLEET', false),
+        // GA 2026-05: cross-server views (Health, Deploys, Domains, EnvSearch)
+        // ship as the org-wide ops counterpart to /infrastructure. Saved-view
+        // persistence is a follow-up enhancement, not a launch gate.
+        'fleet' => env('FEATURE_SURFACE_FLEET', true),
         // exit: ship after a curated v1 marketplace catalog is approved
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', false),
         // exit: ship as the org-substitute UX for solo users with 3+ servers

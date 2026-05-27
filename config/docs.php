@@ -45,6 +45,10 @@ return [
             'file' => 'BYO_LOCAL_SETUP.md',
             'title' => 'Local development',
         ],
+        'deploy-badge' => [
+            'file' => 'DEPLOY_BADGE.md',
+            'title' => 'Deploy to dply badge',
+        ],
         'edge-overview' => [
             'file' => 'EDGE_OVERVIEW.md',
             'title' => 'Edge overview',

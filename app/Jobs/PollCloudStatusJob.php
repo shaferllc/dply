@@ -115,6 +115,23 @@ class PollCloudStatusJob implements ShouldQueue
         if ($isTerminal) {
             SyncCloudDeployTaskRunsJob::dispatch((string) $site->id);
         }
+
+        // Audit only when the poll observed a real terminal transition
+        // (not on repeated polls of an already-settled deploy) so the
+        // Ops Timeline doesn't repeat the same Cloud event every minute.
+        $statusChanged = ($update['status'] ?? null) !== null;
+        if ($isTerminal && $statusChanged && $site->organization !== null) {
+            $action = $newStatus === Site::STATUS_CONTAINER_ACTIVE
+                ? 'site.cloud.deploy.success'
+                : 'site.cloud.deploy.failed';
+            audit_log($site->organization, null, $action, $site, null, array_filter([
+                'site' => $site->name,
+                'site_id' => (string) $site->id,
+                'backend' => $site->container_backend,
+                'phase' => $result['phase'] ?? null,
+                'live_url' => $meta['container']['live_url'] ?? null,
+            ], fn ($v) => $v !== null && $v !== ''));
+        }
     }
 
     private function mapPhase(string $phase): ?string

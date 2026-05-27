@@ -13,16 +13,6 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                @if ($fleetEnabled)
-                    <a
-                        href="{{ route('fleet.health') }}"
-                        wire:navigate
-                        class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-heart class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Fleet health') }}
-                    </a>
-                @endif
                 <a
                     href="{{ route('launches.create') }}"
                     wire:navigate
@@ -168,5 +158,85 @@
                 @endif
             </div>
         </section>
+
+        @if ($fleetEnabled)
+            <section class="mt-12" aria-labelledby="infrastructure-fleet-heading">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h2 id="infrastructure-fleet-heading" class="text-sm font-semibold uppercase tracking-[0.18em] text-brand-moss">
+                            {{ __('Fleet ops') }}
+                        </h2>
+                        <p class="mt-1 text-sm text-brand-moss/85">{{ __('Cross-product views over every server and site in the org.') }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    @php
+                        $fleetTiles = [
+                            [
+                                'route' => 'fleet.health',
+                                'icon' => 'heroicon-o-heart',
+                                'title' => __('Fleet health'),
+                                'desc' => __('Drift, in-flight deploys, success rate, most-active sites.'),
+                            ],
+                            [
+                                'route' => 'fleet.deploys',
+                                'icon' => 'heroicon-o-rocket-launch',
+                                'title' => __('Deploys'),
+                                'desc' => __('In-flight, failed-latest, and stale deploys across every site.'),
+                            ],
+                            [
+                                'route' => 'fleet.domains',
+                                'icon' => 'heroicon-o-globe-alt',
+                                'title' => __('Domains'),
+                                'desc' => __('Fleet-wide hostname inventory with runtime and primary filters.'),
+                            ],
+                            [
+                                'route' => 'fleet.env-search',
+                                'icon' => 'heroicon-o-key',
+                                'title' => __('Env search'),
+                                'desc' => __('Find a key (or AWS_* prefix) across every site in the org.'),
+                            ],
+                            [
+                                'route' => 'fleet.env-drift',
+                                'icon' => 'heroicon-o-arrows-right-left',
+                                'title' => __('Env drift'),
+                                'desc' => __('Compare env across BYO + Cloud + Edge sites that share a Git repo.'),
+                            ],
+                            [
+                                'route' => 'fleet.intelligence',
+                                'icon' => 'heroicon-o-light-bulb',
+                                'title' => __('Intelligence'),
+                                'desc' => __('Proactive alerts — slow builds, expiring TLS, preview/prod env drift.'),
+                            ],
+                        ];
+
+                        $opsTimelineOrg = auth()->user()?->currentOrganization();
+                        if ($opsTimelineOrg !== null && $opsTimelineOrg->hasAdminAccess(auth()->user())) {
+                            $fleetTiles[] = [
+                                'route_url' => route('organizations.activity', $opsTimelineOrg),
+                                'icon' => 'heroicon-o-clock',
+                                'title' => __('Ops timeline'),
+                                'desc' => __('Org-wide audit trail — deploys, domains, env, members across every product line.'),
+                            ];
+                        }
+                    @endphp
+                    @foreach ($fleetTiles as $tile)
+                        <a
+                            href="{{ $tile['route_url'] ?? route($tile['route']) }}"
+                            wire:navigate
+                            class="group flex flex-col rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-sage/45 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
+                        >
+                            <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
+                                <x-dynamic-component :component="$tile['icon']" class="h-5 w-5 shrink-0" aria-hidden="true" />
+                            </span>
+                            <h3 class="mt-3 text-sm font-semibold text-brand-ink">{{ $tile['title'] }}</h3>
+                            <p class="mt-1 flex-1 text-xs leading-5 text-brand-moss">{{ $tile['desc'] }}</p>
+                            <p class="mt-3 text-xs font-semibold text-brand-sage group-hover:text-brand-ink">{{ __('Open') }} →</p>
+                        </a>
+                    @endforeach
+                </div>
+            </section>
+        @endif
     </div>
 </div>

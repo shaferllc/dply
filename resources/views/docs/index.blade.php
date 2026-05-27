@@ -26,6 +26,7 @@
                     ['slug' => 'edge-logs', 'title' => 'Edge build & deploy logs', 'desc' => 'CI output and failure reasons per deploy.'],
                     ['slug' => 'edge-danger', 'title' => 'Delete an Edge site', 'desc' => 'Teardown and permanent removal.'],
                     ['slug' => 'edge-preview-comments', 'title' => 'Edge preview comments', 'desc' => 'Review feedback on preview URLs.'],
+                    ['slug' => 'deploy-badge', 'title' => 'Deploy to dply badge', 'desc' => 'Markdown snippet for template authors; pre-fill the Edge create form via /deploy.'],
                 ] as $edgeDoc)
                     <li>
                         <a href="{{ route('docs.markdown', ['slug' => $edgeDoc['slug']]) }}" class="block p-4 rounded-lg border border-brand-ink/10 bg-white hover:border-brand-mist/40 hover:bg-slate-50 transition dark:border-brand-mist/20 dark:bg-zinc-900 dark:hover:bg-zinc-800">

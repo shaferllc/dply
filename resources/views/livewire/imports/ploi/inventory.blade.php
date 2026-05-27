@@ -18,6 +18,12 @@
                     <span wire:loading wire:target="refresh">{{ __('Refreshing…') }}</span>
                 </x-secondary-button>
             @endif
+            <a href="{{ route('imports.parity') }}" wire:navigate>
+                <x-secondary-button type="button">
+                    <x-heroicon-o-arrows-right-left class="mr-1.5 h-4 w-4" />
+                    {{ __('View parity') }}
+                </x-secondary-button>
+            </a>
             <a href="{{ route('credentials.index', ['provider' => 'ploi']) }}" wire:navigate>
                 <x-secondary-button type="button">
                     <x-heroicon-o-key class="mr-1.5 h-4 w-4" />

@@ -86,5 +86,14 @@ class ProvisionCloudSiteJob implements ShouldQueue
             'status' => Site::STATUS_CONTAINER_FAILED,
             'meta' => $meta,
         ]);
+
+        if ($site->organization !== null) {
+            audit_log($site->organization, null, 'site.cloud.deploy.failed', $site, null, [
+                'site' => $site->name,
+                'site_id' => (string) $site->id,
+                'backend' => $site->container_backend,
+                'error' => $message,
+            ]);
+        }
     }
 }

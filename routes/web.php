@@ -44,9 +44,12 @@ use App\Livewire\Edge\Templates;
 use App\Livewire\Edge\Usage;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
+use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
+use App\Livewire\Fleet\Intelligence as FleetIntelligence;
 use App\Livewire\Imports\Forge\Inventory;
+use App\Livewire\Imports\Parity as ImportParity;
 use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
 use App\Livewire\Imports\Ploi\MigrationProgress;
 use App\Livewire\Infrastructure\Index as InfrastructureIndex;
@@ -245,6 +248,34 @@ Route::get('/features', function () {
     return view('features');
 })->name('features');
 
+Route::get('/migrate', function () {
+    return view('migrate.index', [
+        'sources' => config('migration_sources', []),
+    ]);
+})->name('migrate.index');
+
+Route::get('/deploy', function (\Illuminate\Http\Request $request) {
+    $allowed = ['repo', 'branch', 'name', 'runtime_mode', 'build_command', 'output_dir'];
+    $query = array_filter(
+        $request->only($allowed),
+        static fn ($v): bool => is_string($v) && $v !== '',
+    );
+
+    return redirect()->route('edge.create', $query);
+})->name('deploy.shortlink');
+
+Route::get('/migrate/{slug}', function (string $slug) {
+    $source = config('migration_sources.'.$slug);
+
+    abort_unless($source, 404);
+
+    return view('migrate.show', [
+        'slug' => $slug,
+        'source' => $source,
+    ]);
+})->whereIn('slug', array_keys(config('migration_sources', [])))
+    ->name('migrate.show');
+
 Route::livewire('/coming-soon', MarketingComingSoonSignup::class)
     ->name('coming-soon');
 
@@ -268,9 +299,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->name('edge.preview-access');
     Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
     Route::middleware('feature:surface.fleet')->group(function (): void {
+        Route::redirect('/fleet', '/fleet/health')->name('fleet.index');
         Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
         Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
         Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
+        Route::livewire('/fleet/env-drift', FleetEnvDrift::class)->name('fleet.env-drift');
+        Route::livewire('/fleet/intelligence', FleetIntelligence::class)->name('fleet.intelligence');
         Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
     });
     Route::livewire('/admin', AdminDashboard::class)
@@ -311,6 +345,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
     Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
     Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
+    Route::get('organizations/{organization}/compliance-export', \App\Http\Controllers\OrganizationComplianceExportController::class)->name('organizations.compliance-export');
     Route::livewire('organizations/{organization}/automation', OrganizationsAutomation::class)->name('organizations.automation');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
@@ -351,6 +386,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
         Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
     });
+    Route::livewire('imports/parity', ImportParity::class)->name('imports.parity');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
     Route::livewire('imports/ploi/migrations/{migration}', MigrationProgress::class)->name('imports.ploi.migration.progress');
     Route::livewire('imports/forge', Inventory::class)->name('imports.forge.inventory');
