@@ -16,7 +16,8 @@
     $guidesNavClass = $isTop ? 'mt-2 flex flex-wrap gap-2' : 'mt-2 space-y-0.5';
 
     $accountDropdownActive = request()->routeIs(
-        'profile.edit',
+        'settings.profile',
+        'settings.servers',
         'profile.delete-account',
         'profile.referrals',
         'profile.security',
@@ -54,15 +55,9 @@
                     role="navigation"
                     aria-label="{{ __('Settings and guides') }}"
                 >
-                    <a
-                        href="{{ route('settings.profile') }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'settings.servers') ? $navOn : $navOff])
-                    >
-                        <x-heroicon-o-adjustments-horizontal class="{{ $navIcon }}" aria-hidden="true" />
-                        {{ __('Preferences') }}
-                    </a>
-
+                    {{-- "Preferences" pill removed after the /profile merge:
+                         it pointed at the same /settings/profile URL the Account
+                         dropdown's "Profile" entry already covers. --}}
                     <x-dropdown align="left" width="w-72" contentClasses="py-1.5 max-h-[min(70vh,28rem)] overflow-y-auto">
                         <x-slot name="trigger">
                             <button
@@ -79,7 +74,7 @@
                             </button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link :href="route('profile.edit')" wire:navigate>
+                            <x-dropdown-link :href="route('settings.profile')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-user-circle class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
@@ -196,24 +191,32 @@
             @endif
         </div>
     @else
-        <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Settings') }}</p>
-        @if ($user)
-            <p class="mt-1 font-semibold text-brand-ink truncate" title="{{ $user->name }}">{{ $user->name }}</p>
-        @endif
+        {{-- Identity card matches the family's section-header pattern:
+             sage icon tile + eyebrow + the user's display name. Reads as
+             "you're managing these settings for this account" rather than
+             a bare SETTINGS label. --}}
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 pb-4">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
+                @if ($user)
+                    <p class="mt-0.5 truncate text-sm font-semibold text-brand-ink" title="{{ $user->name }}">{{ $user->name }}</p>
+                    <p class="mt-0.5 truncate text-[11px] text-brand-mist" title="{{ $user->email }}">{{ $user->email }}</p>
+                @endif
+            </div>
+        </div>
 
+        <p class="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
         <nav class="{{ $accountNavClass }}" aria-label="{{ __('Account settings') }}">
+            {{-- Profile is the merged page (identity + preferences + sessions
+                 + danger zone). The separate "Preferences" link is gone since
+                 it pointed to the same URL after the /profile merge. --}}
             <a
                 href="{{ route('settings.profile') }}"
                 wire:navigate
-                @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'settings.servers') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-adjustments-horizontal class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Preferences') }}
-            </a>
-            <a
-                href="{{ route('profile.edit') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.edit', 'profile.delete-account') ? $navOn : $navOff])
+                @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'settings.servers', 'profile.delete-account') ? $navOn : $navOff])
             >
                 <x-heroicon-o-user-circle class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Profile') }}
@@ -284,8 +287,8 @@
             </a>
         </nav>
 
-        <div class="mt-4 border-t border-brand-ink/10 pt-4">
-            <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Guides') }}</p>
+        <div class="mt-5 border-t border-brand-ink/10 pt-4">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
             <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Guides') }}">
                 <a
                     href="{{ route('docs.create-first-server') }}"

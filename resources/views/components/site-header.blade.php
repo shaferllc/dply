@@ -417,12 +417,20 @@
                                     </x-slot>
                                     {{ __('Settings') }}
                                 </x-dropdown-link>
-                                <x-dropdown-link :href="route('profile.edit')">
+                                <x-dropdown-link :href="route('settings.profile')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-user class="{{ $hi }}" />
                                     </x-slot>
                                     {{ __('Profile') }}
                                 </x-dropdown-link>
+                                @if (auth()->user()->currentOrganization())
+                                    <x-dropdown-link :href="route('organizations.show', auth()->user()->currentOrganization())">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-building-office-2 class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Org settings') }}
+                                    </x-dropdown-link>
+                                @endif
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf
                                     <x-dropdown-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">
@@ -612,12 +620,20 @@
                             </x-slot>
                             {{ __('Settings') }}
                         </x-responsive-nav-link>
-                        <x-responsive-nav-link :href="route('profile.edit')">
+                        <x-responsive-nav-link :href="route('settings.profile')">
                             <x-slot name="icon">
                                 <x-heroicon-o-user class="{{ $hi }}" />
                             </x-slot>
                             {{ __('Profile') }}
                         </x-responsive-nav-link>
+                        @if (auth()->user()->currentOrganization())
+                            <x-responsive-nav-link :href="route('organizations.show', auth()->user()->currentOrganization())">
+                                <x-slot name="icon">
+                                    <x-heroicon-o-building-office-2 class="{{ $hi }}" />
+                                </x-slot>
+                                {{ __('Org settings') }}
+                            </x-responsive-nav-link>
+                        @endif
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <x-responsive-nav-link :href="route('logout')" onclick="event.preventDefault(); this.closest('form').submit();">

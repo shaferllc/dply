@@ -3,14 +3,17 @@
 namespace App\Livewire\Billing;
 
 use App\Enums\ServerTier;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StandardSubscriptionCreator;
+use App\Services\Billing\VatInsightService;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Laravel\Cashier\Invoice;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -20,12 +23,81 @@ use Throwable;
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use DispatchesToastNotifications;
+
     public Organization $organization;
+
+    /**
+     * Billing-entity fields for the org's invoices. Migrated off
+     * `users` in 2026-05 because subscriptions are org-scoped.
+     */
+    public string $invoice_email = '';
+
+    public string $vat_number = '';
+
+    public string $billing_currency = '';
+
+    public string $billing_details = '';
 
     public function mount(Organization $organization): void
     {
         $this->authorize('update', $organization);
         $this->organization = $organization;
+        $this->invoice_email = (string) ($organization->invoice_email ?? '');
+        $this->vat_number = (string) ($organization->vat_number ?? '');
+        $this->billing_currency = (string) ($organization->billing_currency ?? '');
+        $this->billing_details = (string) ($organization->billing_details ?? '');
+    }
+
+    public function saveBillingDetails(VatInsightService $vatInsights): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $rules = [
+            'invoice_email' => ['nullable', 'string', 'email', 'max:255'],
+            'vat_number' => [
+                'nullable',
+                'string',
+                'max:64',
+                function ($attribute, $value, $fail) use ($vatInsights): void {
+                    $msg = $vatInsights->blockingValidationMessage(is_string($value) ? $value : null);
+                    if ($msg !== null) {
+                        $fail($msg);
+                    }
+                },
+            ],
+            'billing_details' => ['nullable', 'string', 'max:5000'],
+        ];
+
+        // Currency must come from the supported list when populated.
+        $allowed = array_keys((array) config('profile_options.currencies', []));
+        $rules['billing_currency'] = $this->billing_currency === ''
+            ? ['nullable']
+            : ['nullable', 'string', Rule::in($allowed)];
+
+        $this->validate($rules);
+
+        $this->organization->update([
+            'invoice_email' => $this->invoice_email !== '' ? $this->invoice_email : null,
+            'vat_number' => $this->vat_number !== '' ? $this->vat_number : null,
+            'billing_currency' => $this->billing_currency === '' ? null : $this->billing_currency,
+            'billing_details' => $this->billing_details !== '' ? $this->billing_details : null,
+        ]);
+
+        $fresh = $this->organization->fresh();
+        if ($fresh) {
+            $this->organization = $fresh;
+            $this->invoice_email = (string) ($fresh->invoice_email ?? '');
+            $this->vat_number = (string) ($fresh->vat_number ?? '');
+            $this->billing_currency = (string) ($fresh->billing_currency ?? '');
+            $this->billing_details = (string) ($fresh->billing_details ?? '');
+        }
+
+        $this->toastSuccess(__('Billing details saved.'));
+
+        foreach ($vatInsights->collectSoftWarnings($this->vat_number) as $message) {
+            $this->toastInfo($message);
+        }
     }
 
     public function getSubscriptionProperty()

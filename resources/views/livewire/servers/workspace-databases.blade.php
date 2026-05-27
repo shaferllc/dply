@@ -15,7 +15,7 @@
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
 
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('This workspace manages relational databases on this server — MySQL, MariaDB, and PostgreSQL — and the per-app credentials that grant access to them. Engines are installed via apt + systemd; databases live inside whatever engines are running.') }}</p>
         <p>{{ __('Engine state is read live via SSH; database + credential rows live in the dply database. The "Discovered on server" panel reconciles both directions: databases the engine knows about that dply hasn\'t recorded yet.') }}</p>
     </x-explainer>
@@ -212,42 +212,49 @@
                 aria-labelledby="db-credentials-title"
                 wire:key="db-cred-{{ $credentialsModalDatabase->id }}"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCredentialsModal"></div>
+                <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeCredentialsModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                            <h2 id="db-credentials-title" class="text-lg font-semibold text-brand-ink">{{ __('Database credentials') }}</h2>
-                            <p class="mt-1 font-mono text-sm text-brand-moss">{{ $credentialsModalDatabase->name }}</p>
+                    <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
+                        <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
+                                <h2 id="db-credentials-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Database credentials') }}</h2>
+                                <p class="mt-1 font-mono text-sm text-brand-moss">{{ $credentialsModalDatabase->name }}</p>
+                            </div>
                         </div>
-                        <div class="space-y-4 px-6 py-6 sm:px-8">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
-                                <p class="mt-1 font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->username }}</p>
+                        <div class="space-y-4 px-6 py-6">
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
+                                <p class="mt-0.5 font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->username }}</p>
                             </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
-                                <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->password }}</p>
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
+                                <p class="mt-0.5 break-all font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->password }}</p>
                             </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & port') }}</p>
-                                <p class="mt-1 font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->host ?: '127.0.0.1' }}:{{ $credentialsModalDatabase->defaultPort() }}</p>
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & port') }}</p>
+                                <p class="mt-0.5 font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->host ?: '127.0.0.1' }}:{{ $credentialsModalDatabase->defaultPort() }}</p>
                             </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
-                                <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-moss">{{ $credentialsModalDatabase->connectionUrl() }}</p>
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                <p class="mt-0.5 break-all font-mono text-xs leading-relaxed text-brand-moss">{{ $credentialsModalDatabase->connectionUrl() }}</p>
                             </div>
-                            <div class="flex flex-wrap gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    x-data="{ ok: false }"
-                                    @click="navigator.clipboard.writeText(@js($credentialsModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
-                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50"
-                                >
-                                    <span x-show="!ok">{{ __('Copy connection URL') }}</span>
-                                    <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                                </button>
-                                <x-secondary-button type="button" wire:click="closeCredentialsModal">{{ __('Close') }}</x-secondary-button>
-                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                            <button
+                                type="button"
+                                x-data="{ ok: false }"
+                                @click="navigator.clipboard.writeText(@js($credentialsModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span x-show="!ok">{{ __('Copy connection URL') }}</span>
+                                <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                            </button>
+                            <x-secondary-button type="button" wire:click="closeCredentialsModal">{{ __('Close') }}</x-secondary-button>
                         </div>
                     </div>
                 </div>
@@ -262,34 +269,42 @@
                 aria-labelledby="db-share-link-title"
                 wire:key="db-share-link"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeShareLinkModal"></div>
+                <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeShareLinkModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                            <h2 id="db-share-link-title" class="text-lg font-semibold text-brand-ink">{{ __('Share link created') }}</h2>
-                            @if ($share_link_modal_db_name)
-                                <p class="mt-1 font-mono text-sm text-brand-moss">{{ $share_link_modal_db_name }}</p>
-                            @endif
+                    <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
+                        <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Share') }}</p>
+                                <h2 id="db-share-link-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Share link created') }}</h2>
+                                @if ($share_link_modal_db_name)
+                                    <p class="mt-1 font-mono text-sm text-brand-moss">{{ $share_link_modal_db_name }}</p>
+                                @endif
+                                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                    {{ __('Send this link to whoever needs the credentials. It honours the expiry and view limits you set.') }}
+                                </p>
+                            </div>
                         </div>
-                        <div class="space-y-4 px-6 py-6 sm:px-8">
-                            <p class="text-sm text-brand-moss leading-relaxed">
-                                {{ __('Send this link to whoever needs the credentials. It honours the expiry and view limits you set.') }}
-                            </p>
-                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <p class="break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $share_link_modal_url }}</p>
+                        <div class="px-6 py-6">
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Link') }}</p>
+                                <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $share_link_modal_url }}</p>
                             </div>
-                            <div class="flex flex-wrap gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    x-data="{ ok: false }"
-                                    @click="navigator.clipboard.writeText(@js($share_link_modal_url)); ok = true; setTimeout(() => ok = false, 2000)"
-                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50"
-                                >
-                                    <span x-show="!ok">{{ __('Copy link') }}</span>
-                                    <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                                </button>
-                                <x-secondary-button type="button" wire:click="closeShareLinkModal">{{ __('Close') }}</x-secondary-button>
-                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                            <button
+                                type="button"
+                                x-data="{ ok: false }"
+                                @click="navigator.clipboard.writeText(@js($share_link_modal_url)); ok = true; setTimeout(() => ok = false, 2000)"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span x-show="!ok">{{ __('Copy link') }}</span>
+                                <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                            </button>
+                            <x-secondary-button type="button" wire:click="closeShareLinkModal">{{ __('Close') }}</x-secondary-button>
                         </div>
                     </div>
                 </div>
@@ -304,27 +319,37 @@
                 aria-labelledby="db-connection-url-title"
                 wire:key="db-conn-url-{{ $connectionUrlModalDatabase->id }}"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeConnectionUrlModal"></div>
+                <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeConnectionUrlModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                            <h2 id="db-connection-url-title" class="text-lg font-semibold text-brand-ink">{{ __('Connection URL') }}</h2>
-                            <p class="mt-1 font-mono text-sm text-brand-moss">{{ $connectionUrlModalDatabase->name }}</p>
-                        </div>
-                        <div class="space-y-4 px-6 py-6 sm:px-8">
-                            <p class="break-all font-mono text-sm leading-relaxed text-brand-ink">{{ $connectionUrlModalDatabase->connectionUrl() }}</p>
-                            <div class="flex flex-wrap gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    x-data="{ ok: false }"
-                                    @click="navigator.clipboard.writeText(@js($connectionUrlModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
-                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50"
-                                >
-                                    <span x-show="!ok">{{ __('Copy') }}</span>
-                                    <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                                </button>
-                                <x-secondary-button type="button" wire:click="closeConnectionUrlModal">{{ __('Close') }}</x-secondary-button>
+                    <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
+                        <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Connection') }}</p>
+                                <h2 id="db-connection-url-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Connection URL') }}</h2>
+                                <p class="mt-1 font-mono text-sm text-brand-moss">{{ $connectionUrlModalDatabase->name }}</p>
                             </div>
+                        </div>
+                        <div class="px-6 py-6">
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('URL') }}</p>
+                                <p class="mt-1 break-all font-mono text-sm leading-relaxed text-brand-ink">{{ $connectionUrlModalDatabase->connectionUrl() }}</p>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                            <button
+                                type="button"
+                                x-data="{ ok: false }"
+                                @click="navigator.clipboard.writeText(@js($connectionUrlModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span x-show="!ok">{{ __('Copy') }}</span>
+                                <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                            </button>
+                            <x-secondary-button type="button" wire:click="closeConnectionUrlModal">{{ __('Close') }}</x-secondary-button>
                         </div>
                     </div>
                 </div>
@@ -335,29 +360,35 @@
             <x-modal
                 name="edit-database-modal"
                 :show="false"
-                maxWidth="lg"
-                overlayClass="bg-brand-ink/40"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
                 focusable
             >
-                <form wire:submit="saveDatabaseEdit">
-                    <div class="border-b border-brand-ink/10 px-6 py-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Edit database') }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $editing_db_name }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            @switch($editing_db_engine)
-                                @case('sqlite')
-                                    {{ __('SQLite — file-based. Changing the path moves the file on the server.') }}
-                                    @break
-                                @case('postgres')
-                                    {{ __('PostgreSQL — the on-host database keeps its existing settings; this updates Dply\'s description metadata.') }}
-                                    @break
-                                @default
-                                    {{ __('MySQL/MariaDB — charset/collation here apply to the next create. The existing on-host database is unchanged.') }}
-                            @endswitch
-                        </p>
+                <form wire:submit="saveDatabaseEdit" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Edit') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ $editing_db_name }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                @switch($editing_db_engine)
+                                    @case('sqlite')
+                                        {{ __('SQLite — file-based. Changing the path moves the file on the server.') }}
+                                        @break
+                                    @case('postgres')
+                                        {{ __('PostgreSQL — the on-host database keeps its existing settings; this updates Dply\'s description metadata.') }}
+                                        @break
+                                    @default
+                                        {{ __('MySQL/MariaDB — charset/collation here apply to the next create. The existing on-host database is unchanged.') }}
+                                @endswitch
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="space-y-5 px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
                         <div>
                             <x-input-label for="edit-description" :value="__('Description')" />
                             <textarea
@@ -400,15 +431,23 @@
                         @endif
                     </div>
 
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                         <x-secondary-button type="button" wire:click="closeEditDatabaseModal">{{ __('Cancel') }}</x-secondary-button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveDatabaseEdit">
-                            <span wire:loading.remove wire:target="saveDatabaseEdit">{{ __('Save changes') }}</span>
-                            <span wire:loading wire:target="saveDatabaseEdit" class="inline-flex items-center gap-2">
-                                <x-spinner variant="cream" />
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="saveDatabaseEdit"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="saveDatabaseEdit" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Save changes') }}
+                            </span>
+                            <span wire:loading wire:target="saveDatabaseEdit" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
                                 {{ __('Saving…') }}
                             </span>
-                        </x-primary-button>
+                        </button>
                     </div>
                 </form>
             </x-modal>
@@ -418,22 +457,28 @@
             <x-modal
                 name="sqlite-sql-console-modal"
                 :show="false"
-                maxWidth="2xl"
-                overlayClass="bg-brand-ink/40"
+                maxWidth="3xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
                 focusable
             >
-                <form wire:submit="runSqliteSql">
-                    <div class="border-b border-brand-ink/10 px-6 py-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQLite SQL console') }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Paste a SQL statement (or batch). Output streams back from sqlite3 on the server.') }}</p>
-                        <x-explainer class="mt-3" tone="warn">
-                            <p>{{ __('SQL runs as the engine\'s own DB user via SSH — this is full read + write + DDL access. There\'s no row-level safety net; SELECT and DROP are equally easy to type.') }}</p>
-                            <p>{{ __('The audit log records the verb (SELECT/INSERT/UPDATE/DELETE/DROP/etc.) but not the body of the query, so passwords and key contents never get logged. Output streams back as the engine emits it; there\'s no truncation client-side.') }}</p>
-                        </x-explainer>
+                <form wire:submit="runSqliteSql" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQL console') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Paste a SQL statement (or batch). Output streams back from sqlite3 on the server.') }}</p>
+                            <x-explainer class="mt-3" tone="warn">
+                                <p>{{ __('SQL runs as the engine\'s own DB user via SSH — this is full read + write + DDL access. There\'s no row-level safety net; SELECT and DROP are equally easy to type.') }}</p>
+                                <p>{{ __('The audit log records the verb (SELECT/INSERT/UPDATE/DELETE/DROP/etc.) but not the body of the query, so passwords and key contents never get logged. Output streams back as the engine emits it; there\'s no truncation client-side.') }}</p>
+                            </x-explainer>
+                        </div>
                     </div>
 
-                    <div class="space-y-4 px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
                         <div>
                             <x-input-label for="sqlite-console-sql" :value="__('SQL')" />
                             <textarea
@@ -466,15 +511,23 @@
                         @endif
                     </div>
 
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                         <x-secondary-button type="button" wire:click="closeSqliteConsoleModal">{{ __('Close') }}</x-secondary-button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="runSqliteSql">
-                            <span wire:loading.remove wire:target="runSqliteSql">{{ __('Run query') }}</span>
-                            <span wire:loading wire:target="runSqliteSql" class="inline-flex items-center gap-2">
-                                <x-spinner variant="cream" />
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="runSqliteSql"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="runSqliteSql" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Run query') }}
+                            </span>
+                            <span wire:loading wire:target="runSqliteSql" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
                                 {{ __('Running…') }}
                             </span>
-                        </x-primary-button>
+                        </button>
                     </div>
                 </form>
             </x-modal>

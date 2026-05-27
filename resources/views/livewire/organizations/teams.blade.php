@@ -241,12 +241,17 @@
             focusable
         >
             <form wire:submit="createTeam">
-                <div class="border-b border-brand-ink/10 px-6 py-5 dark:border-brand-mist/20">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Create team') }}</p>
-                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Name your team') }}</h2>
-                    <p class="mt-2 text-sm leading-6 text-brand-moss">
-                        {{ __('Teams help you scope notifications and access. You can add organization members after the team is created.') }}
-                    </p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Create team') }}</p>
+                        <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Name your team') }}</h2>
+                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            {{ __('Teams help you scope notifications and access. You can add organization members after the team is created.') }}
+                        </p>
+                    </div>
                 </div>
 
                 <div class="space-y-5 px-6 py-6">
@@ -266,14 +271,17 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4 dark:border-brand-mist/20">
+                <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                     <x-secondary-button type="button" wire:click="closeCreateTeamModal">
                         {{ __('Cancel') }}
                     </x-secondary-button>
                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createTeam">
-                        <span wire:loading.remove wire:target="createTeam">{{ __('Create team') }}</span>
+                        <span wire:loading.remove wire:target="createTeam" class="inline-flex items-center gap-2">
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Create team') }}
+                        </span>
                         <span wire:loading wire:target="createTeam" class="inline-flex items-center gap-2">
-                            <x-spinner variant="cream" />
+                            <x-spinner variant="cream" size="sm" />
                             {{ __('Creating…') }}
                         </span>
                     </x-primary-button>

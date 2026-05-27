@@ -3,7 +3,7 @@
 
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
         ['label' => __('Notification channels'), 'href' => route('profile.notification-channels'), 'icon' => 'bell-alert'],
         ['label' => __('Bulk assign notifications'), 'icon' => 'rectangle-stack'],
     ]" />

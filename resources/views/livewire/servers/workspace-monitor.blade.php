@@ -1,3 +1,14 @@
+@php
+    $tonePalette = [
+        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
+        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
+        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+        'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+    ];
+@endphp
+
 <x-server-workspace-layout
     :server="$server"
     active="monitor"
@@ -13,23 +24,39 @@
 
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('Live + historical resource metrics (CPU, memory, disk, load, network) for this server. Samples are pushed from a small Python guest agent installed during provisioning; the workspace plots time-series and the latest snapshot.') }}</p>
         <p>{{ __('"Probe" is dply\'s SSH-based reachability check — different from the guest agent, which pushes samples on its own cadence. Both being green means metrics will keep flowing; either being red explains a stale dashboard.') }}</p>
     </x-explainer>
 
     @if ($server->workspace)
         @feature('surface.projects')
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-                <p class="font-semibold">{{ __('Project health shortcut') }}</p>
-                <p class="mt-1 leading-relaxed text-brand-moss">
-                    {{ __('Metrics here are server-specific. Open the project operations page when you want to review grouped health, recent activity, and runbooks alongside the rest of this project.') }}
-                </p>
-                <div class="mt-3 flex flex-wrap gap-3">
-                    <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
-                    <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project overview') }}</a>
+            <section class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                            <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Project') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Project health shortcut') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('Metrics here are server-specific. Open the project operations page when you want to review grouped health, recent activity, and runbooks alongside the rest of this project.') }}
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Project operations') }}
+                                </a>
+                                <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                    <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Project overview') }}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
         @endfeature
     @endif
 
@@ -45,26 +72,36 @@
         />
     @endif
     @if ($opsReady && ! $pyOk)
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Install monitor on this server') }}</h2>
-            <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Dply provisions the metrics agent over SSH so this page can stream usage data.') }}
-            </p>
-
-            <ul class="mt-5 space-y-2.5 text-sm text-brand-ink">
-                <li class="flex items-start gap-2.5">
-                    <x-heroicon-o-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    <span>{{ __('Installs Python and the metrics agent over SSH') }}</span>
-                </li>
-                <li class="flex items-start gap-2.5">
-                    <x-heroicon-o-arrow-path class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    <span>{{ __('Updates charts on this page every minute') }}</span>
-                </li>
-                <li class="flex items-start gap-2.5">
-                    <x-heroicon-o-bell-alert class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                    <span>{{ __('Feeds Insights for threshold alerts and digest emails') }}</span>
-                </li>
-            </ul>
+        <section class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                        <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Monitor') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install monitor on this server') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Dply provisions the metrics agent over SSH so this page can stream usage data.') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 sm:p-7">
+                <ul class="space-y-2.5 text-sm text-brand-ink">
+                    <li class="flex items-start gap-2.5">
+                        <x-heroicon-o-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <span>{{ __('Installs Python and the metrics agent over SSH') }}</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <x-heroicon-o-arrow-path class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <span>{{ __('Updates charts on this page every minute') }}</span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                        <x-heroicon-o-bell-alert class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        <span>{{ __('Feeds Insights for threshold alerts and digest emails') }}</span>
+                    </li>
+                </ul>
 
             @if ($probePending)
                 <div class="mt-6 rounded-xl border border-sky-200/80 bg-sky-50/70 p-4">
@@ -176,19 +213,42 @@
                     <p class="mt-4 text-xs text-brand-mist">{{ __('Last check') }}: {{ $probeAt->format('Y-m-d H:i:s T') }}</p>
                 @endif
             @endif
-        </div>
+            </div>
+        </section>
     @endif
 
     @if (! $opsReady)
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before metrics can be collected.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before metrics can be collected.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @endif
 
     @if ($metrics_error)
-        <div class="rounded-2xl border border-red-200/80 bg-red-50/90 px-5 py-4 text-sm text-red-900">
-            {{ $metrics_error }}
-        </div>
+        <section class="dply-card overflow-hidden border-rose-200">
+            <div class="border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['rose'] }}">
+                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Metrics error') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Could not load metrics') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $metrics_error }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @endif
 
     @if ($opsReady && $pyOk)

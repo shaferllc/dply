@@ -1,69 +1,93 @@
             @if ($generated_database_credentials)
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('New database credentials') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Save these now. Dply generated credentials for :name and shows them here right after creation.', ['name' => $generated_database_credentials['name']]) }}
-                            </p>
+                <section class="dply-card overflow-hidden">
+                    <div class="border-b border-brand-ink/10 bg-brand-sage/8 px-6 py-5 sm:px-7">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="flex items-start gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Just created') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('New database credentials') }}</h3>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        {{ __('Save these now. Dply generated credentials for :name and shows them here right after creation.', ['name' => $generated_database_credentials['name']]) }}
+                                    </p>
+                                </div>
+                            </div>
+                            <button type="button" wire:click="dismissGeneratedDatabaseCredentials" class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                <x-heroicon-m-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Dismiss') }}
+                            </button>
                         </div>
-                        <button type="button" wire:click="dismissGeneratedDatabaseCredentials" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                            {{ __('Dismiss') }}
-                        </button>
                     </div>
-                    <dl class="mt-6 grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</dt>
-                            <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $generated_database_credentials['name'] }}</dd>
+                    <dl class="grid gap-3 p-6 sm:grid-cols-2 sm:p-7">
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</dt>
+                            <dd class="mt-0.5 font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['name'] }}</dd>
                         </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</dt>
-                            <dd class="mt-1 text-sm text-brand-ink">{{ $engineLabels[$generated_database_credentials['engine']] ?? ucfirst((string) $generated_database_credentials['engine']) }}</dd>
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</dt>
+                            <dd class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $engineLabels[$generated_database_credentials['engine']] ?? ucfirst((string) $generated_database_credentials['engine']) }}</dd>
                         </div>
                         @if (filled($generated_database_credentials['username']))
-                            <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
-                                <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $generated_database_credentials['username'] }}</dd>
+                            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
+                                <dd class="mt-0.5 font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['username'] }}</dd>
                                 @if ($generated_database_credentials['username_generated'])
-                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Generated for you.') }}</p>
+                                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Generated for you.') }}</p>
                                 @endif
                             </div>
                         @endif
                         @if (filled($generated_database_credentials['password']))
-                            <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $generated_database_credentials['password'] }}</dd>
+                            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
+                                <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['password'] }}</dd>
                                 @if ($generated_database_credentials['password_generated'])
-                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Generated for you.') }}</p>
+                                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Generated for you.') }}</p>
                                 @endif
                             </div>
                         @endif
                         @if ($generated_database_credentials['engine'] === 'sqlite' && filled($generated_database_credentials['host'] ?? null))
-                            <div class="sm:col-span-2">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $generated_database_credentials['host'] }}</dd>
+                            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm sm:col-span-2">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</dt>
+                                <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $generated_database_credentials['host'] }}</dd>
                             </div>
                         @endif
                     </dl>
-                </div>
+                </section>
             @endif
 
             @php
                 $anyEngine = ($capabilities['mysql'] ?? false) || ($capabilities['postgres'] ?? false) || ($capabilities['sqlite'] ?? false);
             @endphp
-            <div class="{{ $card }} p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('New database') }}</h2>
+            <section class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Create') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('New database') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                @if (! $anyEngine)
+                                    {{ __('No database engine detected on this server. Install MySQL, PostgreSQL, or SQLite, then use Recheck engines on the Advanced tab.') }}
+                                @else
+                                    {{ __('Creates the database and a user on the server. Leave user and password empty to generate values automatically.') }}
+                                @endif
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 sm:p-7">
                 @if (! $anyEngine)
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('No database engine detected on this server. Install MySQL, PostgreSQL, or SQLite, then use Recheck engines on the Advanced tab.') }}
-                    </p>
+                    {{-- empty state already in header strip --}}
                 @else
-                <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Creates the database and a user on the server. Leave user and password empty to generate values automatically.') }}</p>
-                <x-explainer class="mt-3">
+                <x-explainer>
                     <p>{{ __('Picks an engine, runs CREATE DATABASE, then creates a per-database user (defaulting to the same name) and grants it full access on that database only. The credentials are stored encrypted in the dply database — reveal + copy them from the Credentials column on each row.') }}</p>
                     <p>{{ __('Auto-generation: an empty user defaults to the database name. An empty password generates a 32-character symbol-free string. Both are good defaults for app-only use.') }}</p>
                 </x-explainer>
-                <form wire:submit="createDatabase" class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <form wire:submit="createDatabase" class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div class="sm:col-span-2">
                         <x-input-label for="new_db_name" value="{{ __('Name') }}" />
                         <x-text-input id="new_db_name" wire:model.live.debounce.250ms="new_db_name" class="mt-1 block w-full font-mono text-sm" wire:loading.attr="disabled" wire:target="createDatabase" required />
@@ -171,13 +195,25 @@
                             </details>
                         </div>
                     @endif
-                    <div class="sm:col-span-2 flex justify-end">
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createDatabase">
-                            <span wire:loading.remove wire:target="createDatabase">{{ __('Add database') }}</span>
-                            <span wire:loading wire:target="createDatabase">{{ __('Adding database…') }}</span>
-                        </x-primary-button>
+                    <div class="sm:col-span-2 flex justify-end border-t border-brand-ink/10 pt-4">
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="createDatabase"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="createDatabase" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Add database') }}
+                            </span>
+                            <span wire:loading wire:target="createDatabase" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Adding database…') }}
+                            </span>
+                        </button>
                     </div>
                 </form>
                 @endif
-            </div>
+                </div>
+            </section>
 

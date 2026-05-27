@@ -60,7 +60,23 @@ class BackupConfigurations extends Component
         ]);
 
         $this->createForm = $this->emptyDestinationForm();
+        $this->dispatch('close-modal', 'backup-destination-modal');
         $this->toastSuccess(__('Backup destination saved.'));
+    }
+
+    public function openCreateModal(): void
+    {
+        $this->authorize('create', BackupConfiguration::class);
+        $this->resetErrorBag();
+        $this->createForm = $this->emptyDestinationForm();
+        $this->dispatch('open-modal', 'backup-destination-modal');
+    }
+
+    public function closeCreateModal(): void
+    {
+        $this->resetErrorBag();
+        $this->createForm = $this->emptyDestinationForm();
+        $this->dispatch('close-modal', 'backup-destination-modal');
     }
 
     public function startEdit(string $id): void

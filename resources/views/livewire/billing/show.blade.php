@@ -210,6 +210,85 @@
                     </div>
                 </section>
 
+                {{-- Billing details. Org-scoped invoice email, VAT, currency,
+                     legal details — printed on Stripe invoices for this org's
+                     subscription. Migrated off the user-level profile page in
+                     2026-05 because subscriptions are org-scoped. --}}
+                @if ($this->canManageBilling)
+                    @php
+                        $currencies = config('profile_options.currencies', []);
+                    @endphp
+                    <section class="dply-card overflow-hidden">
+                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                            <div class="flex items-start gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                                    <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Invoicing') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
+                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <form wire:submit="saveBillingDetails" class="space-y-5 p-6 sm:p-7">
+                            <div class="grid gap-5 sm:grid-cols-2">
+                                <div>
+                                    <x-input-label for="org_invoice_email" :value="__('Invoice email')" />
+                                    <x-text-input id="org_invoice_email" wire:model="invoice_email" type="email" class="mt-1 block w-full" autocomplete="email" />
+                                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Where invoices land — defaults to the org owner\'s email when blank.') }}</p>
+                                    <x-input-error class="mt-2" :messages="$errors->get('invoice_email')" />
+                                </div>
+                                <div>
+                                    <x-input-label for="org_vat_number" :value="__('VAT number')" />
+                                    <x-text-input id="org_vat_number" wire:model="vat_number" type="text" class="mt-1 block w-full" placeholder="NL123456789B01" autocomplete="off" />
+                                    <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Include the country code. EU businesses may receive a VAT exemption notice when valid.') }}</p>
+                                    <x-input-error class="mt-2" :messages="$errors->get('vat_number')" />
+                                </div>
+                            </div>
+                            <div>
+                                <x-input-label for="org_billing_currency" :value="__('Currency')" />
+                                <select
+                                    id="org_billing_currency"
+                                    wire:model="billing_currency"
+                                    class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                                >
+                                    <option value="">{{ __('Select a currency') }}</option>
+                                    @foreach ($currencies as $code => $label)
+                                        <option value="{{ $code }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Preferred currency for invoices and payment references.') }}</p>
+                                <x-input-error class="mt-2" :messages="$errors->get('billing_currency')" />
+                            </div>
+                            <div>
+                                <x-input-label for="org_billing_details" :value="__('Legal details')" />
+                                <textarea
+                                    id="org_billing_details"
+                                    wire:model="billing_details"
+                                    rows="4"
+                                    class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:ring-brand-sage"
+                                    placeholder="{{ __('Legal name, address, and other details to show on invoices') }}"
+                                ></textarea>
+                                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Printed on newly created invoices when provided.') }}</p>
+                                <x-input-error class="mt-2" :messages="$errors->get('billing_details')" />
+                            </div>
+                            <div class="flex items-center justify-end border-t border-brand-ink/10 pt-4">
+                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveBillingDetails">
+                                    <span wire:loading.remove wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
+                                        <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {{ __('Save billing details') }}
+                                    </span>
+                                    <span wire:loading wire:target="saveBillingDetails" class="inline-flex items-center gap-2">
+                                        <x-spinner variant="cream" size="sm" />
+                                        {{ __('Saving…') }}
+                                    </span>
+                                </x-primary-button>
+                            </div>
+                        </form>
+                    </section>
+                @endif
+
                 {{-- Subscription — cancel / resume --}}
                 @if ($this->canManageBilling)
                     <section class="dply-card overflow-hidden">

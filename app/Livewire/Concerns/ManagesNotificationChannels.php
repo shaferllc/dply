@@ -161,7 +161,23 @@ trait ManagesNotificationChannels
 
         $this->resetNewChannelFields();
         unset($this->channels);
+        $this->dispatch('close-modal', 'settings-create-channel-modal');
         $this->toastSuccess(__('Channel created.'));
+    }
+
+    public function openCreateChannelModal(): void
+    {
+        Gate::authorize('manageNotificationChannels', $this->owner());
+        $this->resetErrorBag();
+        $this->resetNewChannelFields();
+        $this->dispatch('open-modal', 'settings-create-channel-modal');
+    }
+
+    public function closeCreateChannelModal(): void
+    {
+        $this->resetErrorBag();
+        $this->resetNewChannelFields();
+        $this->dispatch('close-modal', 'settings-create-channel-modal');
     }
 
     protected function resetNewChannelFields(): void

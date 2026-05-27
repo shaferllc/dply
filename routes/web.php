@@ -5,6 +5,9 @@ use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
 use App\Http\Controllers\DocsController;
+use App\Http\Controllers\Edge\EdgeAuditLogExportController;
+use App\Http\Controllers\Edge\EdgeLogCsvDownloadController;
+use App\Http\Controllers\Edge\EdgeRepoConfigYamlDownloadController;
 use App\Http\Controllers\EdgeDeployHookController;
 use App\Http\Controllers\EdgeLogIngestController;
 use App\Http\Controllers\EdgeLogpushIngestController;
@@ -30,6 +33,7 @@ use App\Livewire\Billing\Show as BillingShow;
 use App\Livewire\Cloud\Create as CloudCreate;
 use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
 use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
+use App\Livewire\Cloud\DeployDetail;
 use App\Livewire\Cloud\Index as CloudIndex;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
@@ -37,6 +41,7 @@ use App\Livewire\Edge\Create as EdgeCreate;
 use App\Livewire\Edge\Import;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Edge\Templates;
+use App\Livewire\Edge\Usage;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
@@ -60,7 +65,6 @@ use App\Livewire\Organizations\NotificationChannels as OrganizationsNotification
 use App\Livewire\Organizations\Show as OrganizationsShow;
 use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
-use App\Livewire\Profile\Edit as ProfileEdit;
 use App\Livewire\Profile\Referrals as ProfileReferrals;
 use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
@@ -289,7 +293,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
     Route::livewire('/notifications', NotificationsIndex::class)->name('notifications.index');
 
-    Route::livewire('/profile', ProfileEdit::class)->name('profile.edit');
     Route::livewire('/profile/referrals', ProfileReferrals::class)->name('profile.referrals');
     Route::livewire('/profile/security', SettingsSecurity::class)->name('profile.security');
     Route::livewire('/profile/source-control', SettingsSourceControl::class)->name('profile.source-control');
@@ -341,7 +344,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
         Route::livewire('edge/import', Import::class)->name('edge.import');
         Route::livewire('edge/templates', Templates::class)->name('edge.templates');
-        Route::livewire('edge/usage', \App\Livewire\Edge\Usage::class)->name('edge.usage');
+        Route::livewire('edge/usage', Usage::class)->name('edge.usage');
     });
     Route::middleware('feature:surface.serverless')->group(function (): void {
         Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
@@ -453,7 +456,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/edge/deployments/{deployment}', EdgeDeploymentDetail::class)->name('sites.edge.deployments.show');
-    Route::livewire('servers/{server}/sites/{site}/cloud/deploys/{deploy}', \App\Livewire\Cloud\DeployDetail::class)
+    Route::livewire('servers/{server}/sites/{site}/cloud/deploys/{deploy}', DeployDetail::class)
         ->name('sites.cloud.deploys.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
@@ -511,18 +514,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // inside the controller) so the dashboard "Download CSV" button
     // works without minting an API token. Stays out of the section
     // dispatcher because the .csv extension wouldn't match.
-    Route::get('servers/{server}/sites/{site}/edge/logs.csv', \App\Http\Controllers\Edge\EdgeLogCsvDownloadController::class)
+    Route::get('servers/{server}/sites/{site}/edge/logs.csv', EdgeLogCsvDownloadController::class)
         ->name('sites.edge.logs.csv');
 
     // Per-site audit-log export (CSV/JSON) — session-authed, no row cap,
     // mirrors the on-screen Audit log panel filters.
-    Route::get('servers/{server}/sites/{site}/edge/audit.export', \App\Http\Controllers\Edge\EdgeAuditLogExportController::class)
+    Route::get('servers/{server}/sites/{site}/edge/audit.export', EdgeAuditLogExportController::class)
         ->name('sites.edge.audit.export');
 
     // Generate dply.yaml from the site's current declarative config
     // (redirects / rewrites / headers / crons). Lets a user export
     // dashboard-managed state to a repo-checked file.
-    Route::get('servers/{server}/sites/{site}/edge/dply.yaml', \App\Http\Controllers\Edge\EdgeRepoConfigYamlDownloadController::class)
+    Route::get('servers/{server}/sites/{site}/edge/dply.yaml', EdgeRepoConfigYamlDownloadController::class)
         ->name('sites.edge.dply-yaml');
 
     Route::get('servers/{server}/sites/{site}/{section?}', SiteWorkspaceController::class)

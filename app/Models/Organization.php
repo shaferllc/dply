@@ -39,6 +39,12 @@ class Organization extends Model
         'services_preferences',
         'alert_slack_webhook_url',
         'alert_extra_emails',
+        // Billing entity. Used on Stripe invoices for this org's
+        // subscription. Migrated off users in 2026-05.
+        'invoice_email',
+        'vat_number',
+        'billing_currency',
+        'billing_details',
     ];
 
     protected function casts(): array

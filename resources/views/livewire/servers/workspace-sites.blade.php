@@ -1,5 +1,28 @@
 @php
-    $card = 'dply-card overflow-hidden';
+    $tonePalette = [
+        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
+        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
+        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+        'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+        'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    ];
+
+    $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    $newCardEyebrow = $isContainerHost ? __('Container apps') : __('Sites');
+    $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
+    $newCardDescription = $isContainerHost
+        ? __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.')
+        : __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.');
+    $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
+    $listHeading = $isContainerHost ? __('Container apps') : __('Site directory');
+    $listEyebrow = __('Library');
+    $emptyHeadline = $isContainerHost ? __('No container apps yet') : __('No sites yet');
+    $emptyLead = $isContainerHost
+        ? __('Add one to deploy a Git repo onto this host.')
+        : __('Add a site to manage web server config, SSL, Git deploys, and environment files.');
+    $siteCount = $server->sites->count();
 @endphp
 
 <x-server-workspace-layout
@@ -11,148 +34,233 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @php
-        $isContainerHostExplainer = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
-    @endphp
-    <x-explainer class="mb-4">
-        @if ($isContainerHostExplainer)
-            <p>{{ __('Container apps deployed onto this host. Each row is a Site rooted at a Git repo: dply builds the image, runs it on the host (Docker container or Kubernetes Deployment), and tracks deploys + env per app.') }}</p>
-            <p>{{ __('Adding a container here inspects the repo, queues the first build + deploy, and surfaces progress on this server\'s overview. Removing a container tears down the running workload and the matching dply records.') }}</p>
-        @else
-            <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
-            <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
-        @endif
-    </x-explainer>
-
-    @php
-        // Q19-D: container-host CTAs use the "container" vocabulary; VM hosts
-        // keep the existing "site" copy. Schema is still `sites` everywhere.
-        $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
-        $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
-        $newCardDescription = $isContainerHost
-            ? __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.')
-            : __('Add a domain to get started. Stack, paths, and PHP options are available in advanced settings.');
-        $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
-    @endphp
-    <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-            <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ $newCardHeading }}</h2>
-                <p class="mt-1 text-sm text-brand-moss leading-relaxed">
-                    {{ $newCardDescription }}
-                </p>
-                @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
-                    <p class="mt-3 inline-flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900">
-                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
-                        <span>{{ $this->addSiteBlockedReason }}</span>
-                    </p>
-                @endif
-            </div>
-            @if ($this->canAddSite)
-                <x-primary-button type="button" wire:click="openAddSiteModal" class="justify-center">{{ $addCtaLabel }}</x-primary-button>
+    <div class="space-y-6">
+        <x-explainer>
+            @if ($isContainerHost)
+                <p>{{ __('Container apps deployed onto this host. Each row is a Site rooted at a Git repo: dply builds the image, runs it on the host (Docker container or Kubernetes Deployment), and tracks deploys + env per app.') }}</p>
+                <p>{{ __('Adding a container here inspects the repo, queues the first build + deploy, and surfaces progress on this server\'s overview. Removing a container tears down the running workload and the matching dply records.') }}</p>
             @else
-                <span
-                    class="inline-flex cursor-not-allowed items-center justify-center rounded-lg bg-brand-mist/40 px-4 py-2.5 text-sm font-semibold text-brand-moss"
-                    title="{{ $this->addSiteBlockedReason }}"
-                >
-                    {{ $addCtaLabel }}
-                </span>
+                <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
+                <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
             @endif
-        </div>
-    </div>
+        </x-explainer>
 
-    <div class="{{ $card }}">
-        <div class="flex items-center justify-between border-b border-brand-ink/10 px-5 py-3 sm:px-8">
-            <h2 class="text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Sites') }}</h2>
-            <x-heroicon-o-funnel class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-        </div>
-        @if ($server->sites->isEmpty())
-            <p class="px-5 py-10 sm:px-8 text-center text-sm text-brand-moss">{{ $isContainerHost
-                ? __('No container apps yet. Add one to deploy a Git repo onto this host.')
-                : __('No sites yet. Add a site to manage web server config, SSL, Git deploys, and environment files.') }}</p>
-        @else
-            <ul class="divide-y divide-brand-ink/10">
-                @foreach ($server->sites as $s)
-                    @php
-                        $primaryDomain = $s->domains->sortByDesc('is_primary')->first();
-                        $displayHost = $primaryDomain?->hostname ?? $s->name;
-                        $statusOk = $s->isReadyForTraffic();
-                        $sslOn = $s->ssl_status === \App\Models\Site::SSL_ACTIVE;
-                        $gitRef = $s->git_repository_url;
-                        $gitShort = $gitRef ? (preg_match('#([^/:]+/[^/]+?)(?:\.git)?$#', $gitRef, $m) ? $m[1] : \Illuminate\Support\Str::limit($gitRef, 40)) : null;
-
-                        // Waiting-for-host hint: a container Site sits in STATUS_PENDING while
-                        // FinalizeContainerCloudLaunchJob polls for the host to be ready.
-                        // Surface that state inline so the row makes sense on its own (per Q18-B).
-                        $containerLaunchStatus = (string) data_get($server->meta, 'container_launch.status', '');
-                        $isWaitingOnHost = $s->status === \App\Models\Site::STATUS_PENDING
-                            && in_array($containerLaunchStatus, ['waiting_for_server', 'queued'], true)
-                            && (string) data_get($server->meta, 'container_launch.site_id', '') === (string) $s->id;
-                    @endphp
-                    <li class="relative flex">
-                        <span
-                            @class([
-                                'absolute bottom-0 left-0 top-0 w-1',
-                                'bg-brand-forest' => $statusOk,
-                                'bg-brand-gold' => ! $statusOk && $s->status !== \App\Models\Site::STATUS_ERROR,
-                                'bg-brand-rust' => $s->status === \App\Models\Site::STATUS_ERROR,
-                            ])
-                            aria-hidden="true"
-                        ></span>
-                        <div class="min-w-0 flex-1 py-5 pl-5 pr-5 sm:pl-8 sm:pr-8">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <a
-                                    href="{{ route('sites.show', [$server, $s]) }}"
-                                    wire:navigate
-                                    class="text-base font-semibold text-brand-ink hover:text-brand-sage transition-colors"
-                                >{{ $s->isCustom() ? $s->name : $displayHost }}</a>
-                                @if ($s->isCustom())
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink/70 ring-1 ring-brand-ink/10">
-                                        <x-heroicon-m-wrench-screwdriver class="h-3 w-3" />
-                                        {{ __('Custom') }}
-                                    </span>
-                                @elseif ($sslOn)
-                                    <x-heroicon-s-lock-closed class="h-4 w-4 text-brand-forest" title="{{ __('SSL active') }}" />
-                                @endif
-                                @if (filter_var($s->meta['debug'] ?? false, FILTER_VALIDATE_BOOLEAN))
-                                    <span class="rounded-md bg-brand-sand px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-olive">{{ __('Debug mode on') }}</span>
-                                @endif
-                                @if ($isWaitingOnHost)
-                                    <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200">
-                                        <x-heroicon-m-clock class="h-3 w-3" />
-                                        {{ __('Waiting for host setup') }}
-                                    </span>
-                                @endif
-                            </div>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-moss">
-                                @if ($gitShort)
-                                    <span class="inline-flex items-center gap-1">
-                                        <x-heroicon-o-code-bracket class="h-3.5 w-3.5 opacity-80" />
-                                        {{ $gitShort }}
-                                        @if ($s->git_branch)
-                                            <span class="text-brand-mist">({{ $s->git_branch }})</span>
-                                        @endif
-                                    </span>
-                                @elseif ($s->isCustomNoRepoMode())
-                                    <span class="inline-flex items-center gap-1 font-mono">
-                                        <x-heroicon-o-folder class="h-3.5 w-3.5 opacity-80" />
-                                        {{ $s->repository_path ?: '/home/'.$s->effectiveSystemUser($server).'/'.$s->slug }}
-                                    </span>
-                                    <span class="text-brand-mist">{{ __('no repo') }}</span>
-                                @endif
-                                <span class="inline-flex items-center gap-1">
-                                    <x-heroicon-o-user class="h-3.5 w-3.5 opacity-80" />
-                                    {{ $s->effectiveSystemUser($server) }}
-                                </span>
-                                @if ($s->type?->value === 'php' && $s->php_version)
-                                    <span class="inline-flex items-center gap-1 font-mono text-brand-ink/80">PHP {{ $s->php_version }}</span>
-                                @endif
-                            </div>
+        {{-- Hero: new site/container CTA. --}}
+        <section class="dply-card overflow-hidden">
+            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+                <div class="lg:col-span-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            @if ($isContainerHost)
+                                <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
+                            @else
+                                <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
+                            @endif
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $newCardEyebrow }}</p>
+                            <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ $newCardHeading }}</h2>
+                            <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
+                                {{ $newCardDescription }}
+                            </p>
+                            @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
+                                <div class="mt-3 inline-flex items-start gap-2 whitespace-nowrap rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                    <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <span class="whitespace-normal">{{ $this->addSiteBlockedReason }}</span>
+                                </div>
+                            @endif
                         </div>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
+                    </div>
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        @if ($this->canAddSite)
+                            <button
+                                type="button"
+                                wire:click="openAddSiteModal"
+                                class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                            >
+                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ $addCtaLabel }}
+                            </button>
+                        @else
+                            <span
+                                class="inline-flex cursor-not-allowed items-center gap-2 whitespace-nowrap rounded-xl bg-brand-mist/30 px-4 py-2 text-sm font-semibold text-brand-moss"
+                                title="{{ $this->addSiteBlockedReason }}"
+                            >
+                                <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ $addCtaLabel }}
+                            </span>
+                        @endif
+                    </div>
+                </div>
+                <dl class="grid grid-cols-2 gap-2 lg:col-span-5">
+                    <div @class([
+                        'rounded-2xl border px-4 py-3 shadow-sm',
+                        'border-brand-sage/30 bg-brand-sage/8' => $siteCount > 0,
+                        'border-brand-ink/10 bg-white' => $siteCount === 0,
+                    ])>
+                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $isContainerHost ? __('Apps') : __('Sites') }}</dt>
+                        <dd class="mt-1 flex items-baseline gap-1.5">
+                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</span>
+                            <span class="text-[11px] text-brand-moss">{{ trans_choice('on this host|on this host', $siteCount) }}</span>
+                        </dd>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('Per server') }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</dt>
+                        <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
+                            {{ $isContainerHost ? __('Container') : __('VM') }}
+                        </dd>
+                        <p class="mt-1 text-[11px] text-brand-mist">{{ ucfirst((string) $server->hostKind()) }}</p>
+                    </div>
+                </dl>
+            </div>
+        </section>
+
+        {{-- Sites list. --}}
+        <section class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listEyebrow }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $listHeading }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Click a row to open that workspace and manage deploys, env, and settings.') }}</p>
+                    </div>
+                    @if ($siteCount > 0)
+                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
+                    @endif
+                </div>
+            </div>
+
+            @if ($server->sites->isEmpty())
+                <div class="px-6 py-12 text-center sm:px-7">
+                    <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                        @if ($isContainerHost)
+                            <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
+                        @else
+                            <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
+                        @endif
+                    </span>
+                    <p class="mt-4 text-sm font-semibold text-brand-ink">{{ $emptyHeadline }}</p>
+                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ $emptyLead }}</p>
+                    @if ($this->canAddSite)
+                        <button
+                            type="button"
+                            wire:click="openAddSiteModal"
+                            class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ $addCtaLabel }}
+                        </button>
+                    @endif
+                </div>
+            @else
+                <ul class="divide-y divide-brand-ink/10">
+                    @foreach ($server->sites as $s)
+                        @php
+                            $primaryDomain = $s->domains->sortByDesc('is_primary')->first();
+                            $displayHost = $primaryDomain?->hostname ?? $s->name;
+                            $statusOk = $s->isReadyForTraffic();
+                            $sslOn = $s->ssl_status === \App\Models\Site::SSL_ACTIVE;
+                            $gitRef = $s->git_repository_url;
+                            $gitShort = $gitRef ? (preg_match('#([^/:]+/[^/]+?)(?:\.git)?$#', $gitRef, $m) ? $m[1] : \Illuminate\Support\Str::limit($gitRef, 40)) : null;
+                            $debugOn = filter_var($s->meta['debug'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+                            $containerLaunchStatus = (string) data_get($server->meta, 'container_launch.status', '');
+                            $isWaitingOnHost = $s->status === \App\Models\Site::STATUS_PENDING
+                                && in_array($containerLaunchStatus, ['waiting_for_server', 'queued'], true)
+                                && (string) data_get($server->meta, 'container_launch.site_id', '') === (string) $s->id;
+
+                            // Status chip (right-side): replaces the colored
+                            // left bar so the row matches the family pattern.
+                            $statusChip = match (true) {
+                                $s->status === \App\Models\Site::STATUS_ERROR => ['tone' => 'border-rose-200 bg-rose-50 text-rose-700', 'icon' => 'm-x-circle', 'label' => __('Error')],
+                                $statusOk => ['tone' => 'border-emerald-200 bg-emerald-50 text-emerald-700', 'icon' => 'm-check-circle', 'label' => __('Ready')],
+                                default => ['tone' => 'border-amber-200 bg-amber-50 text-amber-800', 'icon' => 'm-clock', 'label' => __('Pending')],
+                            };
+                        @endphp
+                        <li wire:key="site-{{ $s->id }}">
+                            <a
+                                href="{{ route('sites.show', [$server, $s]) }}"
+                                wire:navigate
+                                class="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-brand-sand/15 sm:px-7"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                        <span class="truncate text-sm font-semibold text-brand-ink">{{ $s->isCustom() ? $s->name : $displayHost }}</span>
+                                        @if ($s->isCustom())
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                <x-heroicon-m-wrench-screwdriver class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Custom') }}
+                                            </span>
+                                        @elseif ($sslOn)
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700" title="{{ __('SSL active') }}">
+                                                <x-heroicon-s-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('SSL') }}
+                                            </span>
+                                        @endif
+                                        @if ($debugOn)
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                                <x-heroicon-m-bug-ant class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Debug') }}
+                                            </span>
+                                        @endif
+                                        @if ($isWaitingOnHost)
+                                            <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                                                <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Waiting for host') }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-brand-moss">
+                                        @if ($gitShort)
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                <span class="font-mono text-brand-ink">{{ $gitShort }}</span>
+                                                @if ($s->git_branch)
+                                                    <span class="text-brand-mist">({{ $s->git_branch }})</span>
+                                                @endif
+                                            </span>
+                                        @elseif ($s->isCustomNoRepoMode())
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-m-folder class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                <span class="font-mono text-brand-ink">{{ $s->repository_path ?: '/home/'.$s->effectiveSystemUser($server).'/'.$s->slug }}</span>
+                                                <span class="text-brand-mist">{{ __('no repo') }}</span>
+                                            </span>
+                                        @endif
+                                        <span class="inline-flex items-center gap-1">
+                                            <x-heroicon-m-user class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                            <span class="font-mono text-brand-ink">{{ $s->effectiveSystemUser($server) }}</span>
+                                        </span>
+                                        @if ($s->type?->value === 'php' && $s->php_version)
+                                            <span class="inline-flex items-center gap-1">
+                                                <span class="text-[10px] uppercase tracking-wide text-brand-mist">PHP</span>
+                                                <span class="font-mono text-brand-ink">{{ $s->php_version }}</span>
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusChip['tone'] }}">
+                                        @if ($statusChip['icon'] === 'm-check-circle')
+                                            <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        @elseif ($statusChip['icon'] === 'm-x-circle')
+                                            <x-heroicon-m-x-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        @else
+                                            <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        @endif
+                                        {{ $statusChip['label'] }}
+                                    </span>
+                                    <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                </div>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </section>
     </div>
 
     <x-slot name="modals">
@@ -167,20 +275,26 @@
             <x-modal
                 name="add-site-modal"
                 :show="$showAddSiteModal"
-                maxWidth="lg"
-                overlayClass="bg-brand-ink/40"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
                 focusable
             >
-                <form wire:submit="addSite" x-data="{ showAdvanced: false }">
-                    <div class="border-b border-brand-ink/10 px-6 py-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
-                        <p class="mt-2 text-sm leading-6 text-brand-moss">
-                            {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
-                        </p>
+                <form wire:submit="addSite" x-data="{ showAdvanced: false }" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="space-y-5 px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
                         <div>
                             <x-input-label for="add-site-hostname" :value="__('Primary domain')" />
                             <x-text-input
@@ -195,18 +309,21 @@
                             <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
                         </div>
 
-                        <div class="border-t border-brand-ink/10 pt-4">
+                        <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/30">
                             <button
                                 type="button"
                                 x-on:click="showAdvanced = !showAdvanced"
-                                class="flex w-full items-center justify-between text-sm font-semibold text-brand-ink hover:text-brand-sage"
+                                class="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm font-semibold text-brand-ink hover:bg-brand-sand/30"
                                 x-bind:aria-expanded="showAdvanced"
                             >
-                                <span>{{ __('Advanced settings') }}</span>
-                                <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform" x-bind:class="showAdvanced ? 'rotate-180' : ''" />
+                                <span class="inline-flex items-center gap-2">
+                                    <x-heroicon-m-cog-6-tooth class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    {{ __('Advanced settings') }}
+                                </span>
+                                <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 transition-transform" x-bind:class="showAdvanced ? 'rotate-180' : ''" />
                             </button>
 
-                            <div x-show="showAdvanced" x-collapse class="mt-5 space-y-5">
+                            <div x-show="showAdvanced" x-collapse class="space-y-5 border-t border-brand-ink/10 px-4 py-4">
                                 <div>
                                     <x-input-label for="add-site-name" :value="__('Site name')" />
                                     <x-text-input
@@ -328,17 +445,25 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                         <x-secondary-button type="button" wire:click="closeAddSiteModal">
                             {{ __('Cancel') }}
                         </x-secondary-button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addSite">
-                            <span wire:loading.remove wire:target="addSite">{{ __('Add site') }}</span>
-                            <span wire:loading wire:target="addSite" class="inline-flex items-center gap-2">
-                                <x-spinner variant="cream" />
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="addSite"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="addSite" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Add site') }}
+                            </span>
+                            <span wire:loading wire:target="addSite" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
                                 {{ __('Adding…') }}
                             </span>
-                        </x-primary-button>
+                        </button>
                     </div>
                 </form>
             </x-modal>
