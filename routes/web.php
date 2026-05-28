@@ -95,6 +95,7 @@ use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
+use App\Livewire\Servers\WorkspaceBlueprint;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceConsole;
@@ -106,6 +107,7 @@ use App\Livewire\Servers\WorkspaceFirewall;
 use App\Livewire\Servers\WorkspaceHealth;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
+use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
@@ -596,6 +598,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
     Route::middleware('feature:workspace.health')->group(function (): void {
         Route::livewire('servers/{server}/health', WorkspaceHealth::class)->name('servers.health');
+    });
+    Route::middleware('feature:workspace.server_blueprint')->group(function (): void {
+        Route::livewire('servers/{server}/blueprint', WorkspaceBlueprint::class)->name('servers.blueprint');
+    });
+    Route::middleware('feature:workspace.server_maintenance')->group(function (): void {
+        Route::livewire('servers/{server}/maintenance', WorkspaceMaintenance::class)->name('servers.maintenance');
     });
     Route::middleware('feature:workspace.insights')->group(function (): void {
         Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');

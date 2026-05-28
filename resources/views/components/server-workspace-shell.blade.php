@@ -269,6 +269,12 @@
                                 @case('heart')
                                     <x-heroicon-o-heart class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('document-duplicate')
+                                    <x-heroicon-o-document-duplicate class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('wrench')
+                                    <x-heroicon-o-wrench class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                                 @default
                                     <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch

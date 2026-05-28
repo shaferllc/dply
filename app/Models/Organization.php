@@ -438,6 +438,11 @@ class Organization extends Model
         return $this->hasMany(FirewallRuleTemplate::class);
     }
 
+    public function serverBlueprints(): HasMany
+    {
+        return $this->hasMany(ServerBlueprint::class);
+    }
+
     public function defaultSiteScript(): BelongsTo
     {
         return $this->belongsTo(Script::class, 'default_site_script_id');

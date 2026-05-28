@@ -138,6 +138,8 @@ final class AuditActionMeta
             'server.ssh_login_detected' => ['label' => 'SSH login detected', 'icon' => 'heroicon-o-finger-print', 'tone' => 'warning'],
             'server.webhook.test_dispatched' => ['label' => 'Webhook test dispatched', 'icon' => 'heroicon-o-paper-airplane', 'tone' => 'info'],
             'server.webhook.delivery_resent' => ['label' => 'Webhook delivery resent', 'icon' => 'heroicon-o-arrow-path', 'tone' => 'info'],
+            'server.maintenance.enabled' => ['label' => 'Server maintenance enabled', 'icon' => 'heroicon-o-wrench', 'tone' => 'warning'],
+            'server.maintenance.disabled' => ['label' => 'Server maintenance ended', 'icon' => 'heroicon-o-play-circle', 'tone' => 'success'],
 
             // Sites
             'site.suspended' => ['label' => 'Site suspended', 'icon' => 'heroicon-o-pause-circle', 'tone' => 'warning'],

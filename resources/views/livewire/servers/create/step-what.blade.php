@@ -284,6 +284,39 @@
                 </div>
             </div>
             <div class="relative space-y-5 p-6 sm:p-7">
+                @if ($orgBlueprints->isNotEmpty())
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Your blueprints') }}</p>
+                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Golden-server snapshots saved from ready VMs in your organization.') }}</p>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            @foreach ($orgBlueprints as $blueprint)
+                                <button
+                                    type="button"
+                                    wire:click="applyBlueprint('{{ $blueprint['id'] }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyBlueprint"
+                                    @class([
+                                        'group relative flex flex-col items-start rounded-2xl border-2 p-5 text-left shadow-sm transition-all disabled:cursor-wait',
+                                        'border-brand-violet bg-gradient-to-br from-violet-50 via-white to-white shadow-violet-100 ring-2 ring-violet-200 ring-offset-2 ring-offset-white' => $selectedBlueprintId === $blueprint['id'],
+                                        'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md' => $selectedBlueprintId !== $blueprint['id'],
+                                    ])
+                                >
+                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700 ring-1 ring-violet-200">{{ __('Blueprint') }}</span>
+                                    <span class="text-sm font-semibold text-brand-ink">{{ $blueprint['name'] }}</span>
+                                    <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $blueprint['description'] }}</span>
+                                    <span
+                                        wire:loading
+                                        wire:target="applyBlueprint('{{ $blueprint['id'] }}')"
+                                        class="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70 text-xs font-semibold text-brand-moss"
+                                    >{{ __('Applying…') }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($featuredPresets as $preset)
                         <button
