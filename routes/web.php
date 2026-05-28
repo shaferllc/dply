@@ -111,6 +111,7 @@ use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
+use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
 use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceRun;
@@ -604,6 +605,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::middleware('feature:workspace.server_maintenance')->group(function (): void {
         Route::livewire('servers/{server}/maintenance', WorkspaceMaintenance::class)->name('servers.maintenance');
+    });
+    Route::middleware('feature:workspace.patch_advisor')->group(function (): void {
+        Route::livewire('servers/{server}/patches', WorkspacePatchAdvisor::class)->name('servers.patches');
     });
     Route::middleware('feature:workspace.insights')->group(function (): void {
         Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');

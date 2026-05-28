@@ -21,6 +21,7 @@ use App\Models\SiteDeployment;
 use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\ServerHealthCockpit;
+use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
@@ -355,6 +356,9 @@ class WorkspaceOverview extends Component
             'healthCockpitSummary' => Feature::active('workspace.health')
                 ? $this->healthCockpitSummary(app(ServerHealthCockpit::class))
                 : null,
+            'patchAdvisorSummary' => Feature::active('workspace.patch_advisor')
+                ? $this->patchAdvisorSummary(app(ServerPatchAdvisor::class))
+                : null,
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,
             'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
@@ -392,6 +396,25 @@ class WorkspaceOverview extends Component
         return [
             'overall' => $report['overall'],
             'alert_count' => $report['alert_count'],
+        ];
+    }
+
+    /**
+     * @return array{overall: string, alert_count: int, security: int, reboot_required: ?bool}|null
+     */
+    private function patchAdvisorSummary(ServerPatchAdvisor $advisor): ?array
+    {
+        if (! $this->server->isVmHost()) {
+            return null;
+        }
+
+        $report = $advisor->forServer($this->server);
+
+        return [
+            'overall' => $report['overall'],
+            'alert_count' => $report['alert_count'],
+            'security' => $report['packages']['security'],
+            'reboot_required' => $report['reboot']['required'],
         ];
     }
 }

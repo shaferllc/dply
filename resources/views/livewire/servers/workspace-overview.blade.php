@@ -833,6 +833,58 @@
             @endif
             @endfeature
 
+            {{-- Patch advisor shortcut (VM + flag). --}}
+            @feature('workspace.patch_advisor')
+            @if ($patchAdvisorSummary && ($patchAdvisorSummary['alert_count'] > 0 || $patchAdvisorSummary['reboot_required'] === true))
+                @php
+                    $patchCritical = $patchAdvisorSummary['overall'] === 'critical';
+                    $patchWarning = $patchAdvisorSummary['overall'] === 'warning';
+                @endphp
+                <section @class([
+                    'dply-card overflow-hidden',
+                    'border-rose-200' => $patchCritical,
+                    'border-amber-200' => $patchWarning && ! $patchCritical,
+                ])>
+                    <div @class([
+                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'bg-rose-50/60' => $patchCritical,
+                        'bg-amber-50/60' => $patchWarning && ! $patchCritical,
+                        'bg-brand-cream/40' => ! $patchCritical && ! $patchWarning,
+                    ])>
+                        <div class="flex items-start gap-3">
+                            <span @class([
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
+                                $tonePalette['rose'] => $patchCritical,
+                                $tonePalette['amber'] => $patchWarning && ! $patchCritical,
+                                $tonePalette['sage'] => ! $patchCritical && ! $patchWarning,
+                            ])>
+                                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Patch advisor') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                    @if ($patchAdvisorSummary['reboot_required'] === true)
+                                        {{ __('Reboot required') }}
+                                    @elseif ($patchAdvisorSummary['security'] > 0)
+                                        {{ trans_choice(':count security update|:count security updates', $patchAdvisorSummary['security'], ['count' => $patchAdvisorSummary['security']]) }}
+                                    @elseif ($patchAdvisorSummary['alert_count'] > 0)
+                                        {{ trans_choice(':count patch alert|:count patch alerts', $patchAdvisorSummary['alert_count'], ['count' => $patchAdvisorSummary['alert_count']]) }}
+                                    @else
+                                        {{ __('Review pending updates') }}
+                                    @endif
+                                </h3>
+                                <p class="mt-1 text-sm text-brand-moss">{{ __('apt updates, reboot flags, and uptime from the inventory probe.') }}</p>
+                            </div>
+                            <a href="{{ route('servers.patches', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                {{ __('Open Patches') }}
+                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            @endif
+            @endfeature
+
             {{-- Insights (conditional + flag-gated). --}}
             @feature('workspace.insights')
             @if ($openInsightsCount > 0)
