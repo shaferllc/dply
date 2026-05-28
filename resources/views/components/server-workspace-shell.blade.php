@@ -266,6 +266,11 @@
                                 @case('folder')
                                     <x-heroicon-o-folder class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('heart')
+                                    <x-heroicon-o-heart class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @default
+                                    <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch
                             <span class="flex-1 truncate">{{ $label }}</span>
                             @if ($needsSetup)

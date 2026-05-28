@@ -20,10 +20,12 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
+use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -350,6 +352,9 @@ class WorkspaceOverview extends Component
             'latestDeployment' => $latestDeployment,
             'databaseSummary' => $databaseSummary,
             'healthSummary' => $healthSummary,
+            'healthCockpitSummary' => Feature::active('workspace.health')
+                ? $this->healthCockpitSummary(app(ServerHealthCockpit::class))
+                : null,
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,
             'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
@@ -371,5 +376,22 @@ class WorkspaceOverview extends Component
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
+    }
+
+    /**
+     * @return array{overall: string, alert_count: int}|null
+     */
+    private function healthCockpitSummary(ServerHealthCockpit $cockpit): ?array
+    {
+        if (! $this->server->isVmHost()) {
+            return null;
+        }
+
+        $report = $cockpit->forServer($this->server);
+
+        return [
+            'overall' => $report['overall'],
+            'alert_count' => $report['alert_count'],
+        ];
     }
 }

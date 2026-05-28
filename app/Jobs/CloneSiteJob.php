@@ -6,7 +6,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Sites\Clone\SiteCloneDestinationValidator;
+use App\Services\Sites\Clone\SiteCloneOptions;
 use App\Services\Sites\Clone\SiteCloneStrategyResolver;
+use App\Services\Sites\Clone\VmSiteCloneStrategy;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,6 +30,8 @@ class CloneSiteJob implements ShouldQueue
         public string $primaryHostname,
         public string $siteName,
         public string $userId,
+        public bool $previewFirstPromote = false,
+        public ?string $sourceProductionHostname = null,
     ) {}
 
     public function handle(SiteCloneStrategyResolver $resolver): void
@@ -54,7 +58,18 @@ class CloneSiteJob implements ShouldQueue
         $strategy = $resolver->for($source->fresh());
 
         try {
-            $strategy->execute($source->fresh(), $dest->fresh(), $this->primaryHostname, $this->siteName);
+            $options = new SiteCloneOptions(
+                previewFirstPromote: $this->previewFirstPromote,
+                sourceProductionHostname: $this->sourceProductionHostname,
+            );
+
+            $strategy->execute(
+                $source->fresh(),
+                $dest->fresh(),
+                $this->primaryHostname,
+                $this->siteName,
+                $strategy instanceof VmSiteCloneStrategy ? $options : null,
+            );
         } catch (\Throwable $e) {
             Log::warning('CloneSiteJob failed', [
                 'source_site_id' => $source->id,
