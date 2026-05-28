@@ -20,7 +20,7 @@
                     <x-heroicon-o-code-bracket-square class="h-5 w-5" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Repository') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Branch, remote URL, and Git provider context. Changing the URL updates what Dply clones.') }}
                     </p>
@@ -138,7 +138,7 @@
                     <x-heroicon-o-bolt class="h-5 w-5" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Register a push webhook with your Git provider. Only the sync group leader registers an external webhook; peers deploy via coordination.') }}
                     </p>
@@ -189,7 +189,7 @@
                     <x-heroicon-o-rectangle-stack class="h-5 w-5" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Group sites that share a repository so one push or coordinated manual deploy can update multiple destinations.') }}
                     </p>
@@ -284,7 +284,7 @@
                     <x-heroicon-o-shield-check class="h-5 w-5" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Atomic deploys can verify HTTP health before traffic switches. Failed deployments also trigger notification subscriptions when configured.') }}
                     </p>
@@ -309,7 +309,7 @@
                     <x-heroicon-o-arrow-down-on-square class="h-5 w-5" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Optional IP allow list is under Notifications.') }}
                     </p>

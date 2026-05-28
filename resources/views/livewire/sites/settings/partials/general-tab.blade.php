@@ -3,13 +3,14 @@
      everything else → Settings tab. --}}
 <section class="dply-card overflow-hidden">
     <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+        <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
             <div class="flex items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-globe-alt class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overview') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $generalOverviewTitle }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('At-a-glance summary. Edit the primary hostname from Routing > Domains; everything else lives in Settings.') }}
                     </p>
@@ -61,13 +62,14 @@
 </section>
 
 <section class="dply-card overflow-hidden">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-chart-bar class="h-5 w-5" />
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Status') }}</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Status') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Health at a glance') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('At-a-glance deploy, runtime, and certificate state. Detailed editors live on the dedicated tabs.') }}</p>
             </div>
         </div>
@@ -170,13 +172,14 @@
 
 <section class="dply-card overflow-hidden">
     <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+        <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
             <div class="flex items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-identification class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+                    <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ $detailsTitle }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Details') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $detailsTitle }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ $detailsDescription }}
                     </p>
@@ -215,13 +218,14 @@
 @if (data_get($site->meta, 'notes'))
     <section class="dply-card overflow-hidden">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                 <div class="flex items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-pencil-square class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                        <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notes') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings']) }}" wire:navigate class="font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Edit in Settings') }}</a>
                         </p>

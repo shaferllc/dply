@@ -215,24 +215,32 @@
 
     {{-- Reboot pending card (only when relevant) --}}
     @if ($reboot === true)
-        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p class="font-semibold">{{ __('Reboot is pending on this server') }}</p>
-                    <p class="mt-1 text-xs">{{ __('Likely required after kernel or libc updates. Plan a maintenance window before rebooting.') }}</p>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                            <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot is pending on this server') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Likely required after kernel or libc updates. Plan a maintenance window before rebooting.') }}</p>
+                        </div>
+                    </div>
+                    @if ($opsReady && ! $isDeployer && ! empty($dangerousActions['reboot']))
+                        @php $r = $dangerousActions['reboot']; @endphp
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('runAllowlistedAction', ['reboot'], @js($r['label']), @js($r['confirm']), @js($r['label']), true)"
+                            class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-900 hover:bg-red-100"
+                        >
+                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
+                            {{ $r['label'] }}
+                        </button>
+                    @endif
                 </div>
-                @if ($opsReady && ! $isDeployer && ! empty($dangerousActions['reboot']))
-                    @php $r = $dangerousActions['reboot']; @endphp
-                    <button
-                        type="button"
-                        wire:click="openConfirmActionModal('runAllowlistedAction', ['reboot'], @js($r['label']), @js($r['confirm']), @js($r['label']), true)"
-                        class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-900 hover:bg-red-100"
-                    >
-                        <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
-                        {{ $r['label'] }}
-                    </button>
-                @endif
             </div>
-        </div>
+        </section>
     @endif
 </section>

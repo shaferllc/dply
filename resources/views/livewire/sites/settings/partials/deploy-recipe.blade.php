@@ -1,22 +1,33 @@
-<section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <h2 class="text-lg font-semibold text-slate-900">{{ __('Repository') }}</h2>
-            <p class="mt-1 text-sm text-slate-600">{{ __('Repository source, rollout strategy, pipeline steps, and hooks — the deploy recipe top to bottom. Deploy execution itself lives on the site overview.') }}</p>
+<section class="dply-card overflow-hidden">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex min-w-0 items-start gap-3">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository & recipe') }}</h2>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Repository source, rollout strategy, pipeline steps, and hooks — the deploy recipe top to bottom. Deploy execution itself lives on the site overview.') }}</p>
+            </div>
         </div>
-        <div class="flex flex-wrap gap-3 text-sm">
-            <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Deployments') }}</a>
-            <a href="{{ route('sites.commits', [$server, $site]) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Commits') }}</a>
-            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Site logs') }}</a>
-            <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-slate-900 hover:underline">{{ __('Server logs') }}</a>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Deployments') }}</a>
+            <span class="text-brand-mist" aria-hidden="true">·</span>
+            <a href="{{ route('sites.commits', [$server, $site]) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Commits') }}</a>
+            <span class="text-brand-mist" aria-hidden="true">·</span>
+            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Site logs') }}</a>
+            <span class="text-brand-mist" aria-hidden="true">·</span>
+            <a href="{{ route('servers.logs', $server) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Server logs') }}</a>
         </div>
     </div>
+
+    <div class="space-y-6 p-6 sm:p-8">
 
     <form wire:submit="saveGit" class="space-y-4">
         @if ($functionsHost)
             <div>
                 <x-input-label for="functions_repo_source" value="Repository source" />
-                <select id="functions_repo_source" wire:model.live="functions_repo_source" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                <select id="functions_repo_source" wire:model.live="functions_repo_source" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm">
                     @if (count($linkedSourceControlAccounts) > 0)
                         <option value="provider">{{ __('Connected Git provider') }}</option>
                     @endif
@@ -28,7 +39,7 @@
                 <div class="grid gap-3 md:grid-cols-2">
                     <div>
                         <x-input-label for="functions_source_control_account_id" value="Connected account" />
-                        <select id="functions_source_control_account_id" wire:model.live="functions_source_control_account_id" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                        <select id="functions_source_control_account_id" wire:model.live="functions_source_control_account_id" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm">
                             <option value="">{{ __('Select an account') }}</option>
                             @foreach ($linkedSourceControlAccounts as $account)
                                 <option value="{{ $account['id'] }}">{{ $account['label'] }}</option>
@@ -38,7 +49,7 @@
                     </div>
                     <div>
                         <x-input-label for="functions_repository_selection" value="Repository" />
-                        <select id="functions_repository_selection" wire:model.live="functions_repository_selection" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                        <select id="functions_repository_selection" wire:model.live="functions_repository_selection" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm">
                             <option value="">{{ __('Select a repository') }}</option>
                             @foreach ($availableFunctionsRepositories as $repository)
                                 <option value="{{ $repository['url'] }}">{{ $repository['label'] }}</option>
@@ -72,14 +83,14 @@
             </div>
             <div>
                 <x-input-label for="post_deploy_command" value="Deploy command" />
-                <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="php artisan migrate --force"></textarea>
+                <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-sm" placeholder="php artisan migrate --force"></textarea>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Runs in the build environment after dependencies install and the environment is prepared, before the function is packaged — use it for migrations and cache warming. A non-zero exit aborts the deploy.') }}</p>
                 <x-input-error :messages="$errors->get('post_deploy_command')" class="mt-1" />
             </div>
         @else
             <div>
                 <x-input-label for="post_deploy_command" value="Post-deploy command" />
-                <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="composer install --no-dev && php artisan migrate --force"></textarea>
+                <textarea id="post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-sm" placeholder="composer install --no-dev && php artisan migrate --force"></textarea>
             </div>
         @endif
 
@@ -116,7 +127,7 @@
                         </div>
                         <div class="md:col-span-2">
                             <x-input-label for="functions_build_command" value="Build command" />
-                            <textarea id="functions_build_command" wire:model="functions_build_command" rows="3" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="npm install && npm run build"></textarea>
+                            <textarea id="functions_build_command" wire:model="functions_build_command" rows="3" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-sm" placeholder="npm install && npm run build"></textarea>
                             <x-input-error :messages="$errors->get('functions_build_command')" class="mt-1" />
                         </div>
                         <div class="md:col-span-2">
@@ -141,18 +152,25 @@
     @if (! $functionsHost && $site->git_deploy_key_public)
         <div>
             <p class="text-sm text-brand-moss">{{ __('Public key (add to your Git provider deploy keys):') }}</p>
-            <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ $site->git_deploy_key_public }}</pre>
+            <pre class="mt-2 overflow-x-auto rounded-xl bg-brand-ink p-3 text-xs text-green-400">{{ $site->git_deploy_key_public }}</pre>
         </div>
     @endif
 
-    <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
-        <div>
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Lay out the deploy as pre, main, and post stages so custom steps stay visible around the core checkout and activation flow.') }}</p>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stages') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Lay out the deploy as pre, main, and post stages so custom steps stay visible around the core checkout and activation flow.') }}</p>
+            </div>
         </div>
+        <div class="space-y-4 p-6 sm:p-8">
 
         <div class="grid gap-4 xl:grid-cols-3">
-            <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                 <p class="text-sm font-semibold text-brand-ink">{{ __('Pre-deploy script') }}</p>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Ordered pipeline steps run after code is cloned and before the main activation flow completes.') }}</p>
                 <p class="mt-3 text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Current steps') }}</p>
@@ -183,7 +201,7 @@
                 @endif
             </div>
 
-            <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                 <p class="text-sm font-semibold text-brand-ink">{{ __('Main deploy script') }}</p>
                 <div class="mt-3 space-y-2 text-sm text-brand-moss">
                     <p>{{ __('1. Prepare deploy directory / release target') }}</p>
@@ -193,20 +211,20 @@
                 </div>
             </div>
 
-            <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                 <p class="text-sm font-semibold text-brand-ink">{{ __('Post-deploy script') }}</p>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Legacy post-deploy command runs after the pipeline. Keep this empty if the ordered steps already express everything.') }}</p>
-                <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $post_deploy_command !== '' ? $post_deploy_command : __('No post-deploy command configured.') }}</pre>
+                <pre class="mt-3 overflow-x-auto rounded-xl bg-brand-ink p-3 text-xs text-emerald-100">{{ $post_deploy_command !== '' ? $post_deploy_command : __('No post-deploy command configured.') }}</pre>
             </div>
         </div>
 
         @if (! $functionsHost)
-            <details class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+            <details class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                 <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a pipeline step') }}</summary>
                 <form wire:submit="addDeployPipelineStep" class="mt-4 flex flex-wrap items-end gap-3">
                     <div>
                         <label for="new_deploy_step_type" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Step') }}</label>
-                        <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-slate-300 shadow-sm text-sm">
+                        <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-brand-ink/15 shadow-sm text-sm">
                             @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
@@ -214,17 +232,18 @@
                     </div>
                     <div class="min-w-[220px] flex-1">
                         <label for="new_deploy_step_command" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('npm script / custom command') }}</label>
-                        <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
+                        <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
                         <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
                     </div>
                     <div>
                         <label for="new_deploy_step_timeout" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                        <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                        <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-brand-ink/15 shadow-sm text-sm" />
                     </div>
                     <x-primary-button type="submit">{{ __('Add step') }}</x-primary-button>
                 </form>
             </details>
         @endif
+        </div>
     </section>
 
     @if ($site->usesDockerRuntime())
@@ -236,11 +255,11 @@
             <div class="mt-4 grid gap-4 xl:grid-cols-2">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Compose file') }}</p>
-                    <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
+                    <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-brand-ink p-3 text-xs text-sky-100">{{ $dockerRuntime['compose_yaml'] ?? __('Not generated yet') }}</pre>
                 </div>
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Managed Dockerfile') }}</p>
-                    <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-emerald-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
+                    <pre class="mt-2 max-h-80 overflow-auto rounded-xl bg-brand-ink p-3 text-xs text-emerald-100">{{ $dockerRuntime['dockerfile'] ?? __('Not generated yet') }}</pre>
                 </div>
             </div>
         </details>
@@ -254,20 +273,27 @@
             <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Runtime target') }} <span class="font-normal text-brand-moss">— {{ __('Manifest for namespace') }} <code>{{ $kubernetesRuntime['namespace'] ?? 'default' }}</code></span></summary>
             <div class="mt-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Manifest') }}</p>
-                <pre class="mt-2 max-h-96 overflow-auto rounded-xl bg-slate-950 p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
+                <pre class="mt-2 max-h-96 overflow-auto rounded-xl bg-brand-ink p-3 text-xs text-violet-100">{{ $kubernetesRuntime['manifest_yaml'] ?? __('Not generated yet') }}</pre>
             </div>
         </details>
     @endif
 
-    <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
-        <div>
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('before_clone runs in the deploy base directory. after_clone runs in the new release. after_activate runs after the current symlink updates on atomic deploys.') }}</p>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hooks') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('before_clone runs in the deploy base directory. after_clone runs in the new release. after_activate runs after the current symlink updates on atomic deploys.') }}</p>
+            </div>
         </div>
+        <div class="space-y-4 p-6 sm:p-8">
 
         <div class="grid gap-4 xl:grid-cols-3">
             @foreach ($deployHookPhaseLabels as $phase => $phaseLabel)
-                <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                     <p class="text-sm font-semibold text-brand-ink">{{ $phaseLabel }}</p>
                     <p class="mt-1 text-xs font-medium uppercase tracking-wide text-brand-moss">{{ $phase }}</p>
                     @php
@@ -281,7 +307,7 @@
                                         <span class="font-medium text-brand-ink">#{{ $hook->sort_order }} <span class="font-normal text-brand-moss">· {{ (int) ($hook->timeout_seconds ?? config('dply.default_deploy_hook_timeout_seconds', 900)) }}s</span></span>
                                         <button type="button" wire:click="deleteDeployHook({{ $hook->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
                                     </div>
-                                    <pre class="overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-green-400">{{ \Illuminate\Support\Str::limit($hook->script, 500) }}</pre>
+                                    <pre class="overflow-x-auto rounded-xl bg-brand-ink p-3 text-xs text-green-400">{{ \Illuminate\Support\Str::limit($hook->script, 500) }}</pre>
                                 </li>
                             @endforeach
                         </ul>
@@ -292,10 +318,10 @@
             @endforeach
         </div>
 
-        <details class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+        <details class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
             <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a hook') }}</summary>
             <form wire:submit="addDeployHook" class="mt-4 space-y-3">
-                <select wire:model="new_hook_phase" class="rounded-md border-slate-300 text-sm">
+                <select wire:model="new_hook_phase" class="rounded-md border-brand-ink/15 text-sm">
                     <option value="before_clone">before_clone</option>
                     <option value="after_clone">after_clone</option>
                     <option value="after_activate">after_activate</option>
@@ -307,13 +333,14 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                        <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-slate-300 shadow-sm text-sm" />
+                        <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-brand-ink/15 shadow-sm text-sm" />
                     </div>
                 </div>
-                <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-slate-300 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
+                <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-brand-ink/15 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
                 <x-primary-button type="submit">{{ __('Add hook') }}</x-primary-button>
             </form>
         </details>
+        </div>
     </section>
 
     {{-- Zero downtime + post-activate health check + the broader rollout
@@ -321,42 +348,54 @@
          after Pipeline + Hooks so the page reads chronologically:
          Source → Build → Pipeline → Hooks → Activate → Rollout. --}}
     @if (! $functionsHost)
-        <form wire:submit="saveZeroDowntimeDeployment" class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-            <div class="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Zero downtime deployment') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('When enabled, each deploy goes to a new release directory, then traffic switches to it in one step so the app stays up during builds. Disable to run simple git-based deploys in the deploy path.') }}</p>
-                    <x-input-error :messages="$errors->get('zero_downtime_enabled')" class="mt-2" />
+        <form wire:submit="saveZeroDowntimeDeployment" class="dply-card overflow-hidden">
+            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                            <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activate') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Zero downtime deployment') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('When enabled, each deploy goes to a new release directory, then traffic switches to it in one step so the app stays up during builds. Disable to run simple git-based deploys in the deploy path.') }}</p>
+                        </div>
+                    </div>
                 </div>
-                <label class="flex shrink-0 items-center gap-2 text-sm font-medium text-brand-ink">
-                    <input type="checkbox" wire:model="zero_downtime_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
-                    {{ __('Enable') }}
-                </label>
+
+                <div class="space-y-3 p-6 sm:p-8">
+                    <label class="flex items-center gap-3">
+                        <input type="checkbox" wire:model="zero_downtime_enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                        <span class="text-sm font-semibold text-brand-ink">{{ __('Enable zero-downtime rollout') }}</span>
+                    </label>
+                    <x-input-error :messages="$errors->get('zero_downtime_enabled')" />
+                </div>
             </div>
-            <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/30 px-5 py-3">
+
+            <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
                 <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
             </div>
         </form>
 
-        <form wire:submit="saveDeploymentSettings" class="mt-6 space-y-4 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
+        <form wire:submit="saveDeploymentSettings" class="dply-card space-y-5 p-6 sm:p-8">
             @if ($zero_downtime_enabled)
-                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                     <div>
                         <h3 class="text-base font-semibold text-brand-ink">{{ __('After deploy verification') }}</h3>
                         <p class="mt-1 text-sm text-brand-moss">{{ __('Optional HTTP(S) check from the server to a local address with your primary hostname as the Host header after the new release is active. Defaults to http://127.0.0.1. Requires a primary domain and a route that returns the expected status (for example Laravel /up).') }}</p>
                     </div>
                     <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
-                        <input type="checkbox" wire:model="deploy_health_enabled" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest">
+                        <input type="checkbox" wire:model="deploy_health_enabled" class="rounded border-brand-ink/15 text-brand-forest shadow-sm focus:ring-brand-forest">
                         {{ __('Run health check after each atomic deploy') }}
                     </label>
                     <label class="flex items-center gap-2 text-sm font-medium text-brand-ink">
-                        <input type="checkbox" wire:model="deploy_health_auto_rollback" class="rounded border-slate-300 text-brand-forest shadow-sm focus:ring-brand-forest" @disabled(! $deploy_health_enabled)>
+                        <input type="checkbox" wire:model="deploy_health_auto_rollback" class="rounded border-brand-ink/15 text-brand-forest shadow-sm focus:ring-brand-forest" @disabled(! $deploy_health_enabled)>
                         {{ __('Automatically point current back at the previous release if the check fails') }}
                     </label>
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div>
                             <x-input-label for="deploy_health_scheme" value="{{ __('URL scheme') }}" />
-                            <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm" @disabled(! $deploy_health_enabled)>
+                            <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm" @disabled(! $deploy_health_enabled)>
                                 <option value="http">http</option>
                                 <option value="https">https</option>
                             </select>
@@ -418,7 +457,7 @@
             <div class="grid gap-3">
                 <div>
                     <label class="flex items-center gap-2 text-sm text-brand-ink">
-                        <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-slate-300">
+                        <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-brand-ink/15">
                         {{ $site->runtimeSchedulerRolloutFormLabel() }}
                     </label>
                     @if ($site->runtimeSchedulerCheckboxHelp())
@@ -426,12 +465,12 @@
                     @endif
                 </div>
                 <label class="flex items-center gap-2 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-slate-300">
+                    <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-brand-ink/15">
                     {{ __('Restart Supervisor programs after successful deploy') }}
                 </label>
                 <div>
                     <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
-                    <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-slate-300 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
+                    <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
                 </div>
             </div>
 
@@ -446,13 +485,14 @@
         </summary>
         <dl class="mt-4 grid gap-3 md:grid-cols-2">
             @foreach ($deployVariableReference as $token => $description)
-                <div class="rounded-2xl border border-brand-ink/10 bg-slate-50/70 p-4">
+                <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
                     <dt class="font-mono text-sm text-brand-ink">{{ $token }}</dt>
                     <dd class="mt-2 text-sm text-brand-moss">{{ $description }}</dd>
                 </div>
             @endforeach
         </dl>
     </details>
+    </div>
 </section>
 
 <x-cli-snippet :commands="[

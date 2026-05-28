@@ -22,7 +22,7 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Logs') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ $tabs[$tab] }}</h2>
+            <h2 class="mt-1 text-base font-bold text-brand-ink">{{ $tabs[$tab] }}</h2>
             <p class="mt-1 text-sm text-brand-moss">
                 @switch($tab)
                     @case('visits')

@@ -5,7 +5,7 @@
 @if ($managedTiles->isNotEmpty())
         <div class="{{ $card }} p-6 sm:p-8">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Managed services') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Managed services') }}</h2>
                 <p class="text-xs text-brand-mist">{{ __('dply-managed abstractions on this server. Jump to their dedicated workspaces.') }}</p>
             </div>
             <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -28,7 +28,7 @@
     <div class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('System services') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('System services') }}</h2>
                 @if ($systemdInventoryFetchedAt && ($snapHuman ?? null))
                     <p class="mt-2 text-xs text-brand-moss">{{ __('Last inventory sync: :time', ['time' => $snapHuman]) }}</p>
                 @endif

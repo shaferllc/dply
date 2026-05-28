@@ -37,9 +37,20 @@
     </x-explainer>
 
     @if (! $supportsBA)
-        <div class="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-            {{ __('Basic authentication applies to VM sites with managed web server configuration. Container and serverless runtimes use their own access controls.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Basic auth unavailable on this runtime') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Basic authentication applies to VM sites with managed web server configuration. Container and serverless runtimes use their own access controls.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @else
         {{-- Slim header card: icon, title, count + freshness, and the primary CTAs.
              Inspired by the SSH keys workspace — keeps the page from being dominated by a
@@ -51,7 +62,7 @@
                         <x-heroicon-o-lock-closed class="h-5 w-5" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Username and password pairs that the webserver checks before letting a request through.') }}
                             <a href="https://datatracker.ietf.org/doc/html/rfc7617" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
@@ -315,7 +326,7 @@
         <div class="{{ $card }}">
             <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
                 <div>
-                    <h3 class="text-lg font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Rotate or remove credentials — applied on the next webserver config write.') }}</p>
                 </div>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">

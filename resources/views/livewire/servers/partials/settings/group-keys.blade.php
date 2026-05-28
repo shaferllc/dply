@@ -75,7 +75,7 @@
     <div id="settings-keys-outbound" class="{{ $card }} scroll-mt-24 p-6 sm:p-8" x-data="{ copied: false, copiedFp: false }">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="max-w-2xl">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Outbound key (Git & scripts)') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Outbound key (Git & scripts)') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Add this public key on Git hosts or other services that should trust outbound connections from this server. The matching private key never leaves Dply in plain form.') }}
                 </p>
@@ -163,7 +163,7 @@
 
     {{-- Inbound: how Dply connects in --}}
     <div id="settings-keys-inbound" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('How Dply connects in') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('How Dply connects in') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Dply stores two encrypted private keys for this server. Neither is downloadable. Public-key fingerprints are shown so you can verify them against your server’s authorized_keys.') }}
         </p>

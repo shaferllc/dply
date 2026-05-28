@@ -1,6 +1,6 @@
 <section class="space-y-4">
-    <div class="dply-card p-4 sm:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="dply-card overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-cream/40 px-6 py-4 sm:px-7">
             <nav aria-label="{{ __('Repository path') }}" class="min-w-0 flex-1">
                 <ol class="flex flex-wrap items-center gap-1 text-sm">
                     @foreach ($filesBreadcrumb as $crumb)
@@ -37,7 +37,7 @@
             {{ __('Empty directory.') }}
         </div>
     @else
-        <ul class="divide-y divide-brand-ink/10 rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+        <ul class="dply-card divide-y divide-brand-ink/10 overflow-hidden">
             @foreach ($filesTree['entries'] as $entry)
                 <li class="flex items-center justify-between gap-3 px-4 py-2 hover:bg-brand-sand/20" wire:key="entry-{{ $entry['path'] }}">
                     @if ($entry['type'] === 'dir')
@@ -61,8 +61,8 @@
     @endif
 
     @if ($filesView !== null)
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-4 py-3">
+        <div class="dply-card overflow-hidden">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
                 <div class="min-w-0">
                     <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $filesOpenFile }}</p>
                     <p class="mt-0.5 text-xs text-brand-moss">
@@ -96,7 +96,7 @@
                     {{ ($filesView['binary'] ?? false) ? __('Binary file — preview suppressed. Open on the provider to download.') : __('File exceeds the preview size limit. Open on the provider to download.') }}
                 </div>
             @else
-                <pre class="max-h-[40rem] overflow-auto bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $filesView['content'] }}</pre>
+                <pre class="max-h-[40rem] overflow-auto bg-brand-ink p-4 font-mono text-[11px] leading-relaxed text-brand-cream/90">{{ $filesView['content'] }}</pre>
             @endif
         </div>
     @endif

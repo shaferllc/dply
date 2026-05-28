@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\ServerProvider;
-use App\Livewire\Servers\Create as ServersCreate;
+use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerCreateDraft;
 use App\Models\User;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
 use App\Services\DigitalOceanService;
@@ -112,13 +113,28 @@ class DemoDigitalOceanServerCommand extends Command
 
         session(['current_organization_id' => $org->id]);
 
+        // Seed a wizard draft at Step 4 so StepReview::mount() finds it,
+        // hydrates the form from the payload, and lets us call store() directly
+        // instead of walking the 4-step UI for a non-interactive demo run.
+        ServerCreateDraft::query()->updateOrCreate(
+            ['user_id' => $user->id, 'organization_id' => $org->id],
+            [
+                'step' => 4,
+                'expires_at' => now()->addDays(14),
+                'payload' => [
+                    'mode' => 'provider',
+                    'type' => 'digitalocean',
+                    'name' => $serverName,
+                    'provider_credential_id' => (string) $credential->id,
+                    'region' => $region,
+                    'size' => $size,
+                    'provider_host_kind' => 'vm',
+                ],
+            ]
+        );
+
         $lw = Livewire::actingAs($user)
-            ->test(ServersCreate::class)
-            ->set('form.type', 'digitalocean')
-            ->set('form.name', $serverName)
-            ->set('form.provider_credential_id', (string) $credential->id)
-            ->set('form.region', $region)
-            ->set('form.size', $size)
+            ->test(ServerCreateStepReview::class)
             ->call('store');
 
         if ($lw->errors()->isNotEmpty()) {

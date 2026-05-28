@@ -119,7 +119,7 @@
         <div class="{{ $card }} p-6 sm:p-8">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="max-w-2xl">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Clone server') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Clone server') }}</h2>
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                         {{ __('Snapshot this DigitalOcean droplet and provision a new server from the snapshot. The clone lands in the same region and size, with a fresh SSH key. Snapshots typically take 3–8 minutes.') }}
                     </p>

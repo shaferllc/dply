@@ -14,7 +14,7 @@
     ])
 
     <div id="settings-maintenance" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Maintenance window') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Maintenance window') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('When you prefer disruptive work (upgrades, reboots). Times use your Dply timezone preference in the “Timezone & notes” section below, not the server OS clock.') }}
         </p>
@@ -75,7 +75,7 @@
     </div>
 
     <div id="settings-notifications" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Notification routing') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Notification routing') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Pick which org notification channels (Slack, PagerDuty, email, webhook, …) should receive notifications for this server\'s server-scoped events. Each row binds one channel to one event; remove a row to unsubscribe.') }}
         </p>

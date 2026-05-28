@@ -17,7 +17,7 @@
 <div class="{{ $card }} p-6 sm:p-8" wire:key="cache-repl-{{ $engine }}">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
-            <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — interactive console', ['engine' => $engineLabel]) }}</h3>
+            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — interactive console', ['engine' => $engineLabel]) }}</h3>
             <p class="mt-2 text-sm text-brand-moss">{{ __('Run :engine-cli commands directly against the server. Read-only commands work anytime; mutating commands need the unlock below.', ['engine' => $engine]) }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">

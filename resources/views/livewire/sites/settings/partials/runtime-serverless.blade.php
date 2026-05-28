@@ -28,7 +28,7 @@
     <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.') }}</p>
             </div>
             <a href="{{ route('sites.repository', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50">
@@ -93,7 +93,7 @@
     {{-- 2. Resource limits — the editable control surface. --}}
     <form wire:submit="saveServerlessRuntime" class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
         <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
+            <h2 class="text-base font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('How much the function gets per invocation. These are pushed to the action on the next deploy.') }}</p>
         </div>
 
@@ -160,7 +160,7 @@
     <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Cold starts') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Cold starts') }}</h2>
                 <p class="mt-1 text-sm text-brand-moss">
                     {{ __('Keep-warm is currently') }}
                     <span class="font-semibold {{ $keepWarm ? 'text-brand-forest' : 'text-brand-ink' }}">{{ $keepWarm ? __('on') : __('off') }}</span>.

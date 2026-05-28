@@ -79,7 +79,7 @@
     <div class="{{ $card }} scroll-mt-24">
         <div class="flex flex-col gap-1 border-b border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
             <div>
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recent deliveries') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent deliveries') }}</h2>
                 <p class="mt-1 text-xs text-brand-moss leading-relaxed">
                     {{ __('Last 30 outbound webhook attempts for this server. “Would send” rows show the payload that would have fired with no URL configured.') }}
                 </p>

@@ -7,13 +7,14 @@
 <section class="dply-card overflow-hidden">
     <form wire:submit="saveSiteIdentity">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                 <div class="flex items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-identification class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                        <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site identity') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Identity') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site identity') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Display name and URL slug for the site in dashboards and CLI. The on-disk deploy path under /var/www/<slug> is not renamed by this — keep deploys in mind before changing the slug.') }}
                         </p>
@@ -39,7 +40,7 @@
             </div>
         </div>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
             <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
         </div>
     </form>
@@ -53,13 +54,14 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveWebDirectory">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                 <div class="flex items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-folder class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+                        <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ $documentRootLabel }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Path') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $documentRootLabel }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Path nginx serves from for this site. Webserver config re-applies on save.') }}
                         </p>
@@ -76,7 +78,7 @@
             </div>
         </div>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
             <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
         </div>
     </form>
@@ -87,13 +89,14 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveProjectSettings">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                 <div class="flex items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-folder-open class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                        <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Project') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ $projectSettingsDescription }}
                         </p>
@@ -134,7 +137,7 @@
             </div>
         </div>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
             <x-primary-button type="submit">{{ __('Save project settings') }}</x-primary-button>
         </div>
     </form>
@@ -144,13 +147,14 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveSiteNotes">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                 <div class="flex items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-pencil-square class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                        <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notes') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
                         </p>
@@ -167,7 +171,7 @@
             </div>
         </div>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
             <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
         </div>
     </form>

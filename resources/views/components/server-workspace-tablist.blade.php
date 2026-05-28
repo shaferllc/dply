@@ -3,10 +3,10 @@
     'ariaLabel' => null,
 ])
 
-<div
-    {{ $attributes->class('mb-6 flex min-w-0 w-full flex-nowrap items-stretch gap-2 overflow-x-auto overscroll-x-contain scroll-smooth border-b border-brand-ink/10 [-webkit-overflow-scrolling:touch]') }}
+<nav
+    {{ $attributes->class('mb-6 inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-xl border border-brand-ink/10 bg-white p-1.5 shadow-sm') }}
     role="tablist"
     aria-label="{{ $ariaLabel ?? __('Workspace sections') }}"
 >
     {{ $slot }}
-</div>
+</nav>

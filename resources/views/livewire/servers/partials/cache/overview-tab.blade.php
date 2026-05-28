@@ -1,6 +1,6 @@
             @if ($cacheServices->isEmpty())
                 <div class="{{ $card }} p-6 sm:p-8">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('No cache services installed') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('No cache services installed') }}</h2>
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                         {{ __('Pick an engine from the tabs above to install one. You can install multiple engines side-by-side — for example Redis for queues and Memcached for app cache.') }}
                     </p>
@@ -17,7 +17,7 @@
                     @endphp
                     <div class="{{ $card }} p-6 sm:p-8">
                         <div class="flex flex-wrap items-center gap-3">
-                            <h2 class="text-lg font-semibold text-brand-ink">
+                            <h2 class="text-base font-semibold text-brand-ink">
                                 {{ $engineLabel }}
                                 @if (! $row->isDefaultInstance())
                                     <span class="text-brand-mist">/</span>

@@ -2,7 +2,7 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Database') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Managed Database') }}</h2>
+            <h2 class="mt-1 text-base font-bold text-brand-ink">{{ __('Managed Database') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('A DigitalOcean Managed Database, with the connection wired into this function\'s environment.') }}</p>
         </div>
         @if ($state !== '')

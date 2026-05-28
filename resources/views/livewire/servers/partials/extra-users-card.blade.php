@@ -6,7 +6,7 @@
     $selectedExtraDb = $databases->firstWhere('id', $extra_db_id ?? null);
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
-    <h2 class="text-lg font-semibold text-brand-ink">{{ __(':engine database users', ['engine' => $engineLabel]) }}</h2>
+    <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine database users', ['engine' => $engineLabel]) }}</h2>
     <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Each tracked database has a primary user created alongside it. Use the Actions menu on the database to copy connection details.') }}</p>
 
     @if ($databases->isEmpty())

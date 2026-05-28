@@ -1,13 +1,20 @@
-<section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-8">
-    <div>
-        <h2 class="text-lg font-semibold text-brand-ink">{{ __('System user') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('Linux account that owns this site\'s files and runs its PHP-FPM pool. Pick from accounts that already exist on the server; create new accounts on the server\'s System users page.') }}
-        </p>
+<section class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+            <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ownership') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('System user') }}</h2>
+            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                {{ __('Linux account that owns this site\'s files and runs its PHP-FPM pool. Pick from accounts that already exist on the server; create new accounts on the server\'s System users page.') }}
+            </p>
+        </div>
     </div>
 
+    <div class="space-y-8 p-6 sm:p-8">
     @if (! $this->shouldShowSystemUserPanel())
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 text-sm text-brand-moss">
+        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm text-brand-moss">
             {{ __('System user management is available for VM-backed PHP sites on this workspace. Use Runtime for container, serverless, and non-PHP targets.') }}
         </div>
     @else
@@ -15,13 +22,19 @@
             $op = is_array($site->meta ?? null) ? ($site->meta['system_user_operation'] ?? null) : null;
         @endphp
         @if (is_array($op) && ! empty($op['message']))
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4">
+            @php $opFailed = ($op['status'] ?? '') === 'error'; @endphp
+            <div class="rounded-xl border p-4 {{ $opFailed ? 'border-rose-200 bg-rose-50' : 'border-brand-ink/10 bg-brand-sand/15' }}">
                 <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-medium text-brand-ink">{{ ($op['status'] ?? '') === 'error' ? __('System user operation failed') : __('System user operation') }}</p>
-                        <p class="mt-1 text-sm text-brand-moss">{{ $op['message'] }}</p>
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $opFailed ? 'bg-rose-100 text-rose-700 ring-rose-200' : 'bg-brand-sand/40 text-brand-forest ring-brand-ink/10' }}">
+                            <x-dynamic-component :component="$opFailed ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-information-circle'" class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold {{ $opFailed ? 'text-rose-900' : 'text-brand-ink' }}">{{ $opFailed ? __('System user operation failed') : __('System user operation') }}</p>
+                            <p class="mt-1 text-sm {{ $opFailed ? 'text-rose-800' : 'text-brand-moss' }}">{{ $op['message'] }}</p>
+                        </div>
                     </div>
-                    <button type="button" wire:click="dismissSystemUserOperationBanner" class="text-sm font-medium text-brand-forest hover:underline">
+                    <button type="button" wire:click="dismissSystemUserOperationBanner" class="shrink-0 text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">
                         {{ __('Dismiss') }}
                     </button>
                 </div>
@@ -36,7 +49,7 @@
             <p class="font-mono text-sm text-brand-ink">{{ $site->effectiveSystemUser($this->server) }}</p>
         </div>
 
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-4 sm:p-5">
+        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:p-5">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="max-w-xl space-y-1">
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Reset file permissions') }}</p>
@@ -79,13 +92,13 @@
             </div>
 
             @if (count($system_user_remote_rows) === 0)
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 text-sm text-brand-moss">
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-4 text-sm text-brand-moss">
                     {{ __('No regular Linux users on this server yet. Create one on the server\'s System users page, then come back to assign it here.') }}
                 </div>
             @else
                 <div class="max-w-md space-y-2">
                     <x-input-label for="system_user_assign_pick" :value="__('Select system user')" />
-                    <select id="system_user_assign_pick" wire:model="system_user_assign_username" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm text-sm">
+                    <select id="system_user_assign_pick" wire:model="system_user_assign_username" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm">
                         <option value="">{{ __('Choose a user…') }}</option>
                         @foreach ($system_user_remote_rows as $row)
                             <option value="{{ $row['username'] }}">{{ $row['username'] }}</option>
@@ -98,6 +111,9 @@
             @endif
         </div>
     @endif
+    </div>
 
-    <x-cli-snippet tone="stub" />
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+        <x-cli-snippet tone="stub" />
+    </div>
 </section>

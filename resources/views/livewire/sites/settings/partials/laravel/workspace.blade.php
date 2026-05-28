@@ -18,7 +18,7 @@
 <div class="space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Laravel') }}</h2>
+            <h2 class="text-base font-semibold text-brand-ink">{{ __('Laravel') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Artisan commands, Octane and Reverb hints, application logs, and links to server automation.') }}</p>
             @if ($execProfile === 'unsupported')
                 <p class="mt-2 text-sm text-amber-800">{{ __('Remote Artisan from this panel requires a BYO VM with SSH, or a local Orbstack Docker/Kubernetes runtime. Other container hosts need your provider or SSH tooling.') }}</p>
@@ -76,7 +76,7 @@
             @endif
 
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-5">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Preset commands') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Preset commands') }}</h3>
                 <div class="mt-4 space-y-4">
                     @foreach ($presetCategories as $category => $commands)
                         @if (is_array($commands) && $commands !== [])
@@ -102,7 +102,7 @@
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Discovered Artisan commands') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Discovered Artisan commands') }}</h3>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('From `php artisan list` on the app (cached). Run only preset or saved custom commands.') }}</p>
                     </div>
                     <button
@@ -127,7 +127,7 @@
             </div>
 
             <form wire:submit="saveLaravelCustomCommands" class="space-y-3 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Custom commands') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom commands') }}</h3>
                 <p class="text-xs text-brand-moss">{{ __('One Artisan tail per line (e.g. `migrate --force`). These appear as runnable alongside presets.') }}</p>
                 <textarea
                     wire:model="laravel_custom_commands_text"
@@ -141,7 +141,7 @@
 
             @if ($canLaravelSshSetup ?? false)
                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-5">
-                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Remote setup (SSH)') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Remote setup (SSH)') }}</h3>
                     <p class="mt-2 text-sm text-brand-moss">{{ __('One-shot Composer and install steps on the server.') }}</p>
                     @if ($laravel_ssh_setup_error ?? null)
                         <p class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_ssh_setup_error }}</p>
@@ -217,7 +217,7 @@
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Tail Laravel log (remote)') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Tail Laravel log (remote)') }}</h3>
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Streams `storage/logs/laravel.log` via SSH or your local container runtime.') }}</p>
                 <div class="mt-4 flex flex-wrap items-end gap-3">
                     <div>
@@ -230,7 +230,7 @@
 
             @if ($execProfile === 'vm_ssh')
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Log viewer') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Log viewer') }}</h3>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Same viewer as Site logs — Laravel and Horizon files when available.') }}</p>
                     <div class="mt-4">
                         <livewire:sites.site-log-viewer
@@ -250,7 +250,7 @@
     @if ($laravel_tab === 'setup')
         <div class="space-y-6">
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Scheduler & automation') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Scheduler & automation') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Add a per-minute cron entry on the server for `php artisan schedule:run` when you use Laravel’s scheduler.') }}</p>
                 <a href="{{ $cronUrl }}" wire:navigate class="mt-3 inline-flex text-sm font-medium text-brand-forest underline">{{ __('Cron jobs for this site') }}</a>
                 <a href="{{ $cronAllServerUrl }}" wire:navigate class="mt-2 ml-0 block text-xs font-medium text-brand-moss underline hover:text-brand-ink">{{ __('All cron jobs on server') }}</a>

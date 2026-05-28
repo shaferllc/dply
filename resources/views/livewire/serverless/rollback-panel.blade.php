@@ -1,7 +1,7 @@
 <div class="dply-card p-6 sm:p-8 space-y-4">
     <div>
         <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Rollback') }}</p>
-        <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Recent artifacts') }}</h2>
+        <h2 class="mt-1 text-base font-bold text-brand-ink">{{ __('Recent artifacts') }}</h2>
         <p class="mt-1 text-sm text-brand-moss">{{ __('Re-deploy a previous build without rebuilding — use it to revert a bad deploy.') }}</p>
     </div>
 

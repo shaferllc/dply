@@ -35,7 +35,7 @@
                 ];
             @endphp
 
-            <x-server-workspace-tablist :aria-label="__('Routing sections')" class="!mb-0">
+            <x-server-workspace-tablist :aria-label="__('Routing sections')">
                 @foreach ($tabs as $entry)
                     <x-server-workspace-tab
                         id="routing-tab-{{ $entry['id'] }}"

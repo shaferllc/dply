@@ -29,13 +29,14 @@
 <section class="{{ $card }}">
     <form wire:submit="createCertificateRequest">
         <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/15 p-6 lg:border-b-0 lg:border-r">
+            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                 <div class="flex items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-shield-check class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                        <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('SSL') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Create certificates against explicit customer or preview scopes so Dply never guesses which domains should receive SSL.') }}
                         </p>
@@ -148,7 +149,7 @@
             </div>
         </div>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
             <x-primary-button type="submit">{{ __('Save certificate request') }}</x-primary-button>
         </div>
     </form>
@@ -157,11 +158,12 @@
 <section class="{{ $card }} mt-6">
     <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-lock-closed class="h-5 w-5" />
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Existing certificates') }}</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Existing certificates') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each certificate keeps its own scope, provider, challenge path, and last output for safer retries and cleanup.') }}</p>
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                     <span class="inline-flex items-center gap-1">
@@ -208,7 +210,7 @@
                 @endphp
                 <li class="px-6 py-4 sm:px-8" wire:key="cert-{{ $certificate->id }}">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
-                        <span class="mt-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                        <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                             <x-heroicon-o-lock-closed class="h-4 w-4" />
                         </span>
 
@@ -260,7 +262,7 @@
         </ul>
     @endif
 
-    <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
         <x-cli-snippet tone="stub" />
     </div>
 </section>

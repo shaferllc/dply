@@ -7,9 +7,9 @@
 
 @php
     $sharedClasses = [
-        'shrink-0 snap-start whitespace-nowrap rounded-t-md px-3 py-2.5 text-center text-sm font-medium transition-colors',
-        'border-b-2 border-brand-forest text-brand-ink' => $active,
-        'border-b-2 border-transparent text-brand-moss hover:bg-brand-sand/30 hover:text-brand-ink' => ! $active,
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+        'bg-brand-ink text-brand-cream shadow-sm' => $active,
+        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $active,
     ];
 
     // Pull `wire:click` straight out of the raw attribute array so we can
@@ -29,20 +29,16 @@
         {{ $attributes->class($sharedClasses) }}
     >
         @if ($icon)
-            <span class="inline-flex items-center gap-2">
-                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
-                    <x-dynamic-component :component="$icon" class="h-4 w-4" aria-hidden="true" />
-                </span>
-                @if ($wireTarget)
-                    <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
-                        <x-spinner class="h-4 w-4" />
-                    </span>
-                @endif
-                <span>{{ $slot }}</span>
+            <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
+                <x-dynamic-component :component="$icon" class="h-3.5 w-3.5" aria-hidden="true" />
             </span>
-        @else
-            {{ $slot }}
+            @if ($wireTarget)
+                <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
+                    <x-spinner class="h-3.5 w-3.5" />
+                </span>
+            @endif
         @endif
+        <span>{{ $slot }}</span>
     </a>
 @else
     <button
@@ -54,19 +50,15 @@
         {{ $attributes->class($sharedClasses) }}
     >
         @if ($icon)
-            <span class="inline-flex items-center gap-2">
-                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
-                    <x-dynamic-component :component="$icon" class="h-4 w-4" aria-hidden="true" />
-                </span>
-                @if ($wireTarget)
-                    <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
-                        <x-spinner class="h-4 w-4" />
-                    </span>
-                @endif
-                <span>{{ $slot }}</span>
+            <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" @if ($wireTarget) wire:loading.remove wire:target="{{ $wireTarget }}" @endif>
+                <x-dynamic-component :component="$icon" class="h-3.5 w-3.5" aria-hidden="true" />
             </span>
-        @else
-            {{ $slot }}
+            @if ($wireTarget)
+                <span class="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" wire:loading wire:target="{{ $wireTarget }}">
+                    <x-spinner class="h-3.5 w-3.5" />
+                </span>
+            @endif
         @endif
+        <span>{{ $slot }}</span>
     </button>
 @endif

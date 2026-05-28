@@ -92,35 +92,51 @@
     </x-explainer>
 
     @if ($envInDocroot)
-        <div class="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-            <div class="min-w-0">
-                <p class="font-semibold">{{ __('Env file lives inside the docroot.') }}</p>
-                <p class="mt-1">
-                    {{ __(':path is reachable by the webserver. The default deny rule blocks /.env over HTTP, but moving the file outside the docroot is safer if the rule is ever changed or bypassed.', ['path' => $site->effectiveEnvFilePath()]) }}
-                </p>
+        <div class="dply-card overflow-hidden">
+            <div class="flex flex-wrap items-start justify-between gap-3 bg-amber-50 px-5 py-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">
+                        <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Exposure') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Env file lives inside the docroot') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-amber-900">
+                            {{ __(':path is reachable by the webserver. The default deny rule blocks /.env over HTTP, but moving the file outside the docroot is safer if the rule is ever changed or bypassed.', ['path' => $site->effectiveEnvFilePath()]) }}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    wire:click="relocateEnvOutsideDocroot"
+                    wire:loading.attr="disabled"
+                    wire:target="relocateEnvOutsideDocroot"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    title="{{ __('Move .env to /etc/dply/:slug.env (root:site-user 640) and push.', ['slug' => $site->slug]) }}"
+                >
+                    <x-heroicon-o-arrow-up-on-square class="h-3.5 w-3.5" />
+                    {{ __('Move outside docroot') }}
+                </button>
             </div>
-            <button
-                type="button"
-                wire:click="relocateEnvOutsideDocroot"
-                wire:loading.attr="disabled"
-                wire:target="relocateEnvOutsideDocroot"
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                title="{{ __('Move .env to /etc/dply/:slug.env (root:site-user 640) and push.', ['slug' => $site->slug]) }}"
-            >
-                <x-heroicon-o-arrow-up-on-square class="h-3.5 w-3.5" />
-                {{ __('Move outside docroot') }}
-            </button>
         </div>
     @endif
 
     @if ($parserErrors !== [])
-        <div class="rounded-xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-900">
-            <p class="font-semibold">{{ __('The cached .env has parse errors. Fix and push to clear:') }}</p>
-            <ul class="mt-1 list-inside list-disc">
-                @foreach ($parserErrors as $err)
-                    <li class="font-mono text-xs">{{ $err }}</li>
-                @endforeach
-            </ul>
+        <div class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 bg-rose-50 px-5 py-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-100 text-rose-700 ring-rose-200">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Parse error') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-rose-900">{{ __('The cached .env has parse errors') }}</h3>
+                    <ul class="mt-1 list-inside list-disc text-sm text-rose-800">
+                        @foreach ($parserErrors as $err)
+                            <li class="font-mono text-xs">{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
         </div>
     @endif
 
@@ -130,11 +146,12 @@
     <div class="{{ $card }}">
         <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-key class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                    <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Configuration') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Key/value pairs written into the site\'s .env file.') }}
                     </p>
@@ -374,7 +391,7 @@
     >
         <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
             <div>
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Site variables') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Site variables') }}</h3>
                 <p class="mt-1 text-sm text-brand-moss">
                     @if ($supportsEnvPush)
                         {{ __('Edits push to the server automatically. Click Sync from server to pull drift caused by out-of-band edits.') }}
@@ -476,7 +493,7 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-key class="h-4 w-4" />
                                     </span>
                                     <div class="min-w-0">
@@ -722,14 +739,15 @@
         ];
     @endphp
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8 sm:py-6">
+        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8 sm:py-6">
             <div class="flex items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-link class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Bindings') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Resources') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bindings') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Managed resources attached to this app. Each attachment auto-injects its connection variables (e.g. DATABASE_URL) so plain Variables above don\'t have to duplicate them.') }}
                     </p>
                 </div>
@@ -754,7 +772,7 @@
                             @endif
                         </p>
                     </div>
-                    <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] {{ $bindingStatusBadge[$binding->status] ?? 'bg-slate-100 text-slate-700' }}">
+                    <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] {{ $bindingStatusBadge[$binding->status] ?? 'bg-brand-sand/40 text-brand-moss' }}">
                         {{ $binding->status }}
                     </span>
                 </li>

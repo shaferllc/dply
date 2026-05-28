@@ -70,23 +70,28 @@
     </header>
 
     @if ($connectedBackends->isEmpty() && ! $fakeCloudActive)
-        <div class="mt-6 flex flex-col gap-4 rounded-2xl border border-brand-gold/30 bg-brand-gold/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-start gap-3">
-                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gold/25 text-brand-rust" aria-hidden="true">
-                    <x-heroicon-o-link class="h-4 w-4" />
-                </span>
-                <div class="space-y-1">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Connect a cloud account to deploy') }}</p>
-                    <p class="text-sm text-brand-moss">{{ __('dply needs a DigitalOcean or AWS account to run your app on. Connect once and we handle the rest.') }}</p>
+        <section class="dply-card overflow-hidden border-amber-200 mt-6">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                            <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connect a cloud account to deploy') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('dply needs a DigitalOcean or AWS account to run your app on. Connect once and we handle the rest.') }}</p>
+                        </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2 text-xs">
+                        <a href="{{ route('credentials.index', ['provider' => 'digitalocean']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 font-semibold text-brand-cream hover:bg-brand-ink/90">
+                            {{ __('Connect DigitalOcean') }}
+                        </a>
+                        <a href="{{ route('credentials.index', ['provider' => 'aws_app_runner']) }}" wire:navigate class="font-medium text-brand-moss hover:text-brand-ink">{{ __('Use AWS instead') }}</a>
+                    </div>
                 </div>
             </div>
-            <div class="flex shrink-0 items-center gap-2 text-xs">
-                <a href="{{ route('credentials.index', ['provider' => 'digitalocean']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 font-semibold text-brand-cream hover:bg-brand-ink/90">
-                    {{ __('Connect DigitalOcean') }}
-                </a>
-                <a href="{{ route('credentials.index', ['provider' => 'aws_app_runner']) }}" wire:navigate class="font-medium text-brand-moss hover:text-brand-ink">{{ __('Use AWS instead') }}</a>
-            </div>
-        </div>
+        </section>
     @elseif ($connectedBackends->isEmpty() && $fakeCloudActive)
         <div data-testid="fake-cloud-active-notice" class="mt-6 flex gap-3 rounded-2xl border border-sky-200/80 bg-sky-50/70 px-5 py-4 text-sm text-sky-950 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200">
             <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300" aria-hidden="true">
@@ -108,7 +113,7 @@
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">01</span>
                     <div class="min-w-0 flex-1 space-y-5">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Source') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Source') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Deploy from a Git repository or a pre-built image. Source mode rebuilds on every push.') }}</p>
                         </div>
 
@@ -268,7 +273,7 @@
                         <div class="min-w-0 flex-1 space-y-4">
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div>
-                                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Detect build settings') }}</h2>
+                                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Detect build settings') }}</h2>
                                     <p class="mt-0.5 text-sm text-brand-moss">{{ __('Preview what dply detects in this repo before you deploy. Buildpacks run automatically when no Dockerfile path is set.') }}</p>
                                 </div>
                                 <button
@@ -299,7 +304,7 @@
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-sm font-bold text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">{{ $runtimeStep }}</span>
                     <div class="min-w-0 flex-1 space-y-5">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Runtime') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Runtime') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('How the container runs — HTTP port, instance count, size, and region.') }}</p>
                         </div>
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -355,7 +360,7 @@
                     <div class="min-w-0 flex-1 space-y-3">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Environment') }}</h2>
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Environment') }}</h2>
                                 <p class="mt-0.5 text-sm text-brand-moss">{{ __('Plain .env-style key/value pairs merged into the container at boot.') }}</p>
                             </div>
                             <span class="rounded-full bg-brand-cream/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-brand-mist dark:bg-zinc-800">{{ __('Optional') }}</span>
@@ -385,7 +390,7 @@
                     </span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Databases') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Databases') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Attach managed databases — each row gets its own connection env vars under the chosen prefix.') }}</p>
                         </div>
 
@@ -493,7 +498,7 @@
                     </span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Buckets') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Buckets') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Object storage — each row\'s env prefix governs the S3 connection env vars (e.g. S3_BUCKET, S3_2_BUCKET).') }}</p>
                         </div>
 
@@ -561,7 +566,7 @@
                     </span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Custom domains') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Hostnames you want pointed at this app. Each is attached automatically once provisioning finishes; DNS validation records appear on the app dashboard afterward.') }}</p>
                         </div>
                         @if (! empty($domains))
@@ -593,7 +598,7 @@
                     </span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Background workers') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Background workers') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Queue workers and a Laravel scheduler. Each runs as a long-lived process inside the same image as your web service — the command you set has to be runnable in that image.') }}</p>
                         </div>
                         @unless ($backendSupportsWorkers)
@@ -666,7 +671,7 @@
                     </span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Deploy tasks') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Deploy tasks') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('One-shot commands tied to the deploy lifecycle. Migrations before traffic flips, cache warmers after, manual ops on demand. Each runs inside the same image as the web service.') }}</p>
                         </div>
                         @unless ($backendSupportsDeployTasks)
@@ -850,7 +855,7 @@
                     </span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Alerts') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Alerts') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('All four rules default on. Org-level destinations apply unless this site overrides them.') }}</p>
                         </div>
 

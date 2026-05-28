@@ -19,7 +19,7 @@
     ])
 
     <div id="settings-cost" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Cost & lifecycle') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Cost & lifecycle') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Rough costs and renewal reminders for your team. Pull the catalog price from your provider when supported, or type your own number — for example a negotiated annual commit, a parent-account sub-allocation, or a chargeback total that includes data transfer.') }}
         </p>
@@ -144,7 +144,7 @@
     </div>
 
     <div id="settings-compliance" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Environment & compliance') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Environment & compliance') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Classify the server for policy reviews. Labels are visible in Dply only unless you export them.') }}
         </p>
@@ -219,7 +219,7 @@
     </div>
 
     <div id="settings-backup" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Backup & disaster recovery') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Backup & disaster recovery') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Describe how data is protected and how you would restore this host. Dply does not execute backups from these fields—they are for operators and auditors.') }}
         </p>

@@ -15,7 +15,7 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-700 dark:text-indigo-300">{{ __('Hybrid Edge stack') }}</p>
-                <h2 class="mt-1 text-lg font-semibold text-brand-ink">
+                <h2 class="mt-1 text-base font-semibold text-brand-ink">
                     @if ($stackStatus === 'complete')
                         {{ __('Edge hybrid app ready') }}
                     @elseif ($stackStatus === 'failed')

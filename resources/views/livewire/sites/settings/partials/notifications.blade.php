@@ -2,7 +2,7 @@
     <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Deploy and uptime notifications') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Deploy and uptime notifications') }}</h2>
                 <p class="mt-1 text-sm text-brand-moss max-w-2xl">
                     {{ __('Subscribe notification channels to site events. Dply delivers in-app notifications and routes to the channels you select here.') }}
                 </p>
@@ -101,7 +101,7 @@
 
     <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
         <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Outbound integration webhooks') }}</h2>
+            <h2 class="text-base font-semibold text-brand-ink">{{ __('Outbound integration webhooks') }}</h2>
             <p class="mt-1 text-sm text-brand-moss max-w-2xl">
                 {{ __('Dply POSTs to these URLs when matching events occur for this site. Payloads are adapter-specific: Slack uses a text field, Discord uses content, and Microsoft Teams uses a MessageCard-style JSON body.') }}
             </p>
@@ -161,7 +161,7 @@
 
     <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-4">
         <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
+            <h2 class="text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('The deploy URL, secret rotation, and Quick deploy live under Repository. IP restrictions stay below.') }}</p>
             <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'repository']) }}" wire:navigate class="mt-2 inline-flex text-sm font-medium text-brand-forest underline">{{ __('Open Repository → Inbound deploy webhook') }}</a>
         </div>

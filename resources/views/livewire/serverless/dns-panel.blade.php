@@ -17,7 +17,7 @@
     <div class="flex flex-wrap items-start justify-between gap-4">
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('DNS & hostname') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ $host ?: __('No hostname yet') }}</h2>
+            <h2 class="mt-1 text-base font-bold text-brand-ink">{{ $host ?: __('No hostname yet') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">
                 {{ __('Friendly hostname for the function. Resolves through the dply edge to the raw DigitalOcean Functions URL — DO Functions has no custom-domain support, so dply\'s app proxies the request.') }}
             </p>
@@ -117,21 +117,31 @@
             </p>
         </div>
     @elseif ($status === 'skipped')
-        <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p class="font-semibold">{{ __('DNS provisioning skipped') }}</p>
-            <p class="mt-1">
-                @switch($reason)
-                    @case('missing_token')
-                        {{ __('No DigitalOcean token configured. Set DIGITALOCEAN_TOKEN in dply\'s environment, then retry.') }}
-                        @break
-                    @case('unconfigured_zone')
-                        {{ __('The hostname\'s zone isn\'t in DPLY_TESTING_DOMAINS. Add it (e.g. `dply.host`) to dply\'s environment, then retry.') }}
-                        @break
-                    @default
-                        {{ __('See deploy log for details.') }}
-                @endswitch
-            </p>
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DNS provisioning skipped') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            @switch($reason)
+                                @case('missing_token')
+                                    {{ __('No DigitalOcean token configured. Set DIGITALOCEAN_TOKEN in dply\'s environment, then retry.') }}
+                                    @break
+                                @case('unconfigured_zone')
+                                    {{ __('The hostname\'s zone isn\'t in DPLY_TESTING_DOMAINS. Add it (e.g. `dply.host`) to dply\'s environment, then retry.') }}
+                                    @break
+                                @default
+                                    {{ __('See deploy log for details.') }}
+                            @endswitch
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @else
         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 text-sm text-brand-moss">
             {{ __('DNS not provisioned yet. The next deploy will attempt it, or click "Provision DNS now" to run it immediately.') }}

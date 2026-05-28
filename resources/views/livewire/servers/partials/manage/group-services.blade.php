@@ -60,7 +60,7 @@
     <div class="{{ $card }} p-6 sm:p-8">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="max-w-2xl">
-                <h2 id="manage-services-title" class="text-lg font-semibold text-brand-ink">{{ __('Services') }}</h2>
+                <h2 id="manage-services-title" class="text-base font-semibold text-brand-ink">{{ __('Services') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Live status of watched systemd units. Each row’s actions are queued over SSH; output streams into the panel above.') }}
                 </p>

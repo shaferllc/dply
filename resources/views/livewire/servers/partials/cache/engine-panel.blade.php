@@ -58,7 +58,7 @@
                         @endphp
                         {{-- Overview when not installed: the install affordance. --}}
                         <div class="{{ $card }} p-6 sm:p-8">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Install :engine', ['engine' => $info['label']]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">{{ __('Runs apt + systemctl over SSH; takes a few minutes on a small box. Other engines on this server are not affected.') }}</p>
                             @if ($unsupportedReason)
                                 {{-- Distro gate: the host's /etc/os-release codename isn't in the engine's
@@ -108,7 +108,7 @@
                         {{-- Overview when in-flight: small status note pointing at the
                              top-of-page console banner for live details. --}}
                         <div class="{{ $card }} p-6 sm:p-8">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ $engineLabels[$engine] }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
                                 {{ __(':engine is changing — see the progress banner above for live status and output.', ['engine' => $engineLabels[$engine]]) }}
                             </p>
@@ -191,7 +191,7 @@
                     @if ($activeSubtab === 'overview')
                     {{-- Installed and idle: status grid + action row. --}}
                     <div class="{{ $card }} p-6 sm:p-8">
-                        <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine status', ['engine' => $engineLabels[$engine]]) }}</h3>
                         <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
@@ -476,7 +476,7 @@
                     {{-- Port card (Configure subtab, all engines). Restarts the unit. --}}
                     @if ($activeSubtab === 'configure')
                         <div class="{{ $card }} p-6 sm:p-8">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — listen port', ['engine' => $engineLabels[$engine]]) }}</h3>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — listen port', ['engine' => $engineLabels[$engine]]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
                                 {{ __('Change the TCP port :engine listens on. The systemd unit will restart and connections drop briefly while the new port comes up. If the engine fails to bind, the previous config is restored automatically.', ['engine' => $engineLabels[$engine]]) }}
                             </p>
@@ -514,7 +514,7 @@
                     @if (\App\Models\ServerCacheService::engineSupportsAuth($row->engine))
                         @if ($activeSubtab === 'configure')
                         <div class="{{ $card }} p-6 sm:p-8">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — AUTH password', ['engine' => $engineLabels[$engine]]) }}</h3>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — AUTH password', ['engine' => $engineLabels[$engine]]) }}</h3>
                             <p class="mt-2 text-sm text-brand-moss">
                                 @if (filled($row->auth_password))
                                     {{ __('A password is set. Apps connecting to this engine must send AUTH. Rotate by entering a new value below.') }}
@@ -581,7 +581,7 @@
                         <div class="{{ $card }} p-6 sm:p-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0">
-                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — network exposure', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — network exposure', ['engine' => $engineLabels[$engine]]) }}</h3>
                                     <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                                         @if ($isExposed)
                                             {{ __('This instance is exposed to :source on TCP :port. Other servers in that range can connect.', ['source' => $exposedRule?->source ?? '—', 'port' => $row->port]) }}
@@ -692,7 +692,7 @@
                         <div class="{{ $card }} p-6 sm:p-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — memory limits', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — memory limits', ['engine' => $engineLabels[$engine]]) }}</h3>
                                     <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
@@ -789,7 +789,7 @@
                             <div class="{{ $card }} p-6 sm:p-8">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div class="max-w-2xl">
-                                        <h3 class="text-lg font-semibold text-brand-ink">{{ __('System INFO snapshot') }}</h3>
+                                        <h3 class="text-base font-semibold text-brand-ink">{{ __('System INFO snapshot') }}</h3>
                                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Last `redis-cli INFO` output captured by the host inventory probe. Refresh the probe from Manage → Overview to update.') }}</p>
                                     </div>
                                     @if (! empty($serviceActions['redis_info']) && ! $rowInFlight)
@@ -850,7 +850,7 @@
                         <div class="{{ $card }} p-6 sm:p-8">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
                                     <p class="mt-2 text-sm text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand — refresh to see who\'s connected right now.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
@@ -973,7 +973,7 @@
                     <div class="{{ $card }} p-6 sm:p-8">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                                <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — server config file', ['engine' => $engineLabels[$engine]]) }}</h3>
                                 <p class="mt-2 text-sm text-brand-moss">
                                     {{ __('Read-only view of the engine\'s main config file. Click Edit inside the viewer to change it — Dply backs up, restarts, verifies, and rolls back automatically on failure.') }}
                                 </p>

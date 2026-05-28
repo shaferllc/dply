@@ -50,7 +50,7 @@
                 {{ ucfirst((string) $f->status) }}
             </span>
         </div>
-        <h3 class="text-lg font-semibold text-brand-ink leading-snug break-words [overflow-wrap:anywhere]">{{ $f->title }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink leading-snug break-words [overflow-wrap:anywhere]">{{ $f->title }}</h3>
         @if ($detail['label'])
             <p class="text-xs text-brand-mist">{{ $detail['label'] }}</p>
         @endif

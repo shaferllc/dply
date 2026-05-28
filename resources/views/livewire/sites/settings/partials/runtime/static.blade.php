@@ -1,6 +1,6 @@
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
     <div>
-        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Static runtime') }}</h2>
+        <h2 class="text-base font-semibold text-brand-ink">{{ __('Static runtime') }}</h2>
         <p class="mt-1 text-sm text-brand-moss">{{ __('Static-site runtime settings. Set the directory the web server publishes after a build.') }}</p>
     </div>
 

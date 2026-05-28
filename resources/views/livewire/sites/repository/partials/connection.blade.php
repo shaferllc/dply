@@ -1,11 +1,19 @@
 <section class="space-y-6">
-    <div class="dply-card p-6 sm:p-8">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Connection') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('Which OAuth account dply uses to read commits, list branches, and provision webhooks.') }}
-        </p>
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Source control') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connection') }}</h2>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    {{ __('Which OAuth account dply uses to read commits, list branches, and provision webhooks.') }}
+                </p>
+            </div>
+        </div>
 
-        <form wire:submit.prevent="saveConnection" class="mt-5 space-y-4">
+        <form wire:submit.prevent="saveConnection" class="space-y-4 p-6 sm:p-8">
             <label class="block text-sm">
                 <span class="flex items-center justify-between gap-2">
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Linked source-control account') }}</span>
@@ -42,32 +50,39 @@
                     />
                 </label>
             </div>
-
-            <div class="flex justify-end">
-                <button
-                    type="submit"
-                    wire:loading.attr="disabled"
-                    wire:target="saveConnection"
-                    class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                >
-                    <x-heroicon-o-check class="h-4 w-4" />
-                    <span wire:loading.remove wire:target="saveConnection">{{ __('Save connection') }}</span>
-                    <span wire:loading wire:target="saveConnection">{{ __('Saving…') }}</span>
-                </button>
-            </div>
         </form>
+
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+            <button
+                type="button"
+                wire:click="saveConnection"
+                wire:loading.attr="disabled"
+                wire:target="saveConnection"
+                class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+            >
+                <x-heroicon-o-check class="h-4 w-4" />
+                <span wire:loading.remove wire:target="saveConnection">{{ __('Save connection') }}</span>
+                <span wire:loading wire:target="saveConnection">{{ __('Saving…') }}</span>
+            </button>
+        </div>
     </div>
 
     @if (! empty($connectionRepositories))
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-            <header>
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Repositories on this account') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('One-click swap to a different repository under the linked account. The deploy branch resets to the target repo\'s default.') }}</p>
-            </header>
-            <ul class="mt-4 divide-y divide-brand-ink/10">
+        <div class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                    <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repositories on this account') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('One-click swap to a different repository under the linked account. The deploy branch resets to the target repo\'s default.') }}</p>
+                </div>
+            </div>
+            <ul class="divide-y divide-brand-ink/10">
                 @foreach ($connectionRepositories as $repo)
                     @php($isCurrent = (string) ($repo['url'] ?? '') === $currentRepositoryUrl)
-                    <li class="flex flex-wrap items-center justify-between gap-3 py-2" wire:key="repo-{{ $repo['url'] }}">
+                    <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8" wire:key="repo-{{ $repo['url'] }}">
                         <div class="min-w-0">
                             <p class="truncate font-mono text-sm text-brand-ink">{{ $repo['label'] }}</p>
                             @if (! empty($repo['url']))
@@ -93,55 +108,64 @@
         </div>
     @endif
 
-    <div class="dply-card p-6 sm:p-8">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Quick deploy webhook') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('When enabled, dply registers a push webhook with your Git provider and queues a deploy on every push to the deploy branch.') }}
-        </p>
-
-        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-            <div>
-                <p class="text-sm font-semibold text-brand-ink">
-                    {{ $connectionQuickDeploy ? __('Quick deploy is enabled') : __('Quick deploy is disabled') }}
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Webhook') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    {{ __('When enabled, dply registers a push webhook with your Git provider and queues a deploy on every push to the deploy branch.') }}
                 </p>
-                @if ($connectionDeployHookUrl)
-                    <p class="mt-1 break-all font-mono text-[11px] text-brand-moss">{{ $connectionDeployHookUrl }}</p>
-                @endif
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                @if ($connectionQuickDeploy)
+        </div>
+
+        <div class="p-6 sm:p-8">
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">
+                        {{ $connectionQuickDeploy ? __('Quick deploy is enabled') : __('Quick deploy is disabled') }}
+                    </p>
+                    @if ($connectionDeployHookUrl)
+                        <p class="mt-1 break-all font-mono text-[11px] text-brand-moss">{{ $connectionDeployHookUrl }}</p>
+                    @endif
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($connectionQuickDeploy)
+                        <button
+                            type="button"
+                            wire:click="disableQuickDeploy"
+                            wire:confirm="{{ __('Disable quick deploy and remove the provider webhook?') }}"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50"
+                        >
+                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                            {{ __('Disable') }}
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="enableQuickDeploy"
+                            wire:loading.attr="disabled"
+                            wire:target="enableQuickDeploy"
+                            class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                        >
+                            <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                            {{ __('Enable quick deploy') }}
+                        </button>
+                    @endif
                     <button
                         type="button"
-                        wire:click="disableQuickDeploy"
-                        wire:confirm="{{ __('Disable quick deploy and remove the provider webhook?') }}"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50"
+                        wire:click="regenerateWebhookSecret"
+                        wire:confirm="{{ __('Rotate the webhook secret? Existing webhooks need to be re-synced.') }}"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
-                        {{ __('Disable') }}
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                        {{ __('Rotate secret') }}
                     </button>
-                @else
-                    <button
-                        type="button"
-                        wire:click="enableQuickDeploy"
-                        wire:loading.attr="disabled"
-                        wire:target="enableQuickDeploy"
-                        class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                    >
-                        <x-heroicon-o-bolt class="h-3.5 w-3.5" />
-                        {{ __('Enable quick deploy') }}
-                    </button>
-                @endif
-                <button
-                    type="button"
-                    wire:click="regenerateWebhookSecret"
-                    wire:confirm="{{ __('Rotate the webhook secret? Existing webhooks need to be re-synced.') }}"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                    {{ __('Rotate secret') }}
-                </button>
+                </div>
             </div>
         </div>
     </div>
-
 </section>

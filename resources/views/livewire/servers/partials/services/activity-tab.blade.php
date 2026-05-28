@@ -4,7 +4,7 @@
                         <x-heroicon-o-clock class="h-5 w-5" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Service activity') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Service activity') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Started, stopped, restarted, and state-change events Dply observed between inventory snapshots.') }}</p>
                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                             <span class="inline-flex items-center gap-1">

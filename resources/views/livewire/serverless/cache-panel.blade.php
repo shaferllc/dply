@@ -2,7 +2,7 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Cache') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Managed Redis') }}</h2>
+            <h2 class="mt-1 text-base font-bold text-brand-ink">{{ __('Managed Redis') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('A DigitalOcean Managed Redis cluster, wired in as this function\'s cache store.') }}</p>
         </div>
         @if ($state !== '')

@@ -38,7 +38,7 @@
 
     @can('clone', $site)
         <div class="rounded-xl border border-brand-ink/10 bg-slate-50/80 p-4 space-y-2">
-            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Clone site') }}</h3>
+            <h3 class="text-base font-semibold text-brand-ink">{{ __('Clone site') }}</h3>
             <p class="text-sm text-slate-600">{{ __('Create a copy on another server in your organization with a new domain. Databases, SSL certificates, environment files, and custom Nginx extra snippets are not copied.') }}</p>
             <a href="{{ route('sites.clone', [$server, $site]) }}" wire:navigate class="inline-flex rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
                 {{ __('Clone site') }}

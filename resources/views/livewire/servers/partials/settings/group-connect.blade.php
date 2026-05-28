@@ -147,7 +147,7 @@
         <div id="settings-connection-repair" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div class="max-w-2xl">
-                    <h3 class="text-lg font-semibold text-brand-ink">{{ __('Repair SSH access') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Repair SSH access') }}</h3>
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                         {{ __('If the deploy user no longer accepts Dply’s operational key, repair access from the hidden root recovery key without changing your saved connection details.') }}
                     </p>

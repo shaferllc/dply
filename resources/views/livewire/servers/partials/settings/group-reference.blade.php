@@ -7,7 +7,7 @@
     ])
 
     <div id="settings-timezone" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Display timezone') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Display timezone') }}</h3>
         <p class="mt-2 text-sm text-brand-moss">
             {{ __('Used when showing times in this workspace. The guest OS keeps its own timezone unless you change it over SSH.') }}
         </p>
@@ -34,7 +34,7 @@
     </div>
 
     <div id="settings-date-format" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Date format') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Date format') }}</h3>
         <p class="mt-2 text-sm text-brand-moss">
             {{ __('Controls how this server\'s timestamps render across the workspace — last sample, deploys, audit log, etc. Saved on the server, so different servers can use different formats.') }}
         </p>
@@ -63,7 +63,7 @@
     </div>
 
     <div id="settings-notes" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Internal notes') }}</h3>
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Internal notes') }}</h3>
         <p class="mt-2 text-sm text-brand-moss">{{ __('Free-form context: runbooks, customer IDs, things the next engineer should know.') }}</p>
         <form wire:submit="saveServerNotes" class="mt-6">
             <textarea

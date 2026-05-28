@@ -72,7 +72,7 @@
     <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden p-6 sm:p-8">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="max-w-2xl">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Run a fresh check over SSH to count upgradable packages, detect reboot flags, and optionally capture disk/memory/uptime. Automatic unattended upgrades are configured under Manage, not here.') }}
                 </p>

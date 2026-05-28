@@ -10,8 +10,12 @@ use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\WaitForServerSshReadyJob;
-use App\Livewire\Servers\Create as ServersCreate;
+use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
+use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
+use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
+use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Index as ServersIndex;
+use App\Models\ServerCreateDraft;
 use App\Livewire\Servers\ProvisionJourney;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
@@ -56,6 +60,27 @@ function userWithOrganization(): User
     session(['current_organization_id' => $org->id]);
 
     return $user;
+}
+
+/**
+ * Seed a ServerCreateDraft at a given step with the supplied form payload.
+ * Mirrors what the wizard does between steps — lets tests jump straight
+ * into Step 2/3/4 without walking through earlier steps.
+ *
+ * @param  array<string, mixed>  $payload
+ */
+function seedServerCreateDraft(User $user, ?Organization $org = null, int $step = 1, array $payload = []): ServerCreateDraft
+{
+    $org ??= $user->currentOrganization();
+    abort_unless($org !== null, 500, 'seedServerCreateDraft requires a current organization');
+
+    return ServerCreateDraft::create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'step' => $step,
+        'payload' => $payload,
+        'expires_at' => now()->addDays(14),
+    ]);
 }
 
 test('servers index redirects guest', function () {
@@ -716,14 +741,11 @@ test('servers create shows provider provisioning option even without provider cr
     $response->assertDontSee('Choose provider');
 });
 
-test('servers create defaults to no path until operator selects one', function () {
+test('servers create step one can switch to custom mode', function () {
+    // Step 1 of the wizard offers a Provider/Custom mode picker. Custom mode
+    // sets form.mode = 'custom' + form.type = 'custom' (the Custom/BYO path).
     $user = userWithOrganization();
     $org = $user->currentOrganization();
-
-    UserSshKey::factory()->create([
-        'user_id' => $user->id,
-        'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('b', 43).' blocked-size',
-    ]);
 
     ProviderCredential::factory()->create([
         'user_id' => $user->id,
@@ -734,21 +756,16 @@ test('servers create defaults to no path until operator selects one', function (
     ]);
 
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->assertSee('Use an existing server')
+        ->test(ServerCreateStepType::class)
         ->assertSee('Provision with a provider')
-        ->assertSee('Bring your own server')
-        ->assertDontSee('SSH private key (PEM / OpenSSH)')
-        ->assertDontSee('Choose provider')
-        ->assertSet('createMode', '')
-        ->assertSet('form.type', 'custom')
-        ->call('useExistingServerPath')
-        ->assertSee('SSH private key (PEM / OpenSSH)')
-        ->assertSee('Test connection')
-        ->assertSet('createMode', 'existing');
+        ->assertSee('Custom server (BYO)')
+        ->assertSet('form.mode', 'provider')
+        ->call('chooseCustomMode')
+        ->assertSet('form.mode', 'custom')
+        ->assertSet('form.type', 'custom');
 });
 
-test('servers create can switch to provider provisioning path', function () {
+test('servers create step where shows provider account + region + size pickers', function () {
     Http::fake([
         'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
         'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
@@ -766,16 +783,20 @@ test('servers create can switch to provider provisioning path', function () {
         'credentials' => ['api_token' => 'token'],
     ]);
 
+    // Drop user at Step 2 in provider mode with the DO type chosen.
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'name' => 'test-server',
+    ]);
+
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->set('form.type', 'digitalocean')
-        ->set('form.provider_credential_id', (string) $credential->id)
+        ->test(ServerCreateStepWhere::class)
         ->assertSet('form.type', 'digitalocean')
-        ->assertSee('Choose account')
-        ->assertSee('Region')
-        ->assertSee('Droplet size')
-        ->assertSee('Core server config')
-        ->assertSee('Advanced options');
+        ->assertSet('form.provider_credential_id', (string) $credential->id)
+        ->assertSee('Account')
+        ->assertSee('Region & size');
 });
 
 test('servers create generates a name and can regenerate it', function () {
@@ -790,13 +811,13 @@ test('servers create generates a name and can regenerate it', function () {
         'credentials' => ['api_token' => 'token'],
     ]);
 
-    $component = Livewire::actingAs($user)->test(ServersCreate::class);
+    $component = Livewire::actingAs($user)->test(ServerCreateStepType::class);
 
     $initial = $component->get('form.name');
 
     $this->assertNotSame('', $initial);
 
-    $component->call('regenerateServerName');
+    $component->call('regenerateName');
 
     $regenerated = $component->get('form.name');
 
@@ -804,7 +825,10 @@ test('servers create generates a name and can regenerate it', function () {
     $this->assertNotSame($initial, $regenerated);
 });
 
-test('servers create install profile updates stack defaults', function () {
+test('servers create step what install profile updates stack defaults', function () {
+    // install_profile lives on Step 3 (StepWhat). updatedFormInstallProfile()
+    // from the shared ServerCreateActions trait reshuffles webserver/database
+    // when the operator picks a different stack archetype.
     Http::fake([
         'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
         'https://api.digitalocean.com/v2/regions' => Http::response(['regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]]]),
@@ -814,7 +838,7 @@ test('servers create install profile updates stack defaults', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
-    ProviderCredential::factory()->create([
+    $credential = ProviderCredential::factory()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'provider' => 'digitalocean',
@@ -822,8 +846,17 @@ test('servers create install profile updates stack defaults', function () {
         'credentials' => ['api_token' => 'token'],
     ]);
 
+    seedServerCreateDraft($user, $org, step: 3, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'name' => 'test-server',
+        'region' => 'nyc3',
+        'size' => 's-1vcpu-1gb',
+    ]);
+
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
+        ->test(ServerCreateStepWhat::class)
         ->set('form.install_profile', 'queue_worker')
         ->assertSet('form.server_role', 'worker')
         ->assertSet('form.webserver', 'none')
@@ -836,14 +869,19 @@ test('servers can be stored as custom', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
+    seedServerCreateDraft($user, $org, step: 4, payload: [
+        'mode' => 'custom',
+        'type' => 'custom',
+        'name' => 'Custom Box',
+        'ip_address' => '192.168.1.1',
+        'ssh_port' => '22',
+        'ssh_user' => 'root',
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----",
+        'custom_host_kind' => 'vm',
+    ]);
+
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->set('form.type', 'custom')
-        ->set('form.name', 'Custom Box')
-        ->set('form.ip_address', '192.168.1.1')
-        ->set('form.ssh_port', '22')
-        ->set('form.ssh_user', 'root')
-        ->set('form.ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----")
+        ->test(ServerCreateStepReview::class)
         ->call('store')
         ->assertRedirect();
 
@@ -867,15 +905,19 @@ test('servers can be stored as custom docker hosts', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
+    seedServerCreateDraft($user, $org, step: 4, payload: [
+        'mode' => 'custom',
+        'type' => 'custom',
+        'name' => 'Docker Box',
+        'ip_address' => '192.168.1.2',
+        'ssh_port' => '22',
+        'ssh_user' => 'root',
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----",
+        'custom_host_kind' => 'docker',
+    ]);
+
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->set('form.type', 'custom')
-        ->set('form.custom_host_kind', 'docker')
-        ->set('form.name', 'Docker Box')
-        ->set('form.ip_address', '192.168.1.2')
-        ->set('form.ssh_port', '22')
-        ->set('form.ssh_user', 'root')
-        ->set('form.ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza2FzZWFlndm\n-----END OPENSSH PRIVATE KEY-----")
+        ->test(ServerCreateStepReview::class)
         ->call('store')
         ->assertRedirect();
 
@@ -887,20 +929,30 @@ test('servers can be stored as custom docker hosts', function () {
     expect(RunSetupScriptJob::shouldDispatch($server))->toBeFalse();
 });
 
-test('servers create custom path shows warning preflight and unavailable cost', function () {
+test('servers create step where custom mode shows the connection-not-verified sidebar', function () {
+    // Step 2 sidebar for the custom (BYO) path stays in an "idle" connection
+    // state until the operator runs Test connection. That copy is what we used
+    // to assert via the old preflight panel.
     $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'custom',
+        'type' => 'custom',
+        'name' => 'test-server',
+        'custom_host_kind' => 'vm',
+    ]);
 
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->call('useExistingServerPath')
-        ->assertSee('Preflight and cost preview')
-        ->assertSee('Stack selection ready')
-        ->assertSee('SSH reachability is not verified yet')
-        ->assertSee('Dply cannot estimate pricing for your own VPS.')
-        ->assertSee('Unavailable');
+        ->test(ServerCreateStepWhere::class)
+        ->assertSee('Connection check')
+        ->assertSee('Run "Test connection" to verify the SSH credentials before continuing.');
 });
 
-test('servers create custom connection test can report success', function () {
+test('servers create step where custom connection test can report success', function () {
+    // testCustomConnection lives in ServerCreateActions trait used by Step 2
+    // (StepWhere). The test fakes an SSH shell that returns "root" for whoami
+    // and asserts the wizard surfaces the success state.
     $shell = new \Tests\Support\FakeRemoteShell(
         fn (string $command): ?string => $command === 'whoami' ? 'root' : null,
     );
@@ -910,20 +962,30 @@ test('servers create custom connection test can report success', function () {
     );
 
     $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'custom',
+        'type' => 'custom',
+        'name' => 'test-server',
+        'custom_host_kind' => 'vm',
+        'ip_address' => '203.0.113.10',
+        'ssh_port' => '22',
+        'ssh_user' => 'root',
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
 
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->set('form.type', 'custom')
-        ->set('form.ip_address', '203.0.113.10')
-        ->set('form.ssh_port', '22')
-        ->set('form.ssh_user', 'root')
-        ->set('form.ssh_private_key', "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----")
+        ->test(ServerCreateStepWhere::class)
         ->call('testCustomConnection')
         ->assertSet('customConnectionTestState', 'success')
         ->assertSee('SSH connection verified as root.');
 });
 
-test('servers create defaults to custom type even when provider credentials exist', function () {
+test('servers create step one defaults to provider mode with sensible defaults', function () {
+    // The new wizard defaults Step 1 to Provider mode (the more common starting
+    // point) with VM host kind and the standard SSH knobs. Operator can switch
+    // to Custom via chooseCustomMode (covered in the earlier test).
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
@@ -936,26 +998,31 @@ test('servers create defaults to custom type even when provider credentials exis
     ]);
 
     Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->assertSet('form.type', 'custom')
+        ->test(ServerCreateStepType::class)
+        ->assertSet('form.mode', 'provider')
         ->assertSet('form.custom_host_kind', 'vm')
         ->assertSet('form.ssh_port', '22')
         ->assertSet('form.ssh_user', 'root');
 });
 
-test('servers create blocks store when required connection details are missing', function () {
+test('servers create step review blocks store when required custom-mode connection details are missing', function () {
     Queue::fake();
 
     $user = userWithOrganization();
     $org = $user->currentOrganization();
 
-    $component = Livewire::actingAs($user)
-        ->test(ServersCreate::class)
-        ->set('form.name', 'Blocked Box');
+    seedServerCreateDraft($user, $org, step: 4, payload: [
+        'mode' => 'custom',
+        'type' => 'custom',
+        'name' => 'Blocked Box',
+        'custom_host_kind' => 'vm',
+        // intentionally omit ip_address + ssh_private_key
+    ]);
 
-    $component
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepReview::class)
         ->call('store')
-        ->assertHasErrors(['ip_address', 'ssh_private_key']);
+        ->assertHasErrors(['form.ip_address', 'form.ssh_private_key']);
 
     $this->assertDatabaseMissing('servers', [
         'organization_id' => $org->id,

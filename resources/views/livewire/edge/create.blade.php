@@ -57,7 +57,7 @@
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">01</span>
                     <div class="min-w-0 flex-1 space-y-4">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Connect Git') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Connect Git') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('We clone, build, and publish from this repository on every deploy.') }}</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-3">
@@ -300,7 +300,7 @@
                 <div class="flex items-start gap-4">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-gold/15 text-sm font-bold text-brand-olive ring-1 ring-brand-gold/25 dark:bg-brand-gold/10 dark:text-brand-gold dark:ring-brand-gold/20">02</span>
                     <div class="min-w-0 flex-1">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Name your app') }}</h2>
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Name your app') }}</h2>
                         <p class="mt-0.5 text-sm text-brand-moss">{{ __('Used in the Edge index, site workspace, and preview URLs.') }}</p>
                         <div class="mt-4">
                             <x-input-label for="name" :value="__('App name')" />
@@ -341,7 +341,7 @@
                     <div class="min-w-0 flex-1 space-y-4">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Detect build settings') }}</h2>
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Detect build settings') }}</h2>
                                 <p class="mt-0.5 text-sm text-brand-moss">{{ __('We scan the repo automatically when you paste a complete owner/name or URL. Use Detect runtime to retry.') }}</p>
                             </div>
                             @php
@@ -400,7 +400,7 @@
                         <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/20 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/30">↳</span>
                         <div class="min-w-0 flex-1 space-y-4">
                             <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Monorepo detected') }}</h2>
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Monorepo detected') }}</h2>
                                 <p class="mt-0.5 text-sm text-brand-moss">
                                     {{ __('This repository looks like a monorepo (:markers). Pick the package directory this Edge site should build from.', ['markers' => implode(', ', $monorepoMarkers) ?: __('multiple packages')]) }}
                                 </p>
@@ -446,7 +446,7 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Build output') }}</h2>
+                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Build output') }}</h2>
                                 <p class="mt-0.5 text-sm text-brand-moss">{{ __('Override only when detection misses your setup.') }}</p>
                             </div>
                             <button
@@ -592,7 +592,7 @@
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-sm font-bold text-brand-forest ring-1 ring-brand-sage/25 dark:bg-brand-sage/15 dark:text-brand-sage dark:ring-brand-sage/30">05</span>
                     <div class="min-w-0 flex-1 space-y-5">
                         <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Edge delivery') }}</h2>
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h2>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Choose whether dply hosts delivery on our Cloudflare stack or deploys into your account.') }}</p>
                         </div>
 

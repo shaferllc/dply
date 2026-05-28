@@ -51,7 +51,7 @@
                 ];
             @endphp
 
-            <x-server-workspace-tablist :aria-label="__('Repository sections')" class="!mb-0">
+            <x-server-workspace-tablist :aria-label="__('Repository sections')">
                 @foreach ($tabs as $entry)
                     <x-server-workspace-tab
                         id="repository-tab-{{ $entry['id'] }}"

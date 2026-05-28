@@ -30,17 +30,17 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-slate-500" aria-label="{{ __('Breadcrumb') }}">
+    <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
         <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Dashboard') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Servers') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $server->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $site->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li class="font-medium text-slate-900">{{ __('Web server config') }}</li>
+            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ __('Dashboard') }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ __('Servers') }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-brand-ink truncate max-w-[10rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-brand-ink truncate max-w-[10rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li class="font-medium text-brand-ink">{{ __('Web server config') }}</li>
         </ol>
     </nav>
 
@@ -58,20 +58,40 @@
     />
 
     @if ($core_changed_warning)
-        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            {{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}
+        <div class="mb-6 dply-card overflow-hidden">
+            <div class="flex items-start gap-3 bg-amber-50 px-5 py-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Out of sync') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Managed core changed') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}</p>
+                </div>
+            </div>
         </div>
     @endif
 
     @if ($health_hint)
-        <div class="mb-6 rounded-xl border border-brand-ink/10 bg-brand-sand/40 px-4 py-3 text-sm text-brand-ink">{{ $health_hint }}</div>
+        <div class="mb-6 dply-card overflow-hidden">
+            <div class="flex items-start gap-3 bg-brand-cream/40 px-5 py-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                    <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Health') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver status') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $health_hint }}</p>
+                </div>
+            </div>
+        </div>
     @endif
 
     {{-- 75% / 25%: plain 4-column grid, main spans 3, pipeline spans 1 (md+). --}}
     <div class="grid grid-cols-1 gap-8 md:grid-cols-4 md:items-start md:gap-x-6 lg:gap-x-8">
         <div class="min-w-0 space-y-5 md:col-span-3">
             <div class="dply-card overflow-hidden min-w-0">
-                <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                         <div class="flex flex-wrap gap-1 rounded-lg bg-white/80 p-0.5 border border-brand-ink/10">
                             <button type="button" wire:click="$set('content_tab', 'edit')" class="{{ $tabBtn }} {{ $content_tab === 'edit' ? $tabActive : $tabIdle }}">{{ __('Content') }}</button>
@@ -160,15 +180,21 @@
                     @endif
                 </div>
 
-                <div class="px-4 py-2.5 border-t border-brand-ink/10 bg-brand-sand/15 text-xs text-brand-moss leading-relaxed">
+                <div class="px-6 py-4 border-t border-brand-ink/10 bg-brand-sand/25 text-xs text-brand-moss leading-relaxed sm:px-7">
                     {{ __('Edits are not live until you apply. Prefer validating on the server before applying.') }}
                 </div>
             </div>
 
             <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-4">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-4">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                        <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Release') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
+                    </div>
                 </div>
 
                 <div class="px-5 py-5 space-y-5">
@@ -216,7 +242,7 @@
         </div>
 
         <aside class="min-w-0 w-full space-y-0 md:col-span-1 md:sticky md:top-6" aria-label="{{ __('Configuration pipeline') }}">
-            <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss mb-4">{{ __('Config pipeline') }}</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist mb-4">{{ __('Config pipeline') }}</p>
 
             @php
                 $flowActive = 'ring-2 ring-brand-forest border-brand-forest/40 bg-brand-sand/50';
@@ -337,38 +363,55 @@
                 </div>
             </div>
 
-            <div class="mt-6 rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4 text-xs text-brand-moss space-y-2">
-                <p class="font-semibold text-brand-ink text-sm">{{ __('Runbook') }}</p>
-                <a href="{{ route('scripts.marketplace') }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Script marketplace') }}</a>
-                <span class="text-brand-mist">·</span>
-                <a href="{{ route('servers.run', $server) }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Server commands') }}</a>
+            <div class="mt-6 dply-card overflow-hidden">
+                <div class="flex items-start gap-3 bg-brand-cream/40 px-5 py-4">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                        <x-heroicon-o-book-open class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Reference') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runbook') }}</h2>
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                            <a href="{{ route('scripts.marketplace') }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Script marketplace') }}</a>
+                            <span class="text-brand-mist" aria-hidden="true">·</span>
+                            <a href="{{ route('servers.run', $server) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Server commands') }}</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </aside>
     </div>
 
-    @if ($show_history_modal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" wire:click.self="$set('show_history_modal', false)">
-            <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col" @click.stop>
-                <div class="px-5 py-4 border-b border-brand-ink/10 flex justify-between items-center">
-                    <h3 class="font-semibold text-brand-ink">{{ __('Revision history') }}</h3>
-                    <button type="button" wire:click="$set('show_history_modal', false)" class="text-brand-moss hover:text-brand-ink">&times;</button>
-                </div>
-                <ul class="overflow-y-auto divide-y divide-brand-ink/10">
-                    @forelse ($revisions as $rev)
-                        <li class="px-5 py-3 flex justify-between gap-2 items-start">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-brand-ink">{{ $rev->summary ?? __('Snapshot') }}</p>
-                                <p class="text-xs text-brand-moss">{{ $rev->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
-                            </div>
-                            <button type="button" wire:click="restoreRevision('{{ $rev->id }}')" class="{{ $btnSecondary }} shrink-0">{{ __('Restore') }}</button>
-                        </li>
-                    @empty
-                        <li class="px-5 py-8 text-sm text-brand-moss text-center">{{ __('No revisions yet.') }}</li>
-                    @endforelse
-                </ul>
-            </div>
+    <x-modal name="webserver-history-modal" :show="$show_history_modal" maxWidth="lg" overlayClass="bg-brand-ink/40" wire:model.live="show_history_modal">
+        <div class="relative border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('History') }}</p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Revision history') }}</h2>
+            <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">{{ __('Restore any prior saved revision back into the editor.') }}</p>
+            <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}" title="{{ __('Close') }}">
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
         </div>
-    @endif
+
+        <div class="max-h-[60vh] overflow-y-auto">
+            <ul class="divide-y divide-brand-ink/10">
+                @forelse ($revisions as $rev)
+                    <li class="flex items-start justify-between gap-2 px-6 py-4">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-brand-ink">{{ $rev->summary ?? __('Snapshot') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ $rev->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
+                        </div>
+                        <button type="button" wire:click="restoreRevision('{{ $rev->id }}')" class="{{ $btnSecondary }} shrink-0">{{ __('Restore') }}</button>
+                    </li>
+                @empty
+                    <li class="px-6 py-10 text-center text-sm text-brand-moss">{{ __('No revisions yet.') }}</li>
+                @endforelse
+            </ul>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+        </div>
+    </x-modal>
 
     <x-cli-snippet tone="stub" />
         </main>

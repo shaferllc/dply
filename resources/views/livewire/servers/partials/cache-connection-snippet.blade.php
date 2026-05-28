@@ -11,7 +11,7 @@
 @endphp
 @if ($cacheService)
     <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8" x-data="{ tab: 'laravel' }">
-        <h2 class="text-lg font-semibold text-brand-ink">{{ __(':engine — connection snippet', ['engine' => $engineLabel]) }}</h2>
+        <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine — connection snippet', ['engine' => $engineLabel]) }}</h2>
         <p class="mt-2 text-sm text-brand-moss">{{ __('Drop into your app on this server. Localhost-only — Dply does not expose cache services beyond the loopback interface.') }}</p>
         @if ($isRedisFork)
             <p class="mt-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">

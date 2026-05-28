@@ -3,7 +3,7 @@
     $database = $database ?? null;
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
-    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Connection snippet') }}</h2>
+    <h2 class="text-base font-semibold text-brand-ink">{{ __('Connection snippet') }}</h2>
     @if ($database === null)
         <p class="mt-2 text-sm text-brand-moss">{{ __('Add a database to see a ready-to-paste .env block here.') }}</p>
     @else

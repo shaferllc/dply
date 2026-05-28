@@ -100,9 +100,20 @@
     </div>
 
     @if ($checkedAt && (! $toolsProbed || ! $miseRuntimesProbed || ! $systemRuntimesProbed))
-        <div class="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-5 py-3 text-sm text-amber-950">
-            {{ __('The toolchain probe runs as part of the inventory refresh. The last probe predates this section — click Refresh probe to populate the pills below.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('In progress') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Toolchain probe stale') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The toolchain probe runs as part of the inventory refresh. The last probe predates this section — click Refresh probe to populate the pills below.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @endif
 
     {{-- mise card — full width so the runtimes panel has room to breathe. --}}

@@ -7,7 +7,7 @@
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __(':engine drift', ['engine' => $engineLabel]) }}</h2>
+            <h2 class="text-base font-semibold text-brand-ink">{{ __(':engine drift', ['engine' => $engineLabel]) }}</h2>
             <p class="mt-2 text-sm text-brand-moss">{{ __('Compare databases tracked in Dply with names visible to the database engine over SSH.') }}</p>
         </div>
         <button type="button" wire:click="runDriftAnalysis" wire:loading.attr="disabled" wire:target="runDriftAnalysis" class="rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50">
