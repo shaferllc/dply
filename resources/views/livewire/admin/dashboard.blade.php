@@ -395,22 +395,21 @@
         </div>
     </div>
 
-    {{-- Surface flags: VM-only launch keeps Cloud / Edge / Serverless dark
-         by default. This panel lets a platform admin opt specific orgs in
-         (design partners, internal dogfooding) without redeploying. --}}
-    <section class="mb-8" aria-labelledby="surface-flags-heading">
+    {{-- Org feature flags: Pennant per-org overrides for surfaces, workspace
+         tabs, launch workflows, etc. Global app-wide flags are below. --}}
+    <section class="mb-8" aria-labelledby="org-feature-flags-heading">
         <div class="{{ $card }}">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h2 id="surface-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('Surface flags') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Enable VM-launch-gated product surfaces (Cloud, Edge, Serverless) for a specific organization.') }}</p>
+                    <h2 id="org-feature-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('Organization feature flags') }}</h2>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Per-org Pennant overrides for product surfaces, workspace tabs, and launch workflows. Unchecking clears the override and falls back to the config / env default.') }}</p>
                 </div>
             </div>
-            <div class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,18rem),1fr]">
+            <div class="mt-4 grid gap-6 lg:grid-cols-[minmax(0,18rem),1fr]">
                 <div>
-                    <label for="surface-flag-org" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Organization') }}</label>
+                    <label for="org-feature-flag-org" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Organization') }}</label>
                     <select
-                        id="surface-flag-org"
+                        id="org-feature-flag-org"
                         wire:model.live="flagOrgId"
                         class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage"
                     >
@@ -420,38 +419,89 @@
                         @endforeach
                     </select>
                     @if ($surfaceFlagPanel['org'] !== null)
-                        <p class="mt-2 text-[11px] text-brand-mist">{{ __('Toggling writes a per-org Pennant override; unchecking clears it (falls back to config default).') }}</p>
+                        <p class="mt-2 text-[11px] leading-relaxed text-brand-mist">{{ __('Overrides are written to Pennant storage and audited on this org.') }}</p>
                     @endif
                 </div>
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Surfaces') }}</p>
-                    <ul class="mt-1 space-y-2">
-                        @foreach ($surfaceFlagPanel['flags'] as $flag)
-                            <li>
-                                <label class="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2.5 text-sm shadow-sm transition hover:border-brand-ink/15 has-[:checked]:border-brand-sage/50 has-[:checked]:bg-brand-sage/5 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-                                    <span class="flex items-center gap-2">
-                                        @if ($flag['active'])
-                                            <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
-                                        @else
-                                            <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
-                                        @endif
-                                        <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
-                                        <code class="font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
-                                    </span>
-                                    <input
-                                        type="checkbox"
-                                        wire:click="toggleSurfaceFlag('{{ $flag['key'] }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="toggleSurfaceFlag"
-                                        @checked($flag['active'])
-                                        @disabled($surfaceFlagPanel['org'] === null)
-                                        class="h-4 w-4 rounded border-brand-ink/30 text-brand-sage focus:ring-brand-sage"
-                                    />
-                                </label>
-                            </li>
-                        @endforeach
-                    </ul>
+                <div class="space-y-6">
+                    @foreach ($surfaceFlagPanel['groups'] ?? [] as $group)
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</p>
+                            <ul class="mt-2 space-y-2">
+                                @foreach ($group['flags'] as $flag)
+                                    <li>
+                                        <label class="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2.5 text-sm shadow-sm transition hover:border-brand-ink/15 has-[:checked]:border-brand-sage/50 has-[:checked]:bg-brand-sage/5 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+                                            <span class="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                                                <span class="flex items-center gap-2">
+                                                    @if ($flag['active'])
+                                                        <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                                    @else
+                                                        <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
+                                                    @endif
+                                                    <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
+                                                </span>
+                                                <code class="truncate font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
+                                                <span class="text-[10px] text-brand-mist">{{ __('default :state', ['state' => $flag['default'] ? __('on') : __('off')]) }}</span>
+                                            </span>
+                                            <input
+                                                type="checkbox"
+                                                wire:click="toggleOrgFeatureFlag('{{ $flag['key'] }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="toggleOrgFeatureFlag"
+                                                @checked($flag['active'])
+                                                @disabled($surfaceFlagPanel['org'] === null)
+                                                class="h-4 w-4 shrink-0 rounded border-brand-ink/30 text-brand-sage focus:ring-brand-sage"
+                                            />
+                                        </label>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endforeach
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-8" aria-labelledby="global-feature-flags-heading">
+        <div class="{{ $card }}">
+            <div>
+                <h2 id="global-feature-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('App-wide feature flags') }}</h2>
+                <p class="mt-1 text-sm text-brand-moss">{{ __('These apply to every organization (Pennant null scope). Use for billing, signups, maintenance, and cross-cutting product switches like the cost observatory.') }}</p>
+            </div>
+            <div class="mt-4 space-y-6">
+                @foreach ($globalFlagPanel as $group)
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</p>
+                        <ul class="mt-2 grid gap-2 lg:grid-cols-2">
+                            @foreach ($group['flags'] as $flag)
+                                <li>
+                                    <label class="flex h-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2.5 text-sm shadow-sm transition hover:border-brand-ink/15 has-[:checked]:border-brand-sage/50 has-[:checked]:bg-brand-sage/5">
+                                        <span class="flex min-w-0 flex-col gap-0.5">
+                                            <span class="flex items-center gap-2">
+                                                @if ($flag['active'])
+                                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                                @else
+                                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
+                                                @endif
+                                                <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
+                                            </span>
+                                            <code class="font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
+                                            <span class="text-[10px] text-brand-mist">{{ __('default :state', ['state' => $flag['default'] ? __('on') : __('off')]) }}</span>
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            wire:click="toggleGlobalFeatureFlag('{{ $flag['key'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="toggleGlobalFeatureFlag"
+                                            @checked($flag['active'])
+                                            class="h-4 w-4 shrink-0 rounded border-brand-ink/30 text-brand-sage focus:ring-brand-sage"
+                                        />
+                                    </label>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
             </div>
         </div>
     </section>

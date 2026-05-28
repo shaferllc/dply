@@ -114,14 +114,126 @@ FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY=true
 
 ---
 
+### Transparent cost observatory (`global.billing_enabled`)
+
+**Flag:** `global.billing_enabled` (same gate as pricing CTAs)
+
+Org **Billing analytics** adds a **Cost observatory** panel combining:
+
+| Layer | Source |
+|-------|--------|
+| Dply platform | `DesiredBillingState` (base + tiers + managed + Edge usage) |
+| Provider infrastructure | Saved server cost notes or live catalog lookup (`ServerProviderCostEstimator`) |
+| Comparison | Laravel Forge Hobby baseline ($12/server/mo) + same provider estimates |
+
+**Code:**
+
+- [`app/Services/Billing/OrganizationCostObservatory.php`](../app/Services/Billing/OrganizationCostObservatory.php)
+- [`app/Services/Billing/ServerMonthlyCostNoteParser.php`](../app/Services/Billing/ServerMonthlyCostNoteParser.php)
+- Wired into [`BillingAnalytics`](../app/Services/Billing/BillingAnalytics.php) → [`billing/analytics`](../app/Livewire/Billing/Analytics.php)
+
+**Enable:**
+
+```env
+FEATURE_GLOBAL_BILLING_ENABLED=true
+```
+
+**Follow-ups:** Cloud/App Runner provider pass-through estimates; annual commit amortization; currency conversion from live rates.
+
+---
+
+### Preview review hub
+
+**Route:** `/servers/{server}/sites/{preview}/preview-comments` (preview child sites)
+
+Expands preview comments into a **PR-linked review hub**:
+
+| Capability | Detail |
+|------------|--------|
+| PR link | GitHub pull request URL from parent repo + `preview_pr_number` |
+| Threads | `parent_id` on `edge_preview_comments` + dashboard replies |
+| Approvals | `edge_preview_review_approvals` — per-user sign-off with optional note |
+| Promote gate | `confirmPromoteEdgePreview` + review hub promote respect open comments / required approvals |
+
+**Code:**
+
+- [`app/Services/Edge/EdgePreviewReviewState.php`](../app/Services/Edge/EdgePreviewReviewState.php)
+- [`app/Livewire/Sites/EdgePreviewComments.php`](../app/Livewire/Sites/EdgePreviewComments.php) — review hub UI
+- [`app/Support/Edge/EdgePreviewPullRequestLink.php`](../app/Support/Edge/EdgePreviewPullRequestLink.php)
+
+**Config:**
+
+```env
+DPLY_EDGE_PREVIEW_REVIEW_MIN_APPROVALS=1
+DPLY_EDGE_PREVIEW_REVIEW_REQUIRE_APPROVAL=false
+DPLY_EDGE_PREVIEW_REVIEW_BLOCK_OPEN_COMMENTS=true
+```
+
+**Follow-ups:** magic-link guest reviewers (C6); viewport screenshots (C7); BYO preview URL review hub.
+
+---
+
+### Runbook marketplace (`surface.marketplace`)
+
+**Route:** `/marketplace` · **Flag:** `surface.marketplace`
+
+Curated **project runbooks** import into a workspace (project) Operations tab via `RECIPE_WORKSPACE_RUNBOOK`:
+
+| Destination | Recipe type |
+|-------------|-------------|
+| Org webserver templates | `webserver_template` |
+| Server saved commands / deploy | `server_recipe`, `deploy_command` |
+| **Project runbooks** | `workspace_runbook` |
+
+**Seed slugs:** `runbook-deploy-rollback`, `runbook-database-restore`, `runbook-edge-origin-failover`, `runbook-incident-first-15`, `runbook-ssl-renewal-panic`
+
+**Code:**
+
+- [`app/Services/Marketplace/MarketplaceImportService.php`](../app/Services/Marketplace/MarketplaceImportService.php) — `importWorkspaceRunbook()`
+- [`app/Livewire/Marketplace/Index.php`](../app/Livewire/Marketplace/Index.php)
+
+**Enable:**
+
+```env
+FEATURE_SURFACE_MARKETPLACE=true
+```
+
+---
+
+### Ephemeral deploy credentials (`workspace.ephemeral_credentials`)
+
+**Site setting:** Deploy → **Ephemeral deploy credentials** (BYO VM sites only)
+
+Per-deploy ed25519 SSH key lifecycle:
+
+| Phase | Behavior |
+|-------|----------|
+| Provision | Generate keypair, create `ServerAuthorizedKey`, sync to server |
+| Deploy | SSH uses ephemeral private key via scoped context override |
+| Revoke | Delete authorized key row, re-sync, mark credential revoked (always, even on failure) |
+
+**Code:**
+
+- [`app/Services/Deploy/EphemeralDeployCredentialManager.php`](../app/Services/Deploy/EphemeralDeployCredentialManager.php)
+- [`app/Models/SiteDeploymentEphemeralCredential.php`](../app/Models/SiteDeploymentEphemeralCredential.php)
+- [`app/Jobs/RunSiteDeploymentJob.php`](../app/Jobs/RunSiteDeploymentJob.php) — provision / revoke wrapper
+- Site meta: `deploy.ephemeral_credentials` (boolean opt-in per site)
+
+**Enable:**
+
+```env
+FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS=true
+```
+
+**Audit actions:** `site.deploy.ephemeral_credential_provisioned`, `site.deploy.ephemeral_credential_revoked` (fingerprint on deploy audit metadata)
+
+---
+
 ## Tier B backlog (not started)
 
 | Idea | Suggested branch | Notes |
 |------|------------------|-------|
-| Transparent cost observatory | `feature/tier-b-cost-observatory` | Org billing + provider estimates |
-| Preview review hub | `feature/tier-b-preview-review` | Expand `EdgePreviewComments` |
-| Runbook marketplace | `feature/tier-b-marketplace` | Needs `surface.marketplace` GA |
-| Ephemeral deploy credentials | `feature/tier-b-ephemeral-ssh` | Per-deploy key lifecycle |
+| — | — | Tier B differentiators above are implemented on this branch |
 
 ---
 

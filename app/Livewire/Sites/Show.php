@@ -144,6 +144,9 @@ class Show extends Component
     /** Mirrors {@see Site::$deploy_strategy} `atomic` for the zero-downtime card UI. */
     public bool $zero_downtime_enabled = false;
 
+    /** Per-deploy ephemeral SSH credentials (site meta `deploy.ephemeral_credentials`). */
+    public bool $ephemeral_deploy_credentials_enabled = false;
+
     public bool $deploy_health_enabled = false;
 
     public bool $deploy_health_auto_rollback = false;
@@ -372,6 +375,7 @@ class Show extends Component
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
         $dm = is_array($this->site->meta) ? $this->site->meta : [];
+        $this->ephemeral_deploy_credentials_enabled = (bool) data_get($dm, 'deploy.ephemeral_credentials', false);
         $this->deploy_health_enabled = (bool) ($dm['deploy_health_enabled'] ?? false);
         $this->deploy_health_auto_rollback = (bool) ($dm['deploy_health_auto_rollback'] ?? false);
         $this->deploy_health_path = (string) ($dm['deploy_health_path'] ?? '/health');
@@ -1473,6 +1477,26 @@ class Show extends Component
         }
 
         $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.'));
+    }
+
+    public function saveEphemeralDeployCredentials(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! ephemeral_deploy_credentials_active($this->site->organization)) {
+            return;
+        }
+
+        $this->validate([
+            'ephemeral_deploy_credentials_enabled' => 'boolean',
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        data_set($meta, 'deploy.ephemeral_credentials', $this->ephemeral_deploy_credentials_enabled);
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+
+        $this->toastSuccess(__('Ephemeral deploy credentials settings saved.'));
     }
 
     public function shouldShowSystemUserPanel(): bool

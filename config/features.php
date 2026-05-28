@@ -79,6 +79,8 @@ return [
         'activity' => env('FEATURE_WORKSPACE_ACTIVITY', false),
         // exit: ship once remote-script execution surface is reviewed (security risk)
         'run' => env('FEATURE_WORKSPACE_RUN', false),
+        // exit: ship after per-deploy key lifecycle validated on three OSes
+        'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),
     ],
 
     /*
@@ -126,6 +128,8 @@ return [
         'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', false),
         // exit: ship after replay validated against password-protected previews
         'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', false),
+        // exit: ship when LLM + heuristic triage validated across BYO + Edge failures
+        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', false),
     ],
 
     /*
@@ -135,6 +139,8 @@ return [
     'launch' => [
         // exit: ship when FullStackArchitecturePlanner handoffs are validated E2E
         'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', false),
+        // exit: ship when standby playbooks validated on hybrid + BYO + DNS cutover paths
+        'standby_blueprint' => env('FEATURE_LAUNCH_STANDBY_BLUEPRINT', false),
     ],
 
 ];

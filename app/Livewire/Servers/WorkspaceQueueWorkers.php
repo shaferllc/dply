@@ -63,6 +63,14 @@ class WorkspaceQueueWorkers extends Component
     /** Optional site context (sites.queue-workers route binds the Site). null = server-wide view. */
     public ?string $context_site_id = null;
 
+    /** workers | add */
+    public string $queue_workspace_tab = 'workers';
+
+    public function setQueueWorkspaceTab(string $tab): void
+    {
+        $this->queue_workspace_tab = in_array($tab, ['workers', 'add'], true) ? $tab : 'workers';
+    }
+
     public function mount(Server $server, ?Site $site = null): void
     {
         if ($site !== null) {

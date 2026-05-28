@@ -13,6 +13,16 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @if (standby_blueprint_active())
+                    <a
+                        href="{{ route('launches.standby') }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Standby blueprints') }}
+                    </a>
+                @endif
                 <a
                     href="{{ route('launches.create') }}"
                     wire:navigate
@@ -209,7 +219,22 @@
                                 'title' => __('Intelligence'),
                                 'desc' => __('Proactive alerts — slow builds, expiring TLS, preview/prod env drift.'),
                             ],
+                            [
+                                'route' => 'fleet.blast-radius',
+                                'icon' => 'heroicon-o-share',
+                                'title' => __('Blast radius'),
+                                'desc' => __('Dependency map — what breaks if a server, site, or database fails.'),
+                            ],
                         ];
+
+                        if (ops_copilot_active()) {
+                            $fleetTiles[] = [
+                                'route' => 'fleet.copilot',
+                                'icon' => 'heroicon-o-sparkles',
+                                'title' => __('Ops Copilot'),
+                                'desc' => __('Deploy failure triage — log excerpts, repo config, and fix suggestions.'),
+                            ];
+                        }
 
                         $opsTimelineOrg = auth()->user()?->currentOrganization();
                         if ($opsTimelineOrg !== null && $opsTimelineOrg->hasAdminAccess(auth()->user())) {

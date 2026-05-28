@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\RemoteShell;
 use App\Models\Server;
+use App\Services\Deploy\EphemeralDeployCredentialContext;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SFTP;
 use phpseclib3\Net\SSH2;
@@ -229,6 +230,13 @@ class SshConnection implements RemoteShell
 
     protected function privateKeyForConnection(): ?string
     {
+        if (app()->bound(EphemeralDeployCredentialContext::class)) {
+            $context = app(EphemeralDeployCredentialContext::class);
+            if ($context->hasPrivateKey()) {
+                return $context->privateKey();
+            }
+        }
+
         return match ($this->credentialRole) {
             self::ROLE_RECOVERY => $this->server->recoverySshPrivateKey(),
             default => $this->server->operationalSshPrivateKey(),

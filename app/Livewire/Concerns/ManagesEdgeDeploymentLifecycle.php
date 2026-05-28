@@ -12,6 +12,7 @@ use App\Livewire\Sites\EdgeDeploymentDetail;
 use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Services\Edge\EdgePreviewReviewState;
 use App\Support\Edge\EdgeDeploymentConfirmSummary;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
@@ -132,6 +133,16 @@ trait ManagesEdgeDeploymentLifecycle
             return;
         }
 
+        $reviewState = app(EdgePreviewReviewState::class);
+        $review = $reviewState->forPreview($preview);
+        if ($blocked = $reviewState->promoteBlockedMessage($review)) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError($blocked);
+            }
+
+            return;
+        }
+
         $message = __('Copy this preview\'s artifacts into a fresh production prefix and flip the host map. The preview keeps running.');
 
         if (! method_exists($this, 'openConfirmActionModal')) {
@@ -147,7 +158,10 @@ trait ManagesEdgeDeploymentLifecycle
             $message,
             __('Promote to production'),
             false,
-            EdgeDeploymentConfirmSummary::promoteRows($this->site, $preview, $previewDeployment),
+            array_merge(
+                EdgeDeploymentConfirmSummary::promoteRows($this->site, $preview, $previewDeployment),
+                $reviewState->confirmModalRows($review),
+            ),
         );
     }
 

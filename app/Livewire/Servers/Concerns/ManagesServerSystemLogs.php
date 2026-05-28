@@ -10,6 +10,7 @@ use App\Services\Servers\ServerSystemLogReader;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 trait ManagesServerSystemLogs
 {
@@ -620,17 +621,30 @@ trait ManagesServerSystemLogs
             $broadcastPayloadTruncated = true;
         }
 
-        broadcast(new ServerWorkspaceLogSnapshotBroadcast(
-            serverId: (string) $server->id,
-            logKey: $this->logKey,
-            remoteLogRaw: is_string($raw) ? $raw : null,
-            remoteLogError: $this->remoteLogError,
-            logLastFetchedAt: (string) ($this->logLastFetchedAt ?? now()->toIso8601String()),
-            logLastFetchTruncated: $this->logLastFetchTruncated,
-            logLastFetchRawBytes: $this->logLastFetchRawBytes,
-            broadcastPayloadTruncated: $broadcastPayloadTruncated,
-            siteId: $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : null,
-        ))->toOthers();
+        // Best-effort fan-out to the operator's other open tabs. This is a
+        // ShouldBroadcastNow event, so it publishes to Reverb inline within
+        // the Livewire request — a down or misconfigured broadcaster must not
+        // take the log page down with it (cURL timeouts otherwise surface as
+        // a 500). Degrade to "no live peer update" instead.
+        try {
+            broadcast(new ServerWorkspaceLogSnapshotBroadcast(
+                serverId: (string) $server->id,
+                logKey: $this->logKey,
+                remoteLogRaw: is_string($raw) ? $raw : null,
+                remoteLogError: $this->remoteLogError,
+                logLastFetchedAt: (string) ($this->logLastFetchedAt ?? now()->toIso8601String()),
+                logLastFetchTruncated: $this->logLastFetchTruncated,
+                logLastFetchRawBytes: $this->logLastFetchRawBytes,
+                broadcastPayloadTruncated: $broadcastPayloadTruncated,
+                siteId: $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : null,
+            ))->toOthers();
+        } catch (\Throwable $e) {
+            Log::warning('server_system_logs.broadcast_failed', [
+                'server_id' => (string) $server->id,
+                'log_key' => $this->logKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function applyLogFilterToOutput(): void

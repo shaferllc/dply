@@ -58,14 +58,15 @@
         <div class="{{ $card }}">
             <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-lock-closed class="h-5 w-5" />
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                        <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Username and password pairs that the webserver checks before letting a request through.') }}
-                            <a href="https://datatracker.ietf.org/doc/html/rfc7617" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
+                            <a href="https://datatracker.ietf.org/doc/html/rfc7617" target="_blank" rel="noopener" class="whitespace-nowrap font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Learn more') }}</a>
                         </p>
                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                             <span class="inline-flex items-center gap-1">
@@ -324,12 +325,18 @@
         {{-- List of credentials, grouped by path. Each row carries username + path chip,
              added/updated timestamps, and per-row Rotate / Delete actions. --}}
         <div class="{{ $card }}">
-            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Rotate or remove credentials — applied on the next webserver config write.') }}</p>
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                        <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Credentials') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Rotate or remove credentials — applied on the next webserver config write.') }}</p>
+                    </div>
                 </div>
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
                     <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                     {{ trans_choice('{0} no credentials|{1} :count credential|[2,*] :count credentials', $entryCount, ['count' => $entryCount]) }}
                 </span>
@@ -401,7 +408,7 @@
                                     @php $pending = $authUser->isPendingRemoval(); @endphp
                                     <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-3 sm:px-8 {{ $pending ? 'opacity-60' : '' }}" wire:key="ba-user-{{ $authUser->id }}">
                                         <div class="flex min-w-0 items-center gap-3">
-                                            <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                                 <x-heroicon-o-user-circle class="h-4 w-4" />
                                             </span>
                                             <div class="min-w-0">

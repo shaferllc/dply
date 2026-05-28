@@ -67,6 +67,7 @@ use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\DigitalOceanFunctionsActionDeployer;
 use App\Services\Deploy\DigitalOceanFunctionsDeployEngine;
 use App\Services\Deploy\DockerDeployEngine;
+use App\Services\Deploy\EphemeralDeployCredentialContext;
 use App\Services\Deploy\KubernetesDeployEngine;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
 use App\Services\Deploy\RuntimeDetection\GoRuntimeDetector;
@@ -157,6 +158,10 @@ class AppServiceProvider extends ServiceProvider
         // results — we add an explicit binding to make sure every call site
         // hits the same instance.
         $this->app->scoped(WebserverSwitchPreflight::class);
+
+        // Scoped: queue jobs may override SSH private key for one deploy via
+        // EphemeralDeployCredentialManager without touching the server key.
+        $this->app->scoped(EphemeralDeployCredentialContext::class);
 
         // Migration step handler registry — bind handler classes to their step keys.
         // Bind eagerly so the orchestrator always has a fully populated registry; the

@@ -173,6 +173,55 @@ if (! function_exists('full_stack_wizard_active')) {
     }
 }
 
+if (! function_exists('standby_blueprint_active')) {
+    /**
+     * True when the Tier C standby failover blueprint wizard is available.
+     */
+    function standby_blueprint_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('launch.standby_blueprint')
+            : Feature::for($organization)->active('launch.standby_blueprint');
+    }
+}
+
+if (! function_exists('ephemeral_deploy_credentials_active')) {
+    /**
+     * True when per-deploy ephemeral SSH credentials are enabled for the org.
+     */
+    function ephemeral_deploy_credentials_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('workspace.ephemeral_credentials')
+            : Feature::for($organization)->active('workspace.ephemeral_credentials');
+    }
+}
+
+if (! function_exists('cost_observatory_active')) {
+    /**
+     * True when the transparent cost observatory panel should render on
+     * billing analytics (global billing flag — same gate as pricing CTAs).
+     */
+    function cost_observatory_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('global.billing_enabled')
+            : Feature::for($organization)->active('global.billing_enabled');
+    }
+}
+
+if (! function_exists('ops_copilot_active')) {
+    /**
+     * True when Fleet Ops Copilot deploy triage should be available.
+     */
+    function ops_copilot_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('global.ops_copilot')
+            : Feature::for($organization)->active('global.ops_copilot');
+    }
+}
+
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.

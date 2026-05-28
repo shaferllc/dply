@@ -97,6 +97,9 @@
                         if (! empty($item['route'] ?? null)) {
                             $routeArgs = match ($item['route_params'] ?? null) {
                                 'server_only' => ['server' => $server],
+                                // server-level route, but carry the site as a query
+                                // param so the target can render in site context.
+                                'server_with_site' => ['server' => $server, 'site' => $site->id],
                                 'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
                                 default => ['server' => $server, 'site' => $site],
                             };

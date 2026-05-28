@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Server;
 use App\Models\Site;
+use Laravel\Pennant\Feature;
 
 /**
  * Sidebar nav items for the site workspace (Settings, Web server config, etc.).
@@ -171,6 +172,10 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
+                // Hide items whose target page is behind a disabled feature flag
+                // (e.g. Schedule → feature:workspace.schedule) so the sidebar
+                // never links to a route that would 404 for this organization.
+                ->filter(fn (array $item): bool => empty($item['feature']) || Feature::active($item['feature']))
                 ->values()
                 ->all(),
             $server,
@@ -191,10 +196,10 @@ final class SiteSettingsSidebar
         // items above use site-scoped routes (same component, site context bound).
         $background = [
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
-            ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'servers.schedule', 'route_params' => 'server_only'],
+            ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'servers.schedule', 'route_params' => 'server_with_site', 'feature' => 'workspace.schedule'],
             ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'queue-workers', 'label' => __('Queue workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.queue-workers'],
-            ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'servers.backups', 'route_params' => 'server_only'],
+            ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'servers.backups', 'route_params' => 'server_with_site'],
         ];
 
         $insertIndex = null;

@@ -276,6 +276,14 @@
                         @endphp
                         <div class="flex flex-col items-end gap-2">
                             <div class="flex items-center gap-3">
+                                <a
+                                    href="{{ route('sites.preview-comments', ['server' => $preview->server_id, 'site' => $preview]) }}"
+                                    wire:navigate
+                                    class="inline-flex items-center gap-1 text-xs font-medium text-brand-moss hover:text-brand-ink"
+                                >
+                                    <x-heroicon-o-chat-bubble-left-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ __('Review') }}
+                                </a>
                                 @if ($previewIsLive)
                                     <button
                                         type="button"
