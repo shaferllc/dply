@@ -117,7 +117,10 @@
                         wire:navigate
                         @class([
                             $navLink,
-                            'pl-9' => $isChild,
+                            // Children indent as a whole pill (margin, not padding) so the
+                            // active highlight hugs the content instead of leaving a wide
+                            // empty gutter on the left.
+                            'ms-4 !w-auto' => $isChild,
                             'bg-brand-sand/60 text-brand-ink' => $section === $item['id'],
                             'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $section !== $item['id'],
                         ])

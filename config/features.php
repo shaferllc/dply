@@ -59,6 +59,10 @@ return [
     | Livewire component under app/Livewire/Servers/Workspace*.php.
     */
     'workspace' => [
+        // exit: ship after promote cutover validated on three VM migrations
+        'site_promote' => env('FEATURE_WORKSPACE_SITE_PROMOTE', true),
+        // exit: ship once health cockpit validated against guest metrics on three OSes
+        'health' => env('FEATURE_WORKSPACE_HEALTH', true),
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', false),
         // exit: ship once browser-SSH session auditing + RBAC are validated

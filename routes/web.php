@@ -103,6 +103,7 @@ use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDatabases;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFirewall;
+use App\Livewire\Servers\WorkspaceHealth;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
@@ -146,6 +147,7 @@ use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\ServerlessRouting;
 use App\Livewire\Sites\SiteClone as SitesClone;
+use App\Livewire\Sites\SitePromote as SitesPromote;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\Workers;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
@@ -508,6 +510,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
+    Route::middleware('feature:workspace.site_promote')->group(function (): void {
+        Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');
+    });
     Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
@@ -589,6 +594,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->defaults('section', 'general')
         ->name('sites.show');
     Route::livewire('servers/{server}/sites', WorkspaceSites::class)->name('servers.sites');
+    Route::middleware('feature:workspace.health')->group(function (): void {
+        Route::livewire('servers/{server}/health', WorkspaceHealth::class)->name('servers.health');
+    });
     Route::middleware('feature:workspace.insights')->group(function (): void {
         Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     });
