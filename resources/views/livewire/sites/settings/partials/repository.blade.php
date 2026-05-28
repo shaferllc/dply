@@ -130,6 +130,12 @@
         @endif
     </section>
 
+    @feature('global.byo_repo_config')
+        @if ($server->isVmHost())
+            <livewire:sites.byo-repo-config-panel :site="$site" :key="'byo-repo-config-'.$site->id" />
+        @endif
+    @endfeature
+
     {{-- Quick deploy webhook toggle. --}}
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">

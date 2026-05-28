@@ -18,6 +18,7 @@ use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
+use App\Http\Controllers\OrganizationComplianceExportController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\SiteWorkspaceController;
@@ -55,6 +56,7 @@ use App\Livewire\Imports\Ploi\MigrationProgress;
 use App\Livewire\Infrastructure\Index as InfrastructureIndex;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Launches\Create as LaunchesCreate;
+use App\Livewire\Launches\FullStack as LaunchesFullStack;
 use App\Livewire\Launches\Path as LaunchesPath;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
@@ -151,6 +153,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -254,7 +257,7 @@ Route::get('/migrate', function () {
     ]);
 })->name('migrate.index');
 
-Route::get('/deploy', function (\Illuminate\Http\Request $request) {
+Route::get('/deploy', function (Request $request) {
     $allowed = ['repo', 'branch', 'name', 'runtime_mode', 'build_command', 'output_dir'];
     $query = array_filter(
         $request->only($allowed),
@@ -345,7 +348,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
     Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
     Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
-    Route::get('organizations/{organization}/compliance-export', \App\Http\Controllers\OrganizationComplianceExportController::class)->name('organizations.compliance-export');
+    Route::get('organizations/{organization}/compliance-export', OrganizationComplianceExportController::class)->name('organizations.compliance-export');
     Route::livewire('organizations/{organization}/automation', OrganizationsAutomation::class)->name('organizations.automation');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
@@ -404,6 +407,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
     });
     Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
+    Route::middleware('feature:launch.full_stack_wizard')->group(function (): void {
+        Route::livewire('launches/full-stack', LaunchesFullStack::class)->name('launches.full-stack');
+    });
     // Container flow inversion (2026-05): the standalone container launcher is gone.
     // Container apps are now created server-first (host via /servers/create wizard,
     // container via /servers/{id}/sites/create container mode). This route is kept for

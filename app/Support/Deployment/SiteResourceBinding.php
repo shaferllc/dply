@@ -17,7 +17,20 @@ final readonly class SiteResourceBinding
         public string $source,
         public ?string $name = null,
         public array $config = [],
+        // When this binding is backed by a persisted SiteBinding row, its id is
+        // exposed here so the UI can detach it. Derived (inferred) bindings have
+        // no row and so no id.
+        public ?string $bindingId = null,
+        // Whether the operator can attach/provision/detach this binding from the
+        // UI. Derived bindings are still manageable (the action creates a row);
+        // the publication binding is owned by the runtime and is not.
+        public bool $manageable = true,
     ) {}
+
+    public function isManaged(): bool
+    {
+        return $this->bindingId !== null;
+    }
 
     /**
      * @return array{
@@ -27,7 +40,9 @@ final readonly class SiteResourceBinding
      *     status: string,
      *     source: string,
      *     name: ?string,
-     *     config: array<string, mixed>
+     *     config: array<string, mixed>,
+     *     binding_id: ?string,
+     *     manageable: bool
      * }
      */
     public function toArray(): array
@@ -40,6 +55,8 @@ final readonly class SiteResourceBinding
             'source' => $this->source,
             'name' => $this->name,
             'config' => $this->config,
+            'binding_id' => $this->bindingId,
+            'manageable' => $this->manageable,
         ];
     }
 }

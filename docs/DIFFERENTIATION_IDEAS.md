@@ -202,6 +202,8 @@ Medium effort; competitors would need architectural rewrites to match.
 
 **Pitch:** Repo detect → auto-provision Edge front + Cloud API + BYO database with wiring docs and private networking hints.
 
+**Status:** **Wizard v1 shipped** on `feature/tier-b-workflows` — see [`TIER_B_WORKFLOW.md`](TIER_B_WORKFLOW.md).
+
 **Why defensible:** Only dply has hybrid Edge+Cloud stack **and** BYO in one org. Vercel can't provision your VPS; Forge can't deploy to Workers.
 
 **Builds on:**
@@ -224,6 +226,8 @@ Medium effort; competitors would need architectural rewrites to match.
 
 **Pitch:** Extend declarative in-repo config beyond Edge — BYO redirects, cron, deploy hooks, notification rules in one file.
 
+**Status:** **BYO sync v1 shipped** — redirects, crons (`command`), deploy hooks; see [`TIER_B_WORKFLOW.md`](TIER_B_WORKFLOW.md).
+
 **Why defensible:** Vercel/Netlify have platform-specific config; Forge has almost none. **Cross-engine** declarative config is novel.
 
 **Builds on:**
@@ -245,6 +249,8 @@ Medium effort; competitors would need architectural rewrites to match.
 ### Deploy replay / shadow traffic
 
 **Pitch:** Replay sampled production requests against a preview deployment before promote — smoke test with real traffic shapes.
+
+**Status:** **v1 shipped** — GET/HEAD sampler + preview HTTP replay on Previews tab; see [`TIER_B_WORKFLOW.md`](TIER_B_WORKFLOW.md).
 
 **Why defensible:** Edge Wave D already ships sticky A/B split; extending to request replay across BYO/Cloud is a natural moat extension.
 

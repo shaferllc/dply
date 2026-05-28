@@ -145,6 +145,34 @@ if (! function_exists('multi_surface_active')) {
     }
 }
 
+if (! function_exists('full_stack_wizard_active')) {
+    /**
+     * True when the Tier B full-stack launch wizard should be available:
+     * flag on, launchpad surfaces active, and both Cloud + Edge enabled.
+     */
+    function full_stack_wizard_active(?Organization $organization = null): bool
+    {
+        $flagActive = $organization === null
+            ? Feature::active('launch.full_stack_wizard')
+            : Feature::for($organization)->active('launch.full_stack_wizard');
+
+        if (! $flagActive || ! multi_surface_active($organization)) {
+            return false;
+        }
+
+        foreach (['surface.cloud', 'surface.edge'] as $required) {
+            $active = $organization === null
+                ? Feature::active($required)
+                : Feature::for($organization)->active($required);
+            if (! $active) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.

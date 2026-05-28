@@ -327,6 +327,44 @@
                                         </button>
                                     @endif
                                 </div>
+                                @if (($deployReplayEnabled ?? false) && $previewIsLive)
+                                    @php
+                                        $replay = ($latestReplays ?? collect())->get((string) $preview->id);
+                                    @endphp
+                                    <div class="w-full max-w-md space-y-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-[11px] text-brand-moss">
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <span class="inline-flex items-center gap-1 font-semibold text-brand-ink">
+                                                <x-heroicon-o-arrow-path class="h-3 w-3" aria-hidden="true" />
+                                                {{ __('Shadow replay') }}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                wire:click="queueEdgeDeployReplay('{{ $preview->id }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="queueEdgeDeployReplay('{{ $preview->id }}')"
+                                                class="rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                            >
+                                                {{ __('Run sample') }}
+                                            </button>
+                                        </div>
+                                        @if ($replay)
+                                            <p class="text-brand-moss">
+                                                @if ($replay->status === \App\Models\EdgeDeployReplay::STATUS_COMPLETED)
+                                                    {{ __('Last run: :rate% status match · :reg regressions', [
+                                                        'rate' => data_get($replay->summary, 'pass_rate', 0),
+                                                        'reg' => data_get($replay->summary, 'regressions', 0),
+                                                    ]) }}
+                                                @elseif (in_array($replay->status, [\App\Models\EdgeDeployReplay::STATUS_QUEUED, \App\Models\EdgeDeployReplay::STATUS_RUNNING], true))
+                                                    {{ __('Replay in progress…') }}
+                                                @else
+                                                    {{ $replay->error_message ?: __('Last replay failed.') }}
+                                                @endif
+                                            </p>
+                                        @else
+                                            <p>{{ __('Replays recent production GET/HEAD paths against this preview before you promote or split traffic.') }}</p>
+                                        @endif
+                                    </div>
+                                @endif
                             @endif
                         </div>
                     @endcan
