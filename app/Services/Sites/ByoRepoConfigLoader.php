@@ -23,21 +23,26 @@ final class ByoRepoConfigLoader
     /**
      * @return array{
      *     config: EdgeRepoConfig,
-     *     crons: list<array{schedule: string, command: string}>,
+     *     crons: list<array{schedule: string, command: string, user: ?string}>,
+     *     server_crons: list<array{schedule: string, command: string, user: ?string}>,
      *     deploy_hooks: list<array{phase: string, script: string, timeout: int, sort_order: int}>,
+     *     env_declarations: list<array{name: string, required: bool, description: ?string}>,
      *     warnings: list<string>
      * }
      */
     public function parse(string $sourcePath, string $raw): array
     {
         $config = $this->edgeLoader->parse($sourcePath, $raw);
-        $parsed = $this->decodeRoot($sourcePath, $raw);
+        $decoded = $this->decodeRoot($sourcePath, $raw);
+        $parsed = is_array($decoded) ? $decoded : [];
         $warnings = $config->warnings;
 
         return [
             'config' => $config,
-            'crons' => $this->parseByoCrons(is_array($parsed) ? $parsed : [], $warnings),
-            'deploy_hooks' => $this->parseDeployHooks(is_array($parsed) ? $parsed : [], $warnings),
+            'crons' => $this->parseCronBlock($parsed, 'crons', 'BYO site cron', $warnings),
+            'server_crons' => $this->parseCronBlock($parsed, 'server_crons', 'server cron', $warnings),
+            'deploy_hooks' => $this->parseDeployHooks($parsed, $warnings),
+            'env_declarations' => $this->parseEnvDeclarations($parsed, $warnings),
             'warnings' => $warnings,
         ];
     }
@@ -70,11 +75,11 @@ final class ByoRepoConfigLoader
     /**
      * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
-     * @return list<array{schedule: string, command: string}>
+     * @return list<array{schedule: string, command: string, user: ?string}>
      */
-    private function parseByoCrons(array $parsed, array &$warnings): array
+    private function parseCronBlock(array $parsed, string $blockKey, string $label, array &$warnings): array
     {
-        $value = $parsed['crons'] ?? null;
+        $value = $parsed[$blockKey] ?? null;
         if (! is_array($value)) {
             return [];
         }
@@ -82,7 +87,7 @@ final class ByoRepoConfigLoader
         $out = [];
         foreach ($value as $index => $entry) {
             if (! is_array($entry)) {
-                $warnings[] = sprintf('crons[%d] must be a map for BYO sites.', $index);
+                $warnings[] = sprintf('%s[%d] must be a map for BYO %s sync.', $blockKey, $index, $label);
 
                 continue;
             }
@@ -91,15 +96,21 @@ final class ByoRepoConfigLoader
             $command = is_string($entry['command'] ?? null) ? trim($entry['command']) : '';
             if ($schedule === '' || $command === '') {
                 if ($schedule !== '' && $command === '') {
-                    $warnings[] = sprintf('crons[%d] needs `command` for BYO server cron sync.', $index);
+                    $warnings[] = sprintf('%s[%d] needs `command` for BYO %s sync.', $blockKey, $index, $label);
                 }
 
                 continue;
             }
 
+            $user = is_string($entry['user'] ?? null) ? trim($entry['user']) : null;
+            if ($user === '') {
+                $user = null;
+            }
+
             $out[] = [
                 'schedule' => $schedule,
                 'command' => $command,
+                'user' => $user,
             ];
         }
 
@@ -158,6 +169,54 @@ final class ByoRepoConfigLoader
                 'script' => self::MANAGED_HOOK_PREFIX.$script,
                 'timeout' => $timeout,
                 'sort_order' => $sortOrder,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  list<string>  $warnings
+     * @return list<array{name: string, required: bool, description: ?string}>
+     */
+    private function parseEnvDeclarations(array $parsed, array &$warnings): array
+    {
+        $value = $parsed['env'] ?? $parsed['env_declarations'] ?? null;
+        if ($value === null) {
+            return [];
+        }
+        if (! is_array($value)) {
+            $warnings[] = 'env must be a list of declarations for BYO sites.';
+
+            return [];
+        }
+
+        $out = [];
+        foreach ($value as $index => $entry) {
+            if (is_string($entry)) {
+                $name = trim($entry);
+                if ($name !== '') {
+                    $out[] = ['name' => $name, 'required' => true, 'description' => null];
+                }
+
+                continue;
+            }
+            if (! is_array($entry)) {
+                $warnings[] = sprintf('env[%d] must be a string or map.', $index);
+
+                continue;
+            }
+            $name = is_string($entry['name'] ?? null) ? trim($entry['name']) : '';
+            if ($name === '') {
+                $warnings[] = sprintf('env[%d].name is required.', $index);
+
+                continue;
+            }
+            $out[] = [
+                'name' => $name,
+                'required' => (bool) ($entry['required'] ?? true),
+                'description' => is_string($entry['description'] ?? null) ? trim($entry['description']) : null,
             ];
         }
 

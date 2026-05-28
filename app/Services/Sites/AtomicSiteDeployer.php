@@ -148,10 +148,11 @@ class AtomicSiteDeployer
         if ($syncResult['applied']) {
             $log .= "\n--- dply.yaml sync ---\n";
             $log .= sprintf(
-                "Synced %s: %d redirects, %d crons, %d deploy hooks.\n",
+                "Synced %s: %d redirects, %d site crons, %d server crons, %d deploy hooks.\n",
                 (string) ($syncResult['source_path'] ?? 'dply.yaml'),
                 $syncResult['redirects'],
                 $syncResult['crons'],
+                $syncResult['server_crons'],
                 $syncResult['deploy_hooks'],
             );
         }

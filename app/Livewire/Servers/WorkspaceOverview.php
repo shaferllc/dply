@@ -20,6 +20,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
+use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerReleaseHygiene;
@@ -362,6 +363,9 @@ class WorkspaceOverview extends Component
                 : null,
             'releaseHygieneSummary' => Feature::active('workspace.release_hygiene')
                 ? $this->releaseHygieneSummary(app(ServerReleaseHygiene::class))
+                : null,
+            'costCardSummary' => Feature::active('workspace.server_cost')
+                ? app(ServerCostCard::class)->overviewSummary($this->server)
                 : null,
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,

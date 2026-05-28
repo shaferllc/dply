@@ -75,13 +75,6 @@ class Create extends Component
                 'icon' => 'cloud',
             ],
             [
-                'id' => 'cloud-network',
-                'title' => __('Cloud Network'),
-                'description' => __('Start managed cloud network deploys from a network-aware setup flow.'),
-                'enabled' => false,
-                'icon' => 'globe-alt',
-            ],
-            [
                 'id' => 'serverless',
                 'title' => __('Serverless'),
                 'description' => __('Launch function-based app targets without modeling them as traditional servers.'),

@@ -2,18 +2,32 @@
 
 /*
 |--------------------------------------------------------------------------
-| Platform admin — curated Pennant flags
+| Platform admin — Pennant flags
 |--------------------------------------------------------------------------
 |
-| Subset of config/features.php exposed on /admin for per-org overrides
-| (org_groups) and app-wide toggles (global_groups). Not every flag belongs
-| here — provider rollouts stay env-driven unless we add them later.
+| org_groups: per-org overrides on /admin (Pennant org scope).
+| global_groups: app-wide kill switches (Pennant null scope, global.* only).
+|
+| Platform defaults for org-scoped flags reuse org_groups — the admin
+| dashboard renders a second panel that toggles Feature::for(null) so new
+| orgs inherit the value until they get an explicit org override.
 |
 */
 
 return [
 
     'org_groups' => [
+        'Providers' => [
+            'provider.aws' => 'AWS EC2',
+            'provider.linode' => 'Linode',
+            'provider.vultr' => 'Vultr',
+            'provider.fly_io' => 'Fly.io',
+            'provider.upcloud' => 'UpCloud',
+            'provider.scaleway' => 'Scaleway',
+            'provider.equinix_metal' => 'Equinix Metal',
+            'provider.aws_app_runner' => 'AWS App Runner',
+            'provider.aws_eks' => 'AWS EKS',
+        ],
         'Surfaces' => [
             'surface.cloud' => 'Cloud apps',
             'surface.edge' => 'Edge',
@@ -25,17 +39,31 @@ return [
             'surface.status_pages' => 'Status pages',
         ],
         'Workspace' => [
+            'workspace.site_promote' => 'Site promote',
+            'workspace.health' => 'Health cockpit',
+            'workspace.server_blueprint' => 'Server blueprint',
+            'workspace.webserver_config_diff' => 'Webserver config diff',
+            'workspace.server_maintenance' => 'Server maintenance',
+            'workspace.patch_advisor' => 'Patch advisor',
+            'workspace.release_hygiene' => 'Release hygiene',
+            'workspace.daemon_slo' => 'Daemon SLO',
+            'workspace.cert_inventory' => 'Certificate inventory',
+            'workspace.deploy_windows' => 'Deploy windows',
+            'workspace.ssh_access_graph' => 'SSH access graph',
+            'workspace.ssh_sessions' => 'Temporary SSH sessions',
+            'workspace.server_cost' => 'Server cost card',
+            'workspace.security_digest' => 'Security digest',
             'workspace.ephemeral_credentials' => 'Ephemeral deploy credentials',
-            'workspace.caches' => 'Server caches',
-            'workspace.schedule' => 'Schedule workspace',
-            'workspace.activity' => 'Activity log tab',
-            'workspace.run' => 'Run / saved commands',
+            'workspace.cluster' => 'Cluster',
             'workspace.console' => 'Browser console',
             'workspace.files' => 'Remote files',
             'workspace.services' => 'System services',
             'workspace.system_users' => 'System users',
             'workspace.insights' => 'Insights',
-            'workspace.cluster' => 'Cluster',
+            'workspace.caches' => 'Server caches',
+            'workspace.schedule' => 'Schedule workspace',
+            'workspace.activity' => 'Activity log tab',
+            'workspace.run' => 'Run / saved commands',
         ],
         'Launch' => [
             'launch.full_stack_wizard' => 'Full-stack launch wizard',

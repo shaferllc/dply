@@ -15,7 +15,6 @@ use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Index as ServersIndex;
-use App\Models\ServerCreateDraft;
 use App\Livewire\Servers\ProvisionJourney;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceManage;
@@ -26,6 +25,7 @@ use App\Models\Project;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
+use App\Models\ServerCreateDraft;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\ServerFirewallRule;
@@ -42,13 +42,17 @@ use App\Modules\TaskRunner\Services\TaskRunnerService;
 use App\Services\Sites\Contracts\SiteRuntimeProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
+use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Mockery;
+use Tests\Support\FakeRemoteShell;
+use Tests\Support\FakeSshConnectionFactory;
 
 uses(RefreshDatabase::class);
 
@@ -185,8 +189,32 @@ test('servers index reset filters clears state', function () {
         ->call('resetFilters')
         ->assertSet('search', '')
         ->assertSet('statusFilter', '')
+        ->assertSet('tagFilter', '')
         ->assertSet('sort', 'created_at')
         ->assertSet('viewMode', 'list');
+});
+
+test('servers index tag filter limits rows', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'name' => 'srv-tag-prod-xyz',
+        'meta' => ['tags' => ['production', 'web']],
+    ]);
+    Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'name' => 'srv-tag-staging-xyz',
+        'meta' => ['tags' => ['staging']],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServersIndex::class)
+        ->set('tagFilter', 'production')
+        ->assertSee('srv-tag-prod-xyz')
+        ->assertDontSee('srv-tag-staging-xyz');
 });
 
 test('servers index destroy accepts string ulid and deletes', function () {
@@ -219,8 +247,8 @@ test('servers create requires organization', function () {
 test('launchpad is displayed with organization', function () {
     // surface.cloud is off post VM-launch; this test asserts the launches
     // page lists the Cloud tile + cloud.create URL, so opt in locally.
-    \Laravel\Pennant\Feature::define('surface.cloud', fn (): bool => true);
-    \Laravel\Pennant\Feature::flushCache();
+    Feature::define('surface.cloud', fn (): bool => true);
+    Feature::flushCache();
 
     $user = userWithOrganization();
 
@@ -953,12 +981,12 @@ test('servers create step where custom connection test can report success', func
     // testCustomConnection lives in ServerCreateActions trait used by Step 2
     // (StepWhere). The test fakes an SSH shell that returns "root" for whoami
     // and asserts the wizard surfaces the success state.
-    $shell = new \Tests\Support\FakeRemoteShell(
+    $shell = new FakeRemoteShell(
         fn (string $command): ?string => $command === 'whoami' ? 'root' : null,
     );
     app()->instance(
-        \App\Services\SshConnectionFactory::class,
-        new \Tests\Support\FakeSshConnectionFactory($shell),
+        SshConnectionFactory::class,
+        new FakeSshConnectionFactory($shell),
     );
 
     $user = userWithOrganization();

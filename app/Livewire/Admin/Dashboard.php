@@ -73,8 +73,8 @@ class Dashboard extends Component
         $previous = Feature::for($org)->value($flag);
 
         if (Feature::for($org)->active($flag)) {
-            Feature::for($org)->forget($flag);
-            $this->operationMessage = __(':flag disabled for :org (falls back to default).', [
+            Feature::for($org)->deactivate($flag);
+            $this->operationMessage = __(':flag disabled for :org.', [
                 'flag' => $label,
                 'org' => $org->name,
             ]);
@@ -107,6 +107,36 @@ class Dashboard extends Component
     }
 
     /**
+     * Flip the platform-wide default for an org-scoped flag (Pennant null scope).
+     * New orgs inherit this until they receive an explicit org override.
+     */
+    public function togglePlatformDefaultFeatureFlag(string $flag): void
+    {
+        Gate::authorize('viewPlatformAdmin');
+        $this->resetOperationFlash();
+
+        if (! in_array($flag, AdminFeatureFlags::orgFlagKeys(), true)) {
+            $this->operationError = __('Unknown feature flag.');
+
+            return;
+        }
+
+        $label = AdminFeatureFlags::orgFlagLabel($flag) ?? $flag;
+
+        if (Feature::for(null)->active($flag)) {
+            Feature::for(null)->deactivate($flag);
+            $this->operationMessage = __(':flag platform default disabled (applies to orgs without an override).', ['flag' => $label]);
+        } else {
+            Feature::for(null)->activate($flag);
+            $this->operationMessage = __(':flag platform default enabled (new orgs inherit this).', ['flag' => $label]);
+        }
+
+        $this->operationMessage .= ' '.(__('Env/config default: :state.', [
+            'state' => AdminFeatureFlags::configDefault($flag) ? __('on') : __('off'),
+        ]));
+    }
+
+    /**
      * Flip an app-wide Pennant flag ({@see Feature::for(null)}).
      */
     public function toggleGlobalFeatureFlag(string $flag): void
@@ -124,8 +154,8 @@ class Dashboard extends Component
         $previous = Feature::for(null)->value($flag);
 
         if (Feature::for(null)->active($flag)) {
-            Feature::for(null)->forget($flag);
-            $this->operationMessage = __(':flag disabled app-wide (falls back to default).', ['flag' => $label]);
+            Feature::for(null)->deactivate($flag);
+            $this->operationMessage = __(':flag disabled app-wide.', ['flag' => $label]);
         } else {
             Feature::for(null)->activate($flag);
             $this->operationMessage = __(':flag enabled app-wide.', ['flag' => $label]);
@@ -374,6 +404,7 @@ class Dashboard extends Component
             'horizonUrl' => route('horizon.index'),
             'pulseUrl' => route('pulse'),
             'orgFeatureFlagPanel' => $this->orgFeatureFlagPanelData(),
+            'platformDefaultFlagPanel' => $this->platformDefaultFlagPanelData(),
             'globalFlagPanel' => $this->globalFeatureFlagPanelData(),
             // Legacy alias — blade still references surfaceFlagPanel in places.
             'surfaceFlagPanel' => $this->orgFeatureFlagPanelData(),
@@ -400,7 +431,8 @@ class Dashboard extends Component
                     'key' => $key,
                     'label' => $label,
                     'active' => $org instanceof Organization && Feature::for($org)->active($key),
-                    'default' => AdminFeatureFlags::configDefault($key),
+                    'default' => AdminFeatureFlags::platformDefault($key),
+                    'configDefault' => AdminFeatureFlags::configDefault($key),
                 ];
             }
             $groups[] = ['title' => $title, 'flags' => $entries];
@@ -411,6 +443,29 @@ class Dashboard extends Component
             'org' => $org instanceof Organization ? $org : null,
             'groups' => $groups,
         ];
+    }
+
+    /**
+     * @return list<array{title: string, flags: list<array{key: string, label: string, active: bool, default: bool, configDefault: bool}>}>
+     */
+    protected function platformDefaultFlagPanelData(): array
+    {
+        $groups = [];
+        foreach (AdminFeatureFlags::orgGroups() as $title => $flags) {
+            $entries = [];
+            foreach ($flags as $key => $label) {
+                $entries[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'active' => Feature::for(null)->active($key),
+                    'default' => AdminFeatureFlags::configDefault($key),
+                    'configDefault' => AdminFeatureFlags::configDefault($key),
+                ];
+            }
+            $groups[] = ['title' => $title, 'flags' => $entries];
+        }
+
+        return $groups;
     }
 
     /**

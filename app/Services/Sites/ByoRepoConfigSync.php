@@ -24,6 +24,8 @@ final class ByoRepoConfigSync
 
     public const MANAGED_CRON_PREFIX = '[dply.yaml]';
 
+    public const MANAGED_SERVER_CRON_PREFIX = '[dply.yaml server]';
+
     public function __construct(
         private ByoRepoConfigLoader $loader,
     ) {}
@@ -34,25 +36,28 @@ final class ByoRepoConfigSync
      *     source_path: ?string,
      *     redirects: int,
      *     crons: int,
+     *     server_crons: int,
      *     deploy_hooks: int,
      *     warnings: list<string>
      * }
      */
     public function syncAfterDeploy(Site $site, SshConnection $ssh, string $remotePath): array
     {
+        $empty = ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'server_crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];
+
         if (! Feature::active('global.byo_repo_config')) {
-            return ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];
+            return $empty;
         }
 
         if (! $site->server?->isVmHost()) {
-            return ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];
+            return $empty;
         }
 
         $fetched = $this->fetchRemoteConfig($ssh, $remotePath);
         if ($fetched === null) {
             $this->persistSnapshot($site, null);
 
-            return ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];
+            return $empty;
         }
 
         try {
@@ -65,6 +70,7 @@ final class ByoRepoConfigSync
                 'source_path' => $fetched['source'],
                 'redirects' => 0,
                 'crons' => 0,
+                'server_crons' => 0,
                 'deploy_hooks' => 0,
                 'warnings' => ['Could not parse dply config: '.$e->getMessage()],
             ];
@@ -72,11 +78,14 @@ final class ByoRepoConfigSync
 
         $redirectCount = $this->syncRedirects($site, $parsed['config']);
         $cronCount = $this->syncCrons($site, $parsed['crons']);
+        $serverCronCount = $this->syncServerCrons($site, $parsed['server_crons']);
         $hookCount = $this->syncDeployHooks($site, $parsed['deploy_hooks']);
 
         $snapshot = array_merge($parsed['config']->toArray(), [
             'byo_crons' => $parsed['crons'],
+            'byo_server_crons' => $parsed['server_crons'],
             'deploy_hooks' => count($parsed['deploy_hooks']),
+            'env_declarations' => $parsed['env_declarations'],
             'synced_at' => now()->toIso8601String(),
         ]);
 
@@ -91,6 +100,7 @@ final class ByoRepoConfigSync
             'source_path' => $fetched['source'],
             'redirects' => $redirectCount,
             'crons' => $cronCount,
+            'server_crons' => $serverCronCount,
             'deploy_hooks' => $hookCount,
             'warnings' => $parsed['warnings'],
         ];
@@ -155,7 +165,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  list<array{schedule: string, command: string}>  $crons
+     * @param  list<array{schedule: string, command: string, user: ?string}>  $crons
      */
     private function syncCrons(Site $site, array $crons): int
     {
@@ -177,9 +187,43 @@ final class ByoRepoConfigSync
                 'site_id' => $site->id,
                 'cron_expression' => $cron['schedule'],
                 'command' => $cron['command'],
-                'user' => config('server_settings.deploy_user', 'dply'),
+                'user' => $cron['user'] ?? config('server_settings.deploy_user', 'dply'),
                 'enabled' => true,
                 'description' => self::MANAGED_CRON_PREFIX.' '.$cron['command'],
+                'is_synced' => false,
+            ]);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  list<array{schedule: string, command: string, user: ?string}>  $crons
+     */
+    private function syncServerCrons(Site $site, array $crons): int
+    {
+        $server = $site->server;
+        if ($server === null) {
+            return 0;
+        }
+
+        ServerCronJob::query()
+            ->where('server_id', $server->id)
+            ->whereNull('site_id')
+            ->where('description', 'like', self::MANAGED_SERVER_CRON_PREFIX.'%')
+            ->delete();
+
+        $count = 0;
+        foreach ($crons as $cron) {
+            ServerCronJob::query()->create([
+                'server_id' => $server->id,
+                'site_id' => null,
+                'cron_expression' => $cron['schedule'],
+                'command' => $cron['command'],
+                'user' => $cron['user'] ?? config('server_settings.deploy_user', 'dply'),
+                'enabled' => true,
+                'description' => self::MANAGED_SERVER_CRON_PREFIX.' '.$cron['command'],
                 'is_synced' => false,
             ]);
             $count++;

@@ -48,9 +48,47 @@ class DeviceApproval extends Component
             $this->organizationId = (string) $org->id;
         }
 
+        // Default the selection to only the scopes this user's org role can
+        // actually grant — deploy/write are admin/deployer-gated below.
+        $this->selectedAbilities = $this->grantableAbilities();
+
         if ($this->userCode !== '') {
             $this->lookup();
         }
+    }
+
+    public function updatedOrganizationId(): void
+    {
+        $this->selectedAbilities = $this->grantableAbilities();
+    }
+
+    /**
+     * Edge scopes the current user may grant for the selected org, capped
+     * by their org role. The device flow previously let any member mint
+     * deploy/write tokens; deploy/write now require deployer (deploy) or
+     * admin/owner (deploy + write) access, mirroring the admin gate on the
+     * normal API-token UI.
+     *
+     * @return list<string>
+     */
+    protected function grantableAbilities(?Organization $org = null): array
+    {
+        $org ??= $this->resolvedOrganization();
+        $user = Auth::user();
+
+        if ($org === null || $user === null) {
+            return [];
+        }
+
+        if ($org->hasAdminAccess($user)) {
+            return self::DEFAULT_ABILITIES;
+        }
+
+        if ($org->userIsDeployer($user)) {
+            return array_values(array_intersect(self::DEFAULT_ABILITIES, ['edge.read', 'edge.deploy']));
+        }
+
+        return array_values(array_intersect(self::DEFAULT_ABILITIES, ['edge.read']));
     }
 
     public function lookup(): void
@@ -70,7 +108,7 @@ class DeviceApproval extends Component
 
     public function toggleAbility(string $ability): void
     {
-        if (! in_array($ability, self::DEFAULT_ABILITIES, true)) {
+        if (! in_array($ability, $this->grantableAbilities(), true)) {
             return;
         }
 
@@ -101,9 +139,19 @@ class DeviceApproval extends Component
             return;
         }
 
-        $abilities = array_values(array_intersect($this->selectedAbilities, self::DEFAULT_ABILITIES));
-        if ($abilities === []) {
+        $selected = array_values(array_intersect($this->selectedAbilities, self::DEFAULT_ABILITIES));
+        if ($selected === []) {
             $this->addError('selectedAbilities', __('Pick at least one scope.'));
+
+            return;
+        }
+
+        // Cap the requested scopes to what this user's org role may grant.
+        // This is the security boundary — the UI hides ungrantable scopes,
+        // but a tampered request must never escalate past the role cap.
+        $abilities = array_values(array_intersect($selected, $this->grantableAbilities($org)));
+        if ($abilities === []) {
+            $this->addError('selectedAbilities', __('Your organization role does not allow the selected scopes. Ask an org admin to authorize deploy or write access.'));
 
             return;
         }
@@ -208,13 +256,16 @@ class DeviceApproval extends Component
             ? $user->organizations()->orderBy('name')->get()
             : collect();
 
+        $grantable = $this->grantableAbilities();
+        $availableScopes = array_values(array_filter([
+            ['ability' => 'edge.read', 'label' => __('Read Edge sites, deployments, and logs')],
+            ['ability' => 'edge.deploy', 'label' => __('Deploy, roll back, promote previews')],
+            ['ability' => 'edge.write', 'label' => __('Manage custom domains and cache')],
+        ], fn (array $scope): bool => in_array($scope['ability'], $grantable, true)));
+
         return view('livewire.auth.device-approval', [
             'organizations' => $organizations,
-            'availableScopes' => [
-                ['ability' => 'edge.read', 'label' => __('Read Edge sites, deployments, and logs')],
-                ['ability' => 'edge.deploy', 'label' => __('Deploy, roll back, promote previews')],
-                ['ability' => 'edge.write', 'label' => __('Manage custom domains and cache')],
-            ],
+            'availableScopes' => $availableScopes,
         ]);
     }
 }

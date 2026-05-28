@@ -75,6 +75,26 @@ final class OrganizationCostObservatory
     }
 
     /**
+     * Provider infrastructure estimate for a single BYO server.
+     *
+     * @return array{
+     *   id: string,
+     *   name: string,
+     *   provider: ?string,
+     *   plan: ?string,
+     *   monthly_usd_cents: int,
+     *   source: string,
+     *   detail: ?string,
+     * }
+     */
+    public function providerEstimateForServer(Server $server): array
+    {
+        $server->loadMissing('providerCredential');
+
+        return $this->serverRow($server);
+    }
+
+    /**
      * @return array{
      *   id: string,
      *   name: string,

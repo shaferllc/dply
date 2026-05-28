@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\Admin;
 
+use Laravel\Pennant\Feature;
+
 final class AdminFeatureFlags
 {
     /**
@@ -79,5 +81,15 @@ final class AdminFeatureFlags
         [$namespace, $leaf] = explode('.', $key, 2);
 
         return (bool) (config("features.{$namespace}.{$leaf}") ?? false);
+    }
+
+    public static function isGlobalNamespace(string $key): bool
+    {
+        return str_starts_with($key, 'global.');
+    }
+
+    public static function platformDefault(string $key): bool
+    {
+        return Feature::for(null)->active($key);
     }
 }

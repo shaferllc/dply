@@ -11,16 +11,13 @@ use Laravel\Pennant\Feature;
  * Naming convention is dot-namespaced: "{namespace}.{leaf}" where the two
  * levels come straight from the config keys.
  *
- * Resolution model is hybrid: the closure returns the config default;
- * Pennant's database store caches that value per-scope on first read; the
- * `feature:set` artisan command writes per-scope overrides directly into
- * that store. When flipping a default broadly, run `php artisan pennant:purge`
- * to drop cached rows so the new default takes effect for orgs that
- * never explicitly overrode.
+ * Resolution model is hybrid:
+ * - global.* → config/env default; optional Pennant null-scope override.
+ * - org-scoped flags → org override → platform default (Pennant null scope)
+ *   → config/env default.
  *
- * Default scope: `auth()->user()?->currentOrganization()`. Flags named
- * `global.*` are app-wide and should be checked with `Feature::for(null)`
- * (the @feature directive accepts the same name).
+ * Default scope: auth()->user()?->currentOrganization(). global.* checks
+ * should use Feature::for(null) when a true app-wide value is required.
  */
 class FeatureServiceProvider extends ServiceProvider
 {
@@ -30,7 +27,16 @@ class FeatureServiceProvider extends ServiceProvider
 
         foreach (config('features', []) as $namespace => $flags) {
             foreach ($flags as $leaf => $default) {
-                Feature::define("$namespace.$leaf", fn () => (bool) $default);
+                $name = "$namespace.$leaf";
+                $configDefault = (bool) $default;
+
+                Feature::define($name, function ($scope) use ($name, $namespace, $configDefault) {
+                    if ($namespace === 'global' || $scope === null) {
+                        return $configDefault;
+                    }
+
+                    return (bool) Feature::for(null)->value($name);
+                });
             }
         }
     }

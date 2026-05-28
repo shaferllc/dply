@@ -6,6 +6,7 @@ namespace Tests\Unit\Services\Servers;
 
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\SupervisorProgram;
@@ -13,6 +14,8 @@ use App\Models\User;
 use App\Services\Servers\ServerCertificateInventory;
 use App\Services\Servers\ServerDaemonSloPanel;
 use App\Services\Servers\ServerDeployPolicyGuard;
+use App\Services\Servers\ServerSecurityDigest;
+use App\Services\Servers\ServerSshAccessGraph;
 use App\Services\Servers\ServerSupervisorStatusParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -115,4 +118,46 @@ test('deploy policy guard blocks during weekend freeze preset', function (): voi
         ->and($decision['reason'])->toBe('Weekend freeze');
 
     Carbon::setTestNow();
+});
+
+test('ssh access graph summarizes authorized keys', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create(['organization_id' => $org->id, 'user_id' => $user->id, 'meta' => ['host_kind' => 'vm']]);
+
+    ServerAuthorizedKey::query()->create([
+        'server_id' => $server->id,
+        'name' => 'Contractor',
+        'public_key' => 'ssh-ed25519 AAA test',
+        'target_linux_user' => 'dply',
+        'review_after' => now()->subDay(),
+    ]);
+
+    $report = app(ServerSshAccessGraph::class)->forServer($server);
+
+    expect($report['summary']['total'])->toBe(1)
+        ->and($report['summary']['review_overdue'])->toBe(1);
+});
+
+test('security digest flags high auth failure count', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => [
+            'host_kind' => 'vm',
+            'security_digest_snapshot' => [
+                'checked_at' => now()->subHour()->toIso8601String(),
+                'auth_failed_lines' => 250,
+                'fail2ban_active' => 'active',
+                'fail2ban_jails' => ['sshd'],
+            ],
+        ],
+    ]);
+
+    $report = app(ServerSecurityDigest::class)->forServer($server);
+
+    expect($report['overall'])->toBe('critical')
+        ->and($report['auth']['failed_lines'])->toBe(250);
 });

@@ -1,18 +1,23 @@
 <?php
 
 use App\Console\Commands\CdnSyncMetricsCommand;
+use App\Console\Commands\CheckEdgeRumAlertsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\CloudPollStatusCommand;
+use App\Console\Commands\DeployIntelligenceScanCommand;
+use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
+use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
+use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Http\Middleware\AuthenticateApiToken;
@@ -128,7 +133,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Re-evaluate per-site monthly usage guardrails once today's usage
         // collection has landed. Fires the `edge.usage.over_budget`
         // notification on transitions into warn/over.
-        $schedule->command(\App\Console\Commands\EvaluateEdgeGuardrailsCommand::class)
+        $schedule->command(EvaluateEdgeGuardrailsCommand::class)
             ->dailyAt('02:45')
             ->withoutOverlapping();
 
@@ -139,9 +144,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
-        $schedule->command(\App\Console\Commands\PruneAuditLogsCommand::class)->dailyAt('03:20');
-        $schedule->command(\App\Console\Commands\CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
-        $schedule->command(\App\Console\Commands\DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
+        $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');
+        $schedule->command(CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
+        $schedule->command(DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
@@ -159,6 +164,8 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
 
         $schedule->command(ProcessSshKeyRotationRemindersCommand::class)->dailyAt('08:30');
+
+        $schedule->command(RevokeExpiredServerSshSessionsCommand::class)->everyFiveMinutes();
 
         $schedule->command(ProcessInsightDigestQueueCommand::class)->dailyAt('08:00');
         $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly' => true])->weeklyOn(1, '08:15');

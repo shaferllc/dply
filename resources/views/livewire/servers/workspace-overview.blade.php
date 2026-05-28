@@ -833,6 +833,50 @@
             @endif
             @endfeature
 
+            {{-- Cost card shortcut (VM + flag). --}}
+            @feature('workspace.server_cost')
+            @if ($costCardSummary)
+                @php
+                    $costNudgeWarning = ($costCardSummary['nudge_severity'] ?? null) === 'warning';
+                @endphp
+                <section @class([
+                    'dply-card overflow-hidden',
+                    'border-amber-200' => $costNudgeWarning,
+                ])>
+                    <div @class([
+                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'bg-amber-50/60' => $costNudgeWarning,
+                        'bg-brand-cream/40' => ! $costNudgeWarning,
+                    ])>
+                        <div class="flex items-start gap-3">
+                            <span @class([
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
+                                $tonePalette['amber'] => $costNudgeWarning,
+                                $tonePalette['emerald'] => ! $costNudgeWarning,
+                            ])>
+                                <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Cost card') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $costCardSummary['formatted_total'] }}</h3>
+                                <p class="mt-1 text-sm text-brand-moss">
+                                    @if ($costCardSummary['nudge_title'])
+                                        {{ $costCardSummary['nudge_title'] }}
+                                    @else
+                                        {{ __('Provider estimate + dply tier fee for this server.') }}
+                                    @endif
+                                </p>
+                            </div>
+                            <a href="{{ route('servers.cost', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                {{ __('Open Cost') }}
+                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            @endif
+            @endfeature
+
             {{-- Patch advisor shortcut (VM + flag). --}}
             @feature('workspace.patch_advisor')
             @if ($patchAdvisorSummary && ($patchAdvisorSummary['alert_count'] > 0 || $patchAdvisorSummary['reboot_required'] === true))

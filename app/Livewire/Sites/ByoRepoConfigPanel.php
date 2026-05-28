@@ -43,7 +43,9 @@ class ByoRepoConfigPanel extends Component
                 'redirects' => count($snapshot['redirects'] ?? []),
                 'rewrites' => count($snapshot['rewrites'] ?? []),
                 'crons' => count($snapshot['byo_crons'] ?? []),
+                'server_crons' => count($snapshot['byo_server_crons'] ?? []),
                 'deploy_hooks' => (int) ($snapshot['deploy_hooks'] ?? 0),
+                'env_declarations' => count($snapshot['env_declarations'] ?? []),
             ],
         ];
     }

@@ -13,6 +13,7 @@ use App\Models\ServerMetricSnapshot;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisioningDigest;
+use App\Support\Servers\ServerTags;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,6 +35,8 @@ class Index extends Component
     /** @var string all|pending|provisioning|ready|error|disconnected */
     public string $statusFilter = '';
 
+    public string $tagFilter = '';
+
     /** @var string list|grid */
     public string $viewMode = 'list';
 
@@ -54,6 +57,7 @@ class Index extends Component
         $this->search = '';
         $this->sort = 'created_at';
         $this->statusFilter = '';
+        $this->tagFilter = '';
         $this->viewMode = 'list';
     }
 
@@ -311,6 +315,11 @@ class Index extends Component
             $query->where('status', $this->statusFilter);
         }
 
+        $tag = trim($this->tagFilter);
+        if ($tag !== '') {
+            $query->whereJsonContains('meta->tags', $tag);
+        }
+
         return match ($this->sort) {
             'name' => $query->orderBy('name'),
             'status' => $query->orderBy('status')->orderBy('name'),
@@ -322,7 +331,9 @@ class Index extends Component
     {
         $base = $this->baseQuery();
         $org = auth()->user()->currentOrganization();
-        $hasServersInScope = $base !== null && (clone $base)->exists();
+        $allInScope = $base !== null ? (clone $base)->get() : collect();
+        $tagOptions = ServerTags::collectFromServers($allInScope);
+        $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)->get()
             : collect();
@@ -437,6 +448,7 @@ class Index extends Component
                 Server::STATUS_ERROR => __('Error'),
                 Server::STATUS_DISCONNECTED => __('Disconnected'),
             ],
+            'tagOptions' => $tagOptions,
         ]);
     }
 }

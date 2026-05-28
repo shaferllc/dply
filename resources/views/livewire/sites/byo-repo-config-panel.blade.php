@@ -11,7 +11,7 @@
             <div class="min-w-0">
                 <h2 class="text-base font-semibold text-brand-ink">{{ __('dply.yaml (in-repo)') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Commit redirects, BYO crons, and deploy hooks in dply.yaml — Dply syncs them after each deploy on this server.') }}
+                    {{ __('Commit redirects, site crons, server crons, and deploy hooks in dply.yaml — Dply syncs them after each deploy on this server.') }}
                 </p>
             </div>
         </div>
@@ -36,6 +36,11 @@ crons:
   - schedule: "0 * * * *"
     command: "cd /home/dply/your-site && php artisan schedule:run"
 
+server_crons:
+  - schedule: "15 2 * * *"
+    command: "/usr/local/bin/dply-backup-runner"
+    user: root
+
 deploy_hooks:
   - phase: after_clone
     script: |
@@ -55,11 +60,13 @@ deploy_hooks:
                 <div>
                     <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Managed rules') }}</dt>
                     <dd class="mt-1 text-brand-moss">
-                        {{ trans(':redirects redirects · :rewrites rewrites · :crons crons · :hooks hooks', [
+                        {{ trans(':redirects redirects · :rewrites rewrites · :crons site crons · :server_crons server crons · :hooks hooks · :env env vars', [
                             'redirects' => $snapshot['counts']['redirects'] ?? 0,
                             'rewrites' => $snapshot['counts']['rewrites'] ?? 0,
                             'crons' => $snapshot['counts']['crons'] ?? 0,
+                            'server_crons' => $snapshot['counts']['server_crons'] ?? 0,
                             'hooks' => $snapshot['counts']['deploy_hooks'] ?? 0,
+                            'env' => $snapshot['counts']['env_declarations'] ?? 0,
                         ]) }}
                     </dd>
                 </div>
@@ -76,7 +83,7 @@ deploy_hooks:
                 </div>
             @endif
 
-            <p class="text-xs text-brand-moss">{{ __('Redirect changes apply on the next webserver config reload. Cron rows are created in the server workspace — sync crontab to install them on the host.') }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Redirect changes apply on the next webserver config reload. Site cron rows are scoped to this site; server cron rows apply server-wide — sync crontab from the server workspace to install them on the host.') }}</p>
         @endif
     </div>
 </section>

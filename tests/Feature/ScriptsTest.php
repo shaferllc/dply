@@ -3,9 +3,11 @@
 namespace Tests\Feature\ScriptsTest;
 
 use App\Livewire\Scripts\Create;
+use App\Livewire\Scripts\Index;
 use App\Livewire\Scripts\Marketplace;
 use App\Models\Organization;
 use App\Models\Script;
+use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -68,6 +70,35 @@ test('deployer cannot open scripts index', function () {
     $this->actingAs($user)
         ->get(route('scripts.index'))
         ->assertForbidden();
+});
+
+test('member can apply script to server as saved command', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'prod-web-01',
+    ]);
+
+    $script = Script::factory()->forOrganization($org, $user)->create([
+        'name' => 'Restart queue',
+        'content' => 'sudo supervisorctl restart all',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->call('openApplyModal', (string) $script->id)
+        ->set('applyServerId', (string) $server->id)
+        ->call('confirmApplyToServer')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('server_recipes', [
+        'server_id' => $server->id,
+        'name' => 'Restart queue',
+        'script' => 'sudo supervisorctl restart all',
+    ]);
 });
 
 test('marketplace clone creates marketplace sourced script', function () {

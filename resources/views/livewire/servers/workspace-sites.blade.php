@@ -116,6 +116,54 @@
             </div>
         </section>
 
+        @if ($bulkActionsEnabled && ! $isContainerHost && $siteCount > 0 && is_array($bulkPreview))
+            <section class="dply-card overflow-hidden">
+                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Fleet actions') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bulk site operations') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Run the same action across every deployable site on this server without opening each workspace.') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 px-6 py-4 sm:px-7">
+                    @if ($bulkPreview['redeploy_count'] > 0)
+                        <button
+                            type="button"
+                            wire:click="openRedeployAllModal"
+                            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ trans_choice('Redeploy :count site|Redeploy :count sites', $bulkPreview['redeploy_count'], ['count' => $bulkPreview['redeploy_count']]) }}
+                        </button>
+                    @else
+                        <span class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-moss">
+                            <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('No deployable sites yet') }}
+                        </span>
+                    @endif
+                    @if ($bulkPreview['renewable_count'] > 0)
+                        <a
+                            href="{{ route('servers.cert-inventory', $server) }}"
+                            wire:navigate
+                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        >
+                            <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ trans_choice(':count renewable certificate|:count renewable certificates', $bulkPreview['renewable_count'], ['count' => $bulkPreview['renewable_count']]) }}
+                        </a>
+                    @endif
+                </div>
+            </section>
+        @endif
+
         {{-- Sites list. --}}
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
@@ -466,6 +514,56 @@
                         </button>
                     </div>
                 </form>
+            </x-modal>
+        @endif
+
+        @if ($bulkActionsEnabled && ! $isContainerHost)
+            <x-modal name="redeploy-all-sites" maxWidth="lg" overlayClass="bg-brand-ink/40">
+                <div class="relative border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3 pr-10">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Bulk deploy') }}</p>
+                            <h2 class="mt-0.5 text-xl font-semibold text-brand-ink">{{ __('Redeploy all sites on this server?') }}</h2>
+                            <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                                {{ __('Queues a manual deploy for every site that is ready for traffic. Suspended or still-provisioning sites are skipped.') }}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeRedeployAllModal" class="absolute right-4 top-4 rounded-lg p-1.5 text-brand-moss transition hover:bg-brand-sand/50 hover:text-brand-ink" aria-label="{{ __('Close') }}">
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+                @if (is_array($bulkPreview) && count($bulkPreview['site_names'] ?? []) > 0)
+                    <div class="max-h-48 overflow-y-auto border-b border-brand-ink/10 px-6 py-4 sm:px-7">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sites included') }}</p>
+                        <ul class="mt-2 space-y-1 text-sm text-brand-moss">
+                            @foreach ($bulkPreview['site_names'] as $siteName)
+                                <li class="truncate">{{ $siteName }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                    <button type="button" wire:click="closeRedeployAllModal" class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                        {{ __('Cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmRedeployAll"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmRedeployAll"
+                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="confirmRedeployAll">{{ __('Queue redeploys') }}</span>
+                        <span wire:loading wire:target="confirmRedeployAll" class="inline-flex items-center gap-2">
+                            <x-spinner variant="cream" size="sm" />
+                            {{ __('Queueing…') }}
+                        </span>
+                    </button>
+                </div>
             </x-modal>
         @endif
     </x-slot>

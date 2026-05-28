@@ -4,6 +4,7 @@ namespace App\Livewire\Servers;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -12,6 +13,7 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
+use App\Services\Servers\ServerBulkSiteActions;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Sites\InternalPortAllocator;
@@ -20,6 +22,7 @@ use App\Support\HostnameValidator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -27,12 +30,15 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceSites extends Component
 {
+    use DispatchesToastNotifications;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
     public SiteCreateForm $form;
 
     public bool $showAddSiteModal = false;
+
+    public bool $showRedeployAllModal = false;
 
     /**
      * @var list<array{id: string, label: string}>
@@ -123,6 +129,43 @@ class WorkspaceSites extends Component
     {
         $this->dispatch('close-modal', 'add-site-modal');
         $this->showAddSiteModal = false;
+    }
+
+    public function openRedeployAllModal(): void
+    {
+        abort_unless(Feature::active('workspace.bulk_site_actions'), 404);
+        $this->authorize('update', $this->server);
+        $this->showRedeployAllModal = true;
+        $this->dispatch('open-modal', 'redeploy-all-sites');
+    }
+
+    public function closeRedeployAllModal(): void
+    {
+        $this->showRedeployAllModal = false;
+        $this->dispatch('close-modal', 'redeploy-all-sites');
+    }
+
+    public function confirmRedeployAll(ServerBulkSiteActions $bulkActions): void
+    {
+        abort_unless(Feature::active('workspace.bulk_site_actions'), 404);
+        $this->authorize('update', $this->server);
+
+        $preview = $bulkActions->preview($this->server);
+        if ($preview['redeploy_count'] === 0) {
+            $this->closeRedeployAllModal();
+            $this->toastError(__('No deployable sites are ready on this server.'));
+
+            return;
+        }
+
+        $result = $bulkActions->redeployAll($this->server, auth()->user());
+        $this->closeRedeployAllModal();
+
+        $this->toastSuccess(trans_choice(
+            'Queued redeploy for :count site|Queued redeploy for :count sites',
+            $result['queued'],
+            ['count' => $result['queued']],
+        ));
     }
 
     public function updatedFormPrimaryHostname(string $value): void
@@ -297,15 +340,21 @@ class WorkspaceSites extends Component
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
     }
 
-    public function render(): View
+    public function render(ServerBulkSiteActions $bulkActions): View
     {
         $this->server->refresh();
         $this->server->load(['sites.domains']);
+
+        $bulkPreview = Feature::active('workspace.bulk_site_actions') && $this->server->isVmHost()
+            ? $bulkActions->preview($this->server)
+            : null;
 
         return view('livewire.servers.workspace-sites', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'bulkPreview' => $bulkPreview,
+            'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions'),
         ]);
     }
 }

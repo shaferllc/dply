@@ -15,7 +15,7 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-usesFeatures('workspace.daemon_slo', 'workspace.cert_inventory', 'workspace.deploy_windows');
+usesFeatures('workspace.daemon_slo', 'workspace.cert_inventory', 'workspace.deploy_windows', 'workspace.ssh_access_graph', 'workspace.ssh_sessions', 'workspace.server_cost', 'workspace.security_digest');
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
@@ -78,4 +78,34 @@ test('feature flags return 400 when disabled', function (): void {
     $this->actingAs($user)
         ->get(route('servers.daemon-slo', $server))
         ->assertStatus(400);
+});
+
+test('ssh access graph page renders', function (): void {
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.ssh-access', $server))
+        ->assertOk()
+        ->assertSee(__('SSH access'));
+});
+
+test('security digest page renders', function (): void {
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.security-digest', $server))
+        ->assertOk()
+        ->assertSee(__('Security digest'))
+        ->assertSee(__('Refresh digest'));
+});
+
+test('server cost page renders', function (): void {
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $server->update(['meta' => ['host_kind' => 'vm', 'cost_monthly_note' => '$5/mo']]);
+
+    $this->actingAs($user)
+        ->get(route('servers.cost', $server))
+        ->assertOk()
+        ->assertSee(__('Cost'));
 });

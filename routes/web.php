@@ -100,6 +100,7 @@ use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCertInventory;
 use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceConsole;
+use App\Livewire\Servers\WorkspaceCostCard;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDaemonSlo;
@@ -120,9 +121,11 @@ use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Livewire\Servers\WorkspaceRun;
 use App\Livewire\Servers\WorkspaceSchedule;
+use App\Livewire\Servers\WorkspaceSecurityDigest;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
+use App\Livewire\Servers\WorkspaceSshAccessGraph;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Servers\WorkspaceWebserver;
@@ -624,6 +627,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::middleware('feature:workspace.deploy_windows')->group(function (): void {
         Route::livewire('servers/{server}/deploy-policy', WorkspaceDeployPolicy::class)->name('servers.deploy-policy');
+    });
+    Route::middleware('feature:workspace.ssh_access_graph')->group(function (): void {
+        Route::livewire('servers/{server}/ssh-access', WorkspaceSshAccessGraph::class)->name('servers.ssh-access');
+    });
+    Route::middleware('feature:workspace.server_cost')->group(function (): void {
+        Route::livewire('servers/{server}/cost', WorkspaceCostCard::class)->name('servers.cost');
+    });
+    Route::middleware('feature:workspace.security_digest')->group(function (): void {
+        Route::livewire('servers/{server}/security-digest', WorkspaceSecurityDigest::class)->name('servers.security-digest');
     });
     Route::middleware('feature:workspace.insights')->group(function (): void {
         Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');

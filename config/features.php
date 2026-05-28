@@ -41,17 +41,17 @@ return [
         // exit: ship to all orgs once we've had 5+ successful Vultr provisions in prod
         'vultr' => env('FEATURE_PROVIDER_VULTR', true),
         // exit: ship once Fly.io machine provisioning is end-to-end green
-        'fly_io' => env('FEATURE_PROVIDER_FLY_IO', false),
+        'fly_io' => env('FEATURE_PROVIDER_FLY_IO', true),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
         'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', true),
         // exit: ship after Scaleway API token flow + cost catalog are validated
         'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', true),
         // exit: bare-metal flow is materially different; keep gated until a paying customer asks
-        'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', false),
+        'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', true),
         // exit: ship once container-on-AppRunner architecture lands per dply cloud memo
-        'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', false),
+        'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', true),
         // exit: keep gated indefinitely; EKS is enterprise-only positioning
-        'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', false),
+        'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', true),
     ],
 
     /*
@@ -79,26 +79,36 @@ return [
         'cert_inventory' => env('FEATURE_WORKSPACE_CERT_INVENTORY', true),
         // exit: ship once deploy window policy validated blocking/allowing deploy jobs
         'deploy_windows' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS', true),
+        // exit: ship once SSH access graph validated against authorized_keys panel
+        'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
+        // exit: ship once time-boxed contractor SSH sessions validated with auto-revoke
+        'ssh_sessions' => env('FEATURE_WORKSPACE_SSH_SESSIONS', true),
+        // exit: ship once per-server cost card + right-size nudge validated against billing + metrics
+        'server_cost' => env('FEATURE_WORKSPACE_SERVER_COST', true),
+        // exit: ship once server-scoped redeploy-all + cert renew shortcut validated on three VM hosts
+        'bulk_site_actions' => env('FEATURE_WORKSPACE_BULK_SITE_ACTIONS', true),
+        // exit: ship once security digest scan validated on three VM hosts
+        'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', true),
         // exit: ship once multi-node provisioning is end-to-end tested
-        'cluster' => env('FEATURE_WORKSPACE_CLUSTER', false),
+        'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         // exit: ship once browser-SSH session auditing + RBAC are validated
-        'console' => env('FEATURE_WORKSPACE_CONSOLE', false),
+        'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
-        'files' => env('FEATURE_WORKSPACE_FILES', false),
+        'files' => env('FEATURE_WORKSPACE_FILES', true),
         // exit: ship when systemd inventory UI has been validated against three real OSes
-        'services' => env('FEATURE_WORKSPACE_SERVICES', false),
+        'services' => env('FEATURE_WORKSPACE_SERVICES', true),
         // exit: ship when system-user deletion policy is signed off (data loss risk)
-        'system_users' => env('FEATURE_WORKSPACE_SYSTEM_USERS', false),
+        'system_users' => env('FEATURE_WORKSPACE_SYSTEM_USERS', true),
         // exit: ship as a paid-tier differentiator once findings UX is signed off
-        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', false),
+        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', true),
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
-        'caches' => env('FEATURE_WORKSPACE_CACHES', false),
+        'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
-        'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', false),
+        'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
         // exit: ship once audit-log filtering UI is reviewed
-        'activity' => env('FEATURE_WORKSPACE_ACTIVITY', false),
+        'activity' => env('FEATURE_WORKSPACE_ACTIVITY', true),
         // exit: ship once remote-script execution surface is reviewed (security risk)
-        'run' => env('FEATURE_WORKSPACE_RUN', false),
+        'run' => env('FEATURE_WORKSPACE_RUN', true),
         // exit: ship after per-deploy key lifecycle validated on three OSes
         'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),
     ],
@@ -106,30 +116,29 @@ return [
     /*
     | Whole non-workspace product surfaces. Each is a top-level route group.
     |
-    | VM-only launch: cloud / edge / serverless are off by default; per-org
-    | overrides (Admin Dashboard → Surface flags) let design partners and
-    | internal dogfooders opt in without redeploying. Webhooks + scheduled
-    | jobs stay live regardless of the flag — gating is UI/route-only.
+    | Defaults are on for internal/dogfood builds. Platform admin can set
+    | platform-wide defaults (Pennant null scope) and per-org overrides.
+    | Webhooks + scheduled jobs stay live regardless — gating is UI/route-only.
     */
     'surface' => [
         // exit: VM launch is dark; flip to true once container/cloud surface is GA
-        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
+        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
         // GA 2026-05: cross-server views (Health, Deploys, Domains, EnvSearch)
         // ship as the org-wide ops counterpart to /infrastructure. Saved-view
         // persistence is a follow-up enhancement, not a launch gate.
         'fleet' => env('FEATURE_SURFACE_FLEET', true),
         // exit: ship after a curated v1 marketplace catalog is approved
-        'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', false),
+        'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
         // exit: ship as the org-substitute UX for solo users with 3+ servers
-        'projects' => env('FEATURE_SURFACE_PROJECTS', false),
+        'projects' => env('FEATURE_SURFACE_PROJECTS', true),
         // exit: ship once one-off script execution has audit + rollback story
-        'scripts' => env('FEATURE_SURFACE_SCRIPTS', false),
+        'scripts' => env('FEATURE_SURFACE_SCRIPTS', true),
         // exit: ship as a standalone product launch with its own positioning
-        'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
+        'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', true),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
-        'edge' => env('FEATURE_SURFACE_EDGE', false),
+        'edge' => env('FEATURE_SURFACE_EDGE', true),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
-        'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
+        'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
     ],
 
     /*
@@ -139,17 +148,17 @@ return [
     */
     'global' => [
         // exit: flip to true on the day we charge real money; ALSO remove the dormant pricing-page gate
-        'billing_enabled' => env('FEATURE_GLOBAL_BILLING_ENABLED', false),
+        'billing_enabled' => env('FEATURE_GLOBAL_BILLING_ENABLED', true),
         // exit: flip to true when closed beta opens to the public
-        'signups_open' => env('FEATURE_GLOBAL_SIGNUPS_OPEN', false),
+        'signups_open' => env('FEATURE_GLOBAL_SIGNUPS_OPEN', true),
         // exit: kept indefinitely as an emergency switch; never retire
         'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
         // exit: ship when BYO redirect/cron/hook sync is validated on three OSes
-        'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', false),
+        'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
         // exit: ship after replay validated against password-protected previews
-        'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', false),
+        'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
         // exit: ship when LLM + heuristic triage validated across BYO + Edge failures
-        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', false),
+        'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
     ],
 
     /*
@@ -158,9 +167,9 @@ return [
     */
     'launch' => [
         // exit: ship when FullStackArchitecturePlanner handoffs are validated E2E
-        'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', false),
+        'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', true),
         // exit: ship when standby playbooks validated on hybrid + BYO + DNS cutover paths
-        'standby_blueprint' => env('FEATURE_LAUNCH_STANDBY_BLUEPRINT', false),
+        'standby_blueprint' => env('FEATURE_LAUNCH_STANDBY_BLUEPRINT', true),
     ],
 
 ];

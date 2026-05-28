@@ -14,6 +14,7 @@ use App\Jobs\RedeployCloudSiteJob;
 use App\Jobs\SyncCloudWorkersJob;
 use App\Jobs\TeardownCloudSiteJob;
 use App\Models\CloudDatabase;
+use App\Models\CloudDeployTask;
 use App\Models\CloudWorker;
 use App\Models\Site;
 use App\Services\Cloud\CloudRouter;
@@ -153,12 +154,20 @@ trait ManagesContainerSite
         if ($this->container_image_input === '' && isset($this->site)) {
             $this->container_image_input = (string) ($this->site->container_image ?? '');
         }
-        if ($this->container_env_file_input === '' && isset($this->site)) {
-            $this->container_env_file_input = (string) ($this->site->env_file_content ?? '');
-        }
-        if ($this->container_build_env_file_input === '' && isset($this->site)) {
-            $meta = is_array($this->site->meta) ? $this->site->meta : [];
-            $this->container_build_env_file_input = (string) ($meta['container']['build_env_file_content'] ?? '');
+
+        // Runtime + build env file contents carry secrets (DB creds, API
+        // tokens, private registry auth). Only hydrate them for users who
+        // can manage the site — Livewire serializes public props into the
+        // client snapshot, so hydrating for a read-only viewer would leak
+        // the secrets into their browser.
+        if ($this->canManageContainerSite()) {
+            if ($this->container_env_file_input === '' && isset($this->site)) {
+                $this->container_env_file_input = (string) ($this->site->env_file_content ?? '');
+            }
+            if ($this->container_build_env_file_input === '' && isset($this->site)) {
+                $meta = is_array($this->site->meta) ? $this->site->meta : [];
+                $this->container_build_env_file_input = (string) ($meta['container']['build_env_file_content'] ?? '');
+            }
         }
 
         // Hydrate the scaling & health-check form inputs from the
@@ -182,6 +191,18 @@ trait ManagesContainerSite
             $this->container_health_check_success = $healthCheck['success_threshold'];
             $this->container_health_check_failure = $healthCheck['failure_threshold'];
         }
+    }
+
+    /**
+     * Whether the current user may manage (mutate) this container site.
+     * Gates the secret-bearing env inputs and the signed redeploy hook so
+     * read-only viewers never receive runtime/build secrets or the
+     * capability URL in their page / Livewire snapshot.
+     */
+    public function canManageContainerSite(): bool
+    {
+        return isset($this->site)
+            && (auth()->user()?->can('update', $this->site) ?? false);
     }
 
     public function saveContainerEnvAndRedeploy(): void
@@ -523,7 +544,7 @@ trait ManagesContainerSite
     {
         $choices = [['value' => 'web', 'label' => __('Web service')]];
 
-        foreach (\App\Models\CloudWorker::query()->where('site_id', $this->site->id)->get() as $worker) {
+        foreach (CloudWorker::query()->where('site_id', $this->site->id)->get() as $worker) {
             $slug = strtolower((string) preg_replace('/[^a-z0-9-]/i', '-', (string) $worker->name));
             $slug = trim($slug, '-');
             $base = $worker->isScheduler() ? 'scheduler' : 'worker';
@@ -531,9 +552,9 @@ trait ManagesContainerSite
             $choices[] = ['value' => $name, 'label' => __(':label · :name', ['label' => $worker->isScheduler() ? 'Scheduler' : 'Worker', 'name' => $worker->name])];
         }
 
-        $tasks = \App\Models\CloudDeployTask::query()
+        $tasks = CloudDeployTask::query()
             ->where('site_id', $this->site->id)
-            ->where('trigger', '!=', \App\Models\CloudDeployTask::TRIGGER_MANUAL)
+            ->where('trigger', '!=', CloudDeployTask::TRIGGER_MANUAL)
             ->get();
         foreach ($tasks as $task) {
             $slug = strtolower((string) preg_replace('/[^a-z0-9-]/i', '-', (string) $task->name));

@@ -395,6 +395,51 @@
         </div>
     </div>
 
+    {{-- Platform defaults: Pennant null-scope values inherited by new orgs. --}}
+    <section class="mb-8" aria-labelledby="platform-default-flags-heading">
+        <div class="{{ $card }}">
+            <div>
+                <h2 id="platform-default-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('Platform defaults (new orgs)') }}</h2>
+                <p class="mt-1 text-sm text-brand-moss">{{ __('Default on/off for providers, surfaces, workspace tabs, and launch workflows. New organizations inherit these until you set an explicit org override below. Env/config defaults apply when no platform override is stored.') }}</p>
+            </div>
+            <div class="mt-4 space-y-6">
+                @foreach ($platformDefaultFlagPanel as $group)
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</p>
+                        <ul class="mt-2 grid gap-2 lg:grid-cols-2">
+                            @foreach ($group['flags'] as $flag)
+                                <li>
+                                    <label class="flex h-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2.5 text-sm shadow-sm transition hover:border-brand-ink/15 has-[:checked]:border-brand-sage/50 has-[:checked]:bg-brand-sage/5">
+                                        <span class="flex min-w-0 flex-col gap-0.5">
+                                            <span class="flex items-center gap-2">
+                                                @if ($flag['active'])
+                                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-sage" aria-hidden="true"></span>
+                                                @else
+                                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full bg-brand-ink/15" aria-hidden="true"></span>
+                                                @endif
+                                                <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
+                                            </span>
+                                            <code class="font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
+                                            <span class="text-[10px] text-brand-mist">{{ __('env default :state', ['state' => $flag['configDefault'] ? __('on') : __('off')]) }}</span>
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            wire:click="togglePlatformDefaultFeatureFlag('{{ $flag['key'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="togglePlatformDefaultFeatureFlag"
+                                            @checked($flag['active'])
+                                            class="h-4 w-4 shrink-0 rounded border-brand-ink/30 text-brand-sage focus:ring-brand-sage"
+                                        />
+                                    </label>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
     {{-- Org feature flags: Pennant per-org overrides for surfaces, workspace
          tabs, launch workflows, etc. Global app-wide flags are below. --}}
     <section class="mb-8" aria-labelledby="org-feature-flags-heading">
@@ -402,7 +447,7 @@
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 id="org-feature-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('Organization feature flags') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Per-org Pennant overrides for product surfaces, workspace tabs, and launch workflows. Unchecking clears the override and falls back to the config / env default.') }}</p>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Explicit per-org overrides for providers, surfaces, workspace tabs, and launch workflows. Orgs without an override inherit the platform default above.') }}</p>
                 </div>
             </div>
             <div class="mt-4 grid gap-6 lg:grid-cols-[minmax(0,18rem),1fr]">
@@ -440,7 +485,7 @@
                                                     <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
                                                 </span>
                                                 <code class="truncate font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
-                                                <span class="text-[10px] text-brand-mist">{{ __('default :state', ['state' => $flag['default'] ? __('on') : __('off')]) }}</span>
+                                                <span class="text-[10px] text-brand-mist">{{ __('platform default :state', ['state' => $flag['default'] ? __('on') : __('off')]) }}</span>
                                             </span>
                                             <input
                                                 type="checkbox"
@@ -466,7 +511,7 @@
         <div class="{{ $card }}">
             <div>
                 <h2 id="global-feature-flags-heading" class="text-base font-semibold text-brand-ink">{{ __('App-wide feature flags') }}</h2>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('These apply to every organization (Pennant null scope). Use for billing, signups, maintenance, and cross-cutting product switches like the cost observatory.') }}</p>
+                <p class="mt-1 text-sm text-brand-moss">{{ __('App-wide kill switches and cross-cutting product flags (Pennant null scope). These are separate from platform defaults for providers/surfaces/workspace.') }}</p>
             </div>
             <div class="mt-4 space-y-6">
                 @foreach ($globalFlagPanel as $group)

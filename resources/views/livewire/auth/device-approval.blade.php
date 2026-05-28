@@ -109,7 +109,7 @@
                         <fieldset>
                             <legend class="text-sm font-semibold text-brand-ink">{{ __('Permissions the CLI will have') }}</legend>
                             <p class="mt-1 text-xs text-brand-moss">
-                                {{ __('All three scopes are recommended for the default CLI workflow (deploy, manage domains, tail logs).') }}
+                                {{ __('Only the scopes your organization role can grant are shown. Deploy and domain/cache management require deployer or admin access.') }}
                             </p>
                             <div class="mt-3 space-y-2">
                                 @foreach ($availableScopes as $scope)

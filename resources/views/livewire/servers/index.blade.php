@@ -271,6 +271,16 @@
                         @endforeach
                     </x-select>
 
+                    @if (count($tagOptions) > 0)
+                        <label for="servers_tag" class="sr-only">{{ __('Tag') }}</label>
+                        <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-0 w-auto min-w-[10rem]">
+                            <option value="">{{ __('All tags') }}</option>
+                            @foreach ($tagOptions as $tag)
+                                <option value="{{ $tag }}">{{ $tag }}</option>
+                            @endforeach
+                        </x-select>
+                    @endif
+
                     <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
                     <x-select id="servers_sort" wire:model.live="sort" class="mt-0 w-auto min-w-[10rem]">
                         @foreach ($sortOptions as $value => $label)
@@ -502,6 +512,21 @@
                                                             </p>
                                                         @endfeature
                                                     @endif
+                                                    @php $serverTags = \App\Support\Servers\ServerTags::forServer($server); @endphp
+                                                    @if (count($serverTags) > 0)
+                                                        <div class="mt-2 flex flex-wrap gap-1">
+                                                            @foreach ($serverTags as $tag)
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="$set('tagFilter', @js($tag))"
+                                                                    class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink"
+                                                                    title="{{ __('Filter fleet by :tag', ['tag' => $tag]) }}"
+                                                                >
+                                                                    {{ $tag }}
+                                                                </button>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
                                                     @if ($server->scheduled_deletion_at)
                                                         <p class="mt-1 text-xs font-medium text-amber-800">
                                                             {{ __('Removal scheduled :date', ['date' => $server->scheduled_deletion_at->timezone(config('app.timezone'))->toFormattedDateString()]) }}
@@ -598,6 +623,21 @@
                                                             @endif
                                                         @endif
                                                     </p>
+                                                    @php $serverTagsList = \App\Support\Servers\ServerTags::forServer($server); @endphp
+                                                    @if (count($serverTagsList) > 0)
+                                                        <div class="mt-2 flex flex-wrap gap-1">
+                                                            @foreach ($serverTagsList as $tag)
+                                                                <button
+                                                                    type="button"
+                                                                    wire:click="$set('tagFilter', @js($tag))"
+                                                                    class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink"
+                                                                    title="{{ __('Filter fleet by :tag', ['tag' => $tag]) }}"
+                                                                >
+                                                                    {{ $tag }}
+                                                                </button>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
 
                                                     {{-- Setup-failed detail: red chip + journey link. Shown instead of
                                                          the live progress block when applyProvisionOutcomeToServer
