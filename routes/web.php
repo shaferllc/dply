@@ -97,11 +97,14 @@ use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceBlueprint;
 use App\Livewire\Servers\WorkspaceCaches;
+use App\Livewire\Servers\WorkspaceCertInventory;
 use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceConsole;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
+use App\Livewire\Servers\WorkspaceDaemonSlo;
 use App\Livewire\Servers\WorkspaceDatabases;
+use App\Livewire\Servers\WorkspaceDeployPolicy;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFirewall;
 use App\Livewire\Servers\WorkspaceHealth;
@@ -114,6 +117,7 @@ use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
 use App\Livewire\Servers\WorkspaceQueueWorkers;
+use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Livewire\Servers\WorkspaceRun;
 use App\Livewire\Servers\WorkspaceSchedule;
 use App\Livewire\Servers\WorkspaceServices;
@@ -608,6 +612,18 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::middleware('feature:workspace.patch_advisor')->group(function (): void {
         Route::livewire('servers/{server}/patches', WorkspacePatchAdvisor::class)->name('servers.patches');
+    });
+    Route::middleware('feature:workspace.release_hygiene')->group(function (): void {
+        Route::livewire('servers/{server}/hygiene', WorkspaceReleaseHygiene::class)->name('servers.hygiene');
+    });
+    Route::middleware('feature:workspace.daemon_slo')->group(function (): void {
+        Route::livewire('servers/{server}/daemon-slo', WorkspaceDaemonSlo::class)->name('servers.daemon-slo');
+    });
+    Route::middleware('feature:workspace.cert_inventory')->group(function (): void {
+        Route::livewire('servers/{server}/cert-inventory', WorkspaceCertInventory::class)->name('servers.cert-inventory');
+    });
+    Route::middleware('feature:workspace.deploy_windows')->group(function (): void {
+        Route::livewire('servers/{server}/deploy-policy', WorkspaceDeployPolicy::class)->name('servers.deploy-policy');
     });
     Route::middleware('feature:workspace.insights')->group(function (): void {
         Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');

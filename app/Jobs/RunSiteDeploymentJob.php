@@ -12,6 +12,7 @@ use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
+use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Support\DeployLogRedactor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 
 class RunSiteDeploymentJob implements ShouldQueue
 {
@@ -77,6 +79,28 @@ class RunSiteDeploymentJob implements ShouldQueue
             $this->notifyStakeholders($deployment, $notificationPublisher);
 
             return;
+        }
+
+        if (Feature::active('workspace.deploy_windows')) {
+            $policyDecision = app(ServerDeployPolicyGuard::class)->evaluate($this->site);
+            if (! $policyDecision['allowed']) {
+                $deployment = SiteDeployment::query()->create([
+                    'site_id' => $this->site->id,
+                    'project_id' => $this->site->project_id,
+                    'trigger' => $this->trigger,
+                    'status' => SiteDeployment::STATUS_SKIPPED,
+                    'exit_code' => null,
+                    'log_output' => (string) ($policyDecision['reason'] ?? 'Deploy blocked by server deploy window policy.'),
+                    'started_at' => now(),
+                    'finished_at' => now(),
+                    'idempotency_key' => $this->apiIdempotencyHash,
+                ]);
+                $this->auditDeploy($deployment);
+                $this->clearIdempotencyInflight();
+                $this->notifyStakeholders($deployment, $notificationPublisher);
+
+                return;
+            }
         }
 
         $lock = Cache::lock('site-deploy:'.$this->site->id, $this->timeout);

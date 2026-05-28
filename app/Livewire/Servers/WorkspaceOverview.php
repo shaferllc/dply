@@ -22,6 +22,7 @@ use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerPatchAdvisor;
+use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
@@ -359,6 +360,9 @@ class WorkspaceOverview extends Component
             'patchAdvisorSummary' => Feature::active('workspace.patch_advisor')
                 ? $this->patchAdvisorSummary(app(ServerPatchAdvisor::class))
                 : null,
+            'releaseHygieneSummary' => Feature::active('workspace.release_hygiene')
+                ? $this->releaseHygieneSummary(app(ServerReleaseHygiene::class))
+                : null,
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,
             'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
@@ -415,6 +419,24 @@ class WorkspaceOverview extends Component
             'alert_count' => $report['alert_count'],
             'security' => $report['packages']['security'],
             'reboot_required' => $report['reboot']['required'],
+        ];
+    }
+
+    /**
+     * @return array{overall: string, alert_count: int, sites_over_keep: int}|null
+     */
+    private function releaseHygieneSummary(ServerReleaseHygiene $hygiene): ?array
+    {
+        if (! $this->server->isVmHost()) {
+            return null;
+        }
+
+        $report = $hygiene->forServer($this->server);
+
+        return [
+            'overall' => $report['overall'],
+            'alert_count' => $report['alert_count'],
+            'sites_over_keep' => $report['releases']['sites_over_keep'],
         ];
     }
 }

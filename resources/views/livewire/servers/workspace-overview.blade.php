@@ -885,6 +885,50 @@
             @endif
             @endfeature
 
+            {{-- Release hygiene shortcut (VM + flag). --}}
+            @feature('workspace.release_hygiene')
+            @if ($releaseHygieneSummary && $releaseHygieneSummary['alert_count'] > 0)
+                @php
+                    $hygieneCritical = $releaseHygieneSummary['overall'] === 'critical';
+                    $hygieneWarning = $releaseHygieneSummary['overall'] === 'warning';
+                @endphp
+                <section @class([
+                    'dply-card overflow-hidden',
+                    'border-rose-200' => $hygieneCritical,
+                    'border-amber-200' => $hygieneWarning && ! $hygieneCritical,
+                ])>
+                    <div @class([
+                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'bg-rose-50/60' => $hygieneCritical,
+                        'bg-amber-50/60' => $hygieneWarning && ! $hygieneCritical,
+                        'bg-brand-cream/40' => ! $hygieneCritical && ! $hygieneWarning,
+                    ])>
+                        <div class="flex items-start gap-3">
+                            <span @class([
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
+                                $tonePalette['rose'] => $hygieneCritical,
+                                $tonePalette['amber'] => $hygieneWarning && ! $hygieneCritical,
+                                $tonePalette['sage'] => ! $hygieneCritical && ! $hygieneWarning,
+                            ])>
+                                <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Release hygiene') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                    {{ trans_choice(':count cleanup alert|:count cleanup alerts', $releaseHygieneSummary['alert_count'], ['count' => $releaseHygieneSummary['alert_count']]) }}
+                                </h3>
+                                <p class="mt-1 text-sm text-brand-moss">{{ __('Release folders, Laravel logs, and failed queue jobs on this server.') }}</p>
+                            </div>
+                            <a href="{{ route('servers.hygiene', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                {{ __('Open Hygiene') }}
+                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            @endif
+            @endfeature
+
             {{-- Insights (conditional + flag-gated). --}}
             @feature('workspace.insights')
             @if ($openInsightsCount > 0)

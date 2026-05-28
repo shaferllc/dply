@@ -71,6 +71,14 @@ return [
         'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
         // exit: ship once patch advisor rollup validated against inventory probe on three Debian/Ubuntu hosts
         'patch_advisor' => env('FEATURE_WORKSPACE_PATCH_ADVISOR', true),
+        // exit: ship once release hygiene scan + prune template validated on three atomic VM stacks
+        'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', true),
+        // exit: ship once daemon SLO panel validated against supervisor health on three VM stacks
+        'daemon_slo' => env('FEATURE_WORKSPACE_DAEMON_SLO', true),
+        // exit: ship once server cert inventory + bulk renew validated on three VM hosts
+        'cert_inventory' => env('FEATURE_WORKSPACE_CERT_INVENTORY', true),
+        // exit: ship once deploy window policy validated blocking/allowing deploy jobs
+        'deploy_windows' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS', true),
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', false),
         // exit: ship once browser-SSH session auditing + RBAC are validated
