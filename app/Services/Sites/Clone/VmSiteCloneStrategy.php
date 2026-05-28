@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Services\Servers\ServerSystemUserService;
+use App\Services\Sites\Promote\SitePromoteCronReplicator;
 use App\Services\Sites\SiteProvisioner;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,15 +23,30 @@ final class VmSiteCloneStrategy
     /**
      * @throws \Throwable
      */
-    public function execute(Site $source, Server $destServer, string $primaryHostname, string $name): Site
-    {
+    public function execute(
+        Site $source,
+        Server $destServer,
+        string $primaryHostname,
+        string $name,
+        ?SiteCloneOptions $options = null,
+    ): Site {
+        $options ??= new SiteCloneOptions;
         $source->loadMissing('server');
         $slug = Str::slug($name) ?: 'site';
 
         $attributes = SiteCloneAttributeMapper::baseAttributes($source, $destServer, $name, $slug, $primaryHostname);
         $attributes = SiteCloneAttributeMapper::withCloneMeta($attributes, $source, 'in_progress', null);
 
-        $newSite = DB::transaction(function () use ($source, $attributes, $primaryHostname): Site {
+        if ($options->isPromote()) {
+            $attributes = SiteCloneAttributeMapper::withPromoteMeta(
+                $attributes,
+                $source,
+                $primaryHostname,
+                (string) $options->sourceProductionHostname,
+            );
+        }
+
+        $newSite = DB::transaction(function () use ($source, $attributes, $primaryHostname, $options, $destServer): Site {
             /** @var Site $created */
             $created = Site::query()->create($attributes);
             $created->ensureUniqueSlug();
@@ -44,6 +60,10 @@ final class VmSiteCloneStrategy
             ]);
 
             SiteCloneDeployRowsReplicator::replicate($source, $created);
+
+            if ($options->isPromote()) {
+                SitePromoteCronReplicator::replicate($source, $created, $destServer);
+            }
 
             return $created->fresh(['server']);
         });

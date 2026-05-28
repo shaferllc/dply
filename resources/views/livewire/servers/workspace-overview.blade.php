@@ -785,6 +785,54 @@
                 </div>
             </section>
 
+            {{-- Health cockpit shortcut (VM + flag). --}}
+            @feature('workspace.health')
+            @if ($healthCockpitSummary)
+                @php
+                    $healthCritical = $healthCockpitSummary['overall'] === 'critical';
+                    $healthWarning = $healthCockpitSummary['overall'] === 'warning';
+                @endphp
+                <section @class([
+                    'dply-card overflow-hidden',
+                    'border-rose-200' => $healthCritical,
+                    'border-amber-200' => $healthWarning && ! $healthCritical,
+                ])>
+                    <div @class([
+                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'bg-rose-50/60' => $healthCritical,
+                        'bg-amber-50/60' => $healthWarning && ! $healthCritical,
+                        'bg-brand-cream/40' => ! $healthCritical && ! $healthWarning,
+                    ])>
+                        <div class="flex items-start gap-3">
+                            <span @class([
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
+                                $tonePalette['rose'] => $healthCritical,
+                                $tonePalette['amber'] => $healthWarning && ! $healthCritical,
+                                $tonePalette['emerald'] => ! $healthCritical && ! $healthWarning,
+                            ])>
+                                <x-heroicon-o-heart class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Health cockpit') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                    @if ($healthCockpitSummary['alert_count'] > 0)
+                                        {{ trans_choice(':count open alert|:count open alerts', $healthCockpitSummary['alert_count'], ['count' => $healthCockpitSummary['alert_count']]) }}
+                                    @else
+                                        {{ __('No open alerts') }}
+                                    @endif
+                                </h3>
+                                <p class="mt-1 text-sm text-brand-moss">{{ __('Capacity, releases, deploys, certificates, and daemons in one view.') }}</p>
+                            </div>
+                            <a href="{{ route('servers.health', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                {{ __('Open Health') }}
+                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            @endif
+            @endfeature
+
             {{-- Insights (conditional + flag-gated). --}}
             @feature('workspace.insights')
             @if ($openInsightsCount > 0)
