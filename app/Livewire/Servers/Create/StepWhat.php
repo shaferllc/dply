@@ -10,10 +10,14 @@ use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerBlueprint;
 use App\Models\ServerCreateDraft;
 use App\Services\AwsEksService;
+use App\Services\Servers\Blueprint\ServerBlueprintApplier;
+use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use App\Services\Servers\ServerCreatePresetCatalog;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -37,6 +41,11 @@ class StepWhat extends Component
      */
     public string $selectedPreset = '';
 
+    /**
+     * Org golden-server blueprint applied to the form, when one was picked.
+     */
+    public string $selectedBlueprintId = '';
+
     public function mount(): mixed
     {
         $this->authorize('create', Server::class);
@@ -46,6 +55,10 @@ class StepWhat extends Component
         }
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
+
+        if ($this->form->server_blueprint_id !== '') {
+            $this->selectedBlueprintId = $this->form->server_blueprint_id;
+        }
 
         // Docker hosts skip the stack-shaped step entirely. K8s does NOT skip — it
         // re-uses this step for cluster + namespace selection (see render() below).
@@ -254,6 +267,8 @@ class StepWhat extends Component
         }
 
         $this->selectedPreset = $presetId;
+        $this->selectedBlueprintId = '';
+        $this->form->server_blueprint_id = '';
 
         if ($presetId === ServerCreatePresetCatalog::ID_CUSTOM) {
             return;
@@ -292,12 +307,47 @@ class StepWhat extends Component
         };
     }
 
+    public function applyBlueprint(string $blueprintId, ServerBlueprintApplier $applier): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $blueprint = ServerBlueprint::query()
+            ->where('organization_id', $org->getKey())
+            ->find($blueprintId);
+
+        if ($blueprint === null) {
+            return;
+        }
+
+        $this->selectedPreset = '';
+        $this->selectedBlueprintId = $blueprintId;
+        $applier->applyToForm($this->form, $blueprint);
+        $this->saveDraftFromForm($this->form);
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
         $catalog = $context['catalog'];
         $isKubernetes = $this->form->mode === 'provider' && $this->form->provider_host_kind === 'kubernetes';
+
+        $orgBlueprints = collect();
+        if (! $isKubernetes && Feature::active('workspace.server_blueprint') && $org !== null) {
+            $summary = app(ServerBlueprintSummary::class);
+            $orgBlueprints = ServerBlueprint::query()
+                ->where('organization_id', $org->getKey())
+                ->orderByDesc('updated_at')
+                ->get()
+                ->map(fn (ServerBlueprint $blueprint): array => [
+                    'id' => $blueprint->id,
+                    'name' => $blueprint->name,
+                    'description' => $summary->tagline($blueprint->snapshot),
+                ]);
+        }
 
         return view('livewire.servers.create.step-what', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
@@ -306,6 +356,8 @@ class StepWhat extends Component
             'installProfiles' => config('server_provision_options.install_profiles', []),
             'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),
             'selectedPreset' => $this->selectedPreset,
+            'orgBlueprints' => $orgBlueprints,
+            'selectedBlueprintId' => $this->selectedBlueprintId,
             'isKubernetes' => $isKubernetes,
             'kubernetesClusters' => $this->kubernetesClusters(),
             'kubernetesProvider' => $this->form->type,

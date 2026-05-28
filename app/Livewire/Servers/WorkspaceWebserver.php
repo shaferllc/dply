@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunWebserverConfigOpJob;
+use App\Livewire\Servers\Concerns\ManagesWebserverConfigRevisions;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
@@ -32,6 +33,7 @@ use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\ServerWebserverConfigEditor;
 use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Servers\WebserverConfigDriftDetector;
@@ -68,6 +70,8 @@ use Livewire\Attributes\Url;
 #[Layout('layouts.app')]
 class WorkspaceWebserver extends WorkspaceManage
 {
+    use ManagesWebserverConfigRevisions;
+
     /**
      * Second-level tab within this workspace — mirrors WorkspaceDatabases /
      * WorkspaceCaches: an "overview" tab, one tab per webserver in the
@@ -2917,6 +2921,9 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->config_validate_ok = null;
         $this->config_last_backup = null;
         $this->config_backups = [];
+        $this->config_original_contents = '';
+        $this->webserverConfigSaveDiffOpen = false;
+        $this->closeWebserverConfigRevisionDiff();
 
         RunWebserverConfigOpJob::dispatch(
             $this->server->id,
@@ -2955,11 +2962,13 @@ class WorkspaceWebserver extends WorkspaceManage
             if (is_array($cached)) {
                 $this->config_selected_path = $this->pending_load_path;
                 $this->config_contents = (string) ($cached['contents'] ?? '');
+                $this->config_original_contents = $this->config_contents;
                 $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
                 // Bust the cached picker listing so the next render reflects
                 // the freshly-read file size + mtime accurately.
                 Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
                 $this->refreshConfigBackups();
+                $this->refreshWebserverConfigRevisionState();
             }
         }
         $this->pending_load_console_id = null;
@@ -3024,10 +3033,21 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
+        if ($this->webserverConfigRevisionsEnabled()) {
+            app(ServerWebserverConfigEditor::class)->ensureBaseline(
+                $this->server,
+                $this->workspace_tab,
+                (string) $this->config_selected_path,
+                $this->config_original_contents,
+                auth()->user(),
+            );
+        }
+
         $consoleId = $this->seedManageConsoleAction(
             $this->server->fresh(),
             (string) __('Save webserver config: :path', ['path' => basename((string) $this->config_selected_path)]),
         );
+        $this->pending_write_console_id = $consoleId;
         RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
@@ -3035,7 +3055,11 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->workspace_tab,
             $this->config_selected_path,
             $this->config_contents,
+            '',
+            auth()->id(),
+            $this->webserverConfigRevisionsEnabled(),
         );
+        $this->webserverConfigSaveDiffOpen = false;
         $this->toastSuccess(__('Save queued — progress shows in the banner above.'));
     }
 
@@ -3209,6 +3233,7 @@ class WorkspaceWebserver extends WorkspaceManage
     {
         $this->server->refresh();
         $this->pickupQueuedConfigLoad();
+        $this->pickupQueuedConfigWrite();
 
         // listFiles does an SSH call. render() runs on every Livewire commit,
         // including every banner wire:poll tick — so without caching it,
@@ -3234,6 +3259,7 @@ class WorkspaceWebserver extends WorkspaceManage
 
         return view('livewire.servers.workspace-webserver', array_merge(
             WebserverWorkspaceViewData::for($this->server, $this),
+            $this->webserverConfigRevisionViewData(),
             [
                 'configPreviews' => config('server_manage.config_previews', []),
                 'serviceActions' => config('server_manage.service_actions', []),

@@ -63,6 +63,12 @@ return [
         'site_promote' => env('FEATURE_WORKSPACE_SITE_PROMOTE', true),
         // exit: ship once health cockpit validated against guest metrics on three OSes
         'health' => env('FEATURE_WORKSPACE_HEALTH', true),
+        // exit: ship once blueprint capture + wizard apply validated on three VM stacks
+        'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', true),
+        // exit: ship once server webserver diff + rollback validated on nginx + caddy
+        'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
+        // exit: ship once server maintenance suspend/resume validated on three VM hosts
+        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', false),
         // exit: ship once browser-SSH session auditing + RBAC are validated

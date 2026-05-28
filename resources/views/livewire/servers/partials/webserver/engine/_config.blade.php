@@ -8,7 +8,7 @@
                 <div class="{{ $card }} p-6 sm:p-8">
                     <div>
                         <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine config editor', ['engine' => $info['label']]) }}</h3>
-                        <p class="mt-1 max-w-3xl text-sm text-brand-moss">{{ __('Edit → Validate (dry-run) → Save. Save snapshots the live file to _dply_backups/, atomically installs, re-validates, and auto-restores the snapshot if validation rejects the new file. Every save is kept as a revision.') }}</p>
+                        <p class="mt-1 max-w-3xl text-sm text-brand-moss">{{ __('Edit → Review diff → Validate (dry-run) → Save. Save snapshots the live file to _dply_backups/, atomically installs, re-validates, and auto-restores the snapshot if validation rejects the new file. Saved revisions support diff and one-click rollback.') }}</p>
                     </div>
 
                     @if (! $opsReady || $isDeployer)
@@ -192,6 +192,8 @@
                                         spellcheck="false"
                                         class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
                                     >{{ $config_contents }}</textarea>
+
+                                    @include('livewire.servers.partials.webserver.engine._config-revisions')
 
                                     {{-- Validate output --}}
                                     @if ($config_validate_output !== null)

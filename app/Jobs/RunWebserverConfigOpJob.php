@@ -6,8 +6,10 @@ namespace App\Jobs;
 
 use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\RemoteWebserverConfigService;
+use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -46,6 +48,9 @@ class RunWebserverConfigOpJob implements ShouldQueue
         public string $path,
         public string $contents = '',
         public string $backupPath = '',
+        public ?string $userId = null,
+        public bool $recordRevision = false,
+        public ?string $revisionSummary = null,
     ) {}
 
     public function handle(RemoteWebserverConfigService $service): void
@@ -96,6 +101,23 @@ class RunWebserverConfigOpJob implements ShouldQueue
         $ok = (bool) ($result['ok'] ?? $result['validate_ok'] ?? false);
         $errBlob = $ok ? null : (string) ($result['output'] ?? $result['validate_output'] ?? '');
 
+        if ($ok && $this->op === 'write' && $this->recordRevision) {
+            app(ServerWebserverConfigEditor::class)->recordWrite(
+                $server,
+                $this->engine,
+                $this->path,
+                $this->contents,
+                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->revisionSummary,
+            );
+
+            Cache::put(
+                self::writeResultCacheKey($this->consoleActionId),
+                ['contents' => $this->contents],
+                now()->addMinutes(5),
+            );
+        }
+
         $this->markConsole(
             $ok ? ConsoleAction::STATUS_COMPLETED : ConsoleAction::STATUS_FAILED,
             error: $errBlob,
@@ -105,6 +127,11 @@ class RunWebserverConfigOpJob implements ShouldQueue
     public static function readResultCacheKey(string $consoleActionId): string
     {
         return 'dply.webserver-config-read:'.$consoleActionId;
+    }
+
+    public static function writeResultCacheKey(string $consoleActionId): string
+    {
+        return 'dply.webserver-config-write:'.$consoleActionId;
     }
 
     public function failed(?\Throwable $e): void

@@ -131,4 +131,10 @@ class ServerCreateForm extends Form
     public string $do_functions_action_kind = 'nodejs:18';
 
     public string $do_functions_action_main = 'index';
+
+    /**
+     * Org golden-server blueprint applied on Step 3. Empty when a built-in
+     * preset or hand-rolled stack is in use.
+     */
+    public string $server_blueprint_id = '';
 }
