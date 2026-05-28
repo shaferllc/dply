@@ -152,6 +152,8 @@ final class AuditActionMeta
             'site.deploy.failed' => ['label' => 'Deploy failed', 'icon' => 'heroicon-o-exclamation-triangle', 'tone' => 'danger'],
             'site.deploy.skipped' => ['label' => 'Deploy skipped', 'icon' => 'heroicon-o-pause-circle', 'tone' => 'warning'],
             'site.deploy.finished' => ['label' => 'Deploy finished', 'icon' => 'heroicon-o-flag', 'tone' => 'info'],
+            'site.deploy.ephemeral_credential_provisioned' => ['label' => 'Ephemeral deploy key issued', 'icon' => 'heroicon-o-key', 'tone' => 'info'],
+            'site.deploy.ephemeral_credential_revoked' => ['label' => 'Ephemeral deploy key revoked', 'icon' => 'heroicon-o-key', 'tone' => 'info'],
             'site.cloud.deploy.success' => ['label' => 'Cloud deploy succeeded', 'icon' => 'heroicon-o-cube', 'tone' => 'success'],
             'site.cloud.deploy.failed' => ['label' => 'Cloud deploy failed', 'icon' => 'heroicon-o-cube', 'tone' => 'danger'],
             'site.domain.added' => ['label' => 'Domain added', 'icon' => 'heroicon-o-plus', 'tone' => 'success'],
@@ -253,6 +255,7 @@ final class AuditActionMeta
             'marketplace.deploy_command_imported' => ['label' => 'Deploy command imported', 'icon' => 'heroicon-o-arrow-down-tray', 'tone' => 'success'],
             'marketplace.server_recipe_imported' => ['label' => 'Server recipe imported', 'icon' => 'heroicon-o-arrow-down-tray', 'tone' => 'success'],
             'marketplace.webserver_template_imported' => ['label' => 'Webserver template imported', 'icon' => 'heroicon-o-arrow-down-tray', 'tone' => 'success'],
+            'marketplace.workspace_runbook_imported' => ['label' => 'Project runbook imported', 'icon' => 'heroicon-o-book-open', 'tone' => 'success'],
 
             // Backups
             'backup.destination.created' => ['label' => 'Backup destination added', 'icon' => 'heroicon-o-plus', 'tone' => 'success'],

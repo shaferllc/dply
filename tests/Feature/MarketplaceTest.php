@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\ServerRecipe;
 use App\Models\User;
 use App\Models\WebserverTemplate;
+use App\Models\Workspace;
 use Database\Seeders\MarketplaceItemSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -32,7 +33,7 @@ test('authenticated user can view marketplace', function () {
         ->get(route('marketplace.index'))
         ->assertOk()
         ->assertSee('Marketplace')
-        ->assertSee('Saved commands');
+        ->assertSee('Runbooks');
 });
 
 test('org admin can import webserver recipe', function () {
@@ -127,4 +128,29 @@ test('user can import server recipe to server saved commands', function () {
 
     $recipe = ServerRecipe::query()->where('server_id', $server->id)->firstOrFail();
     $this->assertStringContainsString('df -hT', $recipe->script);
+});
+
+test('user can import workspace runbook to project', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'admin']);
+    session(['current_organization_id' => $org->id]);
+
+    $workspace = Workspace::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+    ]);
+
+    $item = MarketplaceItem::query()->where('slug', 'runbook-deploy-rollback')->firstOrFail();
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->set('runbookModalItemId', $item->id)
+        ->set('runbookWorkspaceId', $workspace->id)
+        ->call('confirmRunbookImport');
+
+    $this->assertDatabaseHas('workspace_runbooks', [
+        'workspace_id' => $workspace->id,
+        'title' => 'Deploy rollback checklist',
+    ]);
 });

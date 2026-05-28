@@ -6,7 +6,12 @@
         ['name' => 'fleet.env-search', 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
         ['name' => 'fleet.env-drift', 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
         ['name' => 'fleet.intelligence', 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
+        ['name' => 'fleet.blast-radius', 'label' => __('Blast radius'), 'icon' => 'heroicon-o-share'],
+        ['name' => 'fleet.previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-link'],
     ];
+    if (ops_copilot_active()) {
+        $tabs[] = ['name' => 'fleet.copilot', 'label' => __('Copilot'), 'icon' => 'heroicon-o-sparkles'];
+    }
     // Activity is org-admin-gated, so only render the tab if the current
     // user can land on the page without a 403.
     $orgForTimeline = auth()->user()?->currentOrganization();

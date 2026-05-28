@@ -1068,6 +1068,108 @@ NGINX
             ],
         ];
 
+        $runbookRecipes = [
+            [
+                'slug' => 'runbook-deploy-rollback',
+                'name' => 'Deploy rollback checklist',
+                'summary' => __('BYO atomic deploy rollback — identify the last good release, flip the symlink, and verify health before closing the incident.'),
+                'category' => MarketplaceItem::CATEGORY_RUNBOOKS,
+                'recipe_type' => MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK,
+                'payload' => [
+                    'title' => 'Deploy rollback checklist',
+                    'body' => implode("\n", [
+                        '1. Confirm the bad deploy in Dply deploy history (note commit + release id).',
+                        '2. SSH to the server and list releases under the site path.',
+                        '3. Point the `current` symlink at the previous release directory.',
+                        '4. Reload the webserver config from Dply (or `sudo systemctl reload nginx`).',
+                        '5. Hit the health URL and a critical user flow.',
+                        '6. Post in the incident channel with rollback commit + operator name.',
+                    ]),
+                ],
+                'sort_order' => 700,
+            ],
+            [
+                'slug' => 'runbook-database-restore',
+                'name' => 'Database restore verification',
+                'summary' => __('After restoring a SQL dump, verify connections, migrations, and read-only smoke queries before reopening traffic.'),
+                'category' => MarketplaceItem::CATEGORY_RUNBOOKS,
+                'recipe_type' => MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK,
+                'payload' => [
+                    'title' => 'Database restore verification',
+                    'body' => implode("\n", [
+                        '1. Import the dump to the target database (note exact filename + timestamp).',
+                        '2. Run application migrations if the dump predates schema changes.',
+                        '3. Verify app `.env` database credentials match the restored database.',
+                        '4. Run read-only smoke queries (row counts on critical tables).',
+                        '5. Clear app caches that embed stale schema or config.',
+                        '6. Document restore owner + verification results in the project runbook.',
+                    ]),
+                ],
+                'sort_order' => 710,
+            ],
+            [
+                'slug' => 'runbook-edge-origin-failover',
+                'name' => 'Edge hybrid origin failover',
+                'summary' => __('When a linked Cloud origin is down, swap or relink the hybrid SSR origin and purge Edge cache.'),
+                'category' => MarketplaceItem::CATEGORY_RUNBOOKS,
+                'recipe_type' => MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK,
+                'payload' => [
+                    'title' => 'Edge hybrid origin failover',
+                    'body' => implode("\n", [
+                        '1. Confirm Edge static assets still serve (Worker/CDN path).',
+                        '2. Check linked Cloud app health and recent deploy status.',
+                        '3. If origin is bad, promote last good Cloud deploy or link standby origin URL.',
+                        '4. Purge Edge cache for affected hostnames after origin swap.',
+                        '5. Re-test SSR routes + API paths that fetch from origin.',
+                        '6. Note failover time + operator in project activity.',
+                    ]),
+                ],
+                'sort_order' => 720,
+            ],
+            [
+                'slug' => 'runbook-incident-first-15',
+                'name' => 'Incident triage — first 15 minutes',
+                'summary' => __('Operator checklist for the opening window: scope, comms, rollback decision, and stakeholder ping.'),
+                'category' => MarketplaceItem::CATEGORY_RUNBOOKS,
+                'recipe_type' => MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK,
+                'payload' => [
+                    'title' => 'Incident triage — first 15 minutes',
+                    'body' => implode("\n", [
+                        '1. Assign incident commander + scribe.',
+                        '2. Capture customer impact scope (which sites/products/regions).',
+                        '3. Open status page or internal comms channel.',
+                        '4. Check recent deploys, cert expiries, and provider status pages.',
+                        '5. Decide: rollback, scale, or hotfix — pick one path and owner.',
+                        '6. Link relevant Dply workspaces/servers in the incident doc.',
+                    ]),
+                ],
+                'sort_order' => 730,
+            ],
+            [
+                'slug' => 'runbook-ssl-renewal-panic',
+                'name' => 'SSL certificate renewal panic',
+                'summary' => __('Certificate expired or ACME failed — renew, apply webserver config, and confirm browser trust.'),
+                'category' => MarketplaceItem::CATEGORY_RUNBOOKS,
+                'recipe_type' => MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK,
+                'payload' => [
+                    'title' => 'SSL certificate renewal panic',
+                    'body' => implode("\n", [
+                        '1. Confirm which hostname(s) fail TLS (browser + `openssl s_client`).',
+                        '2. In Dply → site → Certificates, retry issuance or upload replacement.',
+                        '3. Queue webserver config apply and watch for reload errors.',
+                        '4. Verify HTTPS on apex + www/preview aliases.',
+                        '5. If DNS-01, confirm challenge records still exist at provider.',
+                        '6. Add calendar reminder 14 days before next expiry.',
+                    ]),
+                ],
+                'sort_order' => 740,
+            ],
+        ];
+
+        foreach ($runbookRecipes as $row) {
+            $items[] = $row;
+        }
+
         foreach ($nonPhpProcessRecipes as $row) {
             $items[] = $row;
         }

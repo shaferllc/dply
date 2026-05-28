@@ -72,6 +72,14 @@ class WorkspaceBackups extends Component
     /** When set (?site=…), all queries on this page narrow to backups/sites for that site only. */
     public ?string $context_site_id = null;
 
+    /** overview | schedules | history */
+    public string $backups_workspace_tab = 'overview';
+
+    public function setBackupsWorkspaceTab(string $tab): void
+    {
+        $this->backups_workspace_tab = in_array($tab, ['overview', 'schedules', 'history'], true) ? $tab : 'overview';
+    }
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);

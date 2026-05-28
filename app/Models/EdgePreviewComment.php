@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A review comment attached to a preview Edge site, anchored to a CSS
@@ -23,6 +24,7 @@ class EdgePreviewComment extends Model
     protected $fillable = [
         'organization_id',
         'site_id',
+        'parent_id',
         'created_by_user_id',
         'author_label',
         'author_email',
@@ -42,6 +44,19 @@ class EdgePreviewComment extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /**
+     * @return HasMany<EdgePreviewComment, $this>
+     */
+    public function replies(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id')->orderBy('created_at');
     }
 
     public function organization(): BelongsTo

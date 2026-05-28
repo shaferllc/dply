@@ -228,4 +228,13 @@ return [
         'auto_pause' => filter_var(env('DPLY_EDGE_GUARDRAIL_AUTO_PAUSE', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
+    /*
+    | Preview review hub — approve-to-promote workflow on Edge previews.
+    */
+    'preview_review' => [
+        'min_approvals' => max(1, (int) env('DPLY_EDGE_PREVIEW_REVIEW_MIN_APPROVALS', 1)),
+        'require_approval' => filter_var(env('DPLY_EDGE_PREVIEW_REVIEW_REQUIRE_APPROVAL', false), FILTER_VALIDATE_BOOLEAN),
+        'block_open_comments' => filter_var(env('DPLY_EDGE_PREVIEW_REVIEW_BLOCK_OPEN_COMMENTS', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
 ];

@@ -10,6 +10,7 @@ use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentRevisionTracker;
 use App\Services\DigitalOceanService;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
+use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Support\Str;
 
 class TestingHostnameProvisioner
@@ -162,6 +163,8 @@ class TestingHostnameProvisioner
             throw new \RuntimeException('No testing domains are configured.');
         }
 
+        $domains = app(UnifiedPreviewHostname::class)->orderedTestingZones($domains);
+
         $strategy = (string) config('services.digitalocean.testing_domain_strategy', 'deterministic');
 
         return match ($strategy) {
@@ -171,6 +174,16 @@ class TestingHostnameProvisioner
     }
 
     public function buildHostname(Site $site, string $zone): string
+    {
+        $hostnames = app(UnifiedPreviewHostname::class);
+        if ($hostnames->enabled()) {
+            return $hostnames->canonicalHostname($site, $zone);
+        }
+
+        return $this->legacyBuildHostname($site, $zone);
+    }
+
+    private function legacyBuildHostname(Site $site, string $zone): string
     {
         $base = Str::slug($site->slug !== '' ? $site->slug : $site->name);
         $base = trim($base, '-');

@@ -40,13 +40,26 @@ final class CronWorkspaceViewData
         );
 
         if ($includeSummaryContext) {
-            $cronJobCount = $server->cronJobs->count();
-            $enabledCronJobCount = $server->cronJobs->where('enabled', true)->count();
+            // On the per-site cron page (mounted with a context site and the
+            // "This site only" scope) the at-a-glance counts must reflect that
+            // site's jobs, not every job on the server. Switching the scope
+            // toggle to "All jobs on server" widens both the list and these
+            // counts back to the full server set.
+            $cronSummaryScopedToSite = $component->context_site_id !== null
+                && $component->cron_list_scope === 'site';
+
+            $summaryJobs = $cronSummaryScopedToSite
+                ? $server->cronJobs->where('site_id', $component->context_site_id)
+                : $server->cronJobs;
+
+            $cronJobCount = $summaryJobs->count();
+            $enabledCronJobCount = $summaryJobs->where('enabled', true)->count();
             $disabledCronJobCount = $cronJobCount - $enabledCronJobCount;
-            $unsyncedCronCount = $server->cronJobs->where('is_synced', false)->count();
-            $latestCronSync = $server->cronJobs->where('synced_at')->max('synced_at');
+            $unsyncedCronCount = $summaryJobs->where('is_synced', false)->count();
+            $latestCronSync = $summaryJobs->where('synced_at')->max('synced_at');
 
             $data = array_merge($data, compact(
+                'cronSummaryScopedToSite',
                 'cronJobCount',
                 'enabledCronJobCount',
                 'disabledCronJobCount',

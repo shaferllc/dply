@@ -16,22 +16,22 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-slate-500" aria-label="{{ __('Breadcrumb') }}">
+    <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
         <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Dashboard') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Servers') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $server->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $site->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li class="font-medium text-slate-900">{{ __('Monitor') }}</li>
+            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ __('Dashboard') }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ __('Servers') }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-brand-ink truncate max-w-[10rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-brand-ink truncate max-w-[10rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
+            <li class="text-brand-mist" aria-hidden="true">/</li>
+            <li class="font-medium text-brand-ink">{{ __('Monitor') }}</li>
         </ol>
     </nav>
 
     @if (session('success'))
-        <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{{ session('success') }}</div>
+        <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{{ session('success') }}</div>
     @endif
 
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
@@ -65,12 +65,18 @@
             @if (($runtimeMode ?? '') === 'serverless' && $functionStats)
                 @php $fnSummary = $functionStats['summary']; @endphp
                 <section class="{{ $card }}">
-                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-                        <div>
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Function activity') }}</h2>
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Invocations, errors, latency and cold starts — every recorded call to this function.') }}</p>
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+                                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Insights') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function activity') }}</h2>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invocations, errors, latency and cold starts — every recorded call to this function.') }}</p>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-brand-sand/30 p-1">
+                        <div class="flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1">
                             @foreach (['1h' => __('1h'), '24h' => __('24h'), '7d' => __('7d')] as $rangeKey => $rangeLabel)
                                 <button type="button" wire:click="setStatsRange('{{ $rangeKey }}')" @class([
                                     'rounded-md px-2.5 py-1 text-xs font-semibold transition',
@@ -131,11 +137,12 @@
             <div class="{{ $card }}">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                            <x-heroicon-o-signal class="h-5 w-5" />
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                            <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Uptime') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Pick a label, optional path, and a probe-region label. The first check runs immediately.') }}
                             </p>
@@ -165,11 +172,17 @@
                 </div>
 
                 @if ($resolvedBaseUrl === null)
-                    <div class="mx-6 my-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 sm:mx-8">
-                        <p class="min-w-0 leading-6">
-                            <span class="font-semibold">{{ __('No public URL yet.') }}</span>
-                            {{ __('Add a primary domain, preview hostname, or publication URL before uptime checks can run.') }}
-                        </p>
+                    <div class="border-t border-amber-200/70 bg-amber-50 px-6 py-4 sm:px-8">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">
+                                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Blocked') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('No public URL yet') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Add a primary domain, preview hostname, or publication URL before uptime checks can run.') }}</p>
+                            </div>
+                        </div>
                     </div>
                 @endif
             </div>
@@ -238,10 +251,18 @@
             </x-modal>
 
             <section class="{{ $card }}">
-                <div class="flex items-center justify-between border-b border-brand-ink/10 px-6 py-4">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Monitors') }}</h2>
+                <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                            <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Checks') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Monitors') }}</h2>
+                        </div>
+                    </div>
                     @if ($monitorCount > 0)
-                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[11px] font-semibold text-brand-ink">{{ $monitorCount }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[11px] font-semibold text-brand-ink">{{ $monitorCount }}</span>
                     @endif
                 </div>
                 @if ($site->uptimeMonitors->isEmpty())
@@ -310,7 +331,7 @@
 
             <p class="text-sm text-brand-moss">
                 {{ __('Show monitors on a public') }}
-                <a href="{{ route('status-pages.index') }}" class="font-medium text-brand-forest underline">{{ __('status page') }}</a>.
+                <a href="{{ route('status-pages.index') }}" class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('status page') }}</a>.
             </p>
 
             <x-cli-snippet tone="stub" />

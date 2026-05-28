@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastUpdated": "2026-05-27T04:19:14Z",
+  "lastUpdated": "2026-05-28T15:23:27Z",
   "transcripts": [
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/00420e0d-1c0a-4569-b52d-3f069f540b64/00420e0d-1c0a-4569-b52d-3f069f540b64.jsonl",
@@ -231,6 +231,23 @@
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/255fc013-818a-4058-a46c-aee6b189974d/subagents/efa2551f-751c-480b-abb7-579cd6426da7.jsonl",
       "mtimeMs": 1775084833072.4368,
       "lastProcessedAt": "2026-05-25T01:18:11Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/26e976b2-9ee5-4997-b7e6-e93abf87abdc/26e976b2-9ee5-4997-b7e6-e93abf87abdc.jsonl",
+      "mtimeMs": 1779981763087.6965,
+      "lastProcessedAt": "2026-05-28T15:23:27Z"
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/26e976b2-9ee5-4997-b7e6-e93abf87abdc/subagents/20db613b-e33e-49a3-8316-cb4ec235bc3c.jsonl",
+      "mtimeMs": 1779897802656.073
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/26e976b2-9ee5-4997-b7e6-e93abf87abdc/subagents/4e89834f-855e-417d-b91e-04862a241fc2.jsonl",
+      "mtimeMs": 1779981773244.1655
+    },
+    {
+      "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/26e976b2-9ee5-4997-b7e6-e93abf87abdc/subagents/9a4c808f-0fdc-4c3d-b495-a8f8d8c59006.jsonl",
+      "mtimeMs": 1779896575058.8193
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/27b43442-122d-478b-8ea6-8248e190a31e/27b43442-122d-478b-8ea6-8248e190a31e.jsonl",
@@ -499,12 +516,12 @@
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/498ff76b-e07d-4ab2-a4a0-c70054f01add/498ff76b-e07d-4ab2-a4a0-c70054f01add.jsonl",
-      "mtimeMs": 1779855493790.7092,
-      "lastProcessedAt": "2026-05-27T04:19:14Z"
+      "mtimeMs": 1779855562051.3865,
+      "lastProcessedAt": "2026-05-28T15:23:27Z"
     },
     {
       "path": "/Users/tomshafer/.cursor/projects/Users-tomshafer-Projects-Apps-dply/agent-transcripts/498ff76b-e07d-4ab2-a4a0-c70054f01add/subagents/89fe56ca-cc6b-412a-ba8d-5a45560b973b.jsonl",
-      "mtimeMs": 1779855503850.1677,
+      "mtimeMs": 1779855557594.5657,
       "lastProcessedAt": "2026-05-27T04:19:14Z"
     },
     {

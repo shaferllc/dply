@@ -7,12 +7,13 @@ namespace App\Actions\Edge;
 use App\Enums\SiteType;
 use App\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
+use App\Models\EdgeSiteAccessRule;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Edge\EdgeGithubCheckRunService;
 use App\Services\Edge\EdgeGithubPullRequestCommenter;
 use App\Support\Edge\EdgeRepoRoot;
-use App\Support\Edge\EdgeTestingDomains;
+use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
@@ -58,10 +59,10 @@ class CreateEdgePreviewSite
             return $this->refreshExistingPreview($existing, $prNumber, $headSha);
         }
 
-        $slug = $this->previewSlug($parent->slug ?? Str::slug($parent->name), $branch, $prNumber);
+        $slug = Str::slug(app(UnifiedPreviewHostname::class)->branchPreviewLabel($parent, $branch, $prNumber));
         $name = $this->previewName($parent->name, $branch, $prNumber);
         $testingDomain = self::apexForParent($parent);
-        $hostname = $slug.'.'.$testingDomain;
+        $hostname = app(UnifiedPreviewHostname::class)->branchPreviewHostname($parent, $branch, $prNumber, $testingDomain);
 
         $parentBuild = is_array($parent->edgeMeta()['build'] ?? null) ? $parent->edgeMeta()['build'] : [];
         $parentRouting = is_array($parent->edgeMeta()['routing'] ?? null) ? $parent->edgeMeta()['routing'] : [];
@@ -172,18 +173,18 @@ class CreateEdgePreviewSite
             }
 
             $modeMap = [
-                'password' => \App\Models\EdgeSiteAccessRule::MODE_PASSWORD,
-                'dply-account' => \App\Models\EdgeSiteAccessRule::MODE_DPLY_ACCOUNT,
-                'email' => \App\Models\EdgeSiteAccessRule::MODE_DPLY_ACCOUNT, // email gating piggybacks on dply_account + allowed_emails
+                'password' => EdgeSiteAccessRule::MODE_PASSWORD,
+                'dply-account' => EdgeSiteAccessRule::MODE_DPLY_ACCOUNT,
+                'email' => EdgeSiteAccessRule::MODE_DPLY_ACCOUNT, // email gating piggybacks on dply_account + allowed_emails
             ];
             $resolvedMode = $modeMap[$mode] ?? null;
             if ($resolvedMode === null) {
                 return;
             }
 
-            $rule = \App\Models\EdgeSiteAccessRule::query()->firstOrNew(['site_id' => $preview->id]);
+            $rule = EdgeSiteAccessRule::query()->firstOrNew(['site_id' => $preview->id]);
             $rule->mode = $resolvedMode;
-            $rule->cookie_secret = $rule->cookie_secret ?: \Illuminate\Support\Str::random(48);
+            $rule->cookie_secret = $rule->cookie_secret ?: Str::random(48);
             if ($mode === 'email' && is_array($protection['allowed_emails'] ?? null)) {
                 $rule->allowed_emails = array_values(array_filter(array_map('strval', $protection['allowed_emails'])));
             }
@@ -227,10 +228,11 @@ class CreateEdgePreviewSite
             return $existing;
         }
 
-        $slug = $this->adhocPreviewSlug($parent->slug ?? Str::slug($parent->name), $headSha);
-        $name = sprintf('%s preview (%s)', $parent->name, substr($headSha, 0, 7));
+        $hostnames = app(UnifiedPreviewHostname::class);
         $testingDomain = self::apexForParent($parent);
-        $hostname = $slug.'.'.$testingDomain;
+        $slug = Str::slug($hostnames->adhocPreviewLabel($parent, $headSha));
+        $name = sprintf('%s preview (%s)', $parent->name, substr($headSha, 0, 7));
+        $hostname = $hostnames->adhocPreviewHostname($parent, $headSha, $testingDomain);
 
         $parentBuild = is_array($parent->edgeMeta()['build'] ?? null) ? $parent->edgeMeta()['build'] : [];
         $parentRouting = is_array($parent->edgeMeta()['routing'] ?? null) ? $parent->edgeMeta()['routing'] : [];
@@ -444,33 +446,6 @@ class CreateEdgePreviewSite
             ->whereNull('meta->edge->torn_down_at');
     }
 
-    private function previewSlug(string $parentSlug, string $branch, ?int $prNumber): string
-    {
-        $parentSlug = $parentSlug !== '' ? $parentSlug : 'app';
-        if ($prNumber !== null && $prNumber > 0) {
-            return Str::slug('pr-'.$prNumber.'-'.$parentSlug);
-        }
-
-        $branchSlug = Str::slug(str_replace(['/', '_'], '-', $branch));
-        if ($branchSlug === '') {
-            $branchSlug = substr(md5($branch), 0, 8);
-        }
-
-        return Str::slug('preview-'.$branchSlug.'-'.$parentSlug);
-    }
-
-    /**
-     * Short-SHA-keyed slug for ad-hoc previews. Each commit gets its own
-     * hostname so two ad-hoc previews from the same branch don't collide.
-     */
-    private function adhocPreviewSlug(string $parentSlug, string $headSha): string
-    {
-        $parentSlug = $parentSlug !== '' ? $parentSlug : 'app';
-        $shortSha = substr(strtolower(trim($headSha)), 0, 7);
-
-        return Str::slug('adhoc-'.$shortSha.'-'.$parentSlug);
-    }
-
     private function previewName(string $parentName, string $branch, ?int $prNumber): string
     {
         if ($prNumber !== null && $prNumber > 0) {
@@ -480,24 +455,10 @@ class CreateEdgePreviewSite
         return sprintf('%s preview (%s)', $parentName, $branch);
     }
 
-    /**
-     * Pick the apex the preview hostname should live on. Strips the parent's
-     * own slug off its routing hostname so previews share the parent's zone —
-     * if the parent runs on dply.host, the preview does too, regardless of
-     * what the current DPLY_EDGE_TESTING_DOMAINS default has been changed to.
-     * Falls back to the configured default only when the parent has no
-     * usable hostname yet (brand-new sites before first publish).
-     */
     private static function apexForParent(Site $parent): string
     {
-        $hostname = strtolower(trim((string) ($parent->edgeMeta()['routing']['hostname'] ?? '')));
-        if ($hostname !== '' && str_contains($hostname, '.')) {
-            $apex = substr($hostname, strpos($hostname, '.') + 1);
-            if ($apex !== '' && str_contains($apex, '.')) {
-                return $apex;
-            }
-        }
+        $hostnames = app(UnifiedPreviewHostname::class);
 
-        return EdgeTestingDomains::defaultApex();
+        return $hostnames->apexForSite($parent);
     }
 }

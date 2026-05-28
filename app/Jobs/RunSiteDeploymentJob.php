@@ -4,10 +4,12 @@ namespace App\Jobs;
 
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\SiteDeploymentEphemeralCredential;
 use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
+use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
 use App\Support\DeployLogRedactor;
@@ -39,6 +41,7 @@ class RunSiteDeploymentJob implements ShouldQueue
     public function handle(
         DeployEngineResolver $deployEngineResolver,
         NotificationPublisher $notificationPublisher,
+        EphemeralDeployCredentialManager $ephemeralCredentials,
     ): void {
         $this->site = $this->site->fresh();
         if (! $this->site) {
@@ -119,6 +122,12 @@ class RunSiteDeploymentJob implements ShouldQueue
 
             $this->notifyDeploymentStarted($deployment, $notificationPublisher);
 
+            $ephemeralCredential = null;
+            if ($ephemeralCredentials->shouldUseForSite($this->site)) {
+                $ephemeralCredential = $ephemeralCredentials->provision($this->site, $deployment);
+                $ephemeralCredentials->activateForDeploy($ephemeralCredential);
+            }
+
             try {
                 $engine = $deployEngineResolver->forProject($this->site->project);
                 $result = $engine->run(new DeployContext(
@@ -160,12 +169,16 @@ class RunSiteDeploymentJob implements ShouldQueue
                 ]);
                 $this->cacheIdempotencyFailure($deployment, $msg);
                 Log::warning('RunSiteDeploymentJob failed', ['site_id' => $this->site->id, 'error' => $msg]);
-                $this->auditDeploy($deployment);
+                $this->auditDeploy($deployment, $ephemeralCredential);
                 $this->notifyStakeholders($deployment, $notificationPublisher);
                 throw $e;
+            } finally {
+                if ($ephemeralCredential instanceof SiteDeploymentEphemeralCredential) {
+                    $ephemeralCredentials->revoke($ephemeralCredential);
+                }
             }
 
-            $this->auditDeploy($deployment);
+            $this->auditDeploy($deployment, $ephemeralCredential);
             $this->notifyStakeholders($deployment, $notificationPublisher);
         } finally {
             Cache::forget($activeKey);
@@ -213,7 +226,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         ], now()->addDay());
     }
 
-    protected function auditDeploy(SiteDeployment $deployment): void
+    protected function auditDeploy(SiteDeployment $deployment, ?SiteDeploymentEphemeralCredential $ephemeralCredential = null): void
     {
         $this->site->loadMissing('organization');
         $org = $this->site->organization;
@@ -251,6 +264,7 @@ class RunSiteDeploymentJob implements ShouldQueue
             'started_at' => $startedAt?->toIso8601String(),
             'finished_at' => $finishedAt?->toIso8601String(),
             'error_excerpt' => $errorExcerpt,
+            'ephemeral_credential_fingerprint' => $ephemeralCredential?->public_key_fingerprint,
         ]);
     }
 

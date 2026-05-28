@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Organizations;
 
+use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Support\AuditActionMeta;
 use Illuminate\Contracts\View\View;
@@ -92,8 +93,12 @@ class Activity extends Component
      */
     public function getAuditLogsProperty(): LengthAwarePaginator
     {
+        // Eager-load the morphTo subject so the subject_summary accessor
+        // doesn't lazy-load one server/credential/site per row (N+1).
+        // Laravel batches morphTo loads by subject_type, so repeated
+        // subjects collapse to one whereIn per type.
         $query = $this->organization->auditLogs()
-            ->with('user')
+            ->with(['user', 'subject'])
             ->latest();
 
         $this->applyFamilyFilter($query, $this->family);
@@ -117,25 +122,39 @@ class Activity extends Component
      * spikes at a glance. Excludes the search box so the totals don't
      * jump around as you type.
      *
+     * Computed in a single conditional-aggregation query rather than one
+     * COUNT per family (previously 14 round-trips, one of which exactly
+     * duplicated the paginator's count for the unfiltered view).
+     *
      * @return array<string, int>
      */
     public function getFamilyTotalsProperty(): array
     {
-        $totals = ['' => (int) $this->organization->auditLogs()->count()];
+        $conditions = self::familyConditions();
 
-        foreach (AuditActionMeta::FAMILIES as $f) {
-            $q = $this->organization->auditLogs()->newQuery();
-            $this->applyFamilyFilter($q, $f['id']);
-            $totals[$f['id']] = (int) $q->count();
+        $selects = ['COUNT(*) as total_all'];
+        foreach ($conditions as $id => $sql) {
+            $selects[] = "SUM(CASE WHEN {$sql} THEN 1 ELSE 0 END) as total_{$id}";
+        }
+
+        $row = AuditLog::query()
+            ->where('organization_id', $this->organization->id)
+            ->selectRaw(implode(', ', $selects))
+            ->toBase()
+            ->first();
+
+        $totals = ['' => (int) ($row->total_all ?? 0)];
+        foreach (array_keys($conditions) as $id) {
+            $totals[$id] = (int) ($row->{"total_{$id}"} ?? 0);
         }
 
         return $totals;
     }
 
     /**
-     * Map a family id to action-prefix predicates. Keep this in lock-step
-     * with {@see AuditActionMeta::family} — same buckets, but here we
-     * express them in SQL so filtering can happen at the DB.
+     * Apply the family filter to the listing query. Shares its predicate
+     * definitions with {@see familyConditions} so the chip counts and the
+     * filtered list can never drift apart.
      *
      * Accepts either a {@see Builder} or a {@see HasMany} relation; chains
      * on Eloquent relations stay on the relation object rather than
@@ -143,41 +162,43 @@ class Activity extends Component
      */
     private function applyFamilyFilter(Builder|HasMany $query, string $family): void
     {
-        match ($family) {
-            'server' => $query->where('action', 'like', 'server.%'),
-            'site' => $query->where('action', 'like', 'site.%')
-                ->where('action', 'not like', 'site.edge.%'),
-            'edge' => $query->where('action', 'like', 'site.edge.%'),
-            'project' => $query->where('action', 'like', 'project.%'),
-            'team' => $query->where('action', 'like', 'team.%'),
-            'billing' => $query->where('action', 'like', 'billing.%'),
-            'security' => $query->where(function (Builder $q): void {
-                $q->where('action', 'like', 'api_token.%')
-                    ->orWhere('action', 'like', 'invitation.%')
-                    ->orWhere('action', 'like', 'notification_channel.%');
-            }),
-            'org' => $query->where('action', 'like', 'organization.%'),
-            'backup' => $query->where('action', 'like', 'backup.%'),
-            'insight' => $query->where('action', 'like', 'insight.%'),
-            'import' => $query->where('action', 'like', 'import.%'),
-            'background' => $query->where('action', 'like', 'queue_worker.%'),
-            'other' => $query->where(function (Builder $q): void {
-                $q->where('action', 'not like', 'server.%')
-                    ->where('action', 'not like', 'site.%')
-                    ->where('action', 'not like', 'project.%')
-                    ->where('action', 'not like', 'team.%')
-                    ->where('action', 'not like', 'billing.%')
-                    ->where('action', 'not like', 'api_token.%')
-                    ->where('action', 'not like', 'invitation.%')
-                    ->where('action', 'not like', 'notification_channel.%')
-                    ->where('action', 'not like', 'organization.%')
-                    ->where('action', 'not like', 'backup.%')
-                    ->where('action', 'not like', 'insight.%')
-                    ->where('action', 'not like', 'import.%')
-                    ->where('action', 'not like', 'queue_worker.%');
-            }),
-            default => null,
-        };
+        $conditions = self::familyConditions();
+        if (isset($conditions[$family])) {
+            $query->whereRaw('('.$conditions[$family].')');
+        }
+    }
+
+    /**
+     * Family id → raw SQL predicate over the `action` column. The strings
+     * are fully static (no user input), so whereRaw / selectRaw use them
+     * safely. Keep buckets in lock-step with {@see AuditActionMeta::family},
+     * which derives the same families for per-row icons.
+     *
+     * @return array<string, string>
+     */
+    private static function familyConditions(): array
+    {
+        return [
+            'server' => "action LIKE 'server.%'",
+            'site' => "action LIKE 'site.%' AND action NOT LIKE 'site.edge.%'",
+            'edge' => "action LIKE 'site.edge.%'",
+            'project' => "action LIKE 'project.%'",
+            'team' => "action LIKE 'team.%'",
+            'billing' => "action LIKE 'billing.%'",
+            'security' => "(action LIKE 'api_token.%' OR action LIKE 'invitation.%' OR action LIKE 'notification_channel.%')",
+            'org' => "action LIKE 'organization.%'",
+            'backup' => "action LIKE 'backup.%'",
+            'insight' => "action LIKE 'insight.%'",
+            'import' => "action LIKE 'import.%'",
+            'background' => "action LIKE 'queue_worker.%'",
+            'other' => "action NOT LIKE 'server.%' AND action NOT LIKE 'site.%' "
+                ."AND action NOT LIKE 'project.%' AND action NOT LIKE 'team.%' "
+                ."AND action NOT LIKE 'billing.%' AND action NOT LIKE 'api_token.%' "
+                ."AND action NOT LIKE 'invitation.%' AND action NOT LIKE 'notification_channel.%' "
+                ."AND action NOT LIKE 'organization.%' AND action NOT LIKE 'backup.%' "
+                ."AND action NOT LIKE 'insight.%' AND action NOT LIKE 'import.%' "
+                ."AND action NOT LIKE 'queue_worker.%'",
+        ];
     }
 
     public function render(): View

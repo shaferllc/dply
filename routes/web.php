@@ -43,12 +43,15 @@ use App\Livewire\Edge\Import;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Edge\Templates;
 use App\Livewire\Edge\Usage;
+use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
 use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Fleet\Intelligence as FleetIntelligence;
+use App\Livewire\Fleet\OpsCopilot as FleetOpsCopilot;
+use App\Livewire\Fleet\Previews as FleetPreviews;
 use App\Livewire\Imports\Forge\Inventory;
 use App\Livewire\Imports\Parity as ImportParity;
 use App\Livewire\Imports\Ploi\Inventory as PloiInventory;
@@ -58,6 +61,7 @@ use App\Livewire\Invitations\Accept as InvitationsAccept;
 use App\Livewire\Launches\Create as LaunchesCreate;
 use App\Livewire\Launches\FullStack as LaunchesFullStack;
 use App\Livewire\Launches\Path as LaunchesPath;
+use App\Livewire\Launches\StandbyBlueprint as LaunchesStandbyBlueprint;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
 use App\Livewire\Marketplace\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
@@ -78,6 +82,7 @@ use App\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Livewire\Scripts\Index as ScriptsIndex;
 use App\Livewire\Scripts\Marketplace as ScriptsMarketplace;
 use App\Livewire\Serverless\Create as ServerlessCreate;
+use App\Livewire\Serverless\Glue as ServerlessGlue;
 use App\Livewire\Serverless\Index as ServerlessIndex;
 use App\Livewire\Serverless\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
@@ -309,6 +314,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('/fleet/env-drift', FleetEnvDrift::class)->name('fleet.env-drift');
         Route::livewire('/fleet/intelligence', FleetIntelligence::class)->name('fleet.intelligence');
         Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
+        Route::livewire('/fleet/blast-radius', FleetBlastRadius::class)->name('fleet.blast-radius');
+        Route::livewire('/fleet/previews', FleetPreviews::class)->name('fleet.previews');
+        Route::livewire('/fleet/copilot', FleetOpsCopilot::class)
+            ->middleware('feature:global.ops_copilot')
+            ->name('fleet.copilot');
     });
     Route::livewire('/admin', AdminDashboard::class)
         ->middleware('can:viewPlatformAdmin')
@@ -386,6 +396,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::middleware('feature:surface.serverless')->group(function (): void {
         Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
+        Route::livewire('serverless/glue', ServerlessGlue::class)->name('serverless.glue');
         Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
         Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
     });
@@ -409,6 +420,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
     Route::middleware('feature:launch.full_stack_wizard')->group(function (): void {
         Route::livewire('launches/full-stack', LaunchesFullStack::class)->name('launches.full-stack');
+    });
+    Route::middleware('feature:launch.standby_blueprint')->group(function (): void {
+        Route::livewire('launches/standby', LaunchesStandbyBlueprint::class)->name('launches.standby');
     });
     // Container flow inversion (2026-05): the standalone container launcher is gone.
     // Container apps are now created server-first (host via /servers/create wizard,

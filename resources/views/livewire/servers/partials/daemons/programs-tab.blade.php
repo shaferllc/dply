@@ -23,22 +23,8 @@
                 </span>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Programs on this server') }}</h3>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $contextSiteModel ? __('Programs for this site') : __('Programs on this server') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Add a new Supervisor program or edit / start / stop / restart / delete an existing one. Sync afterwards to apply changes on the server.') }}</p>
-                    @if ($contextSiteModel)
-                        <fieldset class="mt-3 flex flex-wrap items-center gap-3 text-sm">
-                            <legend class="sr-only">{{ __('Program list scope') }}</legend>
-                            <span class="text-brand-moss">{{ __('Show') }}</span>
-                            <label class="inline-flex cursor-pointer items-center gap-2">
-                                <input type="radio" wire:model.live="programs_list_scope" value="site" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
-                                <span class="text-brand-ink">{{ __('This site only') }}</span>
-                            </label>
-                            <label class="inline-flex cursor-pointer items-center gap-2">
-                                <input type="radio" wire:model.live="programs_list_scope" value="all" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
-                                <span class="text-brand-ink">{{ __('All programs on server') }}</span>
-                            </label>
-                        </fieldset>
-                    @endif
                 </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
@@ -109,6 +95,24 @@
             </div>
         </div>
     </div>
+
+    @if ($contextSiteModel)
+        <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Show') }}</span>
+            <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm" role="group" aria-label="{{ __('Program list scope') }}">
+                <button type="button" wire:click="$set('programs_list_scope', 'site')" @class([
+                    'rounded-lg px-3 py-1 text-xs font-semibold transition',
+                    'bg-brand-ink text-brand-cream shadow-sm' => $programs_list_scope === 'site',
+                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $programs_list_scope !== 'site',
+                ])>{{ __('This site only') }}</button>
+                <button type="button" wire:click="$set('programs_list_scope', 'all')" @class([
+                    'rounded-lg px-3 py-1 text-xs font-semibold transition',
+                    'bg-brand-ink text-brand-cream shadow-sm' => $programs_list_scope === 'all',
+                    'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $programs_list_scope !== 'all',
+                ])>{{ __('All programs on server') }}</button>
+            </div>
+        </div>
+    @endif
 
     @if ($server->supervisorPrograms->isEmpty())
         <div class="px-6 py-12 text-center sm:px-7">

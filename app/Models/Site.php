@@ -12,6 +12,7 @@ use App\Services\Deploy\ServerlessDeploymentConfigResolver;
 use App\Services\Scaffold\PlaceholderDnsManager;
 use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\EdgeTestingDomains;
+use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -1290,6 +1291,11 @@ class Site extends Model
             }
         }
 
+        $hostnames = app(UnifiedPreviewHostname::class);
+        if ($hostnames->enabled()) {
+            return $hostnames->canonicalHostname($this);
+        }
+
         $testingDomain = EdgeTestingDomains::defaultApex();
         $slug = (string) ($this->slug ?: Str::slug((string) $this->name)) ?: 'site';
         $suffix = substr(strtolower((string) $this->id), -6);
@@ -2292,6 +2298,14 @@ class Site extends Model
     public function isAtomicDeploys(): bool
     {
         return $this->deploy_strategy === 'atomic';
+    }
+
+    /**
+     * Per-deploy ephemeral SSH credentials (org flag + site opt-in).
+     */
+    public function usesEphemeralDeployCredentials(): bool
+    {
+        return (bool) data_get($this->meta, 'deploy.ephemeral_credentials', false);
     }
 
     /**

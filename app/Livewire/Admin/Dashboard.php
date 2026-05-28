@@ -14,6 +14,7 @@ use App\Models\StatusPage;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use App\Support\Admin\AdminFeatureFlags;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
@@ -36,22 +37,11 @@ class Dashboard extends Component
     public ?string $operationError = null;
 
     /**
-     * Org currently being inspected in the "Surface flags" panel. Empty
+     * Org currently being inspected in the feature-flag panels. Empty
      * string until an admin picks one; reads/writes target this scope via
      * Pennant's per-scope override store.
      */
     public string $flagOrgId = '';
-
-    /**
-     * Surfaces gated by per-org flags. Order drives the rendered toggles.
-     * Kept here (not in config) because the admin UI cares about a curated
-     * subset — adding every defined flag would clutter the panel.
-     */
-    public const SURFACE_FLAGS = [
-        'surface.cloud' => 'Cloud',
-        'surface.edge' => 'Edge',
-        'surface.serverless' => 'Serverless',
-    ];
 
     public function mount(): void
     {
@@ -60,17 +50,14 @@ class Dashboard extends Component
 
     /**
      * Flip the per-org override for $flag on the currently-selected org.
-     * Checked → activate (override true). Unchecked → forget (drops the
-     * override, falls back to the env/config default — which is `false`
-     * for these surfaces post-VM-launch).
      */
-    public function toggleSurfaceFlag(string $flag): void
+    public function toggleOrgFeatureFlag(string $flag): void
     {
         Gate::authorize('viewPlatformAdmin');
         $this->resetOperationFlash();
 
-        if (! array_key_exists($flag, self::SURFACE_FLAGS)) {
-            $this->operationError = __('Unknown surface flag.');
+        if (! in_array($flag, AdminFeatureFlags::orgFlagKeys(), true)) {
+            $this->operationError = __('Unknown feature flag.');
 
             return;
         }
@@ -82,19 +69,71 @@ class Dashboard extends Component
             return;
         }
 
+        $label = AdminFeatureFlags::orgFlagLabel($flag) ?? $flag;
+        $previous = Feature::for($org)->value($flag);
+
         if (Feature::for($org)->active($flag)) {
             Feature::for($org)->forget($flag);
             $this->operationMessage = __(':flag disabled for :org (falls back to default).', [
-                'flag' => self::SURFACE_FLAGS[$flag],
+                'flag' => $label,
                 'org' => $org->name,
             ]);
         } else {
             Feature::for($org)->activate($flag);
             $this->operationMessage = __(':flag enabled for :org.', [
-                'flag' => self::SURFACE_FLAGS[$flag],
+                'flag' => $label,
                 'org' => $org->name,
             ]);
         }
+
+        AuditLog::log(
+            organization: $org,
+            user: auth()->user(),
+            action: 'feature.override',
+            subject: null,
+            oldValues: ['flag' => $flag, 'value' => $previous],
+            newValues: [
+                'flag' => $flag,
+                'value' => Feature::for($org)->value($flag),
+                'reason' => 'platform admin dashboard',
+            ],
+        );
+    }
+
+    /** @deprecated Use {@see toggleOrgFeatureFlag} — kept for any cached Livewire payloads. */
+    public function toggleSurfaceFlag(string $flag): void
+    {
+        $this->toggleOrgFeatureFlag($flag);
+    }
+
+    /**
+     * Flip an app-wide Pennant flag ({@see Feature::for(null)}).
+     */
+    public function toggleGlobalFeatureFlag(string $flag): void
+    {
+        Gate::authorize('viewPlatformAdmin');
+        $this->resetOperationFlash();
+
+        if (! in_array($flag, AdminFeatureFlags::globalFlagKeys(), true)) {
+            $this->operationError = __('Unknown feature flag.');
+
+            return;
+        }
+
+        $label = AdminFeatureFlags::globalFlagLabel($flag) ?? $flag;
+        $previous = Feature::for(null)->value($flag);
+
+        if (Feature::for(null)->active($flag)) {
+            Feature::for(null)->forget($flag);
+            $this->operationMessage = __(':flag disabled app-wide (falls back to default).', ['flag' => $label]);
+        } else {
+            Feature::for(null)->activate($flag);
+            $this->operationMessage = __(':flag enabled app-wide.', ['flag' => $label]);
+        }
+
+        $this->operationMessage .= ' '.(__('Default from config: :state.', [
+            'state' => AdminFeatureFlags::configDefault($flag) ? __('on') : __('off'),
+        ]));
     }
 
     public function clearApplicationCache(): void
@@ -334,14 +373,70 @@ class Dashboard extends Component
             'reverbHealthUrl' => reverb_health_check_url(),
             'horizonUrl' => route('horizon.index'),
             'pulseUrl' => route('pulse'),
-            'surfaceFlagPanel' => $this->surfaceFlagPanelData(),
+            'orgFeatureFlagPanel' => $this->orgFeatureFlagPanelData(),
+            'globalFlagPanel' => $this->globalFeatureFlagPanelData(),
+            // Legacy alias — blade still references surfaceFlagPanel in places.
+            'surfaceFlagPanel' => $this->orgFeatureFlagPanelData(),
         ]);
     }
 
     /**
-     * Snapshot for the "Surface flags" admin panel: the org chooser, plus
-     * the resolved enabled-state for each surface flag scoped to the picked
-     * org. The view renders three toggles bound to {@see toggleSurfaceFlag}.
+     * @return array{
+     *     orgs: Collection<int, Organization>,
+     *     org: ?Organization,
+     *     groups: list<array{title: string, flags: list<array{key: string, label: string, active: bool, default: bool}>}>,
+     * }
+     */
+    protected function orgFeatureFlagPanelData(): array
+    {
+        $orgs = Organization::query()->orderBy('name')->get(['id', 'name']);
+        $org = $this->flagOrgId === '' ? null : $orgs->firstWhere('id', $this->flagOrgId);
+
+        $groups = [];
+        foreach (AdminFeatureFlags::orgGroups() as $title => $flags) {
+            $entries = [];
+            foreach ($flags as $key => $label) {
+                $entries[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'active' => $org instanceof Organization && Feature::for($org)->active($key),
+                    'default' => AdminFeatureFlags::configDefault($key),
+                ];
+            }
+            $groups[] = ['title' => $title, 'flags' => $entries];
+        }
+
+        return [
+            'orgs' => $orgs,
+            'org' => $org instanceof Organization ? $org : null,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
+     * @return list<array{title: string, flags: list<array{key: string, label: string, active: bool, default: bool}>}>
+     */
+    protected function globalFeatureFlagPanelData(): array
+    {
+        $groups = [];
+        foreach (AdminFeatureFlags::globalGroups() as $title => $flags) {
+            $entries = [];
+            foreach ($flags as $key => $label) {
+                $entries[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'active' => Feature::for(null)->active($key),
+                    'default' => AdminFeatureFlags::configDefault($key),
+                ];
+            }
+            $groups[] = ['title' => $title, 'flags' => $entries];
+        }
+
+        return $groups;
+    }
+
+    /**
+     * @deprecated Renamed to {@see orgFeatureFlagPanelData}.
      *
      * @return array{
      *     orgs: Collection<int, Organization>,
@@ -351,21 +446,13 @@ class Dashboard extends Component
      */
     protected function surfaceFlagPanelData(): array
     {
-        $orgs = Organization::query()->orderBy('name')->get(['id', 'name']);
-        $org = $this->flagOrgId === '' ? null : $orgs->firstWhere('id', $this->flagOrgId);
-
-        $flags = [];
-        foreach (self::SURFACE_FLAGS as $key => $label) {
-            $flags[] = [
-                'key' => $key,
-                'label' => $label,
-                'active' => $org instanceof Organization && Feature::for($org)->active($key),
-            ];
-        }
+        $panel = $this->orgFeatureFlagPanelData();
+        $surfaceGroup = collect($panel['groups'])->firstWhere('title', 'Surfaces');
+        $flags = is_array($surfaceGroup) ? ($surfaceGroup['flags'] ?? []) : [];
 
         return [
-            'orgs' => $orgs,
-            'org' => $org instanceof Organization ? $org : null,
+            'orgs' => $panel['orgs'],
+            'org' => $panel['org'],
             'flags' => $flags,
         ];
     }

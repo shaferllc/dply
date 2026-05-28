@@ -30,20 +30,21 @@ class EdgePreviewCommentsController extends Controller
 
         $comments = EdgePreviewComment::query()
             ->where('site_id', $site->id)
+            ->whereNull('parent_id')
+            ->with(['replies' => fn ($q) => $q->orderBy('created_at')])
             ->with(['createdBy:id,name,email', 'resolvedBy:id,name,email'])
             ->orderByDesc('created_at')
             ->limit(200)
             ->get()
-            ->map(fn (EdgePreviewComment $c): array => [
-                'id' => $c->id,
-                'author' => $c->authorDisplayName(),
-                'body' => $c->body,
-                'url_path' => $c->url_path,
-                'selector' => $c->selector,
-                'viewport_width' => $c->viewport_width,
-                'resolved' => $c->resolved_at !== null,
-                'created_at' => $c->created_at?->toIso8601String(),
-            ])
+            ->flatMap(function (EdgePreviewComment $thread) {
+                $rows = [$this->serializeComment($thread)];
+                foreach ($thread->replies as $reply) {
+                    $rows[] = $this->serializeComment($reply, $thread->id);
+                }
+
+                return $rows;
+            })
+            ->values()
             ->all();
 
         return $this->corsJson($request, ['comments' => $comments]);
@@ -61,11 +62,27 @@ class EdgePreviewCommentsController extends Controller
             'selector' => ['nullable', 'string', 'max:500'],
             'viewport_width' => ['nullable', 'integer', 'min:1', 'max:8192'],
             'author_label' => ['nullable', 'string', 'max:120'],
+            'parent_id' => ['nullable', 'string', 'ulid'],
         ]);
+
+        $parentId = isset($data['parent_id']) ? (string) $data['parent_id'] : null;
+        if ($parentId !== null && $parentId !== '') {
+            $parent = EdgePreviewComment::query()
+                ->where('site_id', $site->id)
+                ->whereNull('parent_id')
+                ->whereKey($parentId)
+                ->first();
+            if ($parent === null) {
+                return $this->corsJson($request, ['error' => 'invalid_parent'], 422);
+            }
+        } else {
+            $parentId = null;
+        }
 
         $comment = EdgePreviewComment::query()->create([
             'organization_id' => $site->organization_id,
             'site_id' => $site->id,
+            'parent_id' => $parentId,
             'created_by_user_id' => null,
             'author_label' => trim((string) ($data['author_label'] ?? '')) ?: 'Guest',
             'selector' => $data['selector'] ?? null,
@@ -75,17 +92,26 @@ class EdgePreviewCommentsController extends Controller
         ]);
 
         return $this->corsJson($request, [
-            'comment' => [
-                'id' => $comment->id,
-                'author' => $comment->authorDisplayName(),
-                'body' => $comment->body,
-                'url_path' => $comment->url_path,
-                'selector' => $comment->selector,
-                'viewport_width' => $comment->viewport_width,
-                'resolved' => false,
-                'created_at' => $comment->created_at?->toIso8601String(),
-            ],
+            'comment' => $this->serializeComment($comment),
         ], 201);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeComment(EdgePreviewComment $c, ?string $parentId = null): array
+    {
+        return [
+            'id' => $c->id,
+            'parent_id' => $parentId ?? $c->parent_id,
+            'author' => $c->authorDisplayName(),
+            'body' => $c->body,
+            'url_path' => $c->url_path,
+            'selector' => $c->selector,
+            'viewport_width' => $c->viewport_width,
+            'resolved' => $c->resolved_at !== null,
+            'created_at' => $c->created_at?->toIso8601String(),
+        ];
     }
 
     /**

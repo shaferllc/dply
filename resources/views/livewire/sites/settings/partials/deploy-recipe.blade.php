@@ -377,6 +377,38 @@
             </div>
         </form>
 
+        @if (ephemeral_deploy_credentials_active($site->organization))
+            <form wire:submit="saveEphemeralDeployCredentials" class="dply-card overflow-hidden">
+                <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
+                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Security') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ephemeral deploy credentials') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Issue a one-time SSH key for each deploy, sync it to the server for the rollout, then revoke it when the deploy finishes — success or failure.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 p-6 sm:p-8">
+                        <label class="flex items-center gap-3">
+                            <input type="checkbox" wire:model="ephemeral_deploy_credentials_enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                            <span class="text-sm font-semibold text-brand-ink">{{ __('Use ephemeral SSH credentials for deploys') }}</span>
+                        </label>
+                        <x-input-error :messages="$errors->get('ephemeral_deploy_credentials_enabled')" />
+                        <p class="text-sm text-brand-moss">{{ __('Each deployment gets its own ed25519 key with a fingerprint recorded in the audit log. Your server’s operational SSH key is still used to install and remove deploy keys.') }}</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+                    <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+                </div>
+            </form>
+        @endif
+
         <form wire:submit="saveDeploymentSettings" class="dply-card space-y-5 p-6 sm:p-8">
             @if ($zero_downtime_enabled)
                 <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">

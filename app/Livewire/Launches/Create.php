@@ -37,6 +37,18 @@ class Create extends Component
             ];
         }
 
+        if (standby_blueprint_active()) {
+            $options[] = [
+                'id' => 'standby-blueprint',
+                'title' => __('Standby blueprints'),
+                'description' => __('Failover playbooks for hybrid Edge origins, BYO standby servers, and DNS cutover.'),
+                'enabled' => true,
+                'featured' => true,
+                'href' => route('launches.standby'),
+                'icon' => 'shield-check',
+            ];
+        }
+
         return array_merge($options, [
             [
                 'id' => 'byo',
