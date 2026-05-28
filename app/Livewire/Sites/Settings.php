@@ -12,6 +12,7 @@ use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
+use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -64,6 +65,7 @@ class Settings extends Show
 {
     use DismissesConsoleActionRun;
     use ManagesContainerSite;
+    use ManagesSiteBindings;
     use StreamsRemoteSshLivewire;
 
     protected function consoleActionSubject(): Model

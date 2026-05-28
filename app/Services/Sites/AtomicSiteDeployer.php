@@ -143,6 +143,19 @@ class AtomicSiteDeployer
             'is_active' => true,
         ]);
 
+        $currentPath = trim($ssh->exec(sprintf('readlink -f %s/current 2>/dev/null || echo %s/current', $baseEsc, $baseEsc), 30));
+        $syncResult = app(ByoRepoConfigSync::class)->syncAfterDeploy($site, $ssh, $currentPath !== '' ? $currentPath : $base.'/current');
+        if ($syncResult['applied']) {
+            $log .= "\n--- dply.yaml sync ---\n";
+            $log .= sprintf(
+                "Synced %s: %d redirects, %d crons, %d deploy hooks.\n",
+                (string) ($syncResult['source_path'] ?? 'dply.yaml'),
+                $syncResult['redirects'],
+                $syncResult['crons'],
+                $syncResult['deploy_hooks'],
+            );
+        }
+
         return ['output' => $log, 'sha' => $sha !== '' ? $sha : null, 'release_folder' => $folder];
     }
 }

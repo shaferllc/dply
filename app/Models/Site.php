@@ -552,6 +552,11 @@ class Site extends Model
         return $this->hasMany(SiteProcess::class)->orderBy('name');
     }
 
+    public function bindings(): HasMany
+    {
+        return $this->hasMany(SiteBinding::class);
+    }
+
     public function redirects(): HasMany
     {
         return $this->hasMany(SiteRedirect::class)->orderBy('sort_order');

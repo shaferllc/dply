@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Actions\Edge\PromoteEdgePreview;
+use App\Actions\Edge\QueueEdgeDeployReplay;
 use App\Actions\Edge\RollbackEdgeDeployment;
 use App\Actions\Edge\UpdateEdgeSplitTraffic;
 use App\Livewire\Sites\EdgeDeploymentDetail;
@@ -12,6 +13,7 @@ use App\Livewire\Sites\EdgeSettings;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Support\Edge\EdgeDeploymentConfirmSummary;
+use Laravel\Pennant\Feature;
 use Livewire\Component;
 
 /**
@@ -220,6 +222,44 @@ trait ManagesEdgeDeploymentLifecycle
             $this->toastSuccess($percentage > 0
                 ? __('Split traffic: routing :pct% of production traffic to the preview.', ['pct' => $percentage])
                 : __('Split traffic cleared — production is back to 100%.'));
+        }
+    }
+
+    /**
+     * Sample recent production GET/HEAD traffic and replay against a live preview.
+     */
+    public function queueEdgeDeployReplay(string $previewSiteId): void
+    {
+        if (! Feature::active('global.edge_deploy_replay')) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Deploy replay is not enabled for this organization.'));
+            }
+
+            return;
+        }
+
+        if (! $this->site->usesEdgeRuntime() || $this->site->isEdgePreview()) {
+            return;
+        }
+
+        $this->authorize('update', $this->site);
+
+        try {
+            app(QueueEdgeDeployReplay::class)->handle(
+                auth()->user(),
+                $this->site,
+                $previewSiteId,
+            );
+        } catch (\Throwable $e) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError($e->getMessage());
+            }
+
+            return;
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Shadow replay queued — sampling production traffic against the preview.'));
         }
     }
 }

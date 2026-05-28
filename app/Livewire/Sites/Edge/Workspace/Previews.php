@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Edge\Workspace;
 
+use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeBuildSettings;
@@ -13,11 +14,13 @@ use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
 use App\Livewire\Concerns\ManagesEdgeDeploymentLifecycle;
 use App\Livewire\Forms\EdgeBuildSettingsForm;
 use App\Models\EdgeDeployment;
+use App\Models\EdgeDeployReplay;
 use App\Models\Server;
 use App\Models\Site;
 use App\Support\Edge\EdgePreviewPolicy;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Component;
 
 class Previews extends Component
@@ -58,6 +61,15 @@ class Previews extends Component
             ? (string) $latest->repo_config['source_path']
             : 'dply.yaml';
 
+        $previewIds = CreateEdgePreviewSite::listForParent($this->site)->pluck('id');
+        $latestReplays = EdgeDeployReplay::query()
+            ->where('parent_site_id', $this->site->id)
+            ->whereIn('preview_site_id', $previewIds)
+            ->orderByDesc('created_at')
+            ->get()
+            ->unique('preview_site_id')
+            ->keyBy('preview_site_id');
+
         return view('livewire.sites.edge.workspace.previews', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-previews'),
             [
@@ -67,6 +79,8 @@ class Previews extends Component
                 'repoCommentWidget' => $repoCommentWidget,
                 'previewPolicy' => EdgePreviewPolicy::for($this->site),
                 'sourcePath' => $sourcePath,
+                'latestReplays' => $latestReplays,
+                'deployReplayEnabled' => Feature::active('global.edge_deploy_replay'),
             ],
         ));
     }

@@ -106,6 +106,21 @@ class SiteGitDeployer
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
+        $syncResult = app(ByoRepoConfigSync::class)->syncAfterDeploy($site, $ssh, $path);
+        if ($syncResult['applied']) {
+            $log .= "\n--- dply.yaml sync ---\n";
+            $log .= sprintf(
+                "Synced %s: %d redirects, %d crons, %d deploy hooks.\n",
+                (string) ($syncResult['source_path'] ?? 'dply.yaml'),
+                $syncResult['redirects'],
+                $syncResult['crons'],
+                $syncResult['deploy_hooks'],
+            );
+            if ($syncResult['warnings'] !== []) {
+                $log .= "Warnings:\n- ".implode("\n- ", $syncResult['warnings'])."\n";
+            }
+        }
+
         return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];
     }
 }

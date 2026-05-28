@@ -122,7 +122,10 @@
         </section>
     @endunless
 
-    @include('livewire.sites.partials.edge.previews')
+    @include('livewire.sites.partials.edge.previews', [
+        'latestReplays' => $latestReplays ?? collect(),
+        'deployReplayEnabled' => $deployReplayEnabled ?? false,
+    ])
     @unless ($edgeIsPreviewChild)
         @include('livewire.sites.partials.edge.preview-settings')
     @endunless

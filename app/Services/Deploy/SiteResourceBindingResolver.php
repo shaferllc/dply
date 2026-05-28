@@ -7,6 +7,7 @@ namespace App\Services\Deploy;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Models\SupervisorProgram;
 use App\Support\Deployment\SiteResourceBinding;
 
@@ -104,6 +105,44 @@ final class SiteResourceBindingResolver
         $bindings[] = $this->redisBinding($env);
         $bindings[] = $this->queueBinding($env);
         $bindings[] = $this->objectStorageBinding($env);
+
+        // A persisted SiteBinding (an explicit operator attach/provision) is
+        // authoritative: it replaces the derived inference for its type so the
+        // UI shows the managed state and the deploy reads the bound resource.
+        // The publication binding stays runtime-owned and is never manageable.
+        $persisted = $site->bindings()->get()->keyBy('type');
+        $bindings = array_map(function (SiteResourceBinding $derived) use ($persisted): SiteResourceBinding {
+            $manageable = $derived->type !== 'publication';
+
+            $row = $persisted->get($derived->type);
+            if (! $row instanceof SiteBinding) {
+                return new SiteResourceBinding(
+                    type: $derived->type,
+                    mode: $derived->mode,
+                    required: $derived->required,
+                    status: $derived->status,
+                    source: $derived->source,
+                    name: $derived->name,
+                    config: $derived->config,
+                    bindingId: null,
+                    manageable: $manageable,
+                );
+            }
+
+            return new SiteResourceBinding(
+                type: $derived->type,
+                mode: (string) ($row->mode ?: $derived->mode),
+                required: $derived->required,
+                status: (string) ($row->status ?: $derived->status),
+                source: 'binding',
+                name: $row->name ?: $derived->name,
+                config: array_merge($derived->config, is_array($row->config) ? $row->config : [], [
+                    'last_error' => $row->last_error,
+                ]),
+                bindingId: (string) $row->id,
+                manageable: $manageable,
+            );
+        }, $bindings);
 
         if ($key !== '') {
             $this->cache[$key] = $bindings;

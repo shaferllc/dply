@@ -122,6 +122,19 @@ return [
         'signups_open' => env('FEATURE_GLOBAL_SIGNUPS_OPEN', false),
         // exit: kept indefinitely as an emergency switch; never retire
         'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
+        // exit: ship when BYO redirect/cron/hook sync is validated on three OSes
+        'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', false),
+        // exit: ship after replay validated against password-protected previews
+        'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', false),
+    ],
+
+    /*
+    | Tier B launch workflows — multi-engine setup wizards gated until
+    | Cloud + Edge surfaces are enabled for the org.
+    */
+    'launch' => [
+        // exit: ship when FullStackArchitecturePlanner handoffs are validated E2E
+        'full_stack_wizard' => env('FEATURE_LAUNCH_FULL_STACK_WIZARD', false),
     ],
 
 ];

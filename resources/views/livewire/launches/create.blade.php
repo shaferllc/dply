@@ -35,8 +35,17 @@
                             <a
                                 href="{{ $option['href'] }}"
                                 wire:navigate
-                                class="group relative flex flex-col rounded-2xl border-2 border-brand-sage/35 bg-white p-6 shadow-sm ring-1 ring-brand-ink/[0.06] transition hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
+                                @class([
+                                    'group relative flex flex-col rounded-2xl border-2 bg-white p-6 shadow-sm ring-1 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40',
+                                    'border-brand-gold/50 ring-brand-gold/20 hover:border-brand-gold/70' => $option['featured'] ?? false,
+                                    'border-brand-sage/35 ring-brand-ink/[0.06] hover:border-brand-sage/55' => ! ($option['featured'] ?? false),
+                                ])
                             >
+                                @if ($option['featured'] ?? false)
+                                    <span class="absolute end-4 top-4 inline-flex rounded-full bg-brand-gold/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-forest">
+                                        {{ __('Tier B') }}
+                                    </span>
+                                @endif
                                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
                                     <x-dynamic-component :component="$iconComponent" class="h-7 w-7 shrink-0" aria-hidden="true" />
                                 </span>

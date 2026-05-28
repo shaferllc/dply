@@ -19,11 +19,25 @@ class Create extends Component
     }
 
     /**
-     * @return list<array{id: string, title: string, description: string, enabled: bool, icon: string, href?: string}>
+     * @return list<array{id: string, title: string, description: string, enabled: bool, icon: string, href?: string, featured?: bool}>
      */
     public function launchOptions(): array
     {
-        return [
+        $options = [];
+
+        if (full_stack_wizard_active()) {
+            $options[] = [
+                'id' => 'full-stack',
+                'title' => __('Full-stack from one repo'),
+                'description' => __('Analyze a monorepo and split it across Edge, Cloud, and BYO with wiring guidance.'),
+                'enabled' => true,
+                'featured' => true,
+                'href' => route('launches.full-stack'),
+                'icon' => 'squares-2x2',
+            ];
+        }
+
+        return array_merge($options, [
             [
                 'id' => 'byo',
                 'title' => __('Bring your own server'),
@@ -63,7 +77,7 @@ class Create extends Component
                 'href' => route('serverless.create'),
                 'icon' => 'sparkles',
             ],
-        ];
+        ]);
     }
 
     public function render(): View
