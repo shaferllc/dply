@@ -173,6 +173,19 @@ if (! function_exists('full_stack_wizard_active')) {
     }
 }
 
+if (! function_exists('cost_observatory_active')) {
+    /**
+     * True when the transparent cost observatory panel should render on
+     * billing analytics (global billing flag — same gate as pricing CTAs).
+     */
+    function cost_observatory_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('global.billing_enabled')
+            : Feature::for($organization)->active('global.billing_enabled');
+    }
+}
+
 if (! function_exists('audit_log')) {
     /**
      * Log an action to the organization audit log.

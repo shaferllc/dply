@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -30,15 +31,34 @@ test('billing analytics page renders for org admin', function () {
         ->assertOk()
         ->assertSee('Billing analytics')
         ->assertSee('Spend by category')
-        ->assertSee('Historical spend trend')
+        ->assertSee('Historical spend')
         ->assertSee('MRR')
-        ->assertSee('Projected month-end')
-        ->assertSee('Stripe sync audit log')
+        ->assertSee('Month-end projection')
+        ->assertSee('Stripe sync events')
         ->assertSee('Edge sites')
         ->assertSee('Managed products')
         ->assertSee('BYO server fleet')
-        ->assertSee('Invoice history')
-        ->assertDontSee('Still to add later');
+        ->assertSee('Invoice history');
+});
+
+test('billing analytics shows cost observatory when billing flag enabled', function () {
+    Feature::define('global.billing_enabled', fn () => true);
+
+    $admin = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($admin->id, ['role' => 'admin']);
+
+    Server::factory()->for($org)->create([
+        'status' => Server::STATUS_READY,
+        'created_at' => now()->subDays(5),
+        'meta' => ['cost_monthly_note' => '$5/mo Hetzner'],
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(Analytics::class, ['organization' => $org])
+        ->assertSee('Transparent cost observatory')
+        ->assertSee('vs Forge Hobby')
+        ->assertSee('BYO VM provider estimates');
 });
 
 test('billing analytics shows edge usage when snapshots exist', function () {

@@ -76,6 +76,14 @@ return [
         'edge_cents' => 200,
         // Edge delivery usage is billed in 1-cent Stripe units (quantity = cents).
         'edge_usage_unit_cents' => 1,
+        /*
+        | Cost observatory — comparison baselines for billing analytics.
+        | forge_per_server_cents mirrors Laravel Forge Hobby ($12/server/mo).
+        */
+        'observatory' => [
+            'forge_per_server_cents' => (int) env('SUBSCRIPTION_FORGE_PER_SERVER_CENTS', 1200),
+            'eur_to_usd_rate' => (float) env('SUBSCRIPTION_EUR_TO_USD_RATE', 1.08),
+        ],
         'stripe' => [
             'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
             'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),

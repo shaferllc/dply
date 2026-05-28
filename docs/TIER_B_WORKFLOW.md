@@ -114,11 +114,38 @@ FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY=true
 
 ---
 
+### Transparent cost observatory (`global.billing_enabled`)
+
+**Flag:** `global.billing_enabled` (same gate as pricing CTAs)
+
+Org **Billing analytics** adds a **Cost observatory** panel combining:
+
+| Layer | Source |
+|-------|--------|
+| Dply platform | `DesiredBillingState` (base + tiers + managed + Edge usage) |
+| Provider infrastructure | Saved server cost notes or live catalog lookup (`ServerProviderCostEstimator`) |
+| Comparison | Laravel Forge Hobby baseline ($12/server/mo) + same provider estimates |
+
+**Code:**
+
+- [`app/Services/Billing/OrganizationCostObservatory.php`](../app/Services/Billing/OrganizationCostObservatory.php)
+- [`app/Services/Billing/ServerMonthlyCostNoteParser.php`](../app/Services/Billing/ServerMonthlyCostNoteParser.php)
+- Wired into [`BillingAnalytics`](../app/Services/Billing/BillingAnalytics.php) → [`billing/analytics`](../app/Livewire/Billing/Analytics.php)
+
+**Enable:**
+
+```env
+FEATURE_GLOBAL_BILLING_ENABLED=true
+```
+
+**Follow-ups:** Cloud/App Runner provider pass-through estimates; annual commit amortization; currency conversion from live rates.
+
+---
+
 ## Tier B backlog (not started)
 
 | Idea | Suggested branch | Notes |
 |------|------------------|-------|
-| Transparent cost observatory | `feature/tier-b-cost-observatory` | Org billing + provider estimates |
 | Preview review hub | `feature/tier-b-preview-review` | Expand `EdgePreviewComments` |
 | Runbook marketplace | `feature/tier-b-marketplace` | Needs `surface.marketplace` GA |
 | Ephemeral deploy credentials | `feature/tier-b-ephemeral-ssh` | Per-deploy key lifecycle |
