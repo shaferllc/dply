@@ -37,6 +37,14 @@ function costCardUserWithServer(): array
     return [$user, $server];
 }
 
+test('legacy server cost route redirects to settings governance', function (): void {
+    [$user, $server] = costCardUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.cost', $server))
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'governance']).'#settings-cost-estimate');
+});
+
 test('server cost page is hidden without feature flag', function (): void {
     Feature::define('workspace.server_cost', fn (): bool => false);
     Feature::flushCache();
@@ -48,15 +56,13 @@ test('server cost page is hidden without feature flag', function (): void {
         ->assertStatus(400);
 });
 
-test('server cost page renders stack breakdown', function (): void {
+test('settings governance tab renders stack estimate', function (): void {
     [$user, $server] = costCardUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.cost', $server))
+        ->get(route('servers.settings', ['server' => $server, 'section' => 'governance']))
         ->assertOk()
-        ->assertSee(__('Overall'))
+        ->assertSee(__('Stack estimate'))
         ->assertSee(__('Full stack'))
-        ->assertSee(__('Dply tier fee'))
-        ->assertSee(__('Site allocation'))
-        ->assertSee(__('Tier ladder (monthly)'));
+        ->assertSee(__('Cost & lifecycle'));
 });

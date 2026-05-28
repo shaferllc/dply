@@ -623,7 +623,7 @@ final class ServerProvisionCommandBuilder
             $this->stepMarker('Installing base packages'),
             'dply_wait_for_apt_locks',
             ...$this->ensurePackagesInstalled(
-                ['ca-certificates', 'curl', 'gnupg', 'lsb-release', 'locales', 'software-properties-common', 'ufw', 'unattended-upgrades'],
+                ['ca-certificates', 'curl', 'git', 'gnupg', 'lsb-release', 'locales', 'software-properties-common', 'ufw', 'unattended-upgrades'],
                 '[dply] base packages already installed; skipping package install.'
             ),
         ]);
@@ -890,6 +890,7 @@ final class ServerProvisionCommandBuilder
             'none' => [],
             'valkey' => $this->withStep('Installing Valkey', [
                 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
+                'if command -v redis-cli >/dev/null 2>&1; then echo "[dply] redis-cli already available."; else apt-get install -y --no-install-recommends redis-tools || true; fi',
                 $this->writeFileWithRollback('/etc/valkey/valkey.conf', "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
                 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
             ]),
@@ -905,7 +906,7 @@ final class ServerProvisionCommandBuilder
             'dragonfly' => $this->installDragonfly(),
             default => $this->withStep('Installing Redis', [
                 ...$this->ensurePackagesInstalled(
-                    ['redis-server'],
+                    ['redis-server', 'redis-tools'],
                     '[dply] redis-server already installed; skipping package install.'
                 ),
                 $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),

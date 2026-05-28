@@ -369,6 +369,28 @@ final class AdminFeatureFlags
         return in_array($key, self::platformOnlyOrgFlags(), true);
     }
 
+    /**
+     * @return array<string, string> parent flag key => preview flag key
+     */
+    public static function featurePreviewPairs(): array
+    {
+        $pairs = config('admin_feature_flags.feature_preview_pairs', []);
+
+        return is_array($pairs) ? $pairs : [];
+    }
+
+    public static function previewFlagFor(string $parentKey): ?string
+    {
+        $preview = self::featurePreviewPairs()[$parentKey] ?? null;
+
+        return is_string($preview) && $preview !== '' ? $preview : null;
+    }
+
+    public static function isPreviewFlag(string $key): bool
+    {
+        return in_array($key, self::featurePreviewPairs(), true);
+    }
+
     public static function platformOrgFlagActive(string $key): bool
     {
         return Feature::for(null)->active($key);

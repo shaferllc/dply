@@ -93,6 +93,18 @@ test('deploy policy page saves weekend freeze', function (): void {
         ->and($policy['deny_rules'])->not->toBeEmpty();
 });
 
+test('deploy policy page renders expanded workspace', function (): void {
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.deploy-policy', $server))
+        ->assertOk()
+        ->assertSee(__('Deploy window policy'))
+        ->assertSee(__('Configured deny windows'))
+        ->assertSee(__('Site coverage'))
+        ->assertSee(__('Recent policy skips'));
+});
+
 test('cert inventory feature flag returns 400 when disabled', function (): void {
     Feature::define('workspace.cert_inventory', fn (): bool => false);
     Feature::flushCache();
@@ -124,14 +136,12 @@ test('security digest page renders', function (): void {
         ->assertSee(__('Refresh digest'));
 });
 
-test('server cost page renders', function (): void {
+test('server cost page redirects to settings governance', function (): void {
     [$user, $server] = vmRoadmapUserWithServer();
 
     $server->update(['meta' => ['host_kind' => 'vm', 'cost_monthly_note' => '$5/mo']]);
 
     $this->actingAs($user)
         ->get(route('servers.cost', $server))
-        ->assertOk()
-        ->assertSee(__('Cost'))
-        ->assertSee(__('Overall'));
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'governance']).'#settings-cost-estimate');
 });

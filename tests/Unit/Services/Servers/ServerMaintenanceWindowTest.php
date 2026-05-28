@@ -148,3 +148,37 @@ test('refresh expired clears maintenance when until is past', function (): void 
     expect($cleared)->toBeTrue()
         ->and(app(ServerMaintenanceWindow::class)->isActive($server->fresh()))->toBeFalse();
 });
+
+test('report summarizes site impact rows', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => ['host_kind' => 'vm'],
+    ]);
+
+    Site::factory()->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'app-one',
+    ]);
+
+    Site::factory()->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'manual-hold',
+        'suspended_at' => now()->subHour(),
+        'suspended_reason' => 'manual',
+    ]);
+
+    $report = app(ServerMaintenanceWindow::class)->report($server->fresh());
+
+    expect($report['overall'])->toBe('inactive')
+        ->and($report['summary']['eligible'])->toBe(2)
+        ->and($report['summary']['would_suspend'])->toBe(1)
+        ->and($report['summary']['already_suspended'])->toBe(1)
+        ->and(collect($report['site_rows'])->pluck('name')->all())->toContain('app-one', 'manual-hold');
+});

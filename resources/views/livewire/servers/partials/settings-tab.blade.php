@@ -56,7 +56,9 @@
         @include('livewire.servers.partials.settings.group-inventory', $settingsShare)
         @break
     @case ('governance')
-        @include('livewire.servers.partials.settings.group-governance', $settingsShare)
+        @include('livewire.servers.partials.settings.group-governance', $settingsShare + [
+            'costReport' => $costReport ?? null,
+        ])
         @break
     @case ('notes')
         @include('livewire.servers.partials.settings.group-reference', $settingsShare)

@@ -49,7 +49,9 @@ test('server maintenance page renders controls', function (): void {
     $this->actingAs($user)
         ->get(route('servers.maintenance', $server))
         ->assertOk()
-        ->assertSee(__('Start maintenance window'))
+        ->assertSee(__('Visitor maintenance'))
+        ->assertSee(__('Site impact'))
+        ->assertSee(__('Preferred maintenance window'))
         ->assertSee(__('Public visitor message'));
 });
 

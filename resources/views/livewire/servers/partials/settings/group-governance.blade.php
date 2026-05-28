@@ -15,8 +15,16 @@
         'headingId' => 'settings-group-governance-title',
         'kicker' => __('Governance'),
         'title' => __('Cost, environment & backups'),
-        'description' => __('Documentation for finance, compliance, and recovery. Nothing here bills your cloud account or runs backups—use it so operators know where to look.'),
+        'description' => __('Stack estimates, finance notes, compliance labels, and recovery documentation. Estimates are not invoiced amounts — save cost notes below to improve provider lines.'),
     ])
+
+    @if (! empty($costReport))
+        @include('livewire.servers.partials.settings.cost-card-estimate', [
+            'card' => $card,
+            'server' => $server,
+            'report' => $costReport,
+        ])
+    @endif
 
     <div id="settings-cost" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Cost & lifecycle') }}</h3>

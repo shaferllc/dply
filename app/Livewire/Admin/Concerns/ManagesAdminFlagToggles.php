@@ -95,7 +95,7 @@ trait ManagesAdminFlagToggles
             }
             Feature::flushCache();
             $this->toastSuccess(AdminFeatureFlags::isPlatformOnlyOrgFlag($flag)
-                ? __(':flag enabled platform-wide for every org (when full console is off).', ['flag' => $label])
+                ? __(':flag enabled platform-wide for every org (when the full feature above is off).', ['flag' => $label])
                 : __(':flag platform default enabled. Orgs with explicit overrides keep their setting.', ['flag' => $label]));
         }
 
@@ -168,6 +168,39 @@ trait ManagesAdminFlagToggles
                 'active' => Feature::for(null)->active($key),
                 'default' => AdminFeatureFlags::configDefault($key),
                 'configDefault' => AdminFeatureFlags::configDefault($key),
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return list<array{key: string, label: string, active: bool, default: bool, configDefault: bool, preview: array{key: string, label: string, active: bool, default: bool, configDefault: bool}|null}>
+     */
+    protected function groupedPlatformFlagEntries(array $parentFlags, array $allFlagsInGroup): array
+    {
+        $entries = [];
+        foreach ($parentFlags as $key => $label) {
+            $previewKey = AdminFeatureFlags::previewFlagFor($key);
+            $previewEntry = null;
+
+            if ($previewKey !== null && isset($allFlagsInGroup[$previewKey])) {
+                $previewEntry = [
+                    'key' => $previewKey,
+                    'label' => $allFlagsInGroup[$previewKey],
+                    'active' => Feature::for(null)->active($previewKey),
+                    'default' => AdminFeatureFlags::configDefault($previewKey),
+                    'configDefault' => AdminFeatureFlags::configDefault($previewKey),
+                ];
+            }
+
+            $entries[] = [
+                'key' => $key,
+                'label' => $label,
+                'active' => Feature::for(null)->active($key),
+                'default' => AdminFeatureFlags::configDefault($key),
+                'configDefault' => AdminFeatureFlags::configDefault($key),
+                'preview' => $previewEntry,
             ];
         }
 

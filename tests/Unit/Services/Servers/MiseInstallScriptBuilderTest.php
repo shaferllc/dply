@@ -94,3 +94,11 @@ test('install runtime skips when version is blank', function () {
     $lines = (new MiseInstallScriptBuilder)->installRuntimeForUserLines('dply', 'node', '   ');
     expect($lines)->toBe([]);
 });
+test('install runtime version activates global default via mise use', function () {
+    $lines = (new MiseInstallScriptBuilder)->installRuntimeVersionForUserLines('dply', 'node', '26.2.0');
+    $script = implode("\n", $lines);
+
+    expect($lines)->not->toBeEmpty();
+    expect($script)->toContain('mise use --global node@26.2.0');
+    expect($script)->not->toContain('mise install node@26.2.0');
+});

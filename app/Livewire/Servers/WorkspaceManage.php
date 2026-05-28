@@ -22,6 +22,7 @@ use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\MiseInstallScriptBuilder;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\SshConnection;
@@ -401,10 +402,10 @@ BASH;
     }
 
     /**
-     * Install a runtime version under the deploy user's mise without changing
-     * the global default. The Tools tab's "Install version" button is wired
-     * here. Output streams via the hoisted manage-action banner; the seeded
-     * ConsoleAction row carries the per-line progress mise emits.
+     * Install a runtime version under the deploy user's mise and activate it as
+     * the global default (`mise use --global`). Without activation, mise warns
+     * that the version is "installed but not activated". The Tools tab's
+     * "Install & activate" button is wired here.
      */
     public function miseInstallRuntime(string $runtime, string $version): void
     {
@@ -413,7 +414,7 @@ BASH;
             version: $version,
             kind: 'install',
             taskName: 'mise-runtime:install',
-            labelTemplate: __('Installing :runtime :version'),
+            labelTemplate: __('Installing and activating :runtime :version'),
         );
     }
 
@@ -515,12 +516,14 @@ BASH;
         }
 
         $builder = app(MiseInstallScriptBuilder::class);
-        $lines = match ($kind) {
-            'install' => $builder->installRuntimeVersionForUserLines($deployUser, $runtime, $version),
+        $runtimeLines = match ($kind) {
+            'install', 'default' => $builder->installRuntimeForUserLines($deployUser, $runtime, $version),
             'uninstall' => $builder->uninstallRuntimeVersionForUserLines($deployUser, $runtime, $version),
-            'default' => $builder->setRuntimeDefaultForUserLines($deployUser, $runtime, $version),
             default => [],
         };
+        $lines = $kind === 'uninstall'
+            ? $runtimeLines
+            : array_merge($builder->activateForUserLines($deployUser), $runtimeLines);
         if ($lines === []) {
             $this->toastError(__('Could not build the runtime script for :runtime :version.', [
                 'runtime' => $runtime,
@@ -1175,7 +1178,7 @@ BASH;
         $this->manageRemoteTaskId = null;
     }
 
-    public function render(): View
+    public function render(ServerManageToolsReport $toolsReport): View
     {
         $this->server->refresh();
 
@@ -1187,12 +1190,17 @@ BASH;
                 ->get()
             : collect();
 
+        $serviceActions = config('server_manage.service_actions', []);
+
         return view('livewire.servers.workspace-manage', [
             'configPreviews' => config('server_manage.config_previews', []),
-            'serviceActions' => config('server_manage.service_actions', []),
+            'serviceActions' => $serviceActions,
             'dangerousActions' => config('server_manage.dangerous_actions', []),
             'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
             'recentActions' => $recentActions,
+            'toolsReport' => $this->section === 'tools'
+                ? $toolsReport->build($this->server, $serviceActions)
+                : null,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

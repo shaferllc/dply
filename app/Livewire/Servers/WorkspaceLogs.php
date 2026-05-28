@@ -7,6 +7,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
 use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\ServerSystemLogsReport;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -97,13 +98,28 @@ class WorkspaceLogs extends Component
         $this->mergeRemoteLogFromBroadcast($data);
     }
 
-    public function render(): View
+    public function render(ServerSystemLogsReport $logsReport): View
     {
         $this->server->refresh();
 
+        $logSources = $this->availableLogSources();
+
         return view('livewire.servers.workspace-logs', [
-            'logSources' => $this->availableLogSources(),
+            'logSources' => $logSources,
             'logBroadcastEchoSubscribable' => $this->logBroadcastEchoSubscribable(),
+            'report' => $logsReport->build($this->server, $logSources, [
+                'log_key' => $this->logKey,
+                'log_total_lines' => $this->logTotalLines,
+                'log_filtered_lines' => $this->logFilteredLines,
+                'log_last_fetched_at' => $this->logLastFetchedAt,
+                'log_auto_refresh' => $this->logAutoRefresh,
+                'log_auto_refresh_seconds' => $this->logAutoRefreshSeconds,
+                'log_time_range_minutes' => $this->logTimeRangeMinutes,
+                'remote_log_error' => $this->remoteLogError,
+                'log_last_fetch_truncated' => $this->logLastFetchTruncated,
+                'log_last_fetch_raw_bytes' => $this->logLastFetchRawBytes,
+                'log_broadcast_subscribable' => $this->logBroadcastEchoSubscribable(),
+            ]),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

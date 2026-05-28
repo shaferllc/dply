@@ -867,7 +867,7 @@
                                     @endif
                                 </p>
                             </div>
-                            <a href="{{ route('servers.cost', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'governance']) }}#settings-cost-estimate" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 {{ __('Open Cost') }}
                                 <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             </a>

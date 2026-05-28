@@ -27,6 +27,7 @@
             'workspaces' => $workspaces,
             'card' => $card,
             'section' => $section,
+            'costReport' => $costReport ?? null,
         ])
     </div>
 

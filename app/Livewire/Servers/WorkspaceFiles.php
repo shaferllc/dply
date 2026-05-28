@@ -15,6 +15,7 @@ use App\Support\Servers\FileBrowserPathPolicy;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -33,6 +34,9 @@ class WorkspaceFiles extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.files';
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -67,6 +71,18 @@ class WorkspaceFiles extends Component
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.files')) {
+            if (workspace_files_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->comingSoonPreview = false;
         $this->bootWorkspace($server);
         $this->denyDeployer();
 
@@ -75,8 +91,24 @@ class WorkspaceFiles extends Component
         }
     }
 
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
+    }
+
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-files-preview');
+        }
+
         $listing = $this->serverOpsReady() ? $this->safeList() : null;
 
         return view('livewire.servers.workspace-files', [

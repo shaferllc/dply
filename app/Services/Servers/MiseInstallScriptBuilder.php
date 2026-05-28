@@ -164,32 +164,15 @@ class MiseInstallScriptBuilder
     }
 
     /**
-     * Bash lines that install a runtime version for the deploy user **without**
-     * touching the global default. The Tools → mise card calls this when the
-     * operator clicks "Install version" — they want the version available, but
-     * not necessarily the new default.
+     * Bash lines that install a runtime version for the deploy user and activate
+     * it as the global default. Alias of {@see installRuntimeForUserLines} —
+     * kept so call sites that name "install version" still get install + activate.
      *
      * @return list<string>
      */
     public function installRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
-        if (! in_array($runtime, self::SUPPORTED_RUNTIMES, true)) {
-            return [];
-        }
-        $version = trim($version);
-        if ($version === '') {
-            return [];
-        }
-
-        $userArg = escapeshellarg($deployUser);
-        $miseTool = $this->miseToolKey($runtime);
-        $env = $this->preferBinaryEnv();
-        $cmd = escapeshellarg($env."mise install {$miseTool}@{$version}");
-
-        return [
-            "echo \"[dply] installing {$miseTool}@{$version} for {$deployUser} (no change to global default)\"",
-            "sudo -u {$userArg} -H bash -lc {$cmd}",
-        ];
+        return $this->installRuntimeForUserLines($deployUser, $runtime, $version);
     }
 
     /**

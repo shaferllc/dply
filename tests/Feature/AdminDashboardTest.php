@@ -83,6 +83,21 @@ test('vm servers product line page shows emergency and provider flags', function
         ->assertSee('workspace.ephemeral_credentials');
 });
 
+test('vm servers product line groups feature flags with their coming soon previews', function () {
+    $user = User::factory()->create();
+
+    $html = $this->actingAs($user)->get(route('admin.flags.vm.servers'))->assertOk()->getContent();
+
+    expect(substr_count($html, 'wire:key="group-Console"'))->toBe(1)
+        ->and(substr_count($html, 'wire:key="group-Insights"'))->toBe(1)
+        ->and(substr_count($html, 'wire:key="group-Blueprint"'))->toBe(1)
+        ->and($html)->toContain('workspace.console_preview')
+        ->and($html)->toContain('workspace.insights_preview')
+        ->and($html)->toContain('workspace.server_blueprint_preview')
+        ->and($html)->toContain('workspace.files_preview')
+        ->and($html)->toContain(__('Shows Soon badge + teaser page when full workspace above is off. Not overridable per org.'));
+});
+
 test('vm sites product line page shows site promote flag', function () {
     $user = User::factory()->create();
 

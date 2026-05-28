@@ -86,9 +86,13 @@ class WorkspaceDeployPolicy extends Component
 
     public function render(ServerDeployPolicyGuard $guard): View
     {
+        $report = $guard->report($this->server);
+
         return view('livewire.servers.workspace-deploy-policy', [
-            'currentAllowed' => $guard->evaluateServer($this->server)['allowed'],
-            'blockReason' => $guard->evaluateServer($this->server)['reason'],
+            'report' => $report,
+            'currentAllowed' => $report['evaluation']['allowed'],
+            'blockReason' => $report['evaluation']['reason'],
+            'nextAllowedAt' => $report['evaluation']['next_allowed_at'],
             'dayOptions' => ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
         ]);
     }

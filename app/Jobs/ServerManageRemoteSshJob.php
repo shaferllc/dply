@@ -334,6 +334,10 @@ class ServerManageRemoteSshJob implements ShouldQueue
 
     protected function shouldRerunProbeAfterFinish(): bool
     {
+        if (str_starts_with($this->taskName, 'mise-runtime:')) {
+            return true;
+        }
+
         if (! preg_match('/^manage-action:(.+)$/', $this->taskName, $m)) {
             return false;
         }

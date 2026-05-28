@@ -14,6 +14,7 @@
         'dangerousActions' => $dangerousActions,
         'autoUpdateIntervals' => $autoUpdateIntervals,
         'recentActions' => $recentActions ?? collect(),
+        'toolsReport' => $toolsReport ?? null,
     ];
 
     // Workspace-scoped console-actions banner. Surfaces the in-flight + most-recent

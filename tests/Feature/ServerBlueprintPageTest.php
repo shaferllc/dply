@@ -41,15 +41,16 @@ function blueprintUserWithServer(): array
     return [$user, $org, $server];
 }
 
-test('server blueprint page is hidden without feature flag', function (): void {
+test('server blueprint page is hidden without feature flag or preview', function (): void {
     Feature::define('workspace.server_blueprint', fn (): bool => false);
+    Feature::define('workspace.server_blueprint_preview', fn (): bool => false);
     Feature::flushCache();
 
     [$user, , $server] = blueprintUserWithServer();
 
     $this->actingAs($user)
         ->get(route('servers.blueprint', $server))
-        ->assertStatus(400);
+        ->assertNotFound();
 });
 
 test('server blueprint page renders capture form', function (): void {

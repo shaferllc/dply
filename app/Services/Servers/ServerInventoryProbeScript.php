@@ -158,6 +158,30 @@ if command -v wp >/dev/null 2>&1; then
 fi
 printf "WP_CLI_PRESENT=%s\n" "\$wp_p"
 [ -n "\$wp_v" ] && printf "WP_CLI_VERSION=%s\n" "\$wp_v"
+composer_p=0; composer_v=
+if command -v composer >/dev/null 2>&1; then
+  composer_p=1
+  composer_v=\$(composer --version 2>/dev/null | head -n 1)
+fi
+printf "COMPOSER_PRESENT=%s\n" "\$composer_p"
+[ -n "\$composer_v" ] && printf "COMPOSER_VERSION=%s\n" "\$composer_v"
+git_p=0; git_v=
+if command -v git >/dev/null 2>&1; then
+  git_p=1
+  git_v=\$(git --version 2>/dev/null | head -n 1)
+fi
+printf "GIT_PRESENT=%s\n" "\$git_p"
+[ -n "\$git_v" ] && printf "GIT_VERSION=%s\n" "\$git_v"
+redis_cli_p=0; redis_cli_v=
+if command -v redis-cli >/dev/null 2>&1; then
+  redis_cli_p=1
+  redis_cli_v=\$(redis-cli --version 2>/dev/null | head -n 1)
+elif command -v valkey-cli >/dev/null 2>&1; then
+  redis_cli_p=1
+  redis_cli_v=\$(valkey-cli --version 2>/dev/null | head -n 1)
+fi
+printf "REDIS_CLI_PRESENT=%s\n" "\$redis_cli_p"
+[ -n "\$redis_cli_v" ] && printf "REDIS_CLI_VERSION=%s\n" "\$redis_cli_v"
 printf "TOOLS_END\n"
 printf "SYSTEM_RUNTIMES_BEGIN\n"
 # System-level runtime detection — anything on the default PATH that the operator
@@ -412,6 +436,20 @@ SH;
         $miseRuntimes = $this->parseMiseRuntimesBlock($out);
         if ($miseRuntimes !== null) {
             $meta['manage_mise_runtimes'] = $miseRuntimes;
+
+            $defaults = is_array($meta['runtime_defaults'] ?? null) ? $meta['runtime_defaults'] : [];
+            foreach ($miseRuntimes as $runtime => $data) {
+                if (! is_array($data)) {
+                    continue;
+                }
+                $active = trim((string) ($data['active'] ?? ''));
+                if ($active !== '') {
+                    $defaults[$runtime] = $active;
+                }
+            }
+            if ($defaults !== []) {
+                $meta['runtime_defaults'] = $defaults;
+            }
         }
 
         // System-level runtimes — what's on PATH in the non-interactive root
@@ -439,6 +477,9 @@ SH;
             'mise' => 'mise',
             'docker' => 'docker',
             'wp_cli' => 'wp_cli',
+            'composer' => 'composer',
+            'git' => 'git',
+            'redis_cli' => 'redis_cli',
         ] as $slug => $prefix) {
             $present = (string) ($toolsKv[$prefix.'_present'] ?? '0') === '1';
             $version = $present ? (string) ($toolsKv[$prefix.'_version'] ?? '') : '';

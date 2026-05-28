@@ -1076,6 +1076,77 @@ wp --info --allow-root 2>&1 | head -n 10
 BASH,
             'rerun_probe_after_finish' => true,
         ],
+
+        'install_composer' => [
+            'label' => 'Install Composer',
+            'description' => 'Composer (https://getcomposer.org) — PHP dependency manager.',
+            'confirm' => 'Install Composer at /usr/local/bin/composer? Uses the official getcomposer.org installer.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+if command -v composer >/dev/null 2>&1; then
+  echo "Composer already installed: $(composer --version 2>&1 | head -n 1)"
+  echo "Skipping reinstall — remove /usr/local/bin/composer first if you need a clean rebuild."
+  exit 0
+fi
+if ! command -v php >/dev/null 2>&1; then
+  echo "PHP is not installed on this server — install PHP before Composer." >&2
+  exit 1
+fi
+curl --silent --show-error --fail --location --output /tmp/composer-setup.php https://getcomposer.org/installer
+php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+rm -f /tmp/composer-setup.php
+composer --version 2>&1 | head -n 1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_git' => [
+            'label' => 'Install Git',
+            'description' => 'Git version control CLI via apt.',
+            'confirm' => 'Install Git on this server? Uses apt to install the git package.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+if command -v git >/dev/null 2>&1; then
+  echo "Git already installed: $(git --version 2>&1 | head -n 1)"
+  exit 0
+fi
+apt-get update -y
+apt-get install -y --no-install-recommends git
+git --version 2>&1 | head -n 1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_redis_cli' => [
+            'label' => 'Install redis-cli',
+            'description' => 'redis-tools / redis-server client package for cache inspection.',
+            'confirm' => 'Install redis-cli on this server? Installs redis-tools (and redis-server if needed) via apt.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if command -v redis-cli >/dev/null 2>&1; then
+  echo "redis-cli already installed: $(redis-cli --version 2>&1 | head -n 1)"
+  exit 0
+fi
+if command -v valkey-cli >/dev/null 2>&1; then
+  echo "valkey-cli already installed: $(valkey-cli --version 2>&1 | head -n 1)"
+  exit 0
+fi
+apt-get update -y
+if apt-get install -y --no-install-recommends redis-tools; then
+  :
+elif apt-get install -y --no-install-recommends redis-server; then
+  :
+else
+  apt-get install -y --no-install-recommends valkey-tools || apt-get install -y --no-install-recommends valkey-server
+fi
+(command -v redis-cli >/dev/null 2>&1 && redis-cli --version 2>&1 | head -n 1) \
+  || (command -v valkey-cli >/dev/null 2>&1 && valkey-cli --version 2>&1 | head -n 1)
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
     ],
 
     'dangerous_actions' => [
@@ -1095,6 +1166,80 @@ BASH
         'off' => 'Disabled',
         'daily' => 'Daily',
         'weekly' => 'Weekly',
+    ],
+
+    /*
+    | Manage → Tools catalog. Each entry maps to a TOOLS probe key in
+    | ServerInventoryProbeScript and optionally a service_actions install key.
+    | card=hero renders the full-width mise panel; card=generic renders a grid card.
+    */
+    'tool_catalog' => [
+        'mise' => [
+            'slug' => 'mise',
+            'label' => 'mise (dev tool version manager)',
+            'description' => 'Installs Node, Python, Ruby, Go per project via .tool-versions / .mise.toml. dply installs mise from the official apt repo during provisioning — this surface is here for repair / version refresh, not first-install.',
+            'docs_url' => 'https://mise.jdx.dev',
+            'icon' => 'heroicon-o-cube-transparent',
+            'probe_key' => 'mise',
+            'action_key' => 'install_mise',
+            'preinstalled' => true,
+            'card' => 'hero',
+        ],
+        'composer' => [
+            'slug' => 'composer',
+            'label' => 'Composer',
+            'description' => 'PHP dependency manager for Laravel and other PHP projects. Installed during provisioning when PHP is present; use Install when the binary is missing.',
+            'docs_url' => 'https://getcomposer.org',
+            'icon' => 'heroicon-o-code-bracket-square',
+            'probe_key' => 'composer',
+            'action_key' => 'install_composer',
+            'action_when' => 'missing',
+            'requires_php' => true,
+            'card' => 'generic',
+        ],
+        'git' => [
+            'slug' => 'git',
+            'label' => 'Git',
+            'description' => 'Version control CLI — installed on every dply-provisioned server. Use Install when an older import is missing git.',
+            'docs_url' => 'https://git-scm.com',
+            'icon' => 'heroicon-o-code-bracket',
+            'probe_key' => 'git',
+            'action_key' => 'install_git',
+            'action_when' => 'missing',
+            'card' => 'generic',
+        ],
+        'docker' => [
+            'slug' => 'docker',
+            'label' => 'Docker Engine',
+            'description' => 'Container runtime + CLI. Installs docker-ce, docker-ce-cli, and containerd from the official Docker apt repo via the get.docker.com convenience script.',
+            'docs_url' => 'https://docs.docker.com/engine/install/',
+            'icon' => 'heroicon-o-square-3-stack-3d',
+            'probe_key' => 'docker',
+            'action_key' => 'install_docker',
+            'card' => 'generic',
+        ],
+        'wp_cli' => [
+            'slug' => 'wp_cli',
+            'label' => 'wp-cli (WordPress CLI)',
+            'description' => 'Command-line interface for managing WordPress sites — plugins, themes, users, search-replace. dply\'s WordPress scaffold installs this automatically on first scaffold; this surface re-installs / pulls the latest phar on demand.',
+            'docs_url' => 'https://wp-cli.org',
+            'icon' => 'heroicon-o-code-bracket',
+            'probe_key' => 'wp_cli',
+            'action_key' => 'install_wp_cli',
+            'card' => 'generic',
+        ],
+        'redis_cli' => [
+            'slug' => 'redis_cli',
+            'label' => 'redis-cli',
+            'description' => 'Redis wire-protocol CLI for cache inspection. Installed with Redis/Valkey during provisioning; use Install when the CLI is missing. Open Caches for stats, key browser, and REPL.',
+            'docs_url' => 'https://redis.io/docs/latest/develop/tools/cli/',
+            'icon' => 'heroicon-o-circle-stack',
+            'probe_key' => 'redis_cli',
+            'action_key' => 'install_redis_cli',
+            'action_when' => 'missing',
+            'show_when_redis_relevant' => true,
+            'card' => 'generic',
+        ],
     ],
 
     /**

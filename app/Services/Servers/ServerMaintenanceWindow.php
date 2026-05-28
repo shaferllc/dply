@@ -82,6 +82,135 @@ final class ServerMaintenanceWindow
     }
 
     /**
+     * Rich maintenance workspace report: visitor window state, site impact rows,
+     * and eligibility breakdown for the server maintenance page.
+     *
+     * @return array{
+     *     overall: string,
+     *     active: bool,
+     *     summary: array{
+     *         total_sites: int,
+     *         eligible: int,
+     *         would_suspend: int,
+     *         already_suspended: int,
+     *         skipped: int,
+     *         suspended_by_window: int,
+     *         live_eligible: int,
+     *     },
+     *     state: array<string, mixed>|null,
+     *     preview: array{suspend_count: int, already_suspended: int, skipped: int},
+     *     site_rows: list<array{
+     *         id: string,
+     *         name: string,
+     *         primary_hostname: string,
+     *         status: string,
+     *         status_label: string,
+     *         detail: ?string,
+     *         show_url: string,
+     *     }>,
+     * }
+     */
+    public function report(Server $server): array
+    {
+        $server->loadMissing(['sites.server']);
+        $active = $this->isActive($server);
+        $state = $this->state($server);
+        $preview = $this->preview($server);
+        $eligible = $this->eligibleSites($server);
+        $eligibleIds = $eligible->pluck('id')->map(fn ($id): string => (string) $id)->all();
+
+        /** @var list<string> $windowSuspendedIds */
+        $windowSuspendedIds = is_array($state['suspended_site_ids'] ?? null)
+            ? array_map('strval', $state['suspended_site_ids'])
+            : [];
+
+        $suspendedByWindow = 0;
+        $siteRows = [];
+
+        foreach ($server->sites->sortBy('name') as $site) {
+            $siteId = (string) $site->id;
+            $inEligible = in_array($siteId, $eligibleIds, true);
+            $primaryHostname = $site->primaryDomain()?->hostname ?: $site->name;
+
+            if (! $inEligible) {
+                $siteRows[] = [
+                    'id' => $siteId,
+                    'name' => $site->name,
+                    'primary_hostname' => $primaryHostname,
+                    'status' => 'excluded',
+                    'status_label' => __('Excluded'),
+                    'detail' => $this->siteIneligibleReason($site),
+                    'show_url' => route('sites.show', ['server' => $server, 'site' => $site]),
+                ];
+
+                continue;
+            }
+
+            if ($site->isSuspended()) {
+                $reason = (string) ($site->suspended_reason ?? '');
+
+                if ($reason === self::REASON) {
+                    $suspendedByWindow++;
+                    $siteRows[] = [
+                        'id' => $siteId,
+                        'name' => $site->name,
+                        'primary_hostname' => $primaryHostname,
+                        'status' => 'suspended_window',
+                        'status_label' => __('Suspended (maintenance)'),
+                        'detail' => trim((string) ($site->meta['suspended_message'] ?? '')) ?: null,
+                        'show_url' => route('sites.show', ['server' => $server, 'site' => $site]),
+                    ];
+
+                    continue;
+                }
+
+                $siteRows[] = [
+                    'id' => $siteId,
+                    'name' => $site->name,
+                    'primary_hostname' => $primaryHostname,
+                    'status' => 'suspended_other',
+                    'status_label' => __('Already suspended'),
+                    'detail' => $reason !== '' ? $reason : __('Suspended before maintenance started'),
+                    'show_url' => route('sites.show', ['server' => $server, 'site' => $site]),
+                ];
+
+                continue;
+            }
+
+            $siteRows[] = [
+                'id' => $siteId,
+                'name' => $site->name,
+                'primary_hostname' => $primaryHostname,
+                'status' => $active ? 'live' : 'ready',
+                'status_label' => $active ? __('Live traffic') : __('Would suspend'),
+                'detail' => null,
+                'show_url' => route('sites.show', ['server' => $server, 'site' => $site]),
+            ];
+        }
+
+        $wouldSuspend = $preview['suspend_count'];
+        $alreadySuspended = $preview['already_suspended'];
+        $liveEligible = max(0, $eligible->count() - $alreadySuspended - ($active ? $suspendedByWindow : 0));
+
+        return [
+            'overall' => $active ? 'active' : 'inactive',
+            'active' => $active,
+            'summary' => [
+                'total_sites' => $server->sites->count(),
+                'eligible' => $eligible->count(),
+                'would_suspend' => $wouldSuspend,
+                'already_suspended' => $alreadySuspended,
+                'skipped' => $preview['skipped'],
+                'suspended_by_window' => $suspendedByWindow,
+                'live_eligible' => $liveEligible,
+            ],
+            'state' => $state,
+            'preview' => $preview,
+            'site_rows' => $siteRows,
+        ];
+    }
+
+    /**
      * @return array{suspended: int, already_suspended: int}
      */
     public function enable(
@@ -263,6 +392,28 @@ final class ServerMaintenanceWindow
             && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
+    }
+
+    private function siteIneligibleReason(Site $site): string
+    {
+        if ($site->usesDockerRuntime()) {
+            return __('Docker runtime — not managed by VM webserver suspend');
+        }
+
+        if ($site->usesKubernetesRuntime()) {
+            return __('Kubernetes runtime — not managed by VM webserver suspend');
+        }
+
+        if ($site->usesFunctionsRuntime()) {
+            return __('Serverless runtime — not managed by VM webserver suspend');
+        }
+
+        $server = $site->server;
+        if ($server !== null && ! $server->hostCapabilities()->supportsWebserverProvisioning()) {
+            return __('Managed webserver config not available on this host');
+        }
+
+        return __('Not eligible for server maintenance suspend');
     }
 
     private function parseUntil(mixed $value): ?Carbon

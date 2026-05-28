@@ -13,6 +13,7 @@ use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -27,17 +28,45 @@ class WorkspaceBlueprint extends Component
 
     protected string $requiredFeature = 'workspace.server_blueprint';
 
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
+
     public string $blueprint_name = '';
 
     public string $deleteBlueprintId = '';
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.server_blueprint')) {
+            if (workspace_server_blueprint_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+                abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->comingSoonPreview = false;
         $this->bootWorkspace($server);
 
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
 
         $this->blueprint_name = $server->name.' blueprint';
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     public function saveBlueprint(ServerBlueprintCapture $capture): void
@@ -118,6 +147,10 @@ class WorkspaceBlueprint extends Component
         ServerBlueprintCapture $capture,
         ServerBlueprintSummary $summary,
     ): View {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-blueprint-preview');
+        }
+
         $this->server->refresh();
 
         $org = auth()->user()?->currentOrganization();

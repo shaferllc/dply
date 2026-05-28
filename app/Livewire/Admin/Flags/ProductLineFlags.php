@@ -178,37 +178,17 @@ class ProductLineFlags extends Component
             foreach ($flags as $key => $label) {
                 if (AdminFeatureFlags::isGlobalNamespace($key)) {
                     $globalScoped[$key] = $label;
-                } else {
+                } elseif (! AdminFeatureFlags::isPreviewFlag($key)) {
                     $orgScoped[$key] = $label;
                 }
             }
 
             if ($orgScoped !== []) {
-                $platformOnly = [];
-                $platformDefault = [];
-                foreach ($orgScoped as $key => $label) {
-                    if (AdminFeatureFlags::isPlatformOnlyOrgFlag($key)) {
-                        $platformOnly[$key] = $label;
-                    } else {
-                        $platformDefault[$key] = $label;
-                    }
-                }
-
-                if ($platformDefault !== []) {
-                    $groups[] = [
-                        'title' => $title,
-                        'flags' => $this->platformDefaultFlagEntries($platformDefault),
-                        'mode' => 'platform',
-                    ];
-                }
-
-                if ($platformOnly !== []) {
-                    $groups[] = [
-                        'title' => $title,
-                        'flags' => $this->platformDefaultFlagEntries($platformOnly),
-                        'mode' => 'platform_teaser',
-                    ];
-                }
+                $groups[] = [
+                    'title' => $title,
+                    'flags' => $this->groupedPlatformFlagEntries($orgScoped, $flags),
+                    'mode' => 'platform',
+                ];
             }
 
             if ($globalScoped !== []) {

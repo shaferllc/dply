@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -31,6 +32,9 @@ class WorkspaceInsights extends Component
     protected string $requiredFeature = 'workspace.insights';
 
     use InteractsWithServerWorkspace;
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     public string $tab = 'overview';
 
@@ -54,8 +58,32 @@ class WorkspaceInsights extends Component
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.insights')) {
+            if (workspace_insights_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->comingSoonPreview = false;
         $this->bootWorkspace($server);
         $this->loadSettings();
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     protected function loadSettings(): void
@@ -1004,6 +1032,10 @@ class WorkspaceInsights extends Component
 
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-insights-preview');
+        }
+
         $org = $this->server->organization;
         $orgHasPro = $org?->onAnyPaidPlan() ?? false;
 

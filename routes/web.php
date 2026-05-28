@@ -102,6 +102,7 @@ use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceBlueprint;
+use App\Livewire\Servers\WorkspaceBlueprintPreview;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCertInventory;
 use App\Livewire\Servers\WorkspaceCluster;
@@ -114,9 +115,11 @@ use App\Livewire\Servers\WorkspaceDaemonSlo;
 use App\Livewire\Servers\WorkspaceDatabases;
 use App\Livewire\Servers\WorkspaceDeployPolicy;
 use App\Livewire\Servers\WorkspaceFiles;
+use App\Livewire\Servers\WorkspaceFilesPreview;
 use App\Livewire\Servers\WorkspaceFirewall;
 use App\Livewire\Servers\WorkspaceHealth;
 use App\Livewire\Servers\WorkspaceInsights;
+use App\Livewire\Servers\WorkspaceInsightsPreview;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Livewire\Servers\WorkspaceManage;
@@ -645,9 +648,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.health')->group(function (): void {
         Route::livewire('servers/{server}/health', WorkspaceHealth::class)->name('servers.health');
     });
-    Route::middleware('feature:workspace.server_blueprint')->group(function (): void {
-        Route::livewire('servers/{server}/blueprint', WorkspaceBlueprint::class)->name('servers.blueprint');
-    });
+    Route::livewire('servers/{server}/blueprint', WorkspaceBlueprint::class)->name('servers.blueprint');
+    Route::livewire('servers/{server}/blueprint-preview', WorkspaceBlueprintPreview::class)->name('servers.blueprint-preview');
     Route::middleware('feature:workspace.server_maintenance')->group(function (): void {
         Route::livewire('servers/{server}/maintenance', WorkspaceMaintenance::class)->name('servers.maintenance');
     });
@@ -673,9 +675,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.security_digest')->group(function (): void {
         Route::livewire('servers/{server}/security-digest', WorkspaceSecurityDigest::class)->name('servers.security-digest');
     });
-    Route::middleware('feature:workspace.insights')->group(function (): void {
-        Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
-    });
+    Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
+    Route::livewire('servers/{server}/insights-preview', WorkspaceInsightsPreview::class)->name('servers.insights-preview');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
@@ -714,9 +715,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::livewire('servers/{server}/console-preview', WorkspaceConsolePreview::class)->name('servers.console-preview');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
-    Route::middleware('feature:workspace.files')->group(function (): void {
-        Route::livewire('servers/{server}/files', WorkspaceFiles::class)->name('servers.files');
-    });
+    Route::livewire('servers/{server}/files', WorkspaceFiles::class)->name('servers.files');
+    Route::livewire('servers/{server}/files-preview', WorkspaceFilesPreview::class)->name('servers.files-preview');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');

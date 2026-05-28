@@ -8,6 +8,7 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Services\Servers\ServerMaintenanceWindow;
+use App\Support\Servers\MaintenanceWindow;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -169,15 +170,23 @@ class WorkspaceMaintenance extends Component
         $maintenance->refreshExpired($this->server, auth()->user());
         $this->server->refresh();
 
-        $active = $maintenance->isActive($this->server);
-        $state = $maintenance->state($this->server);
-        $preview = $maintenance->preview($this->server);
+        $report = $maintenance->report($this->server);
+        $recurringWindow = MaintenanceWindow::forServer($this->server);
+        $org = $this->server->organization;
+        $cronMaintenanceActive = $org !== null
+            && $org->cron_maintenance_until !== null
+            && now()->lt($org->cron_maintenance_until);
 
         return view('livewire.servers.workspace-maintenance', [
-            'active' => $active,
-            'state' => $state,
-            'preview' => $preview,
-            'eligibleCount' => $maintenance->eligibleSites($this->server)->count(),
+            'report' => $report,
+            'active' => $report['active'],
+            'state' => $report['state'],
+            'preview' => $report['preview'],
+            'eligibleCount' => $report['summary']['eligible'],
+            'recurringWindow' => $recurringWindow,
+            'cronMaintenanceActive' => $cronMaintenanceActive,
+            'cronMaintenanceUntil' => $org?->cron_maintenance_until,
+            'cronMaintenanceNote' => $org?->cron_maintenance_note,
         ]);
     }
 }

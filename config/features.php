@@ -64,7 +64,9 @@ return [
         // exit: ship once health cockpit validated against guest metrics on three OSes
         'health' => env('FEATURE_WORKSPACE_HEALTH', true),
         // exit: ship once blueprint capture + wizard apply validated on three VM stacks
-        'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', true),
+        'server_blueprint' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT', false),
+        // exit: ship alongside server blueprint GA; teaser only when blueprint is off
+        'server_blueprint_preview' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT_PREVIEW', true),
         // exit: ship once server webserver diff + rollback validated on nginx + caddy
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
         // exit: ship once server maintenance suspend/resume validated on three VM hosts
@@ -96,13 +98,17 @@ return [
         // exit: ship alongside console GA; teaser only when console is off
         'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
-        'files' => env('FEATURE_WORKSPACE_FILES', true),
+        'files' => env('FEATURE_WORKSPACE_FILES', false),
+        // exit: ship alongside files GA; teaser only when files is off
+        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', true),
         // exit: ship when systemd inventory UI has been validated against three real OSes
         'services' => env('FEATURE_WORKSPACE_SERVICES', true),
         // exit: ship when system-user deletion policy is signed off (data loss risk)
         'system_users' => env('FEATURE_WORKSPACE_SYSTEM_USERS', true),
         // exit: ship as a paid-tier differentiator once findings UX is signed off
-        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', true),
+        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', false),
+        // exit: ship alongside insights GA; teaser only when insights is off
+        'insights_preview' => env('FEATURE_WORKSPACE_INSIGHTS_PREVIEW', true),
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes

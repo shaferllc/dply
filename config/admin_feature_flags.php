@@ -20,7 +20,10 @@ $serverWorkspaceSections = [
         'workspace.cert_inventory' => 'Certificate inventory',
         'workspace.server_cost' => 'Server cost card',
         'workspace.security_digest' => 'Security digest',
-        'workspace.insights' => 'Insights',
+    ],
+    'Insights' => [
+        'workspace.insights' => 'Full workspace',
+        'workspace.insights_preview' => 'Coming soon preview',
     ],
     'Deploy & ops' => [
         'workspace.deploy_windows' => 'Deploy windows',
@@ -33,16 +36,22 @@ $serverWorkspaceSections = [
     'Access & security' => [
         'workspace.ssh_access_graph' => 'SSH access graph',
         'workspace.ssh_sessions' => 'Temporary SSH sessions',
-        'workspace.files' => 'Remote files',
         'workspace.system_users' => 'System users',
     ],
+    'Files' => [
+        'workspace.files' => 'Remote file browser',
+        'workspace.files_preview' => 'Coming soon preview',
+    ],
     'Console' => [
-        'workspace.console' => 'Browser console',
-        'workspace.console_preview' => 'Coming soon preview (when console is off)',
+        'workspace.console' => 'Full workspace',
+        'workspace.console_preview' => 'Coming soon preview',
+    ],
+    'Blueprint' => [
+        'workspace.server_blueprint' => 'Capture & apply',
+        'workspace.server_blueprint_preview' => 'Coming soon preview',
     ],
     'Advanced' => [
         'workspace.cluster' => 'Cluster',
-        'workspace.server_blueprint' => 'Server blueprint',
         'workspace.webserver_config_diff' => 'Webserver config diff',
         'workspace.server_maintenance' => 'Server maintenance',
         'workspace.services' => 'System services',
@@ -174,6 +183,20 @@ return [
     */
     'platform_only_org_flags' => [
         'workspace.console_preview',
+        'workspace.insights_preview',
+        'workspace.server_blueprint_preview',
+        'workspace.files_preview',
+    ],
+
+    /*
+    | Parent feature → coming-soon preview flag. Admin UI renders these as one
+    | grouped card (full feature toggle + nested preview toggle).
+    */
+    'feature_preview_pairs' => [
+        'workspace.console' => 'workspace.console_preview',
+        'workspace.insights' => 'workspace.insights_preview',
+        'workspace.server_blueprint' => 'workspace.server_blueprint_preview',
+        'workspace.files' => 'workspace.files_preview',
     ],
 
 ];

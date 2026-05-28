@@ -2071,6 +2071,10 @@ test('server show logs tab renders', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceLogs::class, ['server' => $server])
+        ->assertSee(__('Log viewer'))
+        ->assertSee(__('Available sources'))
+        ->assertSee(__('Security digest'))
+        ->assertSee(__('Deploy windows'))
         ->assertSee('Log source')
         ->assertSee('Dply activity')
         ->assertSee(__('Options'))

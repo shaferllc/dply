@@ -151,6 +151,8 @@ test('build emits named step markers for setup progress', function () {
 
     $this->assertStringContainsString('[dply-step] Installing system updates', $joined);
     $this->assertStringContainsString('[dply-step] Installing base packages', $joined);
+    $this->assertStringContainsString("'git'", $joined);
+    $this->assertStringContainsString("'redis-tools'", $joined);
     $this->assertStringContainsString('[dply-step] Creating server user', $joined);
     $this->assertStringContainsString('[dply-step] Installing webserver', $joined);
     $this->assertStringContainsString('[dply-step] Installing PHP 8.3', $joined);

@@ -171,6 +171,57 @@ if (! function_exists('workspace_console_preview_active')) {
     }
 }
 
+if (! function_exists('workspace_insights_preview_active')) {
+    /**
+     * True when insights is off but the coming-soon teaser should surface in
+     * nav and the preview workspace page.
+     */
+    function workspace_insights_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.insights')
+            : Feature::for($organization)->active('workspace.insights')) {
+            return false;
+        }
+
+        return AdminFeatureFlags::platformOrgFlagActive('workspace.insights_preview');
+    }
+}
+
+if (! function_exists('workspace_server_blueprint_preview_active')) {
+    /**
+     * True when server blueprint is off but the coming-soon teaser should
+     * surface in nav and the preview workspace page.
+     */
+    function workspace_server_blueprint_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.server_blueprint')
+            : Feature::for($organization)->active('workspace.server_blueprint')) {
+            return false;
+        }
+
+        return AdminFeatureFlags::platformOrgFlagActive('workspace.server_blueprint_preview');
+    }
+}
+
+if (! function_exists('workspace_files_preview_active')) {
+    /**
+     * True when remote files is off but the coming-soon teaser should
+     * surface in nav and the preview workspace page.
+     */
+    function workspace_files_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.files')
+            : Feature::for($organization)->active('workspace.files')) {
+            return false;
+        }
+
+        return AdminFeatureFlags::platformOrgFlagActive('workspace.files_preview');
+    }
+}
+
 if (! function_exists('multi_surface_active')) {
     /**
      * True when the current org has at least one non-VM product surface

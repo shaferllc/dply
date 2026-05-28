@@ -56,3 +56,41 @@ test('deploy job is skipped when server deploy window blocks', function (): void
 
     Carbon::setTestNow();
 });
+
+test('deploy policy report summarizes rules sites and next allowed time', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-05-29 18:00:00', 'UTC'));
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => [
+            'host_kind' => 'vm',
+            'deploy_policy' => [
+                'enabled' => true,
+                'timezone' => 'UTC',
+                'message' => 'Weekend freeze active',
+                'deny_rules' => app(ServerDeployPolicyGuard::class)->weekendFreezePreset(),
+            ],
+        ],
+    ]);
+
+    Site::factory()->create([
+        'organization_id' => $org->id,
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'name' => 'api',
+    ]);
+
+    $report = app(ServerDeployPolicyGuard::class)->report($server->fresh());
+
+    expect($report['overall'])->toBe('blocked')
+        ->and($report['summary']['rule_count'])->toBe(4)
+        ->and($report['summary']['active_rules_now'])->toBeGreaterThan(0)
+        ->and($report['summary']['total_sites'])->toBe(1)
+        ->and($report['site_rows'])->toHaveCount(1)
+        ->and($report['evaluation']['next_allowed_at'])->not->toBeNull();
+
+    Carbon::setTestNow();
+});

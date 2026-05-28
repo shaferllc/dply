@@ -11,6 +11,7 @@ use App\Models\NotificationSubscription;
 use App\Models\OutboundWebhookDelivery;
 use App\Models\Server;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthProbe;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
@@ -213,6 +214,14 @@ class WorkspaceSettings extends Component
                 ->values();
         }
 
+        $costReport = null;
+        if ($this->section === 'governance'
+            && Feature::active('workspace.server_cost')
+            && $this->server->isVmHost()
+            && ! $this->server->isManagedProductHost()) {
+            $costReport = app(ServerCostCard::class)->forServer($this->server);
+        }
+
         return view('livewire.servers.workspace-settings', [
             'section' => $this->section,
             'settingsTabs' => $this->settingsWorkspaceTabs(),
@@ -223,6 +232,7 @@ class WorkspaceSettings extends Component
             'webhookDeliveries' => $webhookDeliveries,
             'serverNotifSubscriptions' => $serverNotifSubscriptions,
             'assignableChannels' => $assignableChannels,
+            'costReport' => $costReport,
         ]);
     }
 
