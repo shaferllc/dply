@@ -32,6 +32,7 @@ test('release hygiene flags extra releases and large logs', function (): void {
                     'extra' => 3,
                     'release_bytes' => 1200 * 1024 * 1024,
                     'laravel_log_bytes' => 30 * 1024 * 1024,
+                    'laravel_log_path' => '/var/www/app/shared/storage/logs/laravel.log',
                     'failed_jobs' => 12,
                 ]],
                 'system' => [
@@ -70,7 +71,9 @@ test('release hygiene flags extra releases and large logs', function (): void {
     expect($report['overall'])->toBeIn(['warning', 'critical'])
         ->and($report['releases']['sites_over_keep'])->toBe(1)
         ->and($report['failed_jobs']['total'])->toBe(12)
-        ->and($report['logs']['laravel_total_bytes'])->toBe(30 * 1024 * 1024);
+        ->and($report['logs']['laravel_total_bytes'])->toBe(30 * 1024 * 1024)
+        ->and($report['logs']['site_rows'])->toHaveCount(1)
+        ->and($report['logs']['site_rows'][0]['path'])->toBe('/var/www/app/shared/storage/logs/laravel.log');
 });
 
 test('release hygiene script parse captures site and system blocks', function (): void {
@@ -81,6 +84,7 @@ release_count=6
 extra=1
 release_bytes=4096
 laravel_log_bytes=2048
+laravel_log_path=/var/www/demo/shared/storage/logs/laravel.log
 failed_jobs=3
 SITE_END
 SYS_BEGIN
@@ -95,6 +99,7 @@ OUT;
     expect($meta['release_hygiene_snapshot']['sites'])->toHaveCount(1)
         ->and($meta['release_hygiene_snapshot']['sites'][0]['slug'])->toBe('demo')
         ->and($meta['release_hygiene_snapshot']['sites'][0]['failed_jobs'])->toBe(3)
+        ->and($meta['release_hygiene_snapshot']['sites'][0]['laravel_log_path'])->toBe('/var/www/demo/shared/storage/logs/laravel.log')
         ->and($meta['release_hygiene_snapshot']['system']['journal_usage'])->toContain('64.0M');
 });
 

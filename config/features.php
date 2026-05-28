@@ -93,6 +93,8 @@ return [
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         // exit: ship once browser-SSH session auditing + RBAC are validated
         'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
+        // exit: ship alongside console GA; teaser only when console is off
+        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
         'files' => env('FEATURE_WORKSPACE_FILES', true),
         // exit: ship when systemd inventory UI has been validated against three real OSes
@@ -159,6 +161,10 @@ return [
         'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
         // exit: ship when LLM + heuristic triage validated across BYO + Edge failures
         'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
+        // exit: emergency hard stop for BYO VM create/deploy/webhooks; never retire
+        'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
+        // exit: emergency pause for Edge build/deploy pipeline; never retire
+        'edge_delivery_enabled' => env('FEATURE_GLOBAL_EDGE_DELIVERY_ENABLED', true),
     ],
 
     /*

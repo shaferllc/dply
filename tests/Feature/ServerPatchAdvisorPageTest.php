@@ -53,9 +53,26 @@ test('server patch advisor page renders rollup', function (): void {
     $this->actingAs($user)
         ->get(route('servers.patches', $server))
         ->assertOk()
-        ->assertSee(__('Patch advisor'))
+        ->assertSee(__('Patches'))
+        ->assertSee(__('Apt actions'))
         ->assertSee(__('Refresh scan'))
         ->assertSee('Ubuntu 24.04.2 LTS');
+});
+
+test('manage updates section redirects to patches when patch advisor is enabled', function (): void {
+    [$user, $server] = patchAdvisorUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.manage', ['server' => $server, 'section' => 'updates']))
+        ->assertRedirect(route('servers.patches', $server));
+});
+
+test('settings inventory section redirects to patches when patch advisor is enabled', function (): void {
+    [$user, $server] = patchAdvisorUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.settings', ['server' => $server, 'section' => 'inventory']))
+        ->assertRedirect(route('servers.patches', $server));
 });
 
 test('non vm host returns 404', function (): void {

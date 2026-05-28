@@ -17,6 +17,9 @@ return [
     /** SSH scan older than this is flagged stale in the UI. */
     'stale_scan_hours' => max(1, (int) env('SERVER_RELEASE_HYGIENE_STALE_HOURS', 24)),
 
+    /** Default line count when tailing logs from the hygiene page. */
+    'log_tail_lines' => max(50, min(5000, (int) env('SERVER_RELEASE_HYGIENE_LOG_TAIL_LINES', 200))),
+
     'thresholds' => [
         'laravel_log_warning_mb' => max(1, (int) env('SERVER_RELEASE_HYGIENE_LOG_WARNING_MB', 25)),
         'laravel_log_critical_mb' => max(1, (int) env('SERVER_RELEASE_HYGIENE_LOG_CRITICAL_MB', 100)),

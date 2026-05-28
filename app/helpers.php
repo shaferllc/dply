@@ -4,6 +4,7 @@ use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\Admin\AdminFeatureFlags;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Pennant\Feature;
@@ -37,6 +38,10 @@ if (! function_exists('server_workspace_nav_item_url')) {
     function server_workspace_nav_item_url(Server $server, array $item): string
     {
         $routeName = $item['route'] ?? '';
+
+        if (! empty($item['preview_only']) && is_string($item['preview_route'] ?? null) && $item['preview_route'] !== '') {
+            $routeName = $item['preview_route'];
+        }
 
         if ($routeName === 'servers.settings') {
             return route('servers.settings', ['server' => $server, 'section' => 'connection']);
@@ -84,7 +89,15 @@ if (! function_exists('server_workspace_nav_for_server')) {
             }
 
             $feature = $item['feature'] ?? null;
-            if (is_string($feature) && $feature !== '' && ! Feature::active($feature)) {
+            $previewFeature = $item['preview_feature'] ?? null;
+            $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);
+            $previewActive = is_string($previewFeature) && $previewFeature !== ''
+                && AdminFeatureFlags::platformOrgFlagActive($previewFeature)
+                && ! $featureActive;
+
+            if ($featureActive || $previewActive) {
+                // Shown as full nav or coming-soon teaser — host/service checks below.
+            } elseif (is_string($feature) && $feature !== '') {
                 return false;
             }
 
@@ -113,10 +126,48 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 $item['needs_setup'] = true;
             }
 
+            $feature = $item['feature'] ?? null;
+            $previewFeature = $item['preview_feature'] ?? null;
+            $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);
+            $previewActive = is_string($previewFeature) && $previewFeature !== ''
+                && AdminFeatureFlags::platformOrgFlagActive($previewFeature)
+                && ! $featureActive;
+
+            if ($previewActive) {
+                $item['preview_only'] = true;
+            }
+
             return $item;
         }, $filtered);
 
         return array_values($filtered);
+    }
+}
+
+if (! function_exists('workspace_console_active')) {
+    /**
+     * True when the full in-browser SSH console is enabled for the org.
+     */
+    function workspace_console_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('workspace.console')
+            : Feature::for($organization)->active('workspace.console');
+    }
+}
+
+if (! function_exists('workspace_console_preview_active')) {
+    /**
+     * True when console is off but the coming-soon teaser should surface in
+     * nav and the global floating affordance.
+     */
+    function workspace_console_preview_active(?Organization $organization = null): bool
+    {
+        if (workspace_console_active($organization)) {
+            return false;
+        }
+
+        return AdminFeatureFlags::platformOrgFlagActive('workspace.console_preview');
     }
 }
 

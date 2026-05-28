@@ -3,6 +3,11 @@
 return [
 
     /*
+    | Guest metrics older than this are flagged as stale on the cost card.
+    */
+    'metrics_stale_hours' => max(1, (int) env('DPLY_SERVER_COST_METRICS_STALE_HOURS', 24)),
+
+    /*
     | Right-size nudge thresholds — conservative heuristics from guest metrics.
     */
     'right_size' => [

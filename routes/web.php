@@ -24,7 +24,13 @@ use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
-use App\Livewire\Admin\Dashboard as AdminDashboard;
+use App\Livewire\Admin\AuditLog as AdminAuditLog;
+use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
+use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
+use App\Livewire\Admin\Operations as AdminOperations;
+use App\Livewire\Admin\Organizations\Index as AdminOrganizationsIndex;
+use App\Livewire\Admin\Organizations\Show as AdminOrganizationsShow;
+use App\Livewire\Admin\Overview as AdminOverview;
 use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
@@ -100,6 +106,7 @@ use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCertInventory;
 use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceConsole;
+use App\Livewire\Servers\WorkspaceConsolePreview;
 use App\Livewire\Servers\WorkspaceCostCard;
 use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
@@ -169,6 +176,7 @@ use App\Livewire\TwoFactor\Page as TwoFactorPage;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Admin\AdminFeatureFlags;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
@@ -332,9 +340,37 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             ->middleware('feature:global.ops_copilot')
             ->name('fleet.copilot');
     });
-    Route::livewire('/admin', AdminDashboard::class)
+    Route::prefix('admin')
         ->middleware('can:viewPlatformAdmin')
-        ->name('admin.dashboard');
+        ->name('admin.')
+        ->group(function (): void {
+            Route::livewire('/', AdminOverview::class)->name('overview');
+            Route::livewire('/operations', AdminOperations::class)->name('operations');
+            Route::livewire('/audit', AdminAuditLog::class)->name('audit');
+            Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
+            Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
+            Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');
+            Route::livewire('/flags/cloud', AdminProductLineFlags::class)->defaults('line', 'cloud')->name('flags.cloud');
+            Route::livewire('/flags/edge', AdminProductLineFlags::class)->defaults('line', 'edge')->name('flags.edge');
+            Route::livewire('/flags/serverless', AdminProductLineFlags::class)->defaults('line', 'serverless')->name('flags.serverless');
+            Route::livewire('/flags/platform', AdminProductLineFlags::class)->defaults('line', 'platform')->name('flags.platform');
+            Route::get('/flags/defaults/{group}', function (string $group) {
+                $target = AdminFeatureFlags::legacyDefaultGroupRedirectTarget($group);
+                if ($target === null) {
+                    abort(404);
+                }
+
+                $routeName = AdminFeatureFlags::productLineRoute($target);
+                if ($routeName === null) {
+                    abort(404);
+                }
+
+                return redirect()->route($routeName);
+            })->name('flags.defaults');
+            Route::livewire('/organizations', AdminOrganizationsIndex::class)->name('organizations.index');
+            Route::livewire('/organizations/{organization}', AdminOrganizationsShow::class)->name('organizations.show');
+        });
+    Route::redirect('/admin/dashboard', '/admin')->middleware('can:viewPlatformAdmin')->name('admin.dashboard');
     Route::middleware('feature:surface.marketplace')->group(function (): void {
         Route::livewire('/marketplace', MarketplaceIndex::class)->name('marketplace.index');
     });
@@ -451,10 +487,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/import/digitalocean', ServersImportFromDigitalOcean::class)->name('servers.import.digitalocean');
     // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft
     // is past step 1, StepType::mount() redirects on to the current step.
-    Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
-    Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
-    Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');
-    Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');
+    Route::middleware('vm.platform')->group(function (): void {
+        Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
+        Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
+        Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');
+        Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');
+    });
     Route::get('servers/{server}', function (Server $server) {
         Gate::authorize('view', $server);
 
@@ -619,9 +657,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.release_hygiene')->group(function (): void {
         Route::livewire('servers/{server}/hygiene', WorkspaceReleaseHygiene::class)->name('servers.hygiene');
     });
-    Route::middleware('feature:workspace.daemon_slo')->group(function (): void {
-        Route::livewire('servers/{server}/daemon-slo', WorkspaceDaemonSlo::class)->name('servers.daemon-slo');
-    });
+    Route::livewire('servers/{server}/daemon-slo', WorkspaceDaemonSlo::class)->name('servers.daemon-slo');
     Route::middleware('feature:workspace.cert_inventory')->group(function (): void {
         Route::livewire('servers/{server}/cert-inventory', WorkspaceCertInventory::class)->name('servers.cert-inventory');
     });
@@ -676,6 +712,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.console')->group(function (): void {
         Route::livewire('servers/{server}/console', WorkspaceConsole::class)->name('servers.console');
     });
+    Route::livewire('servers/{server}/console-preview', WorkspaceConsolePreview::class)->name('servers.console-preview');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::middleware('feature:workspace.files')->group(function (): void {
         Route::livewire('servers/{server}/files', WorkspaceFiles::class)->name('servers.files');

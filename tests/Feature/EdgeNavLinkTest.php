@@ -23,7 +23,7 @@ test('authenticated dashboard includes edge link when surface edge active', func
         ->assertSee(route('edge.index'), false);
 });
 
-test('edge link visible when surface edge inactive', function () {
+test('edge link hidden when surface edge inactive', function () {
     Feature::define('surface.edge', fn () => false);
     Feature::flushCache();
 
@@ -32,8 +32,7 @@ test('edge link visible when surface edge inactive', function () {
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSee('Edge')
-        ->assertSee(route('edge.index'), false);
+        ->assertDontSee(route('edge.index'), false);
 });
 
 test('browse dropdown includes edge when surface edge active', function () {

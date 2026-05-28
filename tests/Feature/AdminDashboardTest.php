@@ -1,8 +1,11 @@
 <?php
 
-namespace Tests\Feature\AdminDashboardTest;
+namespace Tests\Feature\Admin;
 
-use App\Livewire\Admin\Dashboard;
+use App\Livewire\Admin\Flags\GlobalFlags;
+use App\Livewire\Admin\Flags\ProductLineFlags;
+use App\Livewire\Admin\Organizations\Show as AdminOrganizationsShow;
+use App\Livewire\Admin\Overview;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -12,86 +15,164 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 test('guest cannot access platform admin', function () {
-    $this->get(route('admin.dashboard'))->assertRedirect(route('login', absolute: false));
+    $this->get(route('admin.overview'))->assertRedirect(route('login', absolute: false));
 });
 
-test('authenticated user can open platform admin in testing environment', function () {
+test('authenticated user can open platform admin overview in testing environment', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
-    $this->actingAs($user)->get(route('admin.dashboard'))->assertOk()
-        ->assertSee(__('Platform admin'))
-        ->assertSee(__('Runtime & optimization'))
-        ->assertSee(__('Platform defaults (new orgs)'))
-        ->assertSee(__('Organization feature flags'))
-        ->assertSee(__('App-wide feature flags'))
-        ->assertSee('provider.aws')
-        ->assertSee('surface.serverless')
-        ->assertSee('workspace.ephemeral_credentials')
-        ->assertSee('global.billing_enabled')
-        ->assertSee('included (20)');
+    $this->actingAs($user)->get(route('admin.overview'))->assertOk()
+        ->assertSee(__('Overview'))
+        ->assertSee(__('Operations'))
+        ->assertSee(__('Audit log'));
 });
 
-test('platform admin can toggle org feature flag', function () {
+test('legacy admin dashboard route redirects to overview', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('admin.dashboard'))
+        ->assertRedirect(route('admin.overview'));
+});
+
+test('platform admin can toggle org feature flag from org detail', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create(['slug' => 'flag-toggle-org']);
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
+    Feature::for($org)->deactivate('workspace.ephemeral_credentials');
+    expect(Feature::for($org)->active('workspace.ephemeral_credentials'))->toBeFalse();
+
     Livewire::actingAs($user)
-        ->test(Dashboard::class)
-        ->set('flagOrgId', (string) $org->id)
+        ->test(AdminOrganizationsShow::class, ['organization' => $org])
         ->call('toggleOrgFeatureFlag', 'workspace.ephemeral_credentials')
-        ->assertSet('operationMessage', fn (?string $msg): bool => is_string($msg) && str_contains($msg, 'Ephemeral deploy credentials'));
+        ->assertDispatched('notify');
 
     expect(Feature::for($org)->active('workspace.ephemeral_credentials'))->toBeTrue();
 });
 
-test('platform admin can disable org feature flag explicitly', function () {
-    Feature::for(null)->activate('surface.serverless');
-
+test('platform admin global flag toggle requires confirmation modal', function () {
     $user = User::factory()->create();
-    $org = Organization::factory()->create(['slug' => 'flag-disable-org']);
-    $org->users()->attach($user->id, ['role' => 'owner']);
-    session(['current_organization_id' => $org->id]);
-
-    expect(Feature::for($org)->active('surface.serverless'))->toBeTrue();
 
     Livewire::actingAs($user)
-        ->test(Dashboard::class)
-        ->set('flagOrgId', (string) $org->id)
-        ->call('toggleOrgFeatureFlag', 'surface.serverless');
-
-    expect(Feature::for($org)->active('surface.serverless'))->toBeFalse();
+        ->test(GlobalFlags::class)
+        ->call('requestGlobalFeatureFlagToggle', 'global.billing_enabled')
+        ->assertSet('showConfirmActionModal', true)
+        ->call('confirmActionModal')
+        ->assertDispatched('notify');
 });
 
-test('platform default applies to new orgs until overridden', function () {
-    Feature::purge('surface.serverless');
-    Feature::for(null)->activate('surface.serverless');
+test('legacy defaults workspace route redirects to vm servers', function () {
+    $user = User::factory()->create();
 
+    $this->actingAs($user)->get(route('admin.flags.defaults', 'workspace'))
+        ->assertRedirect(route('admin.flags.vm.servers'));
+});
+
+test('vm servers product line page shows emergency and provider flags', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('admin.flags.vm.servers'))
+        ->assertOk()
+        ->assertSee(__('Emergency controls'))
+        ->assertSee('global.vm_enabled')
+        ->assertSee('provider.aws')
+        ->assertSee('workspace.ephemeral_credentials');
+});
+
+test('vm sites product line page shows site promote flag', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(ProductLineFlags::class, ['line' => 'vm-sites'])
+        ->assertSee('workspace.site_promote');
+});
+
+test('edge product line page shows delivery emergency and surface flags', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get(route('admin.flags.edge'))
+        ->assertOk()
+        ->assertSee('global.edge_delivery_enabled')
+        ->assertSee('surface.edge');
+});
+
+test('orgs inherit enabled config defaults for gated surfaces', function () {
     $org = Organization::factory()->create();
 
     expect(Feature::for($org)->active('surface.serverless'))->toBeTrue();
-
-    Feature::for($org)->deactivate('surface.serverless');
-
-    expect(Feature::for($org)->active('surface.serverless'))->toBeFalse();
+    expect(Feature::for($org)->active('surface.cloud'))->toBeTrue();
+    expect(Feature::for($org)->active('provider.aws'))->toBeTrue();
 });
 
-test('platform admin can toggle platform default feature flag', function () {
-    Feature::purge('surface.edge');
-
+test('disabling platform default clears org overrides and hides cloud nav link', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
-    Livewire::actingAs($user)
-        ->test(Dashboard::class)
-        ->call('togglePlatformDefaultFeatureFlag', 'surface.edge')
-        ->assertSet('operationMessage', fn (?string $msg): bool => is_string($msg) && str_contains($msg, 'Edge'));
+    Feature::for(null)->activate('surface.cloud');
+    Feature::for($org)->activate('surface.cloud');
 
-    expect(Feature::for(null)->active('surface.edge'))->toBeTrue();
+    Livewire::actingAs($user)
+        ->test(ProductLineFlags::class, ['line' => 'cloud'])
+        ->call('requestPlatformDefaultFeatureFlagToggle', 'surface.cloud')
+        ->call('confirmActionModal')
+        ->assertDispatched('notify');
+
+    expect(Feature::for(null)->active('surface.cloud'))->toBeFalse();
+    expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee('Cloud apps');
+});
+
+test('clear org overrides button removes stored org values', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    Feature::for(null)->deactivate('surface.edge');
+    Feature::for($org)->activate('surface.edge');
+
+    Livewire::actingAs($user)
+        ->test(ProductLineFlags::class, ['line' => 'edge'])
+        ->call('requestClearOrgOverridesForFlag', 'surface.edge')
+        ->call('confirmActionModal')
+        ->assertDispatched('notify');
+
+    expect(Feature::for($org)->active('surface.edge'))->toBeFalse();
+});
+
+test('admin organizations index lists organizations', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create(['name' => 'Acme Fleet Org']);
+
+    $this->actingAs($user)->get(route('admin.organizations.index'))
+        ->assertOk()
+        ->assertSee('Acme Fleet Org');
+});
+
+test('overview page shows core KPIs', function () {
+    $user = User::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test(Overview::class)
+        ->assertSee(__('Users'))
+        ->assertSee(__('Organizations'));
+});
+
+test('legacy org tab providers redirects to vm servers tab', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'providers'])
+        ->test(AdminOrganizationsShow::class, ['organization' => $org])
+        ->assertSet('tab', 'vm-servers');
 });

@@ -52,7 +52,7 @@
     @endphp
 
     <x-explainer tone="warn">
-        <p>{{ __('The Manage workspace covers server-level operations that don\'t fit other tabs: web server (nginx/caddy/apache) controls, system updates, the auto-update schedule, and dangerous actions (reboot, disable swap, etc.).') }}</p>
+        <p>{{ __('The Manage workspace covers server-level operations that don\'t fit other tabs: runtime tools, configuration previews, and dangerous actions (reboot, disable swap, etc.). OS package updates live on Patches when that workspace is enabled.') }}</p>
         <p>{{ __('Most actions run via SSH and are queued — the page stays responsive while they run. Dangerous actions all confirm first; every one writes to the server\'s audit log.') }}</p>
     </x-explainer>
 
@@ -63,7 +63,7 @@
         ])
 
         <x-server-tab-strip
-            :tabs="config('server_manage.workspace_tabs', [])"
+            :tabs="$manageTabs"
             :active="$section"
             route-name="servers.manage"
             :route-params="['server' => $server]"

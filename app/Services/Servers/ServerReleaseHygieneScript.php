@@ -52,6 +52,9 @@ if [ -f "\$base/current/artisan" ]; then
   failed_jobs=\$(cd "\$base/current" && php artisan queue:failed 2>/dev/null | tail -n +2 | grep -c . || true)
   failed_jobs=\${failed_jobs:-0}
 fi
+if [ -f "\$log_path" ]; then
+  printf "laravel_log_path=%s\n" "\$log_path"
+fi
 printf "release_count=%s\nextra=%s\nrelease_bytes=%s\nlaravel_log_bytes=%s\nfailed_jobs=%s\n" "\$release_count" "\$extra" "\$release_bytes" "\$laravel_log_bytes" "\$failed_jobs"
 printf "SITE_END\n"
 SH;
@@ -102,6 +105,7 @@ SH;
                     'extra' => 0,
                     'release_bytes' => 0,
                     'laravel_log_bytes' => 0,
+                    'laravel_log_path' => null,
                     'failed_jobs' => null,
                 ];
 
@@ -121,6 +125,8 @@ SH;
                     $current['failed_jobs'] = null;
                 } elseif (in_array($key, ['release_count', 'extra', 'release_bytes', 'laravel_log_bytes'], true)) {
                     $current[$key] = max(0, (int) $value);
+                } elseif ($key === 'laravel_log_path' && $value !== '') {
+                    $current['laravel_log_path'] = $value;
                 } elseif ($key === 'failed_jobs') {
                     $current['failed_jobs'] = max(0, (int) $value);
                 }

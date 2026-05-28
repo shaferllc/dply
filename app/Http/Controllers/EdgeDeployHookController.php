@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Models\EdgeDeployHook;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +31,10 @@ class EdgeDeployHookController extends Controller
         $site = $hook->site;
         if ($site === null || ! $site->usesEdgeRuntime() || $site->isEdgePreview()) {
             return response()->json(['message' => 'Deploy hook target is not an active Edge site.'], 422);
+        }
+
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            return response()->json(['message' => 'Edge delivery is temporarily disabled.'], 503);
         }
 
         try {

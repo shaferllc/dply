@@ -46,7 +46,11 @@ test('cost card totals provider note and dply tier fee', function (): void {
         ->and($report['dply']['tier'])->toBe(ServerTier::M->value)
         ->and($report['sites']['count'])->toBe(1)
         ->and($report['totals']['monthly_usd_cents'])->toBe(1200 + ServerTier::M->priceCents())
-        ->and($report['nudge']['kind'] ?? null)->toBe('oversized');
+        ->and($report['nudge']['kind'] ?? null)->toBe('oversized')
+        ->and($report['overall'])->toBe('info')
+        ->and($report['alert_count'])->toBeGreaterThan(0)
+        ->and($report['site_rows'])->toHaveCount(1)
+        ->and($report['summary']['per_site_cents'])->toBe($report['totals']['monthly_usd_cents']);
 });
 
 test('cost card flags constrained utilization nudge', function (): void {
@@ -67,5 +71,21 @@ test('cost card flags constrained utilization nudge', function (): void {
     $report = app(ServerCostCard::class)->forServer($server->fresh());
 
     expect($report['nudge']['kind'] ?? null)->toBe('constrained')
-        ->and($report['nudge']['severity'] ?? null)->toBe('warning');
+        ->and($report['nudge']['severity'] ?? null)->toBe('warning')
+        ->and($report['overall'])->toBe('critical');
+});
+
+test('cost card flags unknown provider as warning overall', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => ['host_kind' => 'vm'],
+    ]);
+
+    $report = app(ServerCostCard::class)->forServer($server->fresh());
+
+    expect($report['overall'])->toBe('warning')
+        ->and(collect($report['alerts'])->pluck('title')->contains(__('Provider cost unknown')))->toBeTrue();
 });

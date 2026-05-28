@@ -125,6 +125,35 @@ class ServerSystemLogReader
         return ['output' => '', 'error' => __('Unknown log source.')];
     }
 
+    /**
+     * Tail an allowlisted log file over SSH (newest lines first).
+     *
+     * @return array{output: string, error: ?string}
+     */
+    public function tailAllowlistedFile(Server $server, string $path, ?int $tailLineCount = null): array
+    {
+        $normalized = str_starts_with($path, '/') ? $path : '/'.$path;
+        if (str_contains($normalized, '..')) {
+            return ['output' => '', 'error' => __('Invalid log path.')];
+        }
+
+        if (! $this->pathMatchesAllowlist($normalized)) {
+            return ['output' => '', 'error' => __('This log path is not allowlisted.')];
+        }
+
+        if (! $server->ip_address || ! $server->ssh_private_key) {
+            return ['output' => '', 'error' => __('Server is not reachable over SSH yet.')];
+        }
+
+        return $this->tailFileOverSsh(
+            $server,
+            $normalized,
+            $this->resolveTailLineCount($tailLineCount),
+            null,
+            null,
+        );
+    }
+
     public function dplyActivityLog(Server $server, int $maxLines = 300, ?int $sinceMinutes = null): string
     {
         if ($server->organization_id === null) {

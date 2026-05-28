@@ -3,9 +3,12 @@
 
 <x-explainer>
     <p>{{ __('This workspace manages long-running supervisord-supervised processes for this server (queue workers, websocket servers, custom long-running PHP/Node binaries). Each daemon is a config file in /etc/supervisor/conf.d that dply rewrites in full on every change; supervisorctl reread + update applies the change.') }}</p>
-    <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. Restart, stop, and start map to the matching supervisorctl verbs. The audit log records every change.') }}</p>
+    <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. The worker health block above rolls up the scheduled health snapshot — refresh it before restarting workers or syncing config when drift is detected.') }}</p>
 </x-explainer>
 
+@if ($daemonSloReport ?? null)
+    @include('livewire.servers.partials.daemons._slo-overview')
+@else
 {{-- At-a-glance counts. Match the Background-group convention used by Backups,
      Schedule, and Queue workers. Numbers reflect the visible (filtered) program set. --}}
 <section class="dply-card overflow-hidden">
@@ -78,6 +81,7 @@
         </div>
     </dl>
 </section>
+@endif
 
 @if ($siteContextUnavailable)
     <section class="dply-card overflow-hidden border-amber-200">

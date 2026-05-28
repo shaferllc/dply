@@ -25,6 +25,7 @@ use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
+use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Http\Middleware\ResolveServerlessCustomDomain;
@@ -256,6 +257,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'metrics.ingest' => ValidateMetricsIngestToken::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,
+            'vm.platform' => EnsureVmPlatformEnabled::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'hooks/*',

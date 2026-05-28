@@ -36,13 +36,35 @@ function vmRoadmapUserWithServer(): array
     return [$user, $server];
 }
 
-test('daemon slo page renders', function (): void {
+test('daemon slo route redirects to daemons workspace', function (): void {
     [$user, $server] = vmRoadmapUserWithServer();
 
     $this->actingAs($user)
         ->get(route('servers.daemon-slo', $server))
+        ->assertRedirect(route('servers.daemons', $server));
+});
+
+test('daemons workspace shows worker health when daemon slo feature is on', function (): void {
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.daemons', $server))
         ->assertOk()
-        ->assertSee(__('Worker SLOs'));
+        ->assertSee(__('Worker health'))
+        ->assertSee(__('Refresh status'));
+});
+
+test('daemons workspace hides worker health when daemon slo feature is off', function (): void {
+    Feature::define('workspace.daemon_slo', fn (): bool => false);
+    Feature::flushCache();
+
+    [$user, $server] = vmRoadmapUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.daemons', $server))
+        ->assertOk()
+        ->assertDontSee(__('Worker health'))
+        ->assertSee(__('Programs at a glance'));
 });
 
 test('cert inventory page renders', function (): void {
@@ -51,7 +73,9 @@ test('cert inventory page renders', function (): void {
     $this->actingAs($user)
         ->get(route('servers.cert-inventory', $server))
         ->assertOk()
-        ->assertSee(__('Certificate inventory'));
+        ->assertSee(__('Certificates'))
+        ->assertSee(__('Certificate stats'))
+        ->assertSee(__('All certificates'));
 });
 
 test('deploy policy page saves weekend freeze', function (): void {
@@ -69,14 +93,14 @@ test('deploy policy page saves weekend freeze', function (): void {
         ->and($policy['deny_rules'])->not->toBeEmpty();
 });
 
-test('feature flags return 400 when disabled', function (): void {
-    Feature::define('workspace.daemon_slo', fn (): bool => false);
+test('cert inventory feature flag returns 400 when disabled', function (): void {
+    Feature::define('workspace.cert_inventory', fn (): bool => false);
     Feature::flushCache();
 
     [$user, $server] = vmRoadmapUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.daemon-slo', $server))
+        ->get(route('servers.cert-inventory', $server))
         ->assertStatus(400);
 });
 
@@ -96,6 +120,7 @@ test('security digest page renders', function (): void {
         ->get(route('servers.security-digest', $server))
         ->assertOk()
         ->assertSee(__('Security digest'))
+        ->assertSee(__('Overall'))
         ->assertSee(__('Refresh digest'));
 });
 
@@ -107,5 +132,6 @@ test('server cost page renders', function (): void {
     $this->actingAs($user)
         ->get(route('servers.cost', $server))
         ->assertOk()
-        ->assertSee(__('Cost'));
+        ->assertSee(__('Cost'))
+        ->assertSee(__('Overall'));
 });

@@ -153,7 +153,11 @@
                 </dd>
             </div>
 
-            <a href="{{ route('servers.manage', ['server' => $server, 'section' => 'updates']) }}" wire:navigate class="{{ $card }} block p-5 hover:border-brand-sage/40 hover:bg-brand-sand/10 transition-colors">
+            @feature('workspace.patch_advisor')
+                <a href="{{ route('servers.patches', $server) }}" wire:navigate class="{{ $card }} block p-5 hover:border-brand-sage/40 hover:bg-brand-sand/10 transition-colors">
+            @else
+                <a href="{{ route('servers.manage', ['server' => $server, 'section' => 'updates']) }}" wire:navigate class="{{ $card }} block p-5 hover:border-brand-sage/40 hover:bg-brand-sand/10 transition-colors">
+            @endfeature
                 <dt class="text-xs uppercase tracking-wide text-brand-mist">{{ __('Updates') }}</dt>
                 <dd class="mt-1 flex items-baseline gap-2">
                     <span class="text-2xl font-semibold text-brand-ink">{{ $upgrades ?? '—' }}</span>

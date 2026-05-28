@@ -34,7 +34,7 @@ class EnforceMaintenanceMode
         }
 
         $routeName = (string) ($request->route()?->getName() ?? '');
-        if (in_array($routeName, self::ALLOW_ROUTES, true)) {
+        if (in_array($routeName, self::ALLOW_ROUTES, true) || str_starts_with($routeName, 'admin.')) {
             return $next($request);
         }
 

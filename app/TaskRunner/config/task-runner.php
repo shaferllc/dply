@@ -12,7 +12,7 @@ return [
     | If not set, the system's default temporary directory will be used.
     |
     */
-    'temporary_directory' => env('TASK_RUNNER_TEMPORARY_DIRECTORY', ''),
+    'temporary_directory' => env('TASK_RUNNER_TEMPORARY_DIRECTORY', storage_path('app/task-runner/temp')),
 
     /*
     |--------------------------------------------------------------------------

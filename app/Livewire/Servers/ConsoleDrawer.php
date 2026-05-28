@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\RunsServerConsoleCommands;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
@@ -28,7 +29,10 @@ use Livewire\Component;
  */
 class ConsoleDrawer extends Component
 {
+    use RequiresFeature;
     use RunsServerConsoleCommands;
+
+    protected string $requiredFeature = 'workspace.console';
 
     /** Active server, or null when no pick has been made yet. */
     public ?Server $server = null;

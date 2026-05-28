@@ -7,9 +7,15 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Feature::define('workspace.console', fn () => true);
+    Feature::flushCache();
+});
 
 beforeEach(function () {
     session()->forget('dply.consoleDrawer.serverId');
@@ -406,4 +412,28 @@ test('drawer shows ip when name blank', function () {
     Livewire::actingAs($user)
         ->test(ConsoleDrawer::class, ['server' => $server])
         ->assertSee('deploy@192.168.1.100');
+});
+
+test('floating console button hidden when workspace console inactive', function () {
+    Feature::define('workspace.console', fn () => false);
+    Feature::flushCache();
+
+    $user = userWithOrganization();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSee('Open SSH console')
+        ->assertDontSee('livewire:servers.console-drawer', false);
+});
+
+test('console drawer component aborts when workspace console inactive', function () {
+    Feature::define('workspace.console', fn () => false);
+    Feature::flushCache();
+
+    $user = userWithOrganization();
+
+    Livewire::actingAs($user)
+        ->test(ConsoleDrawer::class)
+        ->assertNotFound();
 });

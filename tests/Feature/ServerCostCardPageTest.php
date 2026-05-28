@@ -54,6 +54,9 @@ test('server cost page renders stack breakdown', function (): void {
     $this->actingAs($user)
         ->get(route('servers.cost', $server))
         ->assertOk()
-        ->assertSee(__('Estimated monthly stack'))
-        ->assertSee(__('Dply platform fee'));
+        ->assertSee(__('Overall'))
+        ->assertSee(__('Full stack'))
+        ->assertSee(__('Dply tier fee'))
+        ->assertSee(__('Site allocation'))
+        ->assertSee(__('Tier ladder (monthly)'));
 });

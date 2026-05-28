@@ -18,13 +18,17 @@ final class ServerCertificateInventory
      *     overall: string,
      *     alert_count: int,
      *     alerts: list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>,
-     *     summary: array{total: int, active: int, expiring: int, failed: int, pending: int},
+     *     summary: array{total: int, active: int, expiring: int, failed: int, pending: int, expired: int, renewable: int, sites_with_certs: int, sites_total: int},
+     *     breakdown: array{providers: array<string, int>, challenges: array<string, int>},
      *     items: list<array<string, mixed>>,
+     *     warning_days: int,
+     *     critical_days: int,
      * }
      */
     public function forServer(Server $server): array
     {
-        $siteIds = $server->sites()->pluck('id');
+        $sites = $server->sites()->get(['id', 'name', 'server_id']);
+        $siteIds = $sites->pluck('id');
         $warningDays = max(1, (int) config('server_cert_inventory.warning_days', 30));
         $criticalDays = max(1, (int) config('server_cert_inventory.critical_days', 7));
 
@@ -44,10 +48,16 @@ final class ServerCertificateInventory
         $failed = 0;
         $pending = 0;
         $active = 0;
+        $expired = 0;
+        $renewable = 0;
+        $providers = [];
+        $challenges = [];
+        $sitesWithCerts = [];
 
         foreach ($certs as $cert) {
             $site = $cert->site;
-            $domain = $cert->domainHostnames()[0] ?? __('Unknown domain');
+            $domains = $cert->domainHostnames();
+            $domain = $domains[0] ?? __('Unknown domain');
             $daysLeft = $cert->expires_at !== null
                 ? (int) now()->diffInDays($cert->expires_at, false)
                 : null;
@@ -55,6 +65,9 @@ final class ServerCertificateInventory
             $severity = 'ok';
             if ($cert->status === SiteCertificate::STATUS_FAILED) {
                 $failed++;
+                $severity = 'critical';
+            } elseif ($cert->status === SiteCertificate::STATUS_EXPIRED) {
+                $expired++;
                 $severity = 'critical';
             } elseif (in_array($cert->status, [SiteCertificate::STATUS_PENDING, SiteCertificate::STATUS_ISSUED, SiteCertificate::STATUS_INSTALLING], true)) {
                 $pending++;
@@ -70,18 +83,34 @@ final class ServerCertificateInventory
                 }
             }
 
+            $canRenew = $this->isRenewable($cert);
+            if ($canRenew) {
+                $renewable++;
+            }
+
+            $provider = (string) $cert->provider_type;
+            $challenge = (string) $cert->challenge_type;
+            $providers[$provider] = ($providers[$provider] ?? 0) + 1;
+            $challenges[$challenge] = ($challenges[$challenge] ?? 0) + 1;
+
+            if ($site !== null) {
+                $sitesWithCerts[(string) $site->id] = true;
+            }
+
             $items[] = [
                 'id' => (string) $cert->id,
                 'site_id' => (string) $cert->site_id,
                 'site_name' => $site !== null ? (string) $site->name : __('Unknown site'),
                 'domain' => $domain,
+                'all_domains' => $domains,
+                'scope_type' => (string) $cert->scope_type,
                 'status' => (string) $cert->status,
-                'provider' => (string) $cert->provider_type,
-                'challenge' => (string) $cert->challenge_type,
+                'provider' => $provider,
+                'challenge' => $challenge,
                 'expires_at' => $cert->expires_at,
                 'days_left' => $daysLeft,
                 'severity' => $severity,
-                'renewable' => $this->isRenewable($cert),
+                'renewable' => $canRenew,
                 'href' => $site !== null
                     ? route('sites.show', ['server' => $site->server_id, 'site' => $site, 'section' => 'certificates'])
                     : null,
@@ -102,7 +131,7 @@ final class ServerCertificateInventory
             return ($a['days_left'] ?? 9999) <=> ($b['days_left'] ?? 9999);
         });
 
-        $alerts = $this->buildAlerts($failed, $expiring, $server);
+        $alerts = $this->buildAlerts($failed, $expiring, $expired, $server);
 
         $overall = 'ok';
         foreach ($alerts as $alert) {
@@ -115,6 +144,9 @@ final class ServerCertificateInventory
             }
         }
 
+        arsort($providers);
+        arsort($challenges);
+
         return [
             'overall' => $overall,
             'alert_count' => count($alerts),
@@ -125,6 +157,14 @@ final class ServerCertificateInventory
                 'expiring' => $expiring,
                 'failed' => $failed,
                 'pending' => $pending,
+                'expired' => $expired,
+                'renewable' => $renewable,
+                'sites_with_certs' => count($sitesWithCerts),
+                'sites_total' => $sites->count(),
+            ],
+            'breakdown' => [
+                'providers' => $providers,
+                'challenges' => $challenges,
             ],
             'items' => $items,
             'warning_days' => $warningDays,
@@ -133,7 +173,7 @@ final class ServerCertificateInventory
     }
 
     /**
-     * @return array{overall: string, alert_count: int, alerts: array, summary: array, items: array}
+     * @return array{overall: string, alert_count: int, alerts: array, summary: array, breakdown: array, items: array, warning_days: int, critical_days: int}
      */
     private function emptyReport(): array
     {
@@ -141,7 +181,18 @@ final class ServerCertificateInventory
             'overall' => 'ok',
             'alert_count' => 0,
             'alerts' => [],
-            'summary' => ['total' => 0, 'active' => 0, 'expiring' => 0, 'failed' => 0, 'pending' => 0],
+            'summary' => [
+                'total' => 0,
+                'active' => 0,
+                'expiring' => 0,
+                'failed' => 0,
+                'pending' => 0,
+                'expired' => 0,
+                'renewable' => 0,
+                'sites_with_certs' => 0,
+                'sites_total' => 0,
+            ],
+            'breakdown' => ['providers' => [], 'challenges' => []],
             'items' => [],
             'warning_days' => (int) config('server_cert_inventory.warning_days', 30),
             'critical_days' => (int) config('server_cert_inventory.critical_days', 7),
@@ -151,7 +202,7 @@ final class ServerCertificateInventory
     /**
      * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
      */
-    private function buildAlerts(int $failed, int $expiring, Server $server): array
+    private function buildAlerts(int $failed, int $expiring, int $expired, Server $server): array
     {
         $alerts = [];
 
@@ -159,7 +210,17 @@ final class ServerCertificateInventory
             $alerts[] = [
                 'severity' => 'critical',
                 'title' => trans_choice(':count failed certificate|:count failed certificates', $failed, ['count' => $failed]),
-                'message' => __('Renew or re-issue from the site Certificates tab, or use bulk renew below.'),
+                'message' => __('Re-issue from the site Certificates tab or queue a bulk renewal below.'),
+                'href' => null,
+                'link_label' => null,
+            ];
+        }
+
+        if ($expired > 0) {
+            $alerts[] = [
+                'severity' => 'critical',
+                'title' => trans_choice(':count expired certificate|:count expired certificates', $expired, ['count' => $expired]),
+                'message' => __('Browsers will reject HTTPS until these are renewed.'),
                 'href' => null,
                 'link_label' => null,
             ];
@@ -167,15 +228,52 @@ final class ServerCertificateInventory
 
         if ($expiring > 0) {
             $alerts[] = [
-                'severity' => $failed > 0 ? 'warning' : 'critical',
+                'severity' => ($failed > 0 || $expired > 0) ? 'warning' : 'critical',
                 'title' => trans_choice(':count certificate expiring soon|:count certificates expiring soon', $expiring, ['count' => $expiring]),
-                'message' => __('Plan renewal before browsers or deploy hooks break HTTPS.'),
+                'message' => __('Plan renewal before deploy hooks or browser trust breaks.'),
                 'href' => null,
                 'link_label' => null,
             ];
         }
 
         return $alerts;
+    }
+
+    /**
+     * Queue renewal for one managed certificate when eligible.
+     */
+    public function queueRenewal(string $certificateId, Server $server): bool
+    {
+        $siteIds = $server->sites()->pluck('id');
+        if ($siteIds->isEmpty()) {
+            return false;
+        }
+
+        $cert = SiteCertificate::query()
+            ->whereIn('site_id', $siteIds)
+            ->whereKey($certificateId)
+            ->first();
+
+        if ($cert === null || ! $this->isRenewable($cert)) {
+            return false;
+        }
+
+        $withinDays = (int) config('server_cert_inventory.warning_days', 30);
+        $daysLeft = $cert->expires_at !== null
+            ? (int) now()->diffInDays($cert->expires_at, false)
+            : null;
+
+        $shouldQueue = $cert->status === SiteCertificate::STATUS_FAILED
+            || $cert->status === SiteCertificate::STATUS_EXPIRED
+            || ($daysLeft !== null && $daysLeft <= $withinDays);
+
+        if (! $shouldQueue) {
+            return false;
+        }
+
+        ExecuteSiteCertificateJob::dispatch((string) $cert->id);
+
+        return true;
     }
 
     public function isRenewable(SiteCertificate $cert): bool

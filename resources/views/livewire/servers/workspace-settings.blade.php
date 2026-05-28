@@ -17,7 +17,11 @@
     </x-explainer>
 
     <div class="space-y-6">
-        @include('livewire.servers.partials.settings.tabs', ['server' => $server, 'section' => $section])
+        @include('livewire.servers.partials.settings.tabs', [
+            'server' => $server,
+            'section' => $section,
+            'settingsTabs' => $settingsTabs,
+        ])
 
         @include('livewire.servers.partials.settings-tab', [
             'workspaces' => $workspaces,

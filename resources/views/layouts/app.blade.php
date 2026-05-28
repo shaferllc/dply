@@ -120,8 +120,9 @@
                 if (! $routeServer instanceof \App\Models\Server) {
                     $routeServer = null;
                 }
-                $hideDrawer = request()->routeIs('servers.console');
+                $hideDrawer = request()->routeIs('servers.console', 'servers.console-preview');
             @endphp
+            @feature('workspace.console')
             @unless ($hideDrawer)
                 <div
                     x-data="{
@@ -211,6 +212,49 @@
                     </div>
                 </div>
             @endunless
+            @endfeature
+            @if (workspace_console_preview_active() && ! $hideDrawer)
+                <div
+                    x-data="{ open: false }"
+                    x-on:keydown.escape.window="open = false"
+                >
+                    <button
+                        type="button"
+                        x-on:click="open = true"
+                        class="fixed bottom-4 right-4 z-40 inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white/95 px-3.5 py-2 text-xs font-semibold text-brand-ink shadow-lg shadow-brand-ink/10 backdrop-blur hover:bg-brand-sand/40 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                        title="{{ __('Browser console — coming soon') }}"
+                    >
+                        <x-heroicon-o-command-line class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                        {{ __('Console') }}
+                        <span class="rounded-full bg-brand-sand px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Soon') }}</span>
+                    </button>
+
+                    <div
+                        x-show="open"
+                        x-cloak
+                        class="fixed inset-0 z-[100] overflow-y-auto"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="console-preview-modal-title"
+                    >
+                        <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="open = false"></div>
+                        <div class="relative flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
+                            <div class="relative w-full max-w-xl">
+                                <button
+                                    type="button"
+                                    x-on:click="open = false"
+                                    class="absolute -top-3 end-0 z-10 inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
+                                    aria-label="{{ __('Close') }}"
+                                >
+                                    <x-heroicon-o-x-mark class="h-4 w-4" />
+                                    {{ __('Close') }}
+                                </button>
+                                <x-console-preview-panel compact :server="$routeServer" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
 
             {{-- Global documentation sidebar — opens from page headers and x-docs-link. --}}
             <div

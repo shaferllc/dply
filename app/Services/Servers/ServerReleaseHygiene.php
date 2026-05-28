@@ -25,7 +25,7 @@ final class ServerReleaseHygiene
      *     scan: array{checked_at: ?Carbon, never_scanned: bool, stale: bool},
      *     disk: array{pct: ?float, captured_at: ?Carbon},
      *     releases: array{atomic_site_count: int, total_stored: int, sites_over_keep: int, rows: list<array<string, mixed>>},
-     *     logs: array{laravel_total_bytes: int, system_logfiles: list<array<string, mixed>>, journal_usage: ?string},
+     *     logs: array{laravel_total_bytes: int, site_rows: list<array<string, mixed>>, system_logfiles: list<array<string, mixed>>, journal_usage: ?string},
      *     failed_jobs: array{total: int, sites_with_failures: int, rows: list<array<string, mixed>>},
      *     prune_command: array{name: string, description: string, installed: bool},
      * }
@@ -49,7 +49,7 @@ final class ServerReleaseHygiene
         $stale = $checkedAt !== null && $checkedAt->lt(now()->subHours($staleHours));
 
         $releases = $this->releases($sites, $snapshot);
-        $logs = $this->logs($snapshot);
+        $logs = $this->logs($sites, $snapshot);
         $failedJobs = $this->failedJobs($sites, $snapshot);
         $disk = $this->disk($server);
 
@@ -184,20 +184,41 @@ final class ServerReleaseHygiene
     }
 
     /**
+     * @param  Collection<int, Site>  $sites
      * @return array<string, mixed>
      */
-    private function logs(array $snapshot): array
+    private function logs(Collection $sites, array $snapshot): array
     {
-        $scanSites = is_array($snapshot['sites'] ?? null) ? $snapshot['sites'] : [];
+        $scanSites = collect(is_array($snapshot['sites'] ?? null) ? $snapshot['sites'] : [])->keyBy('slug');
         $system = is_array($snapshot['system'] ?? null) ? $snapshot['system'] : [];
 
         $laravelTotal = 0;
-        foreach ($scanSites as $row) {
-            if (! is_array($row)) {
+        $siteRows = [];
+
+        foreach ($sites as $site) {
+            $scan = $scanSites->get((string) $site->slug);
+            if (! is_array($scan)) {
                 continue;
             }
-            $laravelTotal += (int) ($row['laravel_log_bytes'] ?? 0);
+
+            $bytes = (int) ($scan['laravel_log_bytes'] ?? 0);
+            $path = is_string($scan['laravel_log_path'] ?? null) ? (string) $scan['laravel_log_path'] : '';
+            if ($bytes === 0 && $path === '') {
+                continue;
+            }
+
+            $laravelTotal += $bytes;
+            $siteRows[] = [
+                'site_id' => (string) $site->id,
+                'site_name' => (string) $site->name,
+                'slug' => (string) $site->slug,
+                'path' => $path,
+                'bytes' => $bytes,
+                'href' => route('sites.show', ['server' => $site->server_id, 'site' => $site, 'section' => 'logs']),
+            ];
         }
+
+        usort($siteRows, static fn (array $a, array $b): int => $b['bytes'] <=> $a['bytes']);
 
         $logfiles = [];
         foreach ($system['logfiles'] ?? [] as $file) {
@@ -214,6 +235,7 @@ final class ServerReleaseHygiene
 
         return [
             'laravel_total_bytes' => $laravelTotal,
+            'site_rows' => $siteRows,
             'system_logfiles' => $logfiles,
             'journal_usage' => is_string($system['journal_usage'] ?? null) ? $system['journal_usage'] : null,
         ];

@@ -13,8 +13,10 @@ use App\Services\Edge\EdgeMiddlewareBundleUploader;
 use App\Services\Edge\EdgeRouter;
 use App\Services\Edge\EdgeSsrBundleUploader;
 use App\Services\Edge\EdgeTestingHostnameProvisioner;
+use App\Services\Edge\EnsureEdgeRepoDomains;
 use App\Services\Edge\OriginHealthcheckRunner;
 use App\Services\Notifications\NotificationPublisher;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -58,6 +60,13 @@ class PublishEdgeDeploymentJob implements ShouldQueue
 
         $site = Site::query()->find($deployment->site_id);
         if ($site === null) {
+            return;
+        }
+
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            $this->markFailed($site, $deployment, 'Edge delivery is paused by platform administrators.');
+            $this->cleanupLocalArtifact();
+
             return;
         }
 
@@ -151,7 +160,7 @@ class PublishEdgeDeploymentJob implements ShouldQueue
             // domain from the file does NOT detach — detaches are
             // explicit only (dashboard / API).
             try {
-                app(\App\Services\Edge\EnsureEdgeRepoDomains::class)->ensure($site->fresh(), $deployment->fresh());
+                app(EnsureEdgeRepoDomains::class)->ensure($site->fresh(), $deployment->fresh());
             } catch (Throwable) {
                 // Best-effort; declared domains can be retried on next deploy.
             }

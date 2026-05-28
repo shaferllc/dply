@@ -25,7 +25,7 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <x-explainer>
-        <p>{{ __('This page combines Dply release records with an optional SSH scan of on-disk release folders, laravel.log sizes, and queue:failed counts. Use the prune saved command on Run when extra release folders accumulate.') }}</p>
+        <p>{{ __('This page combines Dply release records with an optional SSH scan of on-disk release folders, laravel.log sizes, and queue:failed counts. Use the prune saved command on Run when extra release folders accumulate. After a scan, use View on any log row to tail the last lines over SSH.') }}</p>
     </x-explainer>
 
     <div class="space-y-6">
@@ -176,8 +176,16 @@
 
             <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h2>
-                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan.') }}</p>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-sm font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h2>
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan. View tails the newest lines over SSH.') }}</p>
+                        </div>
+                        <a href="{{ route('servers.logs', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40">
+                            {{ __('Full log viewer') }}
+                            <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
+                        </a>
+                    </div>
                 </div>
                 <div class="space-y-4 px-6 py-4 sm:px-7">
                     <dl class="grid grid-cols-2 gap-4 text-sm">
@@ -192,6 +200,51 @@
                             </dd>
                         </div>
                     </dl>
+
+                    @if (count($report['logs']['site_rows']) > 0)
+                        <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="bg-brand-sand/30 text-brand-moss">
+                                    <tr>
+                                        <th class="px-3 py-2 font-semibold">{{ __('Site') }}</th>
+                                        <th class="px-3 py-2 font-semibold">{{ __('Laravel log') }}</th>
+                                        <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
+                                        @if ($opsReady && ! $isDeployer)
+                                            <th class="px-3 py-2 font-semibold text-right">{{ __('Read') }}</th>
+                                        @endif
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-brand-ink/5 bg-white">
+                                    @foreach ($report['logs']['site_rows'] as $row)
+                                        <tr>
+                                            <td class="px-3 py-2">
+                                                <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
+                                            </td>
+                                            <td class="max-w-[12rem] truncate px-3 py-2 font-mono text-brand-moss" title="{{ $row['path'] }}">{{ $row['path'] ?: '—' }}</td>
+                                            <td class="px-3 py-2 text-brand-ink">{{ $row['bytes'] > 0 ? $formatBytes($row['bytes']) : '—' }}</td>
+                                            @if ($opsReady && ! $isDeployer)
+                                                <td class="px-3 py-2 text-right">
+                                                    @if ($row['path'] !== '')
+                                                        <button
+                                                            type="button"
+                                                            wire:click="viewHygieneLog(@js($row['path']), @js($row['site_name'].' — laravel.log'))"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="viewHygieneLog"
+                                                            class="font-semibold text-brand-forest hover:underline disabled:opacity-50"
+                                                        >
+                                                            {{ __('View') }}
+                                                        </button>
+                                                    @else
+                                                        <span class="text-brand-mist">—</span>
+                                                    @endif
+                                                </td>
+                                            @endif
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
 
                     @if (count($report['failed_jobs']['rows']) > 0)
                         <ul class="space-y-2 text-sm">
@@ -215,6 +268,9 @@
                                     <tr>
                                         <th class="px-3 py-2 font-semibold">{{ __('System log') }}</th>
                                         <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
+                                        @if ($opsReady && ! $isDeployer)
+                                            <th class="px-3 py-2 font-semibold text-right">{{ __('Read') }}</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-brand-ink/5 bg-white">
@@ -222,6 +278,19 @@
                                         <tr>
                                             <td class="px-3 py-2 font-mono text-brand-moss">{{ $file['path'] }}</td>
                                             <td class="px-3 py-2 text-brand-ink">{{ $formatBytes($file['bytes']) }}</td>
+                                            @if ($opsReady && ! $isDeployer)
+                                                <td class="px-3 py-2 text-right">
+                                                    <button
+                                                        type="button"
+                                                        wire:click="viewHygieneLog(@js($file['path']), @js($file['path']))"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="viewHygieneLog"
+                                                        class="font-semibold text-brand-forest hover:underline disabled:opacity-50"
+                                                    >
+                                                        {{ __('View') }}
+                                                    </button>
+                                                </td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -267,4 +336,64 @@
         </section>
         @endfeature
     </div>
+
+    @if ($showHygieneLogModal)
+        <x-modal name="hygiene-log-view" :show="true" wire:model="showHygieneLogModal" max-width="4xl">
+            <div class="space-y-4 p-6">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs uppercase tracking-wide text-brand-moss">{{ __('Log tail') }}</p>
+                        <p class="break-all font-mono text-sm font-semibold text-brand-ink">{{ $hygieneLogLabel }}</p>
+                        @if ($hygieneLogPath)
+                            <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $hygieneLogPath }}</p>
+                        @endif
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="refreshHygieneLog"
+                            wire:loading.attr="disabled"
+                            wire:target="refreshHygieneLog,viewHygieneLog"
+                            class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                        >
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshHygieneLog,viewHygieneLog" aria-hidden="true" />
+                            {{ __('Refresh') }}
+                        </button>
+                        <button type="button" wire:click="closeHygieneLogModal" class="text-sm text-brand-moss hover:underline">{{ __('Close') }}</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-end gap-3 text-sm">
+                    <div>
+                        <label for="hygiene-log-tail-lines" class="text-xs font-medium text-brand-moss">{{ __('Lines to tail') }}</label>
+                        <input
+                            id="hygiene-log-tail-lines"
+                            type="number"
+                            wire:model="hygieneLogTailLines"
+                            min="50"
+                            max="5000"
+                            class="mt-1 block w-24 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink"
+                        />
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="refreshHygieneLog"
+                        wire:loading.attr="disabled"
+                        wire:target="refreshHygieneLog"
+                        class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                    >
+                        {{ __('Apply') }}
+                    </button>
+                </div>
+
+                @if ($hygieneLogError)
+                    <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ $hygieneLogError }}</div>
+                @elseif ($hygieneLogOutput !== null && $hygieneLogOutput !== '')
+                    <pre class="max-h-[60vh] overflow-auto rounded-md border border-brand-ink/10 bg-brand-ink/5 p-3 text-xs leading-relaxed text-brand-ink"><code>{{ $hygieneLogOutput }}</code></pre>
+                @else
+                    <p class="text-sm text-brand-moss">{{ __('No output yet.') }}</p>
+                @endif
+            </div>
+        </x-modal>
+    @endif
 </x-server-workspace-layout>

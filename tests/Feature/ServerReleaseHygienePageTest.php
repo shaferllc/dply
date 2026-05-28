@@ -8,7 +8,9 @@ use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerRecipe;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\Servers\ServerSystemLogReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -90,4 +92,74 @@ test('non vm host returns 404', function (): void {
     $this->actingAs($user)
         ->get(route('servers.hygiene', $server->fresh()))
         ->assertNotFound();
+});
+
+test('hygiene page shows view log buttons when scan has log paths', function (): void {
+    [$user, $server] = hygieneUserWithServer();
+    $server->update([
+        'status' => 'ready',
+        'meta' => array_merge(is_array($server->meta) ? $server->meta : [], [
+            'release_hygiene_snapshot' => [
+                'checked_at' => now()->subHour()->toIso8601String(),
+                'sites' => [[
+                    'slug' => 'app',
+                    'laravel_log_bytes' => 4096,
+                    'laravel_log_path' => '/var/www/app/shared/storage/logs/laravel.log',
+                    'failed_jobs' => 0,
+                ]],
+                'system' => [
+                    'logfiles' => [[
+                        'path' => '/var/log/nginx/error.log',
+                        'bytes' => 1024,
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    Site::factory()->create([
+        'organization_id' => $server->organization_id,
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'slug' => 'app',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('servers.hygiene', $server->fresh()))
+        ->assertOk()
+        ->assertSee(__('View'))
+        ->assertSee('/var/log/nginx/error.log');
+});
+
+test('org owner can open hygiene log modal with mocked tail', function (): void {
+    [$user, $server] = hygieneUserWithServer();
+    $logPath = '/var/log/nginx/error.log';
+    $server->update([
+        'status' => 'ready',
+        'meta' => array_merge(is_array($server->meta) ? $server->meta : [], [
+            'release_hygiene_snapshot' => [
+                'checked_at' => now()->subHour()->toIso8601String(),
+                'sites' => [],
+                'system' => [
+                    'logfiles' => [[
+                        'path' => $logPath,
+                        'bytes' => 1024,
+                    ]],
+                ],
+            ],
+        ]),
+    ]);
+
+    $this->mock(ServerSystemLogReader::class, function ($mock) use ($logPath): void {
+        $mock->shouldReceive('tailAllowlistedFile')
+            ->once()
+            ->withArgs(fn ($server, string $path): bool => $path === $logPath)
+            ->andReturn(['output' => "[2026-05-27] test error line\n", 'error' => null]);
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceReleaseHygiene::class, ['server' => $server->fresh()])
+        ->call('viewHygieneLog', $logPath, $logPath)
+        ->assertSet('showHygieneLogModal', true)
+        ->assertSet('hygieneLogOutput', "[2026-05-27] test error line\n");
 });

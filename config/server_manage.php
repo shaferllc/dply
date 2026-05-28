@@ -1112,6 +1112,9 @@ BASH
         // action moved to the Caches workspace (redis Stats subtab); the MySQL
         // processlist action + DB connection-hints form moved to the Databases
         // workspace (MySQL Info subtab). mount() redirects /manage/data for back-compat.
+        // When workspace.patch_advisor is on, the Updates tab is hidden and
+        // /manage/updates redirects to Patches; this entry remains for orgs
+        // with the feature disabled.
         'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],
         'tools' => ['label' => 'Tools', 'icon' => 'wrench-screwdriver'],
         'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],

@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesReleaseHygieneLogViewer;
 use App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan;
 use App\Models\Server;
 use App\Services\Servers\ServerReleaseHygiene;
@@ -21,6 +22,7 @@ use Livewire\Component;
 class WorkspaceReleaseHygiene extends Component
 {
     use InteractsWithServerWorkspace;
+    use ManagesReleaseHygieneLogViewer;
     use RequiresFeature;
     use RunsServerReleaseHygieneScan;
 
@@ -29,6 +31,7 @@ class WorkspaceReleaseHygiene extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->mountReleaseHygieneLogViewer();
 
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
     }

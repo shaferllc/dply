@@ -7,6 +7,7 @@ namespace App\Actions\Edge;
 use App\Jobs\BuildEdgeSiteJob;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Support\Str;
 
 /**
@@ -19,6 +20,10 @@ class RedeployEdgeSite
     {
         if (! $site->usesEdgeRuntime()) {
             throw new \RuntimeException('Site is not an Edge delivery site.');
+        }
+
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            throw new \RuntimeException('Edge delivery is paused by platform administrators.');
         }
 
         $edge = $site->edgeMeta();

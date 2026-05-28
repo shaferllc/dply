@@ -23,8 +23,9 @@ final class ServerDaemonSloPanel
      *     overall: string,
      *     alert_count: int,
      *     alerts: list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>,
-     *     health: array{checked_at: ?Carbon, never_checked: bool, stale: bool, ok: ?bool, config_drift: bool, summary: ?string},
-     *     programs: array{total: int, active: int, unhealthy: int, rows: list<array<string, mixed>>},
+     *     health: array{checked_at: ?Carbon, never_checked: bool, stale: bool, ok: ?bool, config_drift: bool, summary: ?string, detail: string},
+     *     supervisor: array{installed: bool, missing: bool},
+     *     programs: array{total: int, active: int, inactive: int, running: int, unhealthy: int, rows: list<array<string, mixed>>},
      * }
      */
     public function forServer(Server $server): array
@@ -33,6 +34,7 @@ final class ServerDaemonSloPanel
         $programs = $this->programs($server, $health);
 
         $alerts = array_merge(
+            $this->supervisorAlerts($server),
             $this->healthAlerts($health, $server),
             $this->programAlerts($programs, $server),
         );
@@ -63,6 +65,10 @@ final class ServerDaemonSloPanel
             'alert_count' => count($alerts),
             'alerts' => $alerts,
             'health' => $health,
+            'supervisor' => [
+                'installed' => $server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED,
+                'missing' => $server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_MISSING,
+            ],
             'programs' => $programs,
         ];
     }
@@ -100,26 +106,76 @@ final class ServerDaemonSloPanel
         $activePrograms = SupervisorProgram::query()
             ->where('server_id', $server->id)
             ->where('is_active', true)
-            ->count();
+            ->with('site:id,name')
+            ->orderBy('slug')
+            ->get(['id', 'site_id', 'slug', 'program_type']);
 
-        $parsed = $this->parser->parseForServer($server, (string) ($health['detail'] ?? ''));
-        $unhealthy = collect($parsed)->where('healthy', false)->count();
+        $total = SupervisorProgram::query()->where('server_id', $server->id)->count();
+        $inactive = max(0, $total - $activePrograms->count());
+
+        $parsed = collect($this->parser->parseForServer($server, (string) ($health['detail'] ?? '')))
+            ->keyBy('program_id');
 
         $rows = [];
-        foreach ($parsed as $row) {
+        foreach ($activePrograms as $program) {
+            $programId = (string) $program->id;
+            $row = $parsed->get($programId, [
+                'program_id' => $programId,
+                'slug' => (string) $program->slug,
+                'program_type' => (string) $program->program_type,
+                'site_id' => $program->site_id !== null ? (string) $program->site_id : null,
+                'site_name' => $program->site !== null ? (string) $program->site->name : null,
+                'state' => 'NOT REPORTED',
+                'uptime' => null,
+                'raw' => '',
+                'healthy' => false,
+            ]);
+
             $rows[] = array_merge($row, [
+                'in_snapshot' => $parsed->has($programId),
                 'href' => $row['site_id'] !== null
                     ? route('sites.show', ['server' => $server->id, 'site' => $row['site_id'], 'section' => 'workers'])
                     : route('servers.daemons', $server),
             ]);
         }
 
+        usort($rows, static function (array $a, array $b): int {
+            if ($a['healthy'] !== $b['healthy']) {
+                return $a['healthy'] <=> $b['healthy'];
+            }
+
+            return strcmp((string) $a['slug'], (string) $b['slug']);
+        });
+
+        $unhealthy = collect($rows)->where('healthy', false)->count();
+        $running = collect($rows)->where('state', 'RUNNING')->count();
+
         return [
-            'total' => SupervisorProgram::query()->where('server_id', $server->id)->count(),
-            'active' => $activePrograms,
+            'total' => $total,
+            'active' => $activePrograms->count(),
+            'inactive' => $inactive,
+            'running' => $running,
             'unhealthy' => $unhealthy,
             'rows' => $rows,
         ];
+    }
+
+    /**
+     * @return list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>
+     */
+    private function supervisorAlerts(Server $server): array
+    {
+        if ($server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_MISSING) {
+            return [];
+        }
+
+        return [[
+            'severity' => 'warning',
+            'title' => __('Supervisor is not installed'),
+            'message' => __('Install supervisor from the Daemons workspace before queue workers can run.'),
+            'href' => route('servers.daemons', $server),
+            'link_label' => __('Install supervisor'),
+        ]];
     }
 
     /**
@@ -154,7 +210,7 @@ final class ServerDaemonSloPanel
                 'title' => __('Supervisor programs need attention'),
                 'message' => $health['summary'] ?? __('One or more managed programs are not RUNNING.'),
                 'href' => route('servers.daemons', $server),
-                'link_label' => __('Open daemons'),
+                'link_label' => __('Go to programs'),
             ];
         }
 
@@ -162,9 +218,9 @@ final class ServerDaemonSloPanel
             $alerts[] = [
                 'severity' => 'warning',
                 'title' => __('Supervisor config drift'),
-                'message' => __('On-disk supervisor files differ from Dply — sync from the Daemons workspace.'),
+                'message' => __('On-disk supervisor files differ from Dply — sync from the Sync tab below.'),
                 'href' => route('servers.daemons', $server),
-                'link_label' => __('Open daemons'),
+                'link_label' => __('Go to sync'),
             ];
         }
 
@@ -194,9 +250,9 @@ final class ServerDaemonSloPanel
                 (int) $programs['unhealthy'],
                 ['count' => (int) $programs['unhealthy']],
             ),
-            'message' => $badStates !== '' ? $badStates : __('Inspect supervisor status on the Daemons tab.'),
+            'message' => $badStates !== '' ? $badStates : __('Inspect supervisor status on the Programs tab.'),
             'href' => route('servers.daemons', $server),
-            'link_label' => __('Open daemons'),
+            'link_label' => __('Go to programs'),
         ]];
     }
 

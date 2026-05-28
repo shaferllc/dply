@@ -15,6 +15,7 @@ use App\Services\Servers\ServerCertificateInventory;
 use App\Services\Servers\ServerDaemonSloPanel;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Servers\ServerSecurityDigest;
+use App\Services\Servers\ServerSecurityDigestScript;
 use App\Services\Servers\ServerSshAccessGraph;
 use App\Services\Servers\ServerSupervisorStatusParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -159,5 +160,74 @@ test('security digest flags high auth failure count', function (): void {
     $report = app(ServerSecurityDigest::class)->forServer($server);
 
     expect($report['overall'])->toBe('critical')
-        ->and($report['auth']['failed_lines'])->toBe(250);
+        ->and($report['auth']['failed_lines'])->toBe(250)
+        ->and($report['summary']['auth_failed_total'])->toBe(250);
+});
+
+test('security digest script parses jail stats and hardening fields', function (): void {
+    $output = <<<'OUT'
+DIGEST_BEGIN
+auth_failed_lines=12
+auth_invalid_user_lines=5
+auth_failed_password_lines=7
+auth_failed_recent=3
+ufw_active=active
+sshd_password_auth=no
+sshd_permit_root=prohibit-password
+fail2ban_active=active
+FAIL2BAN_BEGIN
+Status
+|- Number of jail:	1
+`- Jail list:	sshd
+FAIL2BAN_END
+JAIL_BEGIN=sshd
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed:	2
+|  |- Total failed:	40
+|  `- File list:	/var/log/auth.log
+`- Actions
+   |- Currently banned:	1
+   |- Total banned:	9
+   `- Banned IP list:	203.0.113.10
+JAIL_END
+DIGEST_END
+OUT;
+
+    $meta = app(ServerSecurityDigestScript::class)->parse($output, ['host_kind' => 'vm']);
+    $snapshot = $meta['security_digest_snapshot'];
+
+    expect($snapshot['auth_failed_lines'])->toBe(12)
+        ->and($snapshot['auth_invalid_user_lines'])->toBe(5)
+        ->and($snapshot['auth_failed_recent'])->toBe(3)
+        ->and($snapshot['ufw_active'])->toBe('active')
+        ->and($snapshot['sshd_password_auth'])->toBe('no')
+        ->and($snapshot['fail2ban_jail_rows'][0]['name'])->toBe('sshd')
+        ->and($snapshot['fail2ban_jail_rows'][0]['currently_banned'])->toBe(1)
+        ->and($snapshot['fail2ban_jail_rows'][0]['banned_ips'])->toBe(['203.0.113.10']);
+});
+
+test('security digest warns on password authentication enabled', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => [
+            'host_kind' => 'vm',
+            'security_digest_snapshot' => [
+                'checked_at' => now()->subHour()->toIso8601String(),
+                'auth_failed_lines' => 2,
+                'fail2ban_active' => 'active',
+                'fail2ban_jails' => ['sshd'],
+                'fail2ban_jail_rows' => [],
+                'sshd_password_auth' => 'yes',
+                'ufw_active' => 'active',
+            ],
+        ],
+    ]);
+
+    $report = app(ServerSecurityDigest::class)->forServer($server);
+
+    expect(collect($report['alerts'])->pluck('title')->contains(__('Password authentication enabled')))->toBeTrue();
 });

@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -121,6 +122,12 @@ class WorkspaceManage extends Component
         // (digest emails, etc.) keep working.
         if ($section === 'services') {
             $this->redirect(route('servers.services', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
+        if ($section === 'updates' && Feature::active('workspace.patch_advisor')) {
+            $this->redirect(route('servers.patches', $server), navigate: true);
 
             return;
         }
@@ -1189,7 +1196,22 @@ BASH;
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'manageTabs' => $this->manageWorkspaceTabs(),
         ]);
+    }
+
+    /**
+     * @return array<string, array{label: string, icon: string}>
+     */
+    protected function manageWorkspaceTabs(): array
+    {
+        $tabs = config('server_manage.workspace_tabs', []);
+
+        if (Feature::active('workspace.patch_advisor')) {
+            unset($tabs['updates']);
+        }
+
+        return $tabs;
     }
 
     protected function assertAllowlistedConfigPath(string $path): void

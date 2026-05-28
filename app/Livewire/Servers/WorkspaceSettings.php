@@ -15,6 +15,7 @@ use App\Services\Servers\ServerHealthProbe;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -43,7 +44,13 @@ class WorkspaceSettings extends Component
             return;
         }
 
-        $allowed = array_keys(config('server_settings.workspace_tabs', []));
+        if ($section === 'inventory' && Feature::active('workspace.patch_advisor')) {
+            $this->redirect(route('servers.patches', $server), navigate: true);
+
+            return;
+        }
+
+        $allowed = array_keys($this->settingsWorkspaceTabs());
         if (! in_array($section, $allowed, true)) {
             abort(404);
         }
@@ -208,6 +215,7 @@ class WorkspaceSettings extends Component
 
         return view('livewire.servers.workspace-settings', [
             'section' => $this->section,
+            'settingsTabs' => $this->settingsWorkspaceTabs(),
             'workspaces' => $this->workspacesForCurrentServerOrg(),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
@@ -216,5 +224,19 @@ class WorkspaceSettings extends Component
             'serverNotifSubscriptions' => $serverNotifSubscriptions,
             'assignableChannels' => $assignableChannels,
         ]);
+    }
+
+    /**
+     * @return array<string, array{label: string, icon: string}>
+     */
+    protected function settingsWorkspaceTabs(): array
+    {
+        $tabs = config('server_settings.workspace_tabs', []);
+
+        if (Feature::active('workspace.patch_advisor')) {
+            unset($tabs['inventory']);
+        }
+
+        return $tabs;
     }
 }

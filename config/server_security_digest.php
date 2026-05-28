@@ -9,6 +9,7 @@ return [
     'thresholds' => [
         'auth_failed_warning' => max(1, (int) env('SERVER_SECURITY_DIGEST_AUTH_FAILED_WARNING', 50)),
         'auth_failed_critical' => max(1, (int) env('SERVER_SECURITY_DIGEST_AUTH_FAILED_CRITICAL', 200)),
+        'auth_failed_recent_warning' => max(1, (int) env('SERVER_SECURITY_DIGEST_AUTH_FAILED_RECENT_WARNING', 25)),
     ],
 
 ];

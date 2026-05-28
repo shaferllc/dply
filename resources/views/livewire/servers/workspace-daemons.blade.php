@@ -67,7 +67,7 @@
         :server="$server"
         active="daemons"
         :title="__('Daemons')"
-        :description="__('Supervisor is installed during server provisioning by default. If it is missing on this machine, install it here, then Dply can write configs under /etc/supervisor/conf.d and run supervisorctl reread/update.')"
+        :description="__('Supervisor-managed queue workers and background daemons — health snapshot, program CRUD, sync, and logs.')"
         :context-site="null"
     >
         @include('livewire.servers.partials.daemons._workspace-content')

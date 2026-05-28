@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\EdgeDeployment;
+use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Services\Edge\EdgeArtifactPublisher;
 use App\Services\Edge\EdgeBuildRunner;
 use App\Services\Edge\EdgeDeliveryContextResolver;
 use App\Support\Edge\EdgeRepoRoot;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -44,6 +46,16 @@ class BuildEdgeSiteJob implements ShouldQueue
             return;
         }
 
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            $deployment->update([
+                'status' => EdgeDeployment::STATUS_FAILED,
+                'last_error' => 'Edge delivery is paused by platform administrators.',
+            ]);
+            $site->update(['status' => Site::STATUS_EDGE_FAILED]);
+
+            return;
+        }
+
         $edge = $site->edgeMeta();
         $source = is_array($edge['source'] ?? null) ? $edge['source'] : [];
         $build = is_array($edge['build'] ?? null) ? $edge['build'] : [];
@@ -70,7 +82,7 @@ class BuildEdgeSiteJob implements ShouldQueue
             // platform bindings like HOST_MAP / ASSETS / DEPLOYMENT_ID.
             $buildEnv = [];
             foreach ($site->edgeEnvVars()->where('scope', 'production')->get() as $envVar) {
-                if (! \App\Models\EdgeSiteEnvVar::keyIsValid($envVar->key)) {
+                if (! EdgeSiteEnvVar::keyIsValid($envVar->key)) {
                     continue;
                 }
                 $buildEnv[$envVar->key] = (string) $envVar->value;

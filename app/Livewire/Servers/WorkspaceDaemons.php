@@ -7,12 +7,14 @@ use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RunsServerSupervisorHealthScan;
 use App\Models\OrganizationSupervisorProgramTemplate;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Services\Servers\LaravelQueueWorkCommandBuilder;
+use App\Services\Servers\ServerDaemonSloPanel;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
@@ -22,6 +24,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -33,6 +36,7 @@ class WorkspaceDaemons extends Component
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RunsServerSupervisorHealthScan;
 
     public string $new_sv_slug = '';
 
@@ -194,6 +198,11 @@ class WorkspaceDaemons extends Component
                 'action-cable',
             ], true)) {
             $this->applySupervisorPreset($preset);
+        }
+
+        $tab = request()->query('tab');
+        if (is_string($tab) && $tab !== '') {
+            $this->setDaemonsWorkspaceTab($tab);
         }
     }
 
@@ -1204,6 +1213,10 @@ class WorkspaceDaemons extends Component
             ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
             : null;
 
+        $daemonSloReport = ($contextSiteModel === null && Feature::active('workspace.daemon_slo'))
+            ? app(ServerDaemonSloPanel::class)->forServer($this->server)
+            : null;
+
         // Header at-a-glance counts. Computed against the visible (filtered) set so the
         // numbers match what the operator sees in the program list below — switching the
         // programs_list_scope (site vs all) flips the stats too.
@@ -1228,6 +1241,7 @@ class WorkspaceDaemons extends Component
                 'contextSiteModel' => $contextSiteModel,
                 'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
                 'daemonsStats' => $stats,
+                'daemonSloReport' => $daemonSloReport,
             ],
         ));
     }

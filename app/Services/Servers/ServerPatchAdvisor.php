@@ -18,7 +18,7 @@ final class ServerPatchAdvisor
      *     overall: string,
      *     alert_count: int,
      *     alerts: list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>,
-     *     os: array{pretty: ?string, key: ?string},
+     *     os: array{pretty: ?string, key: ?string, label: ?string},
      *     packages: array{total: ?int, security: int, rows: list<array<string, mixed>>, preview_truncated: bool},
      *     reboot: array{required: ?bool},
      *     uptime: array{raw: ?string, load: ?string},
@@ -96,11 +96,12 @@ final class ServerPatchAdvisor
             'os' => [
                 'pretty' => is_string($meta['inventory_os_pretty'] ?? null) ? $meta['inventory_os_pretty'] : null,
                 'key' => is_string($meta['inventory_os_detected_key'] ?? null) ? $meta['inventory_os_detected_key'] : null,
+                'label' => is_string($meta['os_version'] ?? null) ? $meta['os_version'] : null,
             ],
             'packages' => [
                 'total' => $totalUpgrades,
                 'security' => $securityCount,
-                'rows' => array_slice($rows, 0, max(5, (int) config('server_patch_advisor.ui.package_rows', 40))),
+                'rows' => $rows,
                 'preview_truncated' => $previewTruncated,
             ],
             'reboot' => [
@@ -110,6 +111,7 @@ final class ServerPatchAdvisor
             'unattended' => [
                 'present' => (bool) ($unattended['present'] ?? false),
                 'enabled' => array_key_exists('enabled', $unattended) ? $unattended['enabled'] : null,
+                'snippet' => is_string($unattended['snippet'] ?? null) ? $unattended['snippet'] : null,
             ],
             'inventory' => [
                 'checked_at' => $checkedAt,
@@ -182,17 +184,17 @@ final class ServerPatchAdvisor
             $alerts[] = [
                 'severity' => 'critical',
                 'title' => trans_choice(':count security update pending|:count security updates pending', $securityCount, ['count' => $securityCount]),
-                'message' => __('Review the package list and schedule patching on Manage → Updates.'),
-                'href' => route('servers.manage', $server).'?section=updates',
-                'link_label' => __('Manage updates'),
+                'message' => __('Review the package list below and run apt actions when ready.'),
+                'href' => route('servers.patches', $server).'#patch-apt-actions',
+                'link_label' => __('Apt actions'),
             ];
         } elseif ($total > 0) {
             $alerts[] = [
                 'severity' => 'warning',
                 'title' => trans_choice(':count package update pending|:count package updates pending', $total, ['count' => $total]),
                 'message' => __('Non-security upgrades are available.'),
-                'href' => route('servers.manage', $server).'?section=updates',
-                'link_label' => __('Manage updates'),
+                'href' => route('servers.patches', $server).'#patch-apt-actions',
+                'link_label' => __('Apt actions'),
             ];
         }
 

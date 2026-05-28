@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Enums\ServerTier;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
+use App\Models\Site;
 use App\Services\Billing\OrganizationCostObservatory;
 
 /**
@@ -30,12 +31,42 @@ final class ServerCostCard
         $dplyCents = $tier->priceCents();
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
+        $hardware = $this->hardware($server, $tier);
         $providerCents = (int) ($provider['monthly_usd_cents'] ?? 0);
         $stackCents = $providerCents + $dplyCents;
+        $providerKnown = ($provider['source'] ?? '') !== 'unknown';
 
         $nudge = $this->rightSizeNudge($server, $tier, $siteCount, $capacity);
+        $forgePerServer = (int) config('subscription.standard.observatory.forge_per_server_cents', 1200);
+        $deltaVsForge = $stackCents - ($forgePerServer + $providerCents);
+        $perSiteCents = $siteCount > 0 ? (int) round($stackCents / $siteCount) : null;
+
+        $summary = [
+            'stack_cents' => $stackCents,
+            'provider_cents' => $providerCents,
+            'dply_cents' => $dplyCents,
+            'site_count' => $siteCount,
+            'per_site_cents' => $perSiteCents,
+            'forge_baseline_cents' => $forgePerServer,
+            'delta_vs_forge_cents' => $deltaVsForge,
+            'cpu_pct' => $capacity['cpu_pct'],
+            'mem_pct' => $capacity['mem_pct'],
+            'provider_known' => $providerKnown,
+            'metrics_fresh' => $capacity['metrics_fresh'],
+        ];
+
+        $alerts = $this->buildAlerts($provider, $capacity, $nudge);
+        $overall = $this->resolveOverall($nudge, $providerKnown, $capacity);
 
         return [
+            'overall' => $overall,
+            'alert_count' => count($alerts),
+            'alerts' => $alerts,
+            'summary' => $summary,
+            'hardware' => $hardware,
+            'tiers' => $this->tierLadder($tier),
+            'breakdown' => $this->costBreakdown($providerCents, $dplyCents, $stackCents),
+            'site_rows' => $this->siteRows($server, $perSiteCents),
             'provider' => $provider,
             'dply' => [
                 'tier' => $tier->value,
@@ -52,7 +83,13 @@ final class ServerCostCard
                 'provider_cents' => $providerCents,
                 'dply_cents' => $dplyCents,
                 'formatted' => $this->formatUsdCents($stackCents),
-                'provider_partial' => ($provider['source'] ?? '') === 'unknown',
+                'provider_partial' => ! $providerKnown,
+            ],
+            'comparison' => [
+                'forge_per_server_cents' => $forgePerServer,
+                'forge_plus_provider_cents' => $forgePerServer + $providerCents,
+                'dply_plus_provider_cents' => $stackCents,
+                'delta_vs_forge_cents' => $deltaVsForge,
             ],
             'nudge' => $nudge,
             'disclaimer' => __('Provider cost is a catalog estimate or a note you saved — not an invoiced amount. Dply bills its platform fee separately.'),
@@ -81,7 +118,7 @@ final class ServerCostCard
     }
 
     /**
-     * @return array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string}
+     * @return array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}
      */
     private function capacity(Server $server): array
     {
@@ -93,13 +130,196 @@ final class ServerCostCard
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
         $cpuPct = $this->metricFloat($payload, 'cpu_pct');
         $memPct = $this->metricFloat($payload, 'mem_pct');
+        $capturedAt = $snapshot?->captured_at;
+        $staleHours = max(1, (int) config('server_cost_card.metrics_stale_hours', 24));
+        $metricsFresh = $capturedAt !== null && $capturedAt->gte(now()->subHours($staleHours));
+        $metricsAgeHours = $capturedAt !== null
+            ? (int) max(0, $capturedAt->diffInHours(now()))
+            : null;
 
         return [
             'cpu_pct' => $cpuPct,
             'mem_pct' => $memPct,
             'headroom_sites' => $this->estimateHeadroomSites($cpuPct, $memPct, max(1, $server->sites->count())),
-            'metrics_at' => $snapshot?->captured_at?->toIso8601String(),
+            'metrics_at' => $capturedAt?->toIso8601String(),
+            'metrics_fresh' => $metricsFresh,
+            'metrics_age_hours' => $metricsAgeHours,
         ];
+    }
+
+    /**
+     * @return array{
+     *   cpu_count: ?int,
+     *   mem_mb: ?int,
+     *   mem_formatted: ?string,
+     *   tier: string,
+     *   tier_label: string,
+     *   provider: ?string,
+     *   plan: ?string,
+     *   region: ?string,
+     * }
+     */
+    private function hardware(Server $server, ServerTier $tier): array
+    {
+        $snapshot = $server->metricSnapshots()->first();
+        $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
+
+        $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])
+            ? (int) $payload['cpu_count']
+            : null;
+
+        $memMb = isset($payload['mem_total_kb']) && is_numeric($payload['mem_total_kb'])
+            ? (int) round((float) $payload['mem_total_kb'] / 1024)
+            : null;
+
+        return [
+            'cpu_count' => $cpuCount,
+            'mem_mb' => $memMb,
+            'mem_formatted' => $memMb !== null ? $this->formatMemory($memMb) : null,
+            'tier' => $tier->value,
+            'tier_label' => $tier->label(),
+            'provider' => $server->provider?->label(),
+            'plan' => (string) ($server->size ?: '') ?: null,
+            'region' => (string) ($server->region ?: '') ?: null,
+        ];
+    }
+
+    /**
+     * @return list<array{value: string, label: string, price_cents: int, formatted: string, current: bool}>
+     */
+    private function tierLadder(ServerTier $current): array
+    {
+        return array_map(
+            static fn (ServerTier $tier): array => [
+                'value' => $tier->value,
+                'label' => $tier->label(),
+                'price_cents' => $tier->priceCents(),
+                'formatted' => '$'.number_format($tier->priceCents() / 100, 2).'/mo',
+                'current' => $tier === $current,
+            ],
+            ServerTier::ordered(),
+        );
+    }
+
+    /**
+     * @return array{provider_pct: float, dply_pct: float}
+     */
+    private function costBreakdown(int $providerCents, int $dplyCents, int $stackCents): array
+    {
+        if ($stackCents <= 0) {
+            return ['provider_pct' => 0.0, 'dply_pct' => 0.0];
+        }
+
+        return [
+            'provider_pct' => round(($providerCents / $stackCents) * 100, 1),
+            'dply_pct' => round(($dplyCents / $stackCents) * 100, 1),
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, name: string, href: ?string, allocated_cents: ?int, formatted: ?string}>
+     */
+    private function siteRows(Server $server, ?int $perSiteCents): array
+    {
+        return $server->sites
+            ->sortBy('name')
+            ->values()
+            ->map(static function (Site $site) use ($server, $perSiteCents): array {
+                return [
+                    'id' => (string) $site->id,
+                    'name' => (string) $site->name,
+                    'href' => route('sites.show', ['server' => $server, 'site' => $site]),
+                    'allocated_cents' => $perSiteCents,
+                    'formatted' => $perSiteCents !== null
+                        ? '$'.number_format($perSiteCents / 100, 2).'/mo'
+                        : null,
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $provider
+     * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}  $capacity
+     * @param  array{kind: string, severity: string, title: string, message: string}|null  $nudge
+     * @return list<array{severity: string, title: string, message: string, action_label: ?string, action_route: ?string, action_anchor: ?string}>
+     */
+    private function buildAlerts(array $provider, array $capacity, ?array $nudge): array
+    {
+        $alerts = [];
+
+        if (($provider['source'] ?? '') === 'unknown') {
+            $alerts[] = [
+                'severity' => 'warning',
+                'title' => __('Provider cost unknown'),
+                'message' => (string) ($provider['detail'] ?? __('Add a monthly cost note on Settings or connect a supported provider credential for catalog lookup.')),
+                'action_label' => __('Edit cost notes'),
+                'action_route' => 'servers.settings',
+                'action_anchor' => 'settings-cost',
+            ];
+        }
+
+        if ($capacity['metrics_at'] === null) {
+            $alerts[] = [
+                'severity' => 'info',
+                'title' => __('Utilization metrics pending'),
+                'message' => __('Guest metrics have not reported yet — right-size nudges and headroom estimates appear after the first monitor snapshot.'),
+                'action_label' => __('Open Monitor'),
+                'action_route' => 'servers.monitor',
+                'action_anchor' => null,
+            ];
+        } elseif (! $capacity['metrics_fresh']) {
+            $alerts[] = [
+                'severity' => 'info',
+                'title' => __('Metrics may be stale'),
+                'message' => trans_choice(
+                    'Last snapshot was :hours hour ago — refresh Monitor before trusting utilization nudges.|Last snapshot was :hours hours ago — refresh Monitor before trusting utilization nudges.',
+                    (int) ($capacity['metrics_age_hours'] ?? 0),
+                    ['hours' => (int) ($capacity['metrics_age_hours'] ?? 0)],
+                ),
+                'action_label' => __('Open Monitor'),
+                'action_route' => 'servers.monitor',
+                'action_anchor' => null,
+            ];
+        }
+
+        if ($nudge !== null) {
+            $alerts[] = [
+                'severity' => (string) ($nudge['severity'] ?? 'info'),
+                'title' => (string) ($nudge['title'] ?? ''),
+                'message' => (string) ($nudge['message'] ?? ''),
+                'action_label' => null,
+                'action_route' => null,
+                'action_anchor' => null,
+            ];
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * @param  array{kind: string, severity: string, title: string, message: string}|null  $nudge
+     * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}  $capacity
+     */
+    private function resolveOverall(?array $nudge, bool $providerKnown, array $capacity): string
+    {
+        if (($nudge['severity'] ?? null) === 'warning') {
+            return 'critical';
+        }
+
+        if (! $providerKnown) {
+            return 'warning';
+        }
+
+        if ($nudge !== null) {
+            return 'info';
+        }
+
+        if ($capacity['metrics_at'] === null || ! $capacity['metrics_fresh']) {
+            return 'info';
+        }
+
+        return 'healthy';
     }
 
     /**
@@ -140,7 +360,7 @@ final class ServerCostCard
     }
 
     /**
-     * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string}  $capacity
+     * @param  array{cpu_pct: ?float, mem_pct: ?float, headroom_sites: ?int, metrics_at: ?string, metrics_fresh: bool, metrics_age_hours: ?int}  $capacity
      * @return array{kind: string, severity: string, title: string, message: string}|null
      */
     private function rightSizeNudge(Server $server, ServerTier $tier, int $siteCount, array $capacity): ?array
@@ -214,6 +434,17 @@ final class ServerCostCard
         }
 
         return null;
+    }
+
+    private function formatMemory(int $memMb): string
+    {
+        if ($memMb >= 1024) {
+            $gb = $memMb / 1024;
+
+            return rtrim(rtrim(number_format($gb, 1), '0'), '.').' GB';
+        }
+
+        return $memMb.' MB';
     }
 
     private function formatUsdCents(int $cents): string

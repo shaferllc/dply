@@ -14,6 +14,7 @@ use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Support\DeployLogRedactor;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -62,6 +63,25 @@ class RunSiteDeploymentJob implements ShouldQueue
 
         $this->site->loadMissing('server.organization');
         $organization = $this->site->server?->organization;
+
+        if (ProductLineKillSwitches::blocksVmSiteDeploy($this->site)) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'exit_code' => null,
+                'log_output' => 'VM deploys are temporarily disabled by platform administrators.',
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+
+            return;
+        }
+
         if ($organization !== null && ! $organization->canDeploy()) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,

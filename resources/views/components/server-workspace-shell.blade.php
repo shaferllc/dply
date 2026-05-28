@@ -189,6 +189,7 @@
                             $label = __($item['label']);
                             $navHref = server_workspace_nav_item_url($server, $item);
                             $needsSetup = (bool) ($item['needs_setup'] ?? false);
+                            $previewOnly = (bool) ($item['preview_only'] ?? false);
                         @endphp
                         <a
                             href="{{ $navHref }}"
@@ -197,6 +198,7 @@
                                 $navLink,
                                 'bg-brand-sand/60 text-brand-ink' => $active === $key,
                                 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== $key,
+                                'opacity-90' => $previewOnly && $active !== $key,
                             ])
                         >
                             @switch($icon)
@@ -279,6 +281,11 @@
                                     <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch
                             <span class="flex-1 truncate">{{ $label }}</span>
+                            @if ($previewOnly)
+                                <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    {{ __('Soon') }}
+                                </span>
+                            @endif
                             @if ($needsSetup)
                                 <span
                                     class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"

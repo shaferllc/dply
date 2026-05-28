@@ -164,4 +164,37 @@
             </div>
         </div>
     @endif
+
+    <div id="settings-provider" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
+        <h3 class="text-base font-semibold text-brand-ink">{{ __('Provider & lifecycle') }}</h3>
+        <p class="mt-1 text-sm text-brand-moss">{{ __('Read-only provisioning metadata from when this server was created.') }}</p>
+        <dl class="mt-5 grid gap-4 sm:grid-cols-2 text-sm">
+            <div>
+                <dt class="text-brand-mist">{{ __('Created in Dply') }}</dt>
+                <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-brand-mist">{{ __('Provider') }}</dt>
+                <dd class="mt-0.5 font-medium text-brand-ink">{{ $providerLine }}</dd>
+            </div>
+            <div>
+                <dt class="text-brand-mist">{{ __('Region') }}</dt>
+                <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-brand-mist">{{ __('Provider server ID') }}</dt>
+                <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $server->provider_id ?: '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-brand-mist">{{ __('Status') }}</dt>
+                <dd class="mt-0.5 font-medium text-brand-ink">{{ __($server->status) }} @if ($server->health_status) / {{ __($server->health_status) }} @endif</dd>
+            </div>
+            @if ($invAt ?? null)
+                <div>
+                    <dt class="text-brand-mist">{{ __('Inventory last checked') }}</dt>
+                    <dd class="mt-0.5 text-xs text-brand-moss">{{ \Illuminate\Support\Carbon::parse($invAt)->timezone(config('app.timezone'))->toDayDateTimeString() }}</dd>
+                </div>
+            @endif
+        </dl>
+    </div>
 </section>

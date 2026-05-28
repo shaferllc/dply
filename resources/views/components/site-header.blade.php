@@ -36,7 +36,7 @@
     $adminMenuActive = auth()->check()
         && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
         && (
-            request()->routeIs('admin.dashboard')
+            request()->routeIs('admin.*')
             || request()->is('horizon*')
             || request()->is('pulse*')
         );
@@ -318,7 +318,7 @@
                                 @can('viewPlatformAdmin')
                                     <div class="mx-2 mb-1 mt-1 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-1 pt-2 pb-1">
                                     <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Platform admin') }}</p>
-                                    <x-dropdown-link :href="route('admin.dashboard')">
+                                    <x-dropdown-link :href="route('admin.overview')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-squares-2x2 class="{{ $hi }}" />
                                         </x-slot>
@@ -565,7 +565,7 @@
                 @can('viewPlatformAdmin')
                     <div class="border-t border-brand-ink/10 pt-2 mt-2">
                         <p class="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Admin') }}</p>
-                        <x-responsive-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
+                        <x-responsive-nav-link :href="route('admin.overview')" :active="request()->routeIs('admin.*')">
                             <x-slot name="icon">
                                 <x-heroicon-o-shield-check class="{{ $hi }}" />
                             </x-slot>

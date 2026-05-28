@@ -8,7 +8,9 @@ use App\Actions\Edge\CreateEdgePreviewSite;
 use App\Actions\Edge\RedeployEdgeSite;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
+use App\Support\Edge\EdgePreviewPolicy;
 use App\Support\Edge\EdgeRepoRoot;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -31,6 +33,11 @@ class GithubEdgeWebhookController extends Controller
         if (! $site->usesEdgeRuntime()) {
             return response()->json(['ok' => false, 'reason' => 'not_an_edge_site'], 422);
         }
+
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            return response()->json(['ok' => false, 'reason' => 'edge_delivery_paused'], 503);
+        }
+
         if (! is_array($site->edgeMeta()['source'] ?? null)) {
             return response()->json(['ok' => false, 'reason' => 'site_is_not_source_mode'], 422);
         }
@@ -67,7 +74,7 @@ class GithubEdgeWebhookController extends Controller
         if (in_array($action, ['opened', 'reopened', 'synchronize'], true)) {
             // Gate against the repo's `previews:` policy in dply.yaml.
             // Disabled globally or branch on the exclude list → skip.
-            if (! \App\Support\Edge\EdgePreviewPolicy::shouldCreatePreview($site, \App\Support\Edge\EdgePreviewPolicy::EVENT_PULL_REQUEST, $branch)) {
+            if (! EdgePreviewPolicy::shouldCreatePreview($site, EdgePreviewPolicy::EVENT_PULL_REQUEST, $branch)) {
                 $this->touchWebhookLastEvent($site);
 
                 return response()->json([
