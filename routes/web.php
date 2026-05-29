@@ -106,6 +106,7 @@ use App\Livewire\Servers\WorkspaceBlueprintPreview;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCertInventory;
 use App\Livewire\Servers\WorkspaceCluster;
+use App\Livewire\Servers\WorkspaceConfiguration;
 use App\Livewire\Servers\WorkspaceConsole;
 use App\Livewire\Servers\WorkspaceConsolePreview;
 use App\Livewire\Servers\WorkspaceCostCard;
@@ -689,6 +690,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
     Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
+    Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');

@@ -63,23 +63,25 @@ function manageToolsPageUserWithServer(): array
     return [$user, $server->fresh()];
 }
 
-test('manage tools tab renders expanded toolchain overview', function (): void {
+test('manage tools tab renders compact catalog and runtimes panel', function (): void {
     [$user, $server] = manageToolsPageUserWithServer();
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
-        ->assertSee(__('Server toolchain'))
-        ->assertDontSee(__('Tool catalog'))
-        ->assertSee(__('Open Caches'))
-        ->assertSee(__('Open PHP'))
-        ->assertSee(__('Open Run'))
-        ->assertSee(__('Managed runtimes'))
+        ->assertSee(__(':installed of :total installed', ['installed' => 2, 'total' => 5]))
+        ->assertSee(__('Refresh probe'))
+        ->assertSee(__('Caches'))
+        ->assertSee(__('PHP'))
+        ->assertSee(__('Run'))
         ->assertSee(__('Git'))
         ->assertSee(__('Docker Engine'))
+        ->assertDontSee(__('Managed runtimes'))
+        ->call('setToolsPanel', 'runtimes')
+        ->assertSee(__('Managed runtimes'))
         ->assertSee('Bun')
         ->assertSee('Deno')
         ->assertSee('Java')
-        ->assertSee(__('Prune unused runtimes'));
+        ->assertSee(config('server_manage.service_actions.mise_prune.label'));
 });
 
 test('manage tools http route renders tools section', function (): void {
@@ -88,7 +90,7 @@ test('manage tools http route renders tools section', function (): void {
     $this->actingAs($user)
         ->get(route('servers.manage', ['server' => $server, 'section' => 'tools']))
         ->assertOk()
-        ->assertSee(__('Server toolchain'));
+        ->assertSee(__('Refresh probe'));
 });
 
 test('manage tools shows loading state while git upgrade is running', function (): void {
@@ -181,10 +183,10 @@ test('manage tools clears git upgrade loading after remote task finishes', funct
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
         ->set('manageRemoteTaskId', $taskId)
         ->set('manageRemoteTaskName', 'manage-action:repair_git')
-        ->assertSee(__('Running on server…'))
+        ->assertSee(__('Updating :action…', ['action' => 'Upgrade Git']))
         ->call('pollManageWorkspace')
         ->assertSet('manageRemoteTaskId', null)
-        ->assertDontSee(__('Running on server…'))
+        ->assertDontSee(__('Updating :action…', ['action' => 'Upgrade Git']))
         ->assertDontSee(__('Queued…'));
 
     expect(ServerManageAction::query()->where('server_id', $server->id)->value('status'))
@@ -325,8 +327,8 @@ test('manage tools shows loading state while mise runtime install is running', f
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
-        ->assertSee(__('Installing :version…', ['version' => '3.3.4']))
-        ->assertSee(__('Running on server…'));
+        ->call('setToolsPanel', 'runtimes')
+        ->assertSee(__('Installing :version…', ['version' => '3.3.4']));
 });
 
 function manageOverviewUserWithServerWithoutInventory(): array

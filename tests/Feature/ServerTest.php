@@ -2275,8 +2275,7 @@ test('server manage workspace renders', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'configuration'])
-        ->assertSee('Manage')
-        ->assertSee('Configuration files');
+        ->assertRedirect(route('servers.configuration', ['server' => $server]));
 
     // The 'services' section was retired from /manage/ — visiting it now
     // redirects to the standalone Services page so existing deep links
@@ -2284,33 +2283,6 @@ test('server manage workspace renders', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'services'])
         ->assertRedirect(route('servers.services', ['server' => $server]));
-});
-
-test('server manage config preview dispatches background job when enabled', function () {
-    config(['server_manage.queue_remote_tasks' => true]);
-
-    Queue::fake();
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n-----END OPENSSH PRIVATE KEY-----",
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'configuration'])
-        ->call('previewConfig', 'nginx')
-        ->assertSet('manageRemoteTaskId', fn ($id) => is_string($id) && strlen($id) > 0);
-
-    Queue::assertPushed(ServerManageRemoteSshJob::class);
-
-    $this->assertDatabaseHas('server_manage_actions', [
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'status' => 'queued',
-    ]);
 });
 
 test('servers show returns 403 for non member', function () {

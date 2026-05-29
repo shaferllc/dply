@@ -257,14 +257,14 @@ final class ServerManageToolsReport
     private function statusTone(bool $present, bool $preinstalled): string
     {
         if ($present && $preinstalled) {
-            return 'emerald';
+            return 'forest';
         }
 
         if ($present) {
-            return 'sage';
+            return 'sky';
         }
 
-        return 'amber';
+        return 'mist';
     }
 
     private function parseTimestamp(mixed $value): ?Carbon

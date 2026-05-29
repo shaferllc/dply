@@ -32,7 +32,7 @@ trait RunsAllowlistedManageAction
     /** Polling target while a queued manage task is in flight. */
     public ?string $manageRemoteTaskId = null;
 
-    public function runAllowlistedManageAction(string $key, ?string $containerId = null): void
+    public function runAllowlistedManageAction(string $key, ?string $containerId = null, ?string $imageRef = null): void
     {
         $this->authorize('update', $this->server);
 
@@ -65,6 +65,15 @@ trait RunsAllowlistedManageAction
                 return;
             }
             $script = str_replace('__DPLY_CONTAINER_ID__', $containerId, $script);
+        }
+
+        if (str_contains($script, '__DPLY_IMAGE_REF__')) {
+            if (! is_string($imageRef) || ! $this->isValidDockerImageRef($imageRef)) {
+                $this->toastError(__('Invalid image reference.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_IMAGE_REF__', $imageRef, $script);
         }
 
         $meta = $this->server->meta ?? [];
@@ -222,5 +231,10 @@ trait RunsAllowlistedManageAction
     protected function isValidDockerContainerRef(string $containerId): bool
     {
         return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/', $containerId);
+    }
+
+    protected function isValidDockerImageRef(string $imageRef): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9@][a-zA-Z0-9@:._\/-]{0,255}$/', $imageRef);
     }
 }

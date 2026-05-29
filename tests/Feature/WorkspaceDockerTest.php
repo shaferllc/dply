@@ -105,3 +105,60 @@ test('docker workspace container start dispatches remote job', function (): void
 
     Queue::assertPushed(ServerManageRemoteSshJob::class);
 });
+
+test('docker workspace loads volumes tab over ssh', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+        $mock->shouldReceive('runInlineBash')
+            ->once()
+            ->andReturn(ProcessOutput::make("data_vol\tlocal\tlocal\n"));
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('setWorkspaceTab', 'volumes')
+        ->assertSee('data_vol');
+});
+
+test('docker workspace pull image rejects empty input', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->set('pullImageInput', '')
+        ->call('confirmDockerImagePull')
+        ->assertSet('manageRemoteTaskId', null);
+});
+
+test('docker workspace opens container logs modal', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+        $mock->shouldReceive('runInlineBash')
+            ->once()
+            ->andReturn(ProcessOutput::make("line one\nline two\n"));
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerLogs', 'abc123', 'web')
+        ->assertSet('logsModalContainerId', 'abc123')
+        ->assertSee('line one');
+});
+
+test('docker workspace maintenance tab shows system df', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+        $mock->shouldReceive('runInlineBash')
+            ->once()
+            ->andReturn(ProcessOutput::make("Images\t4\t2\t1.2GB\t800MB\n"));
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('setWorkspaceTab', 'maintenance')
+        ->assertSee('Images')
+        ->assertSee('1.2GB');
+});

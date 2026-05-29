@@ -112,6 +112,9 @@ class WorkspaceManage extends Component
 
     public string $git_deploy_identity_email = '';
 
+    /** Manage → Tools sub-panel: `tools` (catalog list) or `runtimes` (mise). */
+    public string $toolsPanel = 'tools';
+
     public function mount(Server $server, ?string $section = null): void
     {
         if ($section === null) {
@@ -149,6 +152,12 @@ class WorkspaceManage extends Component
             return;
         }
 
+        if ($section === 'configuration') {
+            $this->redirect(route('servers.configuration', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
         // Subclasses (currently WorkspaceWebserver) get a small section allowlist
         // extension so their inherited mount() can pass a logical section name
         // ('web') that's no longer in workspace_tabs config — the tab strip in the
@@ -171,6 +180,15 @@ class WorkspaceManage extends Component
         if ($section === 'tools') {
             $this->hydrateGitDeployIdentityForm();
         }
+    }
+
+    public function setToolsPanel(string $panel): void
+    {
+        if (! in_array($panel, ['tools', 'runtimes'], true)) {
+            return;
+        }
+
+        $this->toolsPanel = $panel;
     }
 
     protected function hydrateGitDeployIdentityForm(): void
@@ -1628,6 +1646,7 @@ BASH;
             'activeToolActionOps' => $activeToolActionOps,
             'pendingToolActionKey' => $this->pendingToolActionKey,
             'miseReprobePending' => $this->miseReprobePending,
+            'toolsPanel' => $this->toolsPanel,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,

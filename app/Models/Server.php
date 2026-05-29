@@ -266,6 +266,18 @@ class Server extends Model
     }
 
     /**
+     * Most-recent metric snapshot as a relation so Eloquent memoizes the
+     * single-row lookup on the instance. The overview render fans the same
+     * server out to the cost card, health cockpit, and billing tier — each
+     * of which used to run its own "latest snapshot" query. Routing them all
+     * through this relation collapses those into one query per request.
+     */
+    public function latestMetricSnapshot(): HasOne
+    {
+        return $this->hasOne(ServerMetricSnapshot::class)->latestOfMany('captured_at');
+    }
+
+    /**
      * Billing tier derived from the most recent metric snapshot's cpu_count
      * and mem_total_kb. Returns ServerTier::XS while specs are unknown so a
      * freshly-connected server isn't accidentally billed at XL during the
@@ -273,7 +285,7 @@ class Server extends Model
      */
     public function billingTier(): ServerTier
     {
-        $snapshot = $this->metricSnapshots()->first();
+        $snapshot = $this->latestMetricSnapshot;
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
 
         $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])

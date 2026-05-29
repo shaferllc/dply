@@ -272,7 +272,7 @@ test('manage tools report marks docker preinstalled on docker host kind', functi
     $docker = collect($report['catalog_rows'])->firstWhere('slug', 'docker');
 
     expect($docker['status_label'])->toBe('Preinstalled')
-        ->and($docker['status_tone'])->toBe('emerald');
+        ->and($docker['status_tone'])->toBe('forest');
 });
 
 test('manage tools report assigns status tones for preinstalled installed and missing tools', function (): void {
@@ -292,11 +292,11 @@ test('manage tools report assigns status tones for preinstalled installed and mi
     $wpCli = collect($report['catalog_rows'])->firstWhere('slug', 'wp_cli');
 
     expect($git['status_label'])->toBe('Preinstalled')
-        ->and($git['status_tone'])->toBe('emerald')
+        ->and($git['status_tone'])->toBe('forest')
         ->and($docker['status_label'])->toBe('Installed')
-        ->and($docker['status_tone'])->toBe('sage')
+        ->and($docker['status_tone'])->toBe('sky')
         ->and($wpCli['status_label'])->toBe('Not detected')
-        ->and($wpCli['status_tone'])->toBe('amber');
+        ->and($wpCli['status_tone'])->toBe('mist');
 });
 
 test('manage tools report shows wp-cli install when missing and update when present', function (): void {

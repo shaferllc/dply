@@ -40,10 +40,7 @@ final class ServerHealthCockpit
         $sites = $server->sites()->get(['id', 'name', 'server_id', 'deploy_strategy', 'releases_to_keep']);
         $siteIds = $sites->pluck('id');
 
-        $latestMetric = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->orderByDesc('captured_at')
-            ->first();
+        $latestMetric = $server->latestMetricSnapshot;
 
         $payload = is_array($latestMetric?->payload) ? $latestMetric->payload : [];
         $capacity = $this->capacity($payload, $latestMetric?->captured_at);

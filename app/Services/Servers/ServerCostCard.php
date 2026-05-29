@@ -6,7 +6,6 @@ namespace App\Services\Servers;
 
 use App\Enums\ServerTier;
 use App\Models\Server;
-use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Services\Billing\OrganizationCostObservatory;
 
@@ -122,10 +121,7 @@ final class ServerCostCard
      */
     private function capacity(Server $server): array
     {
-        $snapshot = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->orderByDesc('captured_at')
-            ->first();
+        $snapshot = $server->latestMetricSnapshot;
 
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
         $cpuPct = $this->metricFloat($payload, 'cpu_pct');
@@ -161,7 +157,7 @@ final class ServerCostCard
      */
     private function hardware(Server $server, ServerTier $tier): array
     {
-        $snapshot = $server->metricSnapshots()->first();
+        $snapshot = $server->latestMetricSnapshot;
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
 
         $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])

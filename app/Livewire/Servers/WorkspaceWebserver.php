@@ -31,6 +31,7 @@ use App\Services\Servers\OpenLiteSpeedListenersConfig;
 use App\Services\Servers\OpenLiteSpeedVhostsConfig;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\ServerWebserverConfigEditor;
@@ -469,6 +470,15 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function mount(Server $server, ?string $section = null): void
     {
+        if ($this->engine_subtab === 'config' && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true)) {
+            $this->redirect(route('servers.configuration', [
+                'server' => $server,
+                'scope' => $this->workspace_tab,
+            ]), navigate: true);
+
+            return;
+        }
+
         // Force the inherited 'web' section state — the parent's render share
         // and any internal asserts on $section still resolve correctly without
         // requiring the operator to type `?section=web` on the URL.
@@ -592,6 +602,14 @@ class WorkspaceWebserver extends WorkspaceManage
         ];
         if ($subtab === 'tools') {
             $subtab = 'overview';
+        }
+        if ($subtab === 'config' && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true)) {
+            $this->redirect(route('servers.configuration', [
+                'server' => $this->server,
+                'scope' => $this->workspace_tab,
+            ]), navigate: true);
+
+            return;
         }
         $this->engine_subtab = in_array($subtab, $allowed, true) ? $subtab : 'overview';
         if ($this->engine_subtab !== 'config') {
@@ -3229,7 +3247,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
     }
 
-    public function render(): View
+    public function render(ServerManageToolsReport $toolsReport): View
     {
         $this->server->refresh();
         $this->pickupQueuedConfigLoad();

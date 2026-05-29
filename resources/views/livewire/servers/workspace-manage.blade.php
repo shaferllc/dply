@@ -31,6 +31,7 @@
         'activeToolActionOps' => $activeToolActionOps ?? [],
         'pendingToolActionKey' => $pendingToolActionKey ?? null,
         'miseReprobePending' => $miseReprobePending ?? false,
+        'toolsPanel' => $toolsPanel ?? 'tools',
     ];
 
     // Workspace-scoped console-actions banner. Surfaces the in-flight + most-recent

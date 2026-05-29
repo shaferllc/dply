@@ -1,5 +1,7 @@
 <?php
 
+use App\Services\Servers\ServerConfigFileCatalog;
+
 /**
  * Server “Manage” workspace: allowlisted read paths and fixed service scripts only.
  * No user-controlled shell fragments.
@@ -1146,6 +1148,7 @@ fi
 sudo -n docker start "$CID"
 docker ps --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 BASH,
+            'rerun_probe_after_finish' => true,
         ],
 
         'docker_container_stop' => [
@@ -1163,6 +1166,7 @@ fi
 sudo -n docker stop "$CID"
 docker ps -a --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 BASH,
+            'rerun_probe_after_finish' => true,
         ],
 
         'docker_container_restart' => [
@@ -1180,12 +1184,67 @@ fi
 sudo -n docker restart "$CID"
 docker ps --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_rm' => [
+            'label' => 'Remove container',
+            'description' => 'docker rm -f for one stopped or running container.',
+            'confirm' => 'Remove this container from the server? This deletes the container record — not the image.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker rm -f "$CID"
+echo "Removed container $CID"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_image_pull' => [
+            'label' => 'Pull image',
+            'description' => 'docker pull for a repository:tag or digest reference.',
+            'confirm' => 'Pull this image onto the server?',
+            'timeout' => 900,
+            'script' => <<<'BASH'
+set -e
+REF=__DPLY_IMAGE_REF__
+if [ -z "$REF" ]; then
+  echo "Missing image reference." >&2
+  exit 1
+fi
+sudo -n docker pull "$REF"
+docker images --filter "reference=$REF" --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}'
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_image_rm' => [
+            'label' => 'Remove image',
+            'description' => 'docker rmi for one image ID or repository:tag.',
+            'confirm' => 'Remove this image from the server? Containers using it must be removed first.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+REF=__DPLY_IMAGE_REF__
+if [ -z "$REF" ]; then
+  echo "Missing image reference." >&2
+  exit 1
+fi
+sudo -n docker rmi "$REF"
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
         ],
 
         'docker_image_prune' => [
-            'label' => 'Prune unused images',
+            'label' => 'Prune dangling images',
             'description' => 'docker image prune -f — removes dangling images only.',
-            'confirm' => 'Prune unused Docker images on this server? Dangling images are removed; tagged images in use are kept.',
+            'confirm' => 'Prune dangling Docker images on this server? Tagged images in use are kept.',
             'timeout' => 300,
             'script' => <<<'BASH'
 set -e
@@ -1194,6 +1253,32 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 sudo -n docker image prune -f
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_volume_prune' => [
+            'label' => 'Prune unused volumes',
+            'description' => 'docker volume prune -f — removes volumes not used by any container.',
+            'confirm' => 'Prune unused Docker volumes? Data in unused volumes will be deleted permanently.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+sudo -n docker volume prune -f
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_system_prune' => [
+            'label' => 'System prune',
+            'description' => 'docker system prune -af — removes stopped containers, unused networks, dangling images, and build cache.',
+            'confirm' => 'Run Docker system prune on this server? Stopped containers, unused networks, dangling images, and build cache will be removed. Named volumes are kept unless you prune them separately.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+sudo -n docker system prune -af
 docker system df
 BASH,
             'rerun_probe_after_finish' => true,
@@ -1504,6 +1589,117 @@ BASH
     /**
      * Server "Manage" workspace sub-pages (URL segment after /manage/). Order matches the tab bar.
      */
+    /**
+     * Unified configuration editor catalog — grouped file discovery for
+     * {@see ServerConfigFileCatalog}. Webserver group
+     * uses live SSH discovery via {@see RemoteWebserverConfigService}; other
+     * groups list static entries and optional globs (always allowlist-checked).
+     */
+    'config_file_catalog' => [
+        'webserver' => [
+            'label' => 'Webserver',
+            'discover_engines' => true,
+            'file_type' => 'nginx',
+        ],
+        'php' => [
+            'label' => 'PHP',
+            'file_type' => 'ini',
+            'entries' => [
+                ['label' => 'php.ini (CLI)', 'path' => '/etc/php/8.3/cli/php.ini', 'file_type' => 'ini'],
+                ['label' => 'php.ini (FPM)', 'path' => '/etc/php/8.3/fpm/php.ini', 'file_type' => 'ini'],
+                ['label' => 'www.conf (FPM pool)', 'path' => '/etc/php/8.3/fpm/pool.d/www.conf', 'file_type' => 'ini'],
+            ],
+            'globs' => [
+                '/etc/php/*/fpm/php.ini',
+                '/etc/php/*/fpm/pool.d/*.conf',
+            ],
+        ],
+        'redis_db' => [
+            'label' => 'Redis & DB',
+            'file_type' => 'conf',
+            'entries' => [
+                ['label' => 'redis.conf', 'path' => '/etc/redis/redis.conf'],
+                ['label' => 'my.cnf', 'path' => '/etc/mysql/my.cnf'],
+            ],
+            'globs' => [
+                '/etc/mysql/mariadb.conf.d/*.cnf',
+            ],
+        ],
+        'system' => [
+            'label' => 'System',
+            'file_type' => 'conf',
+            'entries' => [
+                ['label' => 'sshd_config', 'path' => '/etc/ssh/sshd_config'],
+                ['label' => 'unattended-upgrades', 'path' => '/etc/apt/apt.conf.d/50unattended-upgrades'],
+                ['label' => '20auto-upgrades', 'path' => '/etc/apt/apt.conf.d/20auto-upgrades'],
+            ],
+        ],
+        'supervisor' => [
+            'label' => 'Supervisor',
+            'file_type' => 'ini',
+            'entries' => [
+                ['label' => 'supervisord.conf', 'path' => '/etc/supervisor/supervisord.conf'],
+            ],
+            'globs' => [
+                '/etc/supervisor/conf.d/*.conf',
+            ],
+        ],
+    ],
+
+    /**
+     * Validation hooks for non-webserver config paths. Longest prefix match wins.
+     */
+    'config_validation_hooks' => [
+        'exact' => [
+            '/etc/ssh/sshd_config' => [
+                'validate' => '(sudo -n sshd -t 2>&1 || sshd -t 2>&1)',
+                'success_contains' => [],
+                'failure_contains' => ['fatal', 'missing', 'bad configuration'],
+                'validate_timeout' => 30,
+            ],
+            '/etc/redis/redis.conf' => [
+                'validate' => '(sudo -n redis-server /etc/redis/redis.conf --test-memory 1 2>&1 || redis-server /etc/redis/redis.conf --test-memory 1 2>&1)',
+                'success_contains' => [],
+                'failure_contains' => ['err', 'fatal', 'failed'],
+                'validate_timeout' => 30,
+            ],
+        ],
+        'prefixes' => [
+            '/etc/php/' => [
+                'validate' => '(sudo -n php-fpm8.3 -t 2>&1 || php-fpm8.3 -t 2>&1 || php-fpm -t 2>&1)',
+                'success_contains' => ['successful', 'test is successful'],
+                'failure_contains' => ['error', 'failed', 'emerg'],
+                'validate_timeout' => 45,
+            ],
+            '/etc/supervisor/' => [
+                'validate' => '(sudo -n supervisorctl reread 2>&1 && sudo -n supervisorctl status 2>&1 || supervisorctl reread 2>&1)',
+                'success_contains' => [],
+                'failure_contains' => ['error', 'no such file', 'invalid'],
+                'validate_timeout' => 30,
+            ],
+        ],
+    ],
+
+    /**
+     * Static autocomplete snippets keyed by file type for CodeMirror v1.
+     *
+     * @var array<string, list<array{label: string, insert: string, type?: string, detail?: string}>>
+     */
+    'config_autocomplete_snippets' => [
+        'nginx' => [
+            ['label' => 'server block', 'insert' => "server {\n    listen 80;\n    server_name example.com;\n    root /var/www/html;\n\n    location / {\n        try_files \$uri \$uri/ =404;\n    }\n}\n", 'detail' => 'Basic HTTP server'],
+            ['label' => 'upstream', 'insert' => "upstream backend {\n    server 127.0.0.1:8080;\n}\n", 'detail' => 'Upstream group'],
+        ],
+        'ini' => [
+            ['label' => 'memory_limit', 'insert' => "memory_limit = 256M\n", 'detail' => 'PHP memory limit'],
+            ['label' => 'supervisor program', 'insert' => "[program:example]\ncommand=/usr/bin/example\nautostart=true\nautorestart=true\n", 'detail' => 'Supervisor program block'],
+        ],
+        'conf' => [
+            ['label' => 'bind redis', 'insert' => "bind 127.0.0.1 ::1\n", 'detail' => 'Local-only Redis bind'],
+        ],
+        'default' => [],
+    ],
+
     'workspace_tabs' => [
         'overview' => ['label' => 'Overview', 'icon' => 'squares-2x2'],
         // 'services' sub-tab retired: it duplicated the standalone /servers/{id}/services
