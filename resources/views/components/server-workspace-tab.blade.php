@@ -3,13 +3,16 @@
     'id' => null,
     'as' => 'button',
     'icon' => null,
+    'variant' => 'default',
 ])
 
 @php
     $sharedClasses = [
         'inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-        'bg-brand-ink text-brand-cream shadow-sm' => $active,
-        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $active,
+        'bg-brand-ink text-brand-cream shadow-sm' => $active && $variant !== 'danger',
+        'bg-red-700 text-white shadow-sm' => $active && $variant === 'danger',
+        'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $active && $variant !== 'danger',
+        'text-red-800/90 hover:bg-red-50 hover:text-red-950' => ! $active && $variant === 'danger',
     ];
 
     // Pull `wire:click` straight out of the raw attribute array so we can

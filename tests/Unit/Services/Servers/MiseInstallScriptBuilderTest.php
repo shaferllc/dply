@@ -94,6 +94,10 @@ test('install runtime skips when version is blank', function () {
     $lines = (new MiseInstallScriptBuilder)->installRuntimeForUserLines('dply', 'node', '   ');
     expect($lines)->toBe([]);
 });
+test('supported runtimes include expanded mise catalog', function () {
+    expect(MiseInstallScriptBuilder::supportedRuntimes())
+        ->toContain('node', 'python', 'ruby', 'go', 'bun', 'deno', 'java');
+});
 test('install runtime version activates global default via mise use', function () {
     $lines = (new MiseInstallScriptBuilder)->installRuntimeVersionForUserLines('dply', 'node', '26.2.0');
     $script = implode("\n", $lines);

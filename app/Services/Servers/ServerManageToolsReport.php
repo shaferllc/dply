@@ -99,6 +99,37 @@ final class ServerManageToolsReport
             $showAction = $action !== null
                 && ($actionWhen !== 'missing' || ! $present);
 
+            $presentActionKey = is_string($def['present_action_key'] ?? null) ? $def['present_action_key'] : null;
+            $presentAction = $presentActionKey !== null ? ($serviceActions[$presentActionKey] ?? null) : null;
+            $showPresentAction = $present && is_array($presentAction);
+            if ($showPresentAction && $presentActionKey === 'repair_git') {
+                $showPresentAction = $this->packageIsUpgradable($meta, 'git');
+            } elseif ($showPresentAction && $presentActionKey === 'repair_redis_cli') {
+                $showPresentAction = $this->packageIsUpgradable($meta, 'redis-tools', 'valkey-tools');
+            } elseif ($showPresentAction && $presentActionKey === 'repair_docker') {
+                $showPresentAction = $this->packageIsUpgradable(
+                    $meta,
+                    'docker-ce',
+                    'docker-ce-cli',
+                    'containerd.io',
+                    'docker.io',
+                    'docker-buildx-plugin',
+                    'docker-compose-plugin',
+                );
+            }
+
+            $preinstalled = (bool) ($def['preinstalled'] ?? false);
+            if ($slug === 'docker' && $server->isDockerHost()) {
+                $preinstalled = true;
+            }
+
+            $identityName = is_string($state['user_name'] ?? null) && $state['user_name'] !== ''
+                ? $state['user_name']
+                : null;
+            $identityEmail = is_string($state['user_email'] ?? null) && $state['user_email'] !== ''
+                ? $state['user_email']
+                : null;
+
             $row = [
                 'slug' => $slug,
                 'label' => (string) ($def['label'] ?? $slug),
@@ -107,17 +138,33 @@ final class ServerManageToolsReport
                 'icon' => (string) ($def['icon'] ?? 'heroicon-o-wrench-screwdriver'),
                 'present' => $present,
                 'version' => $version,
-                'preinstalled' => (bool) ($def['preinstalled'] ?? false),
+                'preinstalled' => $preinstalled,
                 'action_key' => $actionKey,
                 'action' => is_array($action) ? $action : null,
                 'show_action' => $showAction,
+                'present_action_key' => $presentActionKey,
+                'present_action' => is_array($presentAction) ? $presentAction : null,
+                'show_present_action' => $showPresentAction,
+                'identity_name' => $identityName,
+                'identity_email' => $identityEmail,
+                'identity_defaults' => $slug === 'git'
+                    ? app(ServerDeployGitIdentity::class)->defaults($server)
+                    : null,
                 'run_suggestion' => is_string($def['run_suggestion'] ?? null) ? $def['run_suggestion'] : null,
-                'run_url' => route('servers.run', $server),
+                'run_url' => ! empty($def['show_run_link']) && $present
+                    ? route('servers.run', $server)
+                    : null,
                 'caches_url' => ! empty($def['show_when_redis_relevant'])
                     ? route('servers.caches', $server)
                     : null,
-                'status_label' => $this->statusLabel($present, (bool) ($def['preinstalled'] ?? false)),
-                'status_tone' => $present ? 'emerald' : 'mist',
+                'source_control_url' => ! empty($def['show_source_control_link'])
+                    ? route('profile.source-control')
+                    : null,
+                'docker_url' => ! empty($def['show_docker_workspace_link']) && $present
+                    ? route('servers.docker', $server)
+                    : null,
+                'status_label' => $this->statusLabel($present, $preinstalled),
+                'status_tone' => $this->statusTone($present, $preinstalled),
             ];
 
             $catalogRows[] = $row;
@@ -160,6 +207,7 @@ final class ServerManageToolsReport
             'catalog_rows' => $catalogRows,
             'generic_tools' => $genericTools,
             'hero_tool' => $heroTool,
+            'mise_runtime_catalog' => config('server_manage.mise_runtimes', []),
         ];
     }
 
@@ -206,6 +254,19 @@ final class ServerManageToolsReport
         return __('Not detected');
     }
 
+    private function statusTone(bool $present, bool $preinstalled): string
+    {
+        if ($present && $preinstalled) {
+            return 'emerald';
+        }
+
+        if ($present) {
+            return 'sage';
+        }
+
+        return 'amber';
+    }
+
     private function parseTimestamp(mixed $value): ?Carbon
     {
         if (! is_string($value) || trim($value) === '') {
@@ -217,5 +278,31 @@ final class ServerManageToolsReport
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function packageIsUpgradable(array $meta, string ...$packageNames): bool
+    {
+        $preview = $meta['inventory_upgradable_preview'] ?? null;
+        if (! is_string($preview) || trim($preview) === '') {
+            return false;
+        }
+
+        $needles = array_map(strtolower(...), $packageNames);
+
+        foreach (explode("\n", $preview) as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, 'Listing') || str_starts_with($line, '[dply]')) {
+                continue;
+            }
+
+            if (preg_match('#^([^/\s]+)/#', $line, $matches) && in_array(strtolower($matches[1]), $needles, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

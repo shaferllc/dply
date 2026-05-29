@@ -114,6 +114,7 @@ use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDaemonSlo;
 use App\Livewire\Servers\WorkspaceDatabases;
 use App\Livewire\Servers\WorkspaceDeployPolicy;
+use App\Livewire\Servers\WorkspaceDocker;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFilesPreview;
 use App\Livewire\Servers\WorkspaceFirewall;
@@ -691,6 +692,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
+    });
+    Route::middleware('feature:workspace.docker')->group(function (): void {
+        Route::livewire('servers/{server}/docker', WorkspaceDocker::class)->name('servers.docker');
     });
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');

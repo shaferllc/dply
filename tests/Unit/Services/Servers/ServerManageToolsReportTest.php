@@ -134,8 +134,240 @@ test('manage tools report suppresses composer install action when already presen
     $composer = collect($report['generic_tools'])->firstWhere('slug', 'composer');
     expect($composer)->not->toBeNull()
         ->and($composer['show_action'])->toBeFalse();
+});
+
+test('manage tools report shows git upgrade action when git is installed and upgradable', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'git' => ['present' => true, 'version' => 'git version 2.43.0'],
+        ],
+        'inventory_upgradable_preview' => "git/noble-updates 1:2.43.0-1ubuntu7.3 amd64 [upgradable from: 1:2.43.0-1ubuntu7.2]\n",
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
 
     $git = collect($report['generic_tools'])->firstWhere('slug', 'git');
     expect($git)->not->toBeNull()
-        ->and($git['action_key'])->toBe('install_git');
+        ->and($git['action_key'])->toBe('install_git')
+        ->and($git['show_action'])->toBeFalse()
+        ->and($git['present_action_key'])->toBe('repair_git')
+        ->and($git['show_present_action'])->toBeTrue()
+        ->and($git['source_control_url'])->toBe(route('profile.source-control'));
+});
+
+test('manage tools report hides git upgrade action when git is current', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'git' => ['present' => true, 'version' => 'git version 2.43.0'],
+        ],
+        'inventory_upgradable_preview' => "curl/noble-updates 8.5.0-2ubuntu10.6 amd64 [upgradable from: 8.5.0-2ubuntu10.5]\n",
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
+
+    $git = collect($report['generic_tools'])->firstWhere('slug', 'git');
+    expect($git)->not->toBeNull()
+        ->and($git['show_present_action'])->toBeFalse();
+});
+
+test('manage tools report shows git install action when git is missing', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'git' => ['present' => false, 'version' => null],
+        ],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
+
+    $git = collect($report['generic_tools'])->firstWhere('slug', 'git');
+    expect($git)->not->toBeNull()
+        ->and($git['show_action'])->toBeTrue()
+        ->and($git['show_present_action'])->toBeFalse();
+});
+
+test('manage tools report surfaces deploy user git identity from probe', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'git' => [
+                'present' => true,
+                'version' => 'git version 2.43.0',
+                'user_name' => 'Deploy Bot',
+                'user_email' => 'deploy@example.com',
+            ],
+        ],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build($server);
+
+    $git = collect($report['generic_tools'])->firstWhere('slug', 'git');
+    expect($git['identity_name'])->toBe('Deploy Bot')
+        ->and($git['identity_email'])->toBe('deploy@example.com')
+        ->and($git['identity_defaults']['name'])->toBeString()
+        ->and($git['identity_defaults']['email'])->toContain('@');
+});
+
+test('manage tools report shows docker upgrade when docker-ce is upgradable', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'docker' => ['present' => true, 'version' => 'Docker version 27.0.0'],
+        ],
+        'inventory_upgradable_preview' => "docker-ce/noble 5:27.0.0-1~ubuntu.24.04~noble amd64 [upgradable from: 5:26.0.0]\n",
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
+
+    $docker = collect($report['generic_tools'])->firstWhere('slug', 'docker');
+    expect($docker)->not->toBeNull()
+        ->and($docker['show_action'])->toBeFalse()
+        ->and($docker['present_action_key'])->toBe('repair_docker')
+        ->and($docker['show_present_action'])->toBeTrue()
+        ->and($docker['docker_url'])->toBe(route('servers.docker', $server));
+});
+
+test('manage tools report hides docker upgrade when apt has no docker packages', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'docker' => ['present' => true, 'version' => 'Docker version 27.0.0'],
+        ],
+        'inventory_upgradable_preview' => "git/noble 1:2.43.0 amd64 [upgradable from: 1:2.42.0]\n",
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
+
+    $docker = collect($report['generic_tools'])->firstWhere('slug', 'docker');
+    expect($docker['show_present_action'])->toBeFalse();
+});
+
+test('manage tools report marks docker preinstalled on docker host kind', function (): void {
+    $server = manageToolsReportServer([
+        'host_kind' => Server::HOST_KIND_DOCKER,
+        'manage_tools' => [
+            'docker' => ['present' => true, 'version' => 'Docker version 27.0.0'],
+        ],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build($server);
+    $docker = collect($report['catalog_rows'])->firstWhere('slug', 'docker');
+
+    expect($docker['status_label'])->toBe('Preinstalled')
+        ->and($docker['status_tone'])->toBe('emerald');
+});
+
+test('manage tools report assigns status tones for preinstalled installed and missing tools', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'git' => ['present' => true, 'version' => 'git version 2.43.0'],
+            'docker' => ['present' => true, 'version' => 'Docker version 27.0.0'],
+            'wp_cli' => ['present' => false, 'version' => null],
+        ],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build($server);
+
+    $git = collect($report['catalog_rows'])->firstWhere('slug', 'git');
+    $docker = collect($report['catalog_rows'])->firstWhere('slug', 'docker');
+    $wpCli = collect($report['catalog_rows'])->firstWhere('slug', 'wp_cli');
+
+    expect($git['status_label'])->toBe('Preinstalled')
+        ->and($git['status_tone'])->toBe('emerald')
+        ->and($docker['status_label'])->toBe('Installed')
+        ->and($docker['status_tone'])->toBe('sage')
+        ->and($wpCli['status_label'])->toBe('Not detected')
+        ->and($wpCli['status_tone'])->toBe('amber');
+});
+
+test('manage tools report shows wp-cli install when missing and update when present', function (): void {
+    $actions = config('server_manage.service_actions', []);
+
+    $missing = manageToolsReportServer([
+        'manage_tools' => [
+            'wp_cli' => ['present' => false, 'version' => null],
+        ],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $missingReport = app(ServerManageToolsReport::class)->build($missing, $actions);
+    $missingWp = collect($missingReport['catalog_rows'])->firstWhere('slug', 'wp_cli');
+    expect($missingWp['show_action'])->toBeTrue()
+        ->and($missingWp['show_present_action'])->toBeFalse()
+        ->and($missingWp['run_url'])->toBeNull();
+
+    $present = manageToolsReportServer([
+        'manage_tools' => [
+            'wp_cli' => ['present' => true, 'version' => 'WP-CLI 2.10.0'],
+        ],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $presentReport = app(ServerManageToolsReport::class)->build($present, $actions);
+    $presentWp = collect($presentReport['catalog_rows'])->firstWhere('slug', 'wp_cli');
+    expect($presentWp['show_action'])->toBeFalse()
+        ->and($presentWp['present_action_key'])->toBe('update_wp_cli')
+        ->and($presentWp['show_present_action'])->toBeTrue()
+        ->and($presentWp['run_url'])->toBe(route('servers.run', $present));
+});
+
+test('manage tools report shows redis-cli upgrade only when redis-tools is upgradable', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'redis_cli' => ['present' => true, 'version' => 'redis-cli 7.0.15'],
+        ],
+        'manage_redis' => ['present' => true],
+        'inventory_upgradable_preview' => "redis-tools/noble-updates 5:7.0.15-1ubuntu0.24.04.1 amd64 [upgradable from: 5:7.0.15-1build1]\n",
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
+
+    $redis = collect($report['catalog_rows'])->firstWhere('slug', 'redis_cli');
+    expect($redis)->not->toBeNull()
+        ->and($redis['show_action'])->toBeFalse()
+        ->and($redis['present_action_key'])->toBe('repair_redis_cli')
+        ->and($redis['show_present_action'])->toBeTrue()
+        ->and($redis['caches_url'])->toBe(route('servers.caches', $server));
+});
+
+test('manage tools report hides redis-cli upgrade when apt has no redis-tools upgrade', function (): void {
+    $server = manageToolsReportServer([
+        'manage_tools' => [
+            'redis_cli' => ['present' => true, 'version' => 'redis-cli 7.0.15'],
+        ],
+        'manage_redis' => ['present' => true],
+        'inventory_checked_at' => now()->toIso8601String(),
+    ]);
+
+    $report = app(ServerManageToolsReport::class)->build(
+        $server,
+        config('server_manage.service_actions', []),
+    );
+
+    $redis = collect($report['catalog_rows'])->firstWhere('slug', 'redis_cli');
+    expect($redis['show_present_action'])->toBeFalse()
+        ->and($redis['caches_url'])->toBe(route('servers.caches', $server));
 });

@@ -21,6 +21,7 @@ use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\MiseInstallScriptBuilder;
+use App\Services\Servers\ServerDeployGitIdentity;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -96,6 +97,16 @@ class WorkspaceManage extends Component
      */
     public ?string $manageRemoteTaskId = null;
 
+    /** Full task name for the in-flight queued SSH job (used to trigger post-run reprobe). */
+    public ?string $manageRemoteTaskName = null;
+
+    /** True while a synchronous inventory reprobe runs after a mise action completes. */
+    public bool $miseReprobePending = false;
+
+    public string $git_deploy_identity_name = '';
+
+    public string $git_deploy_identity_email = '';
+
     public function mount(Server $server, ?string $section = null): void
     {
         if ($section === null) {
@@ -151,6 +162,76 @@ class WorkspaceManage extends Component
         $this->bootWorkspace($server);
         $meta = $server->meta ?? [];
         $this->manage_auto_updates_interval = (string) ($meta['manage_auto_updates_interval'] ?? 'off');
+
+        if ($section === 'tools') {
+            $this->hydrateGitDeployIdentityForm();
+        }
+    }
+
+    protected function hydrateGitDeployIdentityForm(): void
+    {
+        $identity = app(ServerDeployGitIdentity::class);
+        $defaults = $identity->defaults($this->server);
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $git = is_array($meta['manage_tools']['git'] ?? null) ? $meta['manage_tools']['git'] : [];
+
+        $this->git_deploy_identity_name = is_string($git['user_name'] ?? null) && trim($git['user_name']) !== ''
+            ? trim($git['user_name'])
+            : $defaults['name'];
+        $this->git_deploy_identity_email = is_string($git['user_email'] ?? null) && trim($git['user_email']) !== ''
+            ? trim($git['user_email'])
+            : $defaults['email'];
+    }
+
+    public function saveDeployGitIdentity(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server manage settings.'));
+
+            return;
+        }
+
+        $this->validate([
+            'git_deploy_identity_name' => ['required', 'string', 'max:120'],
+            'git_deploy_identity_email' => ['required', 'email', 'max:190'],
+        ]);
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before running actions.'));
+
+            return;
+        }
+
+        $identity = app(ServerDeployGitIdentity::class);
+        $deployUser = $identity->deployUser($this->server);
+        if ($deployUser === null) {
+            $this->toastError(__('This server has no deploy user configured.'));
+
+            return;
+        }
+
+        $name = trim($this->git_deploy_identity_name);
+        $email = trim($this->git_deploy_identity_email);
+
+        $this->dispatchQueuedManageScript(
+            $this->server->fresh() ?? $this->server,
+            'manage-action:set_deploy_git_identity',
+            $identity->buildSetScript($deployUser, $name, $email),
+            60,
+            __('Deploy user Git identity saved.'),
+            __('TaskRunner (SSH)').' — '.__('Git identity'),
+            __('Git identity'),
+        );
+    }
+
+    public function applyDefaultDeployGitIdentity(): void
+    {
+        $defaults = app(ServerDeployGitIdentity::class)->defaults($this->server);
+        $this->git_deploy_identity_name = $defaults['name'];
+        $this->git_deploy_identity_email = $defaults['email'];
+        $this->saveDeployGitIdentity();
     }
 
     public function saveManageMetadata(): void
@@ -319,6 +400,12 @@ BASH;
         if (str_starts_with($key, 'mysql_') && ! empty($meta['manage_internal_db_password']) && is_string($meta['manage_internal_db_password'])) {
             $script = 'export DPLY_DB_PASSWORD='.escapeshellarg($meta['manage_internal_db_password'])."\n".$script;
         }
+        if (str_contains($script, '__DPLY_DEPLOY_USER__')) {
+            $deployUser = trim((string) ($this->server->ssh_user ?? '')) !== ''
+                ? (string) $this->server->ssh_user
+                : (string) config('server_provision.deploy_ssh_user', 'dply');
+            $script = str_replace('__DPLY_DEPLOY_USER__', $deployUser, $script);
+        }
 
         try {
             $server = $this->server->fresh();
@@ -445,6 +532,38 @@ BASH;
     }
 
     /**
+     * Open the confirmation modal before uninstalling a mise runtime version.
+     */
+    public function promptMiseUninstallRuntime(string $runtime, string $version): void
+    {
+        $runtime = strtolower(trim($runtime));
+        $version = trim($version);
+
+        if ($version === '') {
+            return;
+        }
+
+        $catalog = config('server_manage.mise_runtimes', []);
+        $label = is_array($catalog[$runtime] ?? null)
+            ? (string) ($catalog[$runtime]['label'] ?? $runtime)
+            : $runtime;
+
+        $confirm = __('Uninstall :runtime :version? The deploy user\'s mise data directory drops the install; sites already pinned to this version will fall back to the runtime default.', [
+            'runtime' => $label,
+            'version' => $version,
+        ]);
+
+        $this->openConfirmActionModal(
+            'miseUninstallRuntime',
+            [$runtime, $version],
+            __('Uninstall :v', ['v' => $version]),
+            $confirm,
+            __('Uninstall :runtime :v', ['runtime' => $label, 'v' => $version]),
+            true,
+        );
+    }
+
+    /**
      * Set a runtime version as the deploy user's global default (`mise use
      * --global`). Installs the version as a side-effect if it isn't already
      * present, so this doubles as a "switch to this version" affordance.
@@ -484,7 +603,7 @@ BASH;
         $runtime = strtolower(trim($runtime));
         $version = trim($version);
 
-        if (! in_array($runtime, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES, true)) {
+        if (! in_array($runtime, MiseInstallScriptBuilder::supportedRuntimes(), true)) {
             $this->toastError(__('Unsupported runtime: :runtime.', ['runtime' => $runtime]));
 
             return;
@@ -565,7 +684,7 @@ BASH;
         $this->authorize('update', $this->server);
 
         $runtime = strtolower(trim($runtime));
-        if (! in_array($runtime, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES, true)) {
+        if (! in_array($runtime, MiseInstallScriptBuilder::supportedRuntimes(), true)) {
             $this->toastError(__('Unsupported runtime: :runtime.', ['runtime' => $runtime]));
 
             return;
@@ -1128,6 +1247,122 @@ BASH;
         ]);
     }
 
+    public function pollManageWorkspace(): void
+    {
+        $this->syncManageRemoteTaskFromCache();
+    }
+
+    /**
+     * @return array<string, array{kind: string, version: string, status: string, message: string}>
+     */
+    protected function activeMiseRuntimeOperations(): array
+    {
+        $rows = ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', 'like', 'mise-runtime:%')
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->orderByDesc('created_at')
+            ->get(['task_name', 'status']);
+
+        $ops = [];
+
+        foreach ($rows as $row) {
+            if (! preg_match('/^mise-runtime:(install|uninstall|default):([^@]+)@(.+)$/', (string) $row->task_name, $matches)) {
+                continue;
+            }
+
+            $runtime = strtolower($matches[2]);
+            if (isset($ops[$runtime])) {
+                continue;
+            }
+
+            $kind = $matches[1];
+            $version = $matches[3];
+
+            $ops[$runtime] = [
+                'kind' => $kind,
+                'version' => $version,
+                'status' => (string) $row->status,
+                'message' => match ($kind) {
+                    'install' => __('Installing :version…', ['version' => $version]),
+                    'uninstall' => __('Uninstalling :version…', ['version' => $version]),
+                    'default' => __('Setting :version as default…', ['version' => $version]),
+                    default => __('Working…'),
+                },
+            ];
+        }
+
+        return $ops;
+    }
+
+    /**
+     * @return array<string, array{status: string, message: string, label: string}>
+     */
+    protected function activeToolActionOperations(): array
+    {
+        $rows = ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', 'like', 'manage-action:%')
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->orderByDesc('created_at')
+            ->get(['task_name', 'status', 'label']);
+
+        $ops = [];
+
+        foreach ($rows as $row) {
+            if (! preg_match('/^manage-action:(.+)$/', (string) $row->task_name, $matches)) {
+                continue;
+            }
+
+            $key = $matches[1];
+            if (isset($ops[$key])) {
+                continue;
+            }
+
+            $status = (string) $row->status;
+            $ops[$key] = [
+                'status' => $status,
+                'label' => (string) $row->label,
+                'message' => $status === ServerManageAction::STATUS_QUEUED
+                    ? __('Queued…')
+                    : __('Running on server…'),
+            ];
+        }
+
+        if ($this->manageRemoteTaskId !== null
+            && $this->manageRemoteTaskId !== ''
+            && is_string($this->manageRemoteTaskName)
+            && preg_match('/^manage-action:(.+)$/', $this->manageRemoteTaskName, $matches)) {
+            $key = $matches[1];
+            if (! isset($ops[$key])) {
+                $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
+                $status = is_array($payload) ? (string) ($payload['status'] ?? 'queued') : 'queued';
+
+                if (in_array($status, ['queued', 'running'], true)) {
+                    $label = config('server_manage.service_actions.'.$key.'.label')
+                        ?? config('server_manage.dangerous_actions.'.$key.'.label')
+                        ?? $key;
+
+                    $ops[$key] = [
+                        'status' => $status,
+                        'label' => is_string($label) ? $label : $key,
+                        'message' => $status === 'running'
+                            ? __('Running on server…')
+                            : __('Queued…'),
+                    ];
+                }
+            }
+        }
+
+        return $ops;
+    }
+
     public function syncManageRemoteTaskFromCache(): void
     {
         if ($this->manageRemoteTaskId === null || $this->manageRemoteTaskId === '') {
@@ -1166,16 +1401,96 @@ BASH;
             return;
         }
 
+        $taskName = $this->manageRemoteTaskName;
+        $this->finalizeManageRemoteTaskLog($status, $taskName);
+
         if ($status === 'finished') {
             $flash = $payload['flash_success'] ?? null;
             if (is_string($flash) && $flash !== '') {
                 $this->toastSuccess($flash);
             }
-        } else {
+
+            if ($this->shouldRefreshInventoryAfterRemoteTask($taskName)) {
+                $this->runPostMiseInventoryRefresh();
+            }
+
+            if ($this->section === 'tools' && $taskName === 'manage-action:set_deploy_git_identity') {
+                $this->hydrateGitDeployIdentityForm();
+            }
         }
 
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
         $this->manageRemoteTaskId = null;
+        $this->manageRemoteTaskName = null;
+    }
+
+    protected function finalizeManageRemoteTaskLog(string $cacheStatus, ?string $taskName): void
+    {
+        if (! is_string($taskName) || $taskName === '') {
+            return;
+        }
+
+        if (! in_array($cacheStatus, ['finished', 'failed'], true)) {
+            return;
+        }
+
+        $rowStatus = $cacheStatus === 'finished'
+            ? ServerManageAction::STATUS_FINISHED
+            : ServerManageAction::STATUS_FAILED;
+
+        ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', $taskName)
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->update([
+                'status' => $rowStatus,
+                'finished_at' => now(),
+            ]);
+    }
+
+    protected function shouldRefreshInventoryAfterRemoteTask(?string $taskName): bool
+    {
+        if (! is_string($taskName) || $taskName === '') {
+            return false;
+        }
+
+        if (str_starts_with($taskName, 'mise-runtime:')) {
+            return true;
+        }
+
+        if (! preg_match('/^manage-action:(.+)$/', $taskName, $matches)) {
+            return false;
+        }
+
+        $key = $matches[1];
+        if ($key === 'set_deploy_git_identity') {
+            return true;
+        }
+
+        $entry = config('server_manage.service_actions', [])[$key]
+            ?? config('server_manage.dangerous_actions', [])[$key]
+            ?? null;
+
+        return is_array($entry) && (bool) ($entry['rerun_probe_after_finish'] ?? false);
+    }
+
+    protected function runPostMiseInventoryRefresh(): void
+    {
+        if (! $this->canRunInventoryProbe()) {
+            return;
+        }
+
+        $this->miseReprobePending = true;
+
+        try {
+            $this->refreshServerInventoryDetails();
+        } finally {
+            $this->miseReprobePending = false;
+            $this->server->refresh();
+        }
     }
 
     public function render(ServerManageToolsReport $toolsReport): View
@@ -1192,6 +1507,14 @@ BASH;
 
         $serviceActions = config('server_manage.service_actions', []);
 
+        $activeMiseRuntimeOps = $this->section === 'tools'
+            ? $this->activeMiseRuntimeOperations()
+            : [];
+
+        $activeToolActionOps = $this->section === 'tools'
+            ? $this->activeToolActionOperations()
+            : [];
+
         return view('livewire.servers.workspace-manage', [
             'configPreviews' => config('server_manage.config_previews', []),
             'serviceActions' => $serviceActions,
@@ -1201,6 +1524,9 @@ BASH;
             'toolsReport' => $this->section === 'tools'
                 ? $toolsReport->build($this->server, $serviceActions)
                 : null,
+            'activeMiseRuntimeOps' => $activeMiseRuntimeOps,
+            'activeToolActionOps' => $activeToolActionOps,
+            'miseReprobePending' => $this->miseReprobePending,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
@@ -1278,6 +1604,7 @@ BASH;
         ?string $consoleLabel = null,
     ): void {
         $this->manageRemoteTaskId = null;
+        $this->manageRemoteTaskName = $taskName;
 
         $id = (string) Str::uuid();
         $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);

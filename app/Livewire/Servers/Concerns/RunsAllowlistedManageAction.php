@@ -32,7 +32,7 @@ trait RunsAllowlistedManageAction
     /** Polling target while a queued manage task is in flight. */
     public ?string $manageRemoteTaskId = null;
 
-    public function runAllowlistedManageAction(string $key): void
+    public function runAllowlistedManageAction(string $key, ?string $containerId = null): void
     {
         $this->authorize('update', $this->server);
 
@@ -58,6 +58,15 @@ trait RunsAllowlistedManageAction
         }
 
         $script = (string) $def['script'];
+        if (str_contains($script, '__DPLY_CONTAINER_ID__')) {
+            if (! is_string($containerId) || ! $this->isValidDockerContainerRef($containerId)) {
+                $this->toastError(__('Invalid container.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_CONTAINER_ID__', $containerId, $script);
+        }
+
         $meta = $this->server->meta ?? [];
 
         // PHP-FPM service actions need to know which apt-managed php version's unit
@@ -208,5 +217,10 @@ trait RunsAllowlistedManageAction
         ]);
 
         return (string) $row->id;
+    }
+
+    protected function isValidDockerContainerRef(string $containerId): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/', $containerId);
     }
 }

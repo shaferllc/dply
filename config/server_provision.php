@@ -45,6 +45,24 @@ return [
     'deploy_ssh_user' => env('DPLY_SERVER_DEPLOY_SSH_USER', 'dply'),
 
     /*
+    |--------------------------------------------------------------------------
+    | Deploy user Git identity (global git config on the server)
+    |--------------------------------------------------------------------------
+    |
+    | Applied during provisioning when user.name / user.email are unset, and
+    | editable from Manage → Tools → Git. Used for commits made on the server
+    | (deploy hooks, manual git operations as the deploy user).
+    |
+    */
+    'configure_deploy_git_identity' => filter_var(env('DPLY_CONFIGURE_DEPLOY_GIT_IDENTITY', true), FILTER_VALIDATE_BOOLEAN),
+
+    'deploy_git_identity_name_suffix' => env('DPLY_DEPLOY_GIT_IDENTITY_NAME_SUFFIX', ' via Dply'),
+
+    'deploy_git_identity_email_domain' => env('DPLY_DEPLOY_GIT_EMAIL_DOMAIN', 'dply.host'),
+
+    'deploy_git_identity_email_local' => env('DPLY_DEPLOY_GIT_IDENTITY_EMAIL_LOCAL', 'deploy+{server_id}'),
+
+    /*
     | Install python3-minimal + deploy the metrics snapshot script
     | during provision so freshly-built servers start collecting
     | CPU/RAM/disk data automatically. Disable to keep the install

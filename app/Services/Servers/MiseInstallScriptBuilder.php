@@ -29,8 +29,23 @@ class MiseInstallScriptBuilder
     /**
      * Allowed runtime keys. Pinned to the polyglot-five-minus-PHP because
      * mise is the wrong tool for PHP on this platform (see class docblock).
+     *
+     * @deprecated Prefer {@see supportedRuntimes()} — config-driven catalog.
      */
-    public const SUPPORTED_RUNTIMES = ['node', 'python', 'ruby', 'go'];
+    public const SUPPORTED_RUNTIMES = ['node', 'python', 'ruby', 'go', 'bun', 'deno', 'java'];
+
+    /**
+     * @return list<string>
+     */
+    public static function supportedRuntimes(): array
+    {
+        $catalog = config('server_manage.mise_runtimes');
+        if (is_array($catalog) && $catalog !== []) {
+            return array_values(array_map('strval', array_keys($catalog)));
+        }
+
+        return self::SUPPORTED_RUNTIMES;
+    }
 
     /**
      * Bash lines that install mise system-wide via the official apt
@@ -120,7 +135,7 @@ class MiseInstallScriptBuilder
      */
     public function installRuntimeForUserLines(string $deployUser, string $runtime, string $version): array
     {
-        if (! in_array($runtime, self::SUPPORTED_RUNTIMES, true)) {
+        if (! in_array($runtime, self::supportedRuntimes(), true)) {
             return [];
         }
 
@@ -184,7 +199,7 @@ class MiseInstallScriptBuilder
      */
     public function uninstallRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
-        if (! in_array($runtime, self::SUPPORTED_RUNTIMES, true)) {
+        if (! in_array($runtime, self::supportedRuntimes(), true)) {
             return [];
         }
         $version = trim($version);
@@ -228,6 +243,9 @@ class MiseInstallScriptBuilder
             'python' => 'python',
             'ruby' => 'ruby',
             'go' => 'go',
+            'bun' => 'bun',
+            'deno' => 'deno',
+            'java' => 'java',
             default => $runtime,
         };
     }

@@ -150,6 +150,15 @@ if command -v docker >/dev/null 2>&1; then
 fi
 printf "DOCKER_PRESENT=%s\n" "\$docker_p"
 [ -n "\$docker_v" ] && printf "DOCKER_VERSION=%s\n" "\$docker_v"
+docker_running=0; docker_stopped=0; docker_images=0
+if command -v docker >/dev/null 2>&1; then
+  docker_running=\$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+  docker_stopped=\$(docker ps -aq --filter status=exited 2>/dev/null | wc -l | tr -d ' ')
+  docker_images=\$(docker images -q 2>/dev/null | wc -l | tr -d ' ')
+fi
+printf "DOCKER_RUNNING=%s\n" "\$docker_running"
+printf "DOCKER_STOPPED=%s\n" "\$docker_stopped"
+printf "DOCKER_IMAGES=%s\n" "\$docker_images"
 wp_p=0; wp_v=
 if command -v wp >/dev/null 2>&1; then
   wp_p=1
@@ -225,6 +234,10 @@ printf "SYSTEM_RUNTIMES_END\n"
 SH;
 
         if ($hasDeployUser) {
+            $miseRuntimeLoop = implode(' ', array_map(
+                static fn (string $rt): string => preg_match('/^[a-z0-9_-]+$/', $rt) ? $rt : '',
+                MiseInstallScriptBuilder::supportedRuntimes(),
+            ));
             // Per-user mise state — mise stores installed runtimes under
             // ~deploy/.local/share/mise/installs and reads global pins from
             // ~deploy/.config/mise/config.toml. The root SSH login can't see
@@ -239,13 +252,21 @@ if command -v mise >/dev/null 2>&1; then
   printf "LS_BEGIN\n"
   (sudo -n -u {$deployUserArg} -i mise ls --json 2>/dev/null) || (sudo -u {$deployUserArg} -i mise ls --json 2>/dev/null) || printf "{}"
   printf "\nLS_END\n"
-  for rt in node python ruby go; do
+  for rt in {$miseRuntimeLoop}; do
     cur=\$( (sudo -n -u {$deployUserArg} -i mise current "\$rt" 2>/dev/null) || (sudo -u {$deployUserArg} -i mise current "\$rt" 2>/dev/null) || true)
     cur=\$(printf '%s' "\$cur" | head -n 1 | tr -d '[:space:]')
     [ -n "\$cur" ] && printf "CURRENT %s=%s\n" "\$rt" "\$cur"
   done
 fi
 printf "MISE_RUNTIMES_END\n"
+printf "GIT_IDENTITY_BEGIN\n"
+if command -v git >/dev/null 2>&1; then
+  gn=\$( (sudo -n -u {$deployUserArg} -H git config --global user.name 2>/dev/null) || (sudo -u {$deployUserArg} -H git config --global user.name 2>/dev/null) || true)
+  ge=\$( (sudo -n -u {$deployUserArg} -H git config --global user.email 2>/dev/null) || (sudo -u {$deployUserArg} -H git config --global user.email 2>/dev/null) || true)
+  printf "USER_NAME=%s\n" "\$gn"
+  printf "USER_EMAIL=%s\n" "\$ge"
+fi
+printf "GIT_IDENTITY_END\n"
 SH;
         }
 
@@ -488,7 +509,30 @@ SH;
                 'version' => $version !== '' ? $version : null,
             ];
         }
+        $gitIdentity = $this->extractKvBlock($out, 'GIT_IDENTITY');
+        if ($gitIdentity !== [] && isset($tools['git'])) {
+            $name = trim((string) ($gitIdentity['user_name'] ?? ''));
+            $email = trim((string) ($gitIdentity['user_email'] ?? ''));
+            if ($name !== '') {
+                $tools['git']['user_name'] = $name;
+            }
+            if ($email !== '') {
+                $tools['git']['user_email'] = $email;
+            }
+        }
         $meta['manage_tools'] = $tools;
+
+        $dockerPresent = (string) ($toolsKv['docker_present'] ?? '0') === '1';
+        $meta['manage_docker'] = [
+            'present' => $dockerPresent,
+            'version' => $dockerPresent ? (string) ($toolsKv['docker_version'] ?? '') : null,
+            'containers_running' => max(0, (int) ($toolsKv['docker_running'] ?? 0)),
+            'containers_stopped' => max(0, (int) ($toolsKv['docker_stopped'] ?? 0)),
+            'images_count' => max(0, (int) ($toolsKv['docker_images'] ?? 0)),
+        ];
+        if ($meta['manage_docker']['version'] === '') {
+            $meta['manage_docker']['version'] = null;
+        }
 
         // MySQL/MariaDB
         $meta['manage_mysql'] = $this->extractKvBlock($out, 'MYSQL');
@@ -590,12 +634,10 @@ SH;
         }
         $body = $m[1];
 
-        $shape = [
-            'node' => ['versions' => [], 'active' => null],
-            'python' => ['versions' => [], 'active' => null],
-            'ruby' => ['versions' => [], 'active' => null],
-            'go' => ['versions' => [], 'active' => null],
-        ];
+        $shape = [];
+        foreach (MiseInstallScriptBuilder::supportedRuntimes() as $rt) {
+            $shape[$rt] = ['versions' => [], 'active' => null];
+        }
 
         // CURRENT <rt>=<version> lines drive the active-default pill.
         foreach (explode("\n", $body) as $line) {

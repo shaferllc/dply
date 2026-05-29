@@ -111,6 +111,8 @@ return [
         'insights_preview' => env('FEATURE_WORKSPACE_INSIGHTS_PREVIEW', true),
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
+        // exit: ship once Docker workspace container/image actions validated on three hosts
+        'docker' => env('FEATURE_WORKSPACE_DOCKER', true),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
         // exit: ship once audit-log filtering UI is reviewed

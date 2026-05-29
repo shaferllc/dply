@@ -102,6 +102,7 @@ final class ServerProvisionCommandBuilder
 
         $lines = array_merge($lines, $this->metricsAgent($server));
         $lines = array_merge($lines, $this->verificationCommands($role, $web, $php, $database, $cache));
+        $lines = array_merge($lines, $this->deployGitIdentity($server));
         $lines = array_merge($lines, $this->finalize($role));
         $lines = array_merge($lines, $this->emitInstalledStack());
 
@@ -627,6 +628,19 @@ final class ServerProvisionCommandBuilder
                 '[dply] base packages already installed; skipping package install.'
             ),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function deployGitIdentity(Server $server): array
+    {
+        $inner = app(ServerDeployGitIdentity::class)->bootstrapLinesForServer($server);
+        if ($inner === []) {
+            return [];
+        }
+
+        return $this->withStep('Configuring deploy user Git identity', $inner);
     }
 
     /**

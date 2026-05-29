@@ -15,6 +15,9 @@
         'autoUpdateIntervals' => $autoUpdateIntervals,
         'recentActions' => $recentActions ?? collect(),
         'toolsReport' => $toolsReport ?? null,
+        'activeMiseRuntimeOps' => $activeMiseRuntimeOps ?? [],
+        'activeToolActionOps' => $activeToolActionOps ?? [],
+        'miseReprobePending' => $miseReprobePending ?? false,
     ];
 
     // Workspace-scoped console-actions banner. Surfaces the in-flight + most-recent
@@ -38,8 +41,8 @@
     :title="__('Manage')"
     :description="__('Live state and actions for the server stack. Each tab is scoped to one subsystem.')"
 >
-    @if ($manageRemoteTaskId)
-        <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
+    @if ($manageRemoteTaskId || ($section === 'tools' && (($activeMiseRuntimeOps ?? []) !== [] || ($activeToolActionOps ?? []) !== [] || ($miseReprobePending ?? false))))
+        <div wire:poll.2s="pollManageWorkspace" class="hidden" aria-hidden="true"></div>
     @endif
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
@@ -63,14 +66,26 @@
             'kindLabels' => (array) config('console_actions.kinds', []),
         ])
 
-        <x-server-tab-strip
-            :tabs="$manageTabs"
-            :active="$section"
-            route-name="servers.manage"
-            :route-params="['server' => $server]"
-            :aria-label="__('Manage categories')"
-        />
+        <x-server-workspace-tablist :aria-label="__('Manage categories')">
+            @foreach ($manageTabs as $slug => $meta)
+                @php
+                    $tabIcon = ! empty($meta['icon']) ? 'heroicon-o-'.$meta['icon'] : null;
+                @endphp
+                <x-server-workspace-tab
+                    as="a"
+                    :id="'manage-tab-'.$slug"
+                    href="{{ route('servers.manage', ['server' => $server, 'section' => $slug]) }}"
+                    wire:navigate
+                    :active="$section === $slug"
+                    :icon="$tabIcon"
+                    :variant="$slug === 'danger' ? 'danger' : 'default'"
+                >
+                    {{ __($meta['label']) }}
+                </x-server-workspace-tab>
+            @endforeach
+        </x-server-workspace-tablist>
 
+        <div class="relative space-y-6">
         @if ($isDeployer)
             <section class="dply-card overflow-hidden border-amber-200">
                 <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
@@ -132,6 +147,7 @@
                 @include('livewire.servers.partials.manage.group-danger', $manageShare)
                 @break
         @endswitch
+        </div>
     </div>
 
     <x-slot name="modals">

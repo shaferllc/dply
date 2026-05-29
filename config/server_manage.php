@@ -1033,6 +1033,44 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        'mise_prune' => [
+            'label' => 'Prune unused runtimes',
+            'description' => 'Remove mise runtime installs that are no longer referenced by any config or .tool-versions pin.',
+            'confirm' => 'Prune unused mise runtime installs for the deploy user? Active global defaults and pinned versions are kept; orphaned installs are removed.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+DEPLOY_USER="__DPLY_DEPLOY_USER__"
+if [ -z "$DEPLOY_USER" ] || [ "$DEPLOY_USER" = "root" ]; then
+  echo "No deploy user configured; cannot prune mise runtimes." >&2
+  exit 1
+fi
+echo "[dply] pruning unused mise installs for $DEPLOY_USER"
+sudo -u "$DEPLOY_USER" -H bash -lc 'mise prune -y'
+echo "[dply] prune complete"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'mise_reshim' => [
+            'label' => 'Rebuild mise shims',
+            'description' => 'Regenerate shims under ~/.local/share/mise/shims after manual changes or a broken PATH.',
+            'confirm' => 'Rebuild mise shims for the deploy user? Safe repair step — does not change installed versions.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+DEPLOY_USER="__DPLY_DEPLOY_USER__"
+if [ -z "$DEPLOY_USER" ] || [ "$DEPLOY_USER" = "root" ]; then
+  echo "No deploy user configured; cannot rebuild mise shims." >&2
+  exit 1
+fi
+echo "[dply] rebuilding mise shims for $DEPLOY_USER"
+sudo -u "$DEPLOY_USER" -H bash -lc 'mise reshim'
+echo "[dply] reshim complete"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
         'install_docker' => [
             'label' => 'Install Docker service',
             'description' => 'Docker Engine via the upstream get.docker.com convenience script.',
@@ -1056,16 +1094,112 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        'repair_docker' => [
+            'label' => 'Upgrade Docker Engine',
+            'description' => 'Refresh docker-ce / containerd packages via apt when apt lists an upgrade.',
+            'confirm' => 'Upgrade Docker Engine via apt? Installs the latest available docker-ce, docker-ce-cli, and containerd.io packages already on this server.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+if command -v docker >/dev/null 2>&1; then
+  echo "Current: $(docker --version 2>&1 | head -n 1)"
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+pkgs=""
+for p in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker.io; do
+  if apt-cache show "$p" >/dev/null 2>&1; then
+    pkgs="$pkgs $p"
+  fi
+done
+if [ -z "$pkgs" ]; then
+  echo "No docker apt packages found to upgrade." >&2
+  exit 1
+fi
+# shellcheck disable=SC2086
+(sudo -n apt-get install -y --only-upgrade $pkgs || apt-get install -y --only-upgrade $pkgs)
+echo "Installed: $(docker --version 2>&1 | head -n 1)"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_start' => [
+            'label' => 'Start container',
+            'description' => 'docker start for one container ID or name.',
+            'confirm' => 'Start this container on the server?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker start "$CID"
+docker ps --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+BASH,
+        ],
+
+        'docker_container_stop' => [
+            'label' => 'Stop container',
+            'description' => 'docker stop for one container ID or name.',
+            'confirm' => 'Stop this container? Running processes inside will be sent SIGTERM.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker stop "$CID"
+docker ps -a --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+BASH,
+        ],
+
+        'docker_container_restart' => [
+            'label' => 'Restart container',
+            'description' => 'docker restart for one container ID or name.',
+            'confirm' => 'Restart this container? It will stop then start again.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker restart "$CID"
+docker ps --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+BASH,
+        ],
+
+        'docker_image_prune' => [
+            'label' => 'Prune unused images',
+            'description' => 'docker image prune -f — removes dangling images only.',
+            'confirm' => 'Prune unused Docker images on this server? Dangling images are removed; tagged images in use are kept.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker not installed." >&2
+  exit 1
+fi
+sudo -n docker image prune -f
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
         'install_wp_cli' => [
             'label' => 'Install WordPress CLI',
             'description' => 'wp-cli (https://wp-cli.org) — command-line interface for managing WordPress sites.',
-            'confirm' => 'Install or reinstall wp-cli at /usr/local/bin/wp? Pulls the latest phar from wp-cli.org.',
+            'confirm' => 'Install wp-cli at /usr/local/bin/wp? Pulls the latest phar from wp-cli.org.',
             'timeout' => 120,
             'script' => <<<'BASH'
 set -e
 if command -v wp >/dev/null 2>&1; then
   echo "wp-cli already installed: $(wp --version 2>&1 | head -n 1)"
-  echo "Reinstalling to pick up the latest release …"
+  exit 0
 fi
 # Mirrors ScaffoldPrerequisites::ensureWpCli — the scaffold pipeline calls
 # the same install path automatically when scaffolding a WordPress site.
@@ -1073,6 +1207,24 @@ curl --silent --show-error --location --output /tmp/wp-cli.phar https://raw.gith
 chmod +x /tmp/wp-cli.phar
 sudo -n mv /tmp/wp-cli.phar /usr/local/bin/wp
 wp --info --allow-root 2>&1 | head -n 10
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'update_wp_cli' => [
+            'label' => 'Update wp-cli',
+            'description' => 'Pull the latest wp-cli phar from wp-cli.org and replace /usr/local/bin/wp.',
+            'confirm' => 'Update wp-cli to the latest release? The current phar at /usr/local/bin/wp is replaced in place.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+if command -v wp >/dev/null 2>&1; then
+  echo "Current: $(wp --version 2>&1 | head -n 1)"
+fi
+curl --silent --show-error --location --output /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+chmod +x /tmp/wp-cli.phar
+sudo -n mv /tmp/wp-cli.phar /usr/local/bin/wp
+echo "Installed: $(wp --version 2>&1 | head -n 1)"
 BASH,
             'rerun_probe_after_finish' => true,
         ],
@@ -1119,6 +1271,23 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        'repair_git' => [
+            'label' => 'Upgrade Git',
+            'description' => 'Refresh the apt git package — picks up security releases from the distro repo.',
+            'confirm' => 'Upgrade Git via apt? Installs the latest available git package from apt; safe on preinstalled servers.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+if command -v git >/dev/null 2>&1; then
+  echo "Current: $(git --version 2>&1 | head -n 1)"
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+(sudo -n apt-get install -y --no-install-recommends git || apt-get install -y --no-install-recommends git)
+echo "Installed: $(git --version 2>&1 | head -n 1)"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
         'install_redis_cli' => [
             'label' => 'Install redis-cli',
             'description' => 'redis-tools / redis-server client package for cache inspection.',
@@ -1147,6 +1316,33 @@ fi
 BASH,
             'rerun_probe_after_finish' => true,
         ],
+
+        'repair_redis_cli' => [
+            'label' => 'Upgrade redis-cli',
+            'description' => 'Refresh redis-tools or valkey-tools via apt when a newer release is available.',
+            'confirm' => 'Upgrade redis-cli via apt? Installs the latest redis-tools or valkey-tools package from apt.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if command -v redis-cli >/dev/null 2>&1; then
+  echo "Current: $(redis-cli --version 2>&1 | head -n 1)"
+elif command -v valkey-cli >/dev/null 2>&1; then
+  echo "Current: $(valkey-cli --version 2>&1 | head -n 1)"
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+if apt-cache show redis-tools >/dev/null 2>&1; then
+  (sudo -n apt-get install -y --no-install-recommends redis-tools || apt-get install -y --no-install-recommends redis-tools)
+elif apt-cache show valkey-tools >/dev/null 2>&1; then
+  (sudo -n apt-get install -y --no-install-recommends valkey-tools || apt-get install -y --no-install-recommends valkey-tools)
+else
+  (sudo -n apt-get install -y --no-install-recommends redis-tools || apt-get install -y --no-install-recommends redis-tools) \
+    || (sudo -n apt-get install -y --no-install-recommends valkey-tools || apt-get install -y --no-install-recommends valkey-tools)
+fi
+(command -v redis-cli >/dev/null 2>&1 && echo "Installed: $(redis-cli --version 2>&1 | head -n 1)") \
+  || (command -v valkey-cli >/dev/null 2>&1 && echo "Installed: $(valkey-cli --version 2>&1 | head -n 1)")
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
     ],
 
     'dangerous_actions' => [
@@ -1169,7 +1365,49 @@ BASH
     ],
 
     /*
-    | Manage → Tools catalog. Each entry maps to a TOOLS probe key in
+    | mise-managed language runtimes shown on Manage → Tools. Keys must match
+    | mise plugin names (`mise ls-remote <key>`). PHP is intentionally omitted
+    | (ondrej/php apt path).
+    */
+    'mise_runtimes' => [
+        'node' => [
+            'label' => 'Node.js',
+            'placeholder' => '20.16.0',
+            'hint' => 'Numeric major or full semver (e.g. 20, 20.16.0, lts).',
+        ],
+        'python' => [
+            'label' => 'Python',
+            'placeholder' => '3.12.5',
+            'hint' => 'Major.minor or full version (e.g. 3.12, 3.12.5).',
+        ],
+        'ruby' => [
+            'label' => 'Ruby',
+            'placeholder' => '3.3.4',
+            'hint' => 'Major.minor.patch (e.g. 3.3.4). Pre-builds take 30–60s on small droplets.',
+        ],
+        'go' => [
+            'label' => 'Go',
+            'placeholder' => '1.23.0',
+            'hint' => 'Major.minor or full version (e.g. 1.23, 1.23.0).',
+        ],
+        'bun' => [
+            'label' => 'Bun',
+            'placeholder' => '1.2.0',
+            'hint' => 'Full semver (e.g. 1.2.0). JavaScript runtime + toolkit.',
+        ],
+        'deno' => [
+            'label' => 'Deno',
+            'placeholder' => '2.1.0',
+            'hint' => 'Full semver (e.g. 2.1.0). Secure JS/TS runtime.',
+        ],
+        'java' => [
+            'label' => 'Java',
+            'placeholder' => '21.0.2',
+            'hint' => 'Temurin/OpenJDK via mise (e.g. 21, 21.0.2).',
+        ],
+    ],
+
+    /*
     | ServerInventoryProbeScript and optionally a service_actions install key.
     | card=hero renders the full-width mise panel; card=generic renders a grid card.
     */
@@ -1177,7 +1415,7 @@ BASH
         'mise' => [
             'slug' => 'mise',
             'label' => 'mise (dev tool version manager)',
-            'description' => 'Installs Node, Python, Ruby, Go per project via .tool-versions / .mise.toml. dply installs mise from the official apt repo during provisioning — this surface is here for repair / version refresh, not first-install.',
+            'description' => 'Installs Node, Python, Ruby, Go, Bun, Deno, Java per project via .tool-versions / .mise.toml. dply installs mise from the official apt repo during provisioning — this surface is here for repair / version refresh, not first-install.',
             'docs_url' => 'https://mise.jdx.dev',
             'icon' => 'heroicon-o-cube-transparent',
             'probe_key' => 'mise',
@@ -1195,49 +1433,61 @@ BASH
             'action_key' => 'install_composer',
             'action_when' => 'missing',
             'requires_php' => true,
+            'preinstalled' => true,
             'card' => 'generic',
         ],
         'git' => [
             'slug' => 'git',
             'label' => 'Git',
-            'description' => 'Version control CLI — installed on every dply-provisioned server. Use Install when an older import is missing git.',
+            'description' => 'Version control CLI — preinstalled on dply servers. Upgrade below when apt has a newer release; connect GitHub/GitLab/Bitbucket under Source control for deploy credentials.',
             'docs_url' => 'https://git-scm.com',
             'icon' => 'heroicon-o-code-bracket',
             'probe_key' => 'git',
             'action_key' => 'install_git',
             'action_when' => 'missing',
+            'present_action_key' => 'repair_git',
+            'show_source_control_link' => true,
+            'preinstalled' => true,
             'card' => 'generic',
         ],
         'docker' => [
             'slug' => 'docker',
             'label' => 'Docker Engine',
-            'description' => 'Container runtime + CLI. Installs docker-ce, docker-ce-cli, and containerd from the official Docker apt repo via the get.docker.com convenience script.',
+            'description' => 'Container runtime + CLI. Install when missing, upgrade when apt has docker-ce releases, and open Docker to list containers and images.',
             'docs_url' => 'https://docs.docker.com/engine/install/',
             'icon' => 'heroicon-o-square-3-stack-3d',
             'probe_key' => 'docker',
             'action_key' => 'install_docker',
+            'action_when' => 'missing',
+            'present_action_key' => 'repair_docker',
+            'show_docker_workspace_link' => true,
             'card' => 'generic',
         ],
         'wp_cli' => [
             'slug' => 'wp_cli',
             'label' => 'wp-cli (WordPress CLI)',
-            'description' => 'Command-line interface for managing WordPress sites — plugins, themes, users, search-replace. dply\'s WordPress scaffold installs this automatically on first scaffold; this surface re-installs / pulls the latest phar on demand.',
+            'description' => 'Command-line interface for managing WordPress sites — plugins, themes, users, search-replace. dply\'s WordPress scaffold installs this automatically on first scaffold; use Update below to pull the latest phar when wp is already present.',
             'docs_url' => 'https://wp-cli.org',
             'icon' => 'heroicon-o-code-bracket',
             'probe_key' => 'wp_cli',
             'action_key' => 'install_wp_cli',
+            'action_when' => 'missing',
+            'present_action_key' => 'update_wp_cli',
+            'show_run_link' => true,
             'card' => 'generic',
         ],
         'redis_cli' => [
             'slug' => 'redis_cli',
             'label' => 'redis-cli',
-            'description' => 'Redis wire-protocol CLI for cache inspection. Installed with Redis/Valkey during provisioning; use Install when the CLI is missing. Open Caches for stats, key browser, and REPL.',
+            'description' => 'Redis wire-protocol CLI for cache inspection. Installed with Redis/Valkey during provisioning; use Install when the CLI is missing and Upgrade when apt has a newer redis-tools or valkey-tools release. Open Caches for stats, key browser, and REPL.',
             'docs_url' => 'https://redis.io/docs/latest/develop/tools/cli/',
             'icon' => 'heroicon-o-circle-stack',
             'probe_key' => 'redis_cli',
             'action_key' => 'install_redis_cli',
             'action_when' => 'missing',
+            'present_action_key' => 'repair_redis_cli',
             'show_when_redis_relevant' => true,
+            'preinstalled' => true,
             'card' => 'generic',
         ],
     ],

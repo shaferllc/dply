@@ -56,6 +56,7 @@ $serverWorkspaceSections = [
         'workspace.server_maintenance' => 'Server maintenance',
         'workspace.services' => 'System services',
         'workspace.caches' => 'Server caches',
+        'workspace.docker' => 'Docker Engine',
         'workspace.schedule' => 'Schedule workspace',
         'workspace.activity' => 'Activity log tab',
     ],
