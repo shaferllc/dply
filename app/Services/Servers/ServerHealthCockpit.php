@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\SiteDeployment;

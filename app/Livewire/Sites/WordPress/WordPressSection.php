@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\WordPress;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
 use App\Models\Snapshot;
 use App\Services\RemoteCli\Kind;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
 use App\Services\RemoteCli\RemoteCliPermissions;
+use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\WpCli;
 use App\Services\Snapshots\SnapshotDestinationFactory;
 use App\Services\Snapshots\SnapshotService;
@@ -33,6 +35,8 @@ use Livewire\Component;
  */
 class WordPressSection extends Component
 {
+    use DispatchesToastNotifications;
+
     public Site $site;
 
     /** Active sub-tab. Persisted as ?wp= in the URL for sharing. */
@@ -57,6 +61,36 @@ class WordPressSection extends Component
 
     public bool $pluginsLoaded = false;
 
+    /**
+     * Themes-tab cache. Populated by loadThemes() from
+     * `wp theme list --format=json`.
+     *
+     * @var list<array{name: string, status: string, version: string, update: string}>
+     */
+    public array $themes = [];
+
+    public bool $themesLoaded = false;
+
+    /**
+     * Users-tab cache (read-only inspector). Populated by loadUsers()
+     * from `wp user list --format=json`.
+     *
+     * @var list<array{id: string, login: string, name: string, email: string, roles: string}>
+     */
+    public array $users = [];
+
+    public bool $usersLoaded = false;
+
+    /**
+     * Core-tab cache. Populated by loadCore() from `wp core version`
+     * plus `wp core check-update`.
+     *
+     * @var array{version: ?string, update_available: bool, latest: ?string}|null
+     */
+    public ?array $core = null;
+
+    public bool $coreLoaded = false;
+
     public function mount(Site $site): void
     {
         $this->authorize('view', $site);
@@ -69,10 +103,18 @@ class WordPressSection extends Component
 
     public function render(): View
     {
+        // The same risk classification that gates the WpCli service also
+        // drives the UI's enable/disable state, so a member never sees an
+        // action button that the backend would reject.
+        $permissions = app(RemoteCliPermissions::class);
+        $user = auth()->user();
+
         return view('livewire.sites.wordpress.wordpress-section', [
             'history' => $this->history(),
             'latestRun' => $this->latestRunId !== null ? RemoteCliRun::query()->find($this->latestRunId) : null,
             'snapshots' => $this->snapshots(),
+            'canMutate' => $permissions->can($user, $this->site, RiskLevel::MutatingRecoverable),
+            'canDestroy' => $permissions->can($user, $this->site, RiskLevel::Destructive),
         ]);
     }
 
@@ -213,7 +255,243 @@ class WordPressSection extends Component
             );
         } catch (RemoteCliPermissionDeniedException $e) {
             $this->addError('plugins', __('Updates require admin or owner role.'));
+
+            return;
         }
+
+        $this->toastSuccess(__('Queued: update all plugins. Refresh the list in a moment.'));
+    }
+
+    /**
+     * Per-row plugin lifecycle actions (mutating-recoverable — any org
+     * member). These queue async, so the table reflects the change after
+     * a Refresh rather than instantly; the toast says as much.
+     */
+    public function activatePlugin(string $slug, WpCli $wpcli): void
+    {
+        $this->runRecoverable($wpcli, 'plugin activate', $slug, 'plugins');
+    }
+
+    public function deactivatePlugin(string $slug, WpCli $wpcli): void
+    {
+        $this->runRecoverable($wpcli, 'plugin deactivate', $slug, 'plugins');
+    }
+
+    public function updatePlugin(string $slug, WpCli $wpcli): void
+    {
+        $this->runRecoverable($wpcli, 'plugin update', $slug, 'plugins');
+    }
+
+    /**
+     * Themes-tab loader — `wp theme list --format=json` (INSTANT, sync).
+     */
+    public function loadThemes(WpCli $wpcli): void
+    {
+        $this->resetErrorBag('themes');
+        $rows = $this->readJsonRows($wpcli, 'theme list', ['--format=json'], 'themes');
+        if ($rows === null) {
+            $this->themes = [];
+            $this->themesLoaded = true;
+
+            return;
+        }
+
+        $this->themes = array_values(array_map(static fn (array $row): array => [
+            'name' => (string) ($row['name'] ?? ''),
+            'status' => (string) ($row['status'] ?? ''),
+            'version' => (string) ($row['version'] ?? ''),
+            'update' => (string) ($row['update'] ?? 'none'),
+        ], $rows));
+
+        $this->themesLoaded = true;
+    }
+
+    public function activateTheme(string $slug, WpCli $wpcli): void
+    {
+        $this->runRecoverable($wpcli, 'theme activate', $slug, 'themes');
+    }
+
+    public function updateTheme(string $slug, WpCli $wpcli): void
+    {
+        $this->runRecoverable($wpcli, 'theme update', $slug, 'themes');
+    }
+
+    /**
+     * Users-tab loader — read-only inventory from `wp user list`
+     * (INSTANT, sync). No mutating actions in v1; creating/deleting
+     * users is deferred so this stays a safe inspector.
+     */
+    public function loadUsers(WpCli $wpcli): void
+    {
+        $this->resetErrorBag('users');
+        $rows = $this->readJsonRows(
+            $wpcli,
+            'user list',
+            ['--fields=ID,user_login,display_name,user_email,roles', '--format=json'],
+            'users',
+        );
+        if ($rows === null) {
+            $this->users = [];
+            $this->usersLoaded = true;
+
+            return;
+        }
+
+        $this->users = array_values(array_map(static fn (array $row): array => [
+            'id' => (string) ($row['ID'] ?? $row['id'] ?? ''),
+            'login' => (string) ($row['user_login'] ?? ''),
+            'name' => (string) ($row['display_name'] ?? ''),
+            'email' => (string) ($row['user_email'] ?? ''),
+            'roles' => (string) ($row['roles'] ?? ''),
+        ], $rows));
+
+        $this->usersLoaded = true;
+    }
+
+    /**
+     * Core-tab loader — installed version (`wp core version`) plus an
+     * availability check (`wp core check-update`). Both are INSTANT.
+     */
+    public function loadCore(WpCli $wpcli): void
+    {
+        $this->resetErrorBag('core');
+
+        try {
+            $version = $wpcli->run($this->site, 'core version', [], auth()->user());
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError('core', __('Your role can\'t inspect WordPress core on this site.'));
+            $this->coreLoaded = true;
+
+            return;
+        } catch (\Throwable $e) {
+            $this->addError('core', __('Could not reach the site over SSH: :err', ['err' => $e->getMessage()]));
+            $this->coreLoaded = true;
+
+            return;
+        }
+
+        $installed = trim($version->stdout()) ?: null;
+
+        // check-update returns one JSON row per available update; an empty
+        // array (or "Success: WordPress is at the latest version.") means
+        // up to date.
+        $updates = $this->readJsonRows($wpcli, 'core check-update', ['--format=json'], 'core') ?? [];
+        $latest = null;
+        foreach ($updates as $row) {
+            if (isset($row['version'])) {
+                $latest = (string) $row['version'];
+                break;
+            }
+        }
+
+        $this->core = [
+            'version' => $installed,
+            'update_available' => $updates !== [],
+            'latest' => $latest,
+        ];
+        $this->coreLoaded = true;
+    }
+
+    public function updateCore(WpCli $wpcli): void
+    {
+        $this->runRecoverable($wpcli, 'core update', null, 'core');
+    }
+
+    /**
+     * Run a mutating-recoverable wp-cli command (optionally scoped to a
+     * single slug arg) and surface the outcome as a toast. Slugs are
+     * validated before they reach the shell-escaped WpCli layer so a
+     * crafted row name can't smuggle extra arguments.
+     */
+    private function runRecoverable(WpCli $wpcli, string $command, ?string $slug, string $errorBag): void
+    {
+        $args = [];
+        if ($slug !== null) {
+            if (! $this->isValidSlug($slug)) {
+                $this->toastError(__('Invalid item name.'));
+
+                return;
+            }
+            $args = [$slug];
+        }
+
+        try {
+            $result = $wpcli->run($this->site, $command, $args, auth()->user());
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->toastError(__('Your role can\'t run :risk commands. Ask an admin or owner.', [
+                'risk' => $e->risk->value,
+            ]));
+
+            return;
+        } catch (\Throwable $e) {
+            $this->toastError(__('Command failed to start: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        $label = trim('wp '.$command.($slug !== null ? ' '.$slug : ''));
+
+        if ($result->isFailed()) {
+            $this->toastError(__(':label failed (exit :code).', [
+                'label' => $label,
+                'code' => $result->exitCode() ?? '?',
+            ]));
+
+            return;
+        }
+
+        if ($result->isCompleted()) {
+            $this->toastSuccess(__(':label completed.', ['label' => $label]));
+
+            return;
+        }
+
+        $this->toastSuccess(__('Queued: :label. Refresh the list in a moment.', ['label' => $label]));
+    }
+
+    /**
+     * Run an INSTANT read command and decode its JSON output into rows,
+     * or null on permission denial / SSH failure / malformed output
+     * (after setting an inline error on $errorBag).
+     *
+     * @param  list<string>  $args
+     * @return list<array<string, mixed>>|null
+     */
+    private function readJsonRows(WpCli $wpcli, string $command, array $args, string $errorBag): ?array
+    {
+        try {
+            $result = $wpcli->run($this->site, $command, $args, auth()->user());
+        } catch (RemoteCliPermissionDeniedException $e) {
+            $this->addError($errorBag, __('Your role can\'t inspect this on the site.'));
+
+            return null;
+        } catch (\Throwable $e) {
+            $this->addError($errorBag, __('Could not reach the site over SSH: :err', ['err' => $e->getMessage()]));
+
+            return null;
+        }
+
+        if ($result->isFailed()) {
+            $message = trim($result->stderr());
+            $this->addError($errorBag, $message !== '' ? $message : __('wp :command failed.', ['command' => $command]));
+
+            return null;
+        }
+
+        $stdout = trim($result->stdout());
+        $decoded = $stdout !== '' ? json_decode($stdout, associative: true) : [];
+        if (! is_array($decoded)) {
+            $this->addError($errorBag, __('wp :command returned unexpected output.', ['command' => $command]));
+
+            return null;
+        }
+
+        return array_values(array_filter($decoded, 'is_array'));
+    }
+
+    private function isValidSlug(string $value): bool
+    {
+        return $value !== '' && preg_match('/^[A-Za-z0-9._-]+$/', $value) === 1;
     }
 
     /**

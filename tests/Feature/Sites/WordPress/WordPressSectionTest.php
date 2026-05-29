@@ -348,6 +348,156 @@ test('toggle hardening rejects unknown opinion', function () {
         ->call('toggleHardening', 'totally-fake-opinion')
         ->assertHasErrors('hardening');
 });
+test('load themes runs wp theme list and populates rows', function () {
+    [$user, $site] = makeWpSite();
+
+    $json = json_encode([
+        ['name' => 'twentytwentyfour', 'status' => 'active', 'version' => '1.2', 'update' => 'available'],
+        ['name' => 'twentytwentythree', 'status' => 'inactive', 'version' => '1.4', 'update' => 'none'],
+    ]);
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->once()
+        ->withArgs(function ($s, $name, $bash, callable $cb) use ($json) {
+            $cb('out', $json);
+
+            return true;
+        })
+        ->andReturn(new ProcessOutput($json, 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'themes')
+        ->call('loadThemes')
+        ->assertSet('themesLoaded', true);
+
+    $themes = $component->get('themes');
+    expect($themes)->toHaveCount(2);
+    expect($themes[0]['name'])->toBe('twentytwentyfour');
+    expect($themes[0]['status'])->toBe('active');
+    expect($themes[0]['update'])->toBe('available');
+});
+test('load users runs wp user list and populates rows', function () {
+    [$user, $site] = makeWpSite();
+
+    $json = json_encode([
+        ['ID' => 1, 'user_login' => 'admin', 'display_name' => 'Site Admin', 'user_email' => 'admin@example.com', 'roles' => 'administrator'],
+    ]);
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->once()
+        ->withArgs(function ($s, $name, $bash, callable $cb) use ($json) {
+            $cb('out', $json);
+
+            return true;
+        })
+        ->andReturn(new ProcessOutput($json, 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'users')
+        ->call('loadUsers')
+        ->assertSet('usersLoaded', true);
+
+    $users = $component->get('users');
+    expect($users)->toHaveCount(1);
+    expect($users[0]['login'])->toBe('admin');
+    expect($users[0]['roles'])->toBe('administrator');
+});
+test('load core reports installed version and update availability', function () {
+    [$user, $site] = makeWpSite();
+
+    // Two sync reads: `core version` then `core check-update --format=json`.
+    $checkUpdate = json_encode([
+        ['version' => '6.6', 'update_type' => 'major'],
+    ]);
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->twice()
+        ->andReturnUsing(function ($s, $name, $bash, callable $cb) use ($checkUpdate) {
+            if (str_contains($bash, 'check-update')) {
+                $cb('out', $checkUpdate);
+
+                return new ProcessOutput($checkUpdate, 0, false);
+            }
+
+            $cb('out', '6.5.2');
+
+            return new ProcessOutput('6.5.2', 0, false);
+        });
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'core')
+        ->call('loadCore')
+        ->assertSet('coreLoaded', true);
+
+    $core = $component->get('core');
+    expect($core['version'])->toBe('6.5.2');
+    expect($core['update_available'])->toBeTrue();
+    expect($core['latest'])->toBe('6.6');
+});
+test('activate plugin dispatches recoverable async command', function () {
+    [$user, $site] = makeWpSite();
+
+    // 'plugin activate' is mutating-recoverable but not instant — async.
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->call('activatePlugin', 'akismet');
+
+    $run = RemoteCliRun::query()->where('command', 'plugin activate')->sole();
+    expect($run->args)->toBe(['akismet']);
+});
+test('plugin action rejects an invalid slug without dispatching', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->call('updatePlugin', 'evil; rm -rf /');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+});
+test('update core dispatches recoverable async command', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'core')
+        ->call('updateCore');
+
+    $run = RemoteCliRun::query()->where('command', 'core update')->sole();
+    expect($run->args)->toBe([]);
+});
+test('list action buttons hidden for member role', function () {
+    [$user, $site] = makeWpSite(userRole: 'member');
+
+    // Members can run reads + recoverable, so the gate flag we surface
+    // for mutating actions should still be true; only destructive is
+    // gated. Confirm the canMutate flag reaches the view.
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->assertViewHas('canMutate', true)
+        ->assertViewHas('canDestroy', false);
+});
 test('switch to system cron records handler on meta', function () {
     [$user, $site] = makeWpSite();
 

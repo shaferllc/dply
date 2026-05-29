@@ -15,7 +15,6 @@ use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerDatabaseBackup;
-use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteFileBackup;
@@ -137,8 +136,12 @@ class WorkspaceOverview extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
-
+        // No $this->server->refresh() here: Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time. mount() already re-pulls via
+        // kickClusterPollIfStale() when a sync cluster poll mutates it, so
+        // refreshing again here only doubled the `select * from servers`.
         $sites = $this->server->sites()->get(['id', 'status']);
         $siteIds = $sites->pluck('id');
 
@@ -224,10 +227,9 @@ class WorkspaceOverview extends Component
         // One row, cheap. Same source the Monitor page uses — duplicating it
         // here means the overview reflects current load without a full
         // Monitor-tab fetch and the operator can decide whether to drill in.
-        $latestMetricSnapshot = ServerMetricSnapshot::query()
-            ->where('server_id', $this->server->id)
-            ->orderByDesc('captured_at')
-            ->first();
+        // Read through the memoized relation so the cost card, health cockpit,
+        // and billing tier below all reuse this single lookup.
+        $latestMetricSnapshot = $this->server->latestMetricSnapshot;
 
         // Sites preview for the overview. We already have $sites with id+status;
         // pull the small bit extra we need to render five rows (name + updated_at)

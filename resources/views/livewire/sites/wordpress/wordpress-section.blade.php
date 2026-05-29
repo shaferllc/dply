@@ -12,6 +12,9 @@
         @foreach ([
             'console' => ['label' => __('Console'), 'enabled' => true],
             'plugins' => ['label' => __('Plugins'), 'enabled' => true],
+            'themes' => ['label' => __('Themes'), 'enabled' => true],
+            'users' => ['label' => __('Users'), 'enabled' => true],
+            'core' => ['label' => __('Core'), 'enabled' => true],
             'database' => ['label' => __('Database'), 'enabled' => true],
             'cron' => ['label' => __('Cron'), 'enabled' => true],
             'hardening' => ['label' => __('Hardening'), 'enabled' => true],
@@ -158,73 +161,22 @@
 
     {{-- PLUGINS --}}
     @if ($tab === 'plugins')
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-            <header class="flex items-start justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Plugins') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Live list pulled from `wp plugin list`. Each row is cross-checked against Wordfence Intelligence for known CVEs.') }}</p>
-                </div>
-                @if ($pluginsLoaded && collect($plugins)->where('update', 'available')->isNotEmpty())
-                    <button
-                        type="button"
-                        wire:click="updateAllPlugins"
-                        wire:loading.attr="disabled"
-                        class="inline-flex h-9 items-center gap-2 rounded-xl bg-brand-ink px-4 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
-                    >
-                        <x-heroicon-o-arrow-up-circle class="h-4 w-4" />
-                        {{ __('Update all') }}
-                    </button>
-                @endif
-            </header>
+        @include('livewire.sites.wordpress.partials.plugins-tab')
+    @endif
 
-            @if (! $pluginsLoaded)
-                <div class="mt-5 text-center">
-                    <button
-                        type="button"
-                        wire:click="loadPlugins"
-                        wire:loading.attr="disabled"
-                        wire:target="loadPlugins"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-ink px-5 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
-                    >
-                        <x-heroicon-o-arrow-down-tray wire:loading.remove wire:target="loadPlugins" class="h-4 w-4" />
-                        <x-spinner wire:loading wire:target="loadPlugins" variant="cream" size="sm" />
-                        <span wire:loading.remove wire:target="loadPlugins">{{ __('Load installed plugins') }}</span>
-                        <span wire:loading wire:target="loadPlugins">{{ __('Loading…') }}</span>
-                    </button>
-                </div>
-            @else
-                @if (empty($plugins))
-                    <p class="mt-5 text-center text-sm text-brand-mist">{{ __('No plugins installed.') }}</p>
-                @else
-                    <ul class="mt-5 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
-                        @foreach ($plugins as $plugin)
-                            <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-brand-ink">{{ $plugin['name'] }}</p>
-                                    <p class="mt-0.5 text-xs text-brand-mist">v{{ $plugin['version'] }} · {{ $plugin['status'] }}</p>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2 text-[11px]">
-                                    @if ($plugin['update'] === 'available')
-                                        <span class="rounded-full bg-brand-gold/20 px-2 py-0.5 font-semibold text-brand-ink">{{ __('Update available') }}</span>
-                                    @endif
-                                    @foreach ($plugin['advisories'] as $advisory)
-                                        <span
-                                            class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-700"
-                                            title="{{ $advisory['title'] }}{{ $advisory['cve'] ? ' ('.$advisory['cve'].')' : '' }}{{ $advisory['patched'] ? ' — patched in '.$advisory['patched'] : '' }}"
-                                        >
-                                            <x-heroicon-m-shield-exclamation class="h-3 w-3" />
-                                            {{ strtoupper($advisory['severity']) }}
-                                        </span>
-                                    @endforeach
-                                </div>
-                            </li>
-                        @endforeach
-                    </ul>
-                    <p class="mt-3 text-[11px] text-brand-mist">{{ __('Vulnerability data: Wordfence Intelligence (free tier, 24h cache).') }}</p>
-                @endif
-            @endif
-            <x-input-error :messages="$errors->get('plugins')" class="mt-3" />
-        </section>
+    {{-- THEMES --}}
+    @if ($tab === 'themes')
+        @include('livewire.sites.wordpress.partials.themes-tab')
+    @endif
+
+    {{-- USERS --}}
+    @if ($tab === 'users')
+        @include('livewire.sites.wordpress.partials.users-tab')
+    @endif
+
+    {{-- CORE --}}
+    @if ($tab === 'core')
+        @include('livewire.sites.wordpress.partials.core-tab')
     @endif
 
     {{-- DATABASE --}}

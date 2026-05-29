@@ -1613,8 +1613,13 @@ BASH;
 
     public function render(ServerManageToolsReport $toolsReport): View
     {
-        $this->server->refresh();
-
+        // No $this->server->refresh() here: Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time. The poll/action handlers that mutate
+        // the server (pollManageInventoryState, saveManageMetadata,
+        // runPostMiseInventoryRefresh) refresh it themselves, so refreshing
+        // again here only doubled the `select * from servers` per render.
         $recentActions = $this->section === 'overview'
             ? ServerManageAction::query()
                 ->where('server_id', $this->server->id)

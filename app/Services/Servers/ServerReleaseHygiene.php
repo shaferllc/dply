@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Models\SiteRelease;
 use Illuminate\Support\Carbon;
@@ -286,10 +285,10 @@ final class ServerReleaseHygiene
      */
     private function disk(Server $server): array
     {
-        $snapshot = ServerMetricSnapshot::query()
-            ->where('server_id', $server->id)
-            ->orderByDesc('captured_at')
-            ->first(['captured_at', 'payload']);
+        // Reuse the overview's memoized "latest snapshot" relation so the
+        // health cockpit, cost card, billing tier, and this disk probe all
+        // share one lookup instead of each firing their own.
+        $snapshot = $server->latestMetricSnapshot;
 
         if ($snapshot === null) {
             return ['pct' => null, 'captured_at' => null];
