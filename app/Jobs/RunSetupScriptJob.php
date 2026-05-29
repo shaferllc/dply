@@ -24,6 +24,7 @@ use App\Observers\TaskRunnerTaskObserver;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
+use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 use App\Support\Servers\ProvisionPipelineLog;
@@ -603,6 +604,10 @@ class RunSetupScriptJob implements ShouldQueue
             '/No route to host/i',
             '/SSL_connect: Connection reset/i',
             '/curl: \(\d+\) (?:Could not|Operation timed out|Failed to|Recv failure)/i',
+            '/Could not get lock/i',
+            '/Unable to acquire the dpkg frontend lock/i',
+            '/is held by process/i',
+            '/\/var\/lib\/dpkg\/lock-frontend/i',
         ];
 
         $hardErrorPatterns = [
@@ -623,6 +628,10 @@ class RunSetupScriptJob implements ShouldQueue
             if (preg_match($pattern, $output) === 1) {
                 return true;
             }
+        }
+
+        if (ServerAptLockBash::outputLooksLikeAptLockFailure($output)) {
+            return true;
         }
 
         return false;

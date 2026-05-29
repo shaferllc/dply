@@ -13,6 +13,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Cloud\CloudRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -31,7 +32,7 @@ function makeContainerSite(string $backend = 'digitalocean_app_platform'): array
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => ['api_token' => 'tok', 'github_connection_arn' => 'arn:x'],
     ]);
@@ -136,7 +137,7 @@ test('disable scheduler control removes scheduler', function () {
 test('scale worker control updates count and dispatches sync', function () {
     Queue::fake();
     [$user, $server, $site] = makeContainerSite();
-    $worker = CloudWorker::factory()->create(['site_id' => $site->id, 'instance_count' => 1]);
+    $worker = CloudWorker::factory()->create(['site_id' => $site->id, 'size' => 'medium', 'instance_count' => 1]);
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'general'])

@@ -3,6 +3,18 @@
     $opsReady = $server->isReady() && $server->ip_address && $server->ssh_private_key;
     $isDeployer = auth()->user()->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
     $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+    $inventoryCheckedAt = is_array($server->meta ?? null)
+        ? ($server->meta['inventory_checked_at'] ?? null)
+        : null;
+    $needsInventoryProbePoll = (bool) config('server_manage.inventory_probe_refresh_on_load', true)
+        && ! $isDeployer
+        && (
+            ! $opsReady
+            || ! is_string($inventoryCheckedAt)
+            || trim($inventoryCheckedAt) === ''
+        );
+    $inventoryProbePollSeconds = max(3, (int) config('server_manage.inventory_probe_poll_seconds', 5));
+
     $manageShare = [
         'card' => $card,
         'server' => $server,
@@ -17,6 +29,7 @@
         'toolsReport' => $toolsReport ?? null,
         'activeMiseRuntimeOps' => $activeMiseRuntimeOps ?? [],
         'activeToolActionOps' => $activeToolActionOps ?? [],
+        'pendingToolActionKey' => $pendingToolActionKey ?? null,
         'miseReprobePending' => $miseReprobePending ?? false,
     ];
 
@@ -41,7 +54,15 @@
     :title="__('Manage')"
     :description="__('Live state and actions for the server stack. Each tab is scoped to one subsystem.')"
 >
-    @if ($manageRemoteTaskId || ($section === 'tools' && (($activeMiseRuntimeOps ?? []) !== [] || ($activeToolActionOps ?? []) !== [] || ($miseReprobePending ?? false))))
+    @if ($needsInventoryProbePoll)
+        <div
+            wire:init="maybeRefreshInventoryProbeOnLoad"
+            wire:poll.{{ $inventoryProbePollSeconds }}s="pollManageInventoryState"
+            class="hidden"
+            aria-hidden="true"
+        ></div>
+    @endif
+    @if ($manageRemoteTaskId || ($section === 'tools' && (($activeMiseRuntimeOps ?? []) !== [] || ($activeToolActionOps ?? []) !== [] || ($miseReprobePending ?? false) || ($pendingToolActionKey ?? null))))
         <div wire:poll.2s="pollManageWorkspace" class="hidden" aria-hidden="true"></div>
     @endif
     @include('livewire.servers.partials.workspace-flashes')

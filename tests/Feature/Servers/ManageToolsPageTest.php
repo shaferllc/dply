@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Servers;
 
+use App\Jobs\RefreshServerInventoryJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Models\Organization;
@@ -103,7 +104,39 @@ test('manage tools shows loading state while git upgrade is running', function (
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
-        ->assertSee(__('Running on server…'));
+        ->assertSee(__('Updating :action…', ['action' => 'Upgrade Git']));
+});
+
+test('manage tools shows loading state while docker install is running', function (): void {
+    [$user, $server] = manageToolsPageUserWithServer();
+
+    ServerManageAction::query()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'task_name' => 'manage-action:install_docker',
+        'label' => 'Install Docker service',
+        'status' => ServerManageAction::STATUS_RUNNING,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
+        ->assertSee(__('Installing :action…', ['action' => 'Install Docker service']));
+});
+
+test('manage tools shows loading state while wp-cli install is running', function (): void {
+    [$user, $server] = manageToolsPageUserWithServer();
+
+    ServerManageAction::query()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'task_name' => 'manage-action:install_wp_cli',
+        'label' => 'Install WordPress CLI',
+        'status' => ServerManageAction::STATUS_RUNNING,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
+        ->assertSee(__('Installing :action…', ['action' => 'Install WordPress CLI']));
 });
 
 test('manage tools ignores finished remote task cache for git busy state', function (): void {
@@ -198,7 +231,7 @@ test('manage tools shows loading state while git identity save is running', func
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
-        ->assertSee(__('Running on server…'));
+        ->assertSee(__('Running :action…', ['action' => 'Git identity']));
 });
 
 test('manage tools shows loading state while wp-cli update is running', function (): void {
@@ -221,7 +254,7 @@ test('manage tools shows loading state while wp-cli update is running', function
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server->fresh(), 'section' => 'tools'])
-        ->assertSee(__('Running on server…'));
+        ->assertSee(__('Updating :action…', ['action' => 'Update wp-cli']));
 });
 
 test('manage tools shows loading state while redis-cli upgrade is running', function (): void {
@@ -253,7 +286,7 @@ test('manage tools shows loading state while redis-cli upgrade is running', func
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server->fresh(), 'section' => 'tools'])
-        ->assertSee(__('Running on server…'));
+        ->assertSee(__('Updating :action…', ['action' => 'Upgrade redis-cli']));
 });
 
 test('manage tools shows loading state while docker upgrade is running', function (): void {
@@ -276,7 +309,7 @@ test('manage tools shows loading state while docker upgrade is running', functio
 
     Livewire::actingAs($user)
         ->test(WorkspaceManage::class, ['server' => $server->fresh(), 'section' => 'tools'])
-        ->assertSee(__('Running on server…'));
+        ->assertSee(__('Updating :action…', ['action' => 'Upgrade Docker Engine']));
 });
 
 test('manage tools shows loading state while mise runtime install is running', function (): void {
@@ -294,4 +327,103 @@ test('manage tools shows loading state while mise runtime install is running', f
         ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'tools'])
         ->assertSee(__('Installing :version…', ['version' => '3.3.4']))
         ->assertSee(__('Running on server…'));
+});
+
+function manageOverviewUserWithServerWithoutInventory(): array
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'ssh_private_key' => 'test-key',
+        'meta' => [],
+    ]);
+
+    return [$user, $server->fresh()];
+}
+
+test('manage overview auto-dispatches inventory probe when snapshot is missing', function (): void {
+    Queue::fake();
+
+    [$user, $server] = manageOverviewUserWithServerWithoutInventory();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'overview'])
+        ->call('maybeRefreshInventoryProbeOnLoad');
+
+    Queue::assertPushed(RefreshServerInventoryJob::class, fn (RefreshServerInventoryJob $job): bool => $job->serverId === (string) $server->id);
+});
+
+test('manage overview skips auto inventory probe when snapshot already exists', function (): void {
+    Queue::fake();
+
+    [$user, $server] = manageToolsPageUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'overview'])
+        ->call('maybeRefreshInventoryProbeOnLoad');
+
+    Queue::assertNotPushed(RefreshServerInventoryJob::class);
+});
+
+test('manage overview poll dispatches probe once ssh becomes ready', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_PROVISIONING,
+        'meta' => [],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'overview'])
+        ->call('pollManageInventoryState');
+
+    Queue::assertNotPushed(RefreshServerInventoryJob::class);
+
+    $server->update([
+        'status' => Server::STATUS_READY,
+        'ssh_private_key' => 'test-key',
+        'ip_address' => '203.0.113.10',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server->fresh(), 'section' => 'overview'])
+        ->call('pollManageInventoryState');
+
+    Queue::assertPushed(RefreshServerInventoryJob::class);
+});
+
+test('manage overview shows stale state until inventory arrives then updates on poll', function (): void {
+    [$user, $server] = manageOverviewUserWithServerWithoutInventory();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server, 'section' => 'overview'])
+        ->assertSee(__('No probe data yet'));
+
+    $server->update([
+        'meta' => array_merge($server->meta ?? [], [
+            'inventory_checked_at' => now()->toIso8601String(),
+            'manage_units' => ['nginx.service' => ['active_state' => 'active']],
+            'inventory_upgradable_packages' => 0,
+            'inventory_reboot_required' => false,
+            'inventory_extended_snapshot' => "Filesystem      Size  Used Avail Use% Mounted on\n/dev/vda1        20G  4.0G   16G  20% /\n---\n 14:00:01 up 1 day\n---\nMem:           3919        512        3407          0        3407        3407",
+        ]),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceManage::class, ['server' => $server->fresh(), 'section' => 'overview'])
+        ->call('pollManageInventoryState')
+        ->assertDontSee(__('No probe data yet'))
+        ->assertSee(__('Host state looks healthy'));
 });

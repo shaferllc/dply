@@ -1,10 +1,18 @@
 <?php
 
-namespace App\Services\Servers;
+declare(strict_types=1);
+
+namespace App\Support\Servers;
 
 use App\Models\Server;
+use App\Services\Servers\ServerDatabaseRemoteExec;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * SSH-probe whether each database engine is reachable on a server. Mirrors
+ * {@see ServerCacheServiceHostCapabilities} and is consumed by the WorkspaceDatabases
+ * Livewire component to gate the per-engine status UI.
+ */
 class ServerDatabaseHostCapabilities
 {
     public function __construct(

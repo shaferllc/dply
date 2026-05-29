@@ -75,6 +75,35 @@ function fakeImageModeApp(): array
         ]],
     ]]];
 }
+test('sync clamps small worker instance count to one for basic-xxs', function () {
+    Http::fake([
+        'api.digitalocean.com/v2/apps/do-app-1/deployments' => Http::response(['deployment' => ['id' => 'dep-1']], 200),
+        'api.digitalocean.com/v2/apps/do-app-1' => Http::response(fakeImageModeApp(), 200),
+    ]);
+
+    [$site, $credential] = provisionedSite();
+    CloudWorker::factory()->create([
+        'site_id' => $site->id,
+        'type' => CloudWorker::TYPE_WORKER,
+        'name' => 'queue',
+        'command' => 'php artisan queue:work',
+        'size' => 'small',
+        'instance_count' => 3,
+    ]);
+
+    (new DigitalOceanAppPlatformBackend)->syncWorkers($site->fresh(), $credential);
+
+    Http::assertSent(function ($req) {
+        if ($req->method() !== 'PUT') {
+            return false;
+        }
+        $worker = $req->data()['spec']['workers'][0] ?? null;
+
+        return $worker !== null
+            && $worker['instance_count'] === 1
+            && $worker['instance_size_slug'] === 'basic-xxs';
+    });
+});
 test('sync pushes worker components into the spec and redeploys', function () {
     Http::fake([
         'api.digitalocean.com/v2/apps/do-app-1/deployments' => Http::response(['deployment' => ['id' => 'dep-1']], 200),

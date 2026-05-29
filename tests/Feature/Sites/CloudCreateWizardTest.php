@@ -92,6 +92,7 @@ test('deploy passes workers + autoscaling + health + database into the action', 
         ->call('addWorker', 'worker')
         ->call('addWorker', 'scheduler')
         ->set('workers.0.command', 'php artisan queue:work redis')
+        ->set('workers.0.size', 'medium')
         ->set('workers.0.instance_count', 3)
         ->set('autoscaling_enabled', true)
         ->set('autoscaling_min', 2)

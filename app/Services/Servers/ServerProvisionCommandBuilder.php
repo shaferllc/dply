@@ -1883,12 +1883,42 @@ APACHE,
 
         if ($this->forceReinstall()) {
             return [
-                'apt-get install -y --no-install-recommends '.implode(' ', $packages),
+                'dply_wait_for_apt_locks || exit 100',
+                'for _dply_apt_attempt in 1 2 3 4 5 6; do',
+                '  dply_wait_for_apt_locks || exit 100',
+                '  _dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '.implode(' ', $packages).' 2>&1) || true',
+                '  echo "$_dply_apt_log"',
+                '  if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+                '    echo "[dply] apt lock during install — sleeping 15s before retry $_dply_apt_attempt/6."',
+                '    sleep 15',
+                '    continue',
+                '  fi',
+                '  if ! echo "$_dply_apt_log" | grep -qE "^E: "; then break; fi',
+                '  if [ "$_dply_apt_attempt" -eq 6 ]; then exit 100; fi',
+                '  sleep 15',
+                'done',
             ];
         }
 
+        $installBlock = implode(' ', [
+            'dply_wait_for_apt_locks || exit 100;',
+            'for _dply_apt_attempt in 1 2 3 4 5 6; do',
+            'dply_wait_for_apt_locks || exit 100;',
+            '_dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '.implode(' ', $packages).' 2>&1) || true;',
+            'echo "$_dply_apt_log";',
+            'if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+            'echo "[dply] apt lock during install — sleeping 15s before retry $_dply_apt_attempt/6.";',
+            'sleep 15;',
+            'continue;',
+            'fi;',
+            'if ! echo "$_dply_apt_log" | grep -qE "^E: "; then break; fi;',
+            'if [ "$_dply_apt_attempt" -eq 6 ]; then exit 100; fi;',
+            'sleep 15;',
+            'done',
+        ]);
+
         return [
-            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else apt-get install -y --no-install-recommends '.implode(' ', $packages).'; fi',
+            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else '.$installBlock.'; fi',
         ];
     }
 
@@ -1926,7 +1956,7 @@ APACHE,
             '  echo "[dply] apt-get update attempt $attempt/6 (refreshing ondrej/php sources)..."',
             '  update_log=$(timeout 300s apt-get update -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 2>&1 || true)',
             '  echo "$update_log"',
-            '  if echo "$update_log" | grep -qE "Could not get lock|is held by process"; then',
+            '  if echo "$update_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
             '    if [ "$lock_retries" -lt 6 ]; then',
             '      lock_retries=$((lock_retries + 1))',
             '      echo "[dply] another apt-get acquired the lock during our update — re-waiting (lock-retry $lock_retries/6)."',
@@ -1934,7 +1964,8 @@ APACHE,
             '      attempt=$((attempt - 1))',
             '      continue',
             '    fi',
-            '    echo "[dply] WARNING: lock contention persisted across 6 attempts; treating this as a real failure." >&2',
+            '    echo "[dply] ERROR: apt lock contention persisted across 6 retries during ondrej/php update." >&2',
+            '    exit 100',
             '  fi',
             // Real success check: did an InRelease file actually land?
             // ls returns empty if no file matches; -A1 keeps it on one

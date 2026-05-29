@@ -19,13 +19,11 @@ return [
     | Provision auto-retry on transient failures
     |--------------------------------------------------------------------------
     | When true, a failed setup task whose output matches transient patterns
-    | (apt fetch timeout, dpkg error, network blip) reschedules itself with a
-    | backoff up to MAX_AUTO_RETRY_ATTEMPTS. Default is off — operators
-    | iterating on the bash script tend to want the failure to sit visible so
-    | they can inspect output and re-run by hand. Flip on once provisioning
-    | is stable in production and you want resilience to upstream blips.
+    | (apt fetch timeout, dpkg lock contention, network blip) reschedules itself with a
+    | backoff up to MAX_AUTO_RETRY_ATTEMPTS. Default on — disable with
+    | DPLY_AUTO_RETRY_ENABLED=false when iterating on the bash script locally.
     */
-    'auto_retry_enabled' => filter_var(env('DPLY_AUTO_RETRY_ENABLED', false), FILTER_VALIDATE_BOOL),
+    'auto_retry_enabled' => filter_var(env('DPLY_AUTO_RETRY_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------

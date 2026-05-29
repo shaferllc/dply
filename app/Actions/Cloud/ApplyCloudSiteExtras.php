@@ -220,10 +220,11 @@ class ApplyCloudSiteExtras
                 $command = CloudWorker::DEFAULT_WORKER_COMMAND;
             }
 
-            $count = (int) ($raw['instance_count'] ?? 1);
-            if ($isScheduler || $count < 1) {
-                $count = 1;
-            }
+            $count = CloudWorker::normalizeInstanceCount(
+                $size,
+                (int) ($raw['instance_count'] ?? 1),
+                $isScheduler,
+            );
 
             $name = trim((string) ($raw['name'] ?? ''));
             if ($name === '') {

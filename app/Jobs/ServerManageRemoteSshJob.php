@@ -6,6 +6,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use Illuminate\Bus\Queueable;
@@ -191,6 +192,25 @@ class ServerManageRemoteSshJob implements ShouldQueue
             }
 
             if (! $out->isSuccessful()) {
+                $maxAttempts = (int) config('server_manage.apt_auto_retry_max_attempts', 3);
+                $delaySeconds = (int) config('server_manage.apt_auto_retry_delay_seconds', 15);
+                if ($maxAttempts > 1
+                    && $this->attempts() < $maxAttempts
+                    && ServerAptLockBash::outputLooksLikeAptLockFailure($trimmed, $out->getExitCode())) {
+                    $nextAttempt = $this->attempts() + 1;
+                    $this->mergePayload([
+                        'status' => 'queued',
+                        'output' => $trimmed,
+                        'error' => null,
+                        'flash_success' => null,
+                        'retry_attempt' => $nextAttempt,
+                    ]);
+                    $this->updateLog(ServerManageAction::STATUS_QUEUED, output: $trimmed);
+                    $this->release($delaySeconds * $this->attempts());
+
+                    return;
+                }
+
                 $error = __('Remote command exited with code :code.', ['code' => (string) ($out->getExitCode() ?? 'unknown')]);
                 $this->mergePayload([
                     'status' => 'failed',

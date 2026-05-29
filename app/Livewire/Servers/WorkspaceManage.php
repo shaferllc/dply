@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Actions\Servers\CloneServerOnDigitalOcean;
 use App\Enums\ServerProvider;
 use App\Jobs\AddEdgeProxyJob;
+use App\Jobs\RefreshServerInventoryJob;
 use App\Jobs\RemoveEdgeProxyJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\ServerManageRemoteSshJob;
@@ -21,6 +22,7 @@ use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\MiseInstallScriptBuilder;
+use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerDeployGitIdentity;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerManageToolsReport;
@@ -99,6 +101,9 @@ class WorkspaceManage extends Component
 
     /** Full task name for the in-flight queued SSH job (used to trigger post-run reprobe). */
     public ?string $manageRemoteTaskName = null;
+
+    /** Action key (e.g. install_docker) while a Tools install/repair is in flight. */
+    public ?string $pendingToolActionKey = null;
 
     /** True while a synchronous inventory reprobe runs after a mise action completes. */
     public bool $miseReprobePending = false;
@@ -407,16 +412,19 @@ BASH;
             $script = str_replace('__DPLY_DEPLOY_USER__', $deployUser, $script);
         }
 
+        $this->pendingToolActionKey = $key;
+
         try {
             $server = $this->server->fresh();
             $timeout = isset($def['timeout']) ? (int) $def['timeout'] : null;
             $flash = ($def['label'] ?? $key).' '.__('finished.');
             $label = (string) ($def['label'] ?? $key);
+            $taskName = 'manage-action:'.$key;
 
             if ($this->shouldQueueManageRemoteTasks()) {
                 $this->dispatchQueuedManageScript(
                     $server,
-                    'manage-action:'.$key,
+                    $taskName,
                     $script,
                     $timeout,
                     $flash,
@@ -426,6 +434,11 @@ BASH;
 
                 return;
             }
+
+            $logId = $this->logManageActionStart($server, $taskName, $label);
+            ServerManageAction::query()
+                ->where('id', $logId)
+                ->update(['status' => ServerManageAction::STATUS_RUNNING]);
 
             // Sync path — seed the ConsoleAction row so the banner picks it up
             // in real time, then stream output lines into it as they arrive
@@ -446,7 +459,7 @@ BASH;
             try {
                 $out = $this->runManageInlineBash(
                     $server,
-                    'manage-action:'.$key,
+                    $taskName,
                     $script,
                     function (string $type, string $buffer) use ($emitter): void {
                         $this->remoteSshStreamAppendStdout($buffer);
@@ -1253,6 +1266,64 @@ BASH;
     }
 
     /**
+     * wire:init target — queue a background inventory probe when Manage lands with
+     * SSH ready but no probe snapshot yet (common right after provision).
+     */
+    public function maybeRefreshInventoryProbeOnLoad(): void
+    {
+        if (! (bool) config('server_manage.inventory_probe_refresh_on_load', true)) {
+            return;
+        }
+
+        $this->attemptAutoInventoryProbeRefresh();
+    }
+
+    /**
+     * wire:poll target while provisioning is in flight or probe meta is still empty.
+     * Refreshes the server row from the database and re-attempts the auto-refresh
+     * dispatch once SSH becomes ready.
+     */
+    public function pollManageInventoryState(): void
+    {
+        $this->server->refresh();
+        $this->attemptAutoInventoryProbeRefresh();
+    }
+
+    protected function attemptAutoInventoryProbeRefresh(): void
+    {
+        if (! $this->shouldAutoRefreshInventoryProbe()) {
+            return;
+        }
+
+        $cacheKey = 'server-inventory-probe:auto:'.$this->server->id;
+        if (! Cache::add($cacheKey, 1, now()->addMinutes(2))) {
+            return;
+        }
+
+        RefreshServerInventoryJob::dispatch((string) $this->server->id);
+    }
+
+    protected function shouldAutoRefreshInventoryProbe(): bool
+    {
+        if ($this->currentUserIsDeployer()) {
+            return false;
+        }
+
+        if (! auth()->user()?->can('update', $this->server)) {
+            return false;
+        }
+
+        if (! $this->serverOpsReady()) {
+            return false;
+        }
+
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $checkedAt = $meta['inventory_checked_at'] ?? null;
+
+        return ! is_string($checkedAt) || trim($checkedAt) === '';
+    }
+
+    /**
      * @return array<string, array{kind: string, version: string, status: string, message: string}>
      */
     protected function activeMiseRuntimeOperations(): array
@@ -1329,9 +1400,7 @@ BASH;
             $ops[$key] = [
                 'status' => $status,
                 'label' => (string) $row->label,
-                'message' => $status === ServerManageAction::STATUS_QUEUED
-                    ? __('Queued…')
-                    : __('Running on server…'),
+                'message' => $this->toolActionBusyMessage($key, $status, (string) $row->label),
             ];
         }
 
@@ -1352,15 +1421,45 @@ BASH;
                     $ops[$key] = [
                         'status' => $status,
                         'label' => is_string($label) ? $label : $key,
-                        'message' => $status === 'running'
-                            ? __('Running on server…')
-                            : __('Queued…'),
+                        'message' => $this->toolActionBusyMessage($key, $status, is_string($label) ? $label : $key),
                     ];
                 }
             }
         }
 
+        if ($this->pendingToolActionKey !== null
+            && $this->pendingToolActionKey !== ''
+            && ! isset($ops[$this->pendingToolActionKey])) {
+            $key = $this->pendingToolActionKey;
+            $label = config('server_manage.service_actions.'.$key.'.label')
+                ?? config('server_manage.dangerous_actions.'.$key.'.label')
+                ?? $key;
+
+            $ops[$key] = [
+                'status' => ServerManageAction::STATUS_RUNNING,
+                'label' => is_string($label) ? $label : $key,
+                'message' => $this->toolActionBusyMessage($key, ServerManageAction::STATUS_RUNNING, is_string($label) ? $label : $key),
+            ];
+        }
+
         return $ops;
+    }
+
+    protected function toolActionBusyMessage(string $key, string $status, string $label): string
+    {
+        if ($status === ServerManageAction::STATUS_QUEUED) {
+            return __('Queuing :action…', ['action' => $label]);
+        }
+
+        if (str_starts_with($key, 'install_')) {
+            return __('Installing :action…', ['action' => $label]);
+        }
+
+        if (str_starts_with($key, 'repair_') || str_starts_with($key, 'update_')) {
+            return __('Updating :action…', ['action' => $label]);
+        }
+
+        return __('Running :action…', ['action' => $label]);
     }
 
     public function syncManageRemoteTaskFromCache(): void
@@ -1422,6 +1521,7 @@ BASH;
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
         $this->manageRemoteTaskId = null;
         $this->manageRemoteTaskName = null;
+        $this->pendingToolActionKey = null;
     }
 
     protected function finalizeManageRemoteTaskLog(string $cacheStatus, ?string $taskName): void
@@ -1526,6 +1626,7 @@ BASH;
                 : null,
             'activeMiseRuntimeOps' => $activeMiseRuntimeOps,
             'activeToolActionOps' => $activeToolActionOps,
+            'pendingToolActionKey' => $this->pendingToolActionKey,
             'miseReprobePending' => $this->miseReprobePending,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
@@ -1605,6 +1706,12 @@ BASH;
     ): void {
         $this->manageRemoteTaskId = null;
         $this->manageRemoteTaskName = $taskName;
+
+        if (preg_match('/^manage-action:(.+)$/', $taskName, $matches)) {
+            $this->pendingToolActionKey = $matches[1];
+        }
+
+        $inlineBash = ServerAptLockBash::wrapManageScript($inlineBash);
 
         $id = (string) Str::uuid();
         $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);

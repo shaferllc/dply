@@ -35,6 +35,15 @@ return [
     'remote_task_stalled_queued_seconds' => (int) env('SERVER_MANAGE_REMOTE_TASK_STALLED_QUEUED', 45),
 
     /**
+     * When a manage SSH script fails with apt/dpkg lock contention (exit 100 or lock
+     * messages), re-queue the same job with backoff up to this many attempts.
+     */
+    'apt_auto_retry_max_attempts' => max(1, min(6, (int) env('SERVER_MANAGE_APT_AUTO_RETRY_MAX', 3))),
+
+    /** Seconds between apt-lock auto-retries (multiplied by attempt number). */
+    'apt_auto_retry_delay_seconds' => max(5, min(120, (int) env('SERVER_MANAGE_APT_AUTO_RETRY_DELAY', 15))),
+
+    /**
      * Run manage previews and service scripts as root over SSH (TaskRunner). Requires the stored
      * key to be authorized for root. When false, runs as the server SSH user (needs passwordless sudo).
      */
@@ -1515,5 +1524,14 @@ BASH
         'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],
         'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],
+
+    /**
+     * When true, Manage auto-queues an inventory/probe refresh on load (and while
+     * provisioning finishes) so Overview populates without a manual Refresh state click.
+     */
+    'inventory_probe_refresh_on_load' => (bool) env('SERVER_MANAGE_INVENTORY_PROBE_REFRESH_ON_LOAD', true),
+
+    /** wire:poll interval (seconds) while SSH is not ready or probe meta is empty. */
+    'inventory_probe_poll_seconds' => max(3, (int) env('SERVER_MANAGE_INVENTORY_PROBE_POLL_SECONDS', 5)),
 
 ];

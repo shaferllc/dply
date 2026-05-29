@@ -86,6 +86,12 @@ class CreateCloudWorker
         $count = (int) ($payload['instance_count'] ?? 1);
         if ($isScheduler || $count < 1) {
             $count = 1;
+        } elseif ($count > CloudWorker::maxInstanceCountForSize($size)) {
+            throw new InvalidArgumentException(sprintf(
+                'The %s worker tier allows at most %d instance(s) on DigitalOcean App Platform. Choose medium or larger for more instances.',
+                $size,
+                CloudWorker::maxInstanceCountForSize($size),
+            ));
         }
 
         $name = trim((string) ($payload['name'] ?? ''));

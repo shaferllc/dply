@@ -52,9 +52,14 @@ test('scheduler effective instance count is always one', function () {
     expect($worker->effectiveInstanceCount())->toBe(1);
 });
 test('worker effective instance count respects stored value', function () {
-    $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'instance_count' => 4]);
+    $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'size' => 'medium', 'instance_count' => 4]);
 
     expect($worker->effectiveInstanceCount())->toBe(4);
+});
+test('small worker effective instance count is capped at one', function () {
+    $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'size' => 'small', 'instance_count' => 4]);
+
+    expect($worker->effectiveInstanceCount())->toBe(1);
 });
 test('worker effective instance count floors at one', function () {
     $worker = CloudWorker::factory()->make(['type' => CloudWorker::TYPE_WORKER, 'instance_count' => 0]);

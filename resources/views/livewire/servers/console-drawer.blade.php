@@ -1,184 +1,177 @@
 @php
     $promptUser = $server?->ssh_user ?: 'root';
     $promptHost = $server?->name ?: ($server?->ip_address ?: '—');
+    $prompt = $promptUser.'@'.$promptHost;
 @endphp
 
 <div
     x-data="{ pickerSearch: '' }"
     x-on:dply-console-drawer-opened.window="$nextTick(() => { $refs.scroll && ($refs.scroll.scrollTop = $refs.scroll.scrollHeight); $refs.prompt && $refs.prompt.focus(); })"
-    class="flex h-full flex-col"
+    class="flex h-full min-h-0 flex-col bg-gradient-to-b from-brand-cream/80 to-white"
 >
     @if (! $server)
-        {{-- Picker: no server in context yet. List the org's ready+ssh-keyed
-             servers and let the operator choose. Search is purely client-side
-             — server count caps at 100 in the component so DOM stays small. --}}
-        <div class="flex h-full flex-col bg-[#0b1020] text-slate-100">
-            <div class="border-b border-slate-800 bg-slate-900/60 px-3 py-2">
-                <div class="flex items-center justify-between">
-                    <p class="text-xs font-semibold text-slate-100">{{ __('Pick a server to console into') }}</p>
-                    <button
-                        type="button"
-                        wire:click="refreshAvailableServers"
-                        class="text-[11px] text-slate-400 hover:text-slate-100"
-                        title="{{ __('Refresh server list') }}"
-                    >
-                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                    </button>
-                </div>
-                <p class="mt-0.5 text-[11px] text-slate-400">{{ __('Only servers that are ready and have an SSH key are listed.') }}</p>
-                <input
-                    type="text"
-                    x-model="pickerSearch"
-                    placeholder="{{ __('Search by name or IP…') }}"
-                    class="mt-2 w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500/60 focus:outline-none"
-                />
-            </div>
-            <div class="flex-1 overflow-y-auto">
-                @if ($serverLoading)
-                    <div class="flex items-center justify-center px-3 py-8">
-                        <span class="text-xs text-slate-400">{{ __('Loading…') }}</span>
+        <div class="flex h-full min-h-0 flex-col p-3 sm:p-4">
+            <div class="dply-card flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+                <div class="border-b border-brand-ink/10 bg-brand-cream/50 px-4 py-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div>
+                                    <p class="text-sm font-semibold text-brand-ink">{{ __('Pick a server') }}</p>
+                                    <p class="text-[11px] text-brand-moss">{{ __('Ready servers with SSH keys in this organization.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="refreshAvailableServers"
+                            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-[11px] font-medium text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
+                            title="{{ __('Refresh server list') }}"
+                        >
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                            {{ __('Refresh') }}
+                        </button>
                     </div>
-                @elseif ($availableServers->isEmpty())
-                    <p class="px-3 py-4 text-xs italic text-slate-400">{{ __('No console-eligible servers in this organization yet.') }}</p>
-                @else
-                    <ul class="divide-y divide-slate-800">
-                        @foreach ($availableServers as $s)
-                            <li
-                                x-show="(@js((string) $s->name).toLowerCase() + ' ' + @js((string) $s->ip_address).toLowerCase()).includes(pickerSearch.trim().toLowerCase())"
-                            >
-                                <button
-                                    type="button"
-                                    wire:click="selectServer('{{ $s->id }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="selectServer"
-                                    class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-800/60 disabled:opacity-50"
+                    <input
+                        type="text"
+                        x-model="pickerSearch"
+                        placeholder="{{ __('Search by name or IP…') }}"
+                        class="mt-3 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    />
+                </div>
+
+                <div class="min-h-0 flex-1 overflow-y-auto">
+                    @if ($serverLoading)
+                        <div class="flex items-center justify-center gap-2 px-4 py-10 text-sm text-brand-moss">
+                            <x-spinner variant="forest" size="sm" />
+                            {{ __('Loading servers…') }}
+                        </div>
+                    @elseif ($availableServers->isEmpty())
+                        <p class="px-4 py-8 text-center text-sm text-brand-moss">{{ __('No console-eligible servers in this organization yet.') }}</p>
+                    @else
+                        <ul class="divide-y divide-brand-ink/10">
+                            @foreach ($availableServers as $s)
+                                <li
+                                    x-show="(@js((string) $s->name).toLowerCase() + ' ' + @js((string) $s->ip_address).toLowerCase()).includes(pickerSearch.trim().toLowerCase())"
                                 >
-                                    <span class="font-medium text-slate-100">{{ $s->name }}</span>
-                                    <span class="font-mono text-[11px] text-slate-400">{{ $s->ip_address }}</span>
-                                </button>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
+                                    <button
+                                        type="button"
+                                        wire:click="selectServer('{{ $s->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="selectServer"
+                                        class="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-brand-sand/30 disabled:opacity-50"
+                                    >
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $s->name }}</span>
+                                            <span class="mt-0.5 block font-mono text-[11px] text-brand-moss">{{ $s->ip_address }}</span>
+                                        </span>
+                                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
             </div>
         </div>
     @else
-        {{-- Active console view. --}}
-        <div class="flex items-center gap-2 border-b border-slate-800 bg-[#0b1020] px-3 py-1.5 text-[11px] text-slate-300">
-            <span class="font-mono text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span>
-            @if (! $serverReady)
-                <span class="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">
-                    {{ __('Unavailable') }}
-                </span>
-            @endif
-            <span class="ml-auto flex items-center gap-3">
-                @if (! empty($history))
-                    <span class="text-slate-500">{{ count($history) }} {{ Str::plural('entry', count($history)) }}</span>
-                    <button type="button" wire:click="clearHistory" class="text-slate-400 hover:text-slate-100 underline-offset-2 hover:underline">{{ __('Clear') }}</button>
-                @endif
-                <button type="button" wire:click="clearActiveServer" class="text-slate-400 hover:text-slate-100 underline-offset-2 hover:underline" title="{{ __('Pick a different server') }}">
-                    {{ __('Switch') }}
-                </button>
-                <a href="{{ route('servers.console', $server) }}" wire:navigate class="text-slate-400 hover:text-slate-100 underline-offset-2 hover:underline" title="{{ __('Open full Console page') }}">
-                    {{ __('Open full') }}
-                </a>
-            </span>
-        </div>
-
-        <div
-            x-ref="scroll"
-            class="flex-1 overflow-y-auto bg-[#0b1020] font-mono text-[12px] leading-relaxed text-slate-100"
-        >
-            <div class="px-3 py-2 space-y-2">
-                @if (! $serverReady && ! $error)
-                    <div class="rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-                        <p class="text-[11px] text-amber-300">
-                            {{ __('Server is not ready. Commands may fail. The server may be restarting or experiencing issues.') }}
-                        </p>
+        <div class="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
+            <x-console-terminal-shell :prompt-user="$promptUser" :prompt-host="$promptHost" class="min-h-0 flex-1">
+                <x-slot:toolbar>
+                    <div class="flex items-center gap-1.5">
+                        <span class="inline-flex h-2 w-2 rounded-full bg-red-400/80" aria-hidden="true"></span>
+                        <span class="inline-flex h-2 w-2 rounded-full bg-amber-300/80" aria-hidden="true"></span>
+                        <span class="inline-flex h-2 w-2 rounded-full bg-brand-sage/80" aria-hidden="true"></span>
                     </div>
-                @endif
-
-                @if (empty($history) && $serverReady)
-                    <p class="text-slate-400 italic">{{ __('Type a command below and press Enter.') }}</p>
-                @endif
-
-                @foreach ($history as $entry)
-                    <div>
-                        <div class="flex items-baseline gap-2">
-                            <span class="text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-400">:~$</span>
-                            <span class="text-slate-100 break-all">{{ $entry['cmd'] }}</span>
-                        </div>
-                        @if ($entry['error'])
-                            <pre class="mt-1 whitespace-pre-wrap break-words text-rose-300">{{ $entry['error'] }}</pre>
-                        @else
-                            @if ($entry['out'] !== '')
-                                <pre class="mt-1 whitespace-pre-wrap break-words text-slate-200">{{ $entry['out'] }}</pre>
-                            @endif
-                            @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                                <p class="mt-1 text-[11px] text-amber-300">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
-                            @endif
-                        @endif
-                    </div>
-                @endforeach
-
-                {{-- Loading indicator for command execution --}}
-                <div wire:loading wire:target="run" class="text-slate-400">
-                    <span class="text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-400">:~$</span>
-                    <span class="ml-1 animate-pulse">{{ __('running…') }}</span>
-                </div>
-
-                {{-- Loading indicator for server switching --}}
-                <div wire:loading wire:target="selectServer" class="text-slate-400">
-                    <span class="animate-pulse text-[11px]">{{ __('Connecting to server…') }}</span>
-                </div>
-            </div>
-        </div>
-
-        <form wire:submit.prevent="run" class="border-t border-slate-800 bg-[#0b1020] px-3 py-2">
-            @if ($error)
-                <div class="mb-2 rounded border border-rose-500/30 bg-rose-500/10 px-2 py-1.5">
-                    <p class="text-[11px] text-rose-300">{{ $error }}</p>
+                    <span class="font-mono text-[11px] font-medium text-brand-forest">{{ $prompt }}</span>
                     @if (! $serverReady)
-                        <button
-                            type="button"
-                            wire:click="verifyActiveServer"
-                            class="mt-1 text-[10px] text-rose-300 underline hover:text-rose-200"
-                        >
-                            {{ __('Retry connection') }}
-                        </button>
+                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
+                            {{ __('Unavailable') }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/30 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-semibold text-brand-forest">
+                            <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
+                            {{ __('Connected') }}
+                        </span>
                     @endif
-                </div>
-            @endif
-            <div class="flex items-center gap-2 font-mono text-[12px]">
-                <span class="shrink-0 text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-400">:~$</span>
-                <input
-                    type="text"
-                    wire:model="command"
-                    x-ref="prompt"
-                    autocomplete="off"
-                    autocorrect="off"
-                    spellcheck="false"
-                    placeholder="{{ $serverReady ? __('type a command and press Enter') : __('Server unavailable — select another') }}"
-                    class="flex-1 bg-transparent text-slate-100 placeholder-slate-500 caret-emerald-400 focus:outline-none"
-                    wire:loading.attr="disabled"
-                    wire:target="run,selectServer"
-                    @disabled(! $serverReady)
-                />
-                <button
-                    type="submit"
-                    wire:loading.attr="disabled"
-                    wire:target="run,selectServer"
-                    @disabled(! $serverReady)
-                    class="shrink-0 rounded-md bg-emerald-500/80 px-2.5 py-1 text-[11px] font-semibold text-slate-900 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    {{ __('Run') }}
-                </button>
-            </div>
-            @error('command')
-                <p class="mt-1 text-[11px] text-rose-300">{{ $message }}</p>
-            @enderror
-        </form>
+                    <div class="ml-auto flex flex-wrap items-center gap-2 text-[11px]">
+                        @if (! empty($history))
+                            <span class="text-brand-moss">{{ trans_choice('{1} :count entry|[2,*] :count entries', count($history), ['count' => count($history)]) }}</span>
+                            <button type="button" wire:click="clearHistory" class="font-semibold text-brand-moss hover:text-brand-ink">{{ __('Clear') }}</button>
+                        @endif
+                        <button type="button" wire:click="clearActiveServer" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-arrows-right-left class="h-3 w-3" aria-hidden="true" />
+                            {{ __('Switch') }}
+                        </button>
+                        <a href="{{ route('servers.console', $server) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                            {{ __('Open full') }}
+                        </a>
+                    </div>
+                </x-slot:toolbar>
+
+                <x-slot:body>
+                    <div x-ref="scroll" class="space-y-3">
+                        @if (! $serverReady && ! $error)
+                            <div class="rounded-lg border border-amber-300/50 bg-amber-500/10 px-3 py-2">
+                                <p class="text-[11px] leading-relaxed text-amber-100">
+                                    {{ __('Server is not ready. Commands may fail while provisioning finishes or SSH reconnects.') }}
+                                </p>
+                            </div>
+                        @endif
+
+                        @if (empty($history) && $serverReady)
+                            <p class="text-slate-400 italic">{{ __('Type a command below and press Enter.') }}</p>
+                        @endif
+
+                        @foreach ($history as $entry)
+                            <div>
+                                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                    <span class="text-brand-sage">{{ $prompt }}</span><span class="text-slate-500">:~$</span>
+                                    <span class="break-all text-slate-100">{{ $entry['cmd'] }}</span>
+                                </div>
+                                @if ($entry['error'])
+                                    <pre class="mt-1 whitespace-pre-wrap break-words text-rose-300">{{ $entry['error'] }}</pre>
+                                @else
+                                    @if ($entry['out'] !== '')
+                                        <pre class="mt-1 whitespace-pre-wrap break-words text-slate-200">{{ $entry['out'] }}</pre>
+                                    @endif
+                                    @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
+                                        <p class="mt-1 text-[11px] text-amber-300">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                                    @endif
+                                @endif
+                            </div>
+                        @endforeach
+
+                        <div wire:loading wire:target="run" class="text-slate-400">
+                            <span class="text-brand-sage">{{ $prompt }}</span><span class="text-slate-500">:~$</span>
+                            <span class="ml-1 inline-flex items-center gap-1.5 animate-pulse">
+                                <x-spinner variant="slate" size="sm" />
+                                {{ __('running…') }}
+                            </span>
+                        </div>
+
+                        <div wire:loading wire:target="selectServer" class="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+                            <x-spinner variant="slate" size="sm" />
+                            {{ __('Connecting to server…') }}
+                        </div>
+                    </div>
+                </x-slot:body>
+
+                <x-slot:footer>
+                    @include('livewire.servers.partials.console-prompt-form', [
+                        'promptUser' => $promptUser,
+                        'promptHost' => $promptHost,
+                        'serverReady' => $serverReady,
+                        'error' => $error,
+                        'showRetry' => ! $serverReady,
+                        'compact' => true,
+                    ])
+                </x-slot:footer>
+            </x-console-terminal-shell>
+        </div>
     @endif
 </div>

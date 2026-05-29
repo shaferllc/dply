@@ -835,7 +835,20 @@ trait ManagesContainerSite
             return;
         }
 
-        $worker->update(['instance_count' => max(1, $count)]);
+        $count = max(1, $count);
+        $max = $worker->maxInstanceCount();
+        if ($count > $max) {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__(
+                    'The :size worker tier allows at most :max instance(s) on DigitalOcean App Platform. Choose medium or larger for more instances.',
+                    ['size' => $worker->size, 'max' => $max],
+                ));
+            }
+
+            return;
+        }
+
+        $worker->update(['instance_count' => $count]);
         SyncCloudWorkersJob::dispatch($this->site->id);
 
         if (method_exists($this, 'toastSuccess')) {

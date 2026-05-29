@@ -51,12 +51,39 @@
     $miseReshimAction = is_array($serviceActions['mise_reshim'] ?? null) ? $serviceActions['mise_reshim'] : null;
     $activeMiseRuntimeOps = is_array($activeMiseRuntimeOps ?? null) ? $activeMiseRuntimeOps : [];
     $activeToolActionOps = is_array($activeToolActionOps ?? null) ? $activeToolActionOps : [];
+    $pendingToolActionKey = is_string($pendingToolActionKey ?? null) ? $pendingToolActionKey : null;
     $miseReprobePending = (bool) ($miseReprobePending ?? false);
 
-    $toolActionOperation = static function (array $tool) use ($activeToolActionOps): ?array {
+    $toolActionIsActive = static function (?string $key) use ($activeToolActionOps, $pendingToolActionKey): bool {
+        if ($key === null || $key === '') {
+            return false;
+        }
+
+        if ($pendingToolActionKey === $key) {
+            return true;
+        }
+
+        $op = $activeToolActionOps[$key] ?? null;
+
+        return is_array($op)
+            && in_array($op['status'] ?? '', ['queued', 'running'], true);
+    };
+
+    $toolActionOperation = static function (array $tool) use ($activeToolActionOps, $pendingToolActionKey): ?array {
         foreach ([$tool['present_action_key'] ?? null, $tool['action_key'] ?? null] as $key) {
             if (is_string($key) && $key !== '' && isset($activeToolActionOps[$key])) {
                 return $activeToolActionOps[$key];
+            }
+        }
+
+        if ($pendingToolActionKey !== null && $pendingToolActionKey !== '') {
+            foreach ([$tool['present_action_key'] ?? null, $tool['action_key'] ?? null] as $key) {
+                if ($key === $pendingToolActionKey) {
+                    return $activeToolActionOps[$pendingToolActionKey] ?? [
+                        'status' => 'running',
+                        'message' => __('Working…'),
+                    ];
+                }
             }
         }
 
@@ -299,34 +326,63 @@
                     </dd>
                 </div>
                 @if ($miseAction && $heroTool['action_key'] && $opsReady && ! $isDeployer)
+                    @php
+                        $heroInstallBusy = $toolActionIsActive($heroTool['action_key']);
+                        $heroPruneBusy = $toolActionIsActive('mise_prune');
+                        $heroReshimBusy = $toolActionIsActive('mise_reshim');
+                    @endphp
                     <div class="sm:col-span-2 sm:justify-self-end">
                         <div class="flex flex-wrap justify-end gap-2">
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $heroTool['action_key'] }}'], @js($miseAction['label']), @js($miseAction['confirm']), @js($miseAction['label']), false)"
-                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                wire:loading.attr="disabled"
+                                wire:target="confirmActionModal"
+                                @disabled($heroInstallBusy)
+                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <x-dynamic-component :component="$heroTool['icon']" class="h-4 w-4 opacity-80" />
-                                {{ $miseAction['label'] }}
+                                @if ($heroInstallBusy)
+                                    <x-spinner variant="forest" size="sm" />
+                                    {{ $activeToolActionOps[$heroTool['action_key']]['message'] ?? __('Installing…') }}
+                                @else
+                                    <x-dynamic-component :component="$heroTool['icon']" class="h-4 w-4 opacity-80" />
+                                    {{ $miseAction['label'] }}
+                                @endif
                             </button>
                             @if ($misePresent && $misePruneAction)
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('runAllowlistedAction', ['mise_prune'], @js($misePruneAction['label']), @js($misePruneAction['confirm']), @js($misePruneAction['label']), false)"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                    wire:loading.attr="disabled"
+                                    wire:target="confirmActionModal"
+                                    @disabled($heroPruneBusy)
+                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-trash class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                    {{ $misePruneAction['label'] }}
+                                    @if ($heroPruneBusy)
+                                        <x-spinner variant="forest" size="sm" />
+                                        {{ $activeToolActionOps['mise_prune']['message'] ?? __('Running…') }}
+                                    @else
+                                        <x-heroicon-o-trash class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                        {{ $misePruneAction['label'] }}
+                                    @endif
                                 </button>
                             @endif
                             @if ($misePresent && $miseReshimAction)
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('runAllowlistedAction', ['mise_reshim'], @js($miseReshimAction['label']), @js($miseReshimAction['confirm']), @js($miseReshimAction['label']), false)"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                                    wire:loading.attr="disabled"
+                                    wire:target="confirmActionModal"
+                                    @disabled($heroReshimBusy)
+                                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-arrow-path class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                    {{ $miseReshimAction['label'] }}
+                                    @if ($heroReshimBusy)
+                                        <x-spinner variant="forest" size="sm" />
+                                        {{ $activeToolActionOps['mise_reshim']['message'] ?? __('Running…') }}
+                                    @else
+                                        <x-heroicon-o-arrow-path class="h-4 w-4 opacity-80" aria-hidden="true" />
+                                        {{ $miseReshimAction['label'] }}
+                                    @endif
                                 </button>
                             @endif
                         </div>
@@ -571,9 +627,12 @@
     <div class="grid gap-4 lg:grid-cols-2">
         @foreach ($genericTools as $tool)
             @php
+                $presentKey = $tool['present_action_key'] ?? null;
+                $installKey = $tool['action_key'] ?? null;
+                $presentBusy = $toolActionIsActive($presentKey);
+                $installBusy = $toolActionIsActive($installKey);
                 $toolOp = $toolActionOperation($tool);
-                $toolBusy = $toolOp !== null
-                    && in_array($toolOp['status'] ?? '', ['queued', 'running'], true);
+                $toolBusy = $presentBusy || $installBusy;
             @endphp
             <div
                 @class([
@@ -732,25 +791,34 @@
                 </dl>
 
                 <div class="mt-auto flex flex-wrap items-center gap-3 pt-5">
-                    @if ($toolBusy)
-                        <span class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/30 bg-brand-sage/10 px-3 py-2 text-sm font-medium text-brand-forest">
+                    @if ($presentBusy)
+                        <span class="inline-flex items-center gap-2 rounded-lg border border-brand-sage/30 bg-brand-sage/10 px-3 py-2 text-sm font-medium text-brand-forest">
                             <x-spinner variant="forest" size="sm" />
-                            {{ $toolOp['message'] }}
+                            {{ $activeToolActionOps[$presentKey]['message'] ?? __('Updating…') }}
                         </span>
                     @elseif ($tool['show_present_action'] && $tool['present_action'] && $opsReady && ! $isDeployer)
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $tool['present_action_key'] }}'], @js($tool['present_action']['label']), @js($tool['present_action']['confirm']), @js($tool['present_action']['label']), false)"
-                            class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmActionModal"
+                            class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-dynamic-component :component="$tool['icon']" class="h-4 w-4 opacity-80" />
                             {{ $tool['present_action']['label'] }}
                         </button>
+                    @elseif ($installBusy)
+                        <span class="inline-flex items-center gap-2 rounded-lg border border-brand-sage/30 bg-brand-sage/10 px-3 py-2 text-sm font-medium text-brand-forest">
+                            <x-spinner variant="forest" size="sm" />
+                            {{ $activeToolActionOps[$installKey]['message'] ?? __('Installing…') }}
+                        </span>
                     @elseif ($tool['show_action'] && $tool['action'] && $opsReady && ! $isDeployer)
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $tool['action_key'] }}'], @js($tool['action']['label']), @js($tool['action']['confirm']), @js($tool['action']['label']), false)"
-                            class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmActionModal"
+                            class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             <x-dynamic-component :component="$tool['icon']" class="h-4 w-4 opacity-80" />
                             {{ $tool['action']['label'] }}

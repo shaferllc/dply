@@ -58,6 +58,20 @@ class CloudWorker extends Model
         'xlarge' => 'basic-m',
     ];
 
+    /**
+     * DigitalOcean App Platform caps fixed instance_count on worker
+     * components for some size slugs — basic-xxs (our "small" tier)
+     * allows only a single instance.
+     *
+     * @var array<string, int>
+     */
+    public const MAX_INSTANCES_BY_SIZE = [
+        'small' => 1,
+        'medium' => 50,
+        'large' => 50,
+        'xlarge' => 50,
+    ];
+
     protected $fillable = [
         'site_id',
         'type',
@@ -109,6 +123,31 @@ class CloudWorker extends Model
         return $command !== '' ? $command : self::DEFAULT_WORKER_COMMAND;
     }
 
+    public static function maxInstanceCountForSize(string $size): int
+    {
+        $size = strtolower(trim($size));
+
+        return self::MAX_INSTANCES_BY_SIZE[$size] ?? self::MAX_INSTANCES_BY_SIZE['small'];
+    }
+
+    public function maxInstanceCount(): int
+    {
+        return self::maxInstanceCountForSize((string) $this->size);
+    }
+
+    /**
+     * Clamp a requested worker instance count to what the size tier
+     * allows on DigitalOcean App Platform.
+     */
+    public static function normalizeInstanceCount(string $size, int $count, bool $isScheduler = false): int
+    {
+        if ($isScheduler || $count < 1) {
+            return 1;
+        }
+
+        return min(max(1, $count), self::maxInstanceCountForSize($size));
+    }
+
     /**
      * The instance count the backend component should run. A scheduler
      * MUST be a single instance — running the scheduler loop on more
@@ -120,7 +159,7 @@ class CloudWorker extends Model
             return 1;
         }
 
-        return max(1, (int) $this->instance_count);
+        return self::normalizeInstanceCount((string) $this->size, (int) $this->instance_count);
     }
 
     /**

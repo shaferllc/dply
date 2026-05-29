@@ -13,7 +13,7 @@ use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Servers\ServerDatabaseHostCapabilities;
+use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Servers\ServerResourcePreflight;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;

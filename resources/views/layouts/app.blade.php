@@ -172,37 +172,36 @@
                     <div
                         x-show="open"
                         x-cloak
-                        x-transition:enter="transition ease-out duration-150"
+                        x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="translate-y-full opacity-0"
                         x-transition:enter-end="translate-y-0 opacity-100"
-                        x-transition:leave="transition ease-in duration-100"
+                        x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="translate-y-0 opacity-100"
                         x-transition:leave-end="translate-y-full opacity-0"
-                        class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-[#0b1020] shadow-2xl"
-                        style="height: min(55vh, 520px);"
+                        class="fixed inset-x-3 bottom-0 z-40 overflow-hidden rounded-t-2xl border border-brand-ink/10 bg-white shadow-2xl shadow-brand-ink/15 sm:inset-x-auto sm:right-6 sm:left-auto sm:w-[min(100%,42rem)]"
+                        style="height: min(58vh, 540px);"
                     >
-                        <div class="flex h-full flex-col">
-                            <div class="flex items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/60 px-3 py-1.5">
-                                <div class="flex items-center gap-2 text-xs font-semibold text-slate-100">
-                                    <svg class="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/>
-                                        <path d="M5.5 7.5l2.5 2.5-2.5 2.5"/>
-                                        <path d="M9.5 13h3"/>
-                                    </svg>
-                                    <span>{{ __('Console') }}</span>
+                        <div class="flex h-full min-h-0 flex-col">
+                            <div class="flex shrink-0 items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/60 px-4 py-2.5">
+                                <div class="flex min-w-0 items-center gap-2.5">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                        <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-semibold text-brand-ink">{{ __('Console') }}</p>
+                                        <p class="truncate text-[11px] text-brand-moss">{{ __('SSH shell — backtick (`) toggles') }}</p>
+                                    </div>
                                 </div>
                                 <button
                                     type="button"
                                     x-on:click="close()"
-                                    class="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-slate-100"
+                                    class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white p-1.5 text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
                                     title="{{ __('Close (Esc or backtick)') }}"
                                 >
-                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M5 5l10 10"/><path d="M15 5L5 15"/>
-                                    </svg>
+                                    <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
                                 </button>
                             </div>
-                            <div class="flex-1 min-h-0">
+                            <div class="min-h-0 flex-1">
                                 <livewire:servers.console-drawer
                                     :server="$routeServer"
                                     :key="'console-drawer-'.($routeServer?->id ?? 'global').'-'.request()->path()"

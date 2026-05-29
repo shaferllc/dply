@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Cloud\AwsAppRunnerBackend;
+use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\FakeCloudBackend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +30,7 @@ function containerSite(string $backend = 'digitalocean_app_platform'): Site
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => ['api_token' => 'tok', 'github_connection_arn' => 'arn:x'],
     ]);
@@ -66,6 +67,19 @@ test('app runner sync workers throws', function () {
     $this->expectExceptionMessage('App Runner does not support background workers');
 
     (new AwsAppRunnerBackend)->syncWorkers(new Site, new ProviderCredential);
+});
+test('rejects worker count above small tier limit', function () {
+    Bus::fake();
+    $site = containerSite();
+
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('allows at most 1 instance');
+
+    (new CreateCloudWorker)->handle($site, [
+        'type' => 'worker',
+        'size' => 'small',
+        'instance_count' => 3,
+    ]);
 });
 test('creates worker on do site and dispatches sync', function () {
     Bus::fake();

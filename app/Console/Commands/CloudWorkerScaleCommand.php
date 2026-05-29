@@ -52,15 +52,6 @@ class CloudWorkerScaleCommand extends Command
 
         $changes = [];
 
-        if ($countOption !== '') {
-            $count = max(1, (int) $countOption);
-            if ($worker->isScheduler() && $count !== 1) {
-                $this->warn('The scheduler always runs a single instance — --count ignored.');
-            } else {
-                $changes['instance_count'] = $count;
-            }
-        }
-
         if ($sizeOption !== '') {
             $size = strtolower($sizeOption);
             if (! in_array($size, self::TIERS, true)) {
@@ -71,10 +62,44 @@ class CloudWorkerScaleCommand extends Command
             $changes['size'] = $size;
         }
 
+        if ($countOption !== '') {
+            $count = max(1, (int) $countOption);
+            if ($worker->isScheduler() && $count !== 1) {
+                $this->warn('The scheduler always runs a single instance — --count ignored.');
+            } else {
+                $targetSize = (string) ($changes['size'] ?? $worker->size);
+                $max = CloudWorker::maxInstanceCountForSize($targetSize);
+                if ($count > $max) {
+                    $this->error(sprintf(
+                        'The %s worker tier allows at most %d instance(s) on DigitalOcean App Platform.',
+                        $targetSize,
+                        $max,
+                    ));
+
+                    return self::FAILURE;
+                }
+                $changes['instance_count'] = $count;
+            }
+        }
+
         if ($changes === []) {
             $this->info('Nothing to change.');
 
             return self::SUCCESS;
+        }
+
+        if (! $worker->isScheduler()) {
+            $targetSize = (string) ($changes['size'] ?? $worker->size);
+            $targetCount = (int) ($changes['instance_count'] ?? $worker->instance_count);
+            $normalized = CloudWorker::normalizeInstanceCount($targetSize, $targetCount);
+            if ($normalized !== $targetCount) {
+                $changes['instance_count'] = $normalized;
+                $this->warn(sprintf(
+                    'Instance count adjusted to %d for the %s tier.',
+                    $normalized,
+                    $targetSize,
+                ));
+            }
         }
 
         $worker->update($changes);

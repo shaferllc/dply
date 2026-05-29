@@ -210,11 +210,17 @@ class Resources extends Component
             return;
         }
         if ($type === CloudWorker::TYPE_WORKER) {
+            $maxInstances = CloudWorker::maxInstanceCountForSize($this->worker_size);
             $this->validate([
                 'worker_name' => 'required|string|max:60',
                 'worker_command' => 'required|string|max:255',
                 'worker_size' => 'required|in:small,medium,large,xlarge',
-                'worker_instance_count' => 'required|integer|min:1|max:50',
+                'worker_instance_count' => 'required|integer|min:1|max:'.$maxInstances,
+            ], [
+                'worker_instance_count.max' => __(
+                    'The :size worker tier allows at most :max instance(s) on DigitalOcean App Platform. Choose medium or larger for more instances.',
+                    ['size' => $this->worker_size, 'max' => $maxInstances],
+                ),
             ]);
         }
 

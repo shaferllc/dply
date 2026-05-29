@@ -52,7 +52,7 @@ test('drawer shows server picker when no server in context', function () {
     Livewire::actingAs($user)
         ->test(ConsoleDrawer::class)
         ->assertSet('server', null)
-        ->assertSee('Pick a server to console into')
+        ->assertSee('Pick a server')
         ->assertSee($server->name)
         ->assertSee($server->ip_address);
 });
