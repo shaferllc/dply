@@ -149,7 +149,7 @@
                     </a>
                 @else
                     <a
-                        href="{{ route('edge.index') }}"
+                        href="{{ route('migrate.show', 'vercel') }}"
                         wire:navigate
                         class="group relative flex flex-col rounded-2xl border border-brand-ink/10 bg-white/70 p-6 opacity-[0.88] shadow-sm ring-1 ring-brand-ink/[0.04] transition hover:-translate-y-0.5 hover:border-brand-ink/20 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
                     >

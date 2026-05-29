@@ -19,22 +19,47 @@ $serverWorkspaceSections = [
         'workspace.daemon_slo' => 'Daemon SLO',
         'workspace.cert_inventory' => 'Certificate inventory',
         'workspace.server_cost' => 'Server cost card',
+    ],
+    'Security digest' => [
         'workspace.security_digest' => 'Security digest',
+        'workspace.security_digest_preview' => 'Coming soon preview',
     ],
     'Insights' => [
         'workspace.insights' => 'Full workspace',
         'workspace.insights_preview' => 'Coming soon preview',
     ],
-    'Deploy & ops' => [
+    'Deploy windows' => [
         'workspace.deploy_windows' => 'Deploy windows',
-        'workspace.release_hygiene' => 'Release hygiene',
+        'workspace.deploy_windows_preview' => 'Coming soon preview',
+    ],
+    'Maintenance' => [
+        'workspace.server_maintenance' => 'Server maintenance',
+        'workspace.server_maintenance_preview' => 'Coming soon preview',
+    ],
+    'Docker' => [
+        'workspace.docker' => 'Docker Engine',
+        'workspace.docker_preview' => 'Coming soon preview',
+    ],
+    'Backups' => [
+        'workspace.backups' => 'Backups workspace',
+        'workspace.backups_preview' => 'Coming soon preview',
+    ],
+    'Deploy & ops' => [
         'workspace.patch_advisor' => 'Patch advisor',
         'workspace.ephemeral_credentials' => 'Ephemeral deploy credentials',
-        'workspace.run' => 'Run / saved commands',
         'workspace.bulk_site_actions' => 'Bulk site actions',
+    ],
+    'Release hygiene' => [
+        'workspace.release_hygiene' => 'Release hygiene',
+        'workspace.release_hygiene_preview' => 'Coming soon preview',
+    ],
+    'Run' => [
+        'workspace.run' => 'Run / saved commands',
+        'workspace.run_preview' => 'Coming soon preview',
     ],
     'Access & security' => [
         'workspace.ssh_access_graph' => 'SSH access graph',
+        'workspace.ssh_access_graph_preview' => 'Coming soon preview',
         'workspace.ssh_sessions' => 'Temporary SSH sessions',
         'workspace.system_users' => 'System users',
     ],
@@ -53,10 +78,8 @@ $serverWorkspaceSections = [
     'Advanced' => [
         'workspace.cluster' => 'Cluster',
         'workspace.webserver_config_diff' => 'Webserver config diff',
-        'workspace.server_maintenance' => 'Server maintenance',
         'workspace.services' => 'System services',
         'workspace.caches' => 'Server caches',
-        'workspace.docker' => 'Docker Engine',
         'workspace.schedule' => 'Schedule workspace',
         'workspace.activity' => 'Activity log tab',
     ],
@@ -197,6 +220,14 @@ return [
         'workspace.insights' => 'workspace.insights_preview',
         'workspace.server_blueprint' => 'workspace.server_blueprint_preview',
         'workspace.files' => 'workspace.files_preview',
+        'workspace.run' => 'workspace.run_preview',
+        'workspace.release_hygiene' => 'workspace.release_hygiene_preview',
+        'workspace.security_digest' => 'workspace.security_digest_preview',
+        'workspace.deploy_windows' => 'workspace.deploy_windows_preview',
+        'workspace.server_maintenance' => 'workspace.server_maintenance_preview',
+        'workspace.docker' => 'workspace.docker_preview',
+        'workspace.backups' => 'workspace.backups_preview',
+        'workspace.ssh_access_graph' => 'workspace.ssh_access_graph_preview',
     ],
 
 ];

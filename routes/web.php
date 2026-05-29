@@ -94,15 +94,16 @@ use App\Livewire\Serverless\Index as ServerlessIndex;
 use App\Livewire\Serverless\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
-use App\Livewire\Servers\CreateManaged as ServerCreateManaged;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
+use App\Livewire\Servers\CreateManaged as ServerCreateManaged;
 use App\Livewire\Servers\Deploys as ServerDeploys;
 use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
+use App\Livewire\Servers\WorkspaceBackupsPreview;
 use App\Livewire\Servers\WorkspaceBlueprint;
 use App\Livewire\Servers\WorkspaceBlueprintPreview;
 use App\Livewire\Servers\WorkspaceCaches;
@@ -117,7 +118,9 @@ use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceDaemonSlo;
 use App\Livewire\Servers\WorkspaceDatabases;
 use App\Livewire\Servers\WorkspaceDeployPolicy;
+use App\Livewire\Servers\WorkspaceDeployPolicyPreview;
 use App\Livewire\Servers\WorkspaceDocker;
+use App\Livewire\Servers\WorkspaceDockerPreview;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFilesPreview;
 use App\Livewire\Servers\WorkspaceFirewall;
@@ -126,6 +129,7 @@ use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceInsightsPreview;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceMaintenance;
+use App\Livewire\Servers\WorkspaceMaintenancePreview;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
@@ -133,13 +137,17 @@ use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
 use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceReleaseHygiene;
+use App\Livewire\Servers\WorkspaceReleaseHygienePreview;
 use App\Livewire\Servers\WorkspaceRun;
+use App\Livewire\Servers\WorkspaceRunPreview;
 use App\Livewire\Servers\WorkspaceSchedule;
 use App\Livewire\Servers\WorkspaceSecurityDigest;
+use App\Livewire\Servers\WorkspaceSecurityDigestPreview;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshAccessGraph;
+use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Servers\WorkspaceWebserver;
@@ -154,7 +162,6 @@ use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Caching;
 use App\Livewire\Sites\Cdn;
-use App\Livewire\Sites\Commits as SitesCommits;
 use App\Livewire\Sites\ChooseApp as SitesChooseApp;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
@@ -663,31 +670,41 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::livewire('servers/{server}/blueprint', WorkspaceBlueprint::class)->name('servers.blueprint');
     Route::livewire('servers/{server}/blueprint-preview', WorkspaceBlueprintPreview::class)->name('servers.blueprint-preview');
-    Route::middleware('feature:workspace.server_maintenance')->group(function (): void {
-        Route::livewire('servers/{server}/maintenance', WorkspaceMaintenance::class)->name('servers.maintenance');
-    });
+    // No feature middleware: the component renders the full workspace when
+    // workspace.server_maintenance is on, or the coming-soon teaser when it is
+    // off but workspace.server_maintenance_preview is on (else 404).
+    Route::livewire('servers/{server}/maintenance', WorkspaceMaintenance::class)->name('servers.maintenance');
+    Route::livewire('servers/{server}/maintenance-preview', WorkspaceMaintenancePreview::class)->name('servers.maintenance-preview');
     Route::middleware('feature:workspace.patch_advisor')->group(function (): void {
         Route::livewire('servers/{server}/patches', WorkspacePatchAdvisor::class)->name('servers.patches');
     });
-    Route::middleware('feature:workspace.release_hygiene')->group(function (): void {
-        Route::livewire('servers/{server}/hygiene', WorkspaceReleaseHygiene::class)->name('servers.hygiene');
-    });
+    // No feature middleware: the component renders the full workspace when
+    // workspace.release_hygiene is on, or the coming-soon teaser when it is
+    // off but workspace.release_hygiene_preview is on (else 404).
+    Route::livewire('servers/{server}/hygiene', WorkspaceReleaseHygiene::class)->name('servers.hygiene');
+    Route::livewire('servers/{server}/hygiene-preview', WorkspaceReleaseHygienePreview::class)->name('servers.hygiene-preview');
     Route::livewire('servers/{server}/daemon-slo', WorkspaceDaemonSlo::class)->name('servers.daemon-slo');
     Route::middleware('feature:workspace.cert_inventory')->group(function (): void {
         Route::livewire('servers/{server}/cert-inventory', WorkspaceCertInventory::class)->name('servers.cert-inventory');
     });
-    Route::middleware('feature:workspace.deploy_windows')->group(function (): void {
-        Route::livewire('servers/{server}/deploy-policy', WorkspaceDeployPolicy::class)->name('servers.deploy-policy');
-    });
-    Route::middleware('feature:workspace.ssh_access_graph')->group(function (): void {
-        Route::livewire('servers/{server}/ssh-access', WorkspaceSshAccessGraph::class)->name('servers.ssh-access');
-    });
+    // No feature middleware: the component renders the full workspace when
+    // workspace.deploy_windows is on, or the coming-soon teaser when it is
+    // off but workspace.deploy_windows_preview is on (else 404).
+    Route::livewire('servers/{server}/deploy-policy', WorkspaceDeployPolicy::class)->name('servers.deploy-policy');
+    Route::livewire('servers/{server}/deploy-policy-preview', WorkspaceDeployPolicyPreview::class)->name('servers.deploy-policy-preview');
+    // No feature middleware: the component renders the full workspace when
+    // workspace.ssh_access_graph is on, or the coming-soon teaser when it is
+    // off but workspace.ssh_access_graph_preview is on (else 404).
+    Route::livewire('servers/{server}/ssh-access', WorkspaceSshAccessGraph::class)->name('servers.ssh-access');
+    Route::livewire('servers/{server}/ssh-access-preview', WorkspaceSshAccessGraphPreview::class)->name('servers.ssh-access-preview');
     Route::middleware('feature:workspace.server_cost')->group(function (): void {
         Route::livewire('servers/{server}/cost', WorkspaceCostCard::class)->name('servers.cost');
     });
-    Route::middleware('feature:workspace.security_digest')->group(function (): void {
-        Route::livewire('servers/{server}/security-digest', WorkspaceSecurityDigest::class)->name('servers.security-digest');
-    });
+    // No feature middleware: the component renders the full workspace when
+    // workspace.security_digest is on, or the coming-soon teaser when it is
+    // off but workspace.security_digest_preview is on (else 404).
+    Route::livewire('servers/{server}/security-digest', WorkspaceSecurityDigest::class)->name('servers.security-digest');
+    Route::livewire('servers/{server}/security-digest-preview', WorkspaceSecurityDigestPreview::class)->name('servers.security-digest-preview');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/insights-preview', WorkspaceInsightsPreview::class)->name('servers.insights-preview');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
@@ -706,15 +723,21 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
     });
-    Route::middleware('feature:workspace.docker')->group(function (): void {
-        Route::livewire('servers/{server}/docker', WorkspaceDocker::class)->name('servers.docker');
-    });
+    // No feature middleware: the component renders the full workspace when
+    // workspace.docker is on, or the coming-soon teaser when it is off but
+    // workspace.docker_preview is on (else 404).
+    Route::livewire('servers/{server}/docker', WorkspaceDocker::class)->name('servers.docker');
+    Route::livewire('servers/{server}/docker-preview', WorkspaceDockerPreview::class)->name('servers.docker-preview');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
     Route::middleware('feature:workspace.schedule')->group(function (): void {
         Route::livewire('servers/{server}/schedule', WorkspaceSchedule::class)->name('servers.schedule');
     });
+    // The component renders the full workspace when workspace.backups is on,
+    // or the coming-soon teaser when it is off but workspace.backups_preview
+    // is on (else 404). The service.installed gate still applies.
     Route::livewire('servers/{server}/backups', WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
+    Route::livewire('servers/{server}/backups-preview', WorkspaceBackupsPreview::class)->name('servers.backups-preview');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::middleware('feature:workspace.system_users')->group(function (): void {
@@ -727,6 +750,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.run')->group(function (): void {
         Route::livewire('servers/{server}/run', WorkspaceRun::class)->name('servers.run');
     });
+    Route::livewire('servers/{server}/run-preview', WorkspaceRunPreview::class)->name('servers.run-preview');
     Route::middleware('feature:workspace.console')->group(function (): void {
         Route::livewire('servers/{server}/console', WorkspaceConsole::class)->name('servers.console');
     });

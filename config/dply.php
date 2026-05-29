@@ -167,7 +167,7 @@ return [
     | back-end pipelines (PR 5–6) and journey UI (PR 7) ship; flips on once
     | the pipeline is reliable end-to-end.
     */
-    'scaffold_v1_enabled' => filter_var(env('DPLY_SCAFFOLD_V1_ENABLED', false), FILTER_VALIDATE_BOOL),
+    'scaffold_v1_enabled' => filter_var(env('DPLY_SCAFFOLD_V1_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------
@@ -180,7 +180,7 @@ return [
     | wizard remains the fallback. VM hosts only for now — container/serverless
     | keep their dedicated create flows. See docs/CHOOSE_APP_FLOW.md.
     */
-    'choose_app_enabled' => filter_var(env('DPLY_CHOOSE_APP_ENABLED', false), FILTER_VALIDATE_BOOL),
+    'choose_app_enabled' => filter_var(env('DPLY_CHOOSE_APP_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     /*
     |--------------------------------------------------------------------------

@@ -27,6 +27,12 @@ class Index extends Component
         // single source of truth. Reappears the moment any non-VM surface
         // is enabled (admin toggle, env override).
         abort_unless(multi_surface_active(), 404);
+
+        // Fleet Command Center is the default multi-surface home — the
+        // compute inventory lives there with cross-product ops tiles.
+        if (Feature::active('surface.fleet')) {
+            $this->redirect(route('fleet.index'), navigate: true);
+        }
     }
 
     public function render(): View

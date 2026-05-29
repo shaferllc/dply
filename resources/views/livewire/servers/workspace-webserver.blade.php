@@ -87,6 +87,8 @@
                 {{ $info['label'] }}
                 @if ($isActiveEngine)
                     <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ $isEdgeProxyTab ? __('Edge') : __('Active') }}</span>
+                @elseif (! empty($info['coming_soon']))
+                    <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                 @elseif (! $isEdgeProxyTab && $preflight->isBlocked($server, $key))
                     <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
                 @endif

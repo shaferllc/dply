@@ -12,12 +12,18 @@ use App\Support\Servers\MaintenanceWindow;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
 /**
  * Server-level maintenance window — suspend all eligible VM sites with one
  * toggle and a shared public suspended page message.
+ *
+ * When {@see workspace.server_maintenance} is off but
+ * {@see workspace.server_maintenance_preview} is on, the canonical
+ * /maintenance URL renders the coming-soon teaser in place of the full
+ * workspace.
  */
 #[Layout('layouts.app')]
 class WorkspaceMaintenance extends Component
@@ -27,6 +33,9 @@ class WorkspaceMaintenance extends Component
 
     protected string $requiredFeature = 'workspace.server_maintenance';
 
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
+
     public string $maintenance_until_local = '';
 
     public string $maintenance_note = '';
@@ -35,9 +44,20 @@ class WorkspaceMaintenance extends Component
 
     public function mount(Server $server, ServerMaintenanceWindow $maintenance): void
     {
-        $this->bootWorkspace($server);
-
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
+
+        if (! Feature::active('workspace.server_maintenance')) {
+            if (workspace_server_maintenance_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->bootWorkspace($server);
 
         $maintenance->refreshExpired($server, auth()->user());
         $this->server->refresh();
@@ -57,6 +77,18 @@ class WorkspaceMaintenance extends Component
                     $this->maintenance_until_local = '';
                 }
             }
+        }
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
         }
     }
 
@@ -166,6 +198,10 @@ class WorkspaceMaintenance extends Component
 
     public function render(ServerMaintenanceWindow $maintenance): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-maintenance-preview');
+        }
+
         $this->server->refresh();
         $maintenance->refreshExpired($this->server, auth()->user());
         $this->server->refresh();

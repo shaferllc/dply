@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
@@ -100,6 +102,27 @@ test('nav drops needs setup flag when supervisor installed', function () {
     expect($items)->toHaveKey('daemons');
     expect((bool) ($items['daemons']['needs_setup'] ?? false))->toBeFalse();
     expect((bool) ($items['queue-workers']['needs_setup'] ?? false))->toBeFalse();
+});
+
+test('nav batches workspace feature flag lookups', function () {
+    $server = serverWithoutProvisionArtifact();
+    Feature::flushCache();
+
+    $this->actingAs($server->user);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    server_workspace_nav_for_server($server);
+
+    $featureQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains(strtolower($query['query']), 'from "features"'))
+        ->count();
+
+    DB::disableQueryLog();
+
+    expect(count(server_workspace_nav_feature_names()))->toBeGreaterThan(10);
+    expect($featureQueries)->toBeLessThanOrEqual(2);
 });
 
 test('route gate returns 404 for php when php is not installed', function () {

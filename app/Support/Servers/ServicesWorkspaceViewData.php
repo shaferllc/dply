@@ -216,6 +216,63 @@ final class ServicesWorkspaceViewData
         $phpInventory = is_array(($server->meta ?? [])['php_inventory'] ?? null) ? $server->meta['php_inventory'] : [];
         $phpVersionsInstalled = is_array($phpInventory['installed_versions'] ?? null) ? $phpInventory['installed_versions'] : [];
 
+        // The php_inventory meta is only populated once the PHP workspace probe
+        // runs. Until then, fall back to the version reconciled during provision
+        // (stack_summary / installed_stack) so a server that ships with PHP
+        // doesn't read "Not installed" just because nobody opened the PHP tab.
+        $phpActiveVersion = ServerInstalledServices::phpVersionFor($server)
+            ?? InstalledStack::fromMeta($server)->phpVersion;
+        $phpInstalled = array_key_exists('php', $installedTags);
+        $phpDetail = match (true) {
+            $phpVersionsInstalled !== [] => trans_choice(':n version|:n versions', count($phpVersionsInstalled), ['n' => count($phpVersionsInstalled)]),
+            $phpActiveVersion !== null && $phpActiveVersion !== '' => __('PHP :version', ['version' => $phpActiveVersion]),
+            $phpInstalled => __('Installed'),
+            default => __('Not installed'),
+        };
+
+        $installedStack = InstalledStack::fromMeta($server);
+
+        // Same idea as PHP: the database row count only reflects user-created
+        // databases, so a fresh server with a provisioned engine reads "No
+        // databases yet". Surface the installed engine instead. The
+        // installed-service tag is the reliable signal for *which* managed
+        // engine landed (the reconciled stack can mislabel it, e.g. report a
+        // low-memory SQLite fallback while MySQL is the real managed engine);
+        // SQLite is a file, not a managed server, so it stays out of this card.
+        $databaseEngineLabel = match (true) {
+            array_key_exists('postgres', $installedTags) => 'PostgreSQL',
+            array_key_exists('mysql', $installedTags) => 'MySQL',
+            default => null,
+        };
+        // Only trust the reconciled version when it belongs to the tagged engine.
+        if ($databaseEngineLabel !== null && $installedStack->databaseVersion) {
+            $stackDb = strtolower((string) ($installedStack->database ?? ''));
+            $versionMatchesEngine = ($databaseEngineLabel === 'PostgreSQL' && str_starts_with($stackDb, 'postgres'))
+                || ($databaseEngineLabel === 'MySQL' && (str_starts_with($stackDb, 'mysql') || str_starts_with($stackDb, 'mariadb')));
+            if ($versionMatchesEngine) {
+                $databaseEngineLabel .= ' '.$installedStack->databaseVersion;
+            }
+        }
+        $databasesShown = $databaseEngineLabel !== null;
+        $databasesDetail = match (true) {
+            $databaseRows > 0 => trans_choice(':n database|:n databases', $databaseRows, ['n' => $databaseRows]),
+            $databaseEngineLabel !== null => $databaseEngineLabel,
+            default => __('No databases yet'),
+        };
+
+        // Caches: a provisioned engine (redis/valkey/memcached) may not have a
+        // ServerCacheService row yet — fall back to the installed-service tags
+        // so the card names the engine rather than reading "No instances yet".
+        $cacheTagLabels = collect(['redis', 'valkey', 'memcached'])
+            ->filter(fn (string $engine) => array_key_exists($engine, $installedTags))
+            ->map(fn (string $engine) => (string) str($engine)->headline())
+            ->values();
+        $cachesDetail = match (true) {
+            $cacheRows->isNotEmpty() => $cacheCounts->map(fn ($n, $engine) => trans_choice(':n :engine instance|:n :engine instances', $n, ['n' => $n, 'engine' => $engine]))->implode(' · '),
+            $cacheTagLabels->isNotEmpty() => $cacheTagLabels->implode(' · '),
+            default => __('No instances yet'),
+        };
+
         return collect([
             [
                 'key' => 'webserver',
@@ -230,19 +287,15 @@ final class ServicesWorkspaceViewData
                 'label' => __('PHP'),
                 'icon' => 'heroicon-o-command-line',
                 'href' => route('servers.php', $server),
-                'detail' => $phpVersionsInstalled !== []
-                    ? trans_choice(':n version|:n versions', count($phpVersionsInstalled), ['n' => count($phpVersionsInstalled)])
-                    : __('Not installed'),
-                'shown' => array_key_exists('php', $installedTags),
+                'detail' => $phpDetail,
+                'shown' => $phpInstalled,
             ],
             [
                 'key' => 'caches',
                 'label' => __('Caches'),
                 'icon' => 'heroicon-o-bolt',
                 'href' => route('servers.caches', $server),
-                'detail' => $cacheRows->isNotEmpty()
-                    ? $cacheCounts->map(fn ($n, $engine) => trans_choice(':n :engine instance|:n :engine instances', $n, ['n' => $n, 'engine' => $engine]))->implode(' · ')
-                    : __('No instances yet'),
+                'detail' => $cachesDetail,
                 'shown' => true,
             ],
             [
@@ -250,10 +303,8 @@ final class ServicesWorkspaceViewData
                 'label' => __('Databases'),
                 'icon' => 'heroicon-o-circle-stack',
                 'href' => route('servers.databases', $server),
-                'detail' => $databaseRows > 0
-                    ? trans_choice(':n database|:n databases', $databaseRows, ['n' => $databaseRows])
-                    : __('No databases yet'),
-                'shown' => array_key_exists('postgres', $installedTags) || array_key_exists('mysql', $installedTags),
+                'detail' => $databasesDetail,
+                'shown' => $databasesShown,
             ],
             [
                 'key' => 'daemons',

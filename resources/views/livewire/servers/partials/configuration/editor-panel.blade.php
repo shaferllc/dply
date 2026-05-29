@@ -1,13 +1,19 @@
 <div class="min-w-0">
     @if ($config_selected_path === null)
         <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-center text-sm text-brand-moss">
-            <x-heroicon-o-arrow-left class="mx-auto h-5 w-5 text-brand-mist" />
-            <p class="mt-2">{{ __('Pick a file on the left to start editing.') }}</p>
+            <x-heroicon-o-document-text class="mx-auto h-5 w-5 text-brand-mist" />
+            <p class="mt-2">{{ __('Select a config file to start editing.') }}</p>
         </div>
     @else
         <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="min-w-0">
                 <p class="break-all font-mono text-xs text-brand-moss">{{ $config_selected_path }}</p>
+                @if ($pending_load_console_id !== null)
+                    <p class="mt-1 inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
+                        <x-spinner variant="forest" class="h-3.5 w-3.5" />
+                        {{ __('Loading file from server…') }}
+                    </p>
+                @endif
                 @if ($config_truncated_on_load)
                     <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">
                         <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
@@ -16,7 +22,14 @@
                 @endif
             </div>
             <div class="flex flex-wrap gap-1.5">
-                <button type="button" wire:click="loadConfigFile(@js($config_selected_path))" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                <button
+                    type="button"
+                    wire:click="loadConfigFile(@js($config_selected_path))"
+                    wire:loading.attr="disabled"
+                    wire:target="loadConfigFile"
+                    @disabled($pending_load_console_id !== null)
+                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                >
                     <x-heroicon-o-arrow-path class="h-3 w-3" />
                     {{ __('Reload') }}
                 </button>
@@ -26,7 +39,7 @@
                         wire:click="validateConfigBuffer"
                         wire:loading.attr="disabled"
                         wire:target="validateConfigBuffer"
-                        @disabled($config_truncated_on_load)
+                        @disabled($config_truncated_on_load || $pending_load_console_id !== null)
                         class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                     >
                         <x-heroicon-o-shield-check class="h-3 w-3" />
@@ -37,7 +50,7 @@
                         wire:click="saveConfigFile"
                         wire:loading.attr="disabled"
                         wire:target="saveConfigFile,confirmConfigSave"
-                        @disabled($config_truncated_on_load)
+                        @disabled($config_truncated_on_load || $pending_load_console_id !== null)
                         class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-forest bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-50"
                     >
                         <x-heroicon-o-cloud-arrow-up class="h-3 w-3" />
@@ -51,6 +64,14 @@
             </div>
         </div>
 
+        @if ($pending_load_console_id !== null)
+            <div class="mt-2 flex min-h-[50vh] items-center justify-center rounded-lg border border-brand-ink/15 bg-brand-sand/20">
+                <div class="flex items-center gap-2 text-sm text-brand-moss">
+                    <x-spinner variant="forest" class="h-5 w-5" />
+                    <span>{{ __('Fetching file contents…') }}</span>
+                </div>
+            </div>
+        @else
         <div
             wire:key="config-editor-{{ md5($config_selected_path) }}"
             x-data="{
@@ -77,6 +98,7 @@
         >
             <div x-ref="editorMount" class="min-h-[50vh] max-h-[65vh] overflow-auto text-xs"></div>
         </div>
+        @endif
 
         @include('livewire.servers.partials.configuration.revisions-panel')
 

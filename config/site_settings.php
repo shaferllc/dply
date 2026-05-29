@@ -40,6 +40,7 @@ return [
         'edge-error-pages' => ['label' => 'Error pages'],
         'edge-crons' => ['label' => 'Crons'],
         'edge-firewall' => ['label' => 'Firewall'],
+        'edge-members' => ['label' => 'Members'],
         'edge-alerts' => ['label' => 'Alerts'],
         'edge-audit' => ['label' => 'Audit log'],
         'edge-previews' => ['label' => 'Previews'],

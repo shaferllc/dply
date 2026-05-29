@@ -56,12 +56,17 @@ final class ServerProviderGate
     /**
      * Providers that are surfaced as "coming soon" in the credentials UI — visible in the
      * sidebar but disabled (no form submission). Set as a constant rather than via env so
-     * the placeholder rollout is deterministic in tests. Empty now that the DNS & CDN
-     * providers (Gandi, Namecheap, Vercel) ship real credential forms.
+     * the placeholder rollout is deterministic in tests.
+     *
+     * AWS (EC2) is config-enabled but Pennant-gated on `provider.aws`; while that flag is
+     * off it is shown here as "coming soon" rather than hidden. Once the flag is enabled
+     * for an org it resolves to a fully enabled provider (see comingSoon() guard below).
      *
      * @var list<string>
      */
-    private const COMING_SOON = [];
+    private const COMING_SOON = [
+        'aws',
+    ];
 
     public static function enabled(string $provider): bool
     {
@@ -88,6 +93,13 @@ final class ServerProviderGate
      */
     public static function comingSoon(string $provider): bool
     {
+        // A fully enabled provider (config on + any Pennant flag active) is never
+        // "coming soon" — so a flag-gated provider like AWS flips from placeholder
+        // to a working credential form the moment its flag turns on.
+        if (self::enabled($provider)) {
+            return false;
+        }
+
         return in_array($provider, self::COMING_SOON, true);
     }
 

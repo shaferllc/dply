@@ -102,4 +102,58 @@ return [
         'parity_body' => 'Vercel makes the edge story easy and the origin story complicated. dply Edge keeps the edge story just as easy — Git push to Worker, previews on every commit — and lets the origin be a Cloud container right beside it. One vault, one audit log, one Stripe customer.',
     ],
 
+    'netlify' => [
+        'name' => 'Netlify',
+        'kicker' => 'Edge / static',
+        'tagline' => 'Import Netlify sites into dply Edge — build settings, redirects, and env vars land in one org.',
+        'meta' => 'Move from Netlify to dply Edge in an afternoon. Import sites with netlify.toml, env, and framework detection on Cloudflare Workers + R2.',
+        'headline' => 'From Netlify to dply Edge, in an afternoon',
+        'hero' => 'Netlify excels at static and Jamstack deploys. dply Edge gives you the same git-push workflow with hybrid SSR and Cloud origins in the same organization when your app outgrows static-only hosting.',
+        'cta_href' => '/edge/import',
+        'cta_label' => 'Open Edge import',
+        'moves' => [
+            'Your <strong class="text-brand-ink">Netlify site</strong> build command, publish directory, and framework hints.',
+            '<strong class="text-brand-ink">Environment variables</strong> copied into the dply Edge env editor on create.',
+            '<strong class="text-brand-ink">Redirects and headers</strong> from netlify.toml inform dply.yaml during import.',
+        ],
+        'stays' => [
+            'Your <strong class="text-brand-ink">Git repository</strong> stays on GitHub, GitLab, or Bitbucket.',
+            '<strong class="text-brand-ink">DNS</strong> remains on your registrar until you point records at dply.',
+        ],
+        'steps' => [
+            ['title' => 'Connect Netlify', 'body' => 'Paste a personal access token. Pick the site to import — nothing changes on Netlify until you cut DNS over.'],
+            ['title' => 'Prefill Edge create', 'body' => 'dply opens Edge create with repo, branch, build, and env count already filled from the Netlify project.'],
+            ['title' => 'Track in parity', 'body' => 'After deploy, the import parity view keeps a receipt of what landed and links back to your Netlify dashboard for comparison.'],
+        ],
+        'parity_title' => 'Import receipt stays open',
+        'parity_body' => 'The Edge import wizard hands off to create, then the parity dashboard records the source provider and project id so you can compare live URLs before you retire Netlify.',
+    ],
+
+    'cloudflare-pages' => [
+        'name' => 'Cloudflare Pages',
+        'kicker' => 'Edge / static',
+        'tagline' => 'Bring Cloudflare Pages projects to dply Edge with the same Workers + R2 delivery stack you already know.',
+        'meta' => 'Move from Cloudflare Pages to dply Edge. Import build config and env via API token — stay on Cloudflare delivery with dply org controls.',
+        'headline' => 'From Cloudflare Pages to dply Edge, in an afternoon',
+        'hero' => 'Pages is already on Cloudflare. dply Edge keeps delivery on Workers + R2 but adds org-wide billing, Fleet ops, hybrid origins, and BYO VMs in the same panel.',
+        'cta_href' => '/edge/import',
+        'cta_label' => 'Open Edge import',
+        'moves' => [
+            'Your <strong class="text-brand-ink">Pages project</strong> production branch, build command, and output directory.',
+            '<strong class="text-brand-ink">Environment variables</strong> (where the API exposes them) transfer on create.',
+            'Framework detection for popular static and SSR presets.',
+        ],
+        'stays' => [
+            'Your <strong class="text-brand-ink">Cloudflare account</strong> continues to own DNS and zones until you re-point.',
+            'BYO Cloudflare credentials remain optional for delivery — managed dply Edge is the default.',
+        ],
+        'steps' => [
+            ['title' => 'Connect Cloudflare', 'body' => 'Provide an API token with Pages read access and your account id.'],
+            ['title' => 'Import + deploy', 'body' => 'Pick a project, review the prefill, and launch the first Edge build from dply.'],
+            ['title' => 'Cut over DNS', 'body' => 'When the dply preview URL looks right, update custom hostnames and retire the Pages project.'],
+        ],
+        'parity_title' => 'Same CDN family, one control plane',
+        'parity_body' => 'You are not leaving Cloudflare — you are centralizing deploy history, org RBAC, and multi-engine ops (BYO + Cloud + Edge) in dply while Pages keeps serving until you flip.',
+    ],
+
 ];

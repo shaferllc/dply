@@ -50,6 +50,37 @@ if (! function_exists('server_workspace_nav_item_url')) {
     }
 }
 
+if (! function_exists('server_workspace_nav_feature_names')) {
+    /**
+     * All Pennant flags referenced by {@see config('server_workspace.nav')} (full + preview).
+     *
+     * @return list<string>
+     */
+    function server_workspace_nav_feature_names(): array
+    {
+        static $names = null;
+
+        if ($names !== null) {
+            return $names;
+        }
+
+        $names = [];
+        foreach ((array) config('server_workspace.nav', []) as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            foreach (['feature', 'preview_feature'] as $key) {
+                $name = $item[$key] ?? null;
+                if (is_string($name) && $name !== '') {
+                    $names[$name] = true;
+                }
+            }
+        }
+
+        return $names = array_keys($names);
+    }
+}
+
 if (! function_exists('server_workspace_nav_for_server')) {
     /**
      * Server workspace sidebar items filtered to those whose backing service is installed.
@@ -66,25 +97,30 @@ if (! function_exists('server_workspace_nav_for_server')) {
             return [];
         }
 
+        $featureNames = server_workspace_nav_feature_names();
+        if ($featureNames !== []) {
+            Feature::loadMissing($featureNames);
+        }
+
         $installed = ServerInstalledServices::tagsFor($server);
         $unknownStack = array_key_exists('unknown', $installed);
         $hostKind = (string) ($server->meta['host_kind'] ?? 'vm');
+        $needsSupervisorSetup = $server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_INSTALLED;
 
-        $filtered = array_filter($items, static function ($item) use ($installed, $unknownStack, $hostKind): bool {
+        $filtered = [];
+
+        foreach ($items as $item) {
             if (! is_array($item)) {
-                return false;
+                continue;
             }
 
-            // Host-kind gating first — drops VM-shaped items for K8s servers
-            // (PHP, Webserver, Databases, Caches, Cron, etc.) and conversely
-            // keeps the Cluster page off non-K8s servers.
             $onlyHostKinds = $item['only_host_kinds'] ?? null;
             if (is_array($onlyHostKinds) && $onlyHostKinds !== [] && ! in_array($hostKind, $onlyHostKinds, true)) {
-                return false;
+                continue;
             }
             $exceptHostKinds = $item['except_host_kinds'] ?? null;
             if (is_array($exceptHostKinds) && in_array($hostKind, $exceptHostKinds, true)) {
-                return false;
+                continue;
             }
 
             $feature = $item['feature'] ?? null;
@@ -94,52 +130,35 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 && Feature::active($previewFeature)
                 && ! $featureActive;
 
-            if ($featureActive || $previewActive) {
-                // Shown as full nav or coming-soon teaser — host/service checks below.
-            } elseif (is_string($feature) && $feature !== '') {
-                return false;
+            if (! ($featureActive || $previewActive) && is_string($feature) && $feature !== '') {
+                continue;
             }
 
             $required = $item['requires_any_tags'] ?? null;
-            if (! is_array($required) || $required === []) {
-                return true;
-            }
-            if ($unknownStack) {
-                return true;
-            }
-            foreach ($required as $tag) {
-                if (is_string($tag) && array_key_exists($tag, $installed)) {
-                    return true;
+            if (is_array($required) && $required !== [] && ! $unknownStack) {
+                $hasRequiredTag = false;
+                foreach ($required as $tag) {
+                    if (is_string($tag) && array_key_exists($tag, $installed)) {
+                        $hasRequiredTag = true;
+                        break;
+                    }
+                }
+                if (! $hasRequiredTag) {
+                    continue;
                 }
             }
-
-            return false;
-        });
-
-        // Daemons is visible before Supervisor is installed (the page itself
-        // offers the install CTA). Surface a "needs_setup" flag so the
-        // sidebar can render a small indicator until the package is in place.
-        $needsSupervisorSetup = $server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_INSTALLED;
-        $filtered = array_map(static function (array $item) use ($needsSupervisorSetup): array {
-            if (($item['key'] ?? null) === 'daemons' && $needsSupervisorSetup) {
-                $item['needs_setup'] = true;
-            }
-
-            $feature = $item['feature'] ?? null;
-            $previewFeature = $item['preview_feature'] ?? null;
-            $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);
-            $previewActive = is_string($previewFeature) && $previewFeature !== ''
-                && Feature::active($previewFeature)
-                && ! $featureActive;
 
             if ($previewActive) {
                 $item['preview_only'] = true;
             }
+            if (($item['key'] ?? null) === 'daemons' && $needsSupervisorSetup) {
+                $item['needs_setup'] = true;
+            }
 
-            return $item;
-        }, $filtered);
+            $filtered[] = $item;
+        }
 
-        return array_values($filtered);
+        return $filtered;
     }
 }
 
@@ -226,6 +245,158 @@ if (! function_exists('workspace_files_preview_active')) {
         return $organization === null
             ? Feature::active('workspace.files_preview')
             : Feature::for($organization)->active('workspace.files_preview');
+    }
+}
+
+if (! function_exists('workspace_ssh_access_graph_preview_active')) {
+    /**
+     * True when the SSH access graph workspace is off but the coming-soon
+     * teaser should surface in nav and the preview workspace page.
+     */
+    function workspace_ssh_access_graph_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.ssh_access_graph')
+            : Feature::for($organization)->active('workspace.ssh_access_graph')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.ssh_access_graph_preview')
+            : Feature::for($organization)->active('workspace.ssh_access_graph_preview');
+    }
+}
+
+if (! function_exists('workspace_backups_preview_active')) {
+    /**
+     * True when the Backups workspace is off but the coming-soon teaser should
+     * surface in nav and the preview workspace page.
+     */
+    function workspace_backups_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.backups')
+            : Feature::for($organization)->active('workspace.backups')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.backups_preview')
+            : Feature::for($organization)->active('workspace.backups_preview');
+    }
+}
+
+if (! function_exists('workspace_docker_preview_active')) {
+    /**
+     * True when the Docker workspace is off but the coming-soon teaser should
+     * surface in nav and the preview workspace page.
+     */
+    function workspace_docker_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.docker')
+            : Feature::for($organization)->active('workspace.docker')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.docker_preview')
+            : Feature::for($organization)->active('workspace.docker_preview');
+    }
+}
+
+if (! function_exists('workspace_server_maintenance_preview_active')) {
+    /**
+     * True when the server maintenance surface is off but the coming-soon
+     * teaser should surface in nav and the preview workspace page.
+     */
+    function workspace_server_maintenance_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.server_maintenance')
+            : Feature::for($organization)->active('workspace.server_maintenance')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.server_maintenance_preview')
+            : Feature::for($organization)->active('workspace.server_maintenance_preview');
+    }
+}
+
+if (! function_exists('workspace_deploy_windows_preview_active')) {
+    /**
+     * True when the deploy windows surface is off but the coming-soon teaser
+     * should surface in nav and the preview workspace page.
+     */
+    function workspace_deploy_windows_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.deploy_windows')
+            : Feature::for($organization)->active('workspace.deploy_windows')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.deploy_windows_preview')
+            : Feature::for($organization)->active('workspace.deploy_windows_preview');
+    }
+}
+
+if (! function_exists('workspace_security_digest_preview_active')) {
+    /**
+     * True when the security digest surface is off but the coming-soon teaser
+     * should surface in nav and the preview workspace page.
+     */
+    function workspace_security_digest_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.security_digest')
+            : Feature::for($organization)->active('workspace.security_digest')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.security_digest_preview')
+            : Feature::for($organization)->active('workspace.security_digest_preview');
+    }
+}
+
+if (! function_exists('workspace_release_hygiene_preview_active')) {
+    /**
+     * True when the release hygiene surface is off but the coming-soon teaser
+     * should surface in nav and the preview workspace page.
+     */
+    function workspace_release_hygiene_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.release_hygiene')
+            : Feature::for($organization)->active('workspace.release_hygiene')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.release_hygiene_preview')
+            : Feature::for($organization)->active('workspace.release_hygiene_preview');
+    }
+}
+
+if (! function_exists('workspace_run_preview_active')) {
+    /**
+     * True when the Run workspace surface is off but the coming-soon teaser
+     * should surface in nav and the preview workspace page.
+     */
+    function workspace_run_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.run')
+            : Feature::for($organization)->active('workspace.run')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.run_preview')
+            : Feature::for($organization)->active('workspace.run_preview');
     }
 }
 

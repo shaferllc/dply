@@ -18,16 +18,28 @@ use App\Support\Servers\DockerWorkspaceViewData;
 use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
+/**
+ * Remote Docker Engine inspector over SSH — containers, images, volumes,
+ * networks, compose projects, and cleanup.
+ *
+ * When {@see workspace.docker} is off but {@see workspace.docker_preview} is
+ * on, the canonical /docker URL renders the coming-soon teaser in place of the
+ * full workspace.
+ */
 #[Layout('layouts.app')]
 class WorkspaceDocker extends Component
 {
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.docker';
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
@@ -107,7 +119,30 @@ class WorkspaceDocker extends Component
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.docker')) {
+            if (workspace_docker_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
         $this->bootWorkspace($server);
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     public function setWorkspaceTab(string $tab): void
@@ -315,6 +350,10 @@ class WorkspaceDocker extends Component
 
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-docker-preview');
+        }
+
         if (! in_array($this->workspace_tab, self::TABS, true)) {
             $this->workspace_tab = 'overview';
         }

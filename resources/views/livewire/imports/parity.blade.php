@@ -19,6 +19,20 @@
                     {{ __('Ploi inventory') }}
                 </x-secondary-button>
             </a>
+            @feature('surface.edge')
+                <a href="{{ route('edge.import') }}" wire:navigate>
+                    <x-secondary-button type="button">
+                        <x-heroicon-o-globe-alt class="mr-1.5 h-4 w-4" />
+                        {{ __('Edge import') }}
+                    </x-secondary-button>
+                </a>
+            @endfeature
+            <a href="{{ route('migrate.index') }}" wire:navigate>
+                <x-secondary-button type="button">
+                    <x-heroicon-o-arrow-right-circle class="mr-1.5 h-4 w-4" />
+                    {{ __('Migration guides') }}
+                </x-secondary-button>
+            </a>
         </div>
     </header>
 
@@ -30,7 +44,7 @@
                 </div>
                 <h2 class="text-base font-semibold text-brand-ink">{{ __('No completed migrations yet.') }}</h2>
                 <p class="mx-auto max-w-md text-sm leading-relaxed text-brand-moss">
-                    {{ __('Once you run a Forge or Ploi migration, this page will keep showing you the diff between the source and dply until you decide to disconnect.') }}
+                    {{ __('Once you run a Forge, Ploi, or Edge import, this page keeps a receipt of what landed in dply and flags anything still provisioning or failed.') }}
                 </p>
             </div>
         </section>
@@ -53,6 +67,7 @@
         <div class="space-y-4">
             @foreach ($rows as $row)
                 @php($migration = $row['migration'])
+                @php($isEdge = ($row['kind'] ?? 'vm') === 'edge')
                 <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                     <header class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
                         <div class="min-w-0">
@@ -61,24 +76,37 @@
                                     {{ $row['source_label'] }}
                                 </span>
                                 <p class="font-semibold text-brand-ink">
-                                    {{ $row['source_server']?->name ?? __('source server removed') }}
+                                    @if ($isEdge)
+                                        {{ $row['site']?->name ?? __('Edge site') }}
+                                    @else
+                                        {{ $row['source_server']?->name ?? __('source server removed') }}
+                                    @endif
                                 </p>
                                 @if ($row['source_server']?->ip_address)
                                     <span class="text-sm text-brand-moss">· {{ $row['source_server']->ip_address }}</span>
                                 @endif
                             </div>
                             <p class="mt-1 text-xs text-brand-moss">
-                                @if ($row['target_server'])
+                                @if ($isEdge && $row['site'] && $row['target_server'])
+                                    {{ __('Edge site on') }}
+                                    <a href="{{ route('sites.show', ['server' => $row['target_server'], 'site' => $row['site']]) }}" wire:navigate class="font-semibold text-brand-forest hover:text-brand-ink">{{ $row['site']->name }}</a>
+                                    @if ($row['live_url'])
+                                        · <a href="{{ $row['live_url'] }}" target="_blank" rel="noopener noreferrer" class="font-semibold text-brand-forest hover:text-brand-ink">{{ __('live URL') }}</a>
+                                    @endif
+                                    @if (! empty($row['imported_at']))
+                                        · {{ __('imported') }} {{ \Illuminate\Support\Carbon::parse($row['imported_at'])->diffForHumans() }}
+                                    @endif
+                                @elseif ($row['target_server'])
                                     {{ __('Migrated to') }}
                                     <a href="{{ route('servers.show', $row['target_server']) }}" wire:navigate class="font-semibold text-brand-forest hover:text-brand-ink">{{ $row['target_server']->name }}</a>
                                     @if ($row['target_server']->ip_address)
                                         <span>· {{ $row['target_server']->ip_address }}</span>
                                     @endif
+                                    @if ($migration?->completed_at)
+                                        · {{ __('completed') }} {{ $migration->completed_at->diffForHumans() }}
+                                    @endif
                                 @else
                                     {{ __('Target server removed') }}
-                                @endif
-                                @if ($migration->completed_at)
-                                    · {{ __('completed') }} {{ $migration->completed_at->diffForHumans() }}
                                 @endif
                             </p>
                         </div>
@@ -96,29 +124,54 @@
                     </header>
 
                     <div class="grid gap-4 px-5 py-4 sm:grid-cols-3">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Site count') }}</p>
-                            <p class="mt-1 text-sm text-brand-ink">
-                                <span class="font-mono text-base">{{ $row['migrated_site_count'] }}</span>
-                                <span class="text-brand-moss">/ {{ $row['source_site_count'] }}</span>
-                                <span class="ms-1 text-xs text-brand-moss">{{ __('migrated / on source') }}</span>
-                            </p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Source inventory') }}</p>
-                            @if ($row['source_last_synced_at'])
-                                <p class="mt-1 text-sm {{ $row['source_inventory_stale'] ? 'text-amber-800' : 'text-brand-ink' }}">
-                                    {{ __('synced :ago', ['ago' => $row['source_last_synced_at']->diffForHumans()]) }}
+                        @if ($isEdge)
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Source project') }}</p>
+                                <p class="mt-1 font-mono text-sm text-brand-ink">{{ $row['import']['source_project_id'] ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Source dashboard') }}</p>
+                                @if ($row['source_dashboard_url'])
+                                    <a href="{{ $row['source_dashboard_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-1 inline-flex text-sm font-semibold text-brand-forest hover:text-brand-ink">{{ __('Open in :provider', ['provider' => $row['source_label']]) }} →</a>
+                                @else
+                                    <p class="mt-1 text-sm text-brand-moss">{{ __('Not recorded') }}</p>
+                                @endif
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('dply status') }}</p>
+                                <p class="mt-1 text-sm text-brand-ink capitalize">{{ str_replace('_', ' ', (string) $row['status']) }}</p>
+                            </div>
+                        @else
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Site count') }}</p>
+                                <p class="mt-1 text-sm text-brand-ink">
+                                    <span class="font-mono text-base">{{ $row['migrated_site_count'] }}</span>
+                                    <span class="text-brand-moss">/ {{ $row['source_site_count'] }}</span>
+                                    <span class="ms-1 text-xs text-brand-moss">{{ __('migrated / on source') }}</span>
                                 </p>
-                            @else
-                                <p class="mt-1 text-sm text-brand-moss">{{ __('never synced') }}</p>
-                            @endif
-                        </div>
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Status') }}</p>
-                            <p class="mt-1 text-sm text-brand-ink capitalize">{{ str_replace('_', ' ', $migration->status) }}</p>
-                        </div>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Source inventory') }}</p>
+                                @if ($row['source_last_synced_at'])
+                                    <p class="mt-1 text-sm {{ $row['source_inventory_stale'] ? 'text-amber-800' : 'text-brand-ink' }}">
+                                        {{ __('synced :ago', ['ago' => $row['source_last_synced_at']->diffForHumans()]) }}
+                                    </p>
+                                @else
+                                    <p class="mt-1 text-sm text-brand-moss">{{ __('never synced') }}</p>
+                                @endif
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Status') }}</p>
+                                <p class="mt-1 text-sm text-brand-ink capitalize">{{ str_replace('_', ' ', (string) $row['status']) }}</p>
+                            </div>
+                        @endif
                     </div>
+
+                    @if ($isEdge && $row['has_drift'])
+                        <div class="border-t border-brand-ink/10 px-5 py-4">
+                            <p class="text-sm text-amber-900">{{ __('This Edge site is still provisioning or the last deploy failed. Open the site workspace to inspect build logs.') }}</p>
+                        </div>
+                    @endif
 
                     @if ($row['added_after_migration'] !== [])
                         <div class="border-t border-brand-ink/10 px-5 py-4">

@@ -119,6 +119,7 @@ class CreateEdgeSite
                         'repo_root' => $repoRoot !== '' ? $repoRoot : null,
                         'deploy_on_push' => $deployOnPush,
                     ], static fn ($value) => $value !== null),
+                    'import' => self::importMetaFromPayload($payload),
                     'build' => [
                         'command' => $buildCommand,
                         'output_dir' => $outputDir,
@@ -158,6 +159,25 @@ class CreateEdgeSite
         BuildEdgeSiteJob::dispatch($deployment->id, $gitCommit);
 
         return $site;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, string>|null
+     */
+    private static function importMetaFromPayload(array $payload): ?array
+    {
+        $source = trim((string) ($payload['imported_from'] ?? ''));
+        if ($source === '') {
+            return null;
+        }
+
+        return array_filter([
+            'source' => $source,
+            'source_project_id' => trim((string) ($payload['imported_id'] ?? '')) ?: null,
+            'source_dashboard_url' => trim((string) ($payload['imported_dashboard_url'] ?? '')) ?: null,
+            'imported_at' => now()->toIso8601String(),
+        ], static fn ($value) => $value !== null && $value !== '');
     }
 
     /**

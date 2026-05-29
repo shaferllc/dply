@@ -25,6 +25,9 @@ class WorkspaceSshAccessGraph extends Component
 
     protected string $requiredFeature = 'workspace.ssh_access_graph';
 
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
+
     public string $session_name = '';
 
     public string $session_public_key = '';
@@ -37,9 +40,33 @@ class WorkspaceSshAccessGraph extends Component
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.ssh_access_graph')) {
+            if (workspace_ssh_access_graph_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+                abort_unless($server->isVmHost(), 404);
+
+                return;
+            }
+
+            abort(404);
+        }
+
         $this->bootWorkspace($server);
         abort_unless($server->isVmHost(), 404);
         $this->session_linux_user = (string) ($server->ssh_user ?: 'dply');
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     public function openGrantSessionModal(): void
@@ -111,6 +138,10 @@ class WorkspaceSshAccessGraph extends Component
 
     public function render(ServerSshAccessGraph $graph): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-ssh-access-graph-preview');
+        }
+
         $this->server->refresh();
 
         return view('livewire.servers.workspace-ssh-access-graph', [

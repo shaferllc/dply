@@ -10,7 +10,14 @@
     @if ($configConsoleRun)
         @include('livewire.partials.console-action-banner-static', [
             'run' => $configConsoleRun,
-            'kindLabels' => [],
+            'kindLabels' => [
+                'manage_action' => [
+                    'running' => __('Working on server config…'),
+                    'completed' => __('Server config operation finished.'),
+                    'failed' => __('Server config operation failed.'),
+                    'stale' => __('Server config operation did not finish.'),
+                ],
+            ],
         ])
     @endif
 
@@ -21,6 +28,14 @@
     @if (! $opsReady)
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @else
+        @if ($opsReady && ! $configCatalogLoaded && ! $configCatalogLoading)
+            <div wire:init="loadConfigCatalog" class="hidden" aria-hidden="true"></div>
+        @endif
+
+        @if ($pending_load_console_id !== null)
+            <div wire:poll.2s class="hidden" aria-hidden="true"></div>
+        @endif
+
         <div class="{{ $card ?? 'rounded-2xl border border-brand-ink/10 bg-brand-cream shadow-sm' }} overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
@@ -51,10 +66,8 @@
                 />
             </div>
 
-            <div class="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-                @include('livewire.servers.partials.configuration.file-picker', [
-                    'groupedConfigFiles' => $groupedConfigFiles,
-                ])
+            <div class="mt-5 grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
+                @include('livewire.servers.partials.configuration.file-picker')
 
                 @include('livewire.servers.partials.configuration.editor-panel', [
                     'configAutocomplete' => $configAutocomplete,

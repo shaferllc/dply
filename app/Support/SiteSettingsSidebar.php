@@ -241,6 +241,7 @@ final class SiteSettingsSidebar
             ['id' => 'edge-error-pages', 'label' => __('Error pages'), 'icon' => 'heroicon-o-exclamation-circle', 'group' => 'networking'],
             ['id' => 'edge-crons', 'label' => __('Crons'), 'icon' => 'heroicon-o-clock', 'group' => 'background'],
             ['id' => 'edge-firewall', 'label' => __('Firewall'), 'icon' => 'heroicon-o-shield-check', 'group' => 'access'],
+            ['id' => 'edge-members', 'label' => __('Members'), 'icon' => 'heroicon-o-user-group', 'group' => 'access'],
             ['id' => 'edge-alerts', 'label' => __('Alerts'), 'icon' => 'heroicon-o-bell-alert', 'group' => 'observability'],
             ['id' => 'edge-audit', 'label' => __('Audit log'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
         ];

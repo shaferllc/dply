@@ -43,6 +43,17 @@ test('configuration workspace route renders editor shell', function (): void {
         ->assertSee(__('Configuration editor'));
 });
 
+test('configuration workspace defers catalog discovery until wire init', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSet('configCatalogLoaded', false)
+        ->assertSet('groupedConfigFiles', [])
+        ->call('loadConfigCatalog')
+        ->assertSet('configCatalogLoaded', true);
+});
+
 test('manage configuration section redirects to configuration workspace', function (): void {
     [$user, $server] = configurationWorkspaceUserWithServer();
 
@@ -68,7 +79,9 @@ test('load config file queues read job', function (): void {
     Livewire::actingAs($user)
         ->test(WorkspaceConfiguration::class, ['server' => $server])
         ->call('loadConfigFile', '/etc/ssh/sshd_config')
-        ->assertSet('pending_load_path', '/etc/ssh/sshd_config');
+        ->assertSet('pending_load_path', '/etc/ssh/sshd_config')
+        ->assertSet('config_selected_path', '/etc/ssh/sshd_config')
+        ->assertViewHas('configConsoleRun', null);
 
     Queue::assertPushed(RunServerConfigOpJob::class, function (RunServerConfigOpJob $job) use ($server): bool {
         return $job->serverId === $server->id

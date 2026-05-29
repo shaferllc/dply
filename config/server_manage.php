@@ -3,6 +3,14 @@
 use App\Services\Servers\ServerConfigFileCatalog;
 
 /**
+ * Apache syntax check — Debian ships `apache2ctl`; RHEL uses `httpd -t`.
+ * Exits 1 with a clear message when no Apache binary is on PATH.
+ */
+$apacheConfigtestScript = <<<'BASH'
+if command -v apache2ctl >/dev/null 2>&1; then (sudo -n apache2ctl configtest 2>&1 || apache2ctl configtest 2>&1); elif command -v apachectl >/dev/null 2>&1; then (sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1); elif command -v httpd >/dev/null 2>&1; then (sudo -n httpd -t 2>&1 || httpd -t 2>&1); else echo "Apache is not installed on this host — cannot run configtest." >&2; exit 1; fi
+BASH;
+
+/**
  * Server “Manage” workspace: allowlisted read paths and fixed service scripts only.
  * No user-controlled shell fragments.
  */
@@ -151,7 +159,7 @@ return [
                 '/etc/apache2/mods-available/*.conf',
                 '/etc/apache2/ports.conf',
             ],
-            'validate' => '(sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1)',
+            'validate' => $apacheConfigtestScript,
             'reload' => '(sudo -n systemctl reload apache2 || systemctl reload apache2) 2>&1',
             'log_dir' => '/var/log/apache2',
             'access_log' => '/var/log/apache2/access.log',
@@ -393,10 +401,10 @@ BASH
         ],
         'apache_test_config' => [
             'label' => 'Test Apache config',
-            'description' => 'Runs apachectl configtest to validate without reloading.',
+            'description' => 'Runs Apache configtest (apache2ctl / apachectl / httpd -t) without reloading.',
             'confirm' => 'Test the Apache configuration now?',
             'timeout' => 60,
-            'script' => '(sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1)',
+            'script' => $apacheConfigtestScript,
         ],
 
         // ---------------------------------------------------------------
@@ -1666,7 +1674,7 @@ BASH
         ],
         'prefixes' => [
             '/etc/php/' => [
-                'validate' => '(sudo -n php-fpm8.3 -t 2>&1 || php-fpm8.3 -t 2>&1 || php-fpm -t 2>&1)',
+                'validate' => '(sudo -n php-fpm8.4 -t 2>&1 || php-fpm8.4 -t 2>&1 || sudo -n php-fpm8.3 -t 2>&1 || php-fpm8.3 -t 2>&1 || php-fpm -t 2>&1)',
                 'success_contains' => ['successful', 'test is successful'],
                 'failure_contains' => ['error', 'failed', 'emerg'],
                 'validate_timeout' => 45,

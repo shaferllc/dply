@@ -255,6 +255,10 @@ final class WebserverSwitchPreflight
      * path here ultimately reads (config profile for drift, certificates for
      * the caddy TLS opt-in). Shared across all target evaluations.
      *
+     * Delegates to the request-scoped {@see ServerWebserverSitesProvider} so the
+     * drift detector and this preflight share a single sites + profiles +
+     * certificates load on the webserver workspace render.
+     *
      * @return Collection<int, Site>
      */
     private function sitesFor(Server $server): Collection
@@ -263,10 +267,7 @@ final class WebserverSwitchPreflight
             return $this->sitesCache[$server->id];
         }
 
-        return $this->sitesCache[$server->id] = Site::query()
-            ->where('server_id', $server->id)
-            ->with(['webserverConfigProfile', 'certificates'])
-            ->get(['id', 'name', 'runtime', 'status', 'type']);
+        return $this->sitesCache[$server->id] = app(ServerWebserverSitesProvider::class)->for($server);
     }
 
     /**

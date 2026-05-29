@@ -101,6 +101,8 @@
                         @livewire('sites.edge.workspace.crons', ['server' => $server, 'site' => $site], key('edge-section-crons-'.$site->id))
                     @elseif ($section === 'edge-firewall')
                         @livewire('sites.edge.workspace.firewall', ['server' => $server, 'site' => $site], key('edge-section-firewall-'.$site->id))
+                    @elseif ($section === 'edge-members')
+                        @livewire('sites.edge.workspace.members', ['server' => $server, 'site' => $site], key('edge-section-members-'.$site->id))
                     @elseif ($section === 'edge-alerts')
                         @livewire('sites.edge.workspace.alerts', ['server' => $server, 'site' => $site], key('edge-section-alerts-'.$site->id))
                     @elseif ($section === 'edge-audit')

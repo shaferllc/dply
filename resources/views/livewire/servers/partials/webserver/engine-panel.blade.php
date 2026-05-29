@@ -28,30 +28,39 @@
     ];
     $tabsForThisEngine = $liveStateTabsByEngine[$key] ?? [];
     $isLiveStateView = $isActive && in_array($engine_subtab, $tabsForThisEngine, true);
+
+    // Coming-soon engines (flagged in the catalog and not yet active) render a
+    // preview teaser instead of the actionable switch / lifecycle panels.
+    $isComingSoon = ! $isEdgeProxyPanel && ! $isActive && ! empty($info['coming_soon']);
 @endphp
 @include('livewire.servers.partials.webserver.engine._header-tabs')
-@include('livewire.servers.partials.webserver.engine._overview')
-@include('livewire.servers.partials.webserver.engine._logs')
-@include('livewire.servers.partials.webserver.engine._config')
-@switch($key)
-    @case('caddy')
-        @include('livewire.servers.partials.webserver.engine.caddy')
-        @break
-    @case('haproxy')
-        @include('livewire.servers.partials.webserver.engine.haproxy')
-        @break
-    @case('traefik')
-        @include('livewire.servers.partials.webserver.engine.traefik')
-        @break
-    @case('apache')
-        @include('livewire.servers.partials.webserver.engine.apache')
-        @break
-    @case('nginx')
-        @include('livewire.servers.partials.webserver.engine.nginx')
-        @break
-    @case('openlitespeed')
-        @include('livewire.servers.partials.webserver.engine.openlitespeed')
-        @break
-@endswitch
-@include('livewire.servers.partials.webserver.engine._live-state-table')
-@include('livewire.servers.partials.webserver.engine._info')
+@if ($isComingSoon)
+    @include('livewire.servers.partials.webserver.engine._coming-soon')
+    @include('livewire.servers.partials.webserver.engine._info')
+@else
+    @include('livewire.servers.partials.webserver.engine._overview')
+    @include('livewire.servers.partials.webserver.engine._logs')
+    @include('livewire.servers.partials.webserver.engine._config')
+    @switch($key)
+        @case('caddy')
+            @include('livewire.servers.partials.webserver.engine.caddy')
+            @break
+        @case('haproxy')
+            @include('livewire.servers.partials.webserver.engine.haproxy')
+            @break
+        @case('traefik')
+            @include('livewire.servers.partials.webserver.engine.traefik')
+            @break
+        @case('apache')
+            @include('livewire.servers.partials.webserver.engine.apache')
+            @break
+        @case('nginx')
+            @include('livewire.servers.partials.webserver.engine.nginx')
+            @break
+        @case('openlitespeed')
+            @include('livewire.servers.partials.webserver.engine.openlitespeed')
+            @break
+    @endswitch
+    @include('livewire.servers.partials.webserver.engine._live-state-table')
+    @include('livewire.servers.partials.webserver.engine._info')
+@endif

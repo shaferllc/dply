@@ -76,12 +76,7 @@ class WebserverConfigDriftDetector
             return $this->emptyResult($engine ?: null, true);
         }
 
-        $sites = Site::query()
-            ->where('server_id', $server->id)
-            ->where('status', '!=', 'deleted')
-            ->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'certificates', 'server'])
-            ->orderBy('name')
-            ->get();
+        $sites = app(ServerWebserverSitesProvider::class)->for($server);
 
         $total = $sites->count();
         $candidates = $sites->take(self::MAX_SITES_PER_RUN);

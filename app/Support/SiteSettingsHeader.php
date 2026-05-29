@@ -167,8 +167,13 @@ final class SiteSettingsHeader
             ],
             'edge-deploy-triggers' => [
                 'title' => __('Deploy triggers'),
-                'description' => __('Deploy hooks and GitHub auto-deploy webhooks.'),
+                'description' => __('Deploy hooks, GitHub auto-deploy webhooks, and deploy notification routing.'),
                 'icon' => 'heroicon-o-bolt',
+            ],
+            'edge-members' => [
+                'title' => __('Members'),
+                'description' => __('Per-site viewer, deployer, and admin grants on top of org membership.'),
+                'icon' => 'heroicon-o-user-group',
             ],
             'edge-delivery' => [
                 'title' => __('Delivery'),

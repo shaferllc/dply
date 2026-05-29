@@ -29,8 +29,10 @@ class WorkspaceServices extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
-        $this->hydrateSystemdInventoryFromDatabase();
-        $this->hydrateSystemdServiceActivityFromDatabase();
+        // Inventory + activity are hydrated in render() based on the active tab
+        // (and any open modals), which runs on this initial request too — so we
+        // don't hydrate here as well or every page load fires the systemd state
+        // + notification-subscription selects twice.
         $this->hydrateSystemdSyncBannerDismissalFromSession();
     }
 

@@ -64,6 +64,21 @@ class WorkspaceConfiguration extends Component
 
     public ?string $pending_load_path = null;
 
+    /**
+     * Allowlisted config files grouped for the sidebar picker. Populated lazily
+     * via {@see loadConfigCatalog()} so the initial page render is not gated
+     * on many sequential SSH round-trips.
+     *
+     * @var array<string, array{label: string, files: list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string}>}>
+     */
+    public array $groupedConfigFiles = [];
+
+    public bool $configCatalogLoaded = false;
+
+    public bool $configCatalogLoading = false;
+
+    public ?string $configCatalogError = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -71,17 +86,59 @@ class WorkspaceConfiguration extends Component
 
     public function updatedConfigSearch(): void
     {
-        // URL binding refreshes the grouped picker.
+        $this->reloadConfigCatalog();
     }
 
     public function setConfigScope(string $scope): void
     {
         $this->config_scope = $scope;
+        $this->reloadConfigCatalog();
     }
 
     public function clearConfigScope(): void
     {
         $this->config_scope = '';
+        $this->reloadConfigCatalog();
+    }
+
+    /**
+     * Discover allowlisted config files over SSH. Runs once after first paint
+     * via wire:init, and again when scope/search filters change.
+     */
+    public function loadConfigCatalog(): void
+    {
+        if ($this->configCatalogLoading) {
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->groupedConfigFiles = [];
+            $this->configCatalogLoaded = true;
+            $this->configCatalogError = null;
+
+            return;
+        }
+
+        $this->configCatalogLoading = true;
+        $this->configCatalogError = null;
+
+        try {
+            $catalog = app(ServerConfigFileCatalog::class);
+            $scope = $this->config_scope !== '' ? $this->config_scope : null;
+            $search = $this->config_search !== '' ? $this->config_search : null;
+
+            $this->groupedConfigFiles = Cache::remember(
+                $this->configCatalogCacheKey($scope, $search),
+                10,
+                fn () => $catalog->groupedFiles($this->server, $scope, $search),
+            );
+        } catch (\Throwable) {
+            $this->groupedConfigFiles = [];
+            $this->configCatalogError = (string) __('Could not discover config files — confirm the server is reachable.');
+        } finally {
+            $this->configCatalogLoading = false;
+            $this->configCatalogLoaded = true;
+        }
     }
 
     public function loadConfigFile(string $path): void
@@ -122,7 +179,7 @@ class WorkspaceConfiguration extends Component
         );
         $this->pending_load_console_id = $consoleId;
         $this->pending_load_path = $path;
-        $this->config_selected_path = null;
+        $this->config_selected_path = $path;
         $this->config_contents = '';
         $this->config_truncated_on_load = false;
         $this->config_validate_output = null;
@@ -140,8 +197,6 @@ class WorkspaceConfiguration extends Component
             $path,
             engine: $this->resolvedConfigEngineForPath($path),
         );
-
-        $this->toastSuccess(__('Load queued — progress shows in the banner above.'));
     }
 
     public function saveConfigFile(): void
@@ -269,47 +324,25 @@ class WorkspaceConfiguration extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
+        // No $this->server->refresh(): route binding (first load) and Livewire's
+        // Eloquent synthesizer (subsequent requests) already provide a current row.
         $this->pickupQueuedConfigLoad();
         $this->pickupQueuedConfigWrite();
         $this->pickupQueuedConfigValidate();
 
         $catalog = app(ServerConfigFileCatalog::class);
-        $scope = $this->config_scope !== '' ? $this->config_scope : null;
-        $search = $this->config_search !== '' ? $this->config_search : null;
-
-        $groupedFiles = [];
-        if ($this->serverOpsReady()) {
-            $cacheKey = 'dply.server-config-catalog:'.$this->server->id.':'.md5(($scope ?? '').'|'.($search ?? ''));
-            try {
-                $groupedFiles = Cache::remember(
-                    $cacheKey,
-                    10,
-                    fn () => $catalog->groupedFiles($this->server, $scope, $search),
-                );
-            } catch (\Throwable) {
-                $groupedFiles = [];
-            }
-        }
 
         $autocomplete = [];
         if ($this->config_selected_path !== null) {
             $autocomplete = $catalog->autocompleteForPath((string) $this->config_selected_path);
         }
 
-        $configConsoleRun = ConsoleAction::query()
-            ->where('subject_type', $this->server->getMorphClass())
-            ->where('subject_id', $this->server->id)
-            ->where('kind', 'manage_action')
-            ->whereNull('dismissed_at')
-            ->orderByDesc('created_at')
-            ->first();
+        $configConsoleRun = $this->configConsoleRunForBanner();
 
         return view('livewire.servers.workspace-configuration', array_merge(
             $this->configRevisionViewData(),
             [
                 'server' => $this->server,
-                'groupedConfigFiles' => $groupedFiles,
                 'configAutocomplete' => $autocomplete,
                 'configFileType' => $this->config_selected_path !== null
                     ? $catalog->fileTypeForPath((string) $this->config_selected_path)
@@ -327,6 +360,43 @@ class WorkspaceConfiguration extends Component
     protected function stashConfigDraft(string $path, string $contents): void
     {
         $this->config_drafts[$path] = $contents;
+    }
+
+    protected function reloadConfigCatalog(): void
+    {
+        if ($this->configCatalogLoading) {
+            return;
+        }
+
+        $this->configCatalogLoaded = false;
+        $this->loadConfigCatalog();
+    }
+
+    protected function configCatalogCacheKey(?string $scope, ?string $search): string
+    {
+        return 'dply.server-config-catalog:'.$this->server->id.':'.md5(($scope ?? '').'|'.($search ?? ''));
+    }
+
+    protected function configConsoleRunForBanner(): ?ConsoleAction
+    {
+        $run = ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->id)
+            ->where('kind', 'manage_action')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($run === null || $this->isConfigReadConsoleRun($run)) {
+            return null;
+        }
+
+        return $run;
+    }
+
+    protected function isConfigReadConsoleRun(ConsoleAction $run): bool
+    {
+        return str_starts_with((string) $run->label, 'Load config:');
     }
 
     protected function pickupQueuedConfigLoad(): void
@@ -358,12 +428,21 @@ class WorkspaceConfiguration extends Component
                 $this->config_original_contents = $this->config_contents;
                 $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
                 $this->stashConfigDraft($path, $this->config_contents);
-                Cache::forget('dply.server-config-catalog:'.$this->server->id.':'.md5(($this->config_scope !== '' ? $this->config_scope : '').'|'.($this->config_search !== '' ? $this->config_search : '')));
+                Cache::forget($this->configCatalogCacheKey(
+                    $this->config_scope !== '' ? $this->config_scope : null,
+                    $this->config_search !== '' ? $this->config_search : null,
+                ));
                 $this->refreshRemoteConfigBackups();
                 $this->refreshConfigRevisionState();
             }
+
+            $row->forceFill(['dismissed_at' => now()])->save();
         } elseif ($row->status === ConsoleAction::STATUS_FAILED) {
             $this->toastError(__('Failed to load config file.'));
+            $this->config_selected_path = null;
+            $this->config_contents = '';
+            $this->config_original_contents = '';
+            $row->forceFill(['dismissed_at' => now()])->save();
         }
 
         $this->pending_load_console_id = null;

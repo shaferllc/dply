@@ -15,6 +15,15 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * SSH auth failure volume, fail2ban jails, host firewall posture, and sshd
+ * hardening — a read-only security digest over root SSH.
+ *
+ * When {@see workspace.security_digest} is off but
+ * {@see workspace.security_digest_preview} is on, the canonical
+ * /security-digest URL renders the coming-soon teaser in place of the full
+ * workspace.
+ */
 #[Layout('layouts.app')]
 class WorkspaceSecurityDigest extends Component
 {
@@ -24,14 +33,46 @@ class WorkspaceSecurityDigest extends Component
 
     protected string $requiredFeature = 'workspace.security_digest';
 
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
+
     public function mount(Server $server): void
     {
-        $this->bootWorkspace($server);
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
+
+        if (! Feature::active('workspace.security_digest')) {
+            if (workspace_security_digest_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->comingSoonPreview = false;
+        $this->bootWorkspace($server);
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     public function render(ServerSecurityDigest $digest, ServerSshAccessGraph $accessGraph): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-security-digest-preview');
+        }
+
         $this->server->refresh();
 
         $sshAccess = null;

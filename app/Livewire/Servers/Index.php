@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -340,7 +341,9 @@ class Index extends Component
 
         $groupedServers = $this->groupedServers($servers);
 
-        $insightRollup = $servers->isNotEmpty()
+        // Insights is gated (coming soon). Skip the per-server rollup query
+        // entirely when the flag is off — the fleet rows hide the badge too.
+        $insightRollup = $servers->isNotEmpty() && Feature::active('workspace.insights')
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
 

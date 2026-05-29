@@ -100,7 +100,7 @@
         <section class="pt-16 pb-6 px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center">
                 <h1 class="text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">Simple plans, priced by server count.</h1>
-                <p class="mt-4 text-lg text-brand-moss">Start free with one server. Flat monthly plans as your fleet grows — same fee whether you run on DigitalOcean, Hetzner, AWS, or your own SSH box. You always pay your provider for the hardware; dply is just the platform fee.</p>
+                <p class="mt-4 text-lg text-brand-moss">Start free with one server. Flat monthly plans as your fleet grows — same fee whether you run on DigitalOcean, Hetzner, or your own SSH box. You always pay your provider for the hardware; dply is just the platform fee.</p>
                 <p class="mt-3 inline-flex items-center gap-2 rounded-full bg-brand-sand/40 px-4 py-1.5 text-sm font-semibold text-brand-forest">
                     <x-heroicon-s-sparkles class="h-4 w-4" aria-hidden="true" />
                     Your first server is free, forever. No credit card to start.

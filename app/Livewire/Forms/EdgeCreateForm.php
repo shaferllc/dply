@@ -47,6 +47,13 @@ class EdgeCreateForm extends Form
 
     public string $edge_provider_credential_id = '';
 
+    /** @var string Vercel / Netlify / cloudflare_pages when handed off from import wizard */
+    public string $imported_from = '';
+
+    public string $imported_id = '';
+
+    public string $imported_dashboard_url = '';
+
     /**
      * @return array<string, mixed>
      */
@@ -115,6 +122,9 @@ class EdgeCreateForm extends Form
             'origin_routes' => ['/_next/*', '/api/*'],
             'edge_backend' => $this->delivery_mode === 'byo' ? 'org_cloudflare' : 'dply_edge',
             'edge_provider_credential_id' => $this->delivery_mode === 'byo' ? $this->edge_provider_credential_id : null,
+            'imported_from' => trim($this->imported_from) !== '' ? trim($this->imported_from) : null,
+            'imported_id' => trim($this->imported_id) !== '' ? trim($this->imported_id) : null,
+            'imported_dashboard_url' => trim($this->imported_dashboard_url) !== '' ? trim($this->imported_dashboard_url) : null,
         ];
     }
 

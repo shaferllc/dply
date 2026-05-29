@@ -93,18 +93,26 @@ return [
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
         // exit: ship once server maintenance suspend/resume validated on three VM hosts
         'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
+        // exit: ship alongside server maintenance GA; teaser only when server maintenance is off
+        'server_maintenance_preview' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE_PREVIEW', true),
         // exit: ship once patch advisor rollup validated against inventory probe on three Debian/Ubuntu hosts
         'patch_advisor' => env('FEATURE_WORKSPACE_PATCH_ADVISOR', true),
         // exit: ship once release hygiene scan + prune template validated on three atomic VM stacks
-        'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', true),
+        'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', false),
+        // exit: ship alongside release hygiene GA; teaser only when release hygiene is off
+        'release_hygiene_preview' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE_PREVIEW', true),
         // exit: ship once daemon SLO panel validated against supervisor health on three VM stacks
         'daemon_slo' => env('FEATURE_WORKSPACE_DAEMON_SLO', true),
         // exit: ship once server cert inventory + bulk renew validated on three VM hosts
         'cert_inventory' => env('FEATURE_WORKSPACE_CERT_INVENTORY', true),
         // exit: ship once deploy window policy validated blocking/allowing deploy jobs
         'deploy_windows' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS', true),
+        // exit: ship alongside deploy windows GA; teaser only when deploy windows is off
+        'deploy_windows_preview' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS_PREVIEW', true),
         // exit: ship once SSH access graph validated against authorized_keys panel
         'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
+        // exit: ship alongside SSH access graph GA; teaser only when it is off
+        'ssh_access_graph_preview' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH_PREVIEW', true),
         // exit: ship once time-boxed contractor SSH sessions validated with auto-revoke
         'ssh_sessions' => env('FEATURE_WORKSPACE_SSH_SESSIONS', true),
         // exit: ship once per-server cost card + right-size nudge validated against billing + metrics
@@ -112,13 +120,16 @@ return [
         // exit: ship once server-scoped redeploy-all + cert renew shortcut validated on three VM hosts
         'bulk_site_actions' => env('FEATURE_WORKSPACE_BULK_SITE_ACTIONS', true),
         // exit: ship once security digest scan validated on three VM hosts
-        'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', true),
+        'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', false),
+        // exit: ship alongside security digest GA; teaser only when security digest is off
+        'security_digest_preview' => env('FEATURE_WORKSPACE_SECURITY_DIGEST_PREVIEW', true),
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         // exit: ship once browser-SSH session auditing + RBAC are validated
-        'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
+        'console' => env('FEATURE_WORKSPACE_CONSOLE', false),
         // exit: ship alongside console GA; teaser only when console is off
-        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
+        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', true),
+
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
         'files' => env('FEATURE_WORKSPACE_FILES', false),
         // exit: ship alongside files GA; teaser only when files is off
@@ -135,12 +146,21 @@ return [
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         // exit: ship once Docker workspace container/image actions validated on three hosts
         'docker' => env('FEATURE_WORKSPACE_DOCKER', true),
+        // exit: ship alongside Docker GA; teaser only when docker is off
+        'docker_preview' => env('FEATURE_WORKSPACE_DOCKER_PREVIEW', true),
+        // exit: GA — server-scoped database + site-files backup runs and schedules
+        'backups' => env('FEATURE_WORKSPACE_BACKUPS', false),
+        // exit: ship alongside backups GA; teaser only when backups is off
+        'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', true),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
         // exit: ship once audit-log filtering UI is reviewed
         'activity' => env('FEATURE_WORKSPACE_ACTIVITY', true),
         // exit: ship once remote-script execution surface is reviewed (security risk)
-        'run' => env('FEATURE_WORKSPACE_RUN', true),
+        'run' => env('FEATURE_WORKSPACE_RUN', false),
+        // exit: ship alongside run GA; teaser only when run is off
+        'run_preview' => env('FEATURE_WORKSPACE_RUN_PREVIEW', true),
+
         // exit: ship after per-deploy key lifecycle validated on three OSes
         'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),
     ],
@@ -154,7 +174,7 @@ return [
     */
     'surface' => [
         // exit: VM launch is dark; flip to true once container/cloud surface is GA
-        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
+        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
         // GA 2026-05: cross-server views (Health, Deploys, Domains, EnvSearch)
         // ship as the org-wide ops counterpart to /infrastructure. Saved-view
         // persistence is a follow-up enhancement, not a launch gate.
@@ -168,7 +188,7 @@ return [
         // exit: ship as a standalone product launch with its own positioning
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
-        'edge' => env('FEATURE_SURFACE_EDGE', false),
+        'edge' => env('FEATURE_SURFACE_EDGE', true),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
         'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
         // exit: offer the dply-managed serverless option (dply runs the function

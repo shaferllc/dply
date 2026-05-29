@@ -92,6 +92,7 @@ use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\Bootstrap\VmServerBootstrapStrategy;
 use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\ServerMetricsRangeQuery;
+use App\Services\Servers\ServerWebserverSitesProvider;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
@@ -158,6 +159,12 @@ class AppServiceProvider extends ServiceProvider
         // results — we add an explicit binding to make sure every call site
         // hits the same instance.
         $this->app->scoped(WebserverSwitchPreflight::class);
+
+        // Scoped: the drift detector and switch preflight both run on a single
+        // render of the webserver workspace page and each used to load the
+        // server's sites (+ config profiles + certificates) independently. A
+        // shared, request-memoized loader collapses those into one query set.
+        $this->app->scoped(ServerWebserverSitesProvider::class);
 
         // Scoped: queue jobs may override SSH private key for one deploy via
         // EphemeralDeployCredentialManager without touching the server key.

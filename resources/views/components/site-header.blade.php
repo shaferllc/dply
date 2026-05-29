@@ -159,11 +159,11 @@
                                 </x-slot>
                                 <x-slot name="content">
                                     @if (multi_surface_active())
-                                        <x-dropdown-link :href="route('infrastructure.index')">
+                                        <x-dropdown-link :href="feature('surface.fleet') ? route('fleet.index') : route('infrastructure.index')">
                                             <x-slot name="icon">
                                                 <x-heroicon-o-rectangle-group class="{{ $hi }}" />
                                             </x-slot>
-                                            {{ __('Infrastructure') }}
+                                            {{ feature('surface.fleet') ? __('Fleet ops') : __('Infrastructure') }}
                                         </x-dropdown-link>
                                         <div class="mx-3 my-2 flex items-center gap-2" role="presentation">
                                             <div class="h-px flex-1 bg-brand-ink/10"></div>
@@ -485,11 +485,11 @@
                     {{ __('Dashboard') }}
                 </x-responsive-nav-link>
                 @if (multi_surface_active())
-                    <x-responsive-nav-link :href="route('infrastructure.index')" :active="request()->routeIs('infrastructure.*')">
+                    <x-responsive-nav-link :href="feature('surface.fleet') ? route('fleet.index') : route('infrastructure.index')" :active="request()->routeIs('infrastructure.*') || request()->routeIs('fleet.*')">
                         <x-slot name="icon">
                             <x-heroicon-o-rectangle-group class="{{ $hi }}" />
                         </x-slot>
-                        {{ __('Infrastructure') }}
+                        {{ feature('surface.fleet') ? __('Fleet ops') : __('Infrastructure') }}
                     </x-responsive-nav-link>
                 @endif
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Compute') }}</p>

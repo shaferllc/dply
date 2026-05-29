@@ -48,11 +48,13 @@ final class WebserverWorkspaceViewData
             $nginxVersion = $vm[1];
         }
 
+        // `coming_soon` engines render a "Soon" badge in the tab strip until
+        // their switch + config flows ship; nginx is GA today.
         $webserverCatalog = [
             'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
-            'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
-            'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
-            'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
+            'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy', 'coming_soon' => true],
+            'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2', 'coming_soon' => true],
+            'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd', 'coming_soon' => true],
         ];
 
         $edgeProxyCatalog = [

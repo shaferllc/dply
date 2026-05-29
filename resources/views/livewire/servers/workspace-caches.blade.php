@@ -38,7 +38,7 @@
         @endif
 
         <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <x-server-workspace-tablist :aria-label="__('Cache workspace sections')" class="sm:min-w-0 sm:flex-1">
+            <x-server-workspace-tablist :aria-label="__('Cache workspace sections')" scroll class="sm:min-w-0 sm:flex-1">
                 <x-server-workspace-tab
                     id="cache-tab-overview"
                     :active="$workspace_tab === 'overview'"

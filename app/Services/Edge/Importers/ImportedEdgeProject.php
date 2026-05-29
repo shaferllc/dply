@@ -55,6 +55,7 @@ final class ImportedEdgeProject
             'framework' => $this->framework,
             'imported_from' => $this->sourceProvider,
             'imported_id' => $this->sourceProjectId,
+            'imported_dashboard_url' => $this->sourceDashboardUrl,
         ], static fn ($value) => is_string($value) && $value !== '');
 
         // Defensive — limit URL length to avoid blowing past

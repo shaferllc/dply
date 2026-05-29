@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\AuthorsBackupDestinations;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\BackupConfiguration;
@@ -23,6 +24,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -42,6 +44,12 @@ class WorkspaceBackups extends Component
     use AuthorsBackupDestinations;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.backups';
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     /** Form state for "Run database backup now". */
     public string $run_database_id = '';
@@ -80,8 +88,31 @@ class WorkspaceBackups extends Component
         $this->backups_workspace_tab = in_array($tab, ['overview', 'schedules', 'history'], true) ? $tab : 'overview';
     }
 
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
+    }
+
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.backups')) {
+            if (workspace_backups_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
         $this->bootWorkspace($server);
         $this->destinationForm = $this->emptyDestinationForm();
 
@@ -670,6 +701,10 @@ class WorkspaceBackups extends Component
 
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-backups-preview');
+        }
+
         $this->server->refresh();
 
         // Note: $databases/$sites are NOT narrowed by context_site_id — the new-schedule form

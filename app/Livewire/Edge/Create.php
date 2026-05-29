@@ -208,6 +208,21 @@ class Create extends Component
         // of the URL — too sensitive + too long). On consume we pop
         // the session entry and stash the array on the component;
         // deploy() writes EdgeSiteEnvVar rows after the site lands.
+        $importedFrom = $stringValue($query['imported_from'] ?? null);
+        if ($importedFrom !== '') {
+            $this->form->imported_from = $importedFrom;
+        }
+
+        $importedId = $stringValue($query['imported_id'] ?? null);
+        if ($importedId !== '') {
+            $this->form->imported_id = $importedId;
+        }
+
+        $importDashboard = $stringValue($query['imported_dashboard_url'] ?? null);
+        if ($importDashboard !== '') {
+            $this->form->imported_dashboard_url = $importDashboard;
+        }
+
         $importEnvsKey = $stringValue($query['import_envs'] ?? null);
         if ($importEnvsKey !== '') {
             $envs = session()->pull('edge.import.envs.'.$importEnvsKey);

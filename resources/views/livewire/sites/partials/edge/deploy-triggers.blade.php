@@ -176,4 +176,35 @@
             </details>
         </div>
     </section>
+
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notifications') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy notifications') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Successful and failed Edge deploys publish through your org notification channels (Slack, Discord, email, webhooks). Wire them once under organization settings — every Edge site in the org shares the same routing rules.') }}
+                </p>
+            </div>
+        </div>
+        <div class="space-y-3 px-6 py-5 sm:px-8">
+            <ul class="list-disc space-y-1 ps-5 text-sm text-brand-moss">
+                <li>{{ __('edge.deploy.succeeded — production deploy went live') }}</li>
+                <li>{{ __('edge.deploy.failed — build or publish failed (includes failure reason in the body)') }}</li>
+            </ul>
+            @if ($site->organization)
+                <a
+                    href="{{ route('organizations.notification-channels', $site->organization) }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-cog-6-tooth class="h-4 w-4 text-brand-sage" />
+                    {{ __('Manage notification channels') }} →
+                </a>
+            @endif
+        </div>
+    </section>
 @endif

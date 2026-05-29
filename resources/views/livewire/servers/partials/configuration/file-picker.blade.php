@@ -1,7 +1,14 @@
 <div class="rounded-xl border border-brand-ink/10 bg-white">
     <div class="border-b border-brand-ink/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
 
-    @if (empty($groupedConfigFiles))
+    @if ($configCatalogLoading || ($opsReady && ! $configCatalogLoaded))
+        <div class="flex items-center gap-2 px-3 py-6 text-sm text-brand-moss">
+            <x-spinner variant="forest" class="h-4 w-4 shrink-0" />
+            <span>{{ __('Discovering config files on server…') }}</span>
+        </div>
+    @elseif ($configCatalogError)
+        <p class="px-3 py-3 text-xs text-red-700">{{ $configCatalogError }}</p>
+    @elseif (empty($groupedConfigFiles))
         <p class="px-3 py-3 text-xs text-brand-moss">{{ __('No config files discovered. Confirm the server is reachable.') }}</p>
     @else
         <div class="max-h-[60vh] overflow-auto">
@@ -20,7 +27,7 @@
                                 <button
                                     type="button"
                                     wire:click="loadConfigFile(@js($f['path']))"
-                                    wire:target="loadConfigFile(@js($f['path']))"
+                                    wire:target="loadConfigFile"
                                     wire:loading.attr="disabled"
                                     data-skip-busy="1"
                                     @class([
@@ -41,7 +48,13 @@
                                         <span class="block truncate font-mono text-[10px] text-brand-mist">{{ $f['path'] }}</span>
                                     </span>
                                     @if (($f['size'] ?? 0) > 0)
-                                        <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ number_format($f['size']) }}b</span>
+                                        <span class="shrink-0 font-mono text-[10px] text-brand-mist">
+                                            @if ($isLoading)
+                                                {{ __('loading…') }}
+                                            @else
+                                                {{ number_format($f['size']) }}b
+                                            @endif
+                                        </span>
                                     @endif
                                 </button>
                             </li>

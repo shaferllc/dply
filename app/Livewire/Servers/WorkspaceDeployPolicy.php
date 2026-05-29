@@ -9,9 +9,17 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * Server-wide deploy deny windows, live status, and per-site coverage.
+ *
+ * When {@see workspace.deploy_windows} is off but
+ * {@see workspace.deploy_windows_preview} is on, the canonical /deploy-policy
+ * URL renders the coming-soon teaser in place of the full workspace.
+ */
 #[Layout('layouts.app')]
 class WorkspaceDeployPolicy extends Component
 {
@@ -19,6 +27,9 @@ class WorkspaceDeployPolicy extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.deploy_windows';
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     public bool $policy_enabled = false;
 
@@ -31,14 +42,38 @@ class WorkspaceDeployPolicy extends Component
 
     public function mount(Server $server, ServerDeployPolicyGuard $guard): void
     {
-        $this->bootWorkspace($server);
         abort_unless($server->isVmHost(), 404);
+
+        if (! Feature::active('workspace.deploy_windows')) {
+            if (workspace_deploy_windows_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->bootWorkspace($server);
 
         $policy = $guard->policyForServer($server);
         $this->policy_enabled = (bool) ($policy['enabled'] ?? false);
         $this->policy_timezone = (string) ($policy['timezone'] ?? config('app.timezone'));
         $this->policy_message = (string) ($policy['message'] ?? '');
         $this->deny_rules = is_array($policy['deny_rules'] ?? null) ? $policy['deny_rules'] : [];
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     public function applyWeekendFreezePreset(ServerDeployPolicyGuard $guard): void
@@ -86,6 +121,10 @@ class WorkspaceDeployPolicy extends Component
 
     public function render(ServerDeployPolicyGuard $guard): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-deploy-policy-preview');
+        }
+
         $report = $guard->report($this->server);
 
         return view('livewire.servers.workspace-deploy-policy', [

@@ -420,6 +420,10 @@ final class FullStackArchitecturePlanner
             $hints[] = 'Open database ports only to app servers (BYO firewall or private network). Copy DATABASE_URL into Edge, Cloud, and BYO env settings.';
         }
 
+        if (count($layers) >= 2) {
+            $hints[] = 'After each layer is live, align environment variables across Edge, Cloud, and BYO — use Fleet → Env drift to compare preview vs production and linked sites from the same Git repo.';
+        }
+
         if ($hasByoApi) {
             $hints[] = 'Use atomic deploys on the BYO site for zero-downtime API releases while Edge serves the frontend.';
         }

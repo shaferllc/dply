@@ -5,9 +5,14 @@ declare(strict_types=1);
 use App\Models\ConfigRevision;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerProvisionRun;
 use App\Models\User;
+use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
 use App\Services\Servers\RemoteServerConfigService;
+use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerConfigFileCatalog;
 use App\Services\Servers\ServerConfigFileEditor;
 use App\Services\Servers\ServerManageSshExecutor;
@@ -59,6 +64,102 @@ test('catalog exposes autocomplete snippets by file type', function (): void {
 
     expect($items)->not->toBeEmpty()
         ->and($items[0])->toHaveKeys(['label', 'type', 'insert']);
+});
+
+test('catalog discovers remote files in a single ssh batch', function (): void {
+    $executor = Mockery::mock(ServerManageSshExecutor::class);
+    $executor->shouldReceive('runInlineBash')
+        ->once()
+        ->withArgs(function (Server $server, string $taskName, string $script, ?int $timeout): bool {
+            return $taskName === 'server-config:catalog-batch'
+                && str_contains($script, '__DPLY_PROBE_0__')
+                && str_contains($script, '/etc/nginx/nginx.conf')
+                && str_contains($script, '/etc/php/*/fpm/php.ini')
+                && $timeout === 30;
+        })
+        ->andReturn(new ProcessOutput(
+            implode("\n", [
+                '__DPLY_PROBE_0__',
+                '/etc/nginx/nginx.conf|1446|1701383567',
+                '/etc/nginx/sites-available/default|2412|1701383567',
+                '__DPLY_PROBE_6__',
+                '/etc/php/8.4/fpm/php.ini|69369|1778773756',
+            ]),
+            0,
+        ));
+
+    $catalog = new ServerConfigFileCatalog(app(RemoteWebserverConfigService::class), $executor);
+    $server = Server::factory()->make();
+
+    $groups = $catalog->groupedFiles($server);
+
+    expect($groups)->toHaveKey('webserver')
+        ->and($groups['webserver']['files'][0]['path'])->toBe('/etc/nginx/nginx.conf')
+        ->and(collect($groups['webserver']['files'])->pluck('path'))->toContain('/etc/nginx/sites-available/default')
+        ->and(collect($groups['php']['files'] ?? [])->pluck('path'))->toContain('/etc/php/8.4/fpm/php.ini');
+});
+
+test('catalog only probes installed webserver engines when stack is known', function (): void {
+    $executor = Mockery::mock(ServerManageSshExecutor::class);
+    $executor->shouldReceive('runInlineBash')
+        ->once()
+        ->withArgs(function (Server $server, string $taskName, string $script): bool {
+            return $taskName === 'server-config:catalog-batch'
+                && str_contains($script, '/etc/nginx/nginx.conf')
+                && ! str_contains($script, '/etc/apache2/apache2.conf');
+        })
+        ->andReturn(new ProcessOutput("__DPLY_PROBE_0__\n/etc/nginx/nginx.conf|100|1\n", 0));
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+    ]);
+
+    $task = Task::query()->create([
+        'name' => 'stack',
+        'action' => 'provision',
+        'script' => 'x',
+        'timeout' => 60,
+        'user' => 'root',
+        'status' => TaskStatus::Finished,
+        'output' => '',
+        'server_id' => $server->id,
+        'created_by' => $user->id,
+        'started_at' => now(),
+        'completed_at' => now(),
+    ]);
+
+    $run = ServerProvisionRun::query()->create([
+        'server_id' => $server->id,
+        'task_id' => $task->id,
+        'attempt' => 1,
+        'status' => 'completed',
+        'summary' => 'done',
+        'started_at' => now(),
+        'completed_at' => now(),
+    ]);
+
+    $run->artifacts()->create([
+        'type' => 'stack_summary',
+        'key' => 'stack-summary',
+        'label' => 'Stack',
+        'metadata' => [
+            'webserver' => 'nginx',
+            'php_version' => '8.4',
+            'database' => 'none',
+            'cache_service' => 'none',
+            'expected_services' => ['nginx', 'php-fpm'],
+        ],
+        'content' => '{}',
+    ]);
+
+    $catalog = new ServerConfigFileCatalog(app(RemoteWebserverConfigService::class), $executor);
+    $groups = $catalog->groupedFiles($server->fresh());
+
+    expect($groups)->toHaveKey('webserver')
+        ->and(collect($groups['webserver']['files'])->pluck('engine')->unique()->all())->toBe(['nginx']);
 });
 
 test('remote server config service rejects disallowed paths', function (): void {
