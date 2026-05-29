@@ -115,18 +115,16 @@
                      page focused on the actual member directory. --}}
                 @if ($invitationCount > 0)
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
-                                    <x-heroicon-o-envelope class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Outstanding') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pending invitations') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('People you\'ve invited but who haven\'t accepted yet.') }}</p>
-                                </div>
-                                <span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-900 ring-1 ring-amber-200">{{ $invitationCount }}</span>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-envelope class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outstanding') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pending invitations') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('People you\'ve invited but who haven\'t accepted yet.') }}</p>
                             </div>
+                            <span class="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-amber-900 ring-1 ring-amber-200">{{ $invitationCount }}</span>
                         </div>
                         <ul class="divide-y divide-brand-ink/10">
                             @foreach ($organization->invitations as $inv)
@@ -162,17 +160,16 @@
 
                 {{-- Member directory --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Directory') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Members') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Roles control what each person can change. Deployers have a reduced scope.') }}</p>
-                            </div>
-                            @if ($isAdmin)
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Members') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Roles control what each person can change. Deployers have a reduced scope.') }}</p>
+                        </div>
+                        @if ($isAdmin)
                                 <button
                                     type="button"
                                     wire:click="openInviteModal"
@@ -182,7 +179,6 @@
                                     {{ __('Invite') }}
                                 </button>
                             @endif
-                        </div>
                     </div>
 
                     @if ($organization->users->isEmpty())
