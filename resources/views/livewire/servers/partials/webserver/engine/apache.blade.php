@@ -1,10 +1,14 @@
             @if ($key === 'apache' && $engine_subtab === 'modules' && $isActive && $engineHasFullControls($key))
                 <div class="space-y-4 mb-6" wire:key="apache-modules-config">
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <h3 class="text-base font-semibold text-brand-ink">{{ __('Apache modules') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">
+                    <div class="{{ $card }}">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Modules') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apache modules') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                     {{ __('Enable / disable Apache modules without dropping to SSH. Each toggle runs `a2enmod` or `a2dismod`, validates with `apachectl configtest`, and reloads Apache. Failed validates auto-revert the toggle.') }}
                                 </p>
                             </div>
@@ -13,7 +17,7 @@
                                 wire:click="loadApacheModulesConfig"
                                 wire:loading.attr="disabled"
                                 wire:target="loadApacheModulesConfig"
-                                class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                             >
                                 <span wire:loading.remove wire:target="loadApacheModulesConfig" class="inline-flex">
                                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
@@ -25,6 +29,7 @@
                             </button>
                         </div>
 
+                        <div class="px-6 py-6 sm:px-7">
                         @if ($apache_modules_flash)
                             <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $apache_modules_flash }}</div>
                         @endif
@@ -143,6 +148,7 @@
                                 </table>
                             </div>
                         @endif
+                        </div>
                     </div>
                 </div>
             @endif
@@ -159,7 +165,7 @@
                     $apacheMpmParams = \App\Services\Servers\ApacheGlobalOptionsConfig::MPM_PARAMS;
                 @endphp
                 <div
-                    class="{{ $card }} p-6 sm:p-8 mb-6"
+                    class="{{ $card }} mb-6"
                     wire:key="apache-globals-config"
                     x-data="{
                         expanded: true,
@@ -177,7 +183,10 @@
                     }"
                     x-init="init()"
                 >
-                    <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
+                        </span>
                         <button
                             type="button"
                             x-on:click="toggle()"
@@ -190,7 +199,8 @@
                                 aria-hidden="true"
                             />
                             <span class="min-w-0">
-                                <h3 class="text-base font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Apache global options') }}</h3>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Options') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Apache global options') }}</h3>
                                 <p class="mt-1 text-sm text-brand-moss">
                                     {{ __('Top-level directives in /etc/apache2/apache2.conf — keep-alive, timeouts, server tokens — plus MPM worker tuning inside the active `<IfModule mpm_*_module>` block. Site / module / conf fragments under sites-enabled / mods-enabled / conf-enabled pass through. Save runs `apachectl configtest` and reloads; a failed validate auto-restores the previous file.') }}
                                 </p>
@@ -219,7 +229,7 @@
                         </button>
                     </div>
 
-                    <div x-show="expanded" x-cloak>
+                    <div x-show="expanded" x-cloak class="px-6 py-6 sm:px-7">
                         @if ($apache_globals_flash)
                             <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $apache_globals_flash }}</div>
                         @endif

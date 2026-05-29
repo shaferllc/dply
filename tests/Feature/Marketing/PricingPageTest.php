@@ -52,3 +52,12 @@ test('pricing page has faq', function () {
     $response->assertSee('Frequently asked')
         ->assertSee('Why per-server');
 });
+
+test('pricing page advertises the free entry tier when enabled', function () {
+    config(['subscription.standard.free_entry_tier' => true]);
+
+    $response = $this->withoutMiddleware()->get(route('pricing'));
+
+    $response->assertOk()
+        ->assertSee('first small server has no base fee', false);
+});

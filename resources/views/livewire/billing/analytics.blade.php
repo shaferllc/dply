@@ -189,16 +189,14 @@
                     $obsServers = is_array($costObservatory['servers'] ?? null) ? $costObservatory['servers'] : [];
                 @endphp
                 <section class="mt-6 dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['forest'] }}">
-                                <x-heroicon-o-banknotes class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Observatory') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Transparent cost observatory') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Dply platform fees, estimated provider infrastructure, and metered delivery — in one pane. We bill our work; you pay your cloud provider directly.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-banknotes class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Observatory') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Transparent cost observatory') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Dply platform fees, estimated provider infrastructure, and metered delivery — in one pane. We bill our work; you pay your cloud provider directly.') }}</p>
                         </div>
                     </div>
                     <div class="grid gap-4 p-6 sm:grid-cols-2 sm:p-7 lg:grid-cols-4">
@@ -315,16 +313,14 @@
                      dedicated section so MRR/ARR/projection/delta read as one
                      set instead of stacked next to operational KPIs. --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Forecast') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring revenue') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Normalized MRR / ARR, projected month-end, and the change versus 30 days ago.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Forecast') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring revenue') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Normalized MRR / ARR, projected month-end, and the change versus 30 days ago.') }}</p>
                         </div>
                     </div>
                     <div class="grid gap-3 p-6 sm:grid-cols-2 sm:p-7 xl:grid-cols-4">
@@ -360,16 +356,14 @@
 
                 {{-- Spend trend --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                                <x-heroicon-o-presentation-chart-line class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Trend') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Historical spend') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Daily billing snapshots for the last 90 days, with a focused 30-day table below.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-presentation-chart-line class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trend') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Historical spend') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Daily billing snapshots for the last 90 days, with a focused 30-day table below.') }}</p>
                         </div>
                     </div>
                     <div class="p-6 sm:p-7">
@@ -427,16 +421,14 @@
 
                 {{-- Spend by category --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                                <x-heroicon-o-chart-pie class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Breakdown') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Spend by category') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Current-cycle estimate — updates when your fleet changes.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-chart-pie class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Breakdown') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Spend by category') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Current-cycle estimate — updates when your fleet changes.') }}</p>
                         </div>
                     </div>
                     <div class="space-y-5 p-6 sm:p-7">
@@ -502,16 +494,14 @@
                 @if ($edgeOn)
                 {{-- Edge sites --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
-                                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Delivery') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge sites') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Per-site platform fee, delivery usage (MTD), and daily request trends.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge sites') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Per-site platform fee, delivery usage (MTD), and daily request trends.') }}</p>
                         </div>
                     </div>
                     <div class="p-6 sm:p-7">
@@ -553,16 +543,14 @@
                 @if ($hasManagedSurfaces)
                 {{-- Managed products --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['forest'] }}">
-                                <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Catalog') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed products') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Live Cloud, Edge, and Serverless sites billed per unit — separate from BYO VM tiers.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Catalog') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed products') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Live Cloud, Edge, and Serverless sites billed per unit — separate from BYO VM tiers.') }}</p>
                         </div>
                     </div>
                     @php
@@ -605,16 +593,14 @@
 
                 {{-- BYO fleet --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Compute') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('BYO server fleet') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Spec-tiered VMs you SSH into — counted separately from managed products.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Compute') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('BYO server fleet') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Spec-tiered VMs you SSH into — counted separately from managed products.') }}</p>
                         </div>
                     </div>
                     @if ($billableServers === [] && $excludedServers === [])
@@ -655,16 +641,14 @@
 
                 {{-- Stripe sync events --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                                <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Audit') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stripe sync events') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent billing reconciliation runs, including no-op and failed runs.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Audit') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stripe sync events') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent billing reconciliation runs, including no-op and failed runs.') }}</p>
                         </div>
                     </div>
                     @if ($syncEvents === [])
@@ -719,18 +703,16 @@
 
                 {{-- Invoice history --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                                <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoice history') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent Stripe invoices — up to 24 months of paid charges.') }}</p>
-                            </div>
-                            <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('All invoices') }} →</a>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoice history') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent Stripe invoices — up to 24 months of paid charges.') }}</p>
                         </div>
+                        <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('All invoices') }} →</a>
                     </div>
                     @if ($invoiceHistory === [])
                         <div class="px-6 py-10 text-center sm:px-7">

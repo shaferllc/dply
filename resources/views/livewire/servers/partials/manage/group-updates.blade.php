@@ -99,20 +99,26 @@
     {{-- Outdated packages --}}
     @if (! empty($rows))
         <div
-            class="{{ $card }} p-6 sm:p-8"
+            class="{{ $card }} overflow-hidden"
             x-data="{ filter: 'all', q: '' }"
         >
-            <div class="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Outdated packages') }}</h3>
-                    <p class="mt-1 text-xs text-brand-moss">
-                        {{ trans_choice(':count package can be upgraded.|:count packages can be upgraded.', count($rows), ['count' => count($rows)]) }}
-                        @if ($securityCount > 0)
-                            · <span class="font-medium text-red-700">{{ trans_choice(':n flagged as security|:n flagged as security', $securityCount, ['n' => $securityCount]) }}</span>
-                        @endif
-                    </p>
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Packages') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outdated packages') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ trans_choice(':count package can be upgraded.|:count packages can be upgraded.', count($rows), ['count' => count($rows)]) }}
+                            @if ($securityCount > 0)
+                                · <span class="font-medium text-red-700">{{ trans_choice(':n flagged as security|:n flagged as security', $securityCount, ['n' => $securityCount]) }}</span>
+                            @endif
+                        </p>
+                    </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     <div class="inline-flex rounded-lg border border-brand-ink/15 bg-white p-0.5 text-xs">
                         <button type="button" x-on:click="filter = 'all'" :class="filter === 'all' ? 'bg-brand-sage/15 text-brand-ink' : 'text-brand-moss hover:text-brand-ink'" class="rounded-md px-2.5 py-1 font-medium">{{ __('All') }}</button>
                         <button type="button" x-on:click="filter = 'security'" :class="filter === 'security' ? 'bg-red-100 text-red-800' : 'text-brand-moss hover:text-brand-ink'" class="rounded-md px-2.5 py-1 font-medium">{{ __('Security') }}</button>
@@ -126,7 +132,8 @@
                 </div>
             </div>
 
-            <div class="mt-3 max-h-80 overflow-auto rounded-lg border border-brand-ink/10">
+            <div class="px-6 py-6 sm:px-7">
+            <div class="max-h-80 overflow-auto rounded-lg border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
                     <thead class="sticky top-0 bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
                         <tr>
@@ -155,6 +162,7 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
             </div>
         </div>
     @endif
@@ -235,7 +243,7 @@
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">

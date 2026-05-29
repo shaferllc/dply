@@ -41,11 +41,15 @@
     $hitRatePoints = $renderSpark($hitRateSeries);
 @endphp
 
-<div class="{{ $card }} p-6 sm:p-8" wire:key="cache-keyspace-{{ $engine }}">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — keyspace dashboard', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-2 text-sm text-brand-moss">{{ __('Live INFO sampling. Memory and clients are absolute; ops/sec and hit-rate are computed from the delta between the two latest samples.') }}</p>
+<div class="{{ $card }}" wire:key="cache-keyspace-{{ $engine }}">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keyspace') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — keyspace dashboard', ['engine' => $engineLabel]) }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live INFO sampling. Memory and clients are absolute; ops/sec and hit-rate are computed from the delta between the two latest samples.') }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
             @if (! $loaded && $error === null)
@@ -73,6 +77,7 @@
         </div>
     </div>
 
+    <div class="px-6 py-6 sm:px-7">
     <x-explainer class="mt-4">
         <p>{{ __('Each sample runs INFO over SSH, parses the cumulative counters Redis reports, and computes deltas against the previous sample to show throughput and hit-rate over the last sampling window.') }}</p>
         <p>{{ __('Sampling continues at 10s intervals while this card is open; closing the card pauses sampling and discards the buffer. The first sample shows windowed values as "—" because there\'s nothing to delta against yet.') }}</p>
@@ -123,4 +128,5 @@
         </div>
         <p class="mt-3 text-xs text-brand-mist">{{ __('Samples in buffer: :count / :max — refreshing every 10s.', ['count' => count($samples), 'max' => \App\Livewire\Servers\WorkspaceCaches::KEYSPACE_SAMPLE_LIMIT]) }}</p>
     @endif
+    </div>
 </div>

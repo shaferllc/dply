@@ -112,16 +112,14 @@
                      concept ("what do we email about, and to whom"). --}}
                 <section class="dply-card overflow-hidden" id="notifications">
                     @php $h = $sectionHeader(__('Notifications'), __('Email defaults'), __('What dply emails about for sites and servers in this organization. Notification routing for channels lives on a separate page.'), 'heroicon-o-bell', 'sage'); @endphp
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $h['tile'] }}">
-                                <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $h['eyebrow'] }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                         </div>
                     </div>
                     <div class="divide-y divide-brand-ink/10">
@@ -152,16 +150,14 @@
                 {{-- Cloud alerts: Slack webhook + extra emails for deploy/restart/CPU/memory. --}}
                 <section class="dply-card overflow-hidden" id="alerts">
                     @php $h = $sectionHeader(__('Cloud alerts'), __('Alert destinations'), __('Where dply sends deploy-failed, restart, CPU, and memory alerts for Cloud apps. Org owners are always notified on their login emails — these fields add extra recipients.'), 'heroicon-o-exclamation-triangle', 'amber'); @endphp
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $h['tile'] }}">
-                                <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $h['eyebrow'] }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                            <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ $h['eyebrow'] }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                         </div>
                     </div>
                     <form wire:submit="saveAlertDestinations" class="space-y-5 p-6 sm:p-7">
@@ -192,16 +188,14 @@
                 {{-- Edge data region: regional preference for R2 buckets. --}}
                 <section class="dply-card overflow-hidden" id="data-region">
                     @php $h = $sectionHeader(__('Data residency'), __('Edge data region'), __('Preferred Cloudflare R2 region for buckets created on behalf of this organization. Existing buckets stay where they are — the setting only applies to future Edge bootstraps.'), 'heroicon-o-globe-europe-africa', 'sky'); @endphp
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $h['tile'] }}">
-                                <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $h['eyebrow'] }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                         </div>
                     </div>
                     <div class="space-y-2 p-6 sm:p-7">
@@ -222,16 +216,14 @@
                 {{-- API tokens: create form + sandy "Existing tokens" header + clean rows. --}}
                 <section class="dply-card overflow-hidden" id="api-tokens">
                     @php $h = $sectionHeader(__('Automation'), __('API tokens'), __('Scoped tokens for CI/CD and automation. The secret is shown once after creation — copy it into your secrets store immediately.'), 'heroicon-o-key', 'sage'); @endphp
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $h['tile'] }}">
-                                <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $h['eyebrow'] }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                         </div>
                     </div>
                     <form wire:submit="createApiToken" class="space-y-5 p-6 sm:p-7">
@@ -346,16 +338,14 @@
                 {{-- Webhook destinations: outbound Slack/Discord/Teams hooks. --}}
                 <section class="dply-card overflow-hidden" id="webhooks">
                     @php $h = $sectionHeader(__('Outbound'), __('Webhook destinations'), __('Push deploy and monitoring events to Slack, Discord, or Microsoft Teams. Scope to one site or fire for every site in this organization.'), 'heroicon-o-link', 'violet'); @endphp
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $h['tile'] }}">
-                                <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $h['eyebrow'] }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $h['description'] }}</p>
                         </div>
                     </div>
                     <form wire:submit="saveWebhookDestination" class="space-y-4 p-6 sm:p-7">

@@ -27,12 +27,18 @@
 
         <div class="space-y-8">
             <section class="dply-card overflow-hidden">
-                <div class="grid md:grid-cols-12 gap-6 p-6 sm:p-8">
-                    <div class="md:col-span-4">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Script') }}</h2>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Use non-interactive flags so execution does not hang over SSH.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Script') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Use non-interactive flags so execution does not hang over SSH.') }}</p>
                     </div>
-                    <div class="md:col-span-8 space-y-5">
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                    <div class="space-y-5">
                         <div>
                             <x-input-label for="edit_script_name" :value="__('Label')" />
                             <x-text-input id="edit_script_name" wire:model="name" type="text" class="mt-1 block w-full" />
@@ -60,12 +66,18 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="grid md:grid-cols-12 gap-6 p-6 sm:p-8">
-                    <div class="md:col-span-4">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Run script') }}</h2>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Select servers to run this script on. Requires SSH access from Dply.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Run') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run script') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Select servers to run this script on. Requires SSH access from Dply.') }}</p>
                     </div>
-                    <div class="md:col-span-8 space-y-4">
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                    <div class="space-y-4">
                         @if ($servers->isEmpty())
                             <p class="text-sm text-brand-moss">{{ __('No servers in this organization yet.') }}</p>
                         @else

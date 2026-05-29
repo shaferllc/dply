@@ -67,6 +67,53 @@ test('builds minimum line items for empty fleet', function () {
     ]);
 });
 
+test('omits base line item for a single xs server under free entry tier', function () {
+    $org = Organization::factory()->create();
+    server($org, 1, 2048);
+
+    // A single XS server — the base fee is waived, so the subscription carries
+    // only the XS tier line (which keeps it non-empty for Stripe).
+    $desired = app(OrganizationBillingStateComputer::class)->compute($org->fresh());
+
+    expect($desired->baseCents)->toBe(0);
+
+    $items = $this->creator->buildPriceList($desired);
+
+    expect($items)->toBe([
+        ['price' => 'price_tier_xs', 'quantity' => 1],
+    ]);
+});
+
+test('does not require base price when base is waived', function () {
+    Config::set('subscription.standard.stripe.base_monthly', '');
+    $org = Organization::factory()->create();
+    server($org, 1, 2048);
+
+    $desired = app(OrganizationBillingStateComputer::class)->compute($org->fresh());
+
+    // Single XS server waives the base, so a missing base price must not throw.
+    $items = $this->creator->buildPriceList($desired);
+
+    expect($items)->toBe([
+        ['price' => 'price_tier_xs', 'quantity' => 1],
+    ]);
+});
+
+test('keeps base line item once a second server appears', function () {
+    $org = Organization::factory()->create();
+    server($org, 1, 2048);
+    server($org, 1, 2048);
+
+    $desired = app(OrganizationBillingStateComputer::class)->compute($org->fresh());
+
+    expect($desired->baseCents)->toBe(1500);
+
+    $items = $this->creator->buildPriceList($desired);
+
+    $this->assertContainsEquals(['price' => 'price_base_monthly', 'quantity' => 1], $items);
+    $this->assertContainsEquals(['price' => 'price_tier_xs', 'quantity' => 2], $items);
+});
+
 test('builds a line item per non empty tier', function () {
     $org = Organization::factory()->create();
     server($org, 4, 8192);

@@ -34,14 +34,20 @@
         @elseif ($resolvedUserCode === null)
             <div class="dply-card overflow-hidden">
                 <form wire:submit.prevent="lookup">
-                    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-                        <div class="lg:col-span-4">
-                            <h1 class="text-lg font-semibold text-brand-ink">{{ __('Authorize device') }}</h1>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Device') }}</p>
+                            <h1 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Authorize device') }}</h1>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('The dply CLI is asking to connect to your dply account. Enter the code printed in your terminal to continue.') }}
                             </p>
                         </div>
-                        <div class="lg:col-span-8 space-y-5">
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
+                        <div class="space-y-5">
                             <div>
                                 <x-input-label for="device-user-code" :value="__('Code from terminal')" />
                                 <x-text-input
@@ -72,18 +78,24 @@
             </div>
         @else
             <div class="dply-card overflow-hidden">
-                <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-                    <div class="lg:col-span-4">
-                        <h1 class="text-lg font-semibold text-brand-ink">{{ __('Approve dply CLI?') }}</h1>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Authorize') }}</p>
+                        <h1 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Approve dply CLI?') }}</h1>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Approving creates an API token for the CLI to use against your organization. You can revoke it any time from Profile → API keys.') }}
                         </p>
-                        <div class="mt-4 rounded-xl border border-brand-mist bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                    <div class="space-y-5">
+                        <div class="rounded-xl border border-brand-mist bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
                             <span class="block uppercase tracking-wider text-[10px] text-brand-moss/80">{{ __('Code') }}</span>
                             <span class="font-mono text-base tracking-widest text-brand-ink">{{ str_pad(substr($resolvedUserCode, 0, 4), 4) }}-{{ substr($resolvedUserCode, 4, 4) }}</span>
                         </div>
-                    </div>
-                    <div class="lg:col-span-8 space-y-5">
                         <div>
                             <x-input-label for="device-organization" :value="__('Organization')" />
                             @if ($organizations->isEmpty())

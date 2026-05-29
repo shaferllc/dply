@@ -111,16 +111,14 @@
 
             @if ($hasStripeCustomer)
                 <section class="dply-card mt-6 overflow-hidden" x-data="{ showColumns: false }">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('All invoices') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Search by number or description, sort any column, and toggle visibility on a per-column basis.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('All invoices') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Search by number or description, sort any column, and toggle visibility on a per-column basis.') }}</p>
                         </div>
                     </div>
 

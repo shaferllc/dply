@@ -84,7 +84,9 @@
                                 <x-spinner class="h-4 w-4" />
                             </span>
                             {{ $engineLabels[$engine] }}
-                            @if ($row)
+                            @if (($comingSoonEngines[$engine] ?? false) && ! $row)
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                            @elseif ($row)
                                 @if ($isInFlight)
                                     <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
                                         <x-spinner variant="forest" />

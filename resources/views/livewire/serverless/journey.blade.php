@@ -231,14 +231,21 @@
         </div>
 
         {{-- Function facts --}}
-        <div class="dply-card mt-6 p-6 sm:p-8">
-            <div class="flex items-center justify-between">
-                <h2 class="text-sm font-bold text-brand-ink">{{ __('Function details') }}</h2>
+        <div class="dply-card overflow-hidden mt-6">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Details') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function details') }}</h2>
+                </div>
                 @if ($deployDuration !== '')
-                    <span class="text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
+                    <span class="ml-auto shrink-0 text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
                 @endif
             </div>
-            <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+            <div class="px-6 py-6 sm:px-7">
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
                 @foreach ($facts as $fact)
                     <div class="min-w-0">
                         <dt class="text-xs font-medium text-brand-moss/70">{{ $fact['label'] }}</dt>
@@ -261,6 +268,7 @@
                     </dd>
                 </div>
             @endif
+            </div>
         </div>
 
         {{-- Deploy log --}}

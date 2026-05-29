@@ -3,9 +3,18 @@
     $databases = $databases ?? collect();
     $orgAllowsCredentialShares = $orgAllowsCredentialShares ?? true;
 @endphp
-<div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
-    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Share credentials (read-only link)') }}</h2>
-    <p class="mt-2 text-sm text-brand-moss">{{ __('Hand a tracked database\'s credentials to a teammate via a single-use link with an expiry and view cap.') }}</p>
+<div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Share') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Share credentials (read-only link)') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Hand a tracked database\'s credentials to a teammate via a single-use link with an expiry and view cap.') }}</p>
+        </div>
+    </div>
+    <div class="px-6 py-6 sm:px-7">
     @if (! $orgAllowsCredentialShares)
         <p class="mt-2 text-sm text-brand-moss">{{ __('Public credential share links are disabled for this organization.') }}</p>
     @elseif ($databases->isEmpty())
@@ -38,4 +47,5 @@
             </div>
         </form>
     @endif
+    </div>
 </div>

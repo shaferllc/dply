@@ -107,12 +107,21 @@
             </section>
 
             <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Impact simulation') }}</h2>
+                <div class="dply-card overflow-hidden">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Impact') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Impact simulation') }}</h2>
+                        </div>
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
                     @if ($focused === null)
-                        <p class="mt-2 text-sm text-brand-moss">{{ __('Select a server, site, or database to preview downstream blast radius.') }}</p>
+                        <p class="text-sm text-brand-moss">{{ __('Select a server, site, or database to preview downstream blast radius.') }}</p>
                     @else
-                        <div class="mt-3 rounded-xl border border-amber-200/80 bg-amber-50/60 p-4">
+                        <div class="rounded-xl border border-amber-200/80 bg-amber-50/60 p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('If this fails') }}</p>
                             <p class="mt-1 text-base font-semibold text-brand-ink">{{ $focused['label'] }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ ucfirst($focused['kind']) }} · {{ strtoupper($focused['product'] ?? 'byo') }}</p>
@@ -141,6 +150,7 @@
                             <a href="{{ $focused['href'] }}" wire:navigate class="mt-4 inline-flex text-sm font-semibold text-brand-forest hover:underline">{{ __('Open selected resource') }} →</a>
                         @endif
                     @endif
+                    </div>
                 </div>
 
                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/30 p-4 text-xs leading-relaxed text-brand-moss">

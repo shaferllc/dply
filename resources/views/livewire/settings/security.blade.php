@@ -127,21 +127,19 @@
 
         {{-- Password --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                        <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Credential') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use a long, random password and store it in a password manager. Saving here only updates the fields below.') }}</p>
-                    </div>
-                    <p x-show="passwordSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
-                        <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Saved') }}
-                    </p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credential') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Use a long, random password and store it in a password manager. Saving here only updates the fields below.') }}</p>
                 </div>
+                <p x-show="passwordSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                    <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Saved') }}
+                </p>
             </div>
             <form wire:submit="updatePassword" autocomplete="on">
                 {{-- Hidden username so password managers can pair the new value
@@ -190,20 +188,18 @@
 
         {{-- Passkeys --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                        <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Passwordless') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Passkeys') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sign in with your device PIN, fingerprint, or a security key. Multiple passkeys per account are supported.') }}</p>
-                    </div>
-                    @if ($passkeyCount > 0)
-                        <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $passkeyCount }}</span>
-                    @endif
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Passwordless') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Passkeys') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sign in with your device PIN, fingerprint, or a security key. Multiple passkeys per account are supported.') }}</p>
                 </div>
+                @if ($passkeyCount > 0)
+                    <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $passkeyCount }}</span>
+                @endif
             </div>
             <div class="p-6 sm:p-7">
                 @error('passkey')
@@ -283,20 +279,18 @@
         {{-- OAuth sign-in --}}
         @if (! empty($oauthProviders))
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Single sign-on') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('OAuth sign-in') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link GitHub, GitLab, or Bitbucket so you can sign in with the same account you use for Git.') }}</p>
-                        </div>
-                        @if ($linkedOAuth > 0)
-                            <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $linkedOAuth }}</span>
-                        @endif
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-arrow-top-right-on-square class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Single sign-on') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('OAuth sign-in') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link GitHub, GitLab, or Bitbucket so you can sign in with the same account you use for Git.') }}</p>
                     </div>
+                    @if ($linkedOAuth > 0)
+                        <span class="shrink-0 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">{{ $linkedOAuth }}</span>
+                    @endif
                 </div>
                 <div class="space-y-3 p-6 sm:p-7">
                     @error('unlink')
@@ -351,29 +345,27 @@
 
         {{-- Two-factor authentication --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $twoFactorOn ? $tonePalette['sage'] : $tonePalette['amber'] }}">
-                        <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Step-up') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Require a code from your authenticator app when signing in. A stolen password alone won\'t reach your account.') }}</p>
-                    </div>
-                    <span @class([
-                        'shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1',
-                        'bg-brand-sage/15 text-brand-forest ring-brand-sage/20' => $twoFactorOn,
-                        'bg-amber-50 text-amber-900 ring-amber-200' => ! $twoFactorOn,
-                    ])>
-                        <span @class([
-                            'inline-block h-1.5 w-1.5 rounded-full',
-                            'bg-brand-sage' => $twoFactorOn,
-                            'bg-amber-500' => ! $twoFactorOn,
-                        ])></span>
-                        {{ $twoFactorOn ? __('Enabled') : __('Disabled') }}
-                    </span>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Step-up') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Require a code from your authenticator app when signing in. A stolen password alone won\'t reach your account.') }}</p>
                 </div>
+                <span @class([
+                    'shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1',
+                    'bg-brand-sage/15 text-brand-forest ring-brand-sage/20' => $twoFactorOn,
+                    'bg-amber-50 text-amber-900 ring-amber-200' => ! $twoFactorOn,
+                ])>
+                    <span @class([
+                        'inline-block h-1.5 w-1.5 rounded-full',
+                        'bg-brand-sage' => $twoFactorOn,
+                        'bg-amber-500' => ! $twoFactorOn,
+                    ])></span>
+                    {{ $twoFactorOn ? __('Enabled') : __('Disabled') }}
+                </span>
             </div>
             <div class="p-6 sm:p-7">
                 @if (session('status') === 'two-factor-enabled' && session('recovery_codes'))

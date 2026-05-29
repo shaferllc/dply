@@ -14,11 +14,15 @@
     $commandModalName = 'cache-command-reference-'.$engine;
 @endphp
 
-<div class="{{ $card }} p-6 sm:p-8" wire:key="cache-repl-{{ $engine }}">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — interactive console', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-2 text-sm text-brand-moss">{{ __('Run :engine-cli commands directly against the server. Read-only commands work anytime; mutating commands need the unlock below.', ['engine' => $engine]) }}</p>
+<div class="{{ $card }}" wire:key="cache-repl-{{ $engine }}">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — interactive console', ['engine' => $engineLabel]) }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run :engine-cli commands directly against the server. Read-only commands work anytime; mutating commands need the unlock below.', ['engine' => $engine]) }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
             <button
@@ -41,6 +45,7 @@
         </div>
     </div>
 
+    <div class="px-6 py-6 sm:px-7">
     <x-explainer class="mt-4">
         <p>{{ __('A direct line into this engine. Each command runs as a single SSH round-trip via the engine\'s native cli (e.g. redis-cli, valkey-cli) on the server itself, then the response is rendered here.') }}</p>
         <p>
@@ -286,4 +291,5 @@
             </div>
         </div>
     </x-modal>
+    </div>
 </div>

@@ -23,6 +23,8 @@
         $capCents = (int) config('subscription.standard.per_server_cap_cents', 4000);
         $annualPct = (int) config('subscription.standard.annual_discount_pct', 20);
         $tiers = config('subscription.standard.tiers', []);
+        $freeEntry = filter_var(config('subscription.standard.free_entry_tier', true), FILTER_VALIDATE_BOOLEAN);
+        $xsCents = (int) ($tiers['xs'] ?? 0);
         $base = $baseCents / 100;
         $credit = $creditCents / 100;
         $cap = $capCents / 100;
@@ -41,14 +43,24 @@
               base: {{ $base }},
               creditValue: {{ $credit }},
               annualPct: {{ $annualPct }},
+              freeEntry: {{ $freeEntry ? 'true' : 'false' }},
+              get serverCount() {
+                  return ['xs','s','m','l','xl'].reduce((sum, k) => sum + (this.counts[k] || 0), 0);
+              },
               get serverSubtotal() {
                   return ['xs','s','m','l','xl'].reduce((sum, k) => sum + (this.counts[k] || 0) * this.tiers[k], 0);
+              },
+              // Free entry tier: base is waived while the only billable unit is
+              // a single XS server. Mirrors OrganizationBillingStateComputer.
+              get baseDue() {
+                  const onlyOneXs = this.freeEntry && this.serverCount === 1 && (this.counts.xs || 0) === 1;
+                  return onlyOneXs ? 0 : this.base;
               },
               get appliedCredit() {
                   return Math.min(this.creditValue, this.serverSubtotal);
               },
               get monthlyTotal() {
-                  return Math.max(0, this.base + this.serverSubtotal - this.appliedCredit);
+                  return Math.max(0, this.baseDue + this.serverSubtotal - this.appliedCredit);
               },
               get billedTotal() {
                   return this.annual
@@ -61,13 +73,19 @@
             <div class="max-w-3xl mx-auto text-center">
                 <h1 class="text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">One plan. Pay for what you run.</h1>
                 <p class="mt-4 text-lg text-brand-moss">${{ number_format($base, 0) }}/mo base, plus per-server pricing that scales with server size. Same fee whether you're on DigitalOcean, Hetzner, AWS, or your own SSH box.</p>
+                @if ($freeEntry)
+                    <p class="mt-3 inline-flex items-center gap-2 rounded-full bg-brand-sand/40 px-4 py-1.5 text-sm font-semibold text-brand-forest">
+                        <x-heroicon-s-sparkles class="h-4 w-4" aria-hidden="true" />
+                        Your first small server has no base fee — start from just ${{ number_format($xsCents / 100, 0) }}/mo.
+                    </p>
+                @endif
             </div>
         </section>
 
         {{-- Real-world example fleets — concrete dollar amounts visitors can map to themselves --}}
         @php
             $exampleFleets = [
-                ['label' => 'Indie dev', 'desc' => '1 small server', 'monthly_cents' => $baseCents + ($tiers['xs'] ?? 0)],
+                ['label' => 'Indie dev', 'desc' => '1 small server', 'monthly_cents' => ($freeEntry ? 0 : $baseCents) + ($tiers['xs'] ?? 0)],
                 ['label' => 'Side project', 'desc' => '1 mid-size server', 'monthly_cents' => $baseCents + ($tiers['m'] ?? 0)],
                 ['label' => 'Small team', 'desc' => '3 mid servers', 'monthly_cents' => $baseCents + 3 * ($tiers['m'] ?? 0)],
                 ['label' => 'Growing fleet', 'desc' => '5 mid + 2 big', 'monthly_cents' => $baseCents + 5 * ($tiers['m'] ?? 0) + 2 * ($tiers['l'] ?? 0)],
@@ -111,6 +129,12 @@
                     <p class="mt-2 text-sm text-brand-moss">Add servers and dply detects the size automatically. A typical first server runs $5–10/mo on top of the base.</p>
 
                     <ul class="mt-6 space-y-3 text-sm text-brand-moss">
+                        @if ($freeEntry)
+                            <li class="flex items-start gap-3">
+                                <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                <span><span class="font-semibold text-brand-ink">First small server has no base fee</span> — pay only the ${{ number_format($xsCents / 100, 0) }}/mo server tier until you scale up.</span>
+                            </li>
+                        @endif
                         <li class="flex items-start gap-3">
                             <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                             Every feature dply ships. No tier gating.
@@ -238,7 +262,9 @@
                 ],
                 [
                     'q' => 'What about a free tier?',
-                    'a' => 'There isn\'t one, but every account gets a 14-day trial with no credit card required — full product, real servers, real deploys. After 14 days, deploys pause unless you add a card. You decide when you\'re ready to pay.',
+                    'a' => $freeEntry
+                        ? 'Your first small (XS) server carries no organization base fee — you pay only the $2/mo server tier for it. The $15 base kicks in once you add a second server, run a larger server, or use a managed product (Cloud, Edge, or Serverless). Every account also gets a 14-day trial with no credit card required.'
+                        : 'There isn\'t one, but every account gets a 14-day trial with no credit card required — full product, real servers, real deploys. After 14 days, deploys pause unless you add a card. You decide when you\'re ready to pay.',
                 ],
                 [
                     'q' => 'What if I add a server mid-cycle?',

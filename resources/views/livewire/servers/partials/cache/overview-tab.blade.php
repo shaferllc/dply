@@ -2,7 +2,7 @@
                 <div class="{{ $card }} p-6 sm:p-8">
                     <h2 class="text-base font-semibold text-brand-ink">{{ __('No cache services installed') }}</h2>
                     <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('Pick an engine from the tabs above to install one. You can install multiple engines side-by-side — for example Redis for queues and Memcached for app cache.') }}
+                        {{ __('Pick an engine from the tabs above to install one. Redis is available today; additional engines are marked "Soon" and are on the way.') }}
                     </p>
                 </div>
             @else

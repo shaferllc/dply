@@ -148,21 +148,19 @@
                  Lifted from the old /profile/edit page so settings/profile
                  is the single personal-settings surface. --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Identity') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your details') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Name, login email, country, language, and timezone. Avatar is loaded via Gravatar — change it by updating the email tied to your Gravatar account.') }}</p>
-                        </div>
-                        <p x-show="profileSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
-                            <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Saved') }}
-                        </p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your details') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Name, login email, country, language, and timezone. Avatar is loaded via Gravatar — change it by updating the email tied to your Gravatar account.') }}</p>
                     </div>
+                    <p x-show="profileSaved" x-transition x-cloak class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                        <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Saved') }}
+                    </p>
                 </div>
                 <div class="grid gap-6 p-6 sm:p-7 lg:grid-cols-3 lg:gap-8">
                     <div class="lg:col-span-1">
@@ -238,16 +236,14 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Personal') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your preferences') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Only you see these — not shared with your organization or teams.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Personal') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your preferences') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Only you see these — not shared with your organization or teams.') }}</p>
                     </div>
                 </div>
                 <form wire:submit="saveProfile" class="p-6 sm:p-7">
@@ -368,23 +364,21 @@
 
             {{-- Active sessions --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                            <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Devices') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active sessions') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each device currently signed in. Revoking a session logs that device out on its next request.') }}</p>
-                        </div>
-                        @if ($otherSessions > 0)
-                            <button type="button" wire:click="openConfirmActionModal('revokeOtherSessions', [], @js(__('Revoke all other sessions')), @js(__('Revoke all other sessions? You will stay logged in on this device only.')), @js(__('Revoke sessions')), true)" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100">
-                                <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Revoke other devices') }}
-                            </button>
-                        @endif
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Devices') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active sessions') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each device currently signed in. Revoking a session logs that device out on its next request.') }}</p>
                     </div>
+                    @if ($otherSessions > 0)
+                        <button type="button" wire:click="openConfirmActionModal('revokeOtherSessions', [], @js(__('Revoke all other sessions')), @js(__('Revoke all other sessions? You will stay logged in on this device only.')), @js(__('Revoke sessions')), true)" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100">
+                            <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Revoke other devices') }}
+                        </button>
+                    @endif
                 </div>
                 <div class="p-6 sm:p-7">
                     <p x-show="sessionRevoked" x-transition x-cloak class="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
@@ -440,17 +434,15 @@
             {{-- Danger zone --}}
             <section>
                 <p class="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-600/80">{{ __('Danger zone') }}</p>
-                <div class="dply-card overflow-hidden border-red-200">
-                    <div class="border-b border-red-200/60 bg-red-50/60 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700 ring-1 ring-red-200">
-                                <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700/80">{{ __('Permanent') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Delete account') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('You\'ll be signed out and lose access to organizations and data tied to this login. This cannot be undone.') }}</p>
-                            </div>
+                <div class="dply-card overflow-hidden border-rose-200">
+                    <div class="flex items-start gap-3 border-b border-rose-200/60 bg-rose-50/60 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                            <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Permanent') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Delete account') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('You\'ll be signed out and lose access to organizations and data tied to this login. This cannot be undone.') }}</p>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-3 px-6 py-4 sm:px-7">
@@ -490,16 +482,14 @@
         @if ($section === 'servers')
             {{-- Your timezone --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Time') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your timezone') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Used for schedules, Insights quiet hours, and when applying timezone on new servers below.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Time') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your timezone') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Used for schedules, Insights quiet hours, and when applying timezone on new servers below.') }}</p>
                     </div>
                 </div>
                 <form wire:submit="saveProfileTimezone" class="p-6 sm:p-7">
@@ -529,20 +519,18 @@
 
             {{-- Organization defaults --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Org-wide') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization defaults') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Email and new-server policy for the current organization.') }}</p>
-                        </div>
-                        @if ($currentOrg)
-                            <span class="shrink-0 rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss" title="{{ $currentOrg->name }}">{{ $currentOrg->name }}</span>
-                        @endif
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Org-wide') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization defaults') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Email and new-server policy for the current organization.') }}</p>
                     </div>
+                    @if ($currentOrg)
+                        <span class="shrink-0 rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss" title="{{ $currentOrg->name }}">{{ $currentOrg->name }}</span>
+                    @endif
                 </div>
                 <form wire:submit="saveOrganizationServersSites" class="p-6 sm:p-7">
                     <button type="submit" class="sr-only">{{ __('Save organization settings') }}</button>
@@ -577,16 +565,14 @@
 
             {{-- Insights preferences --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
-                            <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Alerts') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Insights preferences') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Org defaults for alert batching and quiet hours. Critical findings still notify immediately when channels are subscribed.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Insights preferences') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Org defaults for alert batching and quiet hours. Critical findings still notify immediately when channels are subscribed.') }}</p>
                     </div>
                 </div>
                 <form wire:submit="saveOrganizationInsights" class="p-6 sm:p-7">
@@ -670,16 +656,14 @@
 
             {{-- Team defaults --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                            <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Per-team') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Team defaults') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('List and creation defaults for servers and sites in the selected team.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Per-team') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Team defaults') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('List and creation defaults for servers and sites in the selected team.') }}</p>
                     </div>
                 </div>
                 <form wire:submit="saveTeamServersSites" class="p-6 sm:p-7">

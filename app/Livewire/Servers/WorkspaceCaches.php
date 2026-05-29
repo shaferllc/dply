@@ -22,6 +22,7 @@ use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\CacheEngineAvailability;
+use App\Support\Servers\CacheEngineInfo;
 use App\Support\Servers\CacheServiceAuth;
 use App\Support\Servers\CacheServiceCli;
 use App\Support\Servers\CacheServiceCommandPolicy;
@@ -635,7 +636,7 @@ BASH,
         // before queueing so a stale payload can't slip past the disabled UI.
         if (CacheEngineAvailability::isComingSoon($engine)) {
             $this->toastError(__(':engine isn\'t available yet — it\'s coming soon.', [
-                'engine' => \App\Support\Servers\CacheEngineInfo::for($engine)['label'] ?? ucfirst($engine),
+                'engine' => CacheEngineInfo::for($engine)['label'] ?? ucfirst($engine),
             ]));
 
             return;

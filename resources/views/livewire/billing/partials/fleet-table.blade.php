@@ -5,17 +5,23 @@
 @endphp
 
 <div class="dply-card overflow-hidden">
-    <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-        <div class="lg:col-span-4">
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your fleet') }}</h2>
-            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fleet') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your fleet') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Servers dply is tracking. Ready, mature servers count toward your bill — fresh or paused servers don\'t.') }}
             </p>
-            <p class="mt-3 text-xs text-brand-moss/80">
+            <p class="mt-2 text-xs text-brand-moss/80">
                 {{ trans_choice('{0} New servers count once they\'re past today.|{1} New servers count once they\'ve been up for :days day.|[2,*] New servers count once they\'ve been up for :days days.', (int) config('subscription.standard.min_billable_age_days', 1), ['days' => (int) config('subscription.standard.min_billable_age_days', 1)]) }}
             </p>
         </div>
-        <div class="lg:col-span-8 space-y-4">
+    </div>
+    <div class="px-6 py-6 sm:px-7">
+        <div class="space-y-4">
             @if (! $hasAnyServer)
                 <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white/40 px-5 py-8 text-center">
                     <p class="text-sm text-brand-moss">{{ __('No servers yet.') }}</p>

@@ -115,23 +115,21 @@
                 {{-- Provider header strip. Brand icon stays in a sand tile
                      for visual consistency with the rest of the family,
                      while OAuth/PAT counts show as a quick-read chip. --}}
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                            <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Provider') }}</p>
-                            <h3 id="sc-heading-{{ $provider['id'] }}" class="mt-0.5 text-base font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link an OAuth account or paste a personal access token for self-hosted hosts and machine-user workflows.') }}</p>
-                        </div>
-                        @if ($hasAny)
-                            <span class="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
-                                <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
-                                {{ $providerLinkedCount }}
-                            </span>
-                        @endif
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
+                        <h3 id="sc-heading-{{ $provider['id'] }}" class="mt-0.5 text-base font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Link an OAuth account or paste a personal access token for self-hosted hosts and machine-user workflows.') }}</p>
                     </div>
+                    @if ($hasAny)
+                        <span class="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
+                            <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
+                            {{ $providerLinkedCount }}
+                        </span>
+                    @endif
                 </div>
 
                 {{-- Action row: OAuth link button + PAT add button. --}}

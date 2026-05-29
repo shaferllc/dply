@@ -44,13 +44,21 @@
         @php
             $providerLabel = collect($providers)->firstWhere('key', $provider)['label'] ?? ucfirst($provider);
         @endphp
-        <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-            <h2 class="text-base font-semibold text-brand-ink">{{ __('Authenticate with :provider', ['provider' => $providerLabel]) }}</h2>
-            <p class="mt-1 text-xs text-brand-moss">
-                {{ collect($providers)->firstWhere('key', $provider)['hint'] ?? '' }}
-            </p>
+        <section class="mt-6 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credential') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Authenticate with :provider', ['provider' => $providerLabel]) }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ collect($providers)->firstWhere('key', $provider)['hint'] ?? '' }}
+                    </p>
+                </div>
+            </div>
 
-            <div class="mt-4 space-y-4">
+            <div class="space-y-4 px-6 py-6 sm:px-7">
                 @if ($provider === 'cloudflare_pages')
                     <label class="block">
                         <span class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Cloudflare account id') }}</span>
@@ -92,15 +100,19 @@
 
     {{-- Step 3 — projects --}}
     @if ($step === 'projects')
-        <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4">
-                <div>
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Pick a project') }}</h2>
+        <section class="mt-6 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a project') }}</h2>
                     @if ($probeResult && ($probeResult['principal'] ?? '') !== '')
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Authenticated as :who', ['who' => $probeResult['principal']]) }}</p>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Authenticated as :who', ['who' => $probeResult['principal']]) }}</p>
                     @endif
                 </div>
-                <button type="button" wire:click="back" class="text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('← Change credential') }}</button>
+                <button type="button" wire:click="back" class="shrink-0 text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('← Change credential') }}</button>
             </div>
 
             @if ($loadError)
@@ -139,13 +151,17 @@
 
     {{-- Step 4 — preview --}}
     @if ($step === 'preview' && is_array($projectPreview))
-        <section class="mt-6 rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
-            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4">
-                <div>
-                    <h2 class="text-base font-semibold text-brand-ink">{{ $projectPreview['name'] }}</h2>
-                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Review the translation, then continue to the Edge Create form to deploy.') }}</p>
+        <section class="mt-6 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Preview') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $projectPreview['name'] }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Review the translation, then continue to the Edge Create form to deploy.') }}</p>
                 </div>
-                <button type="button" wire:click="back" class="text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('← Pick another project') }}</button>
+                <button type="button" wire:click="back" class="shrink-0 text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('← Pick another project') }}</button>
             </div>
 
             <dl class="grid grid-cols-1 gap-y-3 gap-x-6 px-6 py-4 text-sm sm:grid-cols-2">

@@ -305,8 +305,9 @@
                 </div>
             </div>
 
+            <div class="px-6 py-6 sm:px-8">
             @if ($editingThresholds)
-                <form wire:submit="saveThresholdSettings" class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+                <form wire:submit="saveThresholdSettings" class="grid grid-cols-1 gap-5 sm:grid-cols-3">
                     <div>
                         <x-input-label for="threshold-cpu" value="{{ __('CPU warning %') }}" />
                         <div class="mt-1 flex items-center gap-2">
@@ -359,7 +360,7 @@
                     </div>
                 </form>
             @else
-                <dl class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
                         <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('CPU warning') }}</dt>
                         <dd class="mt-1 flex items-baseline gap-1">
@@ -390,6 +391,7 @@
                     </p>
                 @endif
             @endif
+            </div>
         </div>
     @endif
 @endif

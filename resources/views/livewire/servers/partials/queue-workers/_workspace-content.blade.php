@@ -12,7 +12,7 @@
         <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
@@ -47,13 +47,13 @@
 
 {{-- At-a-glance counts. --}}
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Workers') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workers') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workers at a glance') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Counts across queue-class Supervisor programs visible here.') }}</p>
             </div>
@@ -120,13 +120,13 @@
 <x-server-workspace-tab-panel id="queue-panel-workers" labelled-by="queue-tab-workers" panel-class="space-y-6">
 {{-- Existing queue workers ----------------------------------------------------- --}}
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active workers') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Start, stop, restart, or open the full daemon page for any queue worker.') }}</p>
             </div>
@@ -260,13 +260,13 @@
 <x-server-workspace-tab-panel id="queue-panel-add" labelled-by="queue-tab-add" panel-class="space-y-6">
 {{-- Preset shortcuts ----------------------------------------------------------- --}}
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Presets') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Presets') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add a worker') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Picking a preset opens the Daemons page with the worker form prefilled — adjust the directory and add the program from there.') }}</p>
             </div>

@@ -97,7 +97,13 @@
         <div class="px-8 py-5 bg-brand-cream/40 border-t border-brand-ink/10 text-sm">
             <div class="flex items-center justify-between">
                 <span class="text-brand-moss">Organization base</span>
-                <span class="font-semibold text-brand-ink tabular-nums" x-text="fmt(base)"></span>
+                <span class="tabular-nums" x-show="baseDue > 0" x-cloak>
+                    <span class="font-semibold text-brand-ink" x-text="fmt(baseDue)"></span>
+                </span>
+                <span class="tabular-nums" x-show="baseDue === 0" x-cloak>
+                    <span class="text-xs font-semibold text-brand-forest mr-1">Waived</span>
+                    <span class="font-semibold text-brand-ink/40 line-through" x-text="fmt(base)"></span>
+                </span>
             </div>
             <div class="flex items-center justify-between mt-1.5">
                 <span class="text-brand-moss">Server fees (<span x-text="['xs','s','m','l','xl'].reduce((n,k) => n + (counts[k]||0), 0)"></span> servers)</span>

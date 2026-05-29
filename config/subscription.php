@@ -55,6 +55,13 @@ return [
         'per_server_cap_cents' => 4000,
         'trial_days' => (int) env('SUBSCRIPTION_TRIAL_DAYS', 14),
         'soft_pause_days' => (int) env('SUBSCRIPTION_SOFT_PAUSE_DAYS', 30),
+        // Free entry tier: waive the organization base fee while the org's only
+        // billable unit is a single XS server (no managed products). This drops
+        // the effective entry price to just the $2 XS tier so a one-small-server
+        // hobbyist undercuts Forge/Ploi instead of paying base + tier. The base
+        // re-applies automatically at server #2, any larger server, or any
+        // managed product. Toggle off to restore the unconditional base fee.
+        'free_entry_tier' => filter_var(env('SUBSCRIPTION_FREE_ENTRY_TIER', true), FILTER_VALIDATE_BOOLEAN),
         // Servers younger than this are excluded from billing. Absorbs the
         // "spin up + test + kill in five minutes" case so customers aren't
         // nickel-and-dimed for transient infrastructure.

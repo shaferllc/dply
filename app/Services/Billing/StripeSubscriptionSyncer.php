@@ -35,6 +35,13 @@ class StripeSubscriptionSyncer
         $tierPriceIds = $this->tierPriceIdsForSubscription($subscription);
         $changes = [];
 
+        // Reconcile the base line first. Under the free entry tier the base is
+        // dropped while the org runs a single XS server and re-added when it
+        // grows. Doing it before the tier lines guarantees the subscription is
+        // never momentarily empty: when an org returns to zero servers the base
+        // is re-added in the same pass that removes the last tier line.
+        $this->reconcileBaseLine($subscription, $desired, $changes);
+
         foreach (ServerTier::ordered() as $tier) {
             $priceId = $tierPriceIds[$tier->value] ?? null;
             if (! is_string($priceId) || $priceId === '') {
@@ -137,6 +144,32 @@ class StripeSubscriptionSyncer
     }
 
     /**
+     * Add or remove the organization base line item to match the desired
+     * state. `baseCents === 0` means the free entry tier is active and the
+     * base must not appear on the subscription; any positive value means the
+     * base is due at quantity 1.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function reconcileBaseLine(Subscription $subscription, DesiredBillingState $desired, array &$changes): void
+    {
+        $basePriceId = $this->isYearly($subscription)
+            ? (string) (config('subscription.standard.stripe.base_yearly') ?? '')
+            : (string) (config('subscription.standard.stripe.base_monthly') ?? '');
+
+        if ($basePriceId === '') {
+            return;
+        }
+
+        $desiredQty = $desired->baseCents > 0 ? 1 : 0;
+        $current = $this->currentQuantity($subscription, $basePriceId);
+        $change = $this->applyDelta($subscription, $basePriceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => 'base'] + $change;
+        }
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $changes
      */
     private function reconcileManagedProductLine(
@@ -192,8 +225,26 @@ class StripeSubscriptionSyncer
 
     private function isYearly(Subscription $subscription): bool
     {
-        $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
+        // Detect the interval from ANY yearly price on the subscription, not
+        // just the base. Under the free entry tier a yearly org can carry only
+        // a yearly tier line (no base), so keying off the base alone would
+        // misclassify it as monthly and risk mixing intervals on sync.
+        $yearlyIds = array_merge(
+            [(string) (config('subscription.standard.stripe.base_yearly') ?? '')],
+            array_values((array) config('subscription.standard.stripe.tiers_yearly', [])),
+            [
+                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+            ],
+        );
 
-        return $yearlyBase !== '' && $subscription->hasPrice($yearlyBase);
+        foreach ($yearlyIds as $priceId) {
+            if ($priceId !== '' && $subscription->hasPrice($priceId)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

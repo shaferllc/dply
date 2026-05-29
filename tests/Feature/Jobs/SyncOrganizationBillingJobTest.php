@@ -5,6 +5,7 @@ namespace Tests\Feature\Jobs\SyncOrganizationBillingJobTest;
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
 use App\Models\Subscription;
+use App\Services\Billing\BillingSubscriptionSyncEventRecorder;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StripeSubscriptionSyncer;
@@ -25,6 +26,7 @@ test('handle is a no op when organization does not exist', function () {
     (new SyncOrganizationBillingJob('01nonexistentorganizationid'))->handle(
         app(OrganizationBillingStateComputer::class),
         $fake,
+        app(BillingSubscriptionSyncEventRecorder::class),
     );
 
     expect($fake->calls)->toBeEmpty();
@@ -37,6 +39,7 @@ test('handle is a no op when organization has no standard subscription', functio
     (new SyncOrganizationBillingJob($org->id))->handle(
         app(OrganizationBillingStateComputer::class),
         $fake,
+        app(BillingSubscriptionSyncEventRecorder::class),
     );
 
     expect($fake->calls)->toBeEmpty();
@@ -54,6 +57,7 @@ test('invokes syncer when organization has active standard subscription', functi
     (new SyncOrganizationBillingJob($org->id))->handle(
         app(OrganizationBillingStateComputer::class),
         $fake,
+        app(BillingSubscriptionSyncEventRecorder::class),
     );
 
     expect($fake->calls)->toHaveCount(1);
@@ -73,6 +77,7 @@ test('skips when subscription is canceled', function () {
     (new SyncOrganizationBillingJob($org->id))->handle(
         app(OrganizationBillingStateComputer::class),
         $fake,
+        app(BillingSubscriptionSyncEventRecorder::class),
     );
 
     expect($fake->calls)->toBeEmpty();

@@ -185,16 +185,14 @@
 
                 {{-- Payment method --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                <x-heroicon-o-credit-card class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Payment') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Payment method') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Default card on file. Update from the Stripe portal.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-credit-card class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Payment') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Payment method') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Default card on file. Update from the Stripe portal.') }}</p>
                         </div>
                     </div>
                     <div class="flex flex-wrap items-center justify-between gap-3 p-6 sm:p-7">
@@ -219,16 +217,14 @@
                         $currencies = config('profile_options.currencies', []);
                     @endphp
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                                    <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Invoicing') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Invoicing') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Billing details') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invoice email, VAT, currency, and legal details. Printed on every Stripe invoice for this organization\'s subscription.') }}</p>
                             </div>
                         </div>
                         <form wire:submit="saveBillingDetails" class="space-y-5 p-6 sm:p-7">
@@ -292,20 +288,18 @@
                 {{-- Subscription — cancel / resume --}}
                 @if ($this->canManageBilling)
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $this->onGracePeriod ? $tonePalette['amber'] : $tonePalette['sage'] }}">
-                                    @if ($this->onGracePeriod)
-                                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                                    @else
-                                        <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                                    @endif
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Subscription') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cancel or resume') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                @if ($this->onGracePeriod)
+                                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                                @else
+                                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                                @endif
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Subscription') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cancel or resume') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Cancel keeps your data and servers — billing just stops at the end of the period.') }}</p>
                             </div>
                         </div>
                         <div class="p-6 sm:p-7">
@@ -342,18 +336,16 @@
                 {{-- Invoices --}}
                 @if ($this->canManageBilling)
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                                    <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoices') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent invoices from Stripe.') }}</p>
-                                </div>
-                                <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoices') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent invoices from Stripe.') }}</p>
                             </div>
+                            <a href="{{ route('billing.invoices', $organization) }}" wire:navigate class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View all') }} →</a>
                         </div>
                         @if ($this->invoices->isEmpty())
                             <div class="px-6 py-10 text-center sm:px-7">

@@ -21,20 +21,25 @@
     @if (! $opsReady)
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @else
-        <div class="{{ $card ?? 'rounded-2xl border border-brand-ink/10 bg-brand-cream shadow-sm' }} p-6 sm:p-8">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Configuration editor') }}</h2>
-                    <p class="mt-1 max-w-3xl text-sm text-brand-moss">{{ __('Load → edit → validate → review diff → save. Saves snapshot the live file, atomically install, re-validate, and auto-restore when validation rejects the new file.') }}</p>
+        <div class="{{ $card ?? 'rounded-2xl border border-brand-ink/10 bg-brand-cream shadow-sm' }} overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Editor') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Configuration editor') }}</h2>
+                    <p class="mt-1 max-w-3xl text-sm leading-relaxed text-brand-moss">{{ __('Load → edit → validate → review diff → save. Saves snapshot the live file, atomically install, re-validate, and auto-restore when validation rejects the new file.') }}</p>
                 </div>
                 @if ($config_scope !== '')
-                    <button type="button" wire:click="clearConfigScope" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                    <button type="button" wire:click="clearConfigScope" class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
                         <x-heroicon-o-x-mark class="h-3 w-3" />
                         {{ __('Clear scope filter') }}
                     </button>
                 @endif
             </div>
 
+            <div class="px-6 py-6 sm:px-7">
             <div class="mt-4">
                 <label for="config-search" class="sr-only">{{ __('Search files') }}</label>
                 <input
@@ -55,6 +60,7 @@
                     'configAutocomplete' => $configAutocomplete,
                     'configFileType' => $configFileType,
                 ])
+            </div>
             </div>
         </div>
     @endif

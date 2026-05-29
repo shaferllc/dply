@@ -3,14 +3,14 @@
 
     @if ($contextSite)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-funnel class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Filter') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filter') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Filtered to :site', ['site' => $contextSite->name]) }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Database backups are hidden because databases are server-scoped, not site-scoped.') }}
@@ -39,13 +39,13 @@
 
     {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent activity') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recent activity') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backups at a glance') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Counts from the last 7 days plus current state.') }}</p>
                 </div>
@@ -140,13 +140,13 @@
     {{-- Run now -------------------------------------------------------------------- --}}
     <div class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('On demand') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('On demand') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run database backup') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Queue an export job for one database now.') }}</p>
                     </div>
@@ -177,13 +177,13 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('On demand') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('On demand') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run site files backup') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Archive and ship a site’s files to its destination.') }}</p>
                     </div>
@@ -221,13 +221,13 @@
     <x-server-workspace-tab-panel id="backups-panel-schedules" labelled-by="backups-tab-schedules" panel-class="space-y-6">
     {{-- Schedules ------------------------------------------------------------------ --}}
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Schedule') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring schedules') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each schedule materializes a managed cron entry that calls dply:run-backup-schedule {id}.') }}</p>
                 </div>
@@ -467,13 +467,13 @@
     {{-- Recent runs ---------------------------------------------------------------- --}}
     <div class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent database backups') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Latest exports by database, with size and status.') }}</p>
                     </div>
@@ -528,13 +528,13 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent site file backups') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Latest archives by site, with size and status.') }}</p>
                     </div>

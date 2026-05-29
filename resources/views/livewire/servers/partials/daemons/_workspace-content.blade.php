@@ -12,13 +12,12 @@
 {{-- At-a-glance counts. Match the Background-group convention used by Backups,
      Schedule, and Queue workers. Numbers reflect the visible (filtered) program set. --}}
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-        <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Supervisor') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Supervisor') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Programs at a glance') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     @if ($contextSiteModel ?? null)
@@ -28,7 +27,6 @@
                     @endif
                 </p>
             </div>
-        </div>
     </div>
     <dl class="grid grid-cols-2 gap-2 p-6 sm:grid-cols-4 sm:p-7">
         <div @class([
@@ -85,9 +83,8 @@
 
 @if ($siteContextUnavailable)
     <section class="dply-card overflow-hidden border-amber-200">
-        <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-            <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                     <x-heroicon-o-no-symbol class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
@@ -103,7 +100,6 @@
                         </a>
                     @endif
                 </div>
-            </div>
         </div>
     </section>
 @elseif ($opsReady)

@@ -33,12 +33,20 @@ class StandardSubscriptionCreator
      */
     public function buildPriceList(DesiredBillingState $desired, string $interval = self::INTERVAL_MONTH): array
     {
-        $basePriceId = $this->basePriceIdForInterval($interval);
-        if ($basePriceId === '') {
-            throw new RuntimeException("Standard base price for interval '{$interval}' is not configured.");
-        }
+        $items = [];
 
-        $items = [['price' => $basePriceId, 'quantity' => 1]];
+        // Free entry tier: when the org's base fee is waived (single XS server)
+        // the subscription carries no base line item — the per-server tier line
+        // alone keeps the subscription non-empty. The base price only needs to
+        // be configured (and is only validated) when the base is actually due.
+        if ($desired->baseCents > 0) {
+            $basePriceId = $this->basePriceIdForInterval($interval);
+            if ($basePriceId === '') {
+                throw new RuntimeException("Standard base price for interval '{$interval}' is not configured.");
+            }
+
+            $items[] = ['price' => $basePriceId, 'quantity' => 1];
+        }
 
         $tierPriceIds = $this->tierPriceIdsForInterval($interval);
         foreach (ServerTier::ordered() as $tier) {

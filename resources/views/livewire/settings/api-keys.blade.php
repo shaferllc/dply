@@ -161,28 +161,26 @@
 
         <div class="mt-6 space-y-6">
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Directory') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your tokens') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Personal access tokens for the HTTP API. Revoke any you no longer use.') }}</p>
-                        </div>
-                        @if ($totalTokens > 0)
-                            <button
-                                type="button"
-                                wire:click="openCreateApiTokenModal"
-                                @disabled($requiresPaidPlan && $organization && ! $orgHasProPlan)
-                                class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Add token') }}
-                            </button>
-                        @endif
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your tokens') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Personal access tokens for the HTTP API. Revoke any you no longer use.') }}</p>
                     </div>
+                    @if ($totalTokens > 0)
+                        <button
+                            type="button"
+                            wire:click="openCreateApiTokenModal"
+                            @disabled($requiresPaidPlan && $organization && ! $orgHasProPlan)
+                            class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Add token') }}
+                        </button>
+                    @endif
                 </div>
 
                 @if ($tokens->isNotEmpty() || $hasApiTokenSearch)

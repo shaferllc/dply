@@ -84,7 +84,88 @@ test('servers without metrics classify as xs', function () {
     expect($state->serverCount())->toBe(1);
     expect($state->tierQuantities['xs'])->toBe(1);
 
-    // $15 base + $2 XS server = $17
+    // Free entry tier: a single XS server waives the $15 base, so the org
+    // pays only the $2 XS tier.
+    expect($state->baseCents)->toBe(0);
+    expect($state->monthlyTotalCents)->toBe(200);
+});
+
+test('free entry tier waives base for a single xs server only', function () {
+    $org = Organization::factory()->create();
+    Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+    ]);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(1);
+    expect($state->baseCents)->toBe(0);
+    expect($state->monthlyTotalCents)->toBe(200);
+});
+
+test('free entry tier does not apply to a single larger server', function () {
+    $org = Organization::factory()->create();
+    makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 2, memMb: 4096);
+
+    // S — larger than XS, so the base is still due.
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(1);
+    expect($state->tierQuantities['s'])->toBe(1);
+    expect($state->baseCents)->toBe(1500);
+
+    // $15 base + $5 S server = $20
+    expect($state->monthlyTotalCents)->toBe(2000);
+});
+
+test('free entry tier does not apply once a second server appears', function () {
+    $org = Organization::factory()->create();
+    makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
+    makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
+
+    // Two XS servers — base re-applies.
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(2);
+    expect($state->tierQuantities['xs'])->toBe(2);
+    expect($state->baseCents)->toBe(1500);
+
+    // $15 base + 2 × $2 = $19
+    expect($state->monthlyTotalCents)->toBe(1900);
+});
+
+test('free entry tier does not apply when a managed product is present', function () {
+    Config::set('subscription.standard.edge_cents', 200);
+    $org = Organization::factory()->create();
+    makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
+    makeEdgeSite($org, Site::STATUS_EDGE_ACTIVE);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(1);
+    expect($state->tierQuantities['xs'])->toBe(1);
+    expect($state->edgeCount)->toBe(1);
+    expect($state->baseCents)->toBe(1500);
+
+    // $15 base + $2 XS + $2 edge = $19
+    expect($state->monthlyTotalCents)->toBe(1900);
+});
+
+test('free entry tier can be disabled by config', function () {
+    Config::set('subscription.standard.free_entry_tier', false);
+    $org = Organization::factory()->create();
+    Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+    ]);
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(1);
+    expect($state->baseCents)->toBe(1500);
+
+    // Base restored: $15 + $2 XS = $17
     expect($state->monthlyTotalCents)->toBe(1700);
 });
 

@@ -15,14 +15,14 @@
 {{-- Programs list card. Header carries the primary actions (Sync, Restart all,
      Add program) and a count chip; rows below. --}}
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $contextSiteModel ? __('Programs for this site') : __('Programs on this server') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Add a new Supervisor program or edit / start / stop / restart / delete an existing one. Sync afterwards to apply changes on the server.') }}</p>
                 </div>
@@ -280,17 +280,15 @@
 {{-- Org templates card — separate from the create flow so it stays
      visible on the page instead of being buried inside the modal. --}}
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-        <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Reuse') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Reuse') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization templates') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Save the current form as a reusable template for other servers in this organization. Apply later from the create modal’s preset picker.') }}</p>
             </div>
-        </div>
     </div>
     <div class="p-6 sm:p-7">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end">

@@ -4,10 +4,11 @@
                      Matches the redesigned Overview-tab panel for consistency. --}}
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
                     <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-forest/10">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-dynamic-component :component="$info['icon']" class="h-5 w-5 text-brand-forest" />
-                        </div>
+                        </span>
                         <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
                             <h3 class="text-lg font-semibold text-brand-ink">{{ $info['label'] }}</h3>
                             @if ($version !== '')
                                 <p class="font-mono text-[11px] text-brand-mist">{{ $version }}</p>
@@ -211,11 +212,15 @@
                         '7d' => __('7d'),
                     ];
                 @endphp
-                <div class="{{ $card }} p-6 sm:p-8" wire:key="health-{{ $key }}-{{ $engine_metrics_range }}">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — recent health', ['engine' => $info['label']]) }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Live counters from the dply metrics agent. Charts show min/max band, line is the bucket average.') }}</p>
+                <div class="{{ $card }}" wire:key="health-{{ $key }}-{{ $engine_metrics_range }}">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — recent health', ['engine' => $info['label']]) }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live counters from the dply metrics agent. Charts show min/max band, line is the bucket average.') }}</p>
                         </div>
                         <div
                             x-data="{
@@ -254,6 +259,7 @@
                         </div>
                     </div>
 
+                    <div class="px-6 py-6 sm:px-7">
                     @if ($latestBlock === null)
                         <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss">
                             <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
@@ -364,6 +370,7 @@
                             </div>
                         @endif
                     @endif
+                    </div>
                 </div>
             @endif
 

@@ -29,11 +29,19 @@
             </ol>
 
             @if ($step === 'repo')
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm ring-1 ring-brand-ink/[0.04]">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Start with your repository') }}</h2>
-                    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('We shallow-clone the branch, detect runtimes (including monorepos), and map each package to Edge, Cloud, or BYO layers.') }}</p>
-
-                    <form wire:submit="analyze" class="mt-6 space-y-4">
+                <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm ring-1 ring-brand-ink/[0.04]">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Start with your repository') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('We shallow-clone the branch, detect runtimes (including monorepos), and map each package to Edge, Cloud, or BYO layers.') }}</p>
+                        </div>
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
+                    <form wire:submit="analyze" class="space-y-4">
                         <div>
                             <x-input-label for="full-stack-repo" :value="__('Git repository URL')" />
                             <x-text-input wire:model="repo" id="full-stack-repo" type="url" class="mt-1 block w-full font-mono text-sm" placeholder="https://github.com/org/monorepo" required />
@@ -51,22 +59,28 @@
                             </x-primary-button>
                         </div>
                     </form>
+                    </div>
                 </section>
             @endif
 
             @if ($step === 'plan' && $plan !== [])
                 <section class="space-y-6">
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm ring-1 ring-brand-ink/[0.04]">
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recommended architecture') }}</h2>
+                    <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm ring-1 ring-brand-ink/[0.04]">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Architecture') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recommended architecture') }}</h2>
                                 <p class="mt-1 font-mono text-sm text-brand-moss">{{ $plan['repo'] ?? '' }} @ {{ $plan['branch'] ?? 'main' }}</p>
                                 @if ($plan['is_monorepo'] ?? false)
                                     <p class="mt-2 inline-flex rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Monorepo') }}</p>
                                 @endif
                             </div>
-                            <button type="button" wire:click="backToRepo" class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Change repo') }}</button>
+                            <button type="button" wire:click="backToRepo" class="shrink-0 text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Change repo') }}</button>
                         </div>
+                        <div class="px-6 py-6 sm:px-7">
 
                         @if (! empty($plan['reasons']))
                             <ul class="mt-4 space-y-1 text-sm text-brand-moss">
@@ -83,6 +97,7 @@
                                 @endforeach
                             </div>
                         @endif
+                        </div>
                     </div>
 
                     <div class="grid gap-4">
@@ -135,11 +150,19 @@
             @endif
 
             @if ($step === 'wiring' && $plan !== [])
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm ring-1 ring-brand-ink/[0.04]">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Wiring guide') }}</h2>
-                    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('Follow these steps after each layer is provisioned. Order matters when origins and databases must exist before the edge front goes live.') }}</p>
-
-                    <ol class="mt-6 list-decimal space-y-3 ps-5 text-sm leading-6 text-brand-ink">
+                <section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm ring-1 ring-brand-ink/[0.04]">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Wiring') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Wiring guide') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Follow these steps after each layer is provisioned. Order matters when origins and databases must exist before the edge front goes live.') }}</p>
+                        </div>
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
+                    <ol class="list-decimal space-y-3 ps-5 text-sm leading-6 text-brand-ink">
                         @foreach ($plan['wiring_hints'] ?? [] as $hint)
                             <li>{{ $hint }}</li>
                         @endforeach
@@ -147,6 +170,7 @@
 
                     <div class="mt-8 flex flex-wrap gap-3">
                         <button type="button" wire:click="$set('step', 'plan')" class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Back to architecture') }}</button>
+                    </div>
                     </div>
                 </section>
             @endif

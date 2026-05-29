@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
+use App\Support\Servers\CacheEngineAvailability;
 use Illuminate\Support\Arr;
 
 /**
@@ -41,7 +42,7 @@ final class FilterServerProvisionOptionsForCreateForm
     public function handle(string $formType, bool $hasLinkedCredentialForProvider, string $serverRole = 'application'): array
     {
         if ($formType === 'custom') {
-            return $this->stripMetaFromConfig();
+            return $this->removeComingSoonEngines($this->stripMetaFromConfig());
         }
 
         $raw = config('server_provision_options', []);
@@ -56,6 +57,34 @@ final class FilterServerProvisionOptionsForCreateForm
                 $hasLinkedCredentialForProvider,
                 $key === 'server_roles' ? null : $serverRole,
             );
+        }
+
+        return $this->removeComingSoonEngines($out);
+    }
+
+    /**
+     * Drop cache engines that are still "coming soon" (gated behind cache.*
+     * Pennant flags) from the create wizard. Redis is never gated. Also drops
+     * the dedicated Valkey server role when Valkey is coming soon so it can't
+     * be provisioned out from under the gate.
+     *
+     * @param  array<string, list<array<string, mixed>>>  $out
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function removeComingSoonEngines(array $out): array
+    {
+        if (isset($out['cache_services']) && is_array($out['cache_services'])) {
+            $out['cache_services'] = array_values(array_filter(
+                $out['cache_services'],
+                fn (array $row): bool => CacheEngineAvailability::isAvailable((string) ($row['id'] ?? '')),
+            ));
+        }
+
+        if (isset($out['server_roles']) && is_array($out['server_roles'])) {
+            $out['server_roles'] = array_values(array_filter(
+                $out['server_roles'],
+                fn (array $row): bool => ! (($row['id'] ?? null) === 'valkey' && CacheEngineAvailability::isComingSoon('valkey')),
+            ));
         }
 
         return $out;

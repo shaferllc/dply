@@ -22,6 +22,7 @@ use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -121,6 +122,10 @@ test('install allows memcached alongside a redis family engine', function () {
     Queue::fake();
     [$user, $server] = actingOwnerWithServer();
 
+    // Memcached is gated behind cache.memcached (coming soon by default); enable
+    // it platform-wide so this test exercises the coexistence path, not the gate.
+    Feature::for(null)->activate('cache.memcached');
+
     ServerCacheService::query()->create([
         'server_id' => $server->id,
         'engine' => 'redis',
@@ -160,6 +165,10 @@ test('install refuses second redis family engine on same server', function () {
     Queue::fake();
     [$user, $server] = actingOwnerWithServer();
 
+    // Enable Valkey so the refusal under test is the redis-family coexistence
+    // rule, not the coming-soon gate.
+    Feature::for(null)->activate('cache.valkey');
+
     ServerCacheService::query()->create([
         'server_id' => $server->id,
         'engine' => 'redis',
@@ -184,11 +193,37 @@ test('install refuses second redis family engine on same server', function () {
         'engine' => 'valkey',
     ]);
 });
+test('install refuses a coming soon engine before queueing', function () {
+    // Default state: Valkey is gated behind cache.valkey (coming soon). The
+    // install action must refuse without creating a row or queueing a job.
+    Queue::fake();
+    [$user, $server] = actingOwnerWithServer();
+
+    $this->mock(ServerCacheServiceHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+        $mock->shouldReceive('engineUnsupportedReason')->zeroOrMoreTimes()->andReturn(null);
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceCaches::class, ['server' => $server])
+        ->call('installCacheService', 'valkey');
+
+    Queue::assertNotPushed(InstallCacheServiceJob::class);
+    $this->assertDatabaseMissing('server_cache_services', [
+        'server_id' => $server->id,
+        'engine' => 'valkey',
+    ]);
+});
 test('install blocks when another install is in flight', function () {
     // The new server-wide busy guard blocks even cross-engine installs while apt is
     // running on the box (dpkg lock-frontend is per-host).
     Queue::fake();
     [$user, $server] = actingOwnerWithServer();
+
+    // Enable Valkey so the in-flight busy guard is what blocks the install,
+    // not the coming-soon gate.
+    Feature::for(null)->activate('cache.valkey');
 
     ServerCacheService::query()->create([
         'server_id' => $server->id,

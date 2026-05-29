@@ -8,7 +8,7 @@
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                         <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">

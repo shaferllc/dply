@@ -71,9 +71,15 @@
     {{-- Server-level steps --}}
     @if ($serverSteps->isNotEmpty())
         <section class="dply-card overflow-hidden mb-6">
-            <header class="border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-3">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Server-level steps') }}</h2>
-            </header>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Steps') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server-level steps') }}</h2>
+                </div>
+            </div>
             <ul class="divide-y divide-brand-ink/5">
                 @foreach ($serverSteps as $step)
                     @php $sp = $pill($step->status); @endphp
@@ -355,11 +361,17 @@
 
     @php $reviewItems = $migration->manual_review_items ?? []; @endphp
     @if (! empty($reviewItems))
-        <section class="dply-card mt-8 overflow-hidden">
-            <header class="border-b border-brand-ink/10 bg-amber-50/70 px-5 py-3">
-                <h2 class="text-sm font-semibold text-amber-950">{{ __('Manual review — items dply did not migrate') }}</h2>
-                <p class="text-xs text-amber-900">{{ __('These existed on your Ploi server but require manual handling on dply. Review each one and dismiss when done.') }}</p>
-            </header>
+        <section class="dply-card mt-8 overflow-hidden border-amber-200">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Review') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manual review — items dply did not migrate') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('These existed on your Ploi server but require manual handling on dply. Review each one and dismiss when done.') }}</p>
+                </div>
+            </div>
             <ul class="divide-y divide-brand-ink/5">
                 @foreach ($reviewItems as $idx => $item)
                     @php
