@@ -55,6 +55,26 @@ return [
     ],
 
     /*
+    | Cache engines offered for install on BYO servers. Redis is always
+    | available; the rest start as "coming soon" until their install +
+    | operate path is validated. When a flag is off the engine shows a
+    | Soon badge + teaser in the Caches workspace and is filtered out of
+    | the server-create cache picker. Resolved per-org by the hybrid
+    | resolver, so platform admin can flip them on per-org or platform-wide
+    | from /admin/flags — same pattern as the workspace coming-soon previews.
+    */
+    'cache' => [
+        // exit: ship once Valkey install + engine-switch validated on Ubuntu 22.04/24.04 + Debian 12
+        'valkey' => env('FEATURE_CACHE_VALKEY', false),
+        // exit: ship once Memcached install + connection snippet validated on three OSes
+        'memcached' => env('FEATURE_CACHE_MEMCACHED', false),
+        // exit: ship once KeyDB upstream distro coverage is validated end-to-end
+        'keydb' => env('FEATURE_CACHE_KEYDB', false),
+        // exit: ship once Dragonfly pinned-release install is validated on three OSes
+        'dragonfly' => env('FEATURE_CACHE_DRAGONFLY', false),
+    ],
+
+    /*
     | Server-workspace tabs that are NOT in the MVP 14. Each maps to a
     | Livewire component under app/Livewire/Servers/Workspace*.php.
     */

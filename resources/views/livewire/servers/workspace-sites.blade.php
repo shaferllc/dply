@@ -118,20 +118,16 @@
 
         @if ($bulkActionsEnabled && ! $isContainerHost && $siteCount > 0 && is_array($bulkPreview))
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Fleet actions') }}</p>
-                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bulk site operations') }}</h2>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Run the same action across every deployable site on this server without opening each workspace.') }}
-                                </p>
-                            </div>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fleet actions') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Bulk site operations') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Run the same action across every deployable site on this server without opening each workspace.') }}
+                        </p>
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-3 px-6 py-4 sm:px-7">
@@ -166,20 +162,18 @@
 
         {{-- Sites list. --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listEyebrow }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $listHeading }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Click a row to open that workspace and manage deploys, env, and settings.') }}</p>
-                    </div>
-                    @if ($siteCount > 0)
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
-                    @endif
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $listEyebrow }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $listHeading }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Click a row to open that workspace and manage deploys, env, and settings.') }}</p>
                 </div>
+                @if ($siteCount > 0)
+                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
+                @endif
             </div>
 
             @if ($server->sites->isEmpty())

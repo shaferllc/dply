@@ -88,8 +88,14 @@
                     @endif
 
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Deployment details') }}</h2>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Details') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment details') }}</h2>
+                            </div>
                         </div>
                         <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
                             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -123,15 +129,19 @@
 
                     @if ($deploymentAliases !== [])
                         <section class="dply-card overflow-hidden">
-                            <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                                <div>
-                                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Stable aliases') }}</h2>
-                                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Permanent URLs that always resolve to this build.') }}</p>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Aliases') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stable aliases') }}</h2>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Permanent URLs that always resolve to this build.') }}</p>
                                 </div>
                                 <a
                                     href="{{ route('sites.edge.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment, 'tab' => 'aliases']) }}"
                                     wire:navigate
-                                    class="text-xs font-medium text-brand-sage hover:underline"
+                                    class="shrink-0 text-xs font-medium text-brand-sage hover:underline"
                                 >
                                     {{ __('View all aliases →') }}
                                 </a>
@@ -155,9 +165,15 @@
                     @endif
                 @elseif ($tab === 'aliases')
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Stable per-deploy aliases') }}</h2>
-                            <p class="mt-0.5 text-sm text-brand-moss">{{ __('These hostnames always route to this deployment via the Edge host map — even after production moves on.') }}</p>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Aliases') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stable per-deploy aliases') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('These hostnames always route to this deployment via the Edge host map — even after production moves on.') }}</p>
+                            </div>
                         </div>
                         @if ($deploymentAliases === [])
                             <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">
@@ -222,12 +238,18 @@
                     @endif
 
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h2 class="text-base font-semibold text-brand-ink">
-                                {{ $isInProgress ? __('Archived build log') : __('Build log') }}
-                            </h2>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Build log') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                    {{ $isInProgress ? __('Archived build log') : __('Build log') }}
+                                </h2>
+                            </div>
                             @if (! $isInProgress && $buildLog !== null && $buildLog !== '')
-                                <span class="text-[10px] uppercase tracking-wide text-brand-mist">{{ number_format(strlen($buildLog)) }} bytes</span>
+                                <span class="shrink-0 text-[10px] uppercase tracking-wide text-brand-mist">{{ number_format(strlen($buildLog)) }} bytes</span>
                             @endif
                         </div>
                         @if ($buildLog === null || $buildLog === '')
@@ -243,12 +265,18 @@
 
                     @if (! empty($recentDeployments))
                         <section class="dply-card overflow-hidden">
-                            <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                                <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h2>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h2>
+                                </div>
                                 <a
                                     href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-deploys']) }}"
                                     wire:navigate
-                                    class="text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage"
+                                    class="shrink-0 text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage"
                                 >
                                     {{ __('All deploys →') }}
                                 </a>

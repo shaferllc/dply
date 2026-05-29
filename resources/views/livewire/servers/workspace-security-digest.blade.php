@@ -69,7 +69,7 @@
             <section class="dply-card overflow-hidden border-amber-200">
                 <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                             <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
@@ -87,14 +87,14 @@
         @endif
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 {{ $overallTone }}">
                             <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @switch($report['overall'])
                                     @case('critical') {{ __('Immediate review recommended') }} @break
@@ -191,13 +191,13 @@
 
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['mist'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Auth log breakdown') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auth log breakdown') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Brute-force indicators') }}</h2>
                             <p class="mt-1 text-sm text-brand-moss">
                                 {{ __('Warning ≥ :warning · Critical ≥ :critical · Recent burst ≥ :recent', [
@@ -245,13 +245,13 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('SSH hardening') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSH hardening') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Effective sshd settings') }}</h2>
                             <p class="mt-1 text-sm text-brand-moss">{{ __('Sampled with sshd -T on the host during scan.') }}</p>
                         </div>
@@ -363,14 +363,14 @@
 
         @if ($sshAccessEnabled && $sshAccess)
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Access graph rollup') }}</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access graph rollup') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     {{ trans_choice(':count authorized key|:count authorized keys', $sshAccess['total_keys'], ['count' => $sshAccess['total_keys']]) }}
                                 </h2>

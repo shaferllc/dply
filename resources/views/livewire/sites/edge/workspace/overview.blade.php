@@ -12,9 +12,15 @@
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Delivery') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Where this site is published and how traffic is routed.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Delivery') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Where this site is published and how traffic is routed.') }}</p>
+                </div>
             </div>
             <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -52,9 +58,15 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Source') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Git repository connected to this Edge site.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Source') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Source') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Git repository connected to this Edge site.') }}</p>
+                </div>
             </div>
             <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -89,12 +101,16 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Hostnames routed to this Edge site.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Hostnames routed to this Edge site.') }}</p>
                 </div>
-                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-domains']) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">
+                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'edge-domains']) }}" wire:navigate class="shrink-0 text-xs font-medium text-brand-sage hover:underline">
                     {{ __('Manage') }}
                 </a>
             </div>

@@ -10,24 +10,21 @@
 
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}"><x-heroicon-o-key class="h-5 w-5" /></span>
-                        <div>
-                            <h2 class="text-base font-semibold text-brand-ink">{{ trans_choice(':count authorized key|:count authorized keys', $report['summary']['total'], ['count' => $report['summary']['total']]) }}</h2>
-                            <p class="mt-1 text-sm text-brand-moss">
-                                @if ($report['sync']['last_finished_at']){{ __('Last sync :time', ['time' => $report['sync']['last_finished_at']->diffForHumans()]) }}@endif
-                                @if ($report['sync']['disabled']) · {{ __('Sync disabled') }}@endif
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        @if ($sessionsEnabled)
-                            <button type="button" wire:click="openGrantSessionModal" class="inline-flex items-center gap-1 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10">{{ __('Grant session') }}</button>
-                        @endif
-                        <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Manage keys') }}</a>
-                    </div>
+            <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25"><x-heroicon-o-key class="h-5 w-5" /></span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ trans_choice(':count authorized key|:count authorized keys', $report['summary']['total'], ['count' => $report['summary']['total']]) }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        @if ($report['sync']['last_finished_at']){{ __('Last sync :time', ['time' => $report['sync']['last_finished_at']->diffForHumans()]) }}@endif
+                        @if ($report['sync']['disabled']) · {{ __('Sync disabled') }}@endif
+                    </p>
+                </div>
+                <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto">
+                    @if ($sessionsEnabled)
+                        <button type="button" wire:click="openGrantSessionModal" class="inline-flex items-center gap-1 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10">{{ __('Grant session') }}</button>
+                    @endif
+                    <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Manage keys') }}</a>
                 </div>
             </div>
             @if ($report['alert_count'] > 0)
@@ -65,9 +62,15 @@
 
         @if ($sessionsEnabled && count($report['sessions']) > 0)
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ trans_choice(':count active contractor session|:count active contractor sessions', $report['summary']['active_sessions'], ['count' => $report['summary']['active_sessions']]) }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Time-boxed keys auto-revoke at expiry. Revoke early from here if access is no longer needed.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sessions') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ trans_choice(':count active contractor session|:count active contractor sessions', $report['summary']['active_sessions'], ['count' => $report['summary']['active_sessions']]) }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Time-boxed keys auto-revoke at expiry. Revoke early from here if access is no longer needed.') }}</p>
+                    </div>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($report['sessions'] as $session)

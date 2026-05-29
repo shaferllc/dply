@@ -1,22 +1,24 @@
 <div class="space-y-6">
     {{-- dply.yaml integration banner (same pattern as Firewall / Crons / Origin) --}}
-    <section class="dply-card">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <div class="flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Error pages + maintenance') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">
-                        {{ __('Customize 404 / 500 and the maintenance page. Declare them in :file with `error_pages:` / `maintenance:` blocks, or edit inline below — both round-trip into the live worker on the next deploy.', ['file' => $sourcePath]) }}
-                    </p>
-                </div>
-                <a
-                    href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
-                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
-                >
-                    <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
-                    {{ __('Generate dply.yaml') }}
-                </a>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Error pages') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Error pages + maintenance') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Customize 404 / 500 and the maintenance page. Declare them in :file with `error_pages:` / `maintenance:` blocks, or edit inline below — both round-trip into the live worker on the next deploy.', ['file' => $sourcePath]) }}
+                </p>
             </div>
+            <a
+                href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
+                class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
+            >
+                <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                {{ __('Generate dply.yaml') }}
+            </a>
         </div>
 
         {{-- From dply.yaml --}}
@@ -63,15 +65,18 @@ maintenance:
     </section>
 
     {{-- Maintenance --}}
-    <section class="dply-card" x-data="{ tpl: 'minimal' }">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
-                <x-heroicon-o-wrench class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                {{ __('Maintenance mode') }}
-            </h3>
-            <p class="mt-0.5 text-sm text-brand-moss">
-                {{ __('Take this site offline with a friendly 503 page. Toggling republishes the host map immediately — no redeploy needed.') }}
-            </p>
+    <section class="dply-card overflow-hidden" x-data="{ tpl: 'minimal' }">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-wrench class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Maintenance') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Maintenance mode') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Take this site offline with a friendly 503 page. Toggling republishes the host map immediately — no redeploy needed.') }}
+                </p>
+            </div>
         </div>
         <div class="space-y-4 px-6 py-5 sm:px-8">
             <label class="flex items-start gap-3">
@@ -108,15 +113,18 @@ maintenance:
     </section>
 
     {{-- Custom 404 / 500 --}}
-    <section class="dply-card">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
-                <x-heroicon-o-exclamation-circle class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                {{ __('Custom error pages') }}
-            </h3>
-            <p class="mt-0.5 text-sm text-brand-moss">
-                {{ __('Override the built-in 404 and 500 responses. Picked up by the worker on the next deploy.') }}
-            </p>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-exclamation-circle class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Error pages') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom error pages') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Override the built-in 404 and 500 responses. Picked up by the worker on the next deploy.') }}
+                </p>
+            </div>
         </div>
         <div class="space-y-5 px-6 py-5 sm:px-8">
             <div>

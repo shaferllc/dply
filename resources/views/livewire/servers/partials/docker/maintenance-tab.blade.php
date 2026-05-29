@@ -51,9 +51,15 @@
 </section>
 
 <section class="mt-6 dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Prune & cleanup') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Destructive actions run over SSH and stream output in the banner above.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+            <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Cleanup') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Prune & cleanup') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Destructive actions run over SSH and stream output in the banner above.') }}</p>
+        </div>
     </div>
     <div class="flex flex-wrap gap-3 px-6 py-5 sm:px-7">
         @if (is_array($serviceActions['docker_image_prune'] ?? null))

@@ -18,22 +18,20 @@
             $inventoryRoute = $isForge ? route('imports.forge.inventory') : route('imports.ploi.inventory');
         @endphp
         <section class="mt-6 dply-card overflow-hidden border-amber-200">
-            <div class="border-b border-brand-ink/10 bg-amber-50/70 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
-                        <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Creating the dply server for :label', ['label' => $migrationSourceLabel]) }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Walk through the wizard to provision the destination server. Once it is ready, your selected sites migrate automatically — code, env, databases, crons, and SSL.') }}
-                        </p>
-                        <a href="{{ $inventoryRoute }}" wire:navigate class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700">
-                            <x-heroicon-m-arrow-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            {{ __('Cancel and return to inventory') }}
-                        </a>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                    <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Creating the dply server for :label', ['label' => $migrationSourceLabel]) }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Walk through the wizard to provision the destination server. Once it is ready, your selected sites migrate automatically — code, env, databases, crons, and SSL.') }}
+                    </p>
+                    <a href="{{ $inventoryRoute }}" wire:navigate class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700">
+                        <x-heroicon-m-arrow-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ __('Cancel and return to inventory') }}
+                    </a>
                 </div>
             </div>
         </section>
@@ -91,18 +89,16 @@
         <div class="mt-6 space-y-6">
             {{-- Mode selection --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Mode') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How are you adding this server?') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick one — provider provisioning or bring your own host over SSH.') }}</p>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Mode') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How are you adding this server?') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick one — provider provisioning or bring your own host over SSH.') }}</p>
                     </div>
+                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                 </div>
                 <div class="p-6 sm:p-7">
                     {{-- Server-driven: classes follow $form->mode so a fast A/B/A
@@ -193,16 +189,14 @@
 
             {{-- Server name --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                            <x-heroicon-o-tag class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Identity') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server name') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Letters, digits, dot, underscore, hyphen — up to 64 chars.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-tag class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server name') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Letters, digits, dot, underscore, hyphen — up to 64 chars.') }}</p>
                     </div>
                 </div>
                 <div class="p-6 sm:p-7">

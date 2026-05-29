@@ -1,19 +1,20 @@
 <div class="space-y-6">
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <div class="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
-                    <x-heroicon-o-signal class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                    {{ __('RUM alert thresholds') }}
-                </h3>
-                <span wire:loading.inline-flex wire:target="lcp_enabled,err_rate_enabled,err_count_enabled,save" class="inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
-                    <x-spinner size="sm" variant="muted" />
-                    {{ __('Updating…') }}
-                </span>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('RUM alert thresholds') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Checked hourly against the last 60 minutes of traffic + vitals. Breaches publish the `edge.rum.breach` event; route it to Slack/email/webhook via your notification channels. Each (site, kind) has a 6-hour cooldown so sustained issues only page once per window.') }}
+                </p>
             </div>
-            <p class="mt-0.5 text-sm text-brand-moss">
-                {{ __('Checked hourly against the last 60 minutes of traffic + vitals. Breaches publish the `edge.rum.breach` event; route it to Slack/email/webhook via your notification channels. Each (site, kind) has a 6-hour cooldown so sustained issues only page once per window.') }}
-            </p>
+            <span wire:loading.inline-flex wire:target="lcp_enabled,err_rate_enabled,err_count_enabled,save" class="ml-auto inline-flex shrink-0 items-center gap-1.5 text-[11px] text-brand-moss">
+                <x-spinner size="sm" variant="muted" />
+                {{ __('Updating…') }}
+            </span>
         </div>
         <div class="divide-y divide-brand-ink/10">
             <div class="grid grid-cols-1 gap-3 px-6 py-4 sm:grid-cols-[1fr_10rem_auto] sm:items-center sm:px-8">

@@ -3,13 +3,14 @@
 @endphp
 
 <section class="dply-card overflow-hidden">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-document-text class="h-5 w-5" />
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('dply.yaml (in-repo)') }}</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply.yaml (in-repo)') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     {{ __('Commit redirects, site crons, server crons, and deploy hooks in dply.yaml — Dply syncs them after each deploy on this server.') }}
                 </p>

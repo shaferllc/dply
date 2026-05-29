@@ -3,9 +3,15 @@
 @endphp
 
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Engine') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('From the last inventory probe. Open Containers or Maintenance for live SSH data.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Engine') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('From the last inventory probe. Open Containers or Maintenance for live SSH data.') }}</p>
+        </div>
     </div>
     <dl class="grid gap-px bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-4">
         <div class="bg-white px-5 py-4">

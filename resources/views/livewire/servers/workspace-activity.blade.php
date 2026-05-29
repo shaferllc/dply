@@ -107,14 +107,15 @@
             labelled-by="activity-tab-feed"
             :hidden="false"
         >
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-clock class="h-5 w-5" />
+            <div class="{{ $card }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Feed') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Server, site, deploy, and insight events — chronologically. Click "Show" on a row to see the before/after diff.') }}
                         </p>
                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -132,6 +133,7 @@
                     </div>
                 </div>
 
+                <div class="px-6 py-6 sm:px-7">
                 @if ($events->isEmpty())
                     <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
@@ -239,6 +241,7 @@
                         {{ $events->links() }}
                     </div>
                 @endif
+                </div>
             </div>
         </x-server-workspace-tab-panel>
     @else
@@ -247,14 +250,15 @@
             labelled-by="activity-tab-trends"
             :hidden="false"
         >
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-chart-bar class="h-5 w-5" />
+            <div class="{{ $card }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0 flex-1">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Events per day') }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trends') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Events per day') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Stacked by category. Hover any bar for the per-category breakdown.') }}
                         </p>
                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -268,6 +272,7 @@
                     </div>
                 </div>
 
+                <div class="px-6 py-6 sm:px-7">
                 @if (array_sum(array_column($trends['buckets'], 'total')) === 0)
                     <div class="mt-6 flex flex-col items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-10 text-center">
                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand-mist ring-1 ring-brand-ink/10">
@@ -339,6 +344,7 @@
                         @endforeach
                     </div>
                 @endif
+                </div>
             </div>
         </x-server-workspace-tab-panel>
     @endif

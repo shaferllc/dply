@@ -13,13 +13,13 @@
          a one-click jump to the server logs workspace right at the top
          instead of forcing them to backtrack. --}}
     <div class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-3 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-3 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Logs') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site logs') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Showing this site\'s vhost + deploy logs. Need machine-wide logs (syslog, PHP-FPM, fleet activity) for :server? Open them here without leaving the page.', ['server' => $server->name]) }}

@@ -113,23 +113,27 @@
         {{-- Main column --}}
         <div class="min-w-0 space-y-6">
             {{-- Step 1: credentials --}}
-            <section class="rounded-3xl border border-brand-ink/10 bg-white shadow-sm">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/8 px-6 py-5">
-                    <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('DigitalOcean account') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
+            <section class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DigitalOcean account') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Pick the credential whose droplets you want to discover.') }}
                         </p>
                     </div>
                     @if ($hasCredentials)
-                        <x-add-provider-credential-link provider="digitalocean" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5 text-xs font-semibold text-brand-ink no-underline hover:bg-brand-sand/40">
+                        <x-add-provider-credential-link provider="digitalocean" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5 text-xs font-semibold text-brand-ink no-underline hover:bg-brand-sand/40">
                             <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
                             {{ __('Add account') }}
                         </x-add-provider-credential-link>
                     @endif
                 </div>
 
-                <div class="p-6">
+                <div class="px-6 py-6 sm:px-7">
                     @if (! $hasCredentials)
                         <div class="rounded-2xl border border-dashed border-[#0080FF]/25 bg-gradient-to-br from-[#0080FF]/[0.04] via-white to-brand-cream/50 p-8 text-center">
                             <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0080FF]/10 text-[#0080FF] ring-1 ring-[#0080FF]/20">
@@ -219,17 +223,23 @@
             {{-- Step 2: droplets --}}
             @if ($hasDroplets)
                 <section
-                    class="rounded-3xl border border-brand-ink/10 bg-white shadow-sm"
+                    class="dply-card overflow-hidden"
                     x-data="{ filter: '' }"
                 >
-                    <div class="flex flex-col gap-4 border-b border-brand-ink/8 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Droplets in account') }}</h2>
-                            <p class="mt-1 text-sm text-brand-moss">
-                                {{ __('Found :count droplet(s). Already-imported droplets are disabled.', ['count' => $dropletStats['total']]) }}
-                            </p>
+                    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Droplets') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Droplets in account') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Found :count droplet(s). Already-imported droplets are disabled.', ['count' => $dropletStats['total']]) }}
+                                </p>
+                            </div>
                         </div>
-                        <label class="relative block w-full sm:max-w-xs">
+                        <label class="relative block w-full shrink-0 sm:max-w-xs">
                             <span class="sr-only">{{ __('Filter droplets') }}</span>
                             <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" aria-hidden="true" />
                             <input
@@ -241,7 +251,7 @@
                         </label>
                     </div>
 
-                    <ul class="grid gap-4 p-6 sm:grid-cols-2">
+                    <ul class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-7">
                         @foreach ($droplets as $d)
                             @php
                                 $alreadyImported = (bool) ($d['_already_imported'] ?? false);

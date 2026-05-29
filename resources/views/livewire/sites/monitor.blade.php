@@ -65,13 +65,13 @@
             @if (($runtimeMode ?? '') === 'serverless' && $functionStats)
                 @php $fnSummary = $functionStats['summary']; @endphp
                 <section class="{{ $card }}">
-                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
                         <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Insights') }}</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function activity') }}</h2>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Invocations, errors, latency and cold starts — every recorded call to this function.') }}</p>
                             </div>
@@ -135,13 +135,13 @@
                  actual form — keeps the page focused on the monitors list when the operator
                  is just here to check status. --}}
             <div class="{{ $card }}">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Uptime') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Uptime') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Pick a label, optional path, and a probe-region label. The first check runs immediately.') }}
@@ -251,13 +251,13 @@
             </x-modal>
 
             <section class="{{ $card }}">
-                <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+                <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Checks') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Checks') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Monitors') }}</h2>
                         </div>
                     </div>

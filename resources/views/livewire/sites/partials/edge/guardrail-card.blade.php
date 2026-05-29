@@ -3,10 +3,14 @@
 @endphp
 
 <section class="dply-card overflow-hidden">
-    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <div>
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Monthly usage quota') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quota') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Monthly usage quota') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Soft cap on requests and bandwidth per calendar month. You get a heads-up at :pct%; once you cross 100%, the dashboard flags the site as over quota.', ['pct' => $guardrail['warn_at_percent'] ?? config('edge.guardrail.warn_at_percent', 80)]) }}
             </p>
         </div>
@@ -24,7 +28,7 @@
                     default => __('OK'),
                 };
             @endphp
-            <span class="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $stateBadge }}">
+            <span class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $stateBadge }}">
                 {{ $stateLabel }}
             </span>
         @endif

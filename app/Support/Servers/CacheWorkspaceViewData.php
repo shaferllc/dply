@@ -47,6 +47,11 @@ final class CacheWorkspaceViewData
         ], true));
         $cacheBusy = $busyService !== null;
 
+        // Engine => coming-soon bool. Redis is always available; the rest are
+        // gated behind cache.{engine} flags. Drives the Soon badge on the tab
+        // strip + the coming-soon teaser in the engine panel.
+        $comingSoonEngines = CacheEngineAvailability::comingSoonMap($engines);
+
         return compact(
             'card',
             'opsReady',
@@ -55,6 +60,7 @@ final class CacheWorkspaceViewData
             'engineDescriptions',
             'busyService',
             'cacheBusy',
+            'comingSoonEngines',
         );
     }
 }

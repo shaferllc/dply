@@ -85,119 +85,107 @@
                 <form wire:submit.prevent="save" class="space-y-6">
                     {{-- Master toggle --}}
                     <section class="{{ $card }}">
-                        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
-                                        <x-heroicon-o-power class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Master switch') }}</p>
-                                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Enable caching') }}</h2>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                            {{ __('Top-level on/off. Individual methods below only apply when this is on.') }}
-                                        </p>
-                                    </div>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-power class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Master switch') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Enable caching') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Top-level on/off. Individual methods below only apply when this is on.') }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="space-y-3 p-6 sm:p-8">
-                                <label class="flex items-center gap-3">
-                                    <input type="checkbox" wire:model.live="enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
-                                    <span class="text-sm font-semibold text-brand-ink">{{ __('Enable caching for this site') }}</span>
-                                </label>
-                            </div>
+                        <div class="space-y-3 px-6 py-6 sm:px-7">
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" wire:model.live="enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                                <span class="text-sm font-semibold text-brand-ink">{{ __('Enable caching for this site') }}</span>
+                            </label>
                         </div>
                     </section>
 
                     {{-- Methods --}}
                     <section class="{{ $card }}">
-                        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
-                                        <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Layers') }}</p>
-                                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Methods') }}</h2>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                            {{ __('Pick which caching layers apply. Availability depends on site type and the server\'s active webserver.') }}
-                                        </p>
-                                    </div>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Layers') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Methods') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Pick which caching layers apply. Availability depends on site type and the server\'s active webserver.') }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="space-y-3 p-6 sm:p-8">
-                                @foreach ($available as $methodId)
-                                    @php
-                                        $meta = $methodCatalog[$methodId] ?? ['name' => $methodId, 'desc' => '', 'icon' => 'heroicon-o-bolt', 'tone' => ['bg' => 'bg-brand-sand/40', 'text' => 'text-brand-forest', 'ring' => 'ring-brand-ink/10']];
-                                        $isOn = in_array($methodId, $methods, true);
-                                    @endphp
-                                    <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 transition-colors hover:bg-brand-sand/20 {{ $isOn ? 'bg-brand-sand/15' : '' }}">
-                                        <input type="checkbox"
-                                               @checked($isOn)
-                                               wire:click="toggleMethod('{{ $methodId }}')"
-                                               class="mt-1 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $meta['tone']['bg'] }} {{ $meta['tone']['text'] }} {{ $meta['tone']['ring'] }}">
-                                            <x-dynamic-component :component="$meta['icon']" class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $meta['name'] }}</p>
-                                            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $meta['desc'] }}</p>
-                                        </div>
-                                    </label>
-                                @endforeach
-                            </div>
+                        <div class="space-y-3 px-6 py-6 sm:px-7">
+                            @foreach ($available as $methodId)
+                                @php
+                                    $meta = $methodCatalog[$methodId] ?? ['name' => $methodId, 'desc' => '', 'icon' => 'heroicon-o-bolt', 'tone' => ['bg' => 'bg-brand-sand/40', 'text' => 'text-brand-forest', 'ring' => 'ring-brand-ink/10']];
+                                    $isOn = in_array($methodId, $methods, true);
+                                @endphp
+                                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 transition-colors hover:bg-brand-sand/20 {{ $isOn ? 'bg-brand-sand/15' : '' }}">
+                                    <input type="checkbox"
+                                           @checked($isOn)
+                                           wire:click="toggleMethod('{{ $methodId }}')"
+                                           class="mt-1 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $meta['tone']['bg'] }} {{ $meta['tone']['text'] }} {{ $meta['tone']['ring'] }}">
+                                        <x-dynamic-component :component="$meta['icon']" class="h-5 w-5" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $meta['name'] }}</p>
+                                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $meta['desc'] }}</p>
+                                    </div>
+                                </label>
+                            @endforeach
                         </div>
                     </section>
 
                     @if (in_array('nginx_http', $methods, true))
                         <section class="{{ $card }}">
-                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                    <div class="flex items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
-                                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Nginx') }}</p>
-                                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP cache settings') }}</h2>
-                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                {{ __('FastCGI + proxy cache TTLs, plus bypass cookies that skip the cache entirely.') }}
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Nginx') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP cache settings') }}</h2>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        {{ __('FastCGI + proxy cache TTLs, plus bypass cookies that skip the cache entirely.') }}
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div class="space-y-5 p-6 sm:p-8">
-                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="fcgi_ttl_200">{{ __('FastCGI TTL (200)') }}</label>
-                                            <input id="fcgi_ttl_200" type="text" wire:model="nginx_fcgi_ttl_200" class="{{ $inputCls }}">
-                                        </div>
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="fcgi_ttl_404">{{ __('FastCGI TTL (404)') }}</label>
-                                            <input id="fcgi_ttl_404" type="text" wire:model="nginx_fcgi_ttl_404" class="{{ $inputCls }}">
-                                        </div>
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="fcgi_min_uses">{{ __('FastCGI min uses') }}</label>
-                                            <input id="fcgi_min_uses" type="number" min="1" wire:model="nginx_fcgi_min_uses" class="{{ $inputCls }}">
-                                        </div>
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="proxy_ttl_200">{{ __('Proxy TTL (200)') }}</label>
-                                            <input id="proxy_ttl_200" type="text" wire:model="nginx_proxy_ttl_200" class="{{ $inputCls }}">
-                                        </div>
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="proxy_ttl_404">{{ __('Proxy TTL (404)') }}</label>
-                                            <input id="proxy_ttl_404" type="text" wire:model="nginx_proxy_ttl_404" class="{{ $inputCls }}">
-                                        </div>
+                            <div class="space-y-5 px-6 py-6 sm:px-7">
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                    <div>
+                                        <label class="{{ $labelCls }}" for="fcgi_ttl_200">{{ __('FastCGI TTL (200)') }}</label>
+                                        <input id="fcgi_ttl_200" type="text" wire:model="nginx_fcgi_ttl_200" class="{{ $inputCls }}">
                                     </div>
                                     <div>
-                                        <label class="{{ $labelCls }}" for="bypass_cookies">{{ __('Bypass cookies (comma or space separated)') }}</label>
-                                        <input id="bypass_cookies" type="text" placeholder="phpsessid, laravel_session" wire:model="bypass_cookies_input" class="{{ $inputCls }}">
-                                        <p class="mt-1 text-xs text-brand-moss">{{ __('Requests carrying any of these cookies skip the cache. Wildcards are not supported yet.') }}</p>
+                                        <label class="{{ $labelCls }}" for="fcgi_ttl_404">{{ __('FastCGI TTL (404)') }}</label>
+                                        <input id="fcgi_ttl_404" type="text" wire:model="nginx_fcgi_ttl_404" class="{{ $inputCls }}">
                                     </div>
+                                    <div>
+                                        <label class="{{ $labelCls }}" for="fcgi_min_uses">{{ __('FastCGI min uses') }}</label>
+                                        <input id="fcgi_min_uses" type="number" min="1" wire:model="nginx_fcgi_min_uses" class="{{ $inputCls }}">
+                                    </div>
+                                    <div>
+                                        <label class="{{ $labelCls }}" for="proxy_ttl_200">{{ __('Proxy TTL (200)') }}</label>
+                                        <input id="proxy_ttl_200" type="text" wire:model="nginx_proxy_ttl_200" class="{{ $inputCls }}">
+                                    </div>
+                                    <div>
+                                        <label class="{{ $labelCls }}" for="proxy_ttl_404">{{ __('Proxy TTL (404)') }}</label>
+                                        <input id="proxy_ttl_404" type="text" wire:model="nginx_proxy_ttl_404" class="{{ $inputCls }}">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="{{ $labelCls }}" for="bypass_cookies">{{ __('Bypass cookies (comma or space separated)') }}</label>
+                                    <input id="bypass_cookies" type="text" placeholder="phpsessid, laravel_session" wire:model="bypass_cookies_input" class="{{ $inputCls }}">
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Requests carrying any of these cookies skip the cache. Wildcards are not supported yet.') }}</p>
                                 </div>
                             </div>
                         </section>
@@ -205,87 +193,75 @@
 
                     @if (in_array('lscache', $methods, true))
                         <section class="{{ $card }}">
-                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                    <div class="flex items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
-                                            <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('LSCache') }}</p>
-                                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('LiteSpeed cache settings') }}</h2>
-                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                {{ __('Default object TTL for the LSCache module. Per-rule configuration arrives in v2.') }}
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('LSCache') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('LiteSpeed cache settings') }}</h2>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        {{ __('Default object TTL for the LSCache module. Per-rule configuration arrives in v2.') }}
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div class="space-y-3 p-6 sm:p-8">
-                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="lscache_ttl">{{ __('Default TTL (seconds)') }}</label>
-                                            <input id="lscache_ttl" type="number" min="1" wire:model="lscache_ttl" class="{{ $inputCls }}">
-                                        </div>
+                            <div class="space-y-3 px-6 py-6 sm:px-7">
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label class="{{ $labelCls }}" for="lscache_ttl">{{ __('Default TTL (seconds)') }}</label>
+                                        <input id="lscache_ttl" type="number" min="1" wire:model="lscache_ttl" class="{{ $inputCls }}">
                                     </div>
-                                    <p class="text-xs text-brand-moss">{{ __('Tune fine-grained behavior via the webserver-config editor in the meantime.') }}</p>
                                 </div>
+                                <p class="text-xs text-brand-moss">{{ __('Tune fine-grained behavior via the webserver-config editor in the meantime.') }}</p>
                             </div>
                         </section>
                     @endif
 
                     @if (in_array('varnish', $methods, true))
                         <section class="{{ $card }}">
-                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                    <div class="flex items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
-                                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Varnish') }}</p>
-                                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Front cache settings') }}</h2>
-                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                {{ __('Default object TTL hint passed to the Varnish daemon for this site.') }}
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Varnish') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Front cache settings') }}</h2>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        {{ __('Default object TTL hint passed to the Varnish daemon for this site.') }}
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div class="space-y-3 p-6 sm:p-8">
-                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <div>
-                                            <label class="{{ $labelCls }}" for="varnish_ttl_default">{{ __('Default object TTL') }}</label>
-                                            <input id="varnish_ttl_default" type="text" wire:model="varnish_ttl_default" class="{{ $inputCls }}">
-                                        </div>
+                            <div class="space-y-3 px-6 py-6 sm:px-7">
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label class="{{ $labelCls }}" for="varnish_ttl_default">{{ __('Default object TTL') }}</label>
+                                        <input id="varnish_ttl_default" type="text" wire:model="varnish_ttl_default" class="{{ $inputCls }}">
                                     </div>
-                                    <p class="text-xs text-brand-moss">{{ __('Install or remove the Varnish daemon from the server Caches workspace.') }}</p>
                                 </div>
+                                <p class="text-xs text-brand-moss">{{ __('Install or remove the Varnish daemon from the server Caches workspace.') }}</p>
                             </div>
                         </section>
                     @endif
 
                     @if (in_array('opcache', $methods, true))
                         <section class="{{ $card }}">
-                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                    <div class="flex items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
-                                            <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('OPcache') }}</p>
-                                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP opcode cache') }}</h2>
-                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                {{ __('Server-level setting shared across every PHP site on this server.') }}
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('OPcache') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP opcode cache') }}</h2>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        {{ __('Server-level setting shared across every PHP site on this server.') }}
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div class="space-y-3 p-6 sm:p-8">
-                                    <p class="text-sm text-brand-moss">{{ __('Tune knobs (memory, JIT, validate_timestamps) from the server-level OPcache profile in the server PHP workspace.') }}</p>
-                                </div>
+                            <div class="space-y-3 px-6 py-6 sm:px-7">
+                                <p class="text-sm text-brand-moss">{{ __('Tune knobs (memory, JIT, validate_timestamps) from the server-level OPcache profile in the server PHP workspace.') }}</p>
                             </div>
                         </section>
                     @endif

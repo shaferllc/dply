@@ -48,13 +48,13 @@
 
 {{-- 1. Runtime card --}}
 <section class="dply-card overflow-hidden">
-    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Runtime') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $runtimeDisplay !== __('Not set') ? $runtimeDisplay : __('Language & version') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('What this site runs and how. Language and version live here; per-language tuning lives in the runtime sub-tab below.') }}</p>
             </div>
@@ -66,7 +66,7 @@
         @endif
     </div>
 
-    <div class="space-y-6 p-6 sm:p-8">
+    <div class="space-y-6 px-6 py-6 sm:px-7">
 
     <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4 sm:col-span-2">
@@ -105,18 +105,18 @@
 
 {{-- 2. Detection panel --}}
 <section class="mt-6 dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
             <x-heroicon-o-magnifying-glass-circle class="h-5 w-5" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Detection') }}</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Detection') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository detection') }}</h2>
             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('What Dply inferred from your repository. Detection runs on deploy and container inspect.') }}</p>
         </div>
     </div>
 
-    <div class="space-y-4 p-6 sm:p-8">
+    <div class="space-y-4 px-6 py-6 sm:px-7">
 
     @if ($resolvedDetection)
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/40 p-4">
@@ -189,13 +189,13 @@
      systemd unit to back it. --}}
 @if ($site->type !== \App\Enums\SiteType::Static)
 <section class="mt-6 dply-card overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Processes') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Processes') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site processes') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The web row drives the NGINX upstream. Workers and schedulers run as separate systemd units (dply-site-:id-:name.service).', ['id' => $site->id, 'name' => '<name>']) }}</p>
             </div>
@@ -205,7 +205,7 @@
         @endif
     </div>
 
-    <div class="space-y-4 p-6 sm:p-8">
+    <div class="space-y-4 px-6 py-6 sm:px-7">
 
     @if ($site->processes->isNotEmpty())
         <ul class="space-y-2">
@@ -287,13 +287,13 @@
 @if ($site->usesDockerRuntime())
     @if ($dockerContainers->isNotEmpty() || $runtimePublication !== [])
         <section class="mt-6 dply-card overflow-hidden">
-            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Container') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Container') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Docker discovery') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Saved from the live Docker runtime so hostname, IP, and container identity stay referenceable later.') }}</p>
                     </div>
@@ -303,7 +303,7 @@
                 @endif
             </div>
 
-            <div class="space-y-4 p-6 sm:p-8">
+            <div class="space-y-4 px-6 py-6 sm:px-7">
 
             <dl class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
@@ -361,18 +361,18 @@
 
     @if ($site->usesLocalDockerHostRuntime())
         <section class="mt-6 dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-arrows-pointing-out class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Lifecycle') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Lifecycle') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Container lifecycle') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Lifecycle and inspection for the local container runtime behind this app. Output and historical operations live on the Logs tab.') }}</p>
                 </div>
             </div>
 
-            <div class="space-y-5 p-6 sm:p-8">
+            <div class="space-y-5 px-6 py-6 sm:px-7">
 
             <div>
                 <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Lifecycle') }}</p>
@@ -405,12 +405,12 @@
 
 {{-- 5. Working directory footer --}}
 <div class="mt-6 dply-card overflow-hidden">
-    <div class="flex items-start gap-3 bg-brand-cream/40 px-5 py-4">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+    <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
             <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Path') }}</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Path') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Working directory') }}</h3>
             <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $site->effectiveRepositoryPath() }}</p>
         </div>

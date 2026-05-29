@@ -1,14 +1,19 @@
-                    <section class="dply-card overflow-hidden p-6 sm:p-8 space-y-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <h3 class="text-base font-semibold text-brand-ink">{{ __('Runtime target') }}</h3>
-                                <p class="mt-1 text-sm text-brand-moss">{{ __('The latest managed deploy details for this runtime target.') }}</p>
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runtime target') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The latest managed deploy details for this runtime target.') }}</p>
                             </div>
-                            <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">
+                            <span class="ml-auto inline-flex shrink-0 items-center self-center rounded-full bg-brand-sand/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">
                                 {{ $site->runtimeTargetLabel() }}
                             </span>
                         </div>
 
+                        <div class="space-y-4 px-6 py-6 sm:px-7">
                         <dl class="grid gap-4 sm:grid-cols-3">
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
                                 <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Platform') }}</dt>
@@ -249,4 +254,5 @@
                                 @endif
                             </div>
                         @endif
+                        </div>
                     </section>

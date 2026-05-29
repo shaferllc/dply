@@ -6,9 +6,13 @@
          x-data="edgeLiveTail({{ Js::from(['siteId' => $tailSiteId, 'max' => 200]) }})"
          x-init="connect()"
          x-on:beforeunload.window="disconnect()">
-    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <div>
-            <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
+    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Live') }}</p>
+            <h3 class="mt-0.5 inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
                 <span class="relative inline-flex h-2 w-2">
                     <span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 motion-safe:animate-ping"
                           x-show="status === 'connected'"></span>
@@ -17,13 +21,13 @@
                 </span>
                 {{ __('Live request tail') }}
             </h3>
-            <p class="mt-0.5 text-sm text-brand-moss">
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 <span x-show="status === 'connected'">{{ __('Streaming Worker access logs in real time.') }}</span>
                 <span x-show="status === 'connecting'" x-cloak>{{ __('Connecting to the broadcast channel…') }}</span>
                 <span x-show="status === 'disconnected'" x-cloak>{{ __('Disconnected — refresh the page to reconnect.') }}</span>
             </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2 text-xs text-brand-moss">
+        <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs text-brand-moss">
             <input type="text"
                    x-model="filter"
                    placeholder="{{ __('Filter path / status / method') }}"

@@ -21,6 +21,7 @@ use App\Models\ServerCacheServiceAuditEvent;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Servers\CacheEngineAvailability;
 use App\Support\Servers\CacheServiceAuth;
 use App\Support\Servers\CacheServiceCli;
 use App\Support\Servers\CacheServiceCommandPolicy;
@@ -626,6 +627,17 @@ BASH,
         $this->authorize('update', $this->server);
 
         if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        // Coming-soon gate — Valkey / Memcached / KeyDB / Dragonfly are gated
+        // behind cache.{engine} flags until their install path is GA. Refuse
+        // before queueing so a stale payload can't slip past the disabled UI.
+        if (CacheEngineAvailability::isComingSoon($engine)) {
+            $this->toastError(__(':engine isn\'t available yet — it\'s coming soon.', [
+                'engine' => \App\Support\Servers\CacheEngineInfo::for($engine)['label'] ?? ucfirst($engine),
+            ]));
+
             return;
         }
 

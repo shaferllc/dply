@@ -8,18 +8,20 @@
 @endphp
 
 <section id="edge-build-routing" class="scroll-mt-24 dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <div class="flex flex-wrap items-baseline justify-between gap-3">
-            <div>
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Redirects, rewrites & headers') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Read-only view of routing rules from your repo config. Edit :file in Git — the dashboard cannot change these in v1.', ['file' => $sourcePath]) }}</p>
-            </div>
-            @if ($config !== null)
-                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                    {{ __('From repo') }}
-                </span>
-            @endif
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Redirects, rewrites & headers') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Read-only view of routing rules from your repo config. Edit :file in Git — the dashboard cannot change these in v1.', ['file' => $sourcePath]) }}</p>
         </div>
+        @if ($config !== null)
+            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                {{ __('From repo') }}
+            </span>
+        @endif
     </div>
 
     @if ($config === null)

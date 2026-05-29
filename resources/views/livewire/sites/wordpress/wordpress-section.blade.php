@@ -1,9 +1,17 @@
 <div class="space-y-6">
 
     @if (! $site->isWordPressDetected())
-        <section class="space-y-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('WordPress') }}</h2>
-            <p class="text-sm text-brand-moss">{{ __('This section appears when the site is detected as a WordPress install — either from a wp-config.php in the repo or from a successful WordPress scaffold.') }}</p>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('WordPress') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('WordPress') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when the site is detected as a WordPress install — either from a wp-config.php in the repo or from a successful WordPress scaffold.') }}</p>
+                </div>
+            </div>
         </section>
     @else
 
@@ -40,15 +48,20 @@
 
     {{-- CONSOLE --}}
     @if ($tab === 'console')
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-            <header class="flex items-start justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('wp-cli Console') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Run any wp-cli command. Inspect commands return inline; mutating commands queue and stream their output.') }}</p>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('wp-cli Console') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run any wp-cli command. Inspect commands return inline; mutating commands queue and stream their output.') }}</p>
                 </div>
-            </header>
+            </div>
 
-            <div class="mt-5 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
+            <div class="px-6 py-6 sm:px-7">
+            <div class="grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
                 <div>
                     <x-input-label for="wp_command" :value="__('Command')" />
                     <x-text-input id="wp_command" wire:model.live="consoleCommand" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="plugin list" />
@@ -113,6 +126,7 @@
                     </ul>
                 </div>
             @endif
+            </div>
         </section>
     @endif
 
@@ -121,13 +135,20 @@
         @php
             $handler = data_get($site->meta, 'wp_cron.handler', 'wp_cron');
         @endphp
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-            <header>
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Cron handler') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on every page load — fine for low-traffic sites, awful for performance once you grow. Switch to system cron and dply runs `wp cron event run --due-now` every minute via a real crontab entry.') }}</p>
-            </header>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cron') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron handler') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on every page load — fine for low-traffic sites, awful for performance once you grow. Switch to system cron and dply runs `wp cron event run --due-now` every minute via a real crontab entry.') }}</p>
+                </div>
+            </div>
 
-            <div class="mt-5 rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
+            <div class="px-6 py-6 sm:px-7">
+            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Currently') }}</p>
                 <p class="mt-1 text-base font-semibold text-brand-ink">
                     @if ($handler === 'system_cron')
@@ -139,7 +160,7 @@
             </div>
 
             @if ($handler !== 'system_cron')
-                <div class="mt-4">
+                <div class="mt-5">
                     <button
                         type="button"
                         wire:click="switchToSystemCron"
@@ -156,6 +177,7 @@
             @else
                 <p class="mt-4 text-xs text-brand-moss">{{ __('System cron active — switching back to wp-cron lives in the Hardening tab once it ships.') }}</p>
             @endif
+            </div>
         </section>
     @endif
 
@@ -181,27 +203,32 @@
 
     {{-- DATABASE --}}
     @if ($tab === 'database')
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-            <header class="flex items-start justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Database snapshots') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Manual `mysqldump` / `pg_dump` snapshots stored on this server (7-day TTL). BYO S3 destinations land in a follow-up PR.') }}</p>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Database snapshots') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Manual `mysqldump` / `pg_dump` snapshots stored on this server (7-day TTL). BYO S3 destinations land in a follow-up PR.') }}</p>
                 </div>
                 <button
                     type="button"
                     wire:click="takeSnapshot"
                     wire:loading.attr="disabled"
                     wire:target="takeSnapshot"
-                    class="inline-flex h-9 items-center gap-2 rounded-xl bg-brand-ink px-4 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
+                    class="ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-brand-ink px-4 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
                 >
                     <x-heroicon-o-camera wire:loading.remove wire:target="takeSnapshot" class="h-4 w-4" />
                     <x-spinner wire:loading wire:target="takeSnapshot" variant="cream" size="sm" />
                     <span wire:loading.remove wire:target="takeSnapshot">{{ __('Take snapshot') }}</span>
                     <span wire:loading wire:target="takeSnapshot">{{ __('Dumping…') }}</span>
                 </button>
-            </header>
+            </div>
 
-            <x-input-error :messages="$errors->get('snapshots')" class="mt-3" />
+            <div class="px-6 py-6 sm:px-7">
+            <x-input-error :messages="$errors->get('snapshots')" class="mb-3" />
 
             @if ($snapshots->isEmpty())
                 <p class="mt-5 text-center text-sm text-brand-mist">{{ __('No snapshots yet. Click "Take snapshot" to capture one.') }}</p>
@@ -227,6 +254,7 @@
                     @endforeach
                 </ul>
             @endif
+            </div>
         </section>
     @endif
 
@@ -252,15 +280,22 @@
                 ],
             ];
         @endphp
-        <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-            <header>
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
-            </header>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hardening') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
+                </div>
+            </div>
 
-            <x-input-error :messages="$errors->get('hardening')" class="mt-3" />
+            <div class="px-6 py-6 sm:px-7">
+            <x-input-error :messages="$errors->get('hardening')" class="mb-3" />
 
-            <div class="mt-5 space-y-3">
+            <div class="space-y-3">
                 @foreach ($opinions as $key => $copy)
                     @php $enabled = (bool) ($hardeningOpinions[$key]['enabled'] ?? false); @endphp
                     <div class="flex items-start justify-between gap-4 rounded-xl border border-brand-ink/10 bg-brand-cream/20 p-4">
@@ -292,6 +327,7 @@
                         </button>
                     </div>
                 @endforeach
+            </div>
             </div>
         </section>
     @endif

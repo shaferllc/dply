@@ -81,9 +81,15 @@
             @endphp
             <div class="grid gap-6 lg:grid-cols-2">
                 <section class="dply-card overflow-hidden">
-                    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily requests (30d)') }}</h3>
-                        <span class="font-mono text-[11px] text-brand-moss">{{ __('max :n', ['n' => number_format((int) $maxRequests)]) }}</span>
+                    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Requests') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Daily requests (30d)') }}</h3>
+                        </div>
+                        <span class="shrink-0 self-center font-mono text-[11px] text-brand-moss">{{ __('max :n', ['n' => number_format((int) $maxRequests)]) }}</span>
                     </div>
                     <div class="px-6 py-5 sm:px-8">
                         <div class="flex h-28 items-end gap-0.5">
@@ -112,9 +118,15 @@
                 </section>
 
                 <section class="dply-card overflow-hidden">
-                    <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily bandwidth (30d)') }}</h3>
-                        <span class="font-mono text-[11px] text-brand-moss">{{ __('max :n MB', ['n' => number_format($tMaxEgressMb, 1)]) }}</span>
+                    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Bandwidth') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Daily bandwidth (30d)') }}</h3>
+                        </div>
+                        <span class="shrink-0 self-center font-mono text-[11px] text-brand-moss">{{ __('max :n MB', ['n' => number_format($tMaxEgressMb, 1)]) }}</span>
                     </div>
                     <div class="px-6 py-5 sm:px-8">
                         <div class="flex h-28 items-end gap-0.5">
@@ -144,8 +156,14 @@
             </div>
         @else
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Daily traffic (30d)') }}</h3>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Traffic') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Daily traffic (30d)') }}</h3>
+                    </div>
                 </div>
                 <p class="px-6 py-8 text-sm text-brand-moss sm:px-8">
                     {{ __('No traffic snapshots yet this month. Stats appear after the nightly edge usage collection runs. Same-day visits show up on the following day.') }}
@@ -168,12 +186,15 @@
 
     @if ($isHybridForCache)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-cube-transparent class="h-5 w-5 text-brand-moss/70" />
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge cache') }}</h3>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cache') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge cache') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Origin GET responses with Cache-Control s-maxage are stored in KV and served from the edge until expiry. Stale-while-revalidate keeps responses fresh without blocking the request.') }}</p>
                 </div>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Origin GET responses with Cache-Control s-maxage are stored in KV and served from the edge until expiry. Stale-while-revalidate keeps responses fresh without blocking the request.') }}</p>
             </div>
             <div class="grid gap-4 px-6 py-5 sm:grid-cols-3 sm:px-8">
                 <div>
@@ -219,12 +240,15 @@
 
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-bolt class="h-5 w-5 text-brand-moss/70" />
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Performance') }}</h3>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Performance') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Performance') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Worker response time is measured at the edge; Core Web Vitals are measured in visitors’ browsers.') }}</p>
                 </div>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Worker response time is measured at the edge; Core Web Vitals are measured in visitors’ browsers.') }}</p>
             </div>
             <div class="space-y-6 px-6 py-5 sm:px-8">
                 <div>
@@ -296,10 +320,13 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-document-text class="h-5 w-5 text-brand-moss/70" />
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('HTTP access logs') }}</h3>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP access logs') }}</h3>
                 </div>
             </div>
             @if ($recentLogs !== [])

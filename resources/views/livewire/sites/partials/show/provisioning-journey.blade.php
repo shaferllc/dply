@@ -199,9 +199,18 @@
                          Sticky on lg so it stays in view while the journey
                          scrolls. --}}
                     <aside class="w-full space-y-6 self-start lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-w-none">
-                        <section class="dply-card overflow-hidden p-5 sm:p-6">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Site summary') }}</h3>
-                            <dl class="mt-4 grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
+                        <section class="dply-card overflow-hidden">
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site summary') }}</h3>
+                                </div>
+                            </div>
+                            <div class="px-6 py-6 sm:px-7">
+                            <dl class="grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
                                 <div class="sm:col-span-2">
                                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                                     <dd class="mt-0.5 font-semibold capitalize text-brand-ink">{{ $site->statusLabel() }}</dd>
@@ -258,12 +267,21 @@
                                     <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Use this first while the customer domain catches up.') }}</p>
                                 </div>
                             @endif
+                            </div>
                         </section>
 
-                        <section class="dply-card overflow-hidden p-5 sm:p-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('DNS readiness') }}</p>
-                            <h3 class="mt-2 text-base font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>
-                            <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Dply checks both URLs and moves on as soon as one responds.') }}</p>
+                        <section class="dply-card overflow-hidden">
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS readiness') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Dply checks both URLs and moves on as soon as one responds.') }}</p>
+                                </div>
+                            </div>
+                            <div class="px-6 py-6 sm:px-7">
 
                             @if (($testingHostnameMeta['status'] ?? null) === 'failed')
                                 <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
@@ -295,6 +313,7 @@
                                     {{ __('No hostname checks yet — Dply will start polling once the web server config is written.') }}
                                 </p>
                             @endif
+                            </div>
                         </section>
 
                         @can('delete', $site)

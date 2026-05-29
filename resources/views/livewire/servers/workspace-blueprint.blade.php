@@ -22,28 +22,26 @@
 
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                        <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Snapshot preview') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $previewSummary }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __('Role') }}: <span class="font-semibold text-brand-ink">{{ ucfirst((string) ($previewSnapshot['server_role'] ?? 'application')) }}</span>
-                            @if ($previewExtras['firewall_rules'] > 0)
-                                · {{ trans_choice(':count firewall rule|:count firewall rules', $previewExtras['firewall_rules'], ['count' => $previewExtras['firewall_rules']]) }}
-                            @endif
-                            @if ($previewExtras['supervisor_programs'] > 0)
-                                · {{ trans_choice(':count daemon|:count daemons', $previewExtras['supervisor_programs'], ['count' => $previewExtras['supervisor_programs']]) }}
-                            @endif
-                        </p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Snapshot preview') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $previewSummary }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Role') }}: <span class="font-semibold text-brand-ink">{{ ucfirst((string) ($previewSnapshot['server_role'] ?? 'application')) }}</span>
+                        @if ($previewExtras['firewall_rules'] > 0)
+                            · {{ trans_choice(':count firewall rule|:count firewall rules', $previewExtras['firewall_rules'], ['count' => $previewExtras['firewall_rules']]) }}
+                        @endif
+                        @if ($previewExtras['supervisor_programs'] > 0)
+                            · {{ trans_choice(':count daemon|:count daemons', $previewExtras['supervisor_programs'], ['count' => $previewExtras['supervisor_programs']]) }}
+                        @endif
+                    </p>
                 </div>
             </div>
 
-            <form wire:submit.prevent="saveBlueprint" class="space-y-4 p-6 sm:p-7">
+            <form wire:submit.prevent="saveBlueprint" class="space-y-4 px-6 py-6 sm:px-7">
                 <div>
                     <x-input-label for="blueprint_name" :value="__('Blueprint name')" />
                     <x-text-input
@@ -68,9 +66,15 @@
 
         @if ($orgBlueprints->isNotEmpty())
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Organization blueprints') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Pick any of these when provisioning a new VM in Step 3 — What it runs.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization blueprints') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pick any of these when provisioning a new VM in Step 3 — What it runs.') }}</p>
+                    </div>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($orgBlueprints as $blueprint)

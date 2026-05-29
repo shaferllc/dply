@@ -23,16 +23,20 @@
         : 0;
 @endphp
 
-<section class="dply-card p-6 sm:p-8 space-y-5">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Serverless') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Function') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('HTTP-triggered function on DigitalOcean Functions.') }}</p>
+<section class="dply-card overflow-hidden">
+    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Serverless') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('HTTP-triggered function on DigitalOcean Functions.') }}</p>
         </div>
-        <span class="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
+        <span class="inline-flex shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $statusBadgeClass }}">{{ $statusLabel }}</span>
     </div>
 
+    <div class="space-y-5 px-6 py-6 sm:px-7">
     <div x-data="{ copied: false }">
         <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss/70">{{ __('Function URL') }}</p>
         <div class="mt-1 flex items-center gap-2">
@@ -125,6 +129,7 @@
                 {{ __('Deploy journey') }}
             </a>
         @endif
+    </div>
     </div>
 </section>
 

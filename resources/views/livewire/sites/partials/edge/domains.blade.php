@@ -1,7 +1,13 @@
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Default hostname') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Your site is always available on its dply Edge URL.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hostname') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Default hostname') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Your site is always available on its dply Edge URL.') }}</p>
+        </div>
     </div>
     <div class="px-6 py-4 sm:px-8">
         @if ($edgeLiveUrl)
@@ -13,9 +19,15 @@
 </section>
 
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS here. SSL is provided when traffic is proxied through Cloudflare on your zone, or via the dply Edge zone for managed delivery.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom domains') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point a CNAME at your Edge hostname, then verify DNS here. SSL is provided when traffic is proxied through Cloudflare on your zone, or via the dply Edge zone for managed delivery.') }}</p>
+        </div>
     </div>
     <div class="space-y-4 px-6 py-5 sm:px-8">
         @if ($edgeAttachedDomains !== [])

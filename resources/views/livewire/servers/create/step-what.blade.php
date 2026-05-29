@@ -52,18 +52,16 @@
 
             {{-- K8s host: pick an existing cluster OR have dply create one. --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Cluster') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $isCreatingNew
-                                ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in "provisioning" until it\'s ready.')
-                                : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $isCreatingNew
+                            ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in "provisioning" until it\'s ready.')
+                            : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
                     </div>
                 </div>
                 <div class="space-y-5 p-6 sm:p-7">
@@ -271,16 +269,14 @@
 
         {{-- 1. THE CHOICE: stack template (was "preset"). --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                        <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stack') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a stack template') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.') }}</p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a stack template') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.') }}</p>
                 </div>
             </div>
             <div class="relative space-y-5 p-6 sm:p-7">

@@ -83,6 +83,15 @@ return [
                     'provider.aws_app_runner' => 'AWS App Runner',
                     'provider.aws_eks' => 'AWS EKS',
                 ],
+                // Cache engines. Redis is always available (no flag). Each leaf
+                // off = "coming soon": Soon badge + teaser in the Caches
+                // workspace, hidden from the server-create cache picker.
+                'Cache engines' => [
+                    'cache.valkey' => 'Valkey',
+                    'cache.memcached' => 'Memcached',
+                    'cache.keydb' => 'KeyDB',
+                    'cache.dragonfly' => 'Dragonfly',
+                ],
             ], $serverWorkspaceSections),
         ],
         'vm-sites' => [

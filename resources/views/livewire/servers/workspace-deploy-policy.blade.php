@@ -55,14 +55,13 @@
     <div class="space-y-6">
         {{-- Overall --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
                         </span>
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy window policy') }}</p>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy window policy') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @switch($overall)
                                     @case('blocked')
@@ -97,7 +96,6 @@
                     >
                         {{ __('Server deploys') }}
                     </a>
-                </div>
             </div>
 
             <div class="grid gap-px bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-5">
@@ -118,16 +116,15 @@
 
         {{-- Deny rules --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div>
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Configured deny windows') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Each rule blocks deploys on selected weekdays between start and end (local server policy timezone). Overnight ranges span past midnight.') }}</p>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deny windows') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Configured deny windows') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each rule blocks deploys on selected weekdays between start and end (local server policy timezone). Overnight ranges span past midnight.') }}</p>
                     </div>
-                </div>
             </div>
 
             @if ($ruleRows === [])
@@ -176,16 +173,15 @@
         <div class="grid gap-6 lg:grid-cols-2">
             {{-- Site coverage --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                         </span>
-                        <div>
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Site coverage') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Every site on this server inherits the same deploy window policy.') }}</p>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Coverage') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site coverage') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Every site on this server inherits the same deploy window policy.') }}</p>
                         </div>
-                    </div>
                 </div>
 
                 @if ($siteRows === [])
@@ -215,16 +211,15 @@
 
             {{-- Recent skips --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-no-symbol class="h-5 w-5" aria-hidden="true" />
                         </span>
-                        <div>
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent policy skips') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Deploy jobs skipped by this policy in the last 7 days.') }}</p>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Skips') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent policy skips') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deploy jobs skipped by this policy in the last 7 days.') }}</p>
                         </div>
-                    </div>
                 </div>
 
                 @if ($recentSkips === [])
@@ -254,16 +249,15 @@
 
         {{-- Policy editor --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div>
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Edit policy') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Toggle enforcement, set timezone + skip message, and manage deny rules. Save to apply server-wide.') }}</p>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Editor') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edit policy') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Toggle enforcement, set timezone + skip message, and manage deny rules. Save to apply server-wide.') }}</p>
                     </div>
-                </div>
             </div>
 
             <form wire:submit="savePolicy" class="space-y-5 p-6 sm:p-7">

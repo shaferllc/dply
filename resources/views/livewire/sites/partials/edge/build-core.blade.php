@@ -15,9 +15,15 @@
 
 
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Repository & branch') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Source control settings from site creation. Changing these requires a new Edge site in v1.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Source') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository & branch') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Source control settings from site creation. Changing these requires a new Edge site in v1.') }}</p>
+        </div>
     </div>
     <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -49,21 +55,22 @@
 
 @if ($latestRepoConfig !== null)
     <section id="edge-build-repo-config" class="scroll-mt-24 dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <div class="flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                    <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
-                        <x-heroicon-o-document-text class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                        {{ __('Managed by :file', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml']) }}
-                    </h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">
-                        {{ __('Build settings from :file override the dashboard form below on each deploy. Redirects / rewrites / headers live on the :routing tab.', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml', 'routing' => __('Routing')]) }}
-                    </p>
-                </div>
-                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                    {{ __('Repo config') }}
-                </span>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repo config') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                    {{ __('Managed by :file', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml']) }}
+                </h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Build settings from :file override the dashboard form below on each deploy. Redirects / rewrites / headers live on the :routing tab.', ['file' => $latestRepoConfig['source_path'] ?? 'dply.yaml', 'routing' => __('Routing')]) }}
+                </p>
             </div>
+            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                {{ __('Repo config') }}
+            </span>
         </div>
         <dl class="px-6 py-4 text-sm sm:px-8">
             <div>
@@ -110,9 +117,15 @@
 @endif
 
 <section id="edge-build-configuration" class="scroll-mt-24 dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Build configuration') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Command and output directory used on each deploy. Save here, then redeploy to apply.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Build') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Build configuration') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Command and output directory used on each deploy. Save here, then redeploy to apply.') }}</p>
+        </div>
     </div>
     @can('update', $site)
         <form wire:submit.prevent="saveEdgeBuildSettings" class="space-y-5 px-6 py-5 sm:px-8">
@@ -211,11 +224,17 @@
 </section>
 
 <section class="dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Retention') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">
-            {{ __('Older deployments beyond this count have their R2 artifacts deleted. Pruned deployments stay listed for audit but can\'t be rolled back without rebuilding from their commit.') }}
-        </p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Retention') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Retention') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                {{ __('Older deployments beyond this count have their R2 artifacts deleted. Pruned deployments stay listed for audit but can\'t be rolled back without rebuilding from their commit.') }}
+            </p>
+        </div>
     </div>
     <div class="px-6 py-5 sm:px-8">
         @can('update', $site)

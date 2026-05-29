@@ -244,12 +244,20 @@
 
         @if ($phase === 'ready')
             {{-- Kubeconfig panel --}}
-            <section class="{{ $card }} p-6">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Kubeconfig') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Authenticates kubectl against this cluster. Treat it like a password — anyone with this file can manage workloads.') }}</p>
-
+            <section class="{{ $card }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Kubeconfig') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Authenticates kubectl against this cluster. Treat it like a password — anyone with this file can manage workloads.') }}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
                 @if ($hasKubeconfig)
-                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <div class="flex flex-wrap items-center gap-3">
                         <a href="{{ route('servers.cluster.kubeconfig', $server) }}" class="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-brand-ink px-4 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest">
                             <x-heroicon-o-arrow-down-tray class="h-4 w-4" />
                             {{ __('Download kubeconfig') }}
@@ -257,19 +265,28 @@
                         <code class="rounded-lg bg-brand-cream/60 px-3 py-2 font-mono text-xs text-brand-ink">kubectl --kubeconfig=&lt;downloaded-file&gt; get nodes</code>
                     </div>
                 @else
-                    <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                         {{ __('Kubeconfig not fetched yet — the next poll will retrieve it.') }}
                     </div>
                 @endif
+                </div>
             </section>
 
             {{-- Workloads (sites) --}}
-            <section class="{{ $card }} p-6">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Workloads') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Container sites deployed to this cluster.') }}</p>
-
+            <section class="{{ $card }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workloads') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workloads') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Container sites deployed to this cluster.') }}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
                 @if ($sites->isEmpty())
-                    <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 p-6 text-center text-sm text-brand-moss">
+                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 p-6 text-center text-sm text-brand-moss">
                         <p>{{ __('No workloads yet.') }}</p>
                         <a href="{{ route('sites.create', $server) }}" wire:navigate class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-sage px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-forest">
                             {{ __('Add a container site') }}
@@ -277,7 +294,7 @@
                         </a>
                     </div>
                 @else
-                    <ul class="mt-4 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+                    <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
                         @foreach ($sites as $site)
                             <li class="flex items-center justify-between gap-3 px-4 py-3">
                                 <a href="{{ route('sites.overview', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $site->name }}</a>
@@ -286,6 +303,7 @@
                         @endforeach
                     </ul>
                 @endif
+                </div>
             </section>
         @endif
 

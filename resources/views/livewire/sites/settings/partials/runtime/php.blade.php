@@ -13,12 +13,12 @@
 
 @if (! $isPhpSite && ! $showPhpStackDetails)
     <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 bg-brand-cream/40 px-6 py-5 sm:px-8">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+        <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Runtime') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Not a PHP site') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This site does not run PHP, so there are no PHP runtime settings to tune. Open the Runtime hub to manage processes and detection, or pick another runtime sub-tab.') }}</p>
                 <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']) }}" wire:navigate class="mt-3 inline-flex items-center text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">
@@ -31,13 +31,13 @@
 
 @if ($supportsMachinePhp && is_array($sitePhpData) && $isPhpSite)
     <section class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('PHP') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP workspace') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Machine-level PHP, extensions, and Composer auth are shared on the server. Below you set this site’s PHP version and per-site limits.') }}</p>
                 </div>
@@ -47,7 +47,7 @@
             </a>
         </div>
 
-        <div class="space-y-8 p-6 sm:p-8">
+        <div class="space-y-8 px-6 py-6 sm:px-7">
 
         @if ($sitePhpData['mismatch_version'])
             <section class="dply-card overflow-hidden border-amber-200">
@@ -143,19 +143,19 @@
 
 @if ($showPhpStackDetails)
     <section class="dply-card overflow-hidden mt-6">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Process') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Process') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->runtimePhpProcessSectionTitle() }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Process-level PHP knobs that shape how this site runs: pool user, scheduler, and Octane application server.') }}</p>
             </div>
         </div>
 
         <form wire:submit="saveRuntimePreferences">
-            <div class="space-y-6 p-6 sm:p-8">
+            <div class="space-y-6 px-6 py-6 sm:px-7">
                 @include('livewire.sites.settings.partials.laravel.octane-fields', ['site' => $site])
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

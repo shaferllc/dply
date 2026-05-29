@@ -58,10 +58,19 @@
 
     {{-- Apt actions --}}
     @if ($opsReady && ! $isDeployer)
-        <div class="{{ $card }} p-6 sm:p-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Each runs over SSH; output streams in the panel above. Long-running upgrades trigger a state refresh on completion.') }}</p>
-            <div class="mt-4 flex flex-wrap gap-2">
+        <div class="{{ $card }}">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Apt') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each runs over SSH; output streams in the panel above. Long-running upgrades trigger a state refresh on completion.') }}</p>
+                </div>
+            </div>
+            <div class="px-6 py-6 sm:px-7">
+            <div class="flex flex-wrap gap-2">
                 @foreach (['apt_update', 'apt_upgrade', 'apt_dist_upgrade', 'apt_autoremove', 'apt_clean'] as $key)
                     @if (! empty($serviceActions[$key]))
                         @php
@@ -82,6 +91,7 @@
                         </button>
                     @endif
                 @endforeach
+            </div>
             </div>
         </div>
     @endif
@@ -150,26 +160,31 @@
     @endif
 
     {{-- Unattended upgrades --}}
-    <div id="manage-os-updates" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="max-w-2xl">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Server-side automatic update flag (Debian/Ubuntu). The cadence preference below is recorded for future Dply scheduling.') }}</p>
+    @php
+        $statusPill = match (true) {
+            ! ($unattended['present'] ?? false) => ['label' => __('Not installed'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
+            ($unattended['enabled'] ?? null) === true => ['label' => __('Enabled'), 'classes' => 'bg-brand-sage/15 text-brand-forest', 'dot' => 'bg-brand-forest'],
+            ($unattended['enabled'] ?? null) === false => ['label' => __('Disabled'), 'classes' => 'bg-amber-100 text-amber-900', 'dot' => 'bg-amber-500'],
+            default => ['label' => __('Unknown'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
+        };
+    @endphp
+    <div id="manage-os-updates" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-updates') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-side automatic update flag (Debian/Ubuntu). The cadence preference below is recorded for future Dply scheduling.') }}</p>
             </div>
-            @php
-                $statusPill = match (true) {
-                    ! ($unattended['present'] ?? false) => ['label' => __('Not installed'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
-                    ($unattended['enabled'] ?? null) === true => ['label' => __('Enabled'), 'classes' => 'bg-brand-sage/15 text-brand-forest', 'dot' => 'bg-brand-forest'],
-                    ($unattended['enabled'] ?? null) === false => ['label' => __('Disabled'), 'classes' => 'bg-amber-100 text-amber-900', 'dot' => 'bg-amber-500'],
-                    default => ['label' => __('Unknown'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
-                };
-            @endphp
             <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $statusPill['classes'] }}">
                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusPill['dot'] }}"></span>
                 {{ $statusPill['label'] }}
             </span>
         </div>
 
+        <div class="px-6 py-6 sm:px-7">
         @if (! empty($unattended['snippet']))
             <pre class="mt-4 max-h-32 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $unattended['snippet'] }}</pre>
         @endif
@@ -211,6 +226,7 @@
                 <x-primary-button type="submit" class="!py-2.5" :disabled="$isDeployer">{{ __('Save cadence') }}</x-primary-button>
             </div>
         </form>
+        </div>
     </div>
 
     {{-- Reboot pending card (only when relevant) --}}
@@ -219,7 +235,7 @@
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
                             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">

@@ -8,9 +8,18 @@
     </header>
 
     {{-- Step list --}}
-    <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
-        <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-mist">{{ __('Pipeline steps') }}</h2>
-        <ol class="mt-4 space-y-3">
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Pipeline') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline steps') }}</h2>
+            </div>
+        </div>
+        <div class="px-6 py-6 sm:px-7">
+        <ol class="space-y-3">
             @foreach ($steps as $step)
                 <li class="flex items-start gap-3">
                     <span @class([
@@ -37,23 +46,27 @@
                 </li>
             @endforeach
         </ol>
+        </div>
     </section>
 
     {{-- Failed-state retry panel --}}
     @if ($isFailed)
-        <section class="rounded-2xl border-2 border-rose-200 bg-rose-50/50 p-6 shadow-sm">
-            <div class="flex items-start gap-4">
-                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
-                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" />
+        <section class="dply-card overflow-hidden border-rose-200">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </span>
-                <div class="min-w-0 flex-1">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Scaffold failed') }}</h2>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Failed') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scaffold failed') }}</h2>
                     @if ($failedStep)
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Stopped at step ":step". Retry will destroy server-side artifacts and start over.', ['step' => $failedStep['label'] ?? $failedStep['key']]) }}</p>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stopped at step ":step". Retry will destroy server-side artifacts and start over.', ['step' => $failedStep['label'] ?? $failedStep['key']]) }}</p>
                     @endif
                     <p class="mt-1 text-xs text-brand-mist">{{ __('Attempt :n of 3.', ['n' => $attemptCount]) }}</p>
-
-                    <div class="mt-5 flex flex-wrap items-center gap-3">
+                </div>
+            </div>
+            <div class="px-6 py-6 sm:px-7">
+                    <div class="flex flex-wrap items-center gap-3">
                         @if ($canRetry)
                             <button
                                 wire:click="retry"
@@ -71,23 +84,25 @@
                             </a>
                         @endif
                     </div>
-                </div>
             </div>
         </section>
     @endif
 
     {{-- Success-state reveal-once panel --}}
     @if ($isCompleted)
-        <section class="rounded-2xl border-2 border-brand-sage/30 bg-gradient-to-br from-brand-sage/10 via-white to-brand-cream/40 p-6 shadow-sm">
-            <div class="flex items-start gap-4">
-                <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage text-white shadow-sm">
-                    <x-heroicon-o-sparkles class="h-5 w-5" />
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
                 </span>
-                <div class="min-w-0 flex-1">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Scaffold complete') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Your :framework install is up. The admin password is shown only once — save it now.', ['framework' => ucfirst($site->meta['scaffold']['framework'] ?? 'site')]) }}</p>
-
-                    <dl class="mt-5 space-y-3 text-sm">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Complete') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scaffold complete') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Your :framework install is up. The admin password is shown only once — save it now.', ['framework' => ucfirst($site->meta['scaffold']['framework'] ?? 'site')]) }}</p>
+                </div>
+            </div>
+            <div class="px-6 py-6 sm:px-7">
+                    <dl class="space-y-3 text-sm">
                         <div class="flex flex-wrap items-center gap-2">
                             <dt class="font-semibold text-brand-ink">{{ __('Admin email:') }}</dt>
                             <dd class="font-mono text-brand-moss">{{ $site->meta['scaffold']['admin_email'] ?? '' }}</dd>
@@ -118,7 +133,6 @@
                             <x-heroicon-o-arrow-right class="h-4 w-4" />
                         </a>
                     </div>
-                </div>
             </div>
         </section>
     @endif

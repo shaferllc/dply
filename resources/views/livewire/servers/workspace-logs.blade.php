@@ -52,18 +52,16 @@
     <div class="space-y-6">
         @if ($isDeployer)
             <section class="dply-card overflow-hidden border-amber-200">
-                <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
-                            <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Deployers can review Dply activity logs but cannot read server log files over SSH. Switch to Dply activity or ask an admin to grant broader access.') }}
-                            </p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Deployers can review Dply activity logs but cannot read server log files over SSH. Switch to Dply activity or ask an admin to grant broader access.') }}
+                        </p>
                     </div>
                 </div>
             </section>
@@ -75,14 +73,13 @@
 
         {{-- Overall --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Log viewer') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Log viewer') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @switch($overall)
                                     @case('blocked')
@@ -126,7 +123,6 @@
                     >
                         {{ __('Background activity') }}
                     </a>
-                </div>
             </div>
 
             <div class="grid gap-px bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -161,15 +157,14 @@
 
         {{-- Source catalog --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                        <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Available sources') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Catalog filtered by installed services and sites on this server. Active source is highlighted.') }}</p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sources') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Available sources') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Catalog filtered by installed services and sites on this server. Active source is highlighted.') }}</p>
                 </div>
             </div>
 
@@ -219,15 +214,14 @@
         {{-- Related --}}
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                            <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Security digest') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Auth failure counts, fail2ban jails, firewall posture, and sshd settings — lightweight read-only scan.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Security') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Security digest') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Auth failure counts, fail2ban jails, firewall posture, and sshd settings — lightweight read-only scan.') }}</p>
                     </div>
                 </div>
                 <div class="px-6 py-5 text-sm sm:px-7">
@@ -243,15 +237,14 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['mist'] }}">
-                            <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy windows') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Server-wide deny windows that skip deploy jobs — check recent skips when investigating deploy gaps in logs.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploys') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy windows') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-wide deny windows that skip deploy jobs — check recent skips when investigating deploy gaps in logs.') }}</p>
                     </div>
                 </div>
                 <div class="px-6 py-5 text-sm sm:px-7">

@@ -47,13 +47,19 @@
 
     @if ($opsReady)
         <div class="space-y-6">
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
-                        </p>
+            <div class="{{ $card }}">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
+                            </p>
+                        </div>
                     </div>
                     {{-- flex-nowrap + shrink-0 keeps Browse + Write your own
                          on a single row even when the heading column is wide.
@@ -90,15 +96,16 @@
                     </div>
                 </div>
 
+                <div class="px-6 py-6 sm:px-7">
                 @if ($server->recipes->isEmpty())
-                    <div class="mt-6 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
+                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
                         <p class="font-medium text-brand-ink">{{ __('No saved commands yet.') }}</p>
                         <p class="mt-1">
                             {{ __('Open the library to import a marketplace preset or an organization script — or write your own from scratch.') }}
                         </p>
                     </div>
                 @else
-                    <ul class="mt-6 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
+                    <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
                         @foreach ($server->recipes as $rec)
                             <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
@@ -169,24 +176,32 @@
                         @endforeach
                     </ul>
                 @endif
+                </div>
             </div>
 
             @if ($showEditor)
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-base font-semibold text-brand-ink">
-                                {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
-                            </h2>
-                            <p class="mt-1 text-sm text-brand-moss">
-                                {{ __('Store the command exactly as it should run on this server. Recipes are listed above and can be run, edited, or deleted any time.') }}
-                            </p>
+                <div class="{{ $card }}">
+                    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Saved command') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                    {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
+                                </h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Store the command exactly as it should run on this server. Recipes are listed above and can be run, edited, or deleted any time.') }}
+                                </p>
+                            </div>
                         </div>
-                        <button type="button" wire:click="cancelEditingRecipe" class="text-sm font-medium text-brand-moss hover:text-brand-ink">
+                        <button type="button" wire:click="cancelEditingRecipe" class="shrink-0 text-sm font-medium text-brand-moss hover:text-brand-ink">
                             {{ __('Close') }}
                         </button>
                     </div>
 
+                    <div class="px-6 py-6 sm:px-7">
                     @if (! $editing_recipe_id && ! empty($starterTemplates))
                         {{-- Starter templates: pre-fill the form from the
                              small set of presets that the deleted /deploy
@@ -223,6 +238,7 @@
                             </button>
                         </div>
                     </form>
+                    </div>
                 </div>
             @endif
 
@@ -230,16 +246,21 @@
                  /deploy page so /run owns all command execution. Output
                  streams to the live SSH panel via the StreamsRemoteSshLivewire
                  trait — same plumbing the recipe runner uses. --}}
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
+            <div class="{{ $card }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('One-off') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
                         </p>
                     </div>
                 </div>
-                <form wire:submit="runAdhocCommand" class="mt-5 space-y-3">
+                <div class="px-6 py-6 sm:px-7">
+                <form wire:submit="runAdhocCommand" class="space-y-3">
                     <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="uname -a"></textarea>
                     <div class="flex flex-wrap items-center gap-3">
                         <x-primary-button type="submit" class="!py-2">
@@ -250,6 +271,7 @@
                         @endif
                     </div>
                 </form>
+                </div>
             </div>
 
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 px-5 py-4 text-sm text-brand-moss">
@@ -264,16 +286,14 @@
         </div>
     @else
         <section class="dply-card overflow-hidden border-amber-200">
-            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use this section.') }}</p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use this section.') }}</p>
                 </div>
             </div>
         </section>

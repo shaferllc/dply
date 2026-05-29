@@ -1,8 +1,14 @@
 @if (! $site->isEdgePreview())
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Per-site URLs that trigger a redeploy when POSTed. Hand the URL to your CMS (Sanity, Contentful, Strapi) so a content change publishes automatically.') }}</p>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hooks') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Per-site URLs that trigger a redeploy when POSTed. Hand the URL to your CMS (Sanity, Contentful, Strapi) so a content change publishes automatically.') }}</p>
+            </div>
         </div>
 
         @if ($edge_just_minted_deploy_hook_url !== null)
@@ -68,9 +74,15 @@
 
 @if (! $edgeIsPreviewChild)
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('GitHub auto-deploy') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Connect a linked GitHub account to register push and pull request webhooks automatically. Pull requests get a Check Run and a single summary comment (updated in place on each push) with the preview URL when the deploy lands.') }}</p>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-deploy') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('GitHub auto-deploy') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a linked GitHub account to register push and pull request webhooks automatically. Pull requests get a Check Run and a single summary comment (updated in place on each push) with the preview URL when the deploy lands.') }}</p>
+            </div>
         </div>
         <div class="space-y-4 px-6 py-5 sm:px-8">
             <label class="block text-sm">

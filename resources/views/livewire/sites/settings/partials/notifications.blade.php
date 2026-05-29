@@ -1,12 +1,12 @@
 <div class="space-y-6">
     <section class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Alerts') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy and uptime notifications') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss max-w-2xl">
                         {{ __('Subscribe notification channels to site events. Dply delivers in-app notifications and routes to the channels you select here.') }}
@@ -105,12 +105,12 @@
     </section>
 
     <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-arrow-up-right class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Outbound') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outbound') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Integration webhooks') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss max-w-2xl">
                     {{ __('Dply POSTs to these URLs when matching events occur for this site. Payloads are adapter-specific: Slack uses a text field, Discord uses content, and Microsoft Teams uses a MessageCard-style JSON body.') }}
@@ -173,12 +173,12 @@
     </section>
 
     <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Inbound') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inbound') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy webhook') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The deploy URL, secret rotation, and Quick deploy live under Repository. IP restrictions stay below.') }}</p>
                 <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'repository']) }}" wire:navigate class="mt-2 inline-flex text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open Repository → Inbound deploy webhook') }} →</a>

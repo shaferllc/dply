@@ -1,7 +1,13 @@
 <section id="edge-delivery-backend" class="scroll-mt-24 dply-card overflow-hidden">
-    <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h3>
-        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Where builds are published after each deploy.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Where builds are published after each deploy.') }}</p>
+        </div>
     </div>
     <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -32,9 +38,15 @@
 @if (($edgeRuntimeMode ?? 'static') !== 'hybrid')
     @can('update', $site)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Convert to hybrid SSR') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Point this Edge site at an existing origin server (a dply Cloud container, your own VM, etc.) so dynamic routes proxy through. Static assets keep serving from R2.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hybrid') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Convert to hybrid SSR') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point this Edge site at an existing origin server (a dply Cloud container, your own VM, etc.) so dynamic routes proxy through. Static assets keep serving from R2.') }}</p>
+                </div>
             </div>
             <form wire:submit.prevent="convertEdgeStaticToHybrid" class="space-y-4 px-6 py-5 sm:px-8">
                 <label class="block">
@@ -70,9 +82,15 @@
 
 @if (($edgeRuntimeMode ?? 'static') === 'hybrid' && is_array($edgeOrigin ?? null))
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('SSR origin (hybrid)') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Static assets are served from Edge; dynamic routes proxy to this origin after an R2 miss. Saved changes take effect immediately — the Worker host map is republished on save.') }}</p>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Origin') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSR origin (hybrid)') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Static assets are served from Edge; dynamic routes proxy to this origin after an R2 miss. Saved changes take effect immediately — the Worker host map is republished on save.') }}</p>
+            </div>
         </div>
         @can('update', $site)
             <form wire:submit.prevent="saveEdgeHybridOrigin" class="space-y-5 px-6 py-5 sm:px-8">
@@ -237,9 +255,15 @@
         $imageSecret = is_string($imagesMeta['signing_secret'] ?? null) ? (string) $imagesMeta['signing_secret'] : '';
     @endphp
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Image optimization') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Resize and reformat images at the edge via Cloudflare Image Resizing. Generate signed URLs server-side with App\\Services\\Edge\\EdgeImageUrlSigner.') }}</p>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Images') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Image optimization') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Resize and reformat images at the edge via Cloudflare Image Resizing. Generate signed URLs server-side with App\\Services\\Edge\\EdgeImageUrlSigner.') }}</p>
+            </div>
         </div>
         <form wire:submit.prevent="saveEdgeImageOptimization" class="space-y-5 px-6 py-5 sm:px-8">
             <label class="flex items-start gap-3 text-sm text-brand-ink">

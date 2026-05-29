@@ -90,14 +90,14 @@
 
     {{-- Overall --}}
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 {{ $overallTone }}">
                         <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Manage overview') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Manage overview') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                             @switch($overall)
                                 @case('blocked')
@@ -231,15 +231,14 @@
 
     @if ($opsReady && ! $isDeployer)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Quick actions') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('The most-used actions, duplicated here for convenience. Each lives under its subsystem tab too.') }}</p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Actions') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick actions') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The most-used actions, duplicated here for convenience. Each lives under its subsystem tab too.') }}</p>
                 </div>
             </div>
             <div class="flex flex-wrap gap-2 px-6 py-5 sm:px-7">
@@ -273,15 +272,14 @@
 
     @if (! empty($recentActions) && $recentActions->count() > 0)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['mist'] }}">
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('The most recent manage actions queued for this server.') }}</p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('The most recent manage actions queued for this server.') }}</p>
                 </div>
             </div>
             <ul class="divide-y divide-brand-ink/10 px-6 py-2 text-sm sm:px-7">
@@ -320,13 +318,13 @@
     @if ($server->workspace)
         @feature('surface.projects')
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['mist'] }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                         </span>
-                        <div>
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Project operations context') }}</h3>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Project operations context') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Manage actions on this server can affect the rest of the :project project. Use the project operations page for runbooks, activity review, and alert routing before making broader stack changes.', ['project' => $server->workspace->name]) }}
                             </p>

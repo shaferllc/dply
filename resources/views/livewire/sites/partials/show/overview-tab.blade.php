@@ -15,9 +15,15 @@
                 <div class="grid gap-6 lg:grid-cols-2">
                     {{-- Endpoints --}}
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Endpoints') }}</h3>
-                            <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'routing']) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">{{ __('Manage routing') }}</a>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Endpoints') }}</h3>
+                            </div>
+                            <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'routing']) }}" wire:navigate class="ml-auto shrink-0 self-center text-xs font-medium text-brand-sage hover:underline">{{ __('Manage routing') }}</a>
                         </div>
                         <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
                             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -79,9 +85,15 @@
 
                     {{-- Health --}}
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Health & checks') }}</h3>
-                            <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">{{ __('Open monitor') }}</a>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Health & checks') }}</h3>
+                            </div>
+                            <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="ml-auto shrink-0 self-center text-xs font-medium text-brand-sage hover:underline">{{ __('Open monitor') }}</a>
                         </div>
                         <ul class="divide-y divide-brand-ink/8 px-6 sm:px-8">
                             <li class="flex items-start justify-between gap-3 py-3">
@@ -143,13 +155,22 @@
 
                 {{-- Preflight + resources --}}
                 <div class="grid gap-6 lg:grid-cols-2">
-                    <section class="dply-card overflow-hidden p-6 sm:p-8">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Launch preflight') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Shared deployment checks for config, publication, and attached resources.') }}</p>
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Preflight') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Launch preflight') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Shared deployment checks for config, publication, and attached resources.') }}</p>
+                            </div>
+                        </div>
+                        <div class="px-6 py-6 sm:px-7">
                         @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
-                            <p class="mt-3 text-sm font-medium text-emerald-700">{{ __('No blocking preflight issues.') }}</p>
+                            <p class="text-sm font-medium text-emerald-700">{{ __('No blocking preflight issues.') }}</p>
                         @else
-                            <div class="mt-3 space-y-2">
+                            <div class="space-y-2">
                                 @foreach ($preflightErrors as $error)
                                     <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $error }}</p>
                                 @endforeach
@@ -158,15 +179,25 @@
                                 @endforeach
                             </div>
                         @endif
+                        </div>
                     </section>
 
-                    <section class="dply-card overflow-hidden p-6 sm:p-8">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Attached resources') }}</h3>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('What this site expects around the app runtime.') }}</p>
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Resources') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attached resources') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('What this site expects around the app runtime.') }}</p>
+                            </div>
+                        </div>
+                        <div class="px-6 py-6 sm:px-7">
                         @if ($resourceBindings->isEmpty())
-                            <p class="mt-3 text-sm text-brand-mist">{{ __('No resource bindings recorded.') }}</p>
+                            <p class="text-sm text-brand-mist">{{ __('No resource bindings recorded.') }}</p>
                         @else
-                            <div class="mt-3 space-y-2">
+                            <div class="space-y-2">
                                 @foreach ($resourceBindings as $binding)
                                     @include('livewire.sites.partials.resource-binding-row', [
                                         'binding' => $binding,
@@ -175,5 +206,6 @@
                                 @endforeach
                             </div>
                         @endif
+                        </div>
                     </section>
                 </div>

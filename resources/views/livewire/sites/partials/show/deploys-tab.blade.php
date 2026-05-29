@@ -1,12 +1,16 @@
-                <section class="dply-card overflow-hidden p-6 sm:p-8">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <section class="dply-card overflow-hidden">
+                    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                        </span>
                         <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Deploy this site') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Run a deploy now (synchronous) or queue one for the worker. Repository and runtime config live in') }}
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy this site') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run a deploy now (synchronous) or queue one for the worker. Repository and runtime config live in') }}
                                 <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ __('deploy settings') }}</a>.
                             </p>
                         </div>
-                        <div class="flex shrink-0 flex-wrap gap-2">
+                        <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto">
                             <button type="button" wire:click="deployNow" wire:loading.attr="disabled" wire:target="deployNow" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
                                 <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
                                 <span wire:loading wire:target="deployNow"><x-spinner variant="white" size="sm" /></span>
@@ -23,9 +27,15 @@
 
                 @if ($atomicReleases)
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Releases & rollback') }}</h3>
-                            <span class="text-xs text-brand-mist">{{ trans_choice('{0} no releases|{1} :count release|[2,*] :count releases', $site->releases->count(), ['count' => $site->releases->count()]) }}</span>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Releases') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Releases & rollback') }}</h3>
+                            </div>
+                            <span class="ml-auto shrink-0 self-center text-xs text-brand-mist">{{ trans_choice('{0} no releases|{1} :count release|[2,*] :count releases', $site->releases->count(), ['count' => $site->releases->count()]) }}</span>
                         </div>
                         @if ($site->releases->isEmpty())
                             <p class="px-6 py-6 text-sm text-brand-mist sm:px-8">{{ __('No recorded releases yet. Deploy once with the atomic strategy.') }}</p>
@@ -52,11 +62,17 @@
                 @endif
 
                 <section class="dply-card overflow-hidden" wire:poll.10s>
-                    <div class="flex items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h3>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deployments') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h3>
+                        </div>
                         @if ($site->workspace)
                             @feature('surface.projects')
-                                <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="text-xs font-medium text-brand-sage hover:underline">{{ __('Project delivery') }}</a>
+                                <a href="{{ route('projects.delivery', $site->workspace) }}" wire:navigate class="ml-auto shrink-0 self-center text-xs font-medium text-brand-sage hover:underline">{{ __('Project delivery') }}</a>
                             @endfeature
                         @endif
                     </div>

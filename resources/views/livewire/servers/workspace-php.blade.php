@@ -42,20 +42,17 @@
 
     {{-- PHP runtime: hero card with eyebrow + title + summary stat tiles. --}}
     <section class="dply-card overflow-hidden">
-        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                     </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Runtime') }}</p>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP runtime') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Server-owned PHP inventory, CLI default, and new-site default.') }}
                         </p>
                     </div>
-                </div>
                 @can('update', $server)
                     @if ($opsReady)
                         <div class="flex shrink-0 flex-wrap items-center gap-2">
@@ -76,7 +73,6 @@
                         </div>
                     @endif
                 @endcan
-            </div>
         </div>
         <dl class="grid grid-cols-1 gap-2 p-6 sm:grid-cols-3 sm:p-7">
             <div @class([
@@ -172,18 +168,16 @@
 
     @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Versions on this server') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.') }}</p>
                     </div>
                     <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ count($phpVersionRows) }}</span>
-                </div>
             </div>
 
             <ul class="divide-y divide-brand-ink/10">

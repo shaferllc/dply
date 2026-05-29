@@ -2,10 +2,16 @@
     {{-- ─────────────────────────────────────────────────────────────
         Edge delivery — read-only backend / hostname info
        ───────────────────────────────────────────────────────────── --}}
-    <section id="edge-delivery-backend" class="scroll-mt-24 dply-card">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Where builds are published after each deploy.') }}</p>
+    <section id="edge-delivery-backend" class="scroll-mt-24 dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Where builds are published after each deploy.') }}</p>
+            </div>
         </div>
         <dl class="divide-y divide-brand-ink/8 px-6 py-2 text-sm sm:px-8">
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
@@ -37,26 +43,25 @@
         Hybrid origin — dply.yaml panel + dashboard form + test
        ───────────────────────────────────────────────────────────── --}}
     @if (($edgeRuntimeMode ?? 'static') === 'hybrid' && is_array($edgeOrigin ?? null))
-        <section class="dply-card">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div class="flex flex-wrap items-baseline justify-between gap-3">
-                    <div>
-                        <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
-                            <x-heroicon-o-arrow-trending-up class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                            {{ __('Hybrid origin') }}
-                        </h3>
-                        <p class="mt-0.5 text-sm text-brand-moss">
-                            {{ __('Static assets serve from R2; dynamic routes proxy to this origin. `origin:` rules from :file merge with the dashboard form below at deploy time.', ['file' => $sourcePath]) }}
-                        </p>
-                    </div>
-                    <a
-                        href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
-                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
-                        {{ __('Generate dply.yaml') }}
-                    </a>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Origin') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Hybrid origin') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Static assets serve from R2; dynamic routes proxy to this origin. `origin:` rules from :file merge with the dashboard form below at deploy time.', ['file' => $sourcePath]) }}
+                    </p>
                 </div>
+                <a
+                    href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
+                    class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                    {{ __('Generate dply.yaml') }}
+                </a>
             </div>
 
             {{-- 1. From dply.yaml --}}
@@ -219,10 +224,16 @@
        ───────────────────────────────────────────────────────────── --}}
     @if (($edgeRuntimeMode ?? 'static') !== 'hybrid')
         @can('update', $site)
-            <section class="dply-card">
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Convert to hybrid SSR') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">{{ __('Point this Edge site at an existing origin so dynamic routes proxy through. Static assets keep serving from R2.') }}</p>
+            <section class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hybrid') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Convert to hybrid SSR') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point this Edge site at an existing origin so dynamic routes proxy through. Static assets keep serving from R2.') }}</p>
+                    </div>
                 </div>
                 <form wire:submit.prevent="convertEdgeStaticToHybrid" class="space-y-4 px-6 py-5 sm:px-8">
                     <label class="block">
@@ -250,21 +261,20 @@
             $imageSecret = is_string($imagesMeta['signing_secret'] ?? null) ? (string) $imagesMeta['signing_secret'] : '';
             $repoAllowed = is_array($repoImages['allowed_hosts'] ?? null) ? $repoImages['allowed_hosts'] : [];
         @endphp
-        <section class="dply-card">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <div class="flex flex-wrap items-baseline justify-between gap-3">
-                    <div>
-                        <h3 class="inline-flex items-center gap-2 text-base font-semibold text-brand-ink">
-                            <x-heroicon-o-photo class="h-4 w-4 text-brand-forest dark:text-brand-sage" aria-hidden="true" />
-                            {{ __('Image optimization') }}
-                        </h3>
-                        <p class="mt-0.5 text-sm text-brand-moss">{{ __('Resize and reformat images at the edge via Cloudflare Image Resizing. `images.allowed_hosts:` from :file merges with the dashboard list below; the signing secret stays dashboard-only.', ['file' => $sourcePath]) }}</p>
-                    </div>
-                    <a href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40">
-                        <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
-                        {{ __('Generate dply.yaml') }}
-                    </a>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Images') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Image optimization') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Resize and reformat images at the edge via Cloudflare Image Resizing. `images.allowed_hosts:` from :file merges with the dashboard list below; the signing secret stays dashboard-only.', ['file' => $sourcePath]) }}</p>
                 </div>
+                <a href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}" class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40">
+                    <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                    {{ __('Generate dply.yaml') }}
+                </a>
             </div>
 
             {{-- 1. From dply.yaml --}}

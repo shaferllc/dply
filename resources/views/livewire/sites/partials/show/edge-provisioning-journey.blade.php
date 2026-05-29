@@ -109,9 +109,18 @@
     </section>
 
     <aside class="w-full space-y-6 self-start lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-w-none">
-        <section class="dply-card overflow-hidden p-5 sm:p-6">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Edge summary') }}</h3>
-            <dl class="mt-4 flex flex-col gap-3 text-sm">
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge summary') }}</h3>
+                </div>
+            </div>
+            <div class="px-6 py-6 sm:px-7">
+            <dl class="flex flex-col gap-3 text-sm">
                 <div class="min-w-0">
                     <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                     <dd class="mt-0.5 font-semibold capitalize text-brand-ink">{{ $site->statusLabel() }}</dd>
@@ -173,6 +182,7 @@
                     <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Available once publish completes.') }}</p>
                 </div>
             @endif
+            </div>
         </section>
 
         @can('delete', $site)

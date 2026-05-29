@@ -27,16 +27,14 @@
 
     @if (! $opsReady)
         <section class="dply-card overflow-hidden border-amber-200">
-            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
-                    </div>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
                 </div>
             </div>
         </section>
@@ -50,13 +48,14 @@
             ])
 
             <section class="{{ $card }} overflow-hidden">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                            <x-heroicon-o-users class="h-5 w-5" />
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Accounts') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Loaded from /etc/passwd over SSH. Click a row to expand UID, home, shell, groups, and assigned sites.') }}
                             </p>

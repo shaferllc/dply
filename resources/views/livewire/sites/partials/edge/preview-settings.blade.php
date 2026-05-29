@@ -1,9 +1,15 @@
 @can('update', $site)
     @if (! $edgeIsPreviewChild)
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Preview comment widget') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Show a floating "Comments" button on every preview deploy of this site. Anyone visiting the preview URL can leave anonymous review notes that appear in the preview workspace.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-chat-bubble-left-right class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Comments') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview comment widget') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Show a floating "Comments" button on every preview deploy of this site. Anyone visiting the preview URL can leave anonymous review notes that appear in the preview workspace.') }}</p>
+                </div>
             </div>
             <form wire:submit.prevent="saveEdgeCommentWidget" class="space-y-3 px-6 py-5 sm:px-8">
                 <label class="flex items-start gap-3 text-sm text-brand-ink">
@@ -27,9 +33,15 @@
         </section>
 
         <section id="edge-previews-protection" class="scroll-mt-24 dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Preview protection') }}</h3>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Require a password or Dply sign-in before anyone can view PR previews and deploy aliases. Your live production URL and custom domains stay public.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Protection') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview protection') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Require a password or Dply sign-in before anyone can view PR previews and deploy aliases. Your live production URL and custom domains stay public.') }}</p>
+                </div>
             </div>
             <form
                 wire:submit.prevent="saveEdgePreviewProtection"

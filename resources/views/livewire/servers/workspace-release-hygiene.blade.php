@@ -30,14 +30,13 @@
 
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
                         </span>
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @switch($report['overall'])
                                     @case('critical') {{ __('Disk or release pressure') }} @break
@@ -78,7 +77,6 @@
                             </span>
                         </button>
                     @endif
-                </div>
             </div>
 
             @if ($report['alert_count'] > 0)
@@ -119,9 +117,15 @@
 
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Atomic releases') }}</h2>
-                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Stored in Dply vs on-disk release folders from the last scan.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Releases') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Atomic releases') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply vs on-disk release folders from the last scan.') }}</p>
+                    </div>
                 </div>
                 <div class="px-6 py-4 sm:px-7">
                     @if ($report['releases']['atomic_site_count'] === 0)
@@ -175,17 +179,21 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h2 class="text-sm font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h2>
-                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan. View tails the newest lines over SSH.') }}</p>
+                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan. View tails the newest lines over SSH.') }}</p>
+                            </div>
                         </div>
                         <a href="{{ route('servers.logs', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40">
                             {{ __('Full log viewer') }}
                             <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
                         </a>
-                    </div>
                 </div>
                 <div class="space-y-4 px-6 py-4 sm:px-7">
                     <dl class="grid grid-cols-2 gap-4 text-sm">
@@ -303,11 +311,16 @@
 
         @feature('workspace.run')
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h2 class="text-sm font-semibold text-brand-ink">{{ __('Prune saved command') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm text-brand-moss">{{ $report['prune_command']['description'] }}</p>
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cleanup') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Prune saved command') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $report['prune_command']['description'] }}</p>
+                        </div>
                     </div>
                     @if (! $isDeployer)
                         <button
@@ -325,7 +338,6 @@
                             @endif
                         </button>
                     @endif
-                </div>
             </div>
             <div class="px-6 py-4 sm:px-7">
                 <a href="{{ route('servers.run', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">

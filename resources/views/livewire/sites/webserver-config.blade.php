@@ -59,12 +59,12 @@
 
     @if ($core_changed_warning)
         <div class="mb-6 dply-card overflow-hidden">
-            <div class="flex items-start gap-3 bg-amber-50 px-5 py-4">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">
+            <div class="flex items-start gap-3 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Out of sync') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Out of sync') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Managed core changed') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}</p>
                 </div>
@@ -74,12 +74,12 @@
 
     @if ($health_hint)
         <div class="mb-6 dply-card overflow-hidden">
-            <div class="flex items-start gap-3 bg-brand-cream/40 px-5 py-4">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+            <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Health') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver status') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $health_hint }}</p>
                 </div>
@@ -186,12 +186,12 @@
             </div>
 
             <div class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-5 py-4">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Release') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
                     </div>
@@ -364,12 +364,12 @@
             </div>
 
             <div class="mt-6 dply-card overflow-hidden">
-                <div class="flex items-start gap-3 bg-brand-cream/40 px-5 py-4">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-book-open class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Reference') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Reference') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runbook') }}</h2>
                         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                             <a href="{{ route('scripts.marketplace') }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Script marketplace') }}</a>

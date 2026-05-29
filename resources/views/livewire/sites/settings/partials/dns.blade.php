@@ -98,28 +98,25 @@
      orientation copy, right-side fields, and a sand-tinted save footer. --}}
 <div class="{{ $card }} mt-6">
     <form wire:submit="saveDnsSettings">
-        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
-                        <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Settings') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Provider & zone') }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('The credential here can differ from where the server is hosted — for example DigitalOcean compute with Cloudflare DNS.') }}
-                        </p>
-                        <p class="mt-3 text-sm">
-                            <a href="{{ route('credentials.index', ['tab' => 'dns']) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">
-                                {{ __('Connected DNS providers') }} &raquo;
-                            </a>
-                        </p>
-                    </div>
-                </div>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Settings') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Provider & zone') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('The credential here can differ from where the server is hosted — for example DigitalOcean compute with Cloudflare DNS.') }}
+                </p>
+                <p class="mt-3 text-sm">
+                    <a href="{{ route('credentials.index', ['tab' => 'dns']) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">
+                        {{ __('Connected DNS providers') }} &raquo;
+                    </a>
+                </p>
             </div>
+        </div>
 
-            <div class="space-y-5 p-6 sm:p-8">
+        <div class="space-y-5 px-6 py-6 sm:px-7">
                 <div>
                     <x-input-label for="settings_dns_provider_credential_id" :value="__('DNS credential')" />
                     <select
@@ -152,7 +149,6 @@
                     </p>
                     <x-input-error :messages="$errors->get('settings_dns_zone')" class="mt-2" />
                 </div>
-            </div>
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">

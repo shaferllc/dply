@@ -96,92 +96,84 @@
                 <form wire:submit.prevent="save" class="space-y-6">
                     {{-- Master toggle --}}
                     <section class="{{ $card }}">
-                        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
-                                        <x-heroicon-o-power class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Edge switch') }}</p>
-                                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Proxy through the edge') }}</h2>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                            {{ __('When on, the primary hostname resolves to the provider\'s proxy IPs; when off, traffic goes directly to the origin server.') }}
-                                        </p>
-                                    </div>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-power class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Edge switch') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Proxy through the edge') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('When on, the primary hostname resolves to the provider\'s proxy IPs; when off, traffic goes directly to the origin server.') }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="space-y-3 p-6 sm:p-8">
-                                <label class="flex items-center gap-3">
-                                    <input type="checkbox" wire:model.live="enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
-                                    <span class="text-sm font-semibold text-brand-ink">{{ __('Edge in front of this site') }}</span>
-                                </label>
-                                @if ($lastAppliedAt)
-                                    <p class="text-xs text-brand-moss">{{ __('Last sync:') }} <span class="font-mono text-brand-ink">{{ $lastAppliedAt }}</span></p>
-                                @endif
-                                @if ($lastError)
-                                    <p class="text-xs text-rose-700">{{ __('Last error:') }} {{ $lastError }}</p>
-                                @endif
-                            </div>
+                        <div class="space-y-3 px-6 py-6 sm:px-7">
+                            <label class="flex items-center gap-3">
+                                <input type="checkbox" wire:model.live="enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                                <span class="text-sm font-semibold text-brand-ink">{{ __('Edge in front of this site') }}</span>
+                            </label>
+                            @if ($lastAppliedAt)
+                                <p class="text-xs text-brand-moss">{{ __('Last sync:') }} <span class="font-mono text-brand-ink">{{ $lastAppliedAt }}</span></p>
+                            @endif
+                            @if ($lastError)
+                                <p class="text-xs text-rose-700">{{ __('Last error:') }} {{ $lastError }}</p>
+                            @endif
                         </div>
                     </section>
 
                     {{-- Provider config --}}
                     <section class="{{ $card }}">
-                        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
-                                        <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Provider') }}</p>
-                                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge configuration') }}</h2>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                            {{ __('CDN credentials, target zone, hostname mapped through the edge, and the origin IP that the proxy points back to.') }}
-                                        </p>
-                                    </div>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge configuration') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('CDN credentials, target zone, hostname mapped through the edge, and the origin IP that the proxy points back to.') }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="space-y-5 p-6 sm:p-8">
-                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="provider">{{ __('CDN provider') }}</label>
-                                        <select id="provider" wire:model.live="provider" class="{{ $inputCls }}">
-                                            <option value="cloudflare">{{ __('Cloudflare') }}</option>
-                                        </select>
-                                        @error('provider') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                                    </div>
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="credentialId">{{ __('Credential') }}</label>
-                                        <select id="credentialId" wire:model="credentialId" class="{{ $inputCls }}">
-                                            <option value="">{{ __('— select —') }}</option>
-                                            @foreach ($credentials as $cred)
-                                                @if ($cred->provider === $provider)
-                                                    <option value="{{ $cred->id }}">{{ $cred->name }}</option>
-                                                @endif
-                                            @endforeach
-                                        </select>
-                                        @error('credentialId') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                                    </div>
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="zoneName">{{ __('Zone (apex domain)') }}</label>
-                                        <input id="zoneName" type="text" wire:model="zoneName" placeholder="example.com" class="{{ $inputCls }}">
-                                        @error('zoneName') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                                    </div>
-                                    <div>
-                                        <label class="{{ $labelCls }}" for="hostname">{{ __('Site hostname') }}</label>
-                                        <input id="hostname" type="text" wire:model="hostname" placeholder="app.example.com" class="{{ $inputCls }}">
-                                        @error('hostname') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                                    </div>
-                                    <div class="sm:col-span-2">
-                                        <label class="{{ $labelCls }}" for="originIp">{{ __('Origin IP') }}</label>
-                                        <input id="originIp" type="text" wire:model="originIp" placeholder="203.0.113.10" class="{{ $inputCls }}">
-                                        <p class="mt-1 text-xs text-brand-moss">{{ __('Defaults to the site server\'s public IP. Change this if you front the origin with a separate load balancer.') }}</p>
-                                        @error('originIp') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
-                                    </div>
+                        <div class="space-y-5 px-6 py-6 sm:px-7">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label class="{{ $labelCls }}" for="provider">{{ __('CDN provider') }}</label>
+                                    <select id="provider" wire:model.live="provider" class="{{ $inputCls }}">
+                                        <option value="cloudflare">{{ __('Cloudflare') }}</option>
+                                    </select>
+                                    @error('provider') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="{{ $labelCls }}" for="credentialId">{{ __('Credential') }}</label>
+                                    <select id="credentialId" wire:model="credentialId" class="{{ $inputCls }}">
+                                        <option value="">{{ __('— select —') }}</option>
+                                        @foreach ($credentials as $cred)
+                                            @if ($cred->provider === $provider)
+                                                <option value="{{ $cred->id }}">{{ $cred->name }}</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                    @error('credentialId') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="{{ $labelCls }}" for="zoneName">{{ __('Zone (apex domain)') }}</label>
+                                    <input id="zoneName" type="text" wire:model="zoneName" placeholder="example.com" class="{{ $inputCls }}">
+                                    @error('zoneName') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="{{ $labelCls }}" for="hostname">{{ __('Site hostname') }}</label>
+                                    <input id="hostname" type="text" wire:model="hostname" placeholder="app.example.com" class="{{ $inputCls }}">
+                                    @error('hostname') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="{{ $labelCls }}" for="originIp">{{ __('Origin IP') }}</label>
+                                    <input id="originIp" type="text" wire:model="originIp" placeholder="203.0.113.10" class="{{ $inputCls }}">
+                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Defaults to the site server\'s public IP. Change this if you front the origin with a separate load balancer.') }}</p>
+                                    @error('originIp') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                                 </div>
                             </div>
                         </div>
@@ -189,102 +181,94 @@
 
                     {{-- Cache preset --}}
                     <section class="{{ $card }}">
-                        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
-                                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Aggressiveness') }}</p>
-                                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cache preset') }}</h2>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                            {{ __('Baseline cache behavior applied to every request unless a path rule below overrides it.') }}
-                                        </p>
-                                    </div>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Aggressiveness') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cache preset') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Baseline cache behavior applied to every request unless a path rule below overrides it.') }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="space-y-3 p-6 sm:p-8">
-                                @foreach ($presets as $key => $meta)
-                                    @php $isOn = $cachePreset === $key; @endphp
-                                    <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 transition-colors hover:bg-brand-sand/20 {{ $isOn ? 'bg-brand-sand/15' : '' }}">
-                                        <input type="radio" name="cachePreset" value="{{ $key }}" wire:model="cachePreset"
-                                               class="mt-1 h-4 w-4 border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $meta['tone']['bg'] }} {{ $meta['tone']['text'] }} {{ $meta['tone']['ring'] }}">
-                                            <x-dynamic-component :component="$meta['icon']" class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-semibold text-brand-ink">{{ $meta['name'] }}</p>
-                                            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $meta['desc'] }}</p>
-                                        </div>
-                                    </label>
-                                @endforeach
-                                @error('cachePreset') <p class="text-xs text-rose-700">{{ $message }}</p> @enderror
-                            </div>
+                        <div class="space-y-3 px-6 py-6 sm:px-7">
+                            @foreach ($presets as $key => $meta)
+                                @php $isOn = $cachePreset === $key; @endphp
+                                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 transition-colors hover:bg-brand-sand/20 {{ $isOn ? 'bg-brand-sand/15' : '' }}">
+                                    <input type="radio" name="cachePreset" value="{{ $key }}" wire:model="cachePreset"
+                                           class="mt-1 h-4 w-4 border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $meta['tone']['bg'] }} {{ $meta['tone']['text'] }} {{ $meta['tone']['ring'] }}">
+                                        <x-dynamic-component :component="$meta['icon']" class="h-5 w-5" aria-hidden="true" />
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $meta['name'] }}</p>
+                                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $meta['desc'] }}</p>
+                                    </div>
+                                </label>
+                            @endforeach
+                            @error('cachePreset') <p class="text-xs text-rose-700">{{ $message }}</p> @enderror
                         </div>
                     </section>
 
                     {{-- Path rules --}}
                     <section class="{{ $card }}">
-                        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overrides') }}</p>
-                                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Path cache rules') }}</h2>
-                                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                            {{ __('Per-path overrides applied at the edge. Rules are matched top-to-bottom; the first match wins. Bypass skips the cache; cache forces a TTL regardless of origin headers.') }}
-                                        </p>
-                                    </div>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overrides') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Path cache rules') }}</h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Per-path overrides applied at the edge. Rules are matched top-to-bottom; the first match wins. Bypass skips the cache; cache forces a TTL regardless of origin headers.') }}
+                                </p>
                             </div>
+                        </div>
 
-                            <div class="space-y-4 p-6 sm:p-8">
-                                @if (! empty($rules))
-                                    <div class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
-                                        @foreach ($rules as $idx => $rule)
-                                            <div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                                                <span class="font-mono text-xs text-brand-ink flex-1 min-w-[10rem] break-all">{{ $rule['path'] }}</span>
-                                                <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
-                                                    {{ $rule['action'] === 'bypass' ? 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-200/70' : 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200/70' }}">
-                                                    {{ $rule['action'] === 'bypass' ? __('Bypass') : __('Cache') }}
-                                                </span>
-                                                @if ($rule['action'] === 'cache')
-                                                    <span class="text-[11px] text-brand-moss">{{ __('TTL') }}: <span class="font-mono text-brand-ink">{{ $rule['ttl'] }}s</span></span>
-                                                @endif
-                                                <button type="button" wire:click="removeRule({{ $idx }})" class="text-[11px] font-semibold text-rose-700 hover:underline">
-                                                    {{ __('Remove') }}
-                                                </button>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <p class="text-xs italic text-brand-moss">{{ __('No path rules yet — the cache preset above applies to all paths.') }}</p>
-                                @endif
+                        <div class="space-y-4 px-6 py-6 sm:px-7">
+                            @if (! empty($rules))
+                                <div class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+                                    @foreach ($rules as $idx => $rule)
+                                        <div class="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                                            <span class="font-mono text-xs text-brand-ink flex-1 min-w-[10rem] break-all">{{ $rule['path'] }}</span>
+                                            <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
+                                                {{ $rule['action'] === 'bypass' ? 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-200/70' : 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200/70' }}">
+                                                {{ $rule['action'] === 'bypass' ? __('Bypass') : __('Cache') }}
+                                            </span>
+                                            @if ($rule['action'] === 'cache')
+                                                <span class="text-[11px] text-brand-moss">{{ __('TTL') }}: <span class="font-mono text-brand-ink">{{ $rule['ttl'] }}s</span></span>
+                                            @endif
+                                            <button type="button" wire:click="removeRule({{ $idx }})" class="text-[11px] font-semibold text-rose-700 hover:underline">
+                                                {{ __('Remove') }}
+                                            </button>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-xs italic text-brand-moss">{{ __('No path rules yet — the cache preset above applies to all paths.') }}</p>
+                            @endif
 
-                                <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-12">
-                                    <div class="sm:col-span-5">
-                                        <label class="{{ $labelCls }}" for="newRulePath">{{ __('Path prefix') }}</label>
-                                        <input id="newRulePath" type="text" wire:model="newRulePath" placeholder="/api/" class="{{ $inputCls }}">
-                                    </div>
-                                    <div class="sm:col-span-3">
-                                        <label class="{{ $labelCls }}" for="newRuleAction">{{ __('Action') }}</label>
-                                        <select id="newRuleAction" wire:model.live="newRuleAction" class="{{ $inputCls }}">
-                                            <option value="bypass">{{ __('Bypass') }}</option>
-                                            <option value="cache">{{ __('Cache') }}</option>
-                                        </select>
-                                    </div>
-                                    <div class="sm:col-span-2">
-                                        <label class="{{ $labelCls }}" for="newRuleTtl">{{ __('TTL (s)') }}</label>
-                                        <input id="newRuleTtl" type="number" min="1" wire:model="newRuleTtl" class="{{ $inputCls }}" @disabled($newRuleAction !== 'cache')>
-                                    </div>
-                                    <div class="sm:col-span-2">
-                                        <button type="button" wire:click="addRule" class="{{ $btnSecondary }} w-full">{{ __('Add rule') }}</button>
-                                    </div>
+                            <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-12">
+                                <div class="sm:col-span-5">
+                                    <label class="{{ $labelCls }}" for="newRulePath">{{ __('Path prefix') }}</label>
+                                    <input id="newRulePath" type="text" wire:model="newRulePath" placeholder="/api/" class="{{ $inputCls }}">
+                                </div>
+                                <div class="sm:col-span-3">
+                                    <label class="{{ $labelCls }}" for="newRuleAction">{{ __('Action') }}</label>
+                                    <select id="newRuleAction" wire:model.live="newRuleAction" class="{{ $inputCls }}">
+                                        <option value="bypass">{{ __('Bypass') }}</option>
+                                        <option value="cache">{{ __('Cache') }}</option>
+                                    </select>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="{{ $labelCls }}" for="newRuleTtl">{{ __('TTL (s)') }}</label>
+                                    <input id="newRuleTtl" type="number" min="1" wire:model="newRuleTtl" class="{{ $inputCls }}" @disabled($newRuleAction !== 'cache')>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <button type="button" wire:click="addRule" class="{{ $btnSecondary }} w-full">{{ __('Add rule') }}</button>
                                 </div>
                             </div>
                         </div>
@@ -293,28 +277,25 @@
                     @if ($enabled)
                         {{-- Metrics --}}
                         <section class="{{ $card }}">
-                            <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-                                <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                                    <div class="flex items-start gap-3">
-                                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">
-                                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Insights') }}</p>
-                                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Last 24 hours') }}</h2>
-                                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                                @if ($lastPolled)
-                                                    {{ __('Polled') }} <span class="font-mono text-brand-ink">{{ $lastPolled }}</span>
-                                                @else
-                                                    {{ __('No snapshot yet — hourly scheduler will populate this, or refresh manually.') }}
-                                                @endif
-                                            </p>
-                                        </div>
-                                    </div>
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
+                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Last 24 hours') }}</h2>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                        @if ($lastPolled)
+                                            {{ __('Polled') }} <span class="font-mono text-brand-ink">{{ $lastPolled }}</span>
+                                        @else
+                                            {{ __('No snapshot yet — hourly scheduler will populate this, or refresh manually.') }}
+                                        @endif
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div class="space-y-4 p-6 sm:p-8">
-                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="space-y-4 px-6 py-6 sm:px-7">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
                                         @if ($metricsError)
                                             <p class="text-xs text-rose-700">{{ __('Last poll error:') }} {{ $metricsError }}</p>
                                         @else
@@ -346,7 +327,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
                         </section>
                     @endif
 

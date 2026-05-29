@@ -46,14 +46,14 @@
     <div class="space-y-6">
         {{-- Overall --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 {{ $overallTone }}">
                             <x-heroicon-o-wrench class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Visitor maintenance') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Visitor maintenance') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @if ($active)
                                     {{ __('Maintenance active — visitors see suspended pages') }}
@@ -127,15 +127,14 @@
         {{-- Related maintenance controls --}}
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                            <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Advisory recurring local-time schedule for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Alerts.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Advisory recurring local-time schedule for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Alerts.') }}</p>
                     </div>
                 </div>
                 <div class="space-y-3 px-6 py-5 text-sm sm:px-7">
@@ -168,15 +167,14 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Org cron maintenance') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Pauses managed cron lines org-wide during migrations or deploy freezes — separate from visitor suspend.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cron') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Org cron maintenance') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pauses managed cron lines org-wide during migrations or deploy freezes — separate from visitor suspend.') }}</p>
                     </div>
                 </div>
                 <div class="space-y-3 px-6 py-5 text-sm sm:px-7">
@@ -270,14 +268,14 @@
 
         {{-- Enable / settings form --}}
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
-                        <x-heroicon-o-pause-circle class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <h2 class="text-base font-semibold text-brand-ink">{{ $active ? __('Window details') : __('Start visitor maintenance') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                    <x-heroicon-o-pause-circle class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Maintenance') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $active ? __('Window details') : __('Start visitor maintenance') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             @if ($active)
                                 {{ __('End maintenance above to resume sites suspended by this window. Fields below reflect the active window (read-only).') }}
                             @else
@@ -285,7 +283,6 @@
                             @endif
                         </p>
                     </div>
-                </div>
             </div>
 
             <form class="space-y-5 p-6 sm:p-7">

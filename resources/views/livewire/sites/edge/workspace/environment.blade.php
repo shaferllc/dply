@@ -1,22 +1,24 @@
 <div class="space-y-6">
     {{-- dply.yaml integration banner (same pattern as Crons / Firewall / Routing) --}}
-    <section class="dply-card">
-        <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-            <div class="flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Env vars in dply.yaml') }}</h3>
-                    <p class="mt-0.5 text-sm text-brand-moss">
-                        {{ __('You can declare env vars in :file too. The format intentionally splits public vs secret so you don\'t leak credentials.', ['file' => $sourcePath]) }}
-                    </p>
-                </div>
-                <a
-                    href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
-                    class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
-                >
-                    <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
-                    {{ __('Generate dply.yaml') }}
-                </a>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-variable class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Environment') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Env vars in dply.yaml') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('You can declare env vars in :file too. The format intentionally splits public vs secret so you don\'t leak credentials.', ['file' => $sourcePath]) }}
+                </p>
             </div>
+            <a
+                href="{{ route('sites.edge.dply-yaml', ['server' => $site->server_id, 'site' => $site->id]) }}"
+                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-ink hover:bg-brand-sand/40"
+            >
+                <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                {{ __('Generate dply.yaml') }}
+            </a>
         </div>
 
         {{-- Safety messaging --}}

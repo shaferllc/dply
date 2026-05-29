@@ -62,14 +62,13 @@
 
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $overallTone }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-heart class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 @switch($report['overall'])
                                     @case('critical') {{ __('Needs attention') }} @break
@@ -87,7 +86,6 @@
                     <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                         {{ __('Full metrics') }}
                     </a>
-                </div>
             </div>
 
             @if (count($report['alerts']) > 0)
@@ -115,12 +113,17 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Capacity') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Guest metrics snapshot') }}</h3>
-                @if ($report['capacity']['captured_at'])
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Sampled :ago', ['ago' => $report['capacity']['captured_at']->diffForHumans()]) }}</p>
-                @endif
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Capacity') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Guest metrics snapshot') }}</h3>
+                    @if ($report['capacity']['captured_at'])
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Sampled :ago', ['ago' => $report['capacity']['captured_at']->diffForHumans()]) }}</p>
+                    @endif
+                </div>
             </div>
             <div class="p-6 sm:p-7">
                 @if (! ($report['capacity']['has_samples'] ?? false))
@@ -143,12 +146,12 @@
 
         @if (count($report['disks']) > 0)
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Disk') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Disk') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Mount points') }}</h3>
                     </div>
                 </div>
@@ -170,12 +173,12 @@
 
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Releases') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Releases') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Atomic releases') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stored release folders vs each site\'s keep setting.') }}</p>
                     </div>
@@ -199,12 +202,12 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-50 text-rose-700 ring-rose-200">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploys') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploys') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Failed deploys') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Last :days days', ['days' => $report['deployments']['lookback_days'] ?? 7]) }}</p>
                     </div>
@@ -226,12 +229,12 @@
 
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('TLS') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('TLS') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Certificates') }}</h3>
                     </div>
                 </div>
@@ -261,12 +264,12 @@
             </section>
 
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                         <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Workers') }}</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workers') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Daemons') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Supervisor programs marked inactive.') }}</p>
                     </div>

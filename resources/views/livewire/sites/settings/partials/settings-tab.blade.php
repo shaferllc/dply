@@ -6,23 +6,20 @@
      update only, on-disk path under /var/www/<slug> stays put. --}}
 <section class="dply-card overflow-hidden">
     <form wire:submit="saveSiteIdentity">
-        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
-                        <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Identity') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site identity') }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Display name and URL slug for the site in dashboards and CLI. The on-disk deploy path under /var/www/<slug> is not renamed by this — keep deploys in mind before changing the slug.') }}
-                        </p>
-                    </div>
-                </div>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site identity') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Display name and URL slug for the site in dashboards and CLI. The on-disk deploy path under /var/www/<slug> is not renamed by this — keep deploys in mind before changing the slug.') }}
+                </p>
             </div>
+        </div>
 
-            <div class="space-y-5 p-6 sm:p-8">
+        <div class="space-y-5 px-6 py-6 sm:px-7">
                 <div>
                     <x-input-label for="settings_site_name" :value="__('Display name')" />
                     <x-text-input id="settings_site_name" wire:model="settings_site_name" class="mt-2 block w-full text-sm" />
@@ -37,7 +34,6 @@
                         {{ __('Lowercase letters, digits, and hyphens. Used in URLs and the deploy-path stub.') }}
                     </p>
                 </div>
-            </div>
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
@@ -53,29 +49,25 @@
 @if (! $isContainerWorkspace)
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveWebDirectory">
-        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/55 text-brand-forest ring-brand-ink/10">
-                        <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Path') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $documentRootLabel }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Path nginx serves from for this site. Webserver config re-applies on save.') }}
-                        </p>
-                    </div>
-                </div>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Path') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $documentRootLabel }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Path nginx serves from for this site. Webserver config re-applies on save.') }}
+                </p>
             </div>
+        </div>
 
-            <div class="space-y-5 p-6 sm:p-8">
+        <div class="space-y-5 px-6 py-6 sm:px-7">
                 <div>
                     <x-input-label for="settings_document_root" :value="$documentRootLabel" />
                     <x-text-input id="settings_document_root" wire:model="settings_document_root" class="mt-2 block w-full font-mono text-sm" :placeholder="$documentRootPlaceholder" />
                     <x-input-error :messages="$errors->get('settings_document_root')" class="mt-2" />
                 </div>
-            </div>
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
@@ -88,23 +80,20 @@
 {{-- Project / workspace assignment — moved from General. --}}
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveProjectSettings">
-        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
-                        <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Project') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ $projectSettingsDescription }}
-                        </p>
-                    </div>
-                </div>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ $projectSettingsDescription }}
+                </p>
             </div>
+        </div>
 
-            <div class="space-y-5 p-6 sm:p-8">
+        <div class="space-y-5 px-6 py-6 sm:px-7">
                 <div>
                     <x-input-label for="project_workspace_id" value="Project" />
                     <select id="project_workspace_id" wire:model="project_workspace_id" class="dply-input">
@@ -134,7 +123,6 @@
                         </div>
                     @endfeature
                 @endif
-            </div>
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
@@ -146,29 +134,25 @@
 {{-- Site notes — moved from General. --}}
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveSiteNotes">
-        <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
-            <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
-                        <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notes') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
-                        </p>
-                    </div>
-                </div>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notes') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Keep operational notes here for details you want to save or hand off later. Avoid putting secrets or credentials in this field.') }}
+                </p>
             </div>
+        </div>
 
-            <div class="space-y-4 p-6 sm:p-8">
+        <div class="space-y-4 px-6 py-6 sm:px-7">
                 <div>
                     <x-input-label for="site_notes" value="Notes" />
                     <textarea id="site_notes" wire:model="site_notes" rows="5" class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"></textarea>
                     <x-input-error :messages="$errors->get('site_notes')" class="mt-2" />
                 </div>
-            </div>
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">

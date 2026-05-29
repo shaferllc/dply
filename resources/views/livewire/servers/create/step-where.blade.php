@@ -85,18 +85,16 @@
             @if ($isProvider)
                 {{-- Provider host kind --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Host') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Full stack VM, Docker-only host, or register a managed Kubernetes cluster.') }}</p>
-                            </div>
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Full stack VM, Docker-only host, or register a managed Kubernetes cluster.') }}</p>
                         </div>
+                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                     </div>
                     <div class="p-6 sm:p-7">
                         <div class="grid gap-3 sm:grid-cols-3">
@@ -156,23 +154,21 @@
 
                 {{-- Provider tile picker --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                                <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Provider') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick the cloud — connect an account right here if one is missing.') }}</p>
-                            </div>
-                            <x-add-provider-credential-link
-                                class="!inline-flex !items-center !gap-1.5 !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!underline-offset-0 hover:!no-underline whitespace-nowrap shrink-0"
-                            >
-                                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Connect provider') }}
-                            </x-add-provider-credential-link>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick the cloud — connect an account right here if one is missing.') }}</p>
                         </div>
+                        <x-add-provider-credential-link
+                            class="!inline-flex !items-center !gap-1.5 !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!underline-offset-0 hover:!no-underline whitespace-nowrap shrink-0"
+                        >
+                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Connect provider') }}
+                        </x-add-provider-credential-link>
                     </div>
                     <div class="p-6 sm:p-7">
                         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -229,27 +225,25 @@
 
                 {{-- Account / credential picker --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Use which API credential?') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a stored token, or connect a fresh one without leaving this step.') }}</p>
-                            </div>
-                            @if ($form->type !== '' && $form->type !== 'custom')
-                                @php $credentialProvider = str_replace('_kubernetes', '', $form->type); @endphp
-                                <x-add-provider-credential-link
-                                    :provider="$credentialProvider"
-                                    class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
-                                >
-                                    <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    {{ __('Add new') }}
-                                </x-add-provider-credential-link>
-                            @endif
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Use which API credential?') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a stored token, or connect a fresh one without leaving this step.') }}</p>
                         </div>
+                        @if ($form->type !== '' && $form->type !== 'custom')
+                            @php $credentialProvider = str_replace('_kubernetes', '', $form->type); @endphp
+                            <x-add-provider-credential-link
+                                :provider="$credentialProvider"
+                                class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
+                            >
+                                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                {{ __('Add new') }}
+                            </x-add-provider-credential-link>
+                        @endif
                     </div>
                     <div class="p-6 sm:p-7">
                         @if ($catalog['credentials']->isEmpty())
@@ -292,16 +286,14 @@
                 {{-- Region + size (VM / Docker hosts only). --}}
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Placement') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Region & size') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick where the VM lives and how big it should be.') }}</p>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Placement') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Region & size') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick where the VM lives and how big it should be.') }}</p>
                             </div>
                         </div>
                         <div class="grid gap-6 p-6 sm:grid-cols-2 sm:p-7">
@@ -315,18 +307,16 @@
                 @if ($form->provider_host_kind === 'kubernetes' && $form->provider_credential_id !== '')
                     @php $k8sProviderLabel = $form->type === 'aws_kubernetes' ? __('AWS EKS') : __('DigitalOcean DOKS'); @endphp
                     <section class="dply-card overflow-hidden">
-                        <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                            <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
-                                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Cluster') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a cluster on the next step') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                        {{ __('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel]) }}
-                                    </p>
-                                </div>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a cluster on the next step') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel]) }}
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -334,18 +324,16 @@
             @else
                 {{-- Custom (BYO) host kind --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
-                                <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Host') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Standard VM/VPS gets the full dply stack; Docker host is just Docker + your containers.') }}</p>
-                            </div>
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Standard VM/VPS gets the full dply stack; Docker host is just Docker + your containers.') }}</p>
                         </div>
+                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                     </div>
                     <div class="p-6 sm:p-7">
                         <div class="grid gap-3 sm:grid-cols-2">
@@ -398,16 +386,14 @@
 
                 {{-- SSH connection --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
-                                <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Connection') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('We connect read-only first to verify access. Private key is stored encrypted at rest.') }}</p>
-                            </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Connection') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('We connect read-only first to verify access. Private key is stored encrypted at rest.') }}</p>
                         </div>
                     </div>
                     <div class="space-y-5 p-6 sm:p-7">

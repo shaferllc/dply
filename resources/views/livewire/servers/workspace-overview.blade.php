@@ -146,27 +146,25 @@
         @if ($server->workspace)
             @feature('surface.projects')
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
-                                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Project') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $server->workspace->name }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                    {{ __('This server is managed as part of the project. Use the project pages when you need access control, grouped activity, shared variables, coordinated deploys, or cross-resource health review.') }}
-                                </p>
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                        <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                        {{ __('Project overview') }}
-                                    </a>
-                                    <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                        <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                        {{ __('Project operations') }}
-                                    </a>
-                                </div>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $server->workspace->name }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                {{ __('This server is managed as part of the project. Use the project pages when you need access control, grouped activity, shared variables, coordinated deploys, or cross-resource health review.') }}
+                            </p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                    <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Project overview') }}
+                                </a>
+                                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Project operations') }}
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -337,17 +335,17 @@
                     x-data="{ open: @js($onboardingDone === 0) }"
                     class="dply-card overflow-hidden"
                 >
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <button
                             type="button"
                             x-on:click="open = ! open"
                             class="flex w-full items-start gap-3 text-left"
                         >
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Get started') }}</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Get started') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     {{ trans_choice('{1} :n step left to make this server useful|[2,*] :n steps left to make this server useful', $onboardingTotal - $onboardingDone, ['n' => $onboardingTotal - $onboardingDone]) }}
                                 </h3>
@@ -434,13 +432,13 @@
                 };
             @endphp
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Live load') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Live load') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('System load right now') }}</h3>
                             @if ($metricCapturedAt)
                                 <p class="mt-1 text-xs {{ $metricStale ? 'text-amber-700' : 'text-brand-mist' }}">
@@ -489,7 +487,7 @@
                     <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
                                     <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
@@ -526,14 +524,14 @@
             {{-- First container app CTA. --}}
             @if ($isContainerHost && $siteCount === 0 && ! $containerLaunch)
                 <section data-testid="add-first-container-cta" class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-sky-50/60 px-6 py-5 sm:px-7">
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sky'] }}">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                     <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Next step') }}</p>
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Next step') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first container app') }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
                                 </div>
@@ -571,13 +569,13 @@
                     : __('No deploys yet');
             @endphp
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('At a glance') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('At a glance') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workspace summary') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each tile drops you onto its full workspace page.') }}</p>
                         </div>
@@ -658,13 +656,13 @@
             {{-- Sites preview. --}}
             @if ($sitesPreview->isNotEmpty())
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Sites') }}</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sites') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Top sites by last-touched, with each site\'s most recent deploy.') }}</p>
                             </div>
@@ -727,13 +725,13 @@
 
             {{-- Stack summary --}}
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sand'] }}">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stack') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Installed runtime') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Database engine, language runtime, webserver, cache.') }}</p>
                         </div>
@@ -801,19 +799,24 @@
                         'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
                         'bg-rose-50/60' => $healthCritical,
                         'bg-amber-50/60' => $healthWarning && ! $healthCritical,
-                        'bg-brand-cream/40' => ! $healthCritical && ! $healthWarning,
+                        'bg-brand-sand/20' => ! $healthCritical && ! $healthWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
-                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
-                                $tonePalette['rose'] => $healthCritical,
-                                $tonePalette['amber'] => $healthWarning && ! $healthCritical,
-                                $tonePalette['emerald'] => ! $healthCritical && ! $healthWarning,
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1',
+                                'bg-rose-50 text-rose-700 ring-rose-200' => $healthCritical,
+                                'bg-amber-100 text-amber-700 ring-amber-200' => $healthWarning && ! $healthCritical,
+                                'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => ! $healthCritical && ! $healthWarning,
                             ])>
                                 <x-heroicon-o-heart class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Health cockpit') }}</p>
+                                <p @class([
+                                    'text-[11px] font-semibold uppercase tracking-[0.16em]',
+                                    'text-rose-700' => $healthCritical,
+                                    'text-amber-800' => $healthWarning && ! $healthCritical,
+                                    'text-brand-sage' => ! $healthCritical && ! $healthWarning,
+                                ])>{{ __('Health cockpit') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     @if ($healthCockpitSummary['alert_count'] > 0)
                                         {{ trans_choice(':count open alert|:count open alerts', $healthCockpitSummary['alert_count'], ['count' => $healthCockpitSummary['alert_count']]) }}
@@ -846,18 +849,22 @@
                     <div @class([
                         'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
                         'bg-amber-50/60' => $costNudgeWarning,
-                        'bg-brand-cream/40' => ! $costNudgeWarning,
+                        'bg-brand-sand/20' => ! $costNudgeWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
-                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
-                                $tonePalette['amber'] => $costNudgeWarning,
-                                $tonePalette['emerald'] => ! $costNudgeWarning,
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1',
+                                'bg-amber-100 text-amber-700 ring-amber-200' => $costNudgeWarning,
+                                'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => ! $costNudgeWarning,
                             ])>
                                 <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Cost card') }}</p>
+                                <p @class([
+                                    'text-[11px] font-semibold uppercase tracking-[0.16em]',
+                                    'text-amber-800' => $costNudgeWarning,
+                                    'text-brand-sage' => ! $costNudgeWarning,
+                                ])>{{ __('Cost card') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $costCardSummary['formatted_total'] }}</h3>
                                 <p class="mt-1 text-sm text-brand-moss">
                                     @if ($costCardSummary['nudge_title'])
@@ -893,19 +900,24 @@
                         'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
                         'bg-rose-50/60' => $patchCritical,
                         'bg-amber-50/60' => $patchWarning && ! $patchCritical,
-                        'bg-brand-cream/40' => ! $patchCritical && ! $patchWarning,
+                        'bg-brand-sand/20' => ! $patchCritical && ! $patchWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
-                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
-                                $tonePalette['rose'] => $patchCritical,
-                                $tonePalette['amber'] => $patchWarning && ! $patchCritical,
-                                $tonePalette['sage'] => ! $patchCritical && ! $patchWarning,
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1',
+                                'bg-rose-50 text-rose-700 ring-rose-200' => $patchCritical,
+                                'bg-amber-100 text-amber-700 ring-amber-200' => $patchWarning && ! $patchCritical,
+                                'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => ! $patchCritical && ! $patchWarning,
                             ])>
                                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Patch advisor') }}</p>
+                                <p @class([
+                                    'text-[11px] font-semibold uppercase tracking-[0.16em]',
+                                    'text-rose-700' => $patchCritical,
+                                    'text-amber-800' => $patchWarning && ! $patchCritical,
+                                    'text-brand-sage' => ! $patchCritical && ! $patchWarning,
+                                ])>{{ __('Patch advisor') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     @if ($patchAdvisorSummary['reboot_required'] === true)
                                         {{ __('Reboot required') }}
@@ -945,19 +957,24 @@
                         'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
                         'bg-rose-50/60' => $hygieneCritical,
                         'bg-amber-50/60' => $hygieneWarning && ! $hygieneCritical,
-                        'bg-brand-cream/40' => ! $hygieneCritical && ! $hygieneWarning,
+                        'bg-brand-sand/20' => ! $hygieneCritical && ! $hygieneWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
-                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1',
-                                $tonePalette['rose'] => $hygieneCritical,
-                                $tonePalette['amber'] => $hygieneWarning && ! $hygieneCritical,
-                                $tonePalette['sage'] => ! $hygieneCritical && ! $hygieneWarning,
+                                'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1',
+                                'bg-rose-50 text-rose-700 ring-rose-200' => $hygieneCritical,
+                                'bg-amber-100 text-amber-700 ring-amber-200' => $hygieneWarning && ! $hygieneCritical,
+                                'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => ! $hygieneCritical && ! $hygieneWarning,
                             ])>
                                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Release hygiene') }}</p>
+                                <p @class([
+                                    'text-[11px] font-semibold uppercase tracking-[0.16em]',
+                                    'text-rose-700' => $hygieneCritical,
+                                    'text-amber-800' => $hygieneWarning && ! $hygieneCritical,
+                                    'text-brand-sage' => ! $hygieneCritical && ! $hygieneWarning,
+                                ])>{{ __('Release hygiene') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     {{ trans_choice(':count cleanup alert|:count cleanup alerts', $releaseHygieneSummary['alert_count'], ['count' => $releaseHygieneSummary['alert_count']]) }}
                                 </h3>
@@ -980,7 +997,7 @@
                 <section class="dply-card overflow-hidden {{ $insightsCritical ? 'border-red-200' : 'border-amber-200' }}">
                     <div class="border-b border-brand-ink/10 {{ $insightsCritical ? 'bg-red-50/60' : 'bg-amber-50/60' }} px-6 py-5 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $insightsCritical ? 'bg-red-50 text-red-700 ring-red-200' : $tonePalette['amber'] }}">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 {{ $insightsCritical ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-amber-100 text-amber-700 ring-amber-200' }}">
                                 <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
@@ -1010,13 +1027,13 @@
             {{-- Notifications --}}
             @if ($notificationSummary['manage_url'])
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['violet'] }}">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Notifications') }}</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notifications') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     @if ($notificationSummary['channel_count'] > 0)
                                         {{ trans_choice('{1} :count channel routing this server|[2,*] :count channels routing this server', $notificationSummary['channel_count'], ['count' => $notificationSummary['channel_count']]) }}
@@ -1045,15 +1062,15 @@
         {{-- Danger zone --}}
         @if (! $setupIncomplete)
             @can('delete', $server)
-                <section class="dply-card overflow-hidden border-red-200">
-                    <div class="border-b border-red-200 bg-red-50/60 px-6 py-5 sm:px-7">
+                <section class="dply-card overflow-hidden border-rose-200">
+                    <div class="border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-red-50 text-red-700 ring-red-200">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
                                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">{{ __('Danger zone') }}</p>
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Danger zone') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Remove this server') }}</h3>
                                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                         {{ __('Deletes the dply server record, runs any provider teardown, and detaches sites / databases / backups. You\'ll be asked to type the server name to confirm and can schedule removal for a future date (runs at the end of that day in your app timezone).') }}
