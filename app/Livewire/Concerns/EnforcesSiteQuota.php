@@ -6,9 +6,9 @@ use App\Models\Organization;
 use App\Support\NotificationToastPosition;
 
 /**
- * Shared site-quota pre-check for site-creation Livewire components. Lets a
- * create action bail out with a friendly upgrade toast before it ever trips
- * the hard block in the Site model boundary.
+ * Shared site-quota guard for site-creation Livewire components. A create
+ * action calls this first and bails out with a friendly upgrade toast when the
+ * organization has reached its plan's site ceiling — the user-facing hard block.
  */
 trait EnforcesSiteQuota
 {

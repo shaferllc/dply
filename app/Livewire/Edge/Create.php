@@ -1314,6 +1314,12 @@ class Create extends Component
 
         $this->validateCreateForm();
 
+        if (! $org->canCreateSite()) {
+            $this->toastError($org->siteLimitMessage());
+
+            return;
+        }
+
         if ($this->detectedPlan !== [] && EdgeSsrDetection::planLooksLikeSsr($this->detectedPlan)
             && ! in_array($this->form->runtime_mode, ['hybrid', 'ssr'], true)) {
             $this->toastError(__('This repository looks like an SSR app. Pick "Worker-native SSR" (Next.js via OpenNext), hybrid mode with an origin URL, or use dply Cloud for full server workloads.'));

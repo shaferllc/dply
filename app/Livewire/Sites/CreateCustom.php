@@ -4,6 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCustomSiteJob;
+use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
@@ -16,6 +17,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class CreateCustom extends Component
 {
+    use EnforcesSiteQuota;
+
     public Server $server;
 
     public string $name = '';
@@ -58,6 +61,10 @@ class CreateCustom extends Component
         }
 
         $this->validate($rules);
+
+        if ($this->siteQuotaReached($this->server->organization)) {
+            return null;
+        }
 
         $slug = $this->buildSlug();
         $systemUser = trim($this->system_user_override) !== ''

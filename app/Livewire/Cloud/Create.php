@@ -938,6 +938,12 @@ class Create extends Component
 
         $this->validate();
 
+        if (! $org->canCreateSite()) {
+            $this->toastError($org->siteLimitMessage());
+
+            return;
+        }
+
         // Pre-flight via /apps/propose — catches DO spec rejections
         // (autoscaling-on-Basic, bad region taxonomy, missing image
         // creds) BEFORE we create a Site row that just lands in

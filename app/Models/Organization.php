@@ -318,14 +318,6 @@ class Organization extends Model
     }
 
     /**
-     * True when the org may create another site under its current plan.
-     */
-    public function canCreateSite(): bool
-    {
-        return ! $this->siteLimitReached();
-    }
-
-    /**
      * Friendly upgrade prompt shown when site creation is blocked.
      */
     public function siteLimitMessage(): string
@@ -705,12 +697,12 @@ class Organization extends Model
     }
 
     /**
-     * Maximum sites allowed. Always unlimited; the marketing page commits to
-     * "no per-site billing" and that's enforced here.
+     * Maximum sites allowed on the org's current plan. Returns PHP_INT_MAX for
+     * the unlimited (Business / null) ceiling so callers can compare numerically.
      */
     public function maxSites(): int
     {
-        return PHP_INT_MAX;
+        return $this->planSiteLimit() ?? PHP_INT_MAX;
     }
 
     /**
@@ -722,11 +714,13 @@ class Organization extends Model
     }
 
     /**
-     * Whether the organization can create another site (under {@see maxSites()}).
+     * Whether the organization can create another site under its current
+     * plan's site ceiling. Preview deployments don't consume quota — see
+     * {@see quotaCountedSiteCount()}.
      */
     public function canCreateSite(): bool
     {
-        return $this->sites()->count() < $this->maxSites();
+        return ! $this->siteLimitReached();
     }
 
     /**

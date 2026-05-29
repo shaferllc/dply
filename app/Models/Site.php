@@ -31,34 +31,6 @@ class Site extends Model
 {
     use HasFactory, HasUlids;
 
-    /**
-     * When false, the plan site-quota guard in AppServiceProvider is skipped.
-     * Used by migration/import/system paths via {@see withoutSiteQuota} that
-     * legitimately materialize sites outside the self-serve creation flow.
-     */
-    public static bool $enforceSiteQuota = true;
-
-    /**
-     * Run a callback with the plan site-quota guard disabled. Restores the
-     * previous state afterward, even on exception.
-     *
-     * @template TReturn
-     *
-     * @param  \Closure(): TReturn  $callback
-     * @return TReturn
-     */
-    public static function withoutSiteQuota(\Closure $callback)
-    {
-        $previous = self::$enforceSiteQuota;
-        self::$enforceSiteQuota = false;
-
-        try {
-            return $callback();
-        } finally {
-            self::$enforceSiteQuota = $previous;
-        }
-    }
-
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_NGINX_ACTIVE = 'nginx_active';

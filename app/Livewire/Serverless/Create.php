@@ -163,6 +163,12 @@ class Create extends Component
         }
         $this->authorize('update', $org);
 
+        if (! $org->canCreateSite()) {
+            $this->toastError($org->siteLimitMessage());
+
+            return null;
+        }
+
         // Validate the credential by row, scoped to org + provider. The action
         // re-checks the same constraint as defense-in-depth (in case a future
         // caller skips Livewire), but doing it here gives inline form errors

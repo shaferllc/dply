@@ -390,6 +390,10 @@ class Create extends Component
             abort(403);
         }
 
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
         // K8s containers may target a different namespace than the server's
         // default. Stash the per-container namespace into the inspection
         // payload so the job + CreateContainerSiteFromInspection see it.
@@ -500,6 +504,10 @@ class Create extends Component
         $org = auth()->user()?->currentOrganization();
         abort_if($org === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
+
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
 
         // Database-engine compat per Q5: WordPress requires MySQL/MariaDB.
         // We don't auto-block here because the server's engine list may
@@ -874,6 +882,10 @@ class Create extends Component
         abort_if($this->server->organization_id === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
 
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
         $phpVersionIds = array_column($this->phpVersions, 'id');
         $functionsHost = $this->server->hostCapabilities()->supportsFunctionDeploy();
         $dockerHost = $this->server->isDockerHost();
@@ -1199,6 +1211,10 @@ class Create extends Component
         abort_if($org === null, 403);
         abort_if($this->server->organization_id === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
+
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
 
         $this->form->validate([
             'name' => ['required', 'string', 'max:120'],

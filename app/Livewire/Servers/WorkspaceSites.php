@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -31,6 +32,7 @@ use Livewire\Component;
 class WorkspaceSites extends Component
 {
     use DispatchesToastNotifications;
+    use EnforcesSiteQuota;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -262,6 +264,10 @@ class WorkspaceSites extends Component
         }
 
         $org = $this->server->organization;
+
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
 
         // PHP version is intentionally not collected in the modal: the
         // server's preselected default is used at create time and the

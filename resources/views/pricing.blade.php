@@ -25,6 +25,7 @@
                 'label' => $plan['label'] ?? ucfirst($key),
                 'price' => (int) ($plan['price_cents'] ?? 0) / 100,
                 'max' => $plan['max_servers'] ?? null,
+                'max_sites' => $plan['max_sites'] ?? null,
             ])
             ->values();
 
@@ -117,16 +118,19 @@
 
         {{-- Plan cards --}}
         <section class="pb-12 px-4 sm:px-6 lg:px-8">
-            <div class="mx-auto grid w-full max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="mx-auto grid w-full max-w-6xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($plans as $plan)
                     @php
                         $isHighlight = $plan['key'] === $highlightKey;
                         $ceiling = $plan['max'] === null
                             ? 'Unlimited servers'
                             : ($plan['max'] === 1 ? '1 server' : 'Up to ' . $plan['max'] . ' servers');
+                        $siteCeiling = $plan['max_sites'] === null
+                            ? 'Unlimited sites'
+                            : ($plan['max_sites'] === 1 ? '1 site' : 'Up to ' . $plan['max_sites'] . ' sites');
                     @endphp
                     <div @class([
-                        'relative flex flex-col rounded-2xl p-7 transition',
+                        'relative flex flex-col rounded-2xl p-8 transition',
                         'border-2 border-brand-gold bg-white shadow-xl shadow-brand-gold/10 ring-1 ring-brand-gold/20' => $isHighlight,
                         'border border-brand-ink/10 bg-white/80 backdrop-blur-sm shadow-sm' => ! $isHighlight,
                     ])>
@@ -145,11 +149,11 @@
                                 <span class="text-brand-moss">/mo</span>
                             @endif
                         </div>
-                        <p class="mt-3 text-sm font-semibold text-brand-ink">{{ $ceiling }}</p>
-                        <ul class="mt-4 space-y-2.5 text-sm text-brand-moss flex-1">
+                        <p class="mt-4 text-sm font-semibold text-brand-ink">{{ $ceiling }}</p>
+                        <ul class="mt-5 space-y-3 text-sm text-brand-moss flex-1">
                             <li class="flex items-start gap-2.5">
                                 <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                Unlimited sites, deploys &amp; team members
+                                {{ $siteCeiling }}, unlimited deploys &amp; team members
                             </li>
                             <li class="flex items-start gap-2.5">
                                 <x-heroicon-s-check class="h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -172,7 +176,7 @@
                             @endif
                         </ul>
                         <a href="{{ route('register') }}" @class([
-                            'mt-7 block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold transition-colors',
+                            'mt-8 block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold transition-colors',
                             'bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest' => $isHighlight,
                             'border-2 border-brand-ink/15 bg-white text-brand-ink hover:border-brand-sage/40' => ! $isHighlight,
                         ])>
@@ -239,8 +243,8 @@
         @php
             $faqs = [
                 [
-                    'q' => 'Why per-server count and not per-seat or per-site?',
-                    'a' => 'dply\'s cost scales with the work it does for each server: agent traffic, metrics ingestion, deploys, scheduler ticks, audit. Counting servers matches that cost honestly and keeps pricing predictable. Seats are unlimited; sites are unlimited.',
+                    'q' => 'Why per-server count and not per-seat?',
+                    'a' => 'dply\'s cost scales with the work it does for each server: agent traffic, metrics ingestion, deploys, scheduler ticks, audit. Counting servers matches that cost honestly and keeps pricing predictable. Team seats are always unlimited, and each plan includes a generous site allowance that grows as you move up.',
                 ],
                 [
                     'q' => 'What if I run on Hetzner / cheap providers — am I overpaying?',
