@@ -12,10 +12,12 @@ uses(RefreshDatabase::class);
 
 const FAKE_SSH_KEY = "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n";
 
-test('clone allowed now that site caps are retired', function () {
-    // The legacy "trial site cap" check used to throw here. Under the
-    // Standard pricing model, sites are uncapped — billing is per-server
-    // and trial-state gating handles abuse rather than per-resource caps.
+test('clone allowed when the org has site headroom on its plan', function () {
+    // Sites are capped per flat plan (resolved from billable server count).
+    // An org with two billable servers lands on Starter (10 sites), so a
+    // single existing site leaves plenty of room to clone.
+    config(['subscription.standard.min_billable_age_days' => 0]);
+
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -37,6 +39,7 @@ test('clone allowed now that site caps are retired', function () {
         'organization_id' => $org->id,
     ]);
 
+    expect($org->fresh()->currentSubscriptionPlan()['key'])->toBe('starter');
     expect($org->fresh()->canCreateSite())->toBeTrue();
-    expect($org->fresh()->maxSites())->toBe(PHP_INT_MAX);
+    expect($org->fresh()->maxSites())->toBe(10);
 });

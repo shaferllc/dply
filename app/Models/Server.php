@@ -51,6 +51,12 @@ class Server extends Model
 
     public const HOST_KIND_DPLY_EDGE = 'dply_edge_delivery';
 
+    /** The customer's own provider account runs (and is billed for) this VM. */
+    public const HOSTING_BACKEND_BYO = 'byo';
+
+    /** dply runs this VM on its own provider account and bills it all-in cost-plus. */
+    public const HOSTING_BACKEND_DPLY = 'dply_managed';
+
     public const HEALTH_REACHABLE = 'reachable';
 
     public const HEALTH_UNREACHABLE = 'unreachable';
@@ -75,6 +81,7 @@ class Server extends Model
         'provider_credential_id',
         'name',
         'provider',
+        'hosting_backend',
         'provider_id',
         'ip_address',
         'ssh_port',
@@ -428,6 +435,25 @@ class Server extends Model
     public function isManagedProductHost(): bool
     {
         return $this->isServerlessHost() || $this->isDplyCloudHost() || $this->isDplyEdgeHost();
+    }
+
+    /**
+     * True when this is a real SSH-managed VM that dply runs on its OWN provider
+     * account (dply pays the provider) and bills all-in cost-plus, rather than
+     * the customer's connected credential. Distinct from isManagedProductHost()
+     * — a managed VM is still a full server with SSH, a workspace, sites, etc.
+     */
+    public function usesManagedHosting(): bool
+    {
+        return $this->hosting_backend === self::HOSTING_BACKEND_DPLY;
+    }
+
+    public function hostingBackendLabel(): string
+    {
+        return match ($this->hosting_backend) {
+            self::HOSTING_BACKEND_DPLY => __('Dply-hosted (managed)'),
+            default => __('Your provider account'),
+        };
     }
 
     public function isContainerHost(): bool

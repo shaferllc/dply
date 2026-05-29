@@ -1,17 +1,13 @@
-<div class="mx-auto max-w-7xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-
-    <header class="mb-6 border-b border-brand-ink/10 pb-4">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Preview URLs') }}</h1>
-        <p class="mt-1 max-w-3xl text-sm text-brand-moss">
-            {{ __('Managed preview hostnames across BYO and Edge share one pattern — :primary for production previews, :branch for branch/PR previews — usually on :apex.', [
-                'primary' => $patternPrimary,
-                'branch' => $patternBranch,
-                'apex' => $preferredApex,
-            ]) }}
-        </p>
-    </header>
-
+<div>
+    <x-fleet-shell
+        :title="__('Preview URLs')"
+        :description="__('Managed preview hostnames across BYO and Edge share one pattern — :primary for production previews, :branch for branch/PR previews — usually on :apex.', [
+            'primary' => $patternPrimary,
+            'branch' => $patternBranch,
+            'apex' => $preferredApex,
+        ])"
+        :section="__('Previews')"
+    >
     <div class="mb-4 flex flex-wrap items-center gap-2">
         <label class="sr-only" for="preview-search">{{ __('Search previews') }}</label>
         <input
@@ -22,23 +18,15 @@
             class="rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-1 focus:ring-brand-sage"
         />
         @foreach (['' => __('All'), 'byo' => __('BYO'), 'edge' => __('Edge')] as $value => $label)
-            <button type="button" wire:click="$set('productFilter', '{{ $value }}')"
-                @class([
-                    'rounded-full border px-3 py-1 text-xs font-semibold transition',
-                    'border-brand-ink bg-brand-ink text-brand-cream' => $productFilter === $value,
-                    'border-brand-ink/15 bg-white text-brand-moss hover:text-brand-ink' => $productFilter !== $value,
-                ])>
-                {{ $label }}
-            </button>
+            <x-fleet-pill :active="$productFilter === $value" wire:click="$set('productFilter', '{{ $value }}')">{{ $label }}</x-fleet-pill>
         @endforeach
         <span class="ms-auto text-xs text-brand-moss">{{ trans_choice(':count preview|:count previews', $total, ['count' => $total]) }}</span>
     </div>
 
     @if ($rows === [])
-        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss">
-            <p class="font-medium text-brand-ink">{{ __('No managed preview hostnames yet.') }}</p>
+        <x-fleet-empty :title="__('No managed preview hostnames yet.')">
             <p class="mt-1">{{ __('BYO sites get testing hostnames after provision; Edge sites publish to on-dply delivery domains.') }}</p>
-        </div>
+        </x-fleet-empty>
     @else
         <div class="overflow-x-auto rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
             <table class="min-w-full text-sm">
@@ -76,4 +64,5 @@
             </table>
         </div>
     @endif
+    </x-fleet-shell>
 </div>

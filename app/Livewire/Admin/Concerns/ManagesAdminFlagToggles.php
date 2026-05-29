@@ -66,76 +66,6 @@ trait ManagesAdminFlagToggles
         );
     }
 
-    public function applyPlatformDefaultFeatureFlag(string $flag): void
-    {
-        $this->authorizePlatformAdmin();
-
-        if (! in_array($flag, AdminFeatureFlags::platformDefaultFlagKeys(), true)) {
-            $this->toastError(__('Unknown feature flag.'));
-
-            return;
-        }
-
-        $label = AdminFeatureFlags::orgFlagLabel($flag) ?? $flag;
-
-        if (Feature::for(null)->active($flag)) {
-            Feature::for(null)->deactivate($flag);
-            $purged = AdminFeatureFlags::purgeOrgScopedOverrides($flag);
-            Feature::flushCache();
-            $this->toastSuccess(__(':flag disabled platform-wide.', [
-                'flag' => $label,
-            ]));
-            if ($purged > 0) {
-                $this->toastSuccess(__(':count org override(s) cleared.', ['count' => $purged]));
-            }
-        } else {
-            Feature::for(null)->activate($flag);
-            if (AdminFeatureFlags::isPlatformOnlyOrgFlag($flag)) {
-                AdminFeatureFlags::purgeOrgScopedOverridesRaw($flag);
-            }
-            Feature::flushCache();
-            $this->toastSuccess(AdminFeatureFlags::isPlatformOnlyOrgFlag($flag)
-                ? __(':flag enabled platform-wide for every org (when the full feature above is off).', ['flag' => $label])
-                : __(':flag platform default enabled. Orgs with explicit overrides keep their setting.', ['flag' => $label]));
-        }
-
-        $this->toastWarning(__('Env/config default: :state.', [
-            'state' => AdminFeatureFlags::configDefault($flag) ? __('on') : __('off'),
-        ]));
-    }
-
-    public function applyGlobalFeatureFlag(string $flag): void
-    {
-        $this->authorizePlatformAdmin();
-
-        if (! in_array($flag, AdminFeatureFlags::globalFlagKeys(), true)) {
-            $this->toastError(__('Unknown feature flag.'));
-
-            return;
-        }
-
-        $label = AdminFeatureFlags::globalFlagLabel($flag) ?? $flag;
-
-        if (Feature::for(null)->active($flag)) {
-            Feature::for(null)->deactivate($flag);
-            $purged = AdminFeatureFlags::purgeInvalidOrgScopedGlobalOverrides($flag);
-            Feature::flushCache();
-            $this->toastSuccess(__(':flag disabled app-wide.', ['flag' => $label]));
-            if ($purged > 0) {
-                $this->toastSuccess(__(':count invalid org override(s) removed.', ['count' => $purged]));
-            }
-        } else {
-            Feature::for(null)->activate($flag);
-            AdminFeatureFlags::purgeInvalidOrgScopedGlobalOverrides($flag);
-            Feature::flushCache();
-            $this->toastSuccess(__(':flag enabled app-wide.', ['flag' => $label]));
-        }
-
-        $this->toastWarning(__('Default from config: :state.', [
-            'state' => AdminFeatureFlags::configDefault($flag) ? __('on') : __('off'),
-        ]));
-    }
-
     /**
      * @return list<array{key: string, label: string, active: bool, default: bool, configDefault: bool}>
      */
@@ -147,7 +77,7 @@ trait ManagesAdminFlagToggles
                 'key' => $key,
                 'label' => $label,
                 'active' => $org instanceof Organization && Feature::for($org)->active($key),
-                'default' => AdminFeatureFlags::platformDefault($key),
+                'default' => AdminFeatureFlags::configDefault($key),
                 'configDefault' => AdminFeatureFlags::configDefault($key),
             ];
         }
@@ -156,6 +86,8 @@ trait ManagesAdminFlagToggles
     }
 
     /**
+     * Read-only config-default rows shown on the platform product-line pages.
+     *
      * @return list<array{key: string, label: string, active: bool, default: bool, configDefault: bool}>
      */
     protected function platformDefaultFlagEntries(array $flags): array
@@ -165,7 +97,7 @@ trait ManagesAdminFlagToggles
             $entries[] = [
                 'key' => $key,
                 'label' => $label,
-                'active' => Feature::for(null)->active($key),
+                'active' => AdminFeatureFlags::configDefault($key),
                 'default' => AdminFeatureFlags::configDefault($key),
                 'configDefault' => AdminFeatureFlags::configDefault($key),
             ];
@@ -188,7 +120,7 @@ trait ManagesAdminFlagToggles
                 $previewEntry = [
                     'key' => $previewKey,
                     'label' => $allFlagsInGroup[$previewKey],
-                    'active' => Feature::for(null)->active($previewKey),
+                    'active' => AdminFeatureFlags::configDefault($previewKey),
                     'default' => AdminFeatureFlags::configDefault($previewKey),
                     'configDefault' => AdminFeatureFlags::configDefault($previewKey),
                 ];
@@ -197,7 +129,7 @@ trait ManagesAdminFlagToggles
             $entries[] = [
                 'key' => $key,
                 'label' => $label,
-                'active' => Feature::for(null)->active($key),
+                'active' => AdminFeatureFlags::configDefault($key),
                 'default' => AdminFeatureFlags::configDefault($key),
                 'configDefault' => AdminFeatureFlags::configDefault($key),
                 'preview' => $previewEntry,
@@ -217,7 +149,7 @@ trait ManagesAdminFlagToggles
             $entries[] = [
                 'key' => $key,
                 'label' => $label,
-                'active' => Feature::for(null)->active($key),
+                'active' => AdminFeatureFlags::configDefault($key),
                 'default' => AdminFeatureFlags::configDefault($key),
             ];
         }

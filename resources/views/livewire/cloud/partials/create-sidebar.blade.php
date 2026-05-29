@@ -49,22 +49,16 @@
     </div>
 
     <div class="rounded-2xl border border-brand-sage/25 bg-gradient-to-br from-brand-cream via-white to-brand-sand/30 p-5 shadow-sm dark:border-brand-sage/20 dark:from-zinc-900 dark:via-zinc-900 dark:to-brand-sand/10">
+        @php($resourceEstimate = $resourceEstimate ?? 0)
         <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Estimated cost') }}</p>
         <p class="mt-2 text-3xl font-semibold tracking-tight text-brand-ink">
-            @if (is_numeric($costPreview['value'] ?? null))
-                ${{ number_format($costPreview['value'] + $cloudFee, 2) }}<span class="text-base font-medium text-brand-moss">/mo</span>
-            @else
-                ${{ number_format($cloudFee, 2) }}<span class="text-base font-medium text-brand-moss">/mo</span>
-            @endif
+            ${{ number_format($cloudFee + $resourceEstimate, 2) }}<span class="text-base font-medium text-brand-moss">/mo</span>
         </p>
-        @if (is_numeric($costPreview['value'] ?? null))
-            <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                {{ __('Cloud usage') }} <span class="font-mono text-brand-ink">${{ number_format($costPreview['value'], 2) }}</span>
-                + {{ __('dply fee') }} <span class="font-mono text-brand-ink">${{ number_format($cloudFee, 2) }}</span>{{ __('/mo') }}.
-            </p>
-        @else
-            <p class="mt-2 text-xs leading-relaxed text-brand-moss">{{ __('Flat dply per-app fee plus your cloud account\'s usage. Branch previews are free.') }}</p>
-        @endif
+        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+            {{ __('Platform fee') }} <span class="font-mono text-brand-ink">${{ number_format($cloudFee, 2) }}</span>
+            + {{ __('resources') }} <span class="font-mono text-brand-ink">${{ number_format($resourceEstimate, 2) }}</span>{{ __('/mo') }}.
+        </p>
+        <p class="mt-1 text-[11px] leading-relaxed text-brand-mist">{{ __('Resources = container, workers, and databases (compute scales with size + instances). Branch previews are free.') }}</p>
 
         @if (is_string($costPreview['error'] ?? null) && $costPreview['error'] !== '')
             <div class="mt-4 rounded-xl border border-rose-200/80 bg-rose-50/80 px-3 py-2 text-xs leading-relaxed text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">

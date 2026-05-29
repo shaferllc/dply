@@ -1,16 +1,13 @@
-<div class="mx-auto max-w-7xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-    <header class="mb-6 border-b border-brand-ink/10 pb-4">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Cross-product env drift') }}</h1>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('Sites that share a Git repo across BYO, Cloud, and Edge — and whether their environment variables agree. The first column is the baseline; later columns are compared against it.') }}
-        </p>
-    </header>
-
+<div>
+    <x-fleet-shell
+        :title="__('Cross-product env drift')"
+        :description="__('Sites that share a Git repo across BYO, Cloud, and Edge — and whether their environment variables agree. The first column is the baseline; later columns are compared against it.')"
+        :section="__('Env drift')"
+    >
     <div class="mb-6 flex flex-wrap items-center gap-3">
         <div class="min-w-[18rem] flex-1">
             <label for="drift_search" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Filter by repo') }}</label>
-            <input id="drift_search" type="search" wire:model.live.debounce.300ms="search" placeholder="github.com/owner/repo" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
+            <input id="drift_search" type="search" wire:model.live.debounce.300ms="search" placeholder="github.com/owner/repo" class="dply-input font-mono" />
         </div>
         <label class="inline-flex items-center gap-2 self-end text-sm text-brand-moss">
             <input type="checkbox" wire:model.live="hideClean" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest" />
@@ -27,14 +24,11 @@
     </div>
 
     @if ($totalGroups === 0)
-        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss">
-            <p class="font-medium text-brand-ink">{{ __('No cross-product repos yet.') }}</p>
+        <x-fleet-empty :title="__('No cross-product repos yet.')">
             <p class="mt-1">{{ __('Drift comparison kicks in when at least two sites in the org point at the same Git repo — for example, a Cloud API and an Edge front-end of the same product.') }}</p>
-        </div>
+        </x-fleet-empty>
     @elseif ($groups === [])
-        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss">
-            {{ __('No repos match the current filters.') }}
-        </div>
+        <x-fleet-empty>{{ __('No repos match the current filters.') }}</x-fleet-empty>
     @else
         <p class="mb-4 text-xs text-brand-moss">
             {{ trans_choice('{1} 1 cross-product repo|[2,*] :count cross-product repos', $totalGroups, ['count' => $totalGroups]) }} · {{ $cleanGroups }} {{ __('clean') }} · {{ $totalGroups - $cleanGroups }} {{ __('drifted') }}
@@ -113,4 +107,5 @@
             @endforeach
         </div>
     @endif
+    </x-fleet-shell>
 </div>

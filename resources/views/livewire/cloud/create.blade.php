@@ -965,7 +965,7 @@
             </div>
         </div>
 
-        @include('livewire.cloud.partials.create-sidebar', ['cloudFee' => $cloudFee, 'costPreview' => $costPreview])
+        @include('livewire.cloud.partials.create-sidebar', ['cloudFee' => $cloudFee, 'costPreview' => $costPreview, 'resourceEstimate' => $resourceEstimate])
         </div>
 
         <div x-show="view === 'canvas'" x-cloak>

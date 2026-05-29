@@ -129,6 +129,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ]);
         })->hourly()->name('edge-usage-today');
 
+        // Roll up managed-serverless invocations into usage snapshots (MTD), so
+        // the metered usage line stays current alongside the flat per-function fee.
+        $schedule->call(function (): void {
+            Artisan::call('dply:serverless:collect-usage', [
+                '--date' => now()->toDateString(),
+            ]);
+        })->hourly()->name('serverless-usage-today');
+
         $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);
 
         // Re-evaluate per-site monthly usage guardrails once today's usage

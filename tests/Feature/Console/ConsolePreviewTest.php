@@ -20,7 +20,7 @@ beforeEach(function (): void {
     Feature::flushCache();
 });
 
-test('console preview sidebar ignores org override when platform preview is on', function (): void {
+test('console preview sidebar respects per-org override', function (): void {
     Feature::define('workspace.console', fn (): bool => false);
     Feature::define('workspace.console_preview', fn (): bool => true);
     Feature::flushCache();
@@ -31,13 +31,12 @@ test('console preview sidebar ignores org override when platform preview is on',
 
     $server = readyServer($user);
 
-    expect(workspace_console_preview_active($org))->toBeTrue();
+    expect(workspace_console_preview_active($org))->toBeFalse();
 
     $this->actingAs($user)
         ->get(route('servers.overview', $server))
         ->assertOk()
-        ->assertSee(__('Soon'))
-        ->assertSee('console-preview', false);
+        ->assertDontSee('console-preview', false);
 });
 
 test('admin vm servers page lists console preview flag under console group', function (): void {

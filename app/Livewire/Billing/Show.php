@@ -15,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Laravel\Cashier\Invoice;
+use Laravel\Cashier\Subscription;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use RuntimeException;
@@ -499,6 +500,28 @@ class Show extends Component
             ];
         }
 
+        if ($state->serverlessUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply serverless usage'),
+                'quantity' => 1,
+                'unit_cents' => $state->serverlessUsageSubtotalCents,
+                'line_cents' => $state->serverlessUsageSubtotalCents,
+                'detail' => __('Metered invocations, managed databases & caches'),
+            ];
+        }
+
+        if ($state->managedServerSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply managed server'),
+                'quantity' => $state->managedServerCount,
+                'unit_cents' => $state->managedServerCount > 0
+                    ? (int) round($state->managedServerSubtotalCents / $state->managedServerCount)
+                    : $state->managedServerSubtotalCents,
+                'line_cents' => $state->managedServerSubtotalCents,
+                'detail' => __('All-in cost-plus — dply-hosted VM (provider cost + margin)'),
+            ];
+        }
+
         if ($state->cloudCount > 0) {
             $unit = (int) config('subscription.standard.cloud_cents', 500);
             $items[] = [
@@ -506,6 +529,16 @@ class Show extends Component
                 'quantity' => $state->cloudCount,
                 'unit_cents' => $unit,
                 'line_cents' => $state->cloudSubtotalCents,
+            ];
+        }
+
+        if ($state->cloudResourceSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply Cloud resources'),
+                'quantity' => 1,
+                'unit_cents' => $state->cloudResourceSubtotalCents,
+                'line_cents' => $state->cloudResourceSubtotalCents,
+                'detail' => __('Metered compute, workers & databases'),
             ];
         }
 
@@ -604,7 +637,7 @@ class Show extends Component
      * price on it. A Free-plan org can carry only a yearly managed line (no
      * plan line), so we can't key off a single price.
      */
-    private function subscriptionIsYearly(\Laravel\Cashier\Subscription $sub): bool
+    private function subscriptionIsYearly(Subscription $sub): bool
     {
         $yearlyIds = array_merge(
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),

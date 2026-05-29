@@ -47,7 +47,10 @@ final class OrganizationBillingSnapshotWriter
         return [
             'plan_cents' => $state->planPriceCents,
             'serverless_cents' => $state->serverlessSubtotalCents,
+            'serverless_usage_cents' => $state->serverlessUsageSubtotalCents,
+            'managed_server_cents' => $state->managedServerSubtotalCents,
             'cloud_cents' => $state->cloudSubtotalCents,
+            'cloud_resource_cents' => $state->cloudResourceSubtotalCents,
             'edge_cents' => $state->edgeSubtotalCents,
             'edge_usage_cents' => $state->edgeUsageSubtotalCents,
         ];

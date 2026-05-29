@@ -1,44 +1,41 @@
-<div class="mx-auto max-w-6xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-    <header class="mb-6 border-b border-slate-200 pb-4">
-        <h1 class="text-2xl font-semibold text-slate-900">{{ __('Fleet domains') }}</h1>
-        <p class="mt-1 text-sm text-slate-600">{{ __('Every hostname attached to a site in this organization. Search to locate where a domain is served.') }}</p>
-    </header>
-
+<div>
+    <x-fleet-shell
+        :title="__('Fleet domains')"
+        :description="__('Every hostname attached to a site in this organization. Search to locate where a domain is served.')"
+        :section="__('Domains')"
+    >
     <div class="mb-4 flex flex-wrap items-end gap-3">
         <div class="min-w-[16rem] flex-1">
-            <label for="domain_search" class="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Search') }}</label>
-            <input id="domain_search" type="search" wire:model.live.debounce.250ms="search" placeholder="example.com" class="mt-1 block w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500" />
+            <label for="domain_search" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Search') }}</label>
+            <input id="domain_search" type="search" wire:model.live.debounce.250ms="search" placeholder="example.com" class="dply-input" />
         </div>
         <div>
-            <label for="runtime_filter" class="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Runtime') }}</label>
-            <select id="runtime_filter" wire:model.live="runtimeFilter" class="mt-1 rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500">
+            <label for="runtime_filter" class="block text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Runtime') }}</label>
+            <select id="runtime_filter" wire:model.live="runtimeFilter" class="dply-input">
                 <option value="">{{ __('Any') }}</option>
                 @foreach ($runtimes as $r)
                     <option value="{{ $r }}">{{ $r }}</option>
                 @endforeach
             </select>
         </div>
-        <label class="flex items-center gap-2 text-xs text-slate-700">
-            <input type="checkbox" wire:model.live="primaryOnly" class="rounded border-slate-300 text-slate-700 focus:ring-slate-500" />
+        <label class="flex items-center gap-2 self-end pb-2.5 text-sm text-brand-moss">
+            <input type="checkbox" wire:model.live="primaryOnly" class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/40" />
             {{ __('Primary only') }}
         </label>
         @if ($search !== '' || $runtimeFilter !== '' || $primaryOnly)
-            <button type="button" wire:click="clearFilters" class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+            <button type="button" wire:click="clearFilters" class="self-end rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                 {{ __('Clear filters') }}
             </button>
         @endif
-        <p class="ml-auto text-xs text-slate-500">{{ trans_choice('{1} :count domain|[2,*] :count domains', count($rows), ['count' => count($rows)]) }}</p>
+        <p class="ml-auto self-end pb-2.5 text-xs text-brand-mist">{{ trans_choice('{1} :count domain|[2,*] :count domains', count($rows), ['count' => count($rows)]) }}</p>
     </div>
 
     @if ($rows === [])
-        <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600">
-            {{ __('No domains match the current filters.') }}
-        </div>
+        <x-fleet-empty>{{ __('No domains match the current filters.') }}</x-fleet-empty>
     @else
-        <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+        <div class="overflow-x-auto rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+            <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">
                     <tr>
                         <th class="px-4 py-3">{{ __('Hostname') }}</th>
                         <th class="px-4 py-3">{{ __('Site') }}</th>
@@ -47,22 +44,22 @@
                         <th class="px-4 py-3">{{ __('Primary') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-brand-ink/5">
                     @foreach ($rows as $row)
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-4 py-3 font-mono text-xs text-slate-800">{{ $row['hostname'] }}</td>
-                            <td class="px-4 py-3 text-slate-700">
+                        <tr class="hover:bg-brand-sand/20">
+                            <td class="px-4 py-3 font-mono text-xs text-brand-ink">{{ $row['hostname'] }}</td>
+                            <td class="px-4 py-3 text-brand-ink">
                                 @if ($row['server'])
-                                    <a href="{{ route('sites.show', ['server' => $row['server'], 'site' => $row['site']]) }}" wire:navigate class="hover:underline">{{ $row['site']->name }}</a>
+                                    <a href="{{ route('sites.show', ['server' => $row['server'], 'site' => $row['site']]) }}" wire:navigate class="hover:text-brand-forest">{{ $row['site']->name }}</a>
                                 @else
                                     {{ $row['site']->name }}
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-slate-600">{{ $row['site']->runtime ?: '—' }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ $row['server']?->name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-brand-moss">{{ $row['site']->runtime ?: '—' }}</td>
+                            <td class="px-4 py-3 text-brand-moss">{{ $row['server']?->name ?? '—' }}</td>
                             <td class="px-4 py-3">
                                 @if ($row['is_primary'])
-                                    <span class="text-emerald-700">★</span>
+                                    <span class="text-amber-500" title="{{ __('Primary') }}">★</span>
                                 @endif
                             </td>
                         </tr>
@@ -76,4 +73,5 @@
         ['label' => __('List all'), 'command' => 'dply:fleet:domain-list'],
         ['label' => __('Find by hostname'), 'command' => 'dply:fleet:domain-find example.com'],
     ]" />
+    </x-fleet-shell>
 </div>

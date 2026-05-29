@@ -12,13 +12,29 @@ class HetznerService
 
     protected string $token;
 
-    public function __construct(ProviderCredential $credential)
+    /**
+     * Accepts either a customer's connected ProviderCredential (BYO servers) or a
+     * raw API token (dply-managed servers provisioned on dply's own Hetzner project).
+     */
+    public function __construct(ProviderCredential|string $credentialOrToken)
     {
-        $token = $credential->getApiToken();
+        $token = $credentialOrToken instanceof ProviderCredential
+            ? $credentialOrToken->getApiToken()
+            : trim($credentialOrToken);
+
         if (empty($token)) {
             throw new \InvalidArgumentException('Hetzner API token is required.');
         }
+
         $this->token = $token;
+    }
+
+    /**
+     * Build a service bound to a raw API token (e.g. dply's platform Hetzner project).
+     */
+    public static function fromToken(string $token): self
+    {
+        return new self($token);
     }
 
     /**

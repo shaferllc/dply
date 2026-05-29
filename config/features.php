@@ -34,24 +34,26 @@ return [
     | globally; every other provider is per-org gated for design partners.
     */
     'provider' => [
+        // exit: keep on; flagship MVP provider — flag exists for per-org pause / emergency cutoff
+        'digitalocean' => env('FEATURE_PROVIDER_DIGITALOCEAN', true),
         // exit: ship to all orgs once we've had 5+ successful AWS provisions in prod
-        'aws' => env('FEATURE_PROVIDER_AWS', true),
+        'aws' => env('FEATURE_PROVIDER_AWS', false),
         // exit: ship to all orgs once Linode cost-catalog parity is verified
         'linode' => env('FEATURE_PROVIDER_LINODE', true),
         // exit: ship to all orgs once we've had 5+ successful Vultr provisions in prod
-        'vultr' => env('FEATURE_PROVIDER_VULTR', true),
+        'vultr' => env('FEATURE_PROVIDER_VULTR', false),
         // exit: ship once Fly.io machine provisioning is end-to-end green
-        'fly_io' => env('FEATURE_PROVIDER_FLY_IO', true),
+        'fly_io' => env('FEATURE_PROVIDER_FLY_IO', false),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
-        'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', true),
+        'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', false),
         // exit: ship after Scaleway API token flow + cost catalog are validated
-        'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', true),
+        'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', false),
         // exit: bare-metal flow is materially different; keep gated until a paying customer asks
-        'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', true),
+        'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', false),
         // exit: ship once container-on-AppRunner architecture lands per dply cloud memo
-        'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', true),
+        'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', false),
         // exit: keep gated indefinitely; EKS is enterprise-only positioning
-        'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', true),
+        'aws_eks' => env('FEATURE_PROVIDER_AWS_EKS', false),
     ],
 
     /*
@@ -152,23 +154,31 @@ return [
     */
     'surface' => [
         // exit: VM launch is dark; flip to true once container/cloud surface is GA
-        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
+        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
         // GA 2026-05: cross-server views (Health, Deploys, Domains, EnvSearch)
         // ship as the org-wide ops counterpart to /infrastructure. Saved-view
         // persistence is a follow-up enhancement, not a launch gate.
         'fleet' => env('FEATURE_SURFACE_FLEET', true),
         // exit: ship after a curated v1 marketplace catalog is approved
-        'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', true),
+        'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', false),
         // exit: ship as the org-substitute UX for solo users with 3+ servers
-        'projects' => env('FEATURE_SURFACE_PROJECTS', true),
+        'projects' => env('FEATURE_SURFACE_PROJECTS', false),
         // exit: ship once one-off script execution has audit + rollback story
-        'scripts' => env('FEATURE_SURFACE_SCRIPTS', true),
+        'scripts' => env('FEATURE_SURFACE_SCRIPTS', false),
         // exit: ship as a standalone product launch with its own positioning
-        'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', true),
+        'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
-        'edge' => env('FEATURE_SURFACE_EDGE', true),
+        'edge' => env('FEATURE_SURFACE_EDGE', false),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
-        'serverless' => env('FEATURE_SURFACE_SERVERLESS', true),
+        'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
+        // exit: offer the dply-managed serverless option (dply runs the function
+        // on its own FaaS account, billed cost-plus) once platform namespace
+        // credentials are bootstrapped. Falls back to BYO-only when off.
+        'serverless_managed' => env('FEATURE_SURFACE_SERVERLESS_MANAGED', false),
+        // exit: offer dply-managed servers (dply runs the VM on its own Hetzner
+        // account, billed all-in cost-plus) once the platform Hetzner token is
+        // configured and abuse/teardown safeguards are validated.
+        'managed_servers' => env('FEATURE_SURFACE_MANAGED_SERVERS', false),
     ],
 
     /*
@@ -196,7 +206,6 @@ return [
     ],
 
     /*
-    | Tier B launch workflows — multi-engine setup wizards gated until
     | Cloud + Edge surfaces are enabled for the org.
     */
     'launch' => [

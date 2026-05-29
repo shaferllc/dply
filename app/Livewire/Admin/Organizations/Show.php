@@ -59,7 +59,7 @@ class Show extends Component
         foreach (AdminFeatureFlags::groupsForProductLine($this->tab) as $title => $flags) {
             $orgScoped = [];
             foreach ($flags as $key => $label) {
-                if (! AdminFeatureFlags::isGlobalNamespace($key) && ! AdminFeatureFlags::isPlatformOnlyOrgFlag($key)) {
+                if (! AdminFeatureFlags::isGlobalNamespace($key)) {
                     $orgScoped[$key] = $label;
                 }
             }

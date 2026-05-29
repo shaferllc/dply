@@ -168,7 +168,7 @@ final class AdminFeatureFlags
             }
             foreach ($line['groups'] as $flags) {
                 foreach (array_keys($flags) as $key) {
-                    if (! self::isGlobalNamespace($key) && ! self::isPlatformOnlyOrgFlag($key)) {
+                    if (! self::isGlobalNamespace($key)) {
                         $keys[] = $key;
                     }
                 }
@@ -176,19 +176,6 @@ final class AdminFeatureFlags
         }
 
         return array_values(array_unique($keys));
-    }
-
-    /**
-     * Pennant keys editable as platform defaults on admin product-line pages.
-     *
-     * @return list<string>
-     */
-    public static function platformDefaultFlagKeys(): array
-    {
-        return array_values(array_unique([
-            ...self::orgFlagKeys(),
-            ...self::platformOnlyOrgFlags(),
-        ]));
     }
 
     /**
@@ -245,11 +232,11 @@ final class AdminFeatureFlags
 
     /**
      * Remove stored Pennant values for every org so resolution falls back to
-     * the platform default (null scope).
+     * the config default.
      */
     public static function purgeOrgScopedOverrides(string $flag): int
     {
-        if (! in_array($flag, self::orgFlagKeys(), true) && ! self::isPlatformOnlyOrgFlag($flag)) {
+        if (! in_array($flag, self::orgFlagKeys(), true)) {
             return 0;
         }
 
@@ -258,21 +245,6 @@ final class AdminFeatureFlags
 
     public static function purgeOrgScopedOverridesRaw(string $flag): int
     {
-        return DB::table('features')
-            ->where('name', $flag)
-            ->where('scope', 'like', self::orgScopeLikePrefix().'%')
-            ->delete();
-    }
-
-    /**
-     * Global flags must not be stored on org scopes; strip stray rows.
-     */
-    public static function purgeInvalidOrgScopedGlobalOverrides(string $flag): int
-    {
-        if (! self::isGlobalNamespace($flag)) {
-            return 0;
-        }
-
         return DB::table('features')
             ->where('name', $flag)
             ->where('scope', 'like', self::orgScopeLikePrefix().'%')
@@ -357,19 +329,6 @@ final class AdminFeatureFlags
     }
 
     /**
-     * @return list<string>
-     */
-    public static function platformOnlyOrgFlags(): array
-    {
-        return config('admin_feature_flags.platform_only_org_flags', []);
-    }
-
-    public static function isPlatformOnlyOrgFlag(string $key): bool
-    {
-        return in_array($key, self::platformOnlyOrgFlags(), true);
-    }
-
-    /**
      * @return array<string, string> parent flag key => preview flag key
      */
     public static function featurePreviewPairs(): array
@@ -391,14 +350,17 @@ final class AdminFeatureFlags
         return in_array($key, self::featurePreviewPairs(), true);
     }
 
+    /**
+     * Global state is the config default; there is no null-scope override.
+     */
     public static function platformOrgFlagActive(string $key): bool
     {
-        return Feature::for(null)->active($key);
+        return self::configDefault($key);
     }
 
     public static function platformDefault(string $key): bool
     {
-        return Feature::for(null)->active($key);
+        return self::configDefault($key);
     }
 
     private static function orgScopeLikePrefix(): string

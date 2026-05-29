@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace App\Support\ProductLine;
 
 use App\Models\Site;
-use Laravel\Pennant\Feature;
 
 final class ProductLineKillSwitches
 {
     public static function vmEnabled(): bool
     {
-        return Feature::for(null)->active('global.vm_enabled');
+        return (bool) config('features.global.vm_enabled', true);
     }
 
     public static function edgeDeliveryEnabled(): bool
     {
-        return Feature::for(null)->active('global.edge_delivery_enabled');
+        return (bool) config('features.global.edge_delivery_enabled', true);
     }
 
     public static function siteIsVmByo(Site $site): bool

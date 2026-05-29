@@ -54,6 +54,9 @@ class StripeSubscriptionSyncer
         // dply Cloud + Edge — flat per live site.
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'cloud', $desired->cloudCount);
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeCount);
+        $this->reconcileCloudResourceLine($subscription, $desired, $changes);
+        $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
+        $this->reconcileManagedServerLine($subscription, $desired, $changes);
         $this->reconcileEdgeUsageLine($subscription, $desired, $changes);
 
         if ($changes !== []) {
@@ -207,6 +210,93 @@ class StripeSubscriptionSyncer
         $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
         if ($change !== null) {
             $changes[] = ['tier' => $product] + $change;
+        }
+    }
+
+    /**
+     * Metered dply Cloud resource line — the marked-up cost of the DigitalOcean
+     * containers, workers, databases, and buckets backing the org's Cloud apps.
+     * Uses the per-cent unit price (quantity = cents), same mechanism as the
+     * Edge delivery-usage line. Monthly only — a yearly subscription can't carry
+     * a monthly-metered price.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function reconcileCloudResourceLine(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        if ($this->isYearly($subscription)) {
+            return;
+        }
+
+        $priceId = (string) (config('subscription.standard.stripe.cloud_usage') ?? '');
+        if ($priceId === '') {
+            return;
+        }
+
+        $desiredQty = max(0, $desired->cloudResourceSubtotalCents);
+        $current = $this->currentQuantity($subscription, $priceId);
+        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => 'cloud_resources'] + $change;
+        }
+    }
+
+    /**
+     * Metered managed-serverless usage + resources line (per-cent quantity),
+     * monthly only — mirrors the Cloud-resource and Edge-usage lines.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function reconcileServerlessUsageLine(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        if ($this->isYearly($subscription)) {
+            return;
+        }
+
+        $priceId = (string) (config('subscription.standard.stripe.serverless_usage') ?? '');
+        if ($priceId === '') {
+            return;
+        }
+
+        $desiredQty = max(0, $desired->serverlessUsageSubtotalCents);
+        $current = $this->currentQuantity($subscription, $priceId);
+        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => 'serverless_usage'] + $change;
+        }
+    }
+
+    /**
+     * Metered dply-managed server line — all-in cost-plus billed as a per-cent
+     * quantity, monthly only. Mirrors the Cloud-resource and serverless-usage lines.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function reconcileManagedServerLine(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        if ($this->isYearly($subscription)) {
+            return;
+        }
+
+        $priceId = (string) (config('subscription.standard.stripe.managed_server') ?? '');
+        if ($priceId === '') {
+            return;
+        }
+
+        $desiredQty = max(0, $desired->managedServerSubtotalCents);
+        $current = $this->currentQuantity($subscription, $priceId);
+        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+        if ($change !== null) {
+            $changes[] = ['tier' => 'managed_server'] + $change;
         }
     }
 

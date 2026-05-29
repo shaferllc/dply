@@ -1,5 +1,6 @@
 @php
     $tabs = [
+        ['name' => 'fleet.index', 'label' => __('Overview'), 'icon' => 'heroicon-o-squares-2x2'],
         ['name' => 'fleet.health', 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
         ['name' => 'fleet.deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
         ['name' => 'fleet.domains', 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],

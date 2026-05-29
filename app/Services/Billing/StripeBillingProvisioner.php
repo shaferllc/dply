@@ -37,11 +37,23 @@ class StripeBillingProvisioner
 
     public const ROLE_SERVERLESS_YEARLY = 'standard_serverless_yearly';
 
+    public const ROLE_SERVERLESS_USAGE_PRODUCT = 'standard_serverless_usage_product';
+
+    public const ROLE_SERVERLESS_USAGE_MONTHLY = 'standard_serverless_usage';
+
+    public const ROLE_MANAGED_SERVER_PRODUCT = 'standard_managed_server_product';
+
+    public const ROLE_MANAGED_SERVER_MONTHLY = 'standard_managed_server';
+
     public const ROLE_CLOUD_PRODUCT = 'standard_cloud_product';
 
     public const ROLE_CLOUD_MONTHLY = 'standard_cloud';
 
     public const ROLE_CLOUD_YEARLY = 'standard_cloud_yearly';
+
+    public const ROLE_CLOUD_USAGE_PRODUCT = 'standard_cloud_usage_product';
+
+    public const ROLE_CLOUD_USAGE_MONTHLY = 'standard_cloud_usage';
 
     public const ROLE_EDGE_PRODUCT = 'standard_edge_product';
 
@@ -136,6 +148,49 @@ class StripeBillingProvisioner
             )->id;
         }
 
+        // Metered managed-serverless usage — invocations beyond the included
+        // allowance plus marked-up managed DB/cache resources, billed per cent
+        // (quantity = cents) on top of the flat per-function fee. Only accrues
+        // for dply-managed functions (dply pays the provider).
+        $serverlessUsageUnitCents = (int) ($standardConfig['serverless_usage_unit_cents'] ?? 1);
+        if ($serverlessUsageUnitCents > 0) {
+            $serverlessUsageProduct = $this->upsertProduct(
+                name: 'dply serverless usage',
+                description: 'Metered usage for dply-managed serverless functions — invocations beyond the included monthly allowance plus managed databases and caches. Billed monthly in pass-through-plus-margin units on top of the flat per-function fee.',
+                role: self::ROLE_SERVERLESS_USAGE_PRODUCT,
+            );
+            $result[self::ROLE_SERVERLESS_USAGE_PRODUCT] = $serverlessUsageProduct->id;
+
+            $result[self::ROLE_SERVERLESS_USAGE_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $serverlessUsageProduct->id,
+                amount: $serverlessUsageUnitCents,
+                interval: 'month',
+                nickname: 'Serverless usage — Monthly (per cent)',
+                role: self::ROLE_SERVERLESS_USAGE_MONTHLY,
+            )->id;
+        }
+
+        // Metered dply-managed server — all-in cost-plus (Hetzner provider price
+        // × markup) billed per cent (quantity = cents), monthly. Replaces the
+        // per-server tier fee for VMs dply runs on its own infrastructure.
+        $managedServerUnitCents = (int) ($standardConfig['managed_server_usage_unit_cents'] ?? 1);
+        if ($managedServerUnitCents > 0) {
+            $managedServerProduct = $this->upsertProduct(
+                name: 'dply managed server',
+                description: 'All-in monthly fee for a dply-managed server — dply provisions and pays for the VM on its own infrastructure and bills the provider cost plus margin. Billed monthly in per-cent units; replaces the per-server plan fee.',
+                role: self::ROLE_MANAGED_SERVER_PRODUCT,
+            );
+            $result[self::ROLE_MANAGED_SERVER_PRODUCT] = $managedServerProduct->id;
+
+            $result[self::ROLE_MANAGED_SERVER_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $managedServerProduct->id,
+                amount: $managedServerUnitCents,
+                interval: 'month',
+                nickname: 'Managed server — Monthly (per cent)',
+                role: self::ROLE_MANAGED_SERVER_MONTHLY,
+            )->id;
+        }
+
         $cloudCents = (int) ($standardConfig['cloud_cents'] ?? 500);
         if ($cloudCents > 0) {
             $cloudProduct = $this->upsertProduct(
@@ -159,6 +214,27 @@ class StripeBillingProvisioner
                 interval: 'year',
                 nickname: 'Cloud app — Yearly',
                 role: self::ROLE_CLOUD_YEARLY,
+            )->id;
+        }
+
+        // Metered Cloud resources — the marked-up DigitalOcean container /
+        // worker / database / bucket cost backing each Cloud app, billed per
+        // cent (quantity = cents) on top of the flat per-app platform fee.
+        $cloudUsageUnitCents = (int) ($standardConfig['cloud_usage_unit_cents'] ?? 1);
+        if ($cloudUsageUnitCents > 0) {
+            $cloudUsageProduct = $this->upsertProduct(
+                name: 'dply Cloud resources',
+                description: 'Metered infrastructure for dply Cloud apps — container compute, background workers, managed databases, and object storage. Billed monthly in pass-through-plus-margin units on top of the flat per-app fee.',
+                role: self::ROLE_CLOUD_USAGE_PRODUCT,
+            );
+            $result[self::ROLE_CLOUD_USAGE_PRODUCT] = $cloudUsageProduct->id;
+
+            $result[self::ROLE_CLOUD_USAGE_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $cloudUsageProduct->id,
+                amount: $cloudUsageUnitCents,
+                interval: 'month',
+                nickname: 'Cloud resources — Monthly (per cent)',
+                role: self::ROLE_CLOUD_USAGE_MONTHLY,
             )->id;
         }
 
@@ -227,8 +303,11 @@ class StripeBillingProvisioner
         $static = [
             self::ROLE_SERVERLESS_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS',
             self::ROLE_SERVERLESS_YEARLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY',
+            self::ROLE_SERVERLESS_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_USAGE',
+            self::ROLE_MANAGED_SERVER_MONTHLY => 'STRIPE_PRICE_STANDARD_MANAGED_SERVER',
             self::ROLE_CLOUD_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD',
             self::ROLE_CLOUD_YEARLY => 'STRIPE_PRICE_STANDARD_CLOUD_YEARLY',
+            self::ROLE_CLOUD_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD_USAGE',
             self::ROLE_EDGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE',
             self::ROLE_EDGE_YEARLY => 'STRIPE_PRICE_STANDARD_EDGE_YEARLY',
             self::ROLE_EDGE_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE_USAGE',

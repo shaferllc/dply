@@ -355,7 +355,6 @@ class Create extends Component
     public function storeContainer(LocalRepositoryInspector $repositoryInspector): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         $rules = [
             'container_repo_source' => ['required', 'string', 'in:manual,provider'],
@@ -393,6 +392,8 @@ class Create extends Component
         if ($this->siteQuotaReached($org)) {
             return null;
         }
+
+        $this->authorize('create', Site::class);
 
         // K8s containers may target a different namespace than the server's
         // default. Stash the per-container namespace into the inspection
@@ -493,7 +494,6 @@ class Create extends Component
     public function storeScaffold(): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         if (! config('dply.scaffold_v1_enabled')) {
             $this->addError('form.mode', __('Scaffolding is not enabled on this dply install yet.'));
@@ -508,6 +508,8 @@ class Create extends Component
         if ($this->siteQuotaReached($org)) {
             return null;
         }
+
+        $this->authorize('create', Site::class);
 
         // Database-engine compat per Q5: WordPress requires MySQL/MariaDB.
         // We don't auto-block here because the server's engine list may
@@ -875,16 +877,20 @@ class Create extends Component
     public function store(SiteProvisioner $siteProvisioner): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         $org = auth()->user()->currentOrganization();
         abort_if($org === null, 403);
         abort_if($this->server->organization_id === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
 
+        // Friendly site-quota check first so the user gets an upgrade toast
+        // rather than a raw 403 from the create policy (which also gates on
+        // the plan site ceiling as the authoritative hard block).
         if ($this->siteQuotaReached($org)) {
             return null;
         }
+
+        $this->authorize('create', Site::class);
 
         $phpVersionIds = array_column($this->phpVersions, 'id');
         $functionsHost = $this->server->hostCapabilities()->supportsFunctionDeploy();
@@ -1201,7 +1207,6 @@ class Create extends Component
     public function storeBare(): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         if (! config('dply.choose_app_enabled') || ! $this->server->isVmHost()) {
             abort(404);
@@ -1215,6 +1220,8 @@ class Create extends Component
         if ($this->siteQuotaReached($org)) {
             return null;
         }
+
+        $this->authorize('create', Site::class);
 
         $this->form->validate([
             'name' => ['required', 'string', 'max:120'],

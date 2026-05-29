@@ -178,6 +178,9 @@
                         </h2>
                         <p class="mt-1 text-sm text-brand-moss/85">{{ __('Cross-product views over every server and site in the org.') }}</p>
                     </div>
+                    <a href="{{ route('fleet.index') }}" wire:navigate class="text-sm font-semibold text-brand-sage hover:text-brand-ink">
+                        {{ __('Open fleet overview') }} →
+                    </a>
                 </div>
 
                 <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

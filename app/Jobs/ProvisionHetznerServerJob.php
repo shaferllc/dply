@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\HetznerService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -25,11 +26,15 @@ class ProvisionHetznerServerJob implements ShouldQueue
 
     public function handle(): void
     {
-        $credential = $this->server->providerCredential;
-        if (! $credential || $credential->provider !== 'hetzner') {
-            $this->markFailed('Missing or wrong-provider credential. Re-link a Hetzner credential to this server.');
+        $managed = $this->server->usesManagedHosting();
 
-            return;
+        if (! $managed) {
+            $credential = $this->server->providerCredential;
+            if (! $credential || $credential->provider !== 'hetzner') {
+                $this->markFailed('Missing or wrong-provider credential. Re-link a Hetzner credential to this server.');
+
+                return;
+            }
         }
 
         if (FakeCloudProvision::shouldInterceptVmProvision($this->server)) {
@@ -38,8 +43,17 @@ class ProvisionHetznerServerJob implements ShouldQueue
             return;
         }
 
+        $platform = $managed ? ServerHostingPlatformContext::fromConfig() : null;
+        if ($managed && ! $platform->configured()) {
+            $this->markFailed('dply-managed servers are not configured. Set DPLY_MANAGED_HETZNER_API_TOKEN in the environment.');
+
+            return;
+        }
+
         try {
-            $hetzner = new HetznerService($credential);
+            $hetzner = $managed
+                ? $platform->hetzner()
+                : new HetznerService($this->server->providerCredential);
 
             $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
@@ -52,7 +66,9 @@ class ProvisionHetznerServerJob implements ShouldQueue
                 return;
             }
 
-            $image = config('services.hetzner.default_image', 'ubuntu-24.04');
+            $image = $managed
+                ? $platform->defaultImage
+                : config('services.hetzner.default_image', 'ubuntu-24.04');
 
             $id = $hetzner->createInstance(
                 name: $this->server->name,

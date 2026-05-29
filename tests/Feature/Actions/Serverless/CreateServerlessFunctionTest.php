@@ -11,9 +11,18 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
 
 uses(RefreshDatabase::class);
+
+function configureManagedServerless(): void
+{
+    Config::set('serverless.managed.api_host', 'https://faas-nyc1.doserverless.co');
+    Config::set('serverless.managed.namespace', 'fn-dply-shared');
+    Config::set('serverless.managed.access_key', 'uuid:secretkey');
+    Config::set('serverless.managed.region', 'nyc1');
+}
 
 function createFunction(array $overrides = []): Site
 {
@@ -103,4 +112,67 @@ test('auto runtime is stored unset for deploy time detection', function () {
     $site = createFunction(['runtime' => 'auto']);
 
     expect($site->meta['serverless']['runtime'])->toBe('');
+});
+
+test('byo functions record the customer backend and credential', function () {
+    Bus::fake();
+
+    $site = createFunction();
+
+    expect($site->serverless_backend)->toBe(Site::SERVERLESS_BACKEND_BYO);
+    expect($site->serverless_provider_credential_id)->not->toBeNull();
+    expect($site->usesManagedServerless())->toBeFalse();
+
+    $server = Server::find($site->server_id);
+    expect($server->provider_credential_id)->not->toBeNull();
+    expect($server->meta['serverless_managed'] ?? false)->toBeFalse();
+});
+
+test('managed mode runs on dplys account without a customer credential', function () {
+    Bus::fake();
+    configureManagedServerless();
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    // No provider_credential_id supplied — managed functions don't need one.
+    $site = app(CreateServerlessFunction::class)->handle($user, $org, [
+        'name' => 'Managed API',
+        'repo' => 'acme/api',
+        'branch' => 'main',
+        'runtime' => 'nodejs:20',
+        'region' => 'nyc1',
+        'delivery_mode' => 'managed',
+    ]);
+
+    expect($site->serverless_backend)->toBe(Site::SERVERLESS_BACKEND_DPLY);
+    expect($site->serverless_provider_credential_id)->toBeNull();
+    expect($site->usesManagedServerless())->toBeTrue();
+
+    $server = Server::find($site->server_id);
+    expect($server->provider_credential_id)->toBeNull();
+    expect($server->meta['serverless_managed'])->toBeTrue();
+});
+
+test('managed mode is rejected when the platform namespace is not configured', function () {
+    Bus::fake();
+    Config::set('serverless.managed.api_host', '');
+    Config::set('serverless.managed.namespace', '');
+    Config::set('serverless.managed.access_key', '');
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $this->expectException(InvalidArgumentException::class);
+
+    app(CreateServerlessFunction::class)->handle($user, $org, [
+        'name' => 'Managed API',
+        'repo' => 'acme/api',
+        'branch' => 'main',
+        'runtime' => 'nodejs:20',
+        'region' => 'nyc1',
+        'delivery_mode' => 'managed',
+    ]);
 });

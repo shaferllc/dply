@@ -18,13 +18,7 @@
             <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
         </span>
         <code class="font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
-        @if ($mode === 'org')
-            <span class="text-[10px] text-brand-mist">{{ __('platform default :state', ['state' => ($flag['default'] ?? false) ? __('on') : __('off')]) }}</span>
-        @elseif ($mode === 'platform')
-            <span class="text-[10px] text-brand-mist">{{ __('env default :state', ['state' => ($flag['configDefault'] ?? false) ? __('on') : __('off')]) }}</span>
-        @else
-            <span class="text-[10px] text-brand-mist">{{ __('default :state', ['state' => ($flag['default'] ?? false) ? __('on') : __('off')]) }}</span>
-        @endif
+        <span class="text-[10px] text-brand-mist">{{ __('config default :state', ['state' => ($flag['configDefault'] ?? $flag['default'] ?? false) ? __('on') : __('off')]) }}</span>
     </span>
     {{ $slot }}
 </label>

@@ -54,15 +54,14 @@ test('platform admin can toggle org feature flag from org detail', function () {
     expect(Feature::for($org)->active('workspace.ephemeral_credentials'))->toBeTrue();
 });
 
-test('platform admin global flag toggle requires confirmation modal', function () {
+test('platform admin global flags page renders config-driven flags read-only', function () {
     $user = User::factory()->create();
 
     Livewire::actingAs($user)
         ->test(GlobalFlags::class)
-        ->call('requestGlobalFeatureFlagToggle', 'global.billing_enabled')
-        ->assertSet('showConfirmActionModal', true)
-        ->call('confirmActionModal')
-        ->assertDispatched('notify');
+        ->assertOk()
+        ->assertSee('global.billing_enabled')
+        ->assertDontSee('requestGlobalFeatureFlagToggle');
 });
 
 test('legacy defaults workspace route redirects to vm servers', function () {
@@ -95,7 +94,7 @@ test('vm servers product line groups feature flags with their coming soon previe
         ->and($html)->toContain('workspace.insights_preview')
         ->and($html)->toContain('workspace.server_blueprint_preview')
         ->and($html)->toContain('workspace.files_preview')
-        ->and($html)->toContain(__('Shows Soon badge + teaser page when full workspace above is off. Not overridable per org.'));
+        ->and($html)->toContain(__('Shows Soon badge + teaser page when the full workspace above is off. Overridable per org.'));
 });
 
 test('vm sites product line page shows site promote flag', function () {
@@ -123,22 +122,15 @@ test('orgs inherit enabled config defaults for gated surfaces', function () {
     expect(Feature::for($org)->active('provider.aws'))->toBeTrue();
 });
 
-test('disabling platform default clears org overrides and hides cloud nav link', function () {
+test('cloud nav link hidden when surface disabled in config', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
     session(['current_organization_id' => $org->id]);
 
-    Feature::for(null)->activate('surface.cloud');
-    Feature::for($org)->activate('surface.cloud');
+    config(['features.surface.cloud' => false]);
+    Feature::flushCache();
 
-    Livewire::actingAs($user)
-        ->test(ProductLineFlags::class, ['line' => 'cloud'])
-        ->call('requestPlatformDefaultFeatureFlagToggle', 'surface.cloud')
-        ->call('confirmActionModal')
-        ->assertDispatched('notify');
-
-    expect(Feature::for(null)->active('surface.cloud'))->toBeFalse();
     expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
 
     $this->actingAs($user)
@@ -147,12 +139,26 @@ test('disabling platform default clears org overrides and hides cloud nav link',
         ->assertDontSee('Cloud apps');
 });
 
+test('per-org override beats the config default for a surface', function () {
+    $org = Organization::factory()->create();
+
+    config(['features.surface.cloud' => false]);
+    Feature::flushCache();
+
+    expect(Feature::for($org)->active('surface.cloud'))->toBeFalse();
+
+    Feature::for($org)->activate('surface.cloud');
+
+    expect(Feature::for($org)->active('surface.cloud'))->toBeTrue();
+});
+
 test('clear org overrides button removes stored org values', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
 
-    Feature::for(null)->deactivate('surface.edge');
+    config(['features.surface.edge' => false]);
+    Feature::flushCache();
     Feature::for($org)->activate('surface.edge');
 
     Livewire::actingAs($user)

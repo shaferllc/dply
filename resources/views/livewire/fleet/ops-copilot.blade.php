@@ -1,13 +1,9 @@
-<div class="mx-auto max-w-7xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-
-    <header class="mb-6 border-b border-brand-ink/10 pb-4">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Ops Copilot') }}</h1>
-        <p class="mt-1 max-w-3xl text-sm text-brand-moss">
-            {{ __('Cross-engine deploy triage for AI-built repos — reads the latest failure log, repo config, and fleet intelligence, then suggests concrete fixes. Heuristic v1; optional LLM synthesis when configured.') }}
-        </p>
-    </header>
-
+<div>
+    <x-fleet-shell
+        :title="__('Ops Copilot')"
+        :description="__('Cross-engine deploy triage for AI-built repos — reads the latest failure log, repo config, and fleet intelligence, then suggests concrete fixes. Heuristic v1; optional LLM synthesis when configured.')"
+        :section="__('Copilot')"
+    >
     <div class="grid gap-6 lg:grid-cols-[minmax(0,280px)_1fr]">
         <aside class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm ring-1 ring-brand-ink/[0.04]">
             <h2 class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Recent failures') }}</h2>
@@ -37,10 +33,9 @@
 
         <section class="min-w-0 space-y-6">
             @if ($siteId === '' || $selectedSite === null)
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss">
-                    <p class="font-medium text-brand-ink">{{ __('Pick a site with a failed deploy') }}</p>
+                <x-fleet-empty :title="__('Pick a site with a failed deploy')">
                     <p class="mt-1">{{ __('Suggestions combine deploy logs, dply.yaml snapshots, intelligence alerts, and server saved commands.') }}</p>
-                </div>
+                </x-fleet-empty>
             @elseif ($context === null)
                 <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-6 text-sm text-amber-950">
                     <p class="font-medium">{{ __('No failure context for this site.') }}</p>
@@ -171,4 +166,5 @@
             @endif
         </section>
     </div>
+    </x-fleet-shell>
 </div>

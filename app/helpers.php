@@ -4,7 +4,6 @@ use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Support\Admin\AdminFeatureFlags;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Pennant\Feature;
@@ -92,7 +91,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
             $previewFeature = $item['preview_feature'] ?? null;
             $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);
             $previewActive = is_string($previewFeature) && $previewFeature !== ''
-                && AdminFeatureFlags::platformOrgFlagActive($previewFeature)
+                && Feature::active($previewFeature)
                 && ! $featureActive;
 
             if ($featureActive || $previewActive) {
@@ -130,7 +129,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
             $previewFeature = $item['preview_feature'] ?? null;
             $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);
             $previewActive = is_string($previewFeature) && $previewFeature !== ''
-                && AdminFeatureFlags::platformOrgFlagActive($previewFeature)
+                && Feature::active($previewFeature)
                 && ! $featureActive;
 
             if ($previewActive) {
@@ -167,7 +166,9 @@ if (! function_exists('workspace_console_preview_active')) {
             return false;
         }
 
-        return AdminFeatureFlags::platformOrgFlagActive('workspace.console_preview');
+        return $organization === null
+            ? Feature::active('workspace.console_preview')
+            : Feature::for($organization)->active('workspace.console_preview');
     }
 }
 
@@ -184,7 +185,9 @@ if (! function_exists('workspace_insights_preview_active')) {
             return false;
         }
 
-        return AdminFeatureFlags::platformOrgFlagActive('workspace.insights_preview');
+        return $organization === null
+            ? Feature::active('workspace.insights_preview')
+            : Feature::for($organization)->active('workspace.insights_preview');
     }
 }
 
@@ -201,7 +204,9 @@ if (! function_exists('workspace_server_blueprint_preview_active')) {
             return false;
         }
 
-        return AdminFeatureFlags::platformOrgFlagActive('workspace.server_blueprint_preview');
+        return $organization === null
+            ? Feature::active('workspace.server_blueprint_preview')
+            : Feature::for($organization)->active('workspace.server_blueprint_preview');
     }
 }
 
@@ -218,7 +223,9 @@ if (! function_exists('workspace_files_preview_active')) {
             return false;
         }
 
-        return AdminFeatureFlags::platformOrgFlagActive('workspace.files_preview');
+        return $organization === null
+            ? Feature::active('workspace.files_preview')
+            : Feature::for($organization)->active('workspace.files_preview');
     }
 }
 

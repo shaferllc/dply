@@ -44,6 +44,16 @@ test('pricing page shows server ceilings for each plan', function () {
         ->assertSee('Unlimited servers');
 });
 
+test('pricing page shows site ceilings for each plan', function () {
+    $response = $this->withoutMiddleware()->get(route('pricing'));
+
+    // Free 1 site, Starter 10, Pro 30, Business unlimited.
+    $response->assertSee('1 site, unlimited deploys', false)
+        ->assertSee('Up to 10 sites, unlimited deploys', false)
+        ->assertSee('Up to 30 sites, unlimited deploys', false)
+        ->assertSee('Unlimited sites, unlimited deploys', false);
+});
+
 test('pricing page advertises managed products a la carte', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));
 

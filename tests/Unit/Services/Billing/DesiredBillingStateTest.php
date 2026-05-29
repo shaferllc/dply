@@ -143,6 +143,34 @@ test('cloud apps add a flat per app subtotal', function () {
     expect($state->monthlyTotalCents)->toBe(1000);
 });
 
+test('cloud resource subtotal adds on top of the platform fee', function () {
+    // Free + 2 apps × $5 platform + $28 metered resources = $38
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: FREE,
+        cloudCount: 2,
+        cloudUnitCents: 500,
+        cloudResourceSubtotalCents: 2800,
+    );
+
+    expect($state->cloudCount)->toBe(2);
+    expect($state->cloudSubtotalCents)->toBe(1000);
+    expect($state->cloudResourceSubtotalCents)->toBe(2800);
+    expect($state->managedSubtotalCents())->toBe(3800);
+    expect($state->monthlyTotalCents)->toBe(3800);
+});
+
+test('negative cloud resource subtotal is clamped', function () {
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: FREE,
+        cloudCount: 1,
+        cloudUnitCents: 500,
+        cloudResourceSubtotalCents: -1000,
+    );
+
+    expect($state->cloudResourceSubtotalCents)->toBe(0);
+    expect($state->monthlyTotalCents)->toBe(500);
+});
+
 test('edge sites add a flat per site subtotal', function () {
     // Free + 3 sites × $2 = $6
     $state = DesiredBillingState::fromPlanAndUsage(
@@ -216,6 +244,7 @@ test('to array round trips for queue payloads', function () {
     expect($array['server_count'])->toBe(3);
     expect($array['tier_quantities'])->toBe(['xs' => 0, 's' => 2, 'm' => 0, 'l' => 1, 'xl' => 0]);
     expect($array['monthly_total_cents'])->toBe(900);
+    expect($array['cloud_resource_subtotal_cents'])->toBe(0);
     // Back-compat keys still present for not-yet-migrated consumers.
     expect($array['base_cents'])->toBe(0);
     expect($array['server_subtotal_cents'])->toBe(900);

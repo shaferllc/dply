@@ -15,6 +15,9 @@ use App\Enums\ServerTier;
  * - **Managed products** billed a la carte per unit on top of the plan,
  *   regardless of which plan (including Free): serverless functions, dply
  *   Cloud apps, dply Edge sites.
+ * - **dply Cloud resources** — metered cost-plus for the DigitalOcean
+ *   containers, workers, databases, and buckets backing Cloud apps. Billed on
+ *   top of the flat per-app platform fee, not plan-eligible.
  * - **Edge delivery usage** — metered pass-through on top, not plan-eligible.
  *
  * `tierQuantities` is retained as a *display-only* size breakdown (the billing
@@ -36,8 +39,12 @@ class DesiredBillingState
         public readonly array $tierQuantities,
         public readonly int $serverlessCount,
         public readonly int $serverlessSubtotalCents,
+        public readonly int $serverlessUsageSubtotalCents,
+        public readonly int $managedServerCount,
+        public readonly int $managedServerSubtotalCents,
         public readonly int $cloudCount,
         public readonly int $cloudSubtotalCents,
+        public readonly int $cloudResourceSubtotalCents,
         public readonly int $edgeCount,
         public readonly int $edgeSubtotalCents,
         public readonly int $edgeUsageSubtotalCents,
@@ -64,8 +71,12 @@ class DesiredBillingState
         array $tierQuantities = [],
         int $serverlessCount = 0,
         int $serverlessUnitCents = 0,
+        int $serverlessUsageSubtotalCents = 0,
+        int $managedServerCount = 0,
+        int $managedServerSubtotalCents = 0,
         int $cloudCount = 0,
         int $cloudUnitCents = 0,
+        int $cloudResourceSubtotalCents = 0,
         int $edgeCount = 0,
         int $edgeUnitCents = 0,
         int $edgeUsageSubtotalCents = 0,
@@ -80,9 +91,14 @@ class DesiredBillingState
 
         $serverlessCount = max(0, $serverlessCount);
         $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);
+        $serverlessUsageSubtotalCents = max(0, $serverlessUsageSubtotalCents);
+
+        $managedServerCount = max(0, $managedServerCount);
+        $managedServerSubtotalCents = max(0, $managedServerSubtotalCents);
 
         $cloudCount = max(0, $cloudCount);
         $cloudSubtotal = $cloudCount * max(0, $cloudUnitCents);
+        $cloudResourceSubtotalCents = max(0, $cloudResourceSubtotalCents);
 
         $edgeCount = max(0, $edgeCount);
         $edgeSubtotal = $edgeCount * max(0, $edgeUnitCents);
@@ -91,7 +107,10 @@ class DesiredBillingState
 
         $monthly = $planPriceCents
             + $serverlessSubtotal
+            + $serverlessUsageSubtotalCents
+            + $managedServerSubtotalCents
             + $cloudSubtotal
+            + $cloudResourceSubtotalCents
             + $edgeSubtotal
             + $edgeUsageSubtotalCents;
 
@@ -102,8 +121,12 @@ class DesiredBillingState
             tierQuantities: $normalized,
             serverlessCount: $serverlessCount,
             serverlessSubtotalCents: $serverlessSubtotal,
+            serverlessUsageSubtotalCents: $serverlessUsageSubtotalCents,
+            managedServerCount: $managedServerCount,
+            managedServerSubtotalCents: $managedServerSubtotalCents,
             cloudCount: $cloudCount,
             cloudSubtotalCents: $cloudSubtotal,
+            cloudResourceSubtotalCents: $cloudResourceSubtotalCents,
             edgeCount: $edgeCount,
             edgeSubtotalCents: $edgeSubtotal,
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
@@ -129,11 +152,16 @@ class DesiredBillingState
     }
 
     /**
-     * Combined a-la-carte managed-product subtotal (excludes Edge usage).
+     * Combined a-la-carte managed-product subtotal — flat per-unit fees plus
+     * metered Cloud provider resources (excludes Edge delivery usage).
      */
     public function managedSubtotalCents(): int
     {
-        return $this->serverlessSubtotalCents + $this->cloudSubtotalCents + $this->edgeSubtotalCents;
+        return $this->serverlessSubtotalCents
+            + $this->managedServerSubtotalCents
+            + $this->cloudSubtotalCents
+            + $this->cloudResourceSubtotalCents
+            + $this->edgeSubtotalCents;
     }
 
     /**
@@ -159,8 +187,12 @@ class DesiredBillingState
             'tier_quantities' => $this->tierQuantities,
             'serverless_count' => $this->serverlessCount,
             'serverless_subtotal_cents' => $this->serverlessSubtotalCents,
+            'serverless_usage_subtotal_cents' => $this->serverlessUsageSubtotalCents,
+            'managed_server_count' => $this->managedServerCount,
+            'managed_server_subtotal_cents' => $this->managedServerSubtotalCents,
             'cloud_count' => $this->cloudCount,
             'cloud_subtotal_cents' => $this->cloudSubtotalCents,
+            'cloud_resource_subtotal_cents' => $this->cloudResourceSubtotalCents,
             'edge_count' => $this->edgeCount,
             'edge_subtotal_cents' => $this->edgeSubtotalCents,
             'edge_usage_subtotal_cents' => $this->edgeUsageSubtotalCents,

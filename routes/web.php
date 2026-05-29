@@ -57,6 +57,7 @@ use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
 use App\Livewire\Fleet\Health as FleetHealth;
 use App\Livewire\Fleet\Intelligence as FleetIntelligence;
 use App\Livewire\Fleet\OpsCopilot as FleetOpsCopilot;
+use App\Livewire\Fleet\Overview as FleetOverview;
 use App\Livewire\Fleet\Previews as FleetPreviews;
 use App\Livewire\Imports\Forge\Inventory;
 use App\Livewire\Imports\Parity as ImportParity;
@@ -93,6 +94,7 @@ use App\Livewire\Serverless\Index as ServerlessIndex;
 use App\Livewire\Serverless\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
+use App\Livewire\Servers\CreateManaged as ServerCreateManaged;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Deploys as ServerDeploys;
@@ -333,7 +335,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->name('edge.preview-access');
     Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
     Route::middleware('feature:surface.fleet')->group(function (): void {
-        Route::redirect('/fleet', '/fleet/health')->name('fleet.index');
+        Route::livewire('/fleet', FleetOverview::class)->name('fleet.index');
         Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
         Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
         Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
@@ -494,6 +496,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // Multi-step server-create wizard. /servers/create is Step 1 directly; if a draft
     // is past step 1, StepType::mount() redirects on to the current step.
     Route::middleware('vm.platform')->group(function (): void {
+        // dply-managed servers: dply provisions/pays for the VM on its own infra
+        // and bills all-in cost-plus. Gated by surface.managed_servers in mount().
+        Route::livewire('servers/create/managed', ServerCreateManaged::class)->name('servers.create.managed');
         Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
         Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
         Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');

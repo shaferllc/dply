@@ -113,12 +113,39 @@ final class BillingAnalytics
             ];
         }
 
+        if ($state->serverlessUsageSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'serverless_usage',
+                'label' => __('Serverless usage'),
+                'cents' => $state->serverlessUsageSubtotalCents,
+                'color' => 'bg-violet-500/40',
+            ];
+        }
+
+        if ($state->managedServerSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'managed_server',
+                'label' => __('Managed servers').' × '.$state->managedServerCount,
+                'cents' => $state->managedServerSubtotalCents,
+                'color' => 'bg-sky-500/70',
+            ];
+        }
+
         if ($state->cloudSubtotalCents > 0) {
             $segments[] = [
                 'key' => 'cloud',
                 'label' => __('Cloud').' × '.$state->cloudCount,
                 'cents' => $state->cloudSubtotalCents,
                 'color' => 'bg-sky-500/70',
+            ];
+        }
+
+        if ($state->cloudResourceSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'cloud_resources',
+                'label' => __('Cloud resources'),
+                'cents' => $state->cloudResourceSubtotalCents,
+                'color' => 'bg-sky-500/40',
             ];
         }
 
@@ -171,6 +198,28 @@ final class BillingAnalytics
             ];
         }
 
+        if ($state->serverlessUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply serverless usage'),
+                'quantity' => 1,
+                'unit_cents' => $state->serverlessUsageSubtotalCents,
+                'line_cents' => $state->serverlessUsageSubtotalCents,
+                'detail' => __('Metered invocations, managed databases & caches'),
+            ];
+        }
+
+        if ($state->managedServerSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply managed server'),
+                'quantity' => $state->managedServerCount,
+                'unit_cents' => $state->managedServerCount > 0
+                    ? (int) round($state->managedServerSubtotalCents / $state->managedServerCount)
+                    : $state->managedServerSubtotalCents,
+                'line_cents' => $state->managedServerSubtotalCents,
+                'detail' => __('All-in cost-plus — dply-hosted VM'),
+            ];
+        }
+
         if ($state->cloudCount > 0) {
             $unit = (int) config('subscription.standard.cloud_cents', 500);
             $items[] = [
@@ -179,6 +228,16 @@ final class BillingAnalytics
                 'unit_cents' => $unit,
                 'line_cents' => $state->cloudSubtotalCents,
                 'detail' => null,
+            ];
+        }
+
+        if ($state->cloudResourceSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply Cloud resources'),
+                'quantity' => 1,
+                'unit_cents' => $state->cloudResourceSubtotalCents,
+                'line_cents' => $state->cloudResourceSubtotalCents,
+                'detail' => __('Metered compute, workers & databases'),
             ];
         }
 

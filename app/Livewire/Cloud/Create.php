@@ -996,6 +996,38 @@ class Create extends Component
     }
 
     /**
+     * dply's metered monthly charge (USD) for the resources described in the
+     * form: the marked-up container (× instances), any workers, databases, and
+     * buckets. This is what dply bills on top of the flat platform fee — shown
+     * in the sidebar so the estimate matches the invoice, not the raw provider
+     * cost from DO's propose endpoint.
+     */
+    public function dplyResourceEstimateUsd(): float
+    {
+        $estimator = app(ManagedProductCostEstimator::class);
+
+        $total = $estimator->cloudContainerPrice($this->size_tier) * max(1, $this->instances);
+
+        foreach ($this->workers as $worker) {
+            $size = (string) ($worker['size'] ?? 'small');
+            $count = (int) ($worker['instance_count'] ?? 1);
+            $isScheduler = (string) ($worker['type'] ?? '') === CloudWorker::TYPE_SCHEDULER;
+            $total += $estimator->cloudContainerPrice($size) * ($isScheduler ? 1 : max(1, $count));
+        }
+
+        foreach ($this->databases as $database) {
+            // Attached existing databases are already billed on the org; only
+            // newly created ones add cost from this form.
+            if ((string) ($database['mode'] ?? 'create') !== 'create') {
+                continue;
+            }
+            $total += $estimator->cloudDatabasePrice((string) ($database['size'] ?? 'small'));
+        }
+
+        return $total;
+    }
+
+    /**
      * @return list<array{slug: string, label: string}>
      */
     private function backendRegions(string $backend): array
@@ -1175,6 +1207,7 @@ class Create extends Component
             'awsSourceReady' => $awsSourceReady,
             'fakeCloudActive' => FakeCloudProvision::enabled(),
             'cloudFee' => app(ManagedProductCostEstimator::class)->cloudFee(),
+            'resourceEstimate' => $this->dplyResourceEstimateUsd(),
             'attachableDatabases' => $databases,
             'backendSupportsWorkers' => $this->backend !== 'aws_app_runner',
             'backendSupportsDeployTasks' => $this->backend !== 'aws_app_runner',

@@ -15,6 +15,43 @@ class ManagedProductCostEstimator
         return ((int) config('subscription.standard.cloud_cents', 0)) / 100;
     }
 
+    /**
+     * Customer-facing (marked-up) monthly price in USD for a Cloud container
+     * size tier, per instance. Used to preview the metered resource cost in
+     * the create flow next to the flat platform fee.
+     */
+    public function cloudContainerPrice(string $sizeTier): float
+    {
+        $rates = (array) config('subscription.standard.cloud_container_cents', []);
+        $raw = (int) ($rates[$sizeTier] ?? $rates['small'] ?? 0);
+
+        return $this->withCloudMarkup($raw) / 100;
+    }
+
+    /**
+     * Customer-facing (marked-up) monthly price in USD for a Cloud managed
+     * database size tier.
+     */
+    public function cloudDatabasePrice(string $sizeTier): float
+    {
+        $rates = (array) config('subscription.standard.cloud_database_cents', []);
+        $raw = (int) ($rates[$sizeTier] ?? $rates['small'] ?? 0);
+
+        return $this->withCloudMarkup($raw) / 100;
+    }
+
+    public function cloudBucketPrice(): float
+    {
+        return $this->withCloudMarkup((int) config('subscription.standard.cloud_bucket_cents', 0)) / 100;
+    }
+
+    private function withCloudMarkup(int $rawCents): int
+    {
+        $markup = max(0, (int) config('subscription.standard.cloud_markup_percent', 0));
+
+        return (int) round($rawCents * (100 + $markup) / 100);
+    }
+
     public function edgeFee(): float
     {
         return ((int) config('subscription.standard.edge_cents', 0)) / 100;

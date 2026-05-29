@@ -203,7 +203,10 @@ return [
             'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 2),
             'r2_storage_cents_per_gb_month' => (int) env('DPLY_EDGE_USAGE_R2_STORAGE_CENTS_PER_GB_MONTH', 2),
             'r2_class_a_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_A_CENTS_PER_MILLION', 450),
-            'r2_class_b_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_B_CENTS_PER_MILLION', 360),
+            // Cloudflare R2 Class B (reads) list price is $0.36 / million = 36
+            // cents. The previous default of 360 was a 10x typo that billed
+            // customers ten times the real cost.
+            'r2_class_b_cents_per_million' => (int) env('DPLY_EDGE_USAGE_R2_CLASS_B_CENTS_PER_MILLION', 36),
             'included_requests_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_REQUESTS_PER_SITE', 5_000_000),
             'included_egress_gb_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_EGRESS_GB_PER_SITE', 100),
             'included_r2_storage_gb_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_STORAGE_GB_PER_SITE', 5),
@@ -214,6 +217,41 @@ return [
             // static deploy never accrues ops charges.
             'included_r2_class_a_ops_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_CLASS_A_OPS_PER_SITE', 100_000),
             'included_r2_class_b_ops_per_site' => (int) env('DPLY_EDGE_USAGE_INCLUDED_R2_CLASS_B_OPS_PER_SITE', 1_000_000),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Serverless: usage-based billing for dply-managed functions
+    |--------------------------------------------------------------------------
+    |
+    | Managed functions run on dply's own FaaS account (dply pays the provider),
+    | so they keep the flat per-function fee (serverless_cents in
+    | config/subscription.php) plus metered usage on top. BYO functions — where
+    | the customer pays their own provider — are NOT metered here.
+    |
+    | DigitalOcean Functions has no usable per-function usage API, so v1 meters
+    | INVOCATIONS rolled up from the operational function_invocations log by
+    | `dply:serverless:collect-usage`. The per-function included allowance keeps
+    | low-traffic functions covered by the flat fee. `gib_seconds_*` rates are
+    | wired for future providers (Cloudflare/AWS) that report compute directly.
+    |
+    | Unit rates are customer-facing and embed margin over provider list
+    | pricing; `markup_percent` applies an additional blanket markup.
+    */
+    'serverless' => [
+        'usage_billing' => [
+            'enabled' => filter_var(env('DPLY_SERVERLESS_USAGE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+            'markup_percent' => (int) env('DPLY_SERVERLESS_USAGE_MARKUP_PERCENT', 0),
+            // $0.40 / million invocations after the included allowance. DO bills
+            // bundled compute; this rate keeps margin while staying well under
+            // hyperscaler per-request pricing.
+            'invocations_cents_per_million' => (int) env('DPLY_SERVERLESS_USAGE_INVOCATIONS_CENTS_PER_MILLION', 40),
+            // GiB-second rate for providers that report compute (Cloudflare/AWS).
+            // DO leaves gib_seconds at 0, so this is dormant until those land.
+            'gib_seconds_cents_per_100k' => (int) env('DPLY_SERVERLESS_USAGE_GIB_SECONDS_CENTS_PER_100K', 185),
+            'included_invocations_per_function' => (int) env('DPLY_SERVERLESS_USAGE_INCLUDED_INVOCATIONS_PER_FUNCTION', 1_000_000),
+            'included_gib_seconds_per_function' => (int) env('DPLY_SERVERLESS_USAGE_INCLUDED_GIB_SECONDS_PER_FUNCTION', 90_000),
         ],
     ],
 

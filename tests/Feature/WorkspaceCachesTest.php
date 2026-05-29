@@ -123,8 +123,9 @@ test('install allows memcached alongside a redis family engine', function () {
     [$user, $server] = actingOwnerWithServer();
 
     // Memcached is gated behind cache.memcached (coming soon by default); enable
-    // it platform-wide so this test exercises the coexistence path, not the gate.
-    Feature::for(null)->activate('cache.memcached');
+    // it platform-wide via config so this test exercises the coexistence path, not the gate.
+    config(['features.cache.memcached' => true]);
+    Feature::flushCache();
 
     ServerCacheService::query()->create([
         'server_id' => $server->id,
@@ -167,7 +168,8 @@ test('install refuses second redis family engine on same server', function () {
 
     // Enable Valkey so the refusal under test is the redis-family coexistence
     // rule, not the coming-soon gate.
-    Feature::for(null)->activate('cache.valkey');
+    config(['features.cache.valkey' => true]);
+    Feature::flushCache();
 
     ServerCacheService::query()->create([
         'server_id' => $server->id,
@@ -223,7 +225,8 @@ test('install blocks when another install is in flight', function () {
 
     // Enable Valkey so the in-flight busy guard is what blocks the install,
     // not the coming-soon gate.
-    Feature::for(null)->activate('cache.valkey');
+    config(['features.cache.valkey' => true]);
+    Feature::flushCache();
 
     ServerCacheService::query()->create([
         'server_id' => $server->id,

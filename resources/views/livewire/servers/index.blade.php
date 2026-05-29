@@ -181,6 +181,16 @@
                             {{ __('Create a server') }}
                         </a>
                     @endif
+                    @feature('surface.managed_servers')
+                        <a
+                            href="{{ route('servers.create.managed') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-sage/40 bg-brand-sage/10 px-4 py-2.5 text-sm font-semibold text-brand-forest shadow-sm transition hover:bg-brand-sage/20"
+                        >
+                            <x-heroicon-o-sparkles class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Dply-hosted server') }}
+                        </a>
+                    @endfeature
                     <a
                         href="{{ route('docs.create-first-server') }}"
                         wire:navigate

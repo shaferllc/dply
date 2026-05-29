@@ -7,6 +7,7 @@ use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -30,6 +31,11 @@ class OrganizationBillingStateComputer
         private EdgeOrganizationUsageReader $usageReader,
         private EdgeUsageCostCalculator $usageCostCalculator,
         private SubscriptionPlanResolver $planResolver,
+        private CloudResourceCostCalculator $cloudResourceCalculator,
+        private ServerlessOrganizationUsageReader $serverlessUsageReader,
+        private ServerlessUsageCostCalculator $serverlessUsageCostCalculator,
+        private ServerlessResourceCostCalculator $serverlessResourceCalculator,
+        private ServerResourceCostCalculator $serverResourceCalculator,
     ) {}
 
     public function compute(Organization $organization): DesiredBillingState
@@ -42,12 +48,24 @@ class OrganizationBillingStateComputer
         $minAgeDays = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
         $ageCutoff = now()->subDays($minAgeDays);
 
+        // dply-managed VMs run on dply-owned Hetzner infra and are billed all-in
+        // cost-plus, so they are excluded from the plan-tier scan and collected
+        // separately. BYO servers continue to drive the flat plan.
+        /** @var Collection<int, Server> $managedServers */
+        $managedServers = collect();
+
         $organization->servers()
             ->where('status', Server::STATUS_READY)
             ->where('created_at', '<=', $ageCutoff)
             ->get()
-            ->each(function (Server $server) use (&$tierQuantities): void {
+            ->each(function (Server $server) use (&$tierQuantities, $managedServers): void {
                 if ($server->isManagedProductHost()) {
+                    return;
+                }
+
+                if ($server->usesManagedHosting()) {
+                    $managedServers->push($server);
+
                     return;
                 }
 
@@ -55,9 +73,23 @@ class OrganizationBillingStateComputer
                 $tierQuantities[$tier] = ($tierQuantities[$tier] ?? 0) + 1;
             });
 
+        $managedServerCount = $managedServers->count();
+        $managedServerSubtotalCents = $this->serverResourceCalculator->subtotalCents($managedServers);
+
         $serverlessCount = 0;
         $cloudCount = 0;
         $edgeCount = 0;
+
+        // Billable Cloud apps are collected so their backing DigitalOcean
+        // resources (containers, workers, databases, buckets) can be metered.
+        /** @var Collection<int, Site> $billableCloudSites */
+        $billableCloudSites = collect();
+
+        // dply-managed serverless functions are collected so their usage
+        // (metered) and managed DB/cache resources (cost-plus) can be billed
+        // on top of the flat per-function fee. BYO functions are excluded.
+        /** @var Collection<int, Site> $managedServerlessSites */
+        $managedServerlessSites = collect();
 
         $siteQuery = $organization->sites()
             ->where('created_at', '<=', $ageCutoff);
@@ -67,15 +99,20 @@ class OrganizationBillingStateComputer
         }
 
         $siteQuery->get()
-            ->each(function (Site $site) use (&$serverlessCount, &$cloudCount, &$edgeCount): void {
+            ->each(function (Site $site) use (&$serverlessCount, &$cloudCount, &$edgeCount, $billableCloudSites, $managedServerlessSites): void {
                 if ($site->status === Site::STATUS_FUNCTIONS_ACTIVE) {
                     $serverlessCount += max(1, (int) $site->code_action_count);
+
+                    if ($site->usesManagedServerless()) {
+                        $managedServerlessSites->push($site);
+                    }
 
                     return;
                 }
 
                 if ($site->status === Site::STATUS_CONTAINER_ACTIVE && $site->isDplyCloudSite() && ! $site->isCloudPreview()) {
                     $cloudCount++;
+                    $billableCloudSites->push($site);
 
                     return;
                 }
@@ -89,6 +126,8 @@ class OrganizationBillingStateComputer
                 }
             });
 
+        $cloudResourceSubtotalCents = $this->cloudResourceCalculator->subtotalCents($billableCloudSites);
+
         [$usagePeriodStart, $usagePeriodEnd] = $this->usageReader->currentMonthWindow();
         $usageTotals = $this->usageReader->totalsForOrganization($organization, $usagePeriodStart, $usagePeriodEnd);
         $edgeUsageEstimate = $this->usageCostCalculator->estimate($usageTotals, $edgeCount);
@@ -101,6 +140,16 @@ class OrganizationBillingStateComputer
         ]);
         $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents'] ?? 0);
 
+        // Managed-serverless usage (metered invocations above the included
+        // allowance) + managed DB/cache resources, both cost-plus. BYO
+        // functions contribute nothing here.
+        $managedServerlessCount = $managedServerlessSites->count();
+        [$slPeriodStart, $slPeriodEnd] = $this->serverlessUsageReader->currentMonthWindow();
+        $serverlessUsageTotals = $this->serverlessUsageReader->totalsForOrganization($organization, $slPeriodStart, $slPeriodEnd);
+        $serverlessUsageEstimate = $this->serverlessUsageCostCalculator->estimate($serverlessUsageTotals, $managedServerlessCount);
+        $serverlessUsageSubtotalCents = (int) ($serverlessUsageEstimate['subtotal_cents'] ?? 0)
+            + $this->serverlessResourceCalculator->subtotalCents($managedServerlessSites);
+
         // The flat plan is chosen by billable BYO server count; size only
         // feeds the display-only breakdown carried in $tierQuantities.
         $serverCount = array_sum($tierQuantities);
@@ -111,8 +160,12 @@ class OrganizationBillingStateComputer
             tierQuantities: $tierQuantities,
             serverlessCount: $serverlessCount,
             serverlessUnitCents: (int) config('subscription.standard.serverless_cents', 200),
+            serverlessUsageSubtotalCents: $serverlessUsageSubtotalCents,
+            managedServerCount: $managedServerCount,
+            managedServerSubtotalCents: $managedServerSubtotalCents,
             cloudCount: $cloudCount,
             cloudUnitCents: (int) config('subscription.standard.cloud_cents', 500),
+            cloudResourceSubtotalCents: $cloudResourceSubtotalCents,
             edgeCount: $edgeCount,
             edgeUnitCents: (int) config('subscription.standard.edge_cents', 200),
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,

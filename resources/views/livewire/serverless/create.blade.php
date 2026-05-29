@@ -22,7 +22,7 @@
 
             <x-livewire-validation-errors class="m-6 sm:m-8 mb-0" />
 
-            @if ($credentials->isEmpty())
+            @if ($credentials->isEmpty() && ! $managedAvailable)
                 <div class="p-6 sm:p-8">
                     <x-alert tone="warning">
                         {{ __('Connect a DigitalOcean credential first — serverless functions deploy through your DO account.') }}
@@ -47,6 +47,30 @@
                             </button>
                         </div>
                     </div>
+
+                    @if ($managedAvailable)
+                        <div>
+                            <span class="block text-sm font-semibold text-brand-ink">{{ __('Where should it run?') }}</span>
+                            <div class="mt-2 grid sm:grid-cols-2 gap-3">
+                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 px-4 py-3 transition
+                                              {{ $delivery_mode === 'managed' ? 'border-brand-gold bg-brand-gold/10' : 'border-brand-ink/15 bg-white hover:border-brand-sage/40' }}">
+                                    <input type="radio" wire:model.live="delivery_mode" value="managed" class="mt-0.5 text-brand-gold focus:ring-brand-gold/40">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-brand-ink">{{ __('Dply-hosted (managed)') }}</span>
+                                        <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('Runs on dply\'s infrastructure. No provider account to connect — pay a flat fee plus metered usage.') }}</span>
+                                    </span>
+                                </label>
+                                <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 px-4 py-3 transition
+                                              {{ $delivery_mode === 'byo' ? 'border-brand-gold bg-brand-gold/10' : 'border-brand-ink/15 bg-white hover:border-brand-sage/40' }}">
+                                    <input type="radio" wire:model.live="delivery_mode" value="byo" class="mt-0.5 text-brand-gold focus:ring-brand-gold/40">
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-brand-ink">{{ __('Your own account') }}</span>
+                                        <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ __('Deploys to your connected DigitalOcean account. DigitalOcean bills you for usage; dply charges the flat fee.') }}</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    @endif
 
                     <div>
                         <label class="block text-sm font-semibold text-brand-ink">{{ __('Function name') }}</label>
@@ -80,7 +104,7 @@
                         @include('livewire.partials._runtime-detection-panel')
                     </div>
 
-                    <div class="grid sm:grid-cols-3 gap-4">
+                    <div class="grid gap-4 {{ $delivery_mode === 'byo' ? 'sm:grid-cols-3' : 'sm:grid-cols-2' }}">
                         <div>
                             <label class="block text-sm font-semibold text-brand-ink">{{ __('Runtime') }}</label>
                             <select wire:model="runtime" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
@@ -99,20 +123,34 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-brand-ink">{{ __('DO credential') }}</label>
-                            <select wire:model="provider_credential_id" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
-                                <option value="" disabled>{{ __('Select a credential') }}</option>
-                                @foreach ($credentials as $credential)
-                                    <option value="{{ $credential->id }}">{{ $credential->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        @if ($delivery_mode === 'byo')
+                            <div>
+                                <label class="block text-sm font-semibold text-brand-ink">{{ __('DO credential') }}</label>
+                                @if ($credentials->isEmpty())
+                                    <p class="mt-1 text-xs text-amber-700">
+                                        {{ __('No DigitalOcean credential yet.') }}
+                                        <a href="{{ route('credentials.index') }}" wire:navigate class="font-semibold underline underline-offset-2">{{ __('Add one') }}</a>
+                                    </p>
+                                @else
+                                    <select wire:model="provider_credential_id" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
+                                        <option value="" disabled>{{ __('Select a credential') }}</option>
+                                        @foreach ($credentials as $credential)
+                                            <option value="{{ $credential->id }}">{{ $credential->name }}</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+                            </div>
+                        @endif
                     </div>
 
                     <div class="rounded-lg bg-brand-cream/50 border border-brand-ink/10 px-4 py-3 text-xs text-brand-moss">
-                        <span class="font-semibold text-brand-ink">{{ __('Estimated cost:') }} ${{ number_format($functionFee, 2) }}/mo</span>
-                        — {{ __('a flat dply per-function fee once the function is live. Databases or Redis you add later are billed separately by DigitalOcean (shown before you provision them).') }}
+                        @if ($delivery_mode === 'managed')
+                            <span class="font-semibold text-brand-ink">{{ __('Estimated cost:') }} {{ __('from') }} ${{ number_format($functionFee, 2) }}/mo</span>
+                            — {{ __('a flat dply per-function fee plus metered usage (invocations) above a generous monthly allowance. Managed databases or Redis you add later are billed cost-plus by dply.') }}
+                        @else
+                            <span class="font-semibold text-brand-ink">{{ __('Estimated cost:') }} ${{ number_format($functionFee, 2) }}/mo</span>
+                            — {{ __('a flat dply per-function fee once the function is live. Usage, databases, or Redis are billed separately by DigitalOcean to your own account.') }}
+                        @endif
                     </div>
 
                     <div class="flex justify-end gap-3 pt-2">

@@ -34,50 +34,11 @@ class ProductLineFlags extends Component
         $this->line = $line;
     }
 
-    public function requestPlatformDefaultFeatureFlagToggle(string $flag): void
-    {
-        $this->authorizePlatformAdmin();
-
-        if (! in_array($flag, AdminFeatureFlags::platformDefaultFlagKeys(), true)) {
-            $this->toastError(__('Unknown feature flag.'));
-
-            return;
-        }
-
-        $label = AdminFeatureFlags::orgFlagLabel($flag) ?? $flag;
-        $active = Feature::for(null)->active($flag);
-        $overrideCount = AdminFeatureFlags::orgOverrideCountForFlag($flag);
-
-        $message = $active
-            ? __('Turn :flag off platform-wide? This clears :count org override(s) so every org follows the disabled default.', [
-                'flag' => $label,
-                'count' => $overrideCount,
-            ])
-            : __('Turn :flag on as the platform default? Orgs with an explicit override keep their current setting.', [
-                'flag' => $label,
-            ]);
-
-        $this->openConfirmActionModal(
-            method: 'applyPlatformDefaultFeatureFlag',
-            arguments: [$flag],
-            title: __('Change platform default'),
-            message: $message,
-            confirmLabel: $active ? __('Disable platform-wide') : __('Update default'),
-            destructive: $active,
-            details: [
-                ['label' => __('Flag key'), 'value' => $flag, 'mono' => true],
-                ['label' => __('Current default'), 'value' => $active ? __('On') : __('Off')],
-                ['label' => __('Org overrides'), 'value' => (string) $overrideCount],
-                ['label' => __('Env default'), 'value' => AdminFeatureFlags::configDefault($flag) ? __('On') : __('Off')],
-            ],
-        );
-    }
-
     public function requestClearOrgOverridesForFlag(string $flag): void
     {
         $this->authorizePlatformAdmin();
 
-        if (! in_array($flag, AdminFeatureFlags::platformDefaultFlagKeys(), true)) {
+        if (! in_array($flag, AdminFeatureFlags::orgFlagKeys(), true)) {
             $this->toastError(__('Unknown feature flag.'));
 
             return;
@@ -96,16 +57,16 @@ class ProductLineFlags extends Component
             method: 'clearOrgOverridesForFlag',
             arguments: [$flag],
             title: __('Clear org overrides'),
-            message: __('Remove :count org override(s) for :flag? Each org will inherit the current platform default (:state).', [
+            message: __('Remove :count org override(s) for :flag? Each org will inherit the config default (:state).', [
                 'count' => $overrideCount,
                 'flag' => $label,
-                'state' => Feature::for(null)->active($flag) ? __('on') : __('off'),
+                'state' => AdminFeatureFlags::configDefault($flag) ? __('on') : __('off'),
             ]),
             confirmLabel: __('Clear overrides'),
             destructive: true,
             details: [
                 ['label' => __('Flag key'), 'value' => $flag, 'mono' => true],
-                ['label' => __('Platform default'), 'value' => Feature::for(null)->active($flag) ? __('On') : __('Off')],
+                ['label' => __('Config default'), 'value' => AdminFeatureFlags::configDefault($flag) ? __('On') : __('Off')],
                 ['label' => __('Org overrides'), 'value' => (string) $overrideCount],
             ],
         );
@@ -115,7 +76,7 @@ class ProductLineFlags extends Component
     {
         $this->authorizePlatformAdmin();
 
-        if (! in_array($flag, AdminFeatureFlags::platformDefaultFlagKeys(), true)) {
+        if (! in_array($flag, AdminFeatureFlags::orgFlagKeys(), true)) {
             $this->toastError(__('Unknown feature flag.'));
 
             return;
@@ -129,42 +90,6 @@ class ProductLineFlags extends Component
             'count' => $purged,
             'flag' => $label,
         ]));
-    }
-
-    public function requestLineEmergencyToggle(string $flag): void
-    {
-        $this->authorizePlatformAdmin();
-
-        if (! in_array($flag, AdminFeatureFlags::globalFlagKeys(), true)) {
-            $this->toastError(__('Unknown feature flag.'));
-
-            return;
-        }
-
-        $label = AdminFeatureFlags::globalFlagLabel($flag) ?? $flag;
-        $active = Feature::for(null)->active($flag);
-        $next = $active ? __('off') : __('on');
-
-        $this->openConfirmActionModal(
-            method: 'applyGlobalFeatureFlag',
-            arguments: [$flag],
-            title: __('Change emergency kill switch'),
-            message: __('Turn :flag :state app-wide? This overrides normal product access until re-enabled.', [
-                'flag' => $label,
-                'state' => $next,
-            ]),
-            confirmLabel: __('Update kill switch'),
-            destructive: $active,
-            details: [
-                ['label' => __('Flag key'), 'value' => $flag, 'mono' => true],
-                ['label' => __('Current'), 'value' => $active ? __('On') : __('Off')],
-            ],
-        );
-    }
-
-    public function requestProductLineGlobalToggle(string $flag): void
-    {
-        $this->requestLineEmergencyToggle($flag);
     }
 
     public function render(): View
@@ -204,7 +129,7 @@ class ProductLineFlags extends Component
 
         $orgOverrideCounts = [];
         foreach (AdminFeatureFlags::flagsForProductLine($this->line) as $key => $_label) {
-            if (! AdminFeatureFlags::isGlobalNamespace($key) && ! AdminFeatureFlags::isPlatformOnlyOrgFlag($key)) {
+            if (! AdminFeatureFlags::isGlobalNamespace($key)) {
                 $orgOverrideCounts[$key] = AdminFeatureFlags::orgOverrideCountForFlag($key);
             }
         }

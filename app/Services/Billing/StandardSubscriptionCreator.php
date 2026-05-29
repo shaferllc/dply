@@ -78,6 +78,27 @@ class StandardSubscriptionCreator
             }
         }
 
+        if ($interval === self::INTERVAL_MONTH && $desired->cloudResourceSubtotalCents > 0) {
+            $cloudUsagePriceId = $this->cloudUsagePriceId();
+            if ($cloudUsagePriceId !== '') {
+                $items[] = ['price' => $cloudUsagePriceId, 'quantity' => $desired->cloudResourceSubtotalCents];
+            }
+        }
+
+        if ($interval === self::INTERVAL_MONTH && $desired->serverlessUsageSubtotalCents > 0) {
+            $serverlessUsagePriceId = $this->serverlessUsagePriceId();
+            if ($serverlessUsagePriceId !== '') {
+                $items[] = ['price' => $serverlessUsagePriceId, 'quantity' => $desired->serverlessUsageSubtotalCents];
+            }
+        }
+
+        if ($interval === self::INTERVAL_MONTH && $desired->managedServerSubtotalCents > 0) {
+            $managedServerPriceId = $this->managedServerPriceId();
+            if ($managedServerPriceId !== '') {
+                $items[] = ['price' => $managedServerPriceId, 'quantity' => $desired->managedServerSubtotalCents];
+            }
+        }
+
         if ($interval === self::INTERVAL_MONTH && $desired->edgeUsageSubtotalCents > 0) {
             $usagePriceId = $this->edgeUsagePriceId();
             if ($usagePriceId !== '') {
@@ -106,6 +127,21 @@ class StandardSubscriptionCreator
     public function edgeUsagePriceId(): string
     {
         return (string) (config('subscription.standard.stripe.edge_usage') ?? '');
+    }
+
+    public function cloudUsagePriceId(): string
+    {
+        return (string) (config('subscription.standard.stripe.cloud_usage') ?? '');
+    }
+
+    public function serverlessUsagePriceId(): string
+    {
+        return (string) (config('subscription.standard.stripe.serverless_usage') ?? '');
+    }
+
+    public function managedServerPriceId(): string
+    {
+        return (string) (config('subscription.standard.stripe.managed_server') ?? '');
     }
 
     private function managedProductPriceIdForInterval(string $product, string $interval): string

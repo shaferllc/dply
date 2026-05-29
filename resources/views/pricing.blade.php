@@ -195,23 +195,37 @@
         {{-- Managed products — à la carte on top of any paid plan --}}
         @php
             $managedProducts = [
-                ['name' => 'dply Edge', 'price' => $edge, 'unit' => 'per site / mo', 'desc' => 'Static & SSG sites on a global CDN. Plus metered delivery usage.', 'icon' => 'heroicon-o-globe-alt'],
-                ['name' => 'dply Cloud', 'price' => $cloud, 'unit' => 'per app / mo', 'desc' => 'Managed long-running PHP & Rails containers.', 'icon' => 'heroicon-o-cloud'],
-                ['name' => 'Serverless', 'price' => $serverless, 'unit' => 'per function / mo', 'desc' => 'Deploy functions to Lambda, Workers & more.', 'icon' => 'heroicon-o-bolt'],
+                ['name' => 'dply Edge', 'flag' => 'surface.edge', 'prefix' => 'from', 'price' => $edge, 'unit' => 'per site / mo + usage', 'desc' => 'Static & SSG sites on a managed global CDN. Flat platform fee plus metered delivery (requests & bandwidth) for high-traffic sites.', 'icon' => 'heroicon-o-globe-alt'],
+                ['name' => 'dply Cloud', 'flag' => 'surface.cloud', 'prefix' => 'from', 'price' => $cloud, 'unit' => 'per app / mo + resources', 'desc' => 'Managed long-running PHP & Rails containers. Platform fee plus metered compute, workers & databases at cost + margin.', 'icon' => 'heroicon-o-cloud'],
+                ['name' => 'Serverless', 'flag' => 'surface.serverless', 'prefix' => 'from', 'price' => $serverless, 'unit' => 'per function / mo', 'desc' => 'Deploy functions on your own cloud account (Lambda, Cloudflare Workers & more) for a flat management fee, or let dply host them — a platform fee plus metered usage at cost + margin, no provider account needed.', 'icon' => 'heroicon-o-bolt'],
             ];
+
+            \Laravel\Pennant\Feature::loadMissing(array_column($managedProducts, 'flag'));
         @endphp
         <section class="pb-12 px-4 sm:px-6 lg:px-8">
             <div class="mx-auto max-w-5xl">
                 <div class="text-center">
                     <h2 class="text-2xl font-bold text-brand-ink">Managed products, à la carte</h2>
-                    <p class="mt-2 text-brand-moss">Stack first-party managed hosting on top of any paid plan. Billed per live unit — no separate base fee.</p>
+                    <p class="mt-2 text-brand-moss">Stack first-party managed hosting on top of any paid plan. Each starts at a flat per-unit fee — heavier apps add metered resources or your own provider's usage on top.</p>
                 </div>
                 <div class="mt-6 grid gap-4 sm:grid-cols-3">
                     @foreach ($managedProducts as $product)
-                        <div class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6">
-                            <x-dynamic-component :component="$product['icon']" class="h-7 w-7 text-brand-gold" aria-hidden="true" />
+                        @php $comingSoon = ! \Laravel\Pennant\Feature::active($product['flag']); @endphp
+                        <div @class([
+                            'relative rounded-2xl border border-brand-ink/10 bg-white/80 p-6',
+                            'opacity-75' => $comingSoon,
+                        ])>
+                            <div class="flex items-start justify-between gap-2">
+                                <x-dynamic-component :component="$product['icon']" class="h-7 w-7 text-brand-gold" aria-hidden="true" />
+                                @if ($comingSoon)
+                                    <span class="inline-flex items-center rounded-full bg-brand-gold/15 px-2.5 py-0.5 text-xs font-medium text-brand-gold ring-1 ring-inset ring-brand-gold/25">Coming soon</span>
+                                @endif
+                            </div>
                             <h3 class="mt-3 text-base font-semibold text-brand-ink">{{ $product['name'] }}</h3>
                             <div class="mt-2 flex items-baseline gap-1">
+                                @if (! empty($product['prefix']))
+                                    <span class="text-sm font-medium text-brand-moss">{{ $product['prefix'] }}</span>
+                                @endif
                                 <span class="text-2xl font-bold text-brand-ink">${{ number_format($product['price'], 0) }}</span>
                                 <span class="text-sm text-brand-moss">{{ $product['unit'] }}</span>
                             </div>
@@ -264,7 +278,7 @@
                 ],
                 [
                     'q' => 'How does managed Edge / Cloud / Serverless billing work?',
-                    'a' => 'Those are first-party managed products on dply-owned infra, so they bill à la carte per live unit on top of any paid plan: Edge $' . number_format($edge, 0) . '/site (plus metered delivery), Cloud $' . number_format($cloud, 0) . '/app, Serverless $' . number_format($serverless, 0) . '/function. They require a paid plan.',
+                    'a' => 'They bill à la carte on top of any paid plan, each starting from a flat per-unit fee: Edge from $' . number_format($edge, 0) . '/site (plus metered CDN delivery on dply\'s managed Cloudflare for high-traffic sites), Cloud from $' . number_format($cloud, 0) . '/app (a platform fee plus the metered DigitalOcean compute, workers, and databases your app runs on, at cost plus margin), and Serverless from $' . number_format($serverless, 0) . '/function. Serverless has two modes: bring your own FaaS account (AWS Lambda, Cloudflare Workers, etc.) and your provider bills the compute directly, or let dply host it — then the flat fee covers the platform and dply meters invocations plus any managed database or cache at cost plus margin. They require a paid plan.',
                 ],
                 [
                     'q' => 'How do you handle Enterprise / large fleets?',

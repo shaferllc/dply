@@ -12,6 +12,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Serverless\ServerlessPlatformContext;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -54,40 +55,57 @@ class CreateServerlessFunction
             $runtime = '';
         }
         $region = trim((string) ($payload['region'] ?? ''));
-        $credentialId = trim((string) ($payload['provider_credential_id'] ?? ''));
 
-        // Refuse to create a Functions host without a usable DigitalOcean
-        // credential. The job that creates the OpenWhisk namespace short-
-        // circuits when `providerCredential` is null and the server lands
-        // in STATUS_ERROR with no actionable UX — better to fail loudly at
-        // creation time. Verify the row exists, belongs to this org, and is
-        // for DigitalOcean.
-        if ($credentialId === '') {
-            throw new InvalidArgumentException('A DigitalOcean credential is required to provision a serverless function. Add one at /credentials, then try again.');
-        }
-        $credential = ProviderCredential::query()
-            ->where('id', $credentialId)
-            ->where('organization_id', $organization->id)
-            ->where('provider', 'digitalocean')
-            ->first();
-        if ($credential === null) {
-            throw new InvalidArgumentException('The selected DigitalOcean credential is missing, belongs to another organization, or is not a DigitalOcean credential. Pick one from /credentials.');
+        // Managed = dply runs the function on its own FaaS account (dply pays
+        // the provider and bills usage cost-plus). BYO = the customer's own
+        // DigitalOcean credential runs and is billed for it.
+        $managed = ($payload['delivery_mode'] ?? 'byo') === 'managed';
+
+        $credential = null;
+        $serverMeta = ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS];
+
+        if ($managed) {
+            // Don't let the create succeed if dply's platform namespace isn't
+            // configured — the provision job would only land in STATUS_ERROR.
+            if (! ServerlessPlatformContext::fromConfig()->configured()) {
+                throw new InvalidArgumentException('dply-managed serverless is not available yet — the platform namespace is not configured. Choose "your own account" instead.');
+            }
+            $serverMeta['serverless_managed'] = true;
+            if ($region === '') {
+                $region = ServerlessPlatformContext::fromConfig()->region;
+            }
+        } else {
+            // Refuse to create a BYO Functions host without a usable
+            // DigitalOcean credential. The provision job short-circuits when
+            // `providerCredential` is null and the server lands in STATUS_ERROR
+            // with no actionable UX — better to fail loudly at creation time.
+            $credentialId = trim((string) ($payload['provider_credential_id'] ?? ''));
+            if ($credentialId === '') {
+                throw new InvalidArgumentException('A DigitalOcean credential is required to provision a serverless function. Add one at /credentials, then try again.');
+            }
+            $credential = ProviderCredential::query()
+                ->where('id', $credentialId)
+                ->where('organization_id', $organization->id)
+                ->where('provider', 'digitalocean')
+                ->first();
+            if ($credential === null) {
+                throw new InvalidArgumentException('The selected DigitalOcean credential is missing, belongs to another organization, or is not a DigitalOcean credential. Pick one from /credentials.');
+            }
         }
 
         // The serverless "host" — a DO Functions namespace. It starts PENDING;
-        // ProvisionServerlessHostJob creates the namespace, fills in its
-        // OpenWhisk credentials, marks it READY, then deploys the function.
+        // ProvisionServerlessHostJob creates (or, for managed, reuses dply's)
+        // namespace, fills in its OpenWhisk credentials, marks it READY, then
+        // deploys the function.
         $server = Server::query()->create([
             'user_id' => $user->id,
             'organization_id' => $organization->id,
-            'provider_credential_id' => $credential->id,
+            'provider_credential_id' => $credential?->id,
             'provider' => ServerProvider::DigitalOcean,
             'name' => 'functions-'.$slug,
             'region' => $region,
             'status' => Server::STATUS_PENDING,
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            ],
+            'meta' => $serverMeta,
         ]);
 
         // The function itself — a Site. Starts `functions_configured` (not yet
@@ -103,6 +121,8 @@ class CreateServerlessFunction
             'git_repository_url' => $repo,
             'git_branch' => $branch,
             'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
+            'serverless_backend' => $managed ? Site::SERVERLESS_BACKEND_DPLY : Site::SERVERLESS_BACKEND_BYO,
+            'serverless_provider_credential_id' => $credential?->id,
             'webhook_secret' => Str::random(48),
             'meta' => [
                 'runtime_profile' => 'digitalocean_functions_web',

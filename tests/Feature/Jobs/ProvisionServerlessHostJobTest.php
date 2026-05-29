@@ -106,6 +106,50 @@ test('is idempotent when namespace already provisioned', function () {
     Bus::assertDispatched(RunSiteDeploymentJob::class);
 });
 
+test('managed host stamps platform credentials without calling the do api', function () {
+    Bus::fake();
+    Http::fake();
+    config([
+        'serverless.managed.api_host' => 'https://faas-nyc1.doserverless.co',
+        'serverless.managed.namespace' => 'fn-dply-shared',
+        'serverless.managed.access_key' => 'uuid:secretkey',
+    ]);
+
+    // Managed host has no customer credential — just the managed flag.
+    $server = makeHost(['serverless_managed' => true]);
+    $server->update(['provider_credential_id' => null]);
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    Http::assertNothingSent();
+
+    $server->refresh();
+    expect($server->status)->toBe(Server::STATUS_READY);
+    expect($server->meta['digitalocean_functions']['namespace'])->toBe('fn-dply-shared');
+    expect($server->meta['digitalocean_functions']['access_key'])->toBe('uuid:secretkey');
+    Bus::assertDispatched(RunSiteDeploymentJob::class);
+});
+
+test('managed host errors when the platform namespace is not configured', function () {
+    Bus::fake();
+    Http::fake();
+    config([
+        'serverless.managed.api_host' => '',
+        'serverless.managed.namespace' => '',
+        'serverless.managed.access_key' => '',
+    ]);
+
+    $server = makeHost(['serverless_managed' => true]);
+    $server->update(['provider_credential_id' => null]);
+
+    (new ProvisionServerlessHostJob($server->id))->handle();
+
+    Http::assertNothingSent();
+    $server->refresh();
+    expect($server->status)->toBe(Server::STATUS_ERROR);
+    Bus::assertNotDispatched(RunSiteDeploymentJob::class);
+});
+
 test('marks host errored when the api call fails', function () {
     Bus::fake();
     Http::fake([

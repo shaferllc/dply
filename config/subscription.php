@@ -35,8 +35,9 @@ return [
     |
     |   STRIPE_PRICE_STANDARD_SERVERLESS=price_...         (flat per-function fee, monthly)
     |   STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_...  (flat per-function fee, yearly)
-    |   STRIPE_PRICE_STANDARD_CLOUD=price_...              (flat per dply Cloud app, monthly)
+    |   STRIPE_PRICE_STANDARD_CLOUD=price_...              (flat dply Cloud platform fee, monthly)
     |   STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_...
+    |   STRIPE_PRICE_STANDARD_CLOUD_USAGE=price_...         (metered Cloud resources, per-cent unit)
     |   STRIPE_PRICE_STANDARD_EDGE=price_...               (flat per dply Edge site, monthly)
     |   STRIPE_PRICE_STANDARD_EDGE_YEARLY=price_...
     |
@@ -72,14 +73,100 @@ return [
         ],
         // Flat per-function fee for serverless (FaaS) targets. A serverless
         // function has no vCPU/RAM, so it isn't spec-tiered — it's its own
-        // billable unit. See project_serverless_v1 memo.
+        // billable unit. See project_serverless_v1 memo. For BYO functions
+        // (customer's own provider account) this is the entire dply charge; for
+        // dply-managed functions it's the platform fee and metered usage +
+        // managed DB/cache resources are billed on top (see dply.serverless).
         'serverless_cents' => 200,
-        // Flat per-app fee for first-party dply Cloud (long-running containers).
+        // Metered managed-serverless usage + resources billed in 1-cent Stripe
+        // units (quantity = cents), like Edge/Cloud usage. Monthly only.
+        'serverless_usage_unit_cents' => 1,
+        // Markup applied to raw DO managed database/cache list prices when a
+        // dply-managed function provisions them on dply's own account (dply pays
+        // DO, so it must bill back with margin — same idea as cloud_markup_percent).
+        'serverless_markup_percent' => (int) env('SUBSCRIPTION_SERVERLESS_MARKUP_PERCENT', 40),
+
+        /*
+        |----------------------------------------------------------------------
+        | dply-managed servers — all-in cost-plus (replaces the tier fee)
+        |----------------------------------------------------------------------
+        |
+        | Managed VMs run on dply-owned Hetzner infrastructure (dply pays
+        | Hetzner), so they're billed provider-cost × markup as a single all-in
+        | monthly price and do NOT count toward the per-server plan tier. Raw
+        | values are approximate Hetzner monthly list prices in cents (USD,
+        | verified 2026-05) keyed by the same server_type slug offered in
+        | config/managed_servers.php. Billed via a metered Stripe line
+        | (quantity = cents), like Cloud/Edge usage.
+        */
+        'managed_server_markup_percent' => (int) env('SUBSCRIPTION_MANAGED_SERVER_MARKUP_PERCENT', 60),
+        'managed_server_cents' => [
+            'cx22' => 450,
+            'cx32' => 740,
+            'cx42' => 1790,
+            'cx52' => 3330,
+        ],
+        // Metered managed-server cost is billed in 1-cent Stripe units (quantity = cents).
+        'managed_server_usage_unit_cents' => 1,
+        // dply Cloud **platform fee** per live app — covers builds, deploys,
+        // scaling, TLS, dashboards, and orchestration. This is NOT the whole
+        // bill: Cloud apps run on dply-owned DigitalOcean infra (containers,
+        // managed databases, buckets), so the metered provider resources below
+        // are billed *on top* of this fee. A flat $5 alone loses money the
+        // moment an app attaches a database (DO Postgres is $15+/mo). See the
+        // managed-product billing investigation memo.
         'cloud_cents' => 500,
         // Flat per-site fee for first-party dply Edge (static/SSG delivery).
+        // Edge is genuinely flat-eligible: Cloudflare Workers Paid is $5/mo per
+        // *account* (amortized across the whole fleet) and R2/Pages egress is
+        // free, so the marginal cost of another static site is ~$0.
         'edge_cents' => 200,
         // Edge delivery usage is billed in 1-cent Stripe units (quantity = cents).
         'edge_usage_unit_cents' => 1,
+
+        /*
+        |----------------------------------------------------------------------
+        | dply Cloud — metered provider resources (cost-plus)
+        |----------------------------------------------------------------------
+        |
+        | Cloud apps run on dply-owned DigitalOcean infrastructure, so dply pays
+        | DO for every container, worker, and managed database and must bill it
+        | back with margin. Raw values below are DO list prices (cents/month,
+        | verified 2026-05); `cloud_markup_percent` is applied on top to produce
+        | the customer rate. Billed alongside the flat `cloud_cents` platform fee
+        | via a metered Stripe line (quantity = cents, like Edge usage).
+        |
+        | Container/worker tiers map to App Platform instance_size_slugs
+        | (see DigitalOceanAppPlatformBackend / CloudWorker::SIZE_TIERS):
+        |   small=basic-xxs $5, medium=basic-xs $10, large=basic-s $20,
+        |   xlarge=basic-m $40, *-pro=apps-d-* dedicated ($29 → $78).
+        | Database tiers map to DO Managed DB sizes (CloudDatabase::SIZE_TIERS):
+        |   small=db-s-1vcpu-1gb $15, medium=db-s-1vcpu-2gb $30,
+        |   large=db-s-2vcpu-4gb $60.
+        | Buckets map to a DO Spaces subscription ($5 / 250 GiB).
+        */
+        'cloud_markup_percent' => (int) env('SUBSCRIPTION_CLOUD_MARKUP_PERCENT', 40),
+        // Raw DO container cost (cents/mo) per portable size tier, per instance.
+        'cloud_container_cents' => [
+            'small' => 500,
+            'medium' => 1000,
+            'large' => 2000,
+            'xlarge' => 4000,
+            'small-pro' => 2900,
+            'medium-pro' => 3400,
+            'large-pro' => 3900,
+            'xlarge-pro' => 7800,
+        ],
+        // Raw DO managed-database cost (cents/mo) per portable size tier.
+        'cloud_database_cents' => [
+            'small' => 1500,
+            'medium' => 3000,
+            'large' => 6000,
+        ],
+        // Raw DO Spaces cost (cents/mo) per attached bucket subscription.
+        'cloud_bucket_cents' => 500,
+        // Metered Cloud resources are billed in 1-cent Stripe units (quantity = cents).
+        'cloud_usage_unit_cents' => 1,
         // --- Legacy size-tier keys (being retired in the plan migration) ---
         // Retained so the not-yet-migrated billing dashboard, analytics, and
         // cost cards keep functioning until each is moved onto the plan model.
@@ -117,8 +204,14 @@ return [
             ],
             'serverless' => env('STRIPE_PRICE_STANDARD_SERVERLESS', ''),
             'serverless_yearly' => env('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY', ''),
+            // Metered managed-serverless usage + resources line (per-cent unit), monthly only.
+            'serverless_usage' => env('STRIPE_PRICE_STANDARD_SERVERLESS_USAGE', ''),
+            // Metered managed-server (all-in cost-plus) line (per-cent unit), monthly only.
+            'managed_server' => env('STRIPE_PRICE_STANDARD_MANAGED_SERVER', ''),
             'cloud' => env('STRIPE_PRICE_STANDARD_CLOUD', ''),
             'cloud_yearly' => env('STRIPE_PRICE_STANDARD_CLOUD_YEARLY', ''),
+            // Metered Cloud provider-resource line (per-cent unit), monthly only.
+            'cloud_usage' => env('STRIPE_PRICE_STANDARD_CLOUD_USAGE', ''),
             'edge' => env('STRIPE_PRICE_STANDARD_EDGE', ''),
             'edge_yearly' => env('STRIPE_PRICE_STANDARD_EDGE_YEARLY', ''),
             'edge_usage' => env('STRIPE_PRICE_STANDARD_EDGE_USAGE', ''),

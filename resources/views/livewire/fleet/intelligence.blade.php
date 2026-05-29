@@ -1,69 +1,49 @@
-<div class="mx-auto max-w-7xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-    <header class="mb-6 border-b border-brand-ink/10 pb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-            <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Deploy intelligence') }}</h1>
-            <p class="mt-1 text-sm text-brand-moss max-w-2xl">
-                {{ __('Proactive findings across every site in the org — slow builds, TLS expirations, env drift between preview and production. The scanner runs hourly; dismiss an alert to silence the condition until it materially changes.') }}
-            </p>
-        </div>
-        <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
-            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-sage" wire:loading.class="animate-spin" wire:target="rescan" aria-hidden="true" />
-            <span wire:loading.remove wire:target="rescan">{{ __('Scan now') }}</span>
-            <span wire:loading wire:target="rescan">{{ __('Scanning…') }}</span>
-        </button>
-    </header>
+<div>
+    <x-fleet-shell
+        :title="__('Deploy intelligence')"
+        :description="__('Proactive findings across every site in the org — slow builds, TLS expirations, env drift between preview and production. The scanner runs hourly; dismiss an alert to silence the condition until it materially changes.')"
+        :section="__('Intelligence')"
+    >
+        <x-slot:actions>
+            <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
+                class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-sage" wire:loading.class="animate-spin" wire:target="rescan" aria-hidden="true" />
+                <span wire:loading.remove wire:target="rescan">{{ __('Scan now') }}</span>
+                <span wire:loading wire:target="rescan">{{ __('Scanning…') }}</span>
+            </button>
+        </x-slot:actions>
 
-    <div class="mb-6 grid gap-3 sm:grid-cols-3">
-        <div class="rounded-2xl border border-amber-200 bg-amber-50/60 px-5 py-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">{{ __('Open') }}</p>
-            <p class="mt-1 text-2xl font-semibold text-amber-900">{{ $totals['open'] }}</p>
-        </div>
-        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Auto-resolved') }}</p>
-            <p class="mt-1 text-2xl font-semibold text-emerald-900">{{ $totals['resolved'] }}</p>
-        </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-white px-5 py-4 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Dismissed') }}</p>
-            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $totals['dismissed'] }}</p>
-        </div>
+    <div class="mb-6 grid gap-4 sm:grid-cols-3">
+        <x-fleet-stat :label="__('Open')">
+            <p class="mt-2 text-3xl font-semibold tabular-nums {{ $totals['open'] > 0 ? 'text-amber-600' : 'text-brand-ink' }}">{{ $totals['open'] }}</p>
+        </x-fleet-stat>
+        <x-fleet-stat :label="__('Auto-resolved')">
+            <p class="mt-2 text-3xl font-semibold tabular-nums text-emerald-600">{{ $totals['resolved'] }}</p>
+        </x-fleet-stat>
+        <x-fleet-stat :label="__('Dismissed')">
+            <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $totals['dismissed'] }}</p>
+        </x-fleet-stat>
     </div>
 
     <div class="mb-4 flex flex-wrap items-center gap-2">
-        <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss me-1">{{ __('Show') }}</span>
+        <span class="me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Show') }}</span>
         @foreach (['open' => __('Open'), 'resolved' => __('Resolved'), 'dismissed' => __('Dismissed'), 'all' => __('All')] as $value => $label)
-            <button type="button" wire:click="$set('showFilter', '{{ $value }}')"
-                @class([
-                    'rounded-full border px-3 py-1 text-xs font-semibold transition',
-                    'border-brand-ink bg-brand-ink text-brand-cream' => $showFilter === $value,
-                    'border-brand-ink/15 bg-white text-brand-moss hover:text-brand-ink' => $showFilter !== $value,
-                ])>
-                {{ $label }}
-            </button>
+            <x-fleet-pill :active="$showFilter === $value" wire:click="$set('showFilter', '{{ $value }}')">{{ $label }}</x-fleet-pill>
         @endforeach
-        <span class="ms-3 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss me-1">{{ __('Rule') }}</span>
+        <span class="ms-3 me-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Rule') }}</span>
         @foreach (['' => __('All'), 'slow_build' => __('Slow build'), 'tls_expiring' => __('TLS expiring'), 'env_drift' => __('Env drift')] as $value => $label)
-            <button type="button" wire:click="$set('ruleFilter', '{{ $value }}')"
-                @class([
-                    'rounded-full border px-3 py-1 text-xs font-semibold transition',
-                    'border-brand-ink bg-brand-ink text-brand-cream' => $ruleFilter === $value,
-                    'border-brand-ink/15 bg-white text-brand-moss hover:text-brand-ink' => $ruleFilter !== $value,
-                ])>
-                {{ $label }}
-            </button>
+            <x-fleet-pill :active="$ruleFilter === $value" wire:click="$set('ruleFilter', '{{ $value }}')">{{ $label }}</x-fleet-pill>
         @endforeach
     </div>
 
     @if ($alerts->isEmpty())
-        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-8 text-center text-sm text-brand-moss">
-            @if ($showFilter === 'open' && $ruleFilter === '')
-                <p class="font-medium text-brand-ink">{{ __('Nothing to act on.') }}</p>
+        @if ($showFilter === 'open' && $ruleFilter === '')
+            <x-fleet-empty :title="__('Nothing to act on.')">
                 <p class="mt-1">{{ __('The scanner has nothing open across this org. The Scan now button forces an immediate re-check.') }}</p>
-            @else
-                <p>{{ __('No alerts match the current filters.') }}</p>
-            @endif
-        </div>
+            </x-fleet-empty>
+        @else
+            <x-fleet-empty>{{ __('No alerts match the current filters.') }}</x-fleet-empty>
+        @endif
     @else
         <ul class="space-y-3">
             @foreach ($alerts as $alert)
@@ -120,4 +100,5 @@
             @endforeach
         </ul>
     @endif
+    </x-fleet-shell>
 </div>

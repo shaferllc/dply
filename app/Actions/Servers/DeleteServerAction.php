@@ -18,6 +18,7 @@ use App\Services\Notifications\NotificationPublisher;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
+use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 
@@ -91,15 +92,27 @@ final class DeleteServerAction
         }
 
         if ($server->provider === ServerProvider::Hetzner && ! empty($server->provider_id)) {
-            $credential = $server->providerCredential;
-            if ($credential) {
+            // Managed VMs run on dply's own Hetzner project, so teardown MUST use
+            // the platform token (the customer has no credential) — otherwise the
+            // dply-owned VM keeps costing us money after cancellation.
+            $hetzner = null;
+            if ($server->usesManagedHosting()) {
+                $platform = ServerHostingPlatformContext::fromConfig();
+                if ($platform->configured()) {
+                    $hetzner = $platform->hetzner();
+                }
+            } elseif ($server->providerCredential) {
+                $hetzner = new HetznerService($server->providerCredential);
+            }
+
+            if ($hetzner) {
                 try {
-                    $hetzner = new HetznerService($credential);
                     $hetzner->destroyInstance((int) $server->provider_id);
                 } catch (\Throwable $e) {
                     Log::warning('Failed to destroy Hetzner instance on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
+                        'managed' => $server->usesManagedHosting(),
                         'error' => $e->getMessage(),
                     ]);
                 }

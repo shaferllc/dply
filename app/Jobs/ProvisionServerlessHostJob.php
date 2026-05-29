@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\DigitalOceanService;
+use App\Support\Serverless\ServerlessPlatformContext;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -58,6 +59,31 @@ class ProvisionServerlessHostJob implements ShouldBeUnique, ShouldQueue
                     'setup_status' => Server::SETUP_STATUS_DONE,
                 ]);
             }
+            $this->deployConfiguredFunctions($server);
+
+            return;
+        }
+
+        // Managed mode: dply runs the function on its OWN, pre-provisioned
+        // DigitalOcean Functions namespace. There's no per-host namespace to
+        // create and no customer credential — just stamp the shared platform
+        // OpenWhisk credentials and mark the host ready.
+        if (! empty($meta['serverless_managed'] ?? null)) {
+            $platform = ServerlessPlatformContext::fromConfig();
+            if (! $platform->configured()) {
+                Log::warning('serverless.namespace.managed_not_configured', ['server_id' => $server->id]);
+                $server->update(['status' => Server::STATUS_ERROR]);
+
+                return;
+            }
+
+            $meta['digitalocean_functions'] = $platform->openWhiskCredentials();
+            $server->update([
+                'meta' => $meta,
+                'status' => Server::STATUS_READY,
+                'setup_status' => Server::SETUP_STATUS_DONE,
+            ]);
+
             $this->deployConfiguredFunctions($server);
 
             return;

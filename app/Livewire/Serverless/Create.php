@@ -11,6 +11,7 @@ use App\Models\ProviderCredential;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Serverless\ServerlessCostEstimator;
+use App\Support\Serverless\ServerlessPlatformContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
@@ -33,10 +34,19 @@ class Create extends Component
     public string $provider_credential_id = '';
 
     /**
-     * Preselect a DigitalOcean credential. A serverless host with no
+     * Where the function runs:
+     *   managed = dply's own FaaS account (dply pays the provider, bills usage
+     *             cost-plus on top of the flat fee);
+     *   byo     = the customer's connected DigitalOcean credential.
+     */
+    public string $delivery_mode = 'byo';
+
+    /**
+     * Preselect a DigitalOcean credential. A BYO serverless host with no
      * credential cannot provision its namespace — the deploy dies at
-     * `serverless.namespace.no_credential` — so the form must never submit
-     * without one.
+     * `serverless.namespace.no_credential` — so the BYO form must never submit
+     * without one. Default to managed when it's available and the org has no
+     * DigitalOcean credential of its own.
      */
     public function mount(): void
     {
@@ -54,7 +64,19 @@ class Create extends Component
 
         if (is_string($first)) {
             $this->provider_credential_id = $first;
+        } elseif ($this->managedAvailable()) {
+            $this->delivery_mode = 'managed';
         }
+    }
+
+    /**
+     * True when the dply-managed option is both feature-enabled and the
+     * platform namespace is configured to receive deploys.
+     */
+    public function managedAvailable(): bool
+    {
+        return Feature::active('surface.serverless_managed')
+            && ServerlessPlatformContext::fromConfig()->configured();
     }
 
     public string $region = 'nyc1';
@@ -169,24 +191,38 @@ class Create extends Component
             return null;
         }
 
+        // A stray "managed" pick when the option isn't actually available
+        // would fail downstream — coerce it back to BYO so validation reflects
+        // what the user can really do.
+        if ($this->delivery_mode === 'managed' && ! $this->managedAvailable()) {
+            $this->delivery_mode = 'byo';
+        }
+        $managed = $this->delivery_mode === 'managed';
+
         // Validate the credential by row, scoped to org + provider. The action
         // re-checks the same constraint as defense-in-depth (in case a future
         // caller skips Livewire), but doing it here gives inline form errors
-        // instead of a toast and an aborted create.
-        $this->validate([
+        // instead of a toast and an aborted create. Managed functions run on
+        // dply's namespace, so they need no customer credential.
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'repo' => ['required', 'string', 'max:255'],
             'branch' => ['required', 'string', 'max:255'],
             'runtime' => ['required', 'string', Rule::in(array_keys($this->runtimeOptions()))],
             'region' => ['required', 'string', 'max:32'],
-            'provider_credential_id' => [
+            'delivery_mode' => ['required', 'string', Rule::in(['byo', 'managed'])],
+        ];
+        if (! $managed) {
+            $rules['provider_credential_id'] = [
                 'required',
                 'string',
                 Rule::exists('provider_credentials', 'id')->where(fn ($q) => $q
                     ->where('organization_id', $org->id)
                     ->where('provider', 'digitalocean')),
-            ],
-        ], [
+            ];
+        }
+
+        $this->validate($rules, [
             'provider_credential_id.required' => __('Choose a DigitalOcean credential — the namespace cannot be provisioned without one.'),
             'provider_credential_id.exists' => __('That DigitalOcean credential isn\'t available to this organization. Pick one from the list or add a new one under /credentials.'),
         ]);
@@ -198,6 +234,7 @@ class Create extends Component
                 'branch' => $this->branch,
                 'runtime' => $this->runtime,
                 'region' => $this->region,
+                'delivery_mode' => $this->delivery_mode,
                 'provider_credential_id' => $this->provider_credential_id,
             ]);
         } catch (Throwable $e) {
@@ -243,6 +280,7 @@ class Create extends Component
         return view('livewire.serverless.create', [
             'credentials' => $credentials,
             'functionFee' => app(ServerlessCostEstimator::class)->functionFee(),
+            'managedAvailable' => $this->managedAvailable(),
             'runtimes' => $this->runtimeOptions(),
             'regions' => [
                 'nyc1' => 'New York',

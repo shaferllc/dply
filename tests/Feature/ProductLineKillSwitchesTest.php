@@ -14,7 +14,6 @@ use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Queue;
-use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
@@ -23,7 +22,7 @@ beforeEach(function () {
 });
 
 test('vm kill switch blocks server create routes', function () {
-    Feature::for(null)->deactivate('global.vm_enabled');
+    config(['features.global.vm_enabled' => false]);
 
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -35,7 +34,7 @@ test('vm kill switch blocks server create routes', function () {
 });
 
 test('vm kill switch skips vm site deploy job', function () {
-    Feature::for(null)->deactivate('global.vm_enabled');
+    config(['features.global.vm_enabled' => false]);
 
     $user = User::factory()->create();
     $org = Organization::factory()->create();
@@ -66,7 +65,7 @@ test('vm kill switch skips vm site deploy job', function () {
 });
 
 test('ensure vm platform middleware passes when enabled', function () {
-    Feature::for(null)->activate('global.vm_enabled');
+    config(['features.global.vm_enabled' => true]);
 
     $middleware = new EnsureVmPlatformEnabled;
     $response = $middleware->handle(Request::create('/servers/create', 'GET'), fn () => response('ok'));

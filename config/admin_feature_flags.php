@@ -73,6 +73,7 @@ return [
             ],
             'groups' => array_merge([
                 'Providers' => [
+                    'provider.digitalocean' => 'DigitalOcean',
                     'provider.aws' => 'AWS EC2',
                     'provider.linode' => 'Linode',
                     'provider.vultr' => 'Vultr',
@@ -187,20 +188,9 @@ return [
     ],
 
     /*
-    | Org-scoped Pennant keys that end users always resolve from the platform
-    | default (null scope). Prevents per-org overrides from blocking a global
-    | coming-soon teaser after an admin enables it platform-wide.
-    */
-    'platform_only_org_flags' => [
-        'workspace.console_preview',
-        'workspace.insights_preview',
-        'workspace.server_blueprint_preview',
-        'workspace.files_preview',
-    ],
-
-    /*
     | Parent feature → coming-soon preview flag. Admin UI renders these as one
-    | grouped card (full feature toggle + nested preview toggle).
+    | grouped card; both the parent and the preview default come from
+    | config/features.php and are overridable per org.
     */
     'feature_preview_pairs' => [
         'workspace.console' => 'workspace.console_preview',

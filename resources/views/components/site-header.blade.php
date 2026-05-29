@@ -184,6 +184,13 @@
                                             </x-slot>
                                             {{ __('Cloud apps') }}
                                         </x-dropdown-link>
+                                    @else
+                                        <x-coming-soon-dropdown-link>
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-cube class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Cloud apps') }}
+                                        </x-coming-soon-dropdown-link>
                                     @endfeature
                                     @feature('surface.serverless')
                                         <x-dropdown-link :href="route('serverless.index')">
@@ -192,6 +199,13 @@
                                             </x-slot>
                                             {{ __('Serverless') }}
                                         </x-dropdown-link>
+                                    @else
+                                        <x-coming-soon-dropdown-link>
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-bolt class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Serverless') }}
+                                        </x-coming-soon-dropdown-link>
                                     @endfeature
                                     @feature('surface.edge')
                                         <x-dropdown-link :href="route('edge.index')">
@@ -200,6 +214,13 @@
                                             </x-slot>
                                             {{ __('Edge') }}
                                         </x-dropdown-link>
+                                    @else
+                                        <x-coming-soon-dropdown-link>
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-globe-alt class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Edge') }}
+                                        </x-coming-soon-dropdown-link>
                                     @endfeature
                                     <div class="mx-3 my-2 flex items-center gap-2" role="presentation">
                                         <div class="h-px flex-1 bg-brand-ink/10"></div>
@@ -485,6 +506,13 @@
                         </x-slot>
                         {{ __('Cloud apps') }}
                     </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-cube class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Cloud apps') }}
+                    </x-coming-soon-responsive-nav-link>
                 @endfeature
                 @feature('surface.serverless')
                     <x-responsive-nav-link :href="route('serverless.index')" :active="request()->routeIs('serverless.*')">
@@ -493,6 +521,13 @@
                         </x-slot>
                         {{ __('Serverless') }}
                     </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-bolt class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Serverless') }}
+                    </x-coming-soon-responsive-nav-link>
                 @endfeature
                 @feature('surface.edge')
                     <x-responsive-nav-link :href="route('edge.index')" :active="request()->routeIs('edge.*')">
@@ -501,6 +536,13 @@
                         </x-slot>
                         {{ __('Edge') }}
                     </x-responsive-nav-link>
+                @else
+                    <x-coming-soon-responsive-nav-link>
+                        <x-slot name="icon">
+                            <x-heroicon-o-globe-alt class="{{ $hi }}" />
+                        </x-slot>
+                        {{ __('Edge') }}
+                    </x-coming-soon-responsive-nav-link>
                 @endfeature
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Apps') }}</p>
                 <x-responsive-nav-link :href="route('sites.index')" :active="request()->routeIs('sites.*')">

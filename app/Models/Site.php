@@ -171,6 +171,8 @@ class Site extends Model
         'container_backend',
         'container_backend_id',
         'container_region',
+        'serverless_backend',
+        'serverless_provider_credential_id',
         'edge_backend',
         'edge_backend_id',
         'edge_provider_credential_id',
@@ -369,6 +371,35 @@ class Site extends Model
     public function edgeProviderCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class, 'edge_provider_credential_id');
+    }
+
+    /** dply runs the function on its own managed FaaS account (dply pays the provider). */
+    public const SERVERLESS_BACKEND_DPLY = 'dply_serverless';
+
+    /** The customer's connected provider account runs (and is billed for) the function. */
+    public const SERVERLESS_BACKEND_BYO = 'org_digitalocean';
+
+    public function serverlessProviderCredential(): BelongsTo
+    {
+        return $this->belongsTo(ProviderCredential::class, 'serverless_provider_credential_id');
+    }
+
+    /**
+     * True when dply hosts this function on its own FaaS account and therefore
+     * bills the customer cost-plus for usage on top of the flat fee.
+     */
+    public function usesManagedServerless(): bool
+    {
+        return $this->serverless_backend === self::SERVERLESS_BACKEND_DPLY;
+    }
+
+    public function serverlessBackendLabel(): string
+    {
+        return match ($this->serverless_backend) {
+            self::SERVERLESS_BACKEND_DPLY => __('Dply Serverless (managed)'),
+            self::SERVERLESS_BACKEND_BYO => __('Your provider account'),
+            default => (string) ($this->serverless_backend ?: __('Your provider account')),
+        };
     }
 
     public function usesOrgCloudflareEdge(): bool

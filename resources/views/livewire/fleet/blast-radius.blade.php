@@ -1,34 +1,26 @@
-<div class="mx-auto max-w-6xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-
-    <header class="mb-6 border-b border-brand-ink/10 pb-4">
-        <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Blast radius') }}</h1>
-        <p class="mt-1 max-w-3xl text-sm text-brand-moss">{{ __('Map servers, sites, databases, and hybrid Edge ↔ Cloud links. Select a resource to see what else would break if it went down.') }}</p>
-    </header>
-
+<div>
+    <x-fleet-shell
+        :title="__('Blast radius')"
+        :description="__('Map servers, sites, databases, and hybrid Edge ↔ Cloud links. Select a resource to see what else would break if it went down.')"
+        :section="__('Blast radius')"
+    >
     <section class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Servers') }}</p>
+        <x-fleet-stat :label="__('Servers')">
             <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $counts['servers'] }}</p>
-        </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Sites') }}</p>
+        </x-fleet-stat>
+        <x-fleet-stat :label="__('Sites')">
             <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $counts['sites'] }}</p>
-        </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Databases') }}</p>
+        </x-fleet-stat>
+        <x-fleet-stat :label="__('Databases')">
             <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $counts['databases'] }}</p>
-        </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Dependencies') }}</p>
+        </x-fleet-stat>
+        <x-fleet-stat :label="__('Dependencies')">
             <p class="mt-2 text-3xl font-semibold tabular-nums text-brand-ink">{{ $counts['links'] }}</p>
-        </div>
+        </x-fleet-stat>
     </section>
 
     @if ($counts['servers'] + $counts['sites'] + $counts['databases'] === 0)
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/40 p-8 text-center text-sm text-brand-moss">
-            {{ __('No inventory to map yet. Connect servers or create Cloud / Edge apps to build a dependency graph.') }}
-        </div>
+        <x-fleet-empty>{{ __('No inventory to map yet. Connect servers or create Cloud / Edge apps to build a dependency graph.') }}</x-fleet-empty>
     @else
         <div class="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <section class="space-y-6">
@@ -159,4 +151,5 @@
             </aside>
         </div>
     @endif
+    </x-fleet-shell>
 </div>

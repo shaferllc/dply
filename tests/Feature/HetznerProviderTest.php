@@ -5,6 +5,7 @@ namespace Tests\Feature\HetznerProviderTest;
 use App\Actions\Servers\DeleteServerAction;
 use App\Actions\Servers\ListServerProviderCards;
 use App\Actions\Servers\ResolveServerCreateCatalog;
+use App\Actions\Servers\StoreManagedServer;
 use App\Actions\Servers\StoreServerFromCreateForm;
 use App\Enums\ServerProvider;
 use App\Jobs\PollHetznerIpJob;
@@ -21,6 +22,7 @@ use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\Livewire;
 
@@ -348,6 +350,129 @@ test('delete server action destroys hetzner instance', function () {
 
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && $request->url() === 'https://api.hetzner.cloud/v1/servers/9001');
+});
+
+test('store managed server creates a dply-hosted hetzner server without a credential', function () {
+    Queue::fake();
+    config(['managed_servers.hetzner.api_token' => 'dply-platform-token']);
+
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    $server = StoreManagedServer::run($user, $org, [
+        'name' => 'managed-web',
+        'region' => 'fsn1',
+        'size' => 'cx22',
+        'install_profile' => 'laravel_app',
+    ]);
+
+    expect($server->provider)->toBe(ServerProvider::Hetzner);
+    expect($server->hosting_backend)->toBe(Server::HOSTING_BACKEND_DPLY);
+    expect($server->usesManagedHosting())->toBeTrue();
+    expect($server->provider_credential_id)->toBeNull();
+    expect($server->status)->toBe(Server::STATUS_PENDING);
+
+    Queue::assertPushed(ProvisionHetznerServerJob::class, fn (ProvisionHetznerServerJob $job) => $job->server->is($server));
+});
+
+test('store managed server is rejected when the platform token is not configured', function () {
+    config(['managed_servers.hetzner.api_token' => null]);
+
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    expect(fn () => StoreManagedServer::run($user, $org, [
+        'name' => 'managed-web',
+        'region' => 'fsn1',
+        'size' => 'cx22',
+        'install_profile' => 'laravel_app',
+    ]))->toThrow(ValidationException::class);
+});
+
+test('managed hetzner server provisions using the platform token, not a credential', function () {
+    Queue::fake();
+    config([
+        'server_provision_fake.env_flag' => false,
+        'managed_servers.hetzner.api_token' => 'dply-platform-token',
+    ]);
+
+    Http::fake([
+        'https://api.hetzner.cloud/v1/ssh_keys' => Http::response(['ssh_key' => ['id' => 77]], 201),
+        'https://api.hetzner.cloud/v1/servers' => Http::response(['server' => ['id' => 8800]], 201),
+    ]);
+
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    $server = Server::factory()->hetzner()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider_credential_id' => null,
+        'hosting_backend' => Server::HOSTING_BACKEND_DPLY,
+        'status' => Server::STATUS_PENDING,
+        'region' => 'fsn1',
+        'size' => 'cx22',
+        'meta' => ['server_role' => 'application'],
+    ]);
+
+    (new ProvisionHetznerServerJob($server))->handle();
+
+    $server->refresh();
+
+    expect($server->provider_id)->toBe('8800');
+    expect($server->status)->toBe(Server::STATUS_PROVISIONING);
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.hetzner.cloud/v1/servers'
+        && $request->hasHeader('Authorization', 'Bearer dply-platform-token'));
+});
+
+test('managed hetzner server errors when the platform token is missing', function () {
+    config([
+        'server_provision_fake.env_flag' => false,
+        'managed_servers.hetzner.api_token' => null,
+    ]);
+
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    $server = Server::factory()->hetzner()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider_credential_id' => null,
+        'hosting_backend' => Server::HOSTING_BACKEND_DPLY,
+        'status' => Server::STATUS_PENDING,
+    ]);
+
+    (new ProvisionHetznerServerJob($server))->handle();
+
+    expect($server->refresh()->status)->toBe(Server::STATUS_ERROR);
+});
+
+test('delete managed server destroys the dply-owned instance via the platform token', function () {
+    config(['managed_servers.hetzner.api_token' => 'dply-platform-token']);
+
+    Http::fake([
+        'https://api.hetzner.cloud/v1/servers/8800' => Http::response([], 200),
+    ]);
+
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    $server = Server::factory()->hetzner()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider_credential_id' => null,
+        'hosting_backend' => Server::HOSTING_BACKEND_DPLY,
+        'provider_id' => '8800',
+    ]);
+
+    app(DeleteServerAction::class)->execute($server, $user);
+
+    $this->assertModelMissing($server);
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+        && $request->url() === 'https://api.hetzner.cloud/v1/servers/8800'
+        && $request->hasHeader('Authorization', 'Bearer dply-platform-token'));
 });
 
 test('hetzner disabled via config hides provider from create cards', function () {
