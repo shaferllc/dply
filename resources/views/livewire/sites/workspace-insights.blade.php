@@ -131,8 +131,14 @@
 
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-5 py-4">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-clipboard-document-check class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
+                </div>
             </div>
             @if ($findings->isEmpty())
                 <p class="px-5 py-10 text-sm text-brand-moss text-center">{{ __('No findings yet.') }}</p>

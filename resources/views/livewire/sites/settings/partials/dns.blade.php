@@ -21,15 +21,15 @@
      routing tabs: icon, h2, two-line description, then a row of muted status chips
      summarising the resolved DNS configuration. --}}
 <div class="{{ $card }}">
-    <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('DNS') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DNS automation') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Pick which connected DNS credential Dply should use for this site, and the apex zone that exists in that provider account. Leave the zone empty to fall back to the app-default testing-domain pool.') }}
                 </p>
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">

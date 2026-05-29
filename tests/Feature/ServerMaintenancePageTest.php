@@ -51,7 +51,7 @@ test('server maintenance page renders controls', function (): void {
         ->assertOk()
         ->assertSee(__('Visitor maintenance'))
         ->assertSee(__('Site impact'))
-        ->assertSee(__('Preferred maintenance window'))
+        ->assertSee(__('Preferred maintenance schedule'))
         ->assertSee(__('Public visitor message'));
 });
 

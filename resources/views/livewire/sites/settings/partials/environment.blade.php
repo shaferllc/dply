@@ -144,15 +144,15 @@
          Mirrors basic-auth's header so the two settings pages feel like a
          family. --}}
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Configuration') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Configuration') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Key/value pairs written into the site\'s .env file.') }}
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -389,16 +389,22 @@
         class="{{ $card }}"
         @if ($envSyncInFlight) wire:poll.3s @endif
     >
-        <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-            <div>
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Site variables') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    @if ($supportsEnvPush)
-                        {{ __('Edits push to the server automatically. Click Sync from server to pull drift caused by out-of-band edits.') }}
-                    @else
-                        {{ __('Edits are injected into the runtime on the next deploy.') }}
-                    @endif
-                </p>
+        <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Variables') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site variables') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        @if ($supportsEnvPush)
+                            {{ __('Edits push to the server automatically. Click Sync from server to pull drift caused by out-of-band edits.') }}
+                        @else
+                            {{ __('Edits are injected into the runtime on the next deploy.') }}
+                        @endif
+                    </p>
+                </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 @if ($variableCount > 0)

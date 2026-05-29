@@ -15,9 +15,9 @@
                 <x-heroicon-o-wrench class="h-5 w-5" />
             </span>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Organization maintenance window') }}</h2>
+                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Organization cron pause window') }}</h2>
                 <p class="mt-0.5 text-sm text-brand-moss leading-relaxed">
-                    {{ __('When set, Dply omits managed cron lines from every server in the organization on the next sync until the window ends. Manual “Run now” is blocked while active. Use during deploys, migrations, or maintenance windows.') }}
+                    {{ __('When set, Dply omits managed cron lines from every server in the organization on the next sync until the pause ends. Manual “Run now” is blocked while active. Use during deploys, migrations, or scheduled maintenance.') }}
                 </p>
             </div>
         </div>
@@ -25,7 +25,7 @@
     <div class="space-y-6 p-6 sm:p-8">
         @if ($server->organization?->cron_maintenance_until && now()->lt($server->organization->cron_maintenance_until))
             <div class="rounded-xl border border-amber-300/80 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-                <p class="font-semibold">{{ __('Maintenance window active') }}</p>
+                <p class="font-semibold">{{ __('Cron pause active') }}</p>
                 <p class="mt-1 text-amber-900/90">
                     {{ __('Active until :time.', ['time' => $server->organization->cron_maintenance_until->timezone(config('app.timezone'))->format('Y-m-d H:i T')]) }}
                     @if (filled($server->organization->cron_maintenance_note))
@@ -63,7 +63,7 @@
 
             <div class="flex flex-wrap items-center gap-2">
                 <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveOrgCronMaintenance">
-                    <span wire:loading.remove wire:target="saveOrgCronMaintenance">{{ __('Save maintenance window') }}</span>
+                    <span wire:loading.remove wire:target="saveOrgCronMaintenance">{{ __('Save cron pause') }}</span>
                     <span wire:loading wire:target="saveOrgCronMaintenance">{{ __('Saving…') }}</span>
                 </x-primary-button>
                 @if ($server->organization?->cron_maintenance_until || filled($server->organization?->cron_maintenance_note))
@@ -73,7 +73,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-x-mark class="h-4 w-4" />
-                        {{ __('Clear window') }}
+                        {{ __('Clear pause') }}
                     </button>
                 @endif
             </div>

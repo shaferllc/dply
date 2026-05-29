@@ -1,11 +1,20 @@
 <section class="space-y-6">
-    <div class="dply-card p-6 sm:p-8">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Attach a custom domain') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('Point your own hostname (e.g. api.acme.com) at this function. If dply\'s DigitalOcean token owns the apex zone, the CNAME is written automatically. Otherwise dply gives you the exact CNAME target to publish at your own DNS provider, then verifies it.') }}
-        </p>
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domain') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attach a custom domain') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Point your own hostname (e.g. api.acme.com) at this function. If dply\'s DigitalOcean token owns the apex zone, the CNAME is written automatically. Otherwise dply gives you the exact CNAME target to publish at your own DNS provider, then verifies it.') }}
+                </p>
+            </div>
+        </div>
 
-        <form wire:submit.prevent="addCustomDomain" class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div class="px-6 py-6 sm:px-7">
+        <form wire:submit.prevent="addCustomDomain" class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <label class="flex-1 text-sm">
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Hostname') }}</span>
                 <input
@@ -26,23 +35,29 @@
                 <span wire:loading wire:target="addCustomDomain">{{ __('Attaching…') }}</span>
             </button>
         </form>
+        </div>
     </div>
 
-    <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-        <header class="flex flex-wrap items-baseline justify-between gap-3">
-            <div>
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Attached domains') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Each domain shows its provisioning mode and live DNS state. Manual-mode rows include the CNAME target you need to publish.') }}</p>
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attached domains') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each domain shows its provisioning mode and live DNS state. Manual-mode rows include the CNAME target you need to publish.') }}</p>
             </div>
-            <span class="text-xs text-brand-moss">{{ trans_choice('{0} no custom domains|{1} :count domain|[2,*] :count domains', count($customDomains), ['count' => count($customDomains)]) }}</span>
-        </header>
+            <span class="shrink-0 text-xs text-brand-moss">{{ trans_choice('{0} no custom domains|{1} :count domain|[2,*] :count domains', count($customDomains), ['count' => count($customDomains)]) }}</span>
+        </div>
 
+        <div class="px-6 py-6 sm:px-7">
         @if (empty($customDomains))
-            <div class="mt-4 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">
+            <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">
                 {{ __('No custom domains yet. Attach one above to route a hostname you control to this function.') }}
             </div>
         @else
-            <ul class="mt-4 divide-y divide-brand-ink/10">
+            <ul class="divide-y divide-brand-ink/10">
                 @foreach ($customDomains as $domain)
                     <li class="py-4" wire:key="domain-{{ $domain['hostname'] }}">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -116,6 +131,7 @@
                 @endforeach
             </ul>
         @endif
+        </div>
     </div>
 
     <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-6 text-sm text-brand-moss">

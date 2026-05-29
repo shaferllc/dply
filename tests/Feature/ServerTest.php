@@ -2222,7 +2222,7 @@ test('server show settings tab renders', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'alerts'])
-        ->assertSee('Maintenance window');
+        ->assertSee('Preferred maintenance schedule');
 
     Livewire::actingAs($user)
         ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'export'])

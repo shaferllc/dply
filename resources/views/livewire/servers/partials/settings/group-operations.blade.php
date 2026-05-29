@@ -12,10 +12,10 @@
                 <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
-                <h2 id="settings-group-ops-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Maintenance window') }}</h2>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
+                <h2 id="settings-group-ops-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('When you prefer disruptive work (upgrades, reboots). Times use your Dply timezone preference in the “Timezone & notes” section below, not the server OS clock.') }}
+                    {{ __('Advisory only — the days and hours you\'d prefer Dply to run disruptive work (upgrades, reboots). Dply uses it to warn before risky actions; it doesn\'t pause cron or suspend sites. Times use your Dply timezone preference from the Connection settings tab, not the server OS clock.') }}
                 </p>
             </div>
         </div>
@@ -70,7 +70,7 @@
             </div>
             @if ($this->canEditServerSettings)
                 <div class="flex justify-end">
-                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save maintenance window') }}</x-primary-button>
+                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save preferred schedule') }}</x-primary-button>
                 </div>
             @endif
         </form>

@@ -25,17 +25,22 @@
 
 <div class="space-y-6">
     {{-- 1. Execution profile — what the function is and how it's invoked. --}}
-    <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-5">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.') }}</p>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Function') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Execution profile') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Detected when the artifact is built. Runtime, entrypoint, and build command are edited on the Repository tab.') }}</p>
             </div>
             <a href="{{ route('sites.repository', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50">
                 {{ __('Repository') }} →
             </a>
         </div>
 
+        <div class="px-6 py-6 sm:px-7 space-y-5">
         <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                 <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Runtime') }}</dt>
@@ -88,15 +93,23 @@
                 </div>
             </div>
         @endif
+        </div>
     </section>
 
     {{-- 2. Resource limits — the editable control surface. --}}
-    <form wire:submit="saveServerlessRuntime" class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
-        <div>
-            <h2 class="text-base font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('How much the function gets per invocation. These are pushed to the action on the next deploy.') }}</p>
+    <form wire:submit="saveServerlessRuntime" class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Limits') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resource limits') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('How much the function gets per invocation. These are pushed to the action on the next deploy.') }}</p>
+            </div>
         </div>
 
+        <div class="px-6 py-6 sm:px-7 space-y-6">
         @if ($pendingRedeploy)
             <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 <p>{{ __('Saved limits differ from what is live (:mem MB · :to · concurrency :cc). Redeploy to apply them.', [
@@ -154,14 +167,19 @@
                 <span wire:loading wire:target="saveServerlessRuntime">{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>
+        </div>
     </form>
 
     {{-- 3. Cold starts — keep-warm is owned by the Workers tab; surface its state here. --}}
-    <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Cold starts') }}</h2>
-                <p class="mt-1 text-sm text-brand-moss">
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Latency') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cold starts') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Keep-warm is currently') }}
                     <span class="font-semibold {{ $keepWarm ? 'text-brand-forest' : 'text-brand-ink' }}">{{ $keepWarm ? __('on') : __('off') }}</span>.
                     {{ $keepWarm

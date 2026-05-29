@@ -10,17 +10,32 @@
 @endphp
 
 @if (! $site->isRailsFrameworkDetected())
-    <section class="space-y-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Rails') }}</h2>
-        <p class="text-sm text-brand-moss">{{ __('This section appears when your site is detected as a Ruby on Rails application from repository inspection.') }}</p>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Framework') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Rails') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when your site is detected as a Ruby on Rails application from repository inspection.') }}</p>
+            </div>
+        </div>
     </section>
 @else
-    <section class="space-y-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-        <header>
-            <h2 class="text-base font-semibold text-brand-ink">{{ __('Rails') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Background workers, scheduled jobs, and real-time channels for this Rails site.') }}</p>
-        </header>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Framework') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Rails') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Background workers, scheduled jobs, and real-time channels for this Rails site.') }}</p>
+            </div>
+        </div>
 
+        <div class="space-y-6 px-6 py-6 sm:px-7">
         {{-- Sidekiq quick-add (the only one with a built-in supervisor preset today) --}}
         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-5">
             <div class="flex flex-wrap items-start justify-between gap-3">
@@ -56,6 +71,7 @@
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('See and manage every queue / background worker scoped to this site.') }}</p>
                 <a href="{{ $queueWorkersUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Open Queue workers') }} →</a>
             </div>
+        </div>
         </div>
     </section>
 @endif

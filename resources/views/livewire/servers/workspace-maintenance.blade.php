@@ -133,8 +133,8 @@
                             <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Preferred maintenance window') }}</h3>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Recurring local-time window for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Operations.') }}</p>
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
+                            <p class="mt-1 text-sm text-brand-moss">{{ __('Advisory recurring local-time schedule for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Alerts.') }}</p>
                         </div>
                     </div>
                 </div>

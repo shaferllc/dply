@@ -5,19 +5,23 @@
         \App\Models\SiteDeployHook::PHASE_AFTER_ACTIVATE => __('Runs once the function is live.'),
     ];
 @endphp
-<div class="dply-card p-6 sm:p-8 space-y-5">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Deploy hooks') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Custom build steps') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Shell that runs during this function\'s deploy — e.g. compile assets, warm caches, notify a service. A non-zero exit aborts the deploy.') }}</p>
+<div class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy hooks') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom build steps') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Shell that runs during this function\'s deploy — e.g. compile assets, warm caches, notify a service. A non-zero exit aborts the deploy.') }}</p>
         </div>
         <button type="button" wire:click="$toggle('formOpen')"
-                class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
+                class="ml-auto shrink-0 inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
             {{ $formOpen ? __('Cancel') : __('Add hook') }}
         </button>
     </div>
 
+    <div class="px-6 py-6 sm:px-7 space-y-5">
     @if ($formOpen)
         <form wire:submit="addHook" class="space-y-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
             <div class="flex flex-wrap gap-3">
@@ -82,5 +86,6 @@
                 @endif
             </div>
         @endforeach
+    </div>
     </div>
 </div>

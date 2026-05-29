@@ -1,11 +1,20 @@
 <section class="space-y-6">
-    <div class="dply-card p-6 sm:p-8">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Static response headers') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('Headers merged onto every response the edge proxy returns. Useful for X-Frame-Options, Strict-Transport-Security, custom cache hints, etc. Content-Type, Cache-Control, and Location are reserved — set those in your function.') }}
-        </p>
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Headers') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Static response headers') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Headers merged onto every response the edge proxy returns. Useful for X-Frame-Options, Strict-Transport-Security, custom cache hints, etc. Content-Type, Cache-Control, and Location are reserved — set those in your function.') }}
+                </p>
+            </div>
+        </div>
 
-        <form wire:submit.prevent="addHeader" class="mt-5 grid gap-3 sm:grid-cols-12">
+        <div class="px-6 py-6 sm:px-7">
+        <form wire:submit.prevent="addHeader" class="grid gap-3 sm:grid-cols-12">
             <label class="sm:col-span-4 text-sm">
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Name') }}</span>
                 <input
@@ -37,7 +46,7 @@
         </form>
 
         @if (! empty($headers))
-            <ul class="mt-5 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10">
+            <ul class="mt-4 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10">
                 @foreach ($headers as $index => $header)
                     <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-2" wire:key="header-{{ $index }}">
                         <div class="min-w-0 flex-1 font-mono text-xs">
@@ -55,15 +64,25 @@
                 @endforeach
             </ul>
         @endif
+        </div>
     </div>
 
-    <div class="dply-card p-6 sm:p-8">
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('CORS policy') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">
-            {{ __('When enabled, the proxy short-circuits OPTIONS preflights and decorates real responses with the CORS headers you configure.') }}
-        </p>
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('CORS') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('CORS policy') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('When enabled, the proxy short-circuits OPTIONS preflights and decorates real responses with the CORS headers you configure.') }}
+                </p>
+            </div>
+        </div>
 
-        <form wire:submit.prevent="saveCors" class="mt-5 space-y-4">
+        <div class="px-6 py-6 sm:px-7">
+        <form wire:submit.prevent="saveCors" class="space-y-4">
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Enable CORS handling at the edge') }}</p>
@@ -140,5 +159,6 @@
                 </button>
             </div>
         </form>
+        </div>
     </div>
 </section>

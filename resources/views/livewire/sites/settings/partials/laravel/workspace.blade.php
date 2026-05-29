@@ -75,9 +75,18 @@
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif
 
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-5">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Preset commands') }}</h3>
-                <div class="mt-4 space-y-4">
+            <div class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Presets') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preset commands') }}</h3>
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                <div class="space-y-4">
                     @foreach ($presetCategories as $category => $commands)
                         @if (is_array($commands) && $commands !== [])
                             <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
@@ -97,56 +106,82 @@
                         @endif
                     @endforeach
                 </div>
+                </div>
             </div>
 
-            <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Discovered Artisan commands') }}</h3>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('From `php artisan list` on the app (cached). Run only preset or saved custom commands.') }}</p>
+            <div class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Discovery') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Discovered Artisan commands') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('From `php artisan list` on the app (cached). Run only preset or saved custom commands.') }}</p>
                     </div>
                     <button
                         type="button"
                         wire:click="loadLaravelArtisanDiscovery(true)"
-                        class="text-sm font-medium text-brand-forest underline"
+                        class="shrink-0 text-sm font-medium text-brand-forest underline"
                     >
                         {{ __('Refresh') }}
                     </button>
                 </div>
+                <div class="px-6 py-6 sm:px-7">
                 @if (! empty($laravel_artisan_discovery['ok']))
-                    <ul class="mt-4 max-h-64 overflow-y-auto rounded-lg border border-brand-ink/10 bg-slate-50/80 p-3 font-mono text-[11px] text-brand-ink">
+                    <ul class="max-h-64 overflow-y-auto rounded-lg border border-brand-ink/10 bg-slate-50/80 p-3 font-mono text-[11px] text-brand-ink">
                         @foreach (array_slice($laravel_artisan_discovery['commands'] ?? [], 0, 400) as $row)
                             <li class="py-0.5">{{ $row['name'] ?? '' }}@if (! empty($row['description']))<span class="text-brand-moss"> — {{ $row['description'] }}</span>@endif</li>
                         @endforeach
                     </ul>
                 @elseif (! empty($laravel_artisan_discovery['error']))
-                    <p class="mt-3 text-sm text-amber-800">{{ $laravel_artisan_discovery['error'] }}</p>
+                    <p class="text-sm text-amber-800">{{ $laravel_artisan_discovery['error'] }}</p>
                 @else
-                    <p class="mt-3 text-sm text-brand-moss">{{ __('Load discovery with Refresh, or open this tab again.') }}</p>
+                    <p class="text-sm text-brand-moss">{{ __('Load discovery with Refresh, or open this tab again.') }}</p>
                 @endif
+                </div>
             </div>
 
-            <form wire:submit="saveLaravelCustomCommands" class="space-y-3 rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom commands') }}</h3>
-                <p class="text-xs text-brand-moss">{{ __('One Artisan tail per line (e.g. `migrate --force`). These appear as runnable alongside presets.') }}</p>
+            <form wire:submit="saveLaravelCustomCommands" class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Custom') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom commands') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('One Artisan tail per line (e.g. `migrate --force`). These appear as runnable alongside presets.') }}</p>
+                    </div>
+                </div>
+                <div class="space-y-3 px-6 py-6 sm:px-7">
                 <textarea
                     wire:model="laravel_custom_commands_text"
                     rows="5"
-                    class="mt-2 w-full rounded-lg border border-slate-300 font-mono text-sm shadow-sm"
+                    class="w-full rounded-lg border border-slate-300 font-mono text-sm shadow-sm"
                     placeholder="migrate --force"
                 ></textarea>
                 <x-input-error :messages="$errors->get('laravel_custom_commands_text')" class="mt-1" />
                 <x-primary-button type="submit">{{ __('Save custom commands') }}</x-primary-button>
+                </div>
             </form>
 
             @if ($canLaravelSshSetup ?? false)
-                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-5">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Remote setup (SSH)') }}</h3>
-                    <p class="mt-2 text-sm text-brand-moss">{{ __('One-shot Composer and install steps on the server.') }}</p>
+                <div class="dply-card overflow-hidden">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Setup') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Remote setup (SSH)') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('One-shot Composer and install steps on the server.') }}</p>
+                        </div>
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
                     @if ($laravel_ssh_setup_error ?? null)
-                        <p class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_ssh_setup_error }}</p>
+                        <p class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_ssh_setup_error }}</p>
                     @endif
-                    <div class="mt-4 flex flex-wrap gap-2">
+                    <div class="flex flex-wrap gap-2">
                         @foreach ($allowedSshActions as $action)
                             @php
                                 $label = match ($action) {
@@ -165,6 +200,7 @@
                                 {{ $label }}
                             </button>
                         @endforeach
+                    </div>
                     </div>
                 </div>
             @endif
@@ -216,29 +252,49 @@
             @if ($laravel_console_error)
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $laravel_console_error }}</p>
             @endif
-            <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Tail Laravel log (remote)') }}</h3>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Streams `storage/logs/laravel.log` via SSH or your local container runtime.') }}</p>
-                <div class="mt-4 flex flex-wrap items-end gap-3">
+            <div class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Tail Laravel log (remote)') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Streams `storage/logs/laravel.log` via SSH or your local container runtime.') }}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                <div class="flex flex-wrap items-end gap-3">
                     <div>
                         <x-input-label for="laravel_log_tail_lines" :value="__('Lines')" />
                         <x-text-input id="laravel_log_tail_lines" type="number" wire:model="laravel_log_tail_lines" class="mt-1 block w-28 font-mono text-sm" min="50" max="5000" />
                     </div>
                     <x-primary-button type="button" wire:click="runLaravelApplicationLogTail">{{ __('Tail log') }}</x-primary-button>
                 </div>
+                </div>
             </div>
 
             @if ($execProfile === 'vm_ssh')
-                <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Log viewer') }}</h3>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Same viewer as Site logs — Laravel and Horizon files when available.') }}</p>
-                    <div class="mt-4">
+                <div class="dply-card overflow-hidden">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Log viewer') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Same viewer as Site logs — Laravel and Horizon files when available.') }}</p>
+                        </div>
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
+                    <div>
                         <livewire:sites.site-log-viewer
                             :server="$server"
                             :site="$site"
                             :preferred-log-key="$laravelLogKey"
                             wire:key="laravel-workspace-log-{{ $site->id }}"
                         />
+                    </div>
                     </div>
                 </div>
             @else
@@ -249,11 +305,21 @@
 
     @if ($laravel_tab === 'setup')
         <div class="space-y-6">
-            <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Scheduler & automation') }}</h3>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('Add a per-minute cron entry on the server for `php artisan schedule:run` when you use Laravel’s scheduler.') }}</p>
-                <a href="{{ $cronUrl }}" wire:navigate class="mt-3 inline-flex text-sm font-medium text-brand-forest underline">{{ __('Cron jobs for this site') }}</a>
+            <div class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Automation') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scheduler & automation') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Add a per-minute cron entry on the server for `php artisan schedule:run` when you use Laravel’s scheduler.') }}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                <a href="{{ $cronUrl }}" wire:navigate class="inline-flex text-sm font-medium text-brand-forest underline">{{ __('Cron jobs for this site') }}</a>
                 <a href="{{ $cronAllServerUrl }}" wire:navigate class="mt-2 ml-0 block text-xs font-medium text-brand-moss underline hover:text-brand-ink">{{ __('All cron jobs on server') }}</a>
+                </div>
             </div>
 
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">

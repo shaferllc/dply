@@ -1,9 +1,16 @@
-<section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8 space-y-6">
-    <div>
-        <h2 class="text-base font-semibold text-brand-ink">{{ __('Static runtime') }}</h2>
-        <p class="mt-1 text-sm text-brand-moss">{{ __('Static-site runtime settings. Set the directory the web server publishes after a build.') }}</p>
+<section class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Static') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Static runtime') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Static-site runtime settings. Set the directory the web server publishes after a build.') }}</p>
+        </div>
     </div>
 
+    <div class="px-6 py-6 sm:px-7 space-y-6">
     <form wire:submit="saveRuntimePreferences" class="space-y-6">
         <div>
             <x-input-label for="runtime_settings_document_root" :value="__('Web directory / published path')" />
@@ -16,6 +23,7 @@
             <x-primary-button type="submit">{{ __('Save static runtime settings') }}</x-primary-button>
         </div>
     </form>
+    </div>
 </section>
 
 <x-cli-snippet :commands="[

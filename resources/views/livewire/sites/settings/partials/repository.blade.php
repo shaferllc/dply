@@ -14,14 +14,15 @@
 <div class="space-y-6">
     {{-- Repository configuration: branch, provider, source-control account, URL. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-code-bracket-square class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Branch, remote URL, and Git provider context. Changing the URL updates what Dply clones.') }}
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -138,14 +139,15 @@
 
     {{-- Quick deploy webhook toggle. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-bolt class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Register a push webhook with your Git provider. Only the sync group leader registers an external webhook; peers deploy via coordination.') }}
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -189,14 +191,15 @@
 
     {{-- Synchronized deploy group. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Group sites that share a repository so one push or coordinated manual deploy can update multiple destinations.') }}
                     </p>
                 </div>
@@ -284,14 +287,15 @@
 
     {{-- After-deploy health pointer. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-shield-check class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Atomic deploys can verify HTTP health before traffic switches. Failed deployments also trigger notification subscriptions when configured.') }}
                     </p>
                 </div>
@@ -309,14 +313,15 @@
 
     {{-- Inbound deploy webhook URL + secret rotation. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-arrow-down-on-square class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Optional IP allow list is under Notifications.') }}
                     </p>
                 </div>
@@ -371,15 +376,16 @@
     </section>
 
     {{-- Danger zone. --}}
-    <section class="dply-card overflow-hidden border-rose-200/70 bg-rose-50/40">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <section class="dply-card overflow-hidden border-rose-200">
+        <div class="flex flex-col gap-4 border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 sm:inline-flex">
-                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" />
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-rose-900/80">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
+                    <h2 class="mt-0.5 text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-rose-900/80">
                         {{ __('Remove the deployed repository tree on the server without deleting this site in Dply.') }}
                     </p>
                 </div>

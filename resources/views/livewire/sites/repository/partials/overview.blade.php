@@ -1,12 +1,12 @@
 <section class="space-y-6">
     <div class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sage/15 text-brand-forest ring-brand-sage/25">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $providerKind !== '' ? ucfirst($providerKind) : __('Repository') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $providerKind !== '' ? ucfirst($providerKind) : __('Repository') }}</p>
                     <h2 class="mt-0.5 truncate text-base font-semibold text-brand-ink">
                         {{ $overviewCommits['remote_label'] ?? ($currentRepositoryUrl ?: __('No repository connected')) }}
                     </h2>
@@ -31,22 +31,22 @@
     </div>
 
     <div class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-sky-50 text-sky-700 ring-sky-200">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('History') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent commits') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Latest five commits on the viewed branch. See the dedicated Commits page for the full history.') }}</p>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Latest five commits on the viewed branch. See the dedicated Commits page for the full history.') }}</p>
                 </div>
             </div>
             <a href="{{ route('sites.commits', ['server' => $server, 'site' => $site]) }}" wire:navigate
                class="shrink-0 text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('See all →') }}</a>
         </div>
 
-        <div class="p-6 sm:p-8">
+        <div class="px-6 py-6 sm:px-7">
             @if (! ($overviewCommits['ok'] ?? false))
                 <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
                     {{ $overviewCommits['error'] ?? __('Could not load commits.') }}
@@ -85,15 +85,15 @@
     </div>
 
     <div class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-violet-50 text-violet-700 ring-violet-200">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                     <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Docs') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Docs') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('README') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Rendered from the branch root. Markdown only — other formats display as plain text.') }}</p>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Rendered from the branch root. Markdown only — other formats display as plain text.') }}</p>
                 </div>
             </div>
             @if (! empty($overviewReadme['name']))
@@ -101,7 +101,7 @@
             @endif
         </div>
 
-        <div class="p-6 sm:p-8">
+        <div class="px-6 py-6 sm:px-7">
             @if ($overviewReadme === null)
                 <div class="text-sm text-brand-moss">{{ __('Sign in to load the README.') }}</div>
             @elseif (! ($overviewReadme['ok'] ?? false))

@@ -66,10 +66,14 @@
             @endif
 
             <section class="dply-card overflow-hidden">
-                <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between sm:p-8">
-                    <div class="min-w-0 flex-1">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Run the scheduler every minute') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scheduler') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run the scheduler every minute') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('When enabled, dply invokes the function in scheduler mode every minute. Use this for Laravel `schedule:run`, periodic queue draining, or any one-minute-cadence job. Future versions will let you define multiple named cron rules here.') }}
                         </p>
                         @if ($lastTickAt)
@@ -105,15 +109,19 @@
                 $latestSchedule = $scheduleHistory->first();
             @endphp
             @if ($latestSchedule)
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                    <header class="flex flex-wrap items-baseline justify-between gap-3">
-                        <div>
-                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Latest output') }}</h2>
-                            <p class="mt-1 text-xs text-brand-moss">
+                <section class="dply-card overflow-hidden">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Output') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Latest output') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                 {{ __('Most recent scheduler invocation — the function\'s response body, captured by the tick command. Refreshes every 15 seconds.') }}
                             </p>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                        <div class="flex shrink-0 flex-wrap items-center gap-2 text-xs">
                             <span @class([
                                 'inline-flex items-center rounded-full px-2 py-0.5 font-semibold uppercase tracking-[0.12em]',
                                 'bg-emerald-100 text-emerald-900' => ($latestSchedule['status'] ?? '') === 'ok',
@@ -125,35 +133,42 @@
                             <span class="font-mono text-brand-moss">{{ (int) ($latestSchedule['duration_ms'] ?? 0) }}ms</span>
                             <span class="text-brand-moss" title="{{ $latestSchedule['at'] ?? '' }}">{{ \Illuminate\Support\Carbon::parse($latestSchedule['at'])->diffForHumans() }}</span>
                         </div>
-                    </header>
-                    @if (! empty($latestSchedule['error']))
-                        <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
-                            <p class="font-semibold">{{ __('Error') }}</p>
-                            <p class="mt-1 font-mono">{{ $latestSchedule['error'] }}</p>
-                        </div>
-                    @endif
-                    @php($body = trim((string) ($latestSchedule['body_preview'] ?? '')))
-                    @if ($body !== '')
-                        <pre class="mt-4 max-h-[28rem] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $body }}</pre>
-                    @else
-                        <p class="mt-4 text-xs text-brand-moss">{{ __('No response body captured.') }}</p>
-                    @endif
+                    </div>
+                    <div class="px-6 py-6 sm:px-7">
+                        @if (! empty($latestSchedule['error']))
+                            <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                                <p class="font-semibold">{{ __('Error') }}</p>
+                                <p class="mt-1 font-mono">{{ $latestSchedule['error'] }}</p>
+                            </div>
+                        @endif
+                        @php($body = trim((string) ($latestSchedule['body_preview'] ?? '')))
+                        @if ($body !== '')
+                            <pre class="@if (! empty($latestSchedule['error'])) mt-4 @endif max-h-[28rem] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $body }}</pre>
+                        @else
+                            <p class="@if (! empty($latestSchedule['error'])) mt-4 @endif text-xs text-brand-moss">{{ __('No response body captured.') }}</p>
+                        @endif
+                    </div>
                 </section>
             @endif
 
-            <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <header class="flex flex-wrap items-baseline justify-between gap-3">
-                    <div>
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Firing history') }}</h2>
-                        <p class="mt-1 text-xs text-brand-moss">
+            <section class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Firing history') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                             {{ __('Last 50 scheduler ticks. Newest first. Click a row to see its full output.') }}
                         </p>
                     </div>
-                    <span class="text-xs text-brand-moss">{{ trans_choice('{0} no ticks yet|{1} :count tick recorded|[2,*] :count ticks recorded', $scheduleHistory->count(), ['count' => $scheduleHistory->count()]) }}</span>
-                </header>
+                    <span class="shrink-0 text-xs text-brand-moss">{{ trans_choice('{0} no ticks yet|{1} :count tick recorded|[2,*] :count ticks recorded', $scheduleHistory->count(), ['count' => $scheduleHistory->count()]) }}</span>
+                </div>
 
+                <div class="px-6 py-6 sm:px-7">
                 @if ($scheduleHistory->isEmpty())
-                    <div class="mt-4 rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">
+                    <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">
                         @if ($scheduler_enabled)
                             {{ __('No ticks recorded yet. dply runs the tick command every minute — the first row should land within ~60 seconds.') }}
                         @else
@@ -161,7 +176,7 @@
                         @endif
                     </div>
                 @else
-                    <div class="mt-4 overflow-x-auto">
+                    <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                             <thead class="text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">
                                 <tr>
@@ -209,6 +224,7 @@
                         </table>
                     </div>
                 @endif
+                </div>
             </section>
 
             <section class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-6 text-sm text-brand-moss">

@@ -14,8 +14,8 @@
                     <x-heroicon-o-wrench class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Maintenance') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron maintenance window active') }}</h3>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Cron pause') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron pause active') }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Managed cron lines are not installed on servers until :time.', ['time' => $server->organization->cron_maintenance_until->timezone(config('app.timezone'))->format('Y-m-d H:i T')]) }}
                         @if (filled($server->organization->cron_maintenance_note))
@@ -164,7 +164,7 @@
                 <x-server-workspace-tab id="cron-tab-maintenance" :active="$cron_workspace_tab === 'maintenance'" wire:click="setCronWorkspaceTab('maintenance')">
                     <span class="inline-flex items-center gap-1.5">
                         <x-heroicon-o-wrench class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Maintenance') }}
+                        {{ __('Cron pause') }}
                     </span>
                 </x-server-workspace-tab>
             @endif
