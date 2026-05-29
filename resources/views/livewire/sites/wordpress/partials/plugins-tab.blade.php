@@ -32,6 +32,26 @@
         </div>
     </div>
 
+    @if ($canMutate)
+        <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-6 py-3">
+            <div class="min-w-0 flex-1">
+                <x-input-label for="wp_plugin_install" :value="__('Install plugin (wp.org slug)')" class="text-[11px]" />
+                <x-text-input id="wp_plugin_install" wire:model="pluginInstallSlug" wire:keydown.enter="installPlugin" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="wordpress-seo" />
+            </div>
+            <button
+                type="button"
+                wire:click="installPlugin"
+                wire:loading.attr="disabled"
+                wire:target="installPlugin"
+                class="inline-flex h-10 items-center gap-1.5 rounded-md bg-brand-forest px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink disabled:opacity-60"
+            >
+                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                <span wire:loading.remove wire:target="installPlugin">{{ __('Install & activate') }}</span>
+                <span wire:loading wire:target="installPlugin">{{ __('Queueing…') }}</span>
+            </button>
+        </div>
+    @endif
+
     @if (! $pluginsLoaded)
         <div wire:init="loadPlugins" class="flex items-center justify-center gap-2 px-6 py-12 text-sm text-brand-moss">
             <x-spinner variant="forest" size="sm" />
@@ -93,6 +113,9 @@
                                             <button type="button" wire:click="deactivatePlugin(@js($plugin['name']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Deactivate') }}</button>
                                         @else
                                             <button type="button" wire:click="activatePlugin(@js($plugin['name']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Activate') }}</button>
+                                        @endif
+                                        @if ($canDestroy)
+                                            <button type="button" wire:click="confirmDeletePlugin(@js($plugin['name']))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Delete') }}</button>
                                         @endif
                                     </div>
                                 @else

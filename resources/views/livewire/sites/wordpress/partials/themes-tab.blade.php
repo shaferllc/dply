@@ -18,6 +18,26 @@
         @endif
     </div>
 
+    @if ($canMutate)
+        <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-6 py-3">
+            <div class="min-w-0 flex-1">
+                <x-input-label for="wp_theme_install" :value="__('Install theme (wp.org slug)')" class="text-[11px]" />
+                <x-text-input id="wp_theme_install" wire:model="themeInstallSlug" wire:keydown.enter="installTheme" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="twentytwentyfive" />
+            </div>
+            <button
+                type="button"
+                wire:click="installTheme"
+                wire:loading.attr="disabled"
+                wire:target="installTheme"
+                class="inline-flex h-10 items-center gap-1.5 rounded-md bg-brand-forest px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink disabled:opacity-60"
+            >
+                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                <span wire:loading.remove wire:target="installTheme">{{ __('Install') }}</span>
+                <span wire:loading wire:target="installTheme">{{ __('Queueing…') }}</span>
+            </button>
+        </div>
+    @endif
+
     @if (! $themesLoaded)
         <div wire:init="loadThemes" class="flex items-center justify-center gap-2 px-6 py-12 text-sm text-brand-moss">
             <x-spinner variant="forest" size="sm" />
@@ -66,6 +86,9 @@
                                         @unless ($active)
                                             <button type="button" wire:click="activateTheme(@js($theme['name']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Activate') }}</button>
                                         @endunless
+                                        @if ($canDestroy && ! $active)
+                                            <button type="button" wire:click="confirmDeleteTheme(@js($theme['name']))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Delete') }}</button>
+                                        @endif
                                     </div>
                                 @else
                                     <span class="text-xs text-brand-mist">{{ __('Read-only') }}</span>

@@ -306,5 +306,7 @@
         ['label' => __('List snapshots'), 'command' => 'dply:snapshot:list '.$site->slug],
         ['label' => __('Restore from snapshot'), 'command' => 'dply:snapshot:restore SNAPSHOT_ID --no-confirm'],
     ]" />
+
+    @include('livewire.partials.confirm-action-modal')
     @endif
 </div>

@@ -487,6 +487,114 @@ test('update core dispatches recoverable async command', function () {
     $run = RemoteCliRun::query()->where('command', 'core update')->sole();
     expect($run->args)->toBe([]);
 });
+test('install plugin dispatches plugin install with activate flag', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->set('pluginInstallSlug', 'wordpress-seo')
+        ->call('installPlugin')
+        ->assertSet('pluginInstallSlug', '');
+
+    $run = RemoteCliRun::query()->where('command', 'plugin install')->sole();
+    expect($run->args)->toBe(['wordpress-seo', '--activate']);
+});
+test('install plugin rejects invalid slug without dispatching', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->set('pluginInstallSlug', 'bad slug; rm -rf /')
+        ->call('installPlugin')
+        ->assertHasErrors('plugins');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+});
+test('confirm delete plugin opens modal then deletes on confirm', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->call('confirmDeletePlugin', 'akismet')
+        ->assertSet('showConfirmActionModal', true)
+        ->assertSet('confirmActionModalMethod', 'deletePlugin');
+
+    // Nothing runs until the modal is confirmed.
+    expect(RemoteCliRun::query()->count())->toBe(0);
+
+    $component->call('confirmActionModal')
+        ->assertSet('showConfirmActionModal', false);
+
+    $run = RemoteCliRun::query()->where('command', 'plugin delete')->sole();
+    expect($run->args)->toBe(['akismet']);
+});
+test('delete plugin is blocked for member role by the destructive gate', function () {
+    [$user, $site] = makeWpSite(userRole: 'member');
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->call('deletePlugin', 'akismet');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+});
+test('install theme dispatches theme install', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'themes')
+        ->set('themeInstallSlug', 'twentytwentyfive')
+        ->call('installTheme')
+        ->assertSet('themeInstallSlug', '');
+
+    $run = RemoteCliRun::query()->where('command', 'theme install')->sole();
+    expect($run->args)->toBe(['twentytwentyfive']);
+});
+test('confirm delete theme deletes on confirm', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'themes')
+        ->call('confirmDeleteTheme', 'twentytwentythree')
+        ->assertSet('confirmActionModalMethod', 'deleteTheme')
+        ->call('confirmActionModal');
+
+    $run = RemoteCliRun::query()->where('command', 'theme delete')->sole();
+    expect($run->args)->toBe(['twentytwentythree']);
+});
 test('list action buttons hidden for member role', function () {
     [$user, $site] = makeWpSite(userRole: 'member');
 

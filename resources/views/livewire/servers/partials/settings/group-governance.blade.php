@@ -11,13 +11,6 @@
 @endphp
 
 <section id="settings-group-governance" class="space-y-6" aria-labelledby="settings-group-governance-title">
-    @include('livewire.servers.partials.settings._intro', [
-        'headingId' => 'settings-group-governance-title',
-        'kicker' => __('Governance'),
-        'title' => __('Cost, environment & backups'),
-        'description' => __('Stack estimates, finance notes, compliance labels, and recovery documentation. Estimates are not invoiced amounts — save cost notes below to improve provider lines.'),
-    ])
-
     @if (! empty($costReport))
         @include('livewire.servers.partials.settings.cost-card-estimate', [
             'card' => $card,
@@ -26,7 +19,19 @@
         ])
     @endif
 
-    <div id="settings-cost" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
+    <div id="settings-cost" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cost') }}</p>
+                <h2 id="settings-group-governance-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cost, environment & backups') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stack estimates, finance notes, compliance labels, and recovery documentation. Estimates are not invoiced amounts — save cost notes below to improve provider lines.') }}</p>
+            </div>
+        </div>
+
+        <div class="px-6 py-6 sm:px-7">
         <h3 class="text-base font-semibold text-brand-ink">{{ __('Cost & lifecycle') }}</h3>
         <p class="mt-2 text-sm text-brand-moss leading-relaxed">
             {{ __('Rough costs and renewal reminders for your team. Pull the catalog price from your provider when supported, or type your own number — for example a negotiated annual commit, a parent-account sub-allocation, or a chargeback total that includes data transfer.') }}
@@ -149,14 +154,22 @@
                 </div>
             @endif
         </form>
+        </div>
     </div>
 
-    <div id="settings-compliance" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Environment & compliance') }}</h3>
-        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-            {{ __('Classify the server for policy reviews. Labels are visible in Dply only unless you export them.') }}
-        </p>
-        <form wire:submit="saveComplianceSettings" class="mt-6 grid gap-5 sm:grid-cols-2">
+    <div id="settings-compliance" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Compliance') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Environment & compliance') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Classify the server for policy reviews. Labels are visible in Dply only unless you export them.') }}</p>
+            </div>
+        </div>
+        <div class="px-6 py-6 sm:px-7">
+        <form wire:submit="saveComplianceSettings" class="grid gap-5 sm:grid-cols-2">
             <div>
                 <x-input-label for="settings-env-type" value="{{ __('Environment') }}" />
                 <select
@@ -224,14 +237,22 @@
                 </div>
             @endif
         </form>
+        </div>
     </div>
 
-    <div id="settings-backup" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('Backup & disaster recovery') }}</h3>
-        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-            {{ __('Describe how data is protected and how you would restore this host. Dply does not execute backups from these fields—they are for operators and auditors.') }}
-        </p>
-        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+    <div id="settings-backup" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-lifebuoy class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recovery') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backup & disaster recovery') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Describe how data is protected and how you would restore this host. Dply does not execute backups from these fields—they are for operators and auditors.') }}</p>
+            </div>
+        </div>
+        <div class="px-6 py-6 sm:px-7">
+        <p class="text-sm text-brand-moss leading-relaxed">
             {{ __('Treat this card as the index card on-call reaches for at 3 a.m.: a one-paragraph summary of how backups work, the targets you are committing to, and a link to the full recovery steps.') }}
         </p>
 
@@ -361,5 +382,6 @@
                 </div>
             </div>
         </details>
+        </div>
     </div>
 </section>

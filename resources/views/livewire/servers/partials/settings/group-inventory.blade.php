@@ -25,14 +25,19 @@
 @endphp
 
 <section id="settings-group-inventory" class="space-y-4" aria-labelledby="settings-group-inventory-title">
-    @include('livewire.servers.partials.settings._intro', [
-        'headingId' => 'settings-group-inventory-title',
-        'kicker' => __('Host'),
-        'title' => __('Inventory & provider snapshot'),
-        'description' => __('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.'),
-    ])
+    <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inventory') }}</p>
+                <h2 id="settings-group-inventory-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inventory & provider snapshot') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.') }}</p>
+            </div>
+        </div>
 
-    <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden p-6 sm:p-8">
+        <div class="px-6 py-6 sm:px-7">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="max-w-2xl">
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
@@ -270,5 +275,6 @@
                 >{{ $extSnap }}</pre>
             </div>
         @endif
+        </div>
     </div>
 </section>

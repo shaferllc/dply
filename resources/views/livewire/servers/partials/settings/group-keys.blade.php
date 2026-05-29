@@ -64,38 +64,40 @@
 @endphp
 
 <section id="settings-group-keys" class="space-y-6" aria-labelledby="settings-group-keys-title">
-    @include('livewire.servers.partials.settings._intro', [
-        'headingId' => 'settings-group-keys-title',
-        'kicker' => __('Access'),
-        'title' => __('SSH keys for this server'),
-        'description' => __('Two separate concerns: the public key this server uses for outbound connections (Git pulls, scripts), and the private keys Dply uses to SSH in. Private keys are encrypted at rest and never displayed.'),
-    ])
-
     {{-- Outbound: provisioned key for Git/scripts --}}
-    <div id="settings-keys-outbound" class="{{ $card }} scroll-mt-24 p-6 sm:p-8" x-data="{ copied: false, copiedFp: false }">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="max-w-2xl">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Outbound key (Git & scripts)') }}</h3>
-                <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Add this public key on Git hosts or other services that should trust outbound connections from this server. The matching private key never leaves Dply in plain form.') }}
-                </p>
-            </div>
-            @if ($serverPubInfo)
-                <div class="flex flex-wrap gap-1.5 text-xs">
-                    <span class="inline-flex items-center rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 font-medium text-brand-ink">
-                        {{ $typeLabels[$serverPubInfo['type']] ?? $serverPubInfo['type'] }}
-                    </span>
-                    @if ($serverPubInfo['comment'])
-                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-[11px] text-brand-moss">
-                            {{ $serverPubInfo['comment'] }}
-                        </span>
+    <div id="settings-keys-outbound" class="{{ $card }} scroll-mt-24" x-data="{ copied: false, copiedFp: false }">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keys') }}</p>
+                        <h2 id="settings-group-keys-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outbound key (Git & scripts)') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Add this public key on Git hosts or other services that should trust outbound connections from this server. The matching private key never leaves Dply in plain form.') }}
+                        </p>
+                    </div>
+                    @if ($serverPubInfo)
+                        <div class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="inline-flex items-center rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 font-medium text-brand-ink">
+                                {{ $typeLabels[$serverPubInfo['type']] ?? $serverPubInfo['type'] }}
+                            </span>
+                            @if ($serverPubInfo['comment'])
+                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-[11px] text-brand-moss">
+                                    {{ $serverPubInfo['comment'] }}
+                                </span>
+                            @endif
+                        </div>
                     @endif
                 </div>
-            @endif
+            </div>
         </div>
 
+        <div class="px-6 py-6 sm:px-7">
         @if ($serverPub)
-            <div class="mt-6 space-y-4">
+            <div class="space-y-4">
                 <div>
                     <x-input-label value="{{ __('Public key (OpenSSH)') }}" />
                     <div class="mt-1 flex gap-2">
@@ -155,20 +157,30 @@
                 </div>
             </div>
         @else
-            <p class="mt-6 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-moss">
+            <p class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm text-brand-moss">
                 {{ __('No provisioned key is available yet — SSH may still be provisioning. Refresh this page after the server is ready.') }}
             </p>
         @endif
+        </div>
     </div>
 
     {{-- Inbound: how Dply connects in --}}
-    <div id="settings-keys-inbound" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-base font-semibold text-brand-ink">{{ __('How Dply connects in') }}</h3>
-        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-            {{ __('Dply stores two encrypted private keys for this server. Neither is downloadable. Public-key fingerprints are shown so you can verify them against your server’s authorized_keys.') }}
-        </p>
+    <div id="settings-keys-inbound" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inbound') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How Dply connects in') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Dply stores two encrypted private keys for this server. Neither is downloadable. Public-key fingerprints are shown so you can verify them against your server’s authorized_keys.') }}
+                </p>
+            </div>
+        </div>
 
-        <dl class="mt-6 grid gap-4 sm:grid-cols-2">
+        <div class="px-6 py-6 sm:px-7">
+        <dl class="grid gap-4 sm:grid-cols-2">
             <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
                 <div class="flex items-center justify-between gap-2">
                     <dt class="text-sm font-semibold text-brand-ink">{{ __('Operational key') }}</dt>
@@ -251,5 +263,6 @@
                 </button>
             </div>
         @endif
+        </div>
     </div>
 </section>

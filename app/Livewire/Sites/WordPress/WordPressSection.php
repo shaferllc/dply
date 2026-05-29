@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\WordPress;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
@@ -35,6 +36,7 @@ use Livewire\Component;
  */
 class WordPressSection extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public Site $site;
@@ -60,6 +62,12 @@ class WordPressSection extends Component
     public array $plugins = [];
 
     public bool $pluginsLoaded = false;
+
+    /** Slug typed into the "Install plugin" box (wp.org slug or zip URL host). */
+    public string $pluginInstallSlug = '';
+
+    /** Slug typed into the "Install theme" box. */
+    public string $themeInstallSlug = '';
 
     /**
      * Themes-tab cache. Populated by loadThemes() from
@@ -269,17 +277,64 @@ class WordPressSection extends Component
      */
     public function activatePlugin(string $slug, WpCli $wpcli): void
     {
-        $this->runRecoverable($wpcli, 'plugin activate', $slug, 'plugins');
+        $this->runWpAction($wpcli, 'plugin activate', $slug, 'plugins');
     }
 
     public function deactivatePlugin(string $slug, WpCli $wpcli): void
     {
-        $this->runRecoverable($wpcli, 'plugin deactivate', $slug, 'plugins');
+        $this->runWpAction($wpcli, 'plugin deactivate', $slug, 'plugins');
     }
 
     public function updatePlugin(string $slug, WpCli $wpcli): void
     {
-        $this->runRecoverable($wpcli, 'plugin update', $slug, 'plugins');
+        $this->runWpAction($wpcli, 'plugin update', $slug, 'plugins');
+    }
+
+    /**
+     * Install a plugin by wp.org slug and activate it in one step
+     * (mutating-recoverable — any org member). The slug box is cleared
+     * on dispatch so the operator gets a clean field back.
+     */
+    public function installPlugin(WpCli $wpcli): void
+    {
+        $slug = trim($this->pluginInstallSlug);
+        if (! $this->isValidSlug($slug)) {
+            $this->addError('plugins', __('Enter a valid plugin slug (letters, numbers, dots, dashes).'));
+
+            return;
+        }
+
+        $this->runWpAction($wpcli, 'plugin install', $slug, 'plugins', ['--activate']);
+        $this->pluginInstallSlug = '';
+    }
+
+    /**
+     * Destructive — opens the shared confirm modal before deleting. The
+     * WpCli gate still enforces admin/owner at execution time; this is
+     * the UI guardrail so a click can't nuke a plugin without intent.
+     */
+    public function confirmDeletePlugin(string $slug): void
+    {
+        if (! $this->isValidSlug($slug)) {
+            $this->toastError(__('Invalid plugin name.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deletePlugin',
+            arguments: [$slug],
+            title: __('Delete plugin?'),
+            message: __('This permanently removes the plugin and its files. Deactivate instead if you only want to disable it — deletion cannot be undone from here.'),
+            confirmLabel: __('Delete plugin'),
+            destructive: true,
+            details: [['label' => __('Plugin'), 'value' => $slug, 'mono' => true]],
+        );
+    }
+
+    public function deletePlugin(string $slug, WpCli $wpcli): void
+    {
+        $this->runWpAction($wpcli, 'plugin delete', $slug, 'plugins');
     }
 
     /**
@@ -308,12 +363,49 @@ class WordPressSection extends Component
 
     public function activateTheme(string $slug, WpCli $wpcli): void
     {
-        $this->runRecoverable($wpcli, 'theme activate', $slug, 'themes');
+        $this->runWpAction($wpcli, 'theme activate', $slug, 'themes');
     }
 
     public function updateTheme(string $slug, WpCli $wpcli): void
     {
-        $this->runRecoverable($wpcli, 'theme update', $slug, 'themes');
+        $this->runWpAction($wpcli, 'theme update', $slug, 'themes');
+    }
+
+    public function installTheme(WpCli $wpcli): void
+    {
+        $slug = trim($this->themeInstallSlug);
+        if (! $this->isValidSlug($slug)) {
+            $this->addError('themes', __('Enter a valid theme slug (letters, numbers, dots, dashes).'));
+
+            return;
+        }
+
+        $this->runWpAction($wpcli, 'theme install', $slug, 'themes');
+        $this->themeInstallSlug = '';
+    }
+
+    public function confirmDeleteTheme(string $slug): void
+    {
+        if (! $this->isValidSlug($slug)) {
+            $this->toastError(__('Invalid theme name.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deleteTheme',
+            arguments: [$slug],
+            title: __('Delete theme?'),
+            message: __('This permanently removes the theme and its files. You cannot delete the active theme — activate another first. Deletion cannot be undone from here.'),
+            confirmLabel: __('Delete theme'),
+            destructive: true,
+            details: [['label' => __('Theme'), 'value' => $slug, 'mono' => true]],
+        );
+    }
+
+    public function deleteTheme(string $slug, WpCli $wpcli): void
+    {
+        $this->runWpAction($wpcli, 'theme delete', $slug, 'themes');
     }
 
     /**
@@ -394,7 +486,7 @@ class WordPressSection extends Component
 
     public function updateCore(WpCli $wpcli): void
     {
-        $this->runRecoverable($wpcli, 'core update', null, 'core');
+        $this->runWpAction($wpcli, 'core update', null, 'core');
     }
 
     /**
@@ -402,8 +494,10 @@ class WordPressSection extends Component
      * single slug arg) and surface the outcome as a toast. Slugs are
      * validated before they reach the shell-escaped WpCli layer so a
      * crafted row name can't smuggle extra arguments.
+     *
+     * @param  list<string>  $extraArgs
      */
-    private function runRecoverable(WpCli $wpcli, string $command, ?string $slug, string $errorBag): void
+    private function runWpAction(WpCli $wpcli, string $command, ?string $slug, string $errorBag, array $extraArgs = []): void
     {
         $args = [];
         if ($slug !== null) {
@@ -414,6 +508,7 @@ class WordPressSection extends Component
             }
             $args = [$slug];
         }
+        $args = array_merge($args, $extraArgs);
 
         try {
             $result = $wpcli->run($this->site, $command, $args, auth()->user());
