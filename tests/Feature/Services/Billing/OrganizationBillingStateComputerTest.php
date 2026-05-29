@@ -23,18 +23,17 @@ beforeEach(function () {
     $this->computer = app(OrganizationBillingStateComputer::class);
 });
 
-test('empty org returns base only', function () {
+test('empty org bills nothing on the free plan', function () {
     $org = Organization::factory()->create();
 
     $state = $this->computer->compute($org);
 
     expect($state->serverCount())->toBe(0);
-
-    // $15 base + no servers, no credit.
-    expect($state->monthlyTotalCents)->toBe(1500);
+    expect($state->planKey)->toBe('free');
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('classifies each ready server into its tier', function () {
+test('classifies each ready server into its tier and resolves the plan by count', function () {
     $org = Organization::factory()->create();
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 4, memMb: 8192);
     // M
@@ -50,8 +49,9 @@ test('classifies each ready server into its tier', function () {
     expect($state->tierQuantities['l'])->toBe(1);
     expect($state->tierQuantities['xs'])->toBe(1);
 
-    // $15 base + ($10 + $20 + $2) = $47 = 4700 cents
-    expect($state->monthlyTotalCents)->toBe(4700);
+    // 3 servers → Starter ($9 flat), size no longer matters.
+    expect($state->planKey)->toBe('starter');
+    expect($state->monthlyTotalCents)->toBe(900);
 });
 
 test('excludes non ready servers', function () {
@@ -62,14 +62,13 @@ test('excludes non ready servers', function () {
     makeServerWithSpecs($org, status: Server::STATUS_PENDING, cpuCount: 4, memMb: 8192);
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 2, memMb: 4096);
 
-    // S, only billable
+    // S, only billable — 1 server → Free plan.
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
     expect($state->tierQuantities['s'])->toBe(1);
-
-    // $15 base + $5 S server = $20
-    expect($state->monthlyTotalCents)->toBe(2000);
+    expect($state->planKey)->toBe('free');
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
 test('servers without metrics classify as xs', function () {
@@ -84,58 +83,62 @@ test('servers without metrics classify as xs', function () {
     expect($state->serverCount())->toBe(1);
     expect($state->tierQuantities['xs'])->toBe(1);
 
-    // Free entry tier: a single XS server waives the $15 base, so the org
-    // pays only the $2 XS tier.
-    expect($state->baseCents)->toBe(0);
-    expect($state->monthlyTotalCents)->toBe(200);
+    // A single server is the Free plan — $0.
+    expect($state->planKey)->toBe('free');
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('free entry tier waives base for a single xs server only', function () {
+test('a single server resolves to the free plan', function () {
     $org = Organization::factory()->create();
-    Server::factory()->create([
-        'organization_id' => $org->id,
-        'status' => Server::STATUS_READY,
-    ]);
+    makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 8, memMb: 16384);
 
+    // One large server still falls in the Free ceiling (1 server).
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->baseCents)->toBe(0);
-    expect($state->monthlyTotalCents)->toBe(200);
+    expect($state->planKey)->toBe('free');
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('free entry tier does not apply to a single larger server', function () {
-    $org = Organization::factory()->create();
-    makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 2, memMb: 4096);
-
-    // S — larger than XS, so the base is still due.
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['s'])->toBe(1);
-    expect($state->baseCents)->toBe(1500);
-
-    // $15 base + $5 S server = $20
-    expect($state->monthlyTotalCents)->toBe(2000);
-});
-
-test('free entry tier does not apply once a second server appears', function () {
+test('a second server moves the org onto the starter plan', function () {
     $org = Organization::factory()->create();
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
 
-    // Two XS servers — base re-applies.
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(2);
-    expect($state->tierQuantities['xs'])->toBe(2);
-    expect($state->baseCents)->toBe(1500);
+    expect($state->planKey)->toBe('starter');
+    expect($state->monthlyTotalCents)->toBe(900);
+});
 
-    // $15 base + 2 × $2 = $19
+test('four servers move the org onto the pro plan', function () {
+    $org = Organization::factory()->create();
+    foreach (range(1, 4) as $i) {
+        makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
+    }
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(4);
+    expect($state->planKey)->toBe('pro');
     expect($state->monthlyTotalCents)->toBe(1900);
 });
 
-test('free entry tier does not apply when a managed product is present', function () {
+test('eleven servers move the org onto the unlimited business plan', function () {
+    $org = Organization::factory()->create();
+    foreach (range(1, 11) as $i) {
+        makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
+    }
+
+    $state = $this->computer->compute($org->fresh());
+
+    expect($state->serverCount())->toBe(11);
+    expect($state->planKey)->toBe('business');
+    expect($state->monthlyTotalCents)->toBe(3900);
+});
+
+test('managed products are billed a la carte on top of the free plan', function () {
     Config::set('subscription.standard.edge_cents', 200);
     $org = Organization::factory()->create();
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
@@ -144,29 +147,11 @@ test('free entry tier does not apply when a managed product is present', functio
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['xs'])->toBe(1);
+    expect($state->planKey)->toBe('free');
     expect($state->edgeCount)->toBe(1);
-    expect($state->baseCents)->toBe(1500);
 
-    // $15 base + $2 XS + $2 edge = $19
-    expect($state->monthlyTotalCents)->toBe(1900);
-});
-
-test('free entry tier can be disabled by config', function () {
-    Config::set('subscription.standard.free_entry_tier', false);
-    $org = Organization::factory()->create();
-    Server::factory()->create([
-        'organization_id' => $org->id,
-        'status' => Server::STATUS_READY,
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverCount())->toBe(1);
-    expect($state->baseCents)->toBe(1500);
-
-    // Base restored: $15 + $2 XS = $17
-    expect($state->monthlyTotalCents)->toBe(1700);
+    // Free plan ($0) + $2 edge site = $2
+    expect($state->monthlyTotalCents)->toBe(200);
 });
 
 test('ignores servers from other organizations', function () {
@@ -177,7 +162,8 @@ test('ignores servers from other organizations', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(0);
-    expect($state->monthlyTotalCents)->toBe(1500);
+    expect($state->planKey)->toBe('free');
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
 test('excludes servers younger than min billable age', function () {
@@ -214,8 +200,9 @@ test('excludes servers younger than min billable age', function () {
     expect($state->serverCount())->toBe(1);
     expect($state->tierQuantities['m'])->toBe(1);
 
-    // $15 base + $10 M (the mature one only) = $25
-    expect($state->monthlyTotalCents)->toBe(2500);
+    // Only the mature server counts → 1 server → Free plan.
+    expect($state->planKey)->toBe('free');
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
 test('age threshold is inclusive at the boundary', function () {
@@ -254,7 +241,7 @@ test('serverless host is not counted as a spec tier', function () {
     // It would have classified as XS by null-fallback — must not.
     expect($state->serverCount())->toBe(0);
     expect($state->tierQuantities['xs'])->toBe(0);
-    expect($state->monthlyTotalCents)->toBe(1500);
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
 test('dply cloud and edge hosts are not counted as spec tiers', function () {
@@ -274,7 +261,7 @@ test('dply cloud and edge hosts are not counted as spec tiers', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(0);
-    expect($state->monthlyTotalCents)->toBe(1500);
+    expect($state->monthlyTotalCents)->toBe(0);
 });
 
 test('active dply cloud sites bill per app excluding previews', function () {
@@ -287,7 +274,8 @@ test('active dply cloud sites bill per app excluding previews', function () {
 
     expect($state->cloudCount)->toBe(1);
     expect($state->cloudSubtotalCents)->toBe(500);
-    expect($state->monthlyTotalCents)->toBe(2000);
+    // Free plan ($0, no billable servers) + 1 cloud app ($5) = $5
+    expect($state->monthlyTotalCents)->toBe(500);
 });
 
 test('active dply edge sites bill per site excluding previews', function () {
@@ -300,7 +288,8 @@ test('active dply edge sites bill per site excluding previews', function () {
 
     expect($state->edgeCount)->toBe(1);
     expect($state->edgeSubtotalCents)->toBe(200);
-    expect($state->monthlyTotalCents)->toBe(1700);
+    // Free plan ($0) + 1 edge site ($2) = $2
+    expect($state->monthlyTotalCents)->toBe(200);
 });
 
 test('edge delivery usage adds pass through subtotal when enabled', function () {
@@ -327,7 +316,8 @@ test('edge delivery usage adds pass through subtotal when enabled', function () 
     expect($state->edgeCount)->toBe(1);
     expect($state->edgeSubtotalCents)->toBe(200);
     expect($state->edgeUsageSubtotalCents)->toBe(200);
-    expect($state->monthlyTotalCents)->toBe(1900);
+    // Free plan ($0) + $2 edge site + $2 usage = $4
+    expect($state->monthlyTotalCents)->toBe(400);
 });
 
 test('active serverless functions bill per function', function () {
@@ -342,8 +332,8 @@ test('active serverless functions bill per function', function () {
     expect($state->serverlessCount)->toBe(3);
     expect($state->serverlessSubtotalCents)->toBe(600);
 
-    // $15 base + 3 × $2 = $21
-    expect($state->monthlyTotalCents)->toBe(2100);
+    // Free plan ($0, serverless hosts aren't billable servers) + 3 × $2 = $6
+    expect($state->monthlyTotalCents)->toBe(600);
 });
 
 test('non active functions are not billed', function () {

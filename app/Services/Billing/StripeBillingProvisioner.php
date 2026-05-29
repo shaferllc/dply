@@ -7,8 +7,8 @@ use Stripe\Product;
 use Stripe\StripeClient;
 
 /**
- * Idempotently creates the Stripe products and prices that back the Standard
- * plan committed in [[project_pricing_model]]. Looks objects up by
+ * Idempotently creates the Stripe products and prices that back the flat
+ * plan model in docs/PRICING_AND_REVENUE.md. Looks objects up by
  * `metadata.dply_role` before creating; re-running is a no-op once all roles
  * are present, and rotates anything that's drifted (price amounts, product
  * names/descriptions, the parent product an existing price points at).
@@ -16,29 +16,20 @@ use Stripe\StripeClient;
  * Each Stripe Checkout line item displays its Product's name, so to keep the
  * invoice readable we use *separate Products* for each kind of line item:
  *
- *   - `dply base` — the $15/mo organization fee
- *   - `dply server — XS` … `XL` — the per-server tier fees
+ *   - `dply Starter` / `dply Pro` / `dply Business` — the flat plan fees,
+ *     metered by BYO server count (Free has no Stripe object — a $0 plan
+ *     never creates a subscription)
+ *   - `dply Cloud app` / `dply Edge site` / `dply serverless function` —
+ *     managed products billed a la carte
  *   - `dply Enterprise` — sales-led
- *
- * Old installs that ran an earlier version of this provisioner had a single
- * "dply Standard" product with multiple prices under it. The product-role
- * constant for the base is kept as `standard_product` (its original value)
- * so the metadata lookup matches — the human-facing name/description rotate
- * via {@see upsertProduct}'s drift handling.
  */
 class StripeBillingProvisioner
 {
-    public const ROLE_BASE_PRODUCT = 'standard_product';
+    public const ROLE_PLAN_PRODUCT_PREFIX = 'standard_plan_product_';
 
-    public const ROLE_TIER_PRODUCT_PREFIX = 'standard_tier_product_';
+    public const ROLE_PLAN_PREFIX = 'standard_plan_';
 
-    public const ROLE_BASE_MONTHLY = 'standard_base_monthly';
-
-    public const ROLE_BASE_YEARLY = 'standard_base_yearly';
-
-    public const ROLE_TIER_PREFIX = 'standard_tier_';
-
-    public const ROLE_TIER_YEARLY_SUFFIX = '_yearly';
+    public const ROLE_PLAN_YEARLY_SUFFIX = '_yearly';
 
     public const ROLE_SERVERLESS_PRODUCT = 'standard_serverless_product';
 
@@ -64,14 +55,6 @@ class StripeBillingProvisioner
 
     public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
 
-    private const TIER_PRODUCT_INFO = [
-        'xs' => ['name' => 'dply server — XS', 'spec' => '≤1 vCPU · ≤2 GB'],
-        's' => ['name' => 'dply server — S', 'spec' => '2 vCPU · ≤4 GB'],
-        'm' => ['name' => 'dply server — M', 'spec' => '≤4 vCPU · ≤8 GB'],
-        'l' => ['name' => 'dply server — L', 'spec' => '≤8 vCPU · ≤16 GB'],
-        'xl' => ['name' => 'dply server — XL', 'spec' => 'Above L tier — capped'],
-    ];
-
     public function __construct(private StripeClient $stripe) {}
 
     /**
@@ -81,78 +64,46 @@ class StripeBillingProvisioner
     {
         $result = [];
 
-        // Base product — covers the org-level subscription fee. Existing
-        // installs may have this product still named "dply Standard"; the
-        // drift handler in upsertProduct will rename it to "dply base".
-        $baseProduct = $this->upsertProduct(
-            name: 'dply base',
-            description: 'dply organization base fee. Covers your dply account and the platform features that come with it: command-center console, credentials, deploys, metrics, audit, team management.',
-            role: self::ROLE_BASE_PRODUCT,
-        );
-        $result[self::ROLE_BASE_PRODUCT] = $baseProduct->id;
-
-        // Tier products — one per size so each Checkout line item carries a
-        // self-describing name. Created upfront so the price upserts below
-        // can point at the right parent product.
-        $tierProductIds = [];
-        foreach (self::TIER_PRODUCT_INFO as $tierKey => $info) {
-            $role = self::ROLE_TIER_PRODUCT_PREFIX.$tierKey;
-            $product = $this->upsertProduct(
-                name: $info['name'],
-                description: 'Per-server fee, '.$info['spec'].'. Same fee whether you run on DigitalOcean, Hetzner, AWS, or your own SSH box — dply prices its own work, not your provider invoice.',
-                role: $role,
-            );
-            $tierProductIds[$tierKey] = $product->id;
-            $result[$role] = $product->id;
-        }
-
         $standardConfig = (array) config('subscription.standard', []);
-        $baseCents = (int) ($standardConfig['base_cents'] ?? 1500);
         $annualPct = (int) ($standardConfig['annual_discount_pct'] ?? 20);
-        $tiers = (array) ($standardConfig['tiers'] ?? []);
+        $plans = (array) ($standardConfig['plans'] ?? []);
 
-        $result[self::ROLE_BASE_MONTHLY] = $this->upsertRecurringPrice(
-            productId: $baseProduct->id,
-            amount: $baseCents,
-            interval: 'month',
-            nickname: 'Base — Monthly',
-            role: self::ROLE_BASE_MONTHLY,
-        )->id;
-
-        $result[self::ROLE_BASE_YEARLY] = $this->upsertRecurringPrice(
-            productId: $baseProduct->id,
-            amount: $this->annualAmount($baseCents, $annualPct),
-            interval: 'year',
-            nickname: 'Base — Yearly',
-            role: self::ROLE_BASE_YEARLY,
-        )->id;
-
-        foreach (['xs', 's', 'm', 'l', 'xl'] as $tierKey) {
-            $amount = (int) ($tiers[$tierKey] ?? 0);
+        // One product + monthly/yearly price per *paid* plan. Free ($0) gets
+        // no Stripe object — a $0 plan never starts a subscription.
+        foreach ($plans as $planKey => $plan) {
+            $amount = (int) ($plan['price_cents'] ?? 0);
             if ($amount <= 0) {
                 continue;
             }
 
-            $tierProductId = $tierProductIds[$tierKey] ?? null;
-            if ($tierProductId === null) {
-                continue;
-            }
+            $label = (string) ($plan['label'] ?? ucfirst((string) $planKey));
+            $ceiling = $plan['max_servers'] ?? null;
+            $ceilingText = $ceiling === null
+                ? 'unlimited servers'
+                : 'up to '.$ceiling.' '.($ceiling === 1 ? 'server' : 'servers');
 
-            $monthlyRole = self::ROLE_TIER_PREFIX.$tierKey;
+            $product = $this->upsertProduct(
+                name: 'dply '.$label,
+                description: 'dply '.$label.' plan — flat monthly fee for '.$ceilingText.'. Metered by how many BYO servers dply manages, not their size; you pay your own provider for the hardware. Every feature is included; sites and team members are unlimited.',
+                role: self::ROLE_PLAN_PRODUCT_PREFIX.$planKey,
+            );
+            $result[self::ROLE_PLAN_PRODUCT_PREFIX.$planKey] = $product->id;
+
+            $monthlyRole = self::ROLE_PLAN_PREFIX.$planKey;
             $result[$monthlyRole] = $this->upsertRecurringPrice(
-                productId: $tierProductId,
+                productId: $product->id,
                 amount: $amount,
                 interval: 'month',
-                nickname: strtoupper($tierKey).' — Monthly',
+                nickname: $label.' — Monthly',
                 role: $monthlyRole,
             )->id;
 
-            $yearlyRole = $monthlyRole.self::ROLE_TIER_YEARLY_SUFFIX;
+            $yearlyRole = $monthlyRole.self::ROLE_PLAN_YEARLY_SUFFIX;
             $result[$yearlyRole] = $this->upsertRecurringPrice(
-                productId: $tierProductId,
+                productId: $product->id,
                 amount: $this->annualAmount($amount, $annualPct),
                 interval: 'year',
-                nickname: strtoupper($tierKey).' — Yearly',
+                nickname: $label.' — Yearly',
                 role: $yearlyRole,
             )->id;
         }
@@ -272,19 +223,8 @@ class StripeBillingProvisioner
      */
     public static function formatEnv(array $result): string
     {
-        $map = [
-            self::ROLE_BASE_MONTHLY => 'STRIPE_PRICE_STANDARD_BASE_MONTHLY',
-            self::ROLE_BASE_YEARLY => 'STRIPE_PRICE_STANDARD_BASE_YEARLY',
-            self::ROLE_TIER_PREFIX.'xs' => 'STRIPE_PRICE_STANDARD_TIER_XS',
-            self::ROLE_TIER_PREFIX.'s' => 'STRIPE_PRICE_STANDARD_TIER_S',
-            self::ROLE_TIER_PREFIX.'m' => 'STRIPE_PRICE_STANDARD_TIER_M',
-            self::ROLE_TIER_PREFIX.'l' => 'STRIPE_PRICE_STANDARD_TIER_L',
-            self::ROLE_TIER_PREFIX.'xl' => 'STRIPE_PRICE_STANDARD_TIER_XL',
-            self::ROLE_TIER_PREFIX.'xs'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_XS_YEARLY',
-            self::ROLE_TIER_PREFIX.'s'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_S_YEARLY',
-            self::ROLE_TIER_PREFIX.'m'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_M_YEARLY',
-            self::ROLE_TIER_PREFIX.'l'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_L_YEARLY',
-            self::ROLE_TIER_PREFIX.'xl'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_XL_YEARLY',
+        // Managed products + edge usage map to fixed env var names.
+        $static = [
             self::ROLE_SERVERLESS_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS',
             self::ROLE_SERVERLESS_YEARLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY',
             self::ROLE_CLOUD_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD',
@@ -295,9 +235,23 @@ class StripeBillingProvisioner
         ];
 
         $lines = [];
-        foreach ($map as $role => $envVar) {
-            if (isset($result[$role])) {
-                $lines[] = $envVar.'='.$result[$role];
+        foreach ($result as $role => $id) {
+            $role = (string) $role;
+
+            // Plan price roles → STRIPE_PRICE_STANDARD_{KEY}[_YEARLY]. Skip the
+            // plan *product* roles — operators don't need product IDs at runtime.
+            if (str_starts_with($role, self::ROLE_PLAN_PRODUCT_PREFIX)) {
+                continue;
+            }
+            if (str_starts_with($role, self::ROLE_PLAN_PREFIX)) {
+                $key = substr($role, strlen(self::ROLE_PLAN_PREFIX));
+                $lines[] = 'STRIPE_PRICE_STANDARD_'.strtoupper($key).'='.$id;
+
+                continue;
+            }
+
+            if (isset($static[$role])) {
+                $lines[] = $static[$role].'='.$id;
             }
         }
 

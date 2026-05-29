@@ -1,6 +1,7 @@
 <div>
     @php($functionsHost = $server->hostCapabilities()->supportsFunctionDeploy())
-    <div class="border-b border-slate-200 bg-white">
+    @php($chooseAppBare = config('dply.choose_app_enabled') && $server->isVmHost() && ! $isContainerMode)
+    <div @class(['border-b border-slate-200 bg-white', 'hidden' => $chooseAppBare])>
         <div class="dply-page-shell py-8">
             <x-page-header
                 :title="__('Create site')"
@@ -19,6 +20,8 @@
         <div class="dply-page-shell space-y-8">
             @if ($isContainerMode)
                 @include('livewire.sites._create-container-mode')
+            @elseif (config('dply.choose_app_enabled') && $server->isVmHost())
+                @include('livewire.sites._create-bare')
             @else
             @if (config('dply.scaffold_v1_enabled'))
                 @include('livewire.sites._create-mode-toggle')

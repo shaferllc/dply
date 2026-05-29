@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\TrialState;
+use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Services\Billing\SubscriptionPlanResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\OrganizationFactory;
@@ -91,6 +93,11 @@ class Organization extends Model
     }
 
     /**
+     * Per-request memo for {@see owesNothingThisCycle}.
+     */
+    private ?bool $owesNothingMemo = null;
+
+    /**
      * Resolve the org's current subscription-lifecycle state. The single
      * source of truth for "what can this org do right now?" — see
      * App\Enums\TrialState for the full state machine.
@@ -105,6 +112,14 @@ class Organization extends Model
 
         $reference = $this->pauseLadderReference();
         if ($reference !== null) {
+            // Free-plan exemption: an org that owes nothing this cycle (Free
+            // plan, no managed products, no Edge usage) is never paused — the
+            // pause ladder only protects dply from cost on orgs that should be
+            // paying. Such an org simply lives on the free tier indefinitely.
+            if ($this->owesNothingThisCycle()) {
+                return TrialState::NoTrial;
+            }
+
             $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
 
             return $reference->copy()->addDays($softPauseDays)->isPast()
@@ -117,6 +132,19 @@ class Organization extends Model
         }
 
         return TrialState::ActiveTrial;
+    }
+
+    /**
+     * True when the org's current fleet bills to nothing this cycle: a Free
+     * plan (within the free server ceiling) with no managed products and no
+     * Edge delivery usage. Memoized per request — recomputing on every
+     * {@see trialState} call would be wasteful.
+     */
+    public function owesNothingThisCycle(): bool
+    {
+        return $this->owesNothingMemo ??= app(OrganizationBillingStateComputer::class)
+            ->compute($this)
+            ->isFree();
     }
 
     /**
@@ -225,6 +253,96 @@ class Organization extends Model
     public function acceptsMetrics(): bool
     {
         return $this->trialState() !== TrialState::ExpiredHard;
+    }
+
+    /**
+     * The flat plan the org is currently on, resolved from its billable BYO
+     * server count — the same basis the bill uses. Carries the plan's site
+     * ceiling (`max_sites`).
+     *
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int}
+     */
+    public function currentSubscriptionPlan(): array
+    {
+        return app(SubscriptionPlanResolver::class)
+            ->resolveForServerCount($this->billablePlanServerCount());
+    }
+
+    /**
+     * Billable BYO server count used to pick the plan. Mirrors the filter in
+     * {@see OrganizationBillingStateComputer}: ready, past the new-server age
+     * grace, and excluding dply-managed logical hosts.
+     */
+    private function billablePlanServerCount(): int
+    {
+        $minAgeDays = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
+        $ageCutoff = now()->subDays($minAgeDays);
+
+        return $this->servers()
+            ->where('status', Server::STATUS_READY)
+            ->where('created_at', '<=', $ageCutoff)
+            ->get()
+            ->reject(fn (Server $server) => $server->isManagedProductHost())
+            ->count();
+    }
+
+    /**
+     * The org's current plan site ceiling, or null when unlimited.
+     */
+    public function planSiteLimit(): ?int
+    {
+        return $this->currentSubscriptionPlan()['max_sites'];
+    }
+
+    /**
+     * Number of sites that count against the plan's site ceiling. Preview
+     * deployments (Edge/Cloud) are scratch clones of a parent and never
+     * consume quota.
+     */
+    public function quotaCountedSiteCount(): int
+    {
+        return $this->sites()
+            ->get()
+            ->reject(fn (Site $site) => $site->isEdgePreview() || $site->isCloudPreview())
+            ->count();
+    }
+
+    /**
+     * True when the org has reached its plan's site ceiling.
+     */
+    public function siteLimitReached(): bool
+    {
+        $limit = $this->planSiteLimit();
+
+        return $limit !== null && $this->quotaCountedSiteCount() >= $limit;
+    }
+
+    /**
+     * True when the org may create another site under its current plan.
+     */
+    public function canCreateSite(): bool
+    {
+        return ! $this->siteLimitReached();
+    }
+
+    /**
+     * Friendly upgrade prompt shown when site creation is blocked.
+     */
+    public function siteLimitMessage(): string
+    {
+        $plan = $this->currentSubscriptionPlan();
+        $limit = $plan['max_sites'];
+
+        if ($limit === null) {
+            return '';
+        }
+
+        return sprintf(
+            'Your %s plan includes %d %s. Add a server to move up to the next plan, or contact us to raise your limit.',
+            $plan['label'],
+            $limit,
+            $limit === 1 ? 'site' : 'sites',
+        );
     }
 
     /**
@@ -653,14 +771,45 @@ class Organization extends Model
     }
 
     /**
-     * True when the org is on the Standard plan (base price + per-server tiers).
+     * True when the org has an active dply Standard subscription — i.e. it
+     * carries any price dply owns under the plan model: a flat plan price
+     * (Starter/Pro/Business, monthly or yearly) or any a-la-carte managed
+     * product / Edge-usage price. A Free-plan org with no managed products has
+     * no Stripe subscription at all and returns false here.
      */
     public function onStandardSubscription(): bool
     {
-        return $this->subscriptionMatchesAnyPrice([
-            config('subscription.standard.stripe.base_monthly'),
-            config('subscription.standard.stripe.base_yearly'),
-        ]);
+        return $this->subscriptionMatchesAnyPrice($this->standardStripePriceIds());
+    }
+
+    /**
+     * Every Stripe price ID dply owns under the Standard plan model, across
+     * both billing intervals.
+     *
+     * @return list<?string>
+     */
+    private function standardStripePriceIds(): array
+    {
+        $stripe = (array) config('subscription.standard.stripe', []);
+
+        $ids = array_merge(
+            array_values((array) ($stripe['plans'] ?? [])),
+            array_values((array) ($stripe['plans_yearly'] ?? [])),
+            [
+                $stripe['serverless'] ?? null,
+                $stripe['serverless_yearly'] ?? null,
+                $stripe['cloud'] ?? null,
+                $stripe['cloud_yearly'] ?? null,
+                $stripe['edge'] ?? null,
+                $stripe['edge_yearly'] ?? null,
+                $stripe['edge_usage'] ?? null,
+            ],
+        );
+
+        return array_values(array_map(
+            fn ($id) => is_string($id) ? $id : null,
+            $ids,
+        ));
     }
 
     /**

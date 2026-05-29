@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
-use App\Enums\ServerTier;
 use App\Models\BillingSubscriptionSyncEvent;
 use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
@@ -93,31 +92,17 @@ final class BillingAnalytics
      */
     private function categoryBreakdown(DesiredBillingState $state): array
     {
+        $serverCount = $state->serverCount();
         $segments = [
-            ['key' => 'base', 'label' => __('Base'), 'cents' => $state->baseCents, 'color' => 'bg-brand-ink/80'],
+            [
+                'key' => 'plan',
+                'label' => $serverCount > 0
+                    ? $state->planLabel.' · '.$serverCount.' '.($serverCount === 1 ? __('server') : __('servers'))
+                    : $state->planLabel,
+                'cents' => $state->planPriceCents,
+                'color' => 'bg-brand-ink/80',
+            ],
         ];
-
-        $tierColors = [
-            'xs' => 'bg-brand-sage/70',
-            's' => 'bg-brand-sage',
-            'm' => 'bg-brand-forest/80',
-            'l' => 'bg-brand-gold',
-            'xl' => 'bg-brand-rust/80',
-        ];
-
-        foreach (ServerTier::ordered() as $tier) {
-            $qty = $state->quantityFor($tier);
-            if ($qty <= 0) {
-                continue;
-            }
-            $unit = (int) (config('subscription.standard.tiers.'.$tier->value) ?? 0);
-            $segments[] = [
-                'key' => $tier->value,
-                'label' => strtoupper($tier->value).' × '.$qty,
-                'cents' => $unit * $qty,
-                'color' => $tierColors[$tier->value] ?? 'bg-brand-moss',
-            ];
-        }
 
         if ($state->serverlessSubtotalCents > 0) {
             $segments[] = [
@@ -163,30 +148,17 @@ final class BillingAnalytics
      */
     private function lineItems(DesiredBillingState $state): array
     {
-        $tierPrices = (array) config('subscription.standard.tiers', []);
+        $serverCount = $state->serverCount();
 
         $items = [[
-            'label' => __('dply base'),
+            'label' => __('dply plan — :plan', ['plan' => $state->planLabel]),
             'quantity' => 1,
-            'unit_cents' => $state->baseCents,
-            'line_cents' => $state->baseCents,
-            'detail' => null,
+            'unit_cents' => $state->planPriceCents,
+            'line_cents' => $state->planPriceCents,
+            'detail' => $serverCount > 0
+                ? trans_choice(':count server|:count servers', $serverCount, ['count' => $serverCount])
+                : null,
         ]];
-
-        foreach (ServerTier::ordered() as $tier) {
-            $qty = $state->quantityFor($tier);
-            if ($qty <= 0) {
-                continue;
-            }
-            $unit = (int) ($tierPrices[$tier->value] ?? 0);
-            $items[] = [
-                'label' => __('dply server — :tier', ['tier' => strtoupper($tier->value)]),
-                'quantity' => $qty,
-                'unit_cents' => $unit,
-                'line_cents' => $unit * $qty,
-                'detail' => null,
-            ];
-        }
 
         if ($state->serverlessCount > 0) {
             $unit = (int) config('subscription.standard.serverless_cents', 200);
@@ -473,7 +445,9 @@ final class BillingAnalytics
                     'id' => (string) $server->id,
                     'name' => (string) $server->name,
                     'tier' => strtoupper($tier->value),
-                    'monthly_cents' => (int) (config('subscription.standard.tiers.'.$tier->value) ?? 0),
+                    // Per-server dply fee is $0 under the flat-plan model — the
+                    // plan price (by server count) is billed once, not per size.
+                    'monthly_cents' => 0,
                 ];
             })
             ->values()
@@ -566,9 +540,20 @@ final class BillingAnalytics
             return null;
         }
 
-        $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
-        if ($yearlyBase !== '' && $sub->hasPrice($yearlyBase)) {
-            return 'year';
+        $yearlyIds = array_merge(
+            array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            [
+                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+            ],
+        );
+
+        foreach ($yearlyIds as $priceId) {
+            $priceId = (string) $priceId;
+            if ($priceId !== '' && $sub->hasPrice($priceId)) {
+                return 'year';
+            }
         }
 
         return 'month';

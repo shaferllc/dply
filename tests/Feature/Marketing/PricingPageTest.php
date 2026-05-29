@@ -12,52 +12,58 @@ beforeEach(function () {
     Feature::flushCache();
 });
 
-test('pricing page renders new standard and enterprise cards', function () {
+test('pricing page renders the flat plan cards', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));
 
     $response->assertOk()
-        ->assertSee('One plan. Pay for what you run.')
-        ->assertSee('Standard')
-        ->assertSee('Enterprise')
-        ->assertSee('Start 14-day free trial')
-        ->assertSee('Talk to sales')
+        ->assertSee('Simple plans, priced by server count.')
+        ->assertSee('Free')
+        ->assertSee('Starter')
+        ->assertSee('Pro')
+        ->assertSee('Business')
+        ->assertSee('Start free')
         ->assertSee('Estimate your bill');
 });
 
-test('pricing page lists all five tiers', function () {
+test('pricing page lists every configured plan price', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));
 
-    // The per-server detail table has a Per day + Per month column. Assert
-    // on the monthly amounts (bare, no suffix) and a couple of daily ones.
-    $response->assertSee('Per day')
-        ->assertSee('Per month')
-        ->assertSee('$2.00')
-        ->assertSee('$10.00')
-        ->assertSee('$40.00')
-        // M tier daily: $10 / 30 = $0.33
-        ->assertSee('$0.33');
+    // Free $0, Starter $9, Pro $19, Business $39.
+    $response->assertSee('$0')
+        ->assertSee('$9')
+        ->assertSee('$19')
+        ->assertSee('$39');
 });
 
-test('pricing page shows example fleet amounts', function () {
+test('pricing page shows server ceilings for each plan', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));
 
-    $response->assertSee('Indie dev')
-        ->assertSee('Small team')
-        ->assertSee('Growing fleet');
+    $response->assertSee('1 server')
+        ->assertSee('Up to 3 servers')
+        ->assertSee('Up to 10 servers')
+        ->assertSee('Unlimited servers');
+});
+
+test('pricing page advertises managed products a la carte', function () {
+    $response = $this->withoutMiddleware()->get(route('pricing'));
+
+    $response->assertSee('Managed products, à la carte', false)
+        ->assertSee('dply Edge')
+        ->assertSee('dply Cloud')
+        ->assertSee('Serverless')
+        ->assertSee('Managed products require a paid plan (Starter or higher).');
+});
+
+test('pricing page promotes the free first server', function () {
+    $response = $this->withoutMiddleware()->get(route('pricing'));
+
+    $response->assertOk()
+        ->assertSee('Your first server is free, forever.');
 });
 
 test('pricing page has faq', function () {
     $response = $this->withoutMiddleware()->get(route('pricing'));
 
     $response->assertSee('Frequently asked')
-        ->assertSee('Why per-server');
-});
-
-test('pricing page advertises the free entry tier when enabled', function () {
-    config(['subscription.standard.free_entry_tier' => true]);
-
-    $response = $this->withoutMiddleware()->get(route('pricing'));
-
-    $response->assertOk()
-        ->assertSee('first small server has no base fee', false);
+        ->assertSee('Why per-server count', false);
 });

@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SiteGitCommitsFetcher;
@@ -60,6 +61,10 @@ class Repository extends Component
 
     /** Search box on the Branches tab. */
     public string $branchSearch = '';
+
+    /** Filter box on the Commits tab (matches message / author / sha). */
+    #[Url(as: 'q', except: '')]
+    public string $commitFilter = '';
 
     /** Connection-tab form mirrors of the equivalent fields on the Site. */
     public string $connectionRepositoryUrl = '';
@@ -266,9 +271,47 @@ class Repository extends Component
         return view('livewire.sites.repository', match ($this->tab) {
             'files' => $payload + $this->renderFilesPayload($reader, $user, $branchInUse),
             'branches' => $payload + $this->renderBranchesPayload($reader, $user),
+            'commits' => $payload + $this->renderCommitsPayload($commitsFetcher, $user, $branchInUse),
             'connection' => $payload + $this->renderConnectionPayload($browser, $user),
             default => $payload + $this->renderOverviewPayload($reader, $commitsFetcher, $user, $branchInUse),
         });
+    }
+
+    /**
+     * Full commit history for the Commits tab (merged in from the former
+     * standalone Commits page). Server-side filters the fetched window by
+     * message / author / sha and flags the last successfully-deployed sha.
+     *
+     * @return array{commitsResult: array<string, mixed>, commitsFiltered: list<array<string, mixed>>, lastDeployedSha: ?string}
+     */
+    private function renderCommitsPayload(SiteGitCommitsFetcher $fetcher, $user, string $branch): array
+    {
+        $result = $fetcher->fetch($this->site, $user, 40, $branch);
+
+        $commits = $result['commits'];
+        $filter = trim($this->commitFilter);
+        if ($filter !== '') {
+            $needle = mb_strtolower($filter);
+            $commits = array_values(array_filter($commits, function (array $c) use ($needle): bool {
+                return str_contains(mb_strtolower((string) $c['message']), $needle)
+                    || str_contains(mb_strtolower((string) $c['author_name']), $needle)
+                    || str_contains(mb_strtolower((string) $c['sha']), $needle)
+                    || str_contains(mb_strtolower((string) $c['short_sha']), $needle);
+            }));
+        }
+
+        $lastDeploy = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', SiteDeployment::STATUS_SUCCESS)
+            ->whereNotNull('git_sha')
+            ->orderByDesc('finished_at')
+            ->first();
+
+        return [
+            'commitsResult' => $result,
+            'commitsFiltered' => $commits,
+            'lastDeployedSha' => $lastDeploy?->git_sha,
+        ];
     }
 
     private function renderOverviewPayload(SourceControlRepositoryReader $reader, SiteGitCommitsFetcher $fetcher, $user, string $branch): array

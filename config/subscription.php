@@ -44,34 +44,31 @@ return [
     */
 
     'standard' => [
-        'base_cents' => 1500,
-        // included_credit_cents kept at 0 for back-compat: the legacy "first
-        // server included" coupon model was retired (Stripe Checkout doesn't
-        // accept amount_off + forever coupons, and interval-specific amount
-        // coupons added complexity for marginal gain). DTOs and the marketing
-        // calculator still read this — at 0 they just no-op the credit row.
-        'included_credit_cents' => 0,
+        // Flat plans metered by BYO server COUNT (not size). Customers pay
+        // their own provider for server size; dply's fee scales with how many
+        // servers it manages. Mirrors the proven Ploi/Forge/RunCloud model and
+        // sits inside the $8–39 market cluster. Managed products (serverless,
+        // Cloud, Edge) bill a la carte per unit on top of any plan — including
+        // Free — because they run on dply-owned infra. See
+        // docs/PRICING_AND_REVENUE.md.
         'annual_discount_pct' => 20,
-        'per_server_cap_cents' => 4000,
         'trial_days' => (int) env('SUBSCRIPTION_TRIAL_DAYS', 14),
         'soft_pause_days' => (int) env('SUBSCRIPTION_SOFT_PAUSE_DAYS', 30),
-        // Free entry tier: waive the organization base fee while the org's only
-        // billable unit is a single XS server (no managed products). This drops
-        // the effective entry price to just the $2 XS tier so a one-small-server
-        // hobbyist undercuts Forge/Ploi instead of paying base + tier. The base
-        // re-applies automatically at server #2, any larger server, or any
-        // managed product. Toggle off to restore the unconditional base fee.
-        'free_entry_tier' => filter_var(env('SUBSCRIPTION_FREE_ENTRY_TIER', true), FILTER_VALIDATE_BOOLEAN),
-        // Servers younger than this are excluded from billing. Absorbs the
+        // Servers younger than this are excluded from the count. Absorbs the
         // "spin up + test + kill in five minutes" case so customers aren't
         // nickel-and-dimed for transient infrastructure.
         'min_billable_age_days' => (int) env('SUBSCRIPTION_MIN_BILLABLE_AGE_DAYS', 1),
-        'tiers' => [
-            'xs' => 200,
-            's' => 500,
-            'm' => 1000,
-            'l' => 2000,
-            'xl' => 4000,
+        // Ordered cheapest → most expensive. `max_servers` is the inclusive
+        // server-count ceiling for the plan; null means unlimited. The resolver
+        // picks the cheapest plan whose ceiling covers the org's server count.
+        // `max_sites` is the inclusive ceiling on how many sites an org on this
+        // plan may run (null = unlimited). Enforced as a hard block at site
+        // creation; the plan tier itself is still chosen by server count.
+        'plans' => [
+            'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1],
+            'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3, 'max_sites' => 10],
+            'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10, 'max_sites' => 30],
+            'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null],
         ],
         // Flat per-function fee for serverless (FaaS) targets. A serverless
         // function has no vCPU/RAM, so it isn't spec-tiered — it's its own
@@ -83,6 +80,20 @@ return [
         'edge_cents' => 200,
         // Edge delivery usage is billed in 1-cent Stripe units (quantity = cents).
         'edge_usage_unit_cents' => 1,
+        // --- Legacy size-tier keys (being retired in the plan migration) ---
+        // Retained so the not-yet-migrated billing dashboard, analytics, and
+        // cost cards keep functioning until each is moved onto the plan model.
+        // Remove once every consumer reads `plans` instead of `tiers`/base.
+        'base_cents' => 0,
+        'included_credit_cents' => 0,
+        'per_server_cap_cents' => 4000,
+        'tiers' => [
+            'xs' => 200,
+            's' => 500,
+            'm' => 1000,
+            'l' => 2000,
+            'xl' => 4000,
+        ],
         /*
         | Cost observatory — comparison baselines for billing analytics.
         | forge_per_server_cents mirrors Laravel Forge Hobby ($12/server/mo).
@@ -92,8 +103,18 @@ return [
             'eur_to_usd_rate' => (float) env('SUBSCRIPTION_EUR_TO_USD_RATE', 1.08),
         ],
         'stripe' => [
-            'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
-            'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),
+            // One recurring price per paid plan, per interval. Free has no price
+            // (a $0 plan never creates a Stripe subscription).
+            'plans' => [
+                'starter' => env('STRIPE_PRICE_STANDARD_STARTER', ''),
+                'pro' => env('STRIPE_PRICE_STANDARD_PRO', ''),
+                'business' => env('STRIPE_PRICE_STANDARD_BUSINESS', ''),
+            ],
+            'plans_yearly' => [
+                'starter' => env('STRIPE_PRICE_STANDARD_STARTER_YEARLY', ''),
+                'pro' => env('STRIPE_PRICE_STANDARD_PRO_YEARLY', ''),
+                'business' => env('STRIPE_PRICE_STANDARD_BUSINESS_YEARLY', ''),
+            ],
             'serverless' => env('STRIPE_PRICE_STANDARD_SERVERLESS', ''),
             'serverless_yearly' => env('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY', ''),
             'cloud' => env('STRIPE_PRICE_STANDARD_CLOUD', ''),
@@ -101,6 +122,9 @@ return [
             'edge' => env('STRIPE_PRICE_STANDARD_EDGE', ''),
             'edge_yearly' => env('STRIPE_PRICE_STANDARD_EDGE_YEARLY', ''),
             'edge_usage' => env('STRIPE_PRICE_STANDARD_EDGE_USAGE', ''),
+            // --- Legacy size-tier Stripe prices (retired with the migration) ---
+            'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
+            'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),
             'tiers' => [
                 'xs' => env('STRIPE_PRICE_STANDARD_TIER_XS', ''),
                 's' => env('STRIPE_PRICE_STANDARD_TIER_S', ''),

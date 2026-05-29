@@ -109,9 +109,20 @@
                                 {{ $fetchError }}
                             </div>
                         </div>
-                        <p class="mt-4 text-sm text-brand-moss">
-                            <a href="{{ route('profile.source-control') }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Source control connections') }}</a>
-                        </p>
+                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                            @if ($site->canRechooseApp())
+                                <a href="{{ route('sites.choose-app', [$server, $site]) }}" wire:navigate
+                                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
+                                    <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Choose an application') }}
+                                </a>
+                            @endif
+                            <a href="{{ route('sites.repository', [$server, $site]) }}?tab=connection" wire:navigate
+                                class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                                <x-heroicon-o-link class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Connect a repository') }}
+                            </a>
+                        </div>
                     </div>
                 @elseif ($filteredCommits === [])
                     <div class="px-6 py-12 text-center text-sm text-brand-moss sm:px-8">

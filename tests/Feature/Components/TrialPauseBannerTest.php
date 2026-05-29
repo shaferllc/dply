@@ -3,6 +3,7 @@
 namespace Tests\Feature\Components\TrialPauseBannerTest;
 
 use App\Models\Organization;
+use App\Models\Server;
 use App\Models\Subscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
@@ -10,10 +11,28 @@ use Illuminate\Support\Facades\Config;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    // The pause ladder only applies to orgs that owe money; count servers
+    // immediately so the paid-fleet helper takes effect.
+    Config::set('subscription.standard.min_billable_age_days', 0);
+});
+
 function renderTrialPauseBanner(Organization $org): string
 {
     return Blade::render('<x-trial-pause-banner :organization="$organization" />', [
         'organization' => $org->fresh(),
+    ]);
+}
+
+/**
+ * Two servers → a paid (Starter) plan, so the org is subject to pausing
+ * rather than living on the always-free single-server tier.
+ */
+function payingFleet(Organization $org): void
+{
+    Server::factory()->count(2)->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
     ]);
 }
 
@@ -54,6 +73,7 @@ test('trial ending tomorrow uses singular copy', function () {
 
 test('expired soft still renders pause banner', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(5)]);
+    payingFleet($org);
 
     $html = renderTrialPauseBanner($org);
 
@@ -63,6 +83,7 @@ test('expired soft still renders pause banner', function () {
 
 test('expired soft after cancellation says subscription ended', function () {
     $org = Organization::factory()->create(['trial_ends_at' => null]);
+    payingFleet($org);
     Subscription::factory()
         ->withPrice('price_x')
         ->create([
@@ -79,10 +100,10 @@ test('expired soft after cancellation says subscription ended', function () {
 });
 
 test('subscribed org shows no banner', function () {
-    Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
+    Config::set('subscription.standard.stripe.plans.starter', 'price_sub_plan');
     $org = Organization::factory()->create(['trial_ends_at' => null]);
     Subscription::factory()
-        ->withPrice('price_sub_base')
+        ->withPrice('price_sub_plan')
         ->active()
         ->create(['organization_id' => $org->id]);
 
@@ -94,10 +115,10 @@ test('subscribed org shows no banner', function () {
 });
 
 test('grace period shows resume banner with end date', function () {
-    Config::set('subscription.standard.stripe.base_monthly', 'price_sub_base');
+    Config::set('subscription.standard.stripe.plans.starter', 'price_sub_plan');
     $org = Organization::factory()->create(['trial_ends_at' => null]);
     Subscription::factory()
-        ->withPrice('price_sub_base')
+        ->withPrice('price_sub_plan')
         ->create([
             'organization_id' => $org->id,
             'stripe_status' => 'active',

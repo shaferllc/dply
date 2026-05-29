@@ -2,26 +2,26 @@
 
 As implemented in this repo (`config/subscription.php`, `config/dply.php`, billing services). Amounts are **USD** unless noted.
 
-**Last synced from codebase:** 2026-05-27  
-**Competitive benchmarks added:** 2026-05-27
+**Last synced from codebase:** 2026-05-28  
+**Pricing model:** flat plans metered by BYO server **count** (Free / Starter / Pro / Business), managed products à la carte.
 
 ---
 
 ## Overview
 
-Dply uses **one self-serve plan (Standard)** plus **Enterprise** for sales-led deals. Pricing is **organization-scoped**, not per-seat:
+Dply uses **flat self-serve plans** priced by the **number of BYO servers** an organization manages, plus **Enterprise** for sales-led deals. Pricing is **organization-scoped**, not per-seat:
 
 - **Unlimited team members**
 - **Unlimited sites** (no per-site fee on BYO VMs)
-- **Unlimited servers** (no hard cap in application code)
+- **Servers** are what the plan is metered on — the plan tier is chosen by the **count** of billable servers (not their size)
 
 You charge for:
 
-1. A fixed **organization base fee**
-2. **Billable units** customers run (BYO servers by size tier, plus managed products)
+1. A flat **plan fee** chosen by billable BYO server count (Free → Business)
+2. **Managed products** the org runs à la carte (Cloud, Edge, Serverless) — these require a paid plan
 3. Optional **Edge delivery usage** (metered, when enabled)
 
-**Important:** Dply bills for **platform work**, not the customer's cloud invoice. A $5 Hetzner box and a $500 AWS instance at the same spec pay the **same Dply tier fee**.
+**Important:** Dply bills for **platform work**, not the customer's cloud invoice. A $5 Hetzner box and a $500 AWS instance pay the **same Dply plan** — what matters is how many servers dply manages, not how big they are. This mirrors the proven Ploi / Forge / RunCloud model and sits inside the $8–39 market cluster.
 
 ---
 
@@ -45,75 +45,70 @@ You charge for:
 
 Soft-pause window: `SUBSCRIPTION_SOFT_PAUSE_DAYS` (default **30**).
 
-### Standard (self-serve)
+**Free-zone exemption:** an org whose current usage resolves to the **Free** plan and owes **nothing** this cycle is **never paused** — the pause ladder only applies to orgs that actually owe money. A single-server account can live on Free indefinitely without a card.
+
+### Self-serve plans
+
+Metered by **billable BYO server count**. The resolver (`SubscriptionPlanResolver`) picks the cheapest plan whose ceiling covers the count.
+
+| Plan | USD/mo | Servers | Notes |
+|---|---:|---|---|
+| **Free** | **$0** | 1 | No card. Full product. No managed products. |
+| **Starter** | **$9** | Up to 3 | |
+| **Pro** | **$19** | Up to 10 | |
+| **Business** | **$39** | Unlimited | No server cap |
 
 | | |
 |---|---|
-| **Base fee** | **$15/mo** per organization |
 | **Billing** | Stripe Checkout + Cashier; monthly or annual |
-| **Annual discount** | **20% off** all line items when paid yearly |
-| **Feature gating** | No tier gating on Standard |
+| **Annual discount** | **20% off** when paid yearly |
+| **Feature gating** | None — every plan ships every feature |
+| **Age grace** | Servers younger than **1 day** don't count (`SUBSCRIPTION_MIN_BILLABLE_AGE_DAYS`, default `1`) |
 
 **Example monthly totals (before tax):**
 
-| Profile | Calculation | Monthly |
-|---|---|---|
-| Base only | $15 | **$15** |
-| Base + 1 M-tier server | $15 + $10 | **$25** |
-| Base + 5 M-tier servers | $15 + $50 | **$65** |
+| Profile | Servers | Plan | Monthly |
+|---|---|---|---:|
+| First project | 1 | Free | **$0** |
+| Indie / small team | 3 | Starter | **$9** |
+| Growing team | 8 | Pro | **$19** |
+| Agency / large fleet | 25 | Business | **$39** |
 
 **Example annual (20% off):**
 
-| Profile | Yearly |
-|---|---|
-| Base only | **$144/yr** |
-| Base + 1 M server | **$240/yr** |
-| Base + 5 M servers | **$624/yr** |
+| Plan | Yearly |
+|---|---:|
+| Starter | **~$86/yr** |
+| Pro | **~$182/yr** |
+| Business | **~$374/yr** |
 
 ### Enterprise
 
 | | |
 |---|---|
 | **Price** | Custom — negotiated in Stripe (`STRIPE_PRICE_ENTERPRISE`) |
-| **Typical adds** | Volume pricing on server fees, MSA, SSO, audit logs, dedicated support / SLA |
+| **Typical adds** | Volume pricing, MSA, SSO, audit logs, dedicated support / SLA |
 | **How to buy** | Sales-led; manual Stripe subscription |
 
 ---
 
 ## BYO servers (VM / SSH-managed)
 
-Ready VM hosts the customer SSHs into are **auto-tiered** from detected **vCPU + RAM**. Tier = **higher** of CPU bucket vs RAM bucket.
-
-| Tier | Typical specs | Per server / month | Per server / day* |
-|---|---|---|---|
-| **XS** | ≤1 vCPU, ≤2 GB RAM | **$2** | ~$0.07 |
-| **S** | 2 vCPU, ≤4 GB | **$5** | ~$0.17 |
-| **M** | ≤4 vCPU, ≤8 GB | **$10** | ~$0.33 |
-| **L** | ≤8 vCPU, ≤16 GB | **$20** | ~$0.67 |
-| **XL** | Above L | **$40** | ~$1.33 |
-
-\*Marketing/UI shows per-day as monthly ÷ 30.
+Ready VM hosts the customer SSHs into count toward the **plan tier**. The plan is chosen by **how many** billable servers the org runs — size is **not** billed (the customer already pays their provider for size).
 
 **Rules:**
 
-- **Cap:** never more than **$40/server/mo** (XL ceiling)
-- **Age grace:** servers younger than **1 day** are not billable (`SUBSCRIPTION_MIN_BILLABLE_AGE_DAYS`, default `1`)
+- **Count basis:** plan tier = cheapest plan whose ceiling ≥ billable server count
+- **Age grace:** servers younger than **1 day** are not counted (`SUBSCRIPTION_MIN_BILLABLE_AGE_DAYS`, default `1`)
 - **Status:** must be `ready`
-- **Excluded:** dply-managed logical hosts (Cloud, Edge, serverless namespaces)
+- **Excluded:** dply-managed logical hosts (Cloud, Edge, serverless namespaces) don't count toward the plan tier
 - **Provider:** customer pays DigitalOcean / Hetzner / AWS / etc. **directly**
-
-**Example fleets (monthly, Standard base included):**
-
-| Profile | Fleet | Total |
-|---|---|---|
-| Indie dev | 1 XS | **$17/mo** |
-| Side project | 1 M | **$25/mo** |
-| Small team | 3 M | **$45/mo** |
-| Growing fleet | 5 M + 2 L | **$105/mo** |
 
 ---
 
-## Managed products (flat platform fees)
+## Managed products (flat platform fees, à la carte)
+
+Managed products run on **dply-owned infra**, so they bill per live unit on top of any **paid** plan. They are **not** available on Free — using one requires at least Starter.
 
 | Product | Billable unit | Default fee | Notes |
 |---|---|---|---|
@@ -127,7 +122,7 @@ Ready VM hosts the customer SSHs into are **auto-tiered** from detected **vCPU +
 
 ### Platform fee
 
-**$2/mo per live production Edge site.**
+**$2/mo per live production Edge site** (requires a paid plan).
 
 ### Delivery usage (optional)
 
@@ -161,16 +156,14 @@ Controlled by `DPLY_EDGE_USAGE_BILLING_ENABLED` (default **off**).
 
 ```
 Monthly total =
-  $15 base
-+ Σ (BYO server tier fees)
+  plan fee (Free $0 / Starter $9 / Pro $19 / Business $39, by server count)
 + (serverless count × $2)
 + (Cloud apps × $5)
 + (Edge sites × $2)
 + Edge delivery usage (if enabled)
-− included_credit (currently $0)
 ```
 
-Stripe requires **uniform billing interval** per subscription. Adding a server mid-cycle → Stripe prorates.
+Managed products require a paid plan. Stripe requires a **uniform billing interval** per subscription; adding a server that crosses a plan ceiling → Stripe prorates the plan swap.
 
 ---
 
@@ -179,9 +172,10 @@ Stripe requires **uniform billing interval** per subscription. Adding a server m
 | State | Deploys & scheduler | Agent metrics |
 |---|---|---|
 | Active trial | ✅ | ✅ |
-| Subscribed (Standard / Enterprise) | ✅ | ✅ |
-| Soft pause (expired trial) | ❌ | ✅ |
-| Hard pause | ❌ | ❌ |
+| Subscribed (paid plan / Enterprise) | ✅ | ✅ |
+| Free-zone (owes nothing this cycle) | ✅ | ✅ |
+| Soft pause (expired trial, owes money) | ❌ | ✅ |
+| Hard pause (owes money) | ❌ | ❌ |
 
 Optional: `DPLY_API_TOKENS_REQUIRE_PAID_PLAN=true` gates **creating new** API tokens behind an active paid plan.
 
@@ -191,8 +185,10 @@ Optional: `DPLY_API_TOKENS_REQUIRE_PAID_PLAN=true` gates **creating new** API to
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `subscription.standard.base_cents` | 1500 | Org base ($15) |
-| `subscription.standard.tiers.*` | 200–4000 | XS–XL cents |
+| `subscription.standard.plans.free` | $0 / 1 server | Always-free entry plan |
+| `subscription.standard.plans.starter` | $9 / ≤3 | Starter plan |
+| `subscription.standard.plans.pro` | $19 / ≤10 | Pro plan |
+| `subscription.standard.plans.business` | $39 / unlimited | Business plan |
 | `subscription.standard.serverless_cents` | 200 | $2/function |
 | `subscription.standard.cloud_cents` | 500 | $5/app |
 | `subscription.standard.edge_cents` | 200 | $2/site |
@@ -210,7 +206,7 @@ Related docs: [Billing & plans](./BILLING_AND_PLANS.md), [Edge billing](./EDGE_B
 
 # Revenue projections
 
-In Dply’s model, **“users” = organizations** (workspaces). Seats are unlimited, so revenue scales with **orgs × what each org runs**, not headcount.
+In Dply's model, **"users" = organizations** (workspaces). Seats are unlimited, so revenue scales with **orgs × plan tier**, plus managed-product attach.
 
 Figures below are **gross revenue** (before Stripe fees, infra, support, tax, etc.).
 
@@ -218,63 +214,37 @@ Figures below are **gross revenue** (before Stripe fees, infra, support, tax, et
 
 ## Per-org revenue (quick reference)
 
-| Customer type | Typical stack | **$/mo** | **$/yr** |
+| Customer type | Plan | **$/mo** | **$/yr** |
 |---|---|---:|---:|
-| Minimal | Base + 1 XS server | **$17** | $204 |
-| Common indie | Base + 1 M server | **$25** | $300 |
-| Small team | Base + 3 M servers | **$45** | $540 |
-| Heavier BYO | Base + 5 M + 2 L | **$105** | $1,260 |
+| First project | Free (1 server) | **$0** | $0 |
+| Indie / small team | Starter (≤3) | **$9** | $108 |
+| Growing team | Pro (≤10) | **$19** | $228 |
+| Agency / large fleet | Business (unlimited) | **$39** | $468 |
 | + Edge | Above + 2 live Edge sites | **+$4** | +$48 |
 | + Cloud | Above + 1 Cloud app | **+$5** | +$60 |
 
-**Blended planning estimate:** **~$28–30/org/mo** if the mix is mostly 1-server accounts, some 3-server teams, and a few large fleets.
+**Blended planning estimate:** **~$14–18/org/mo** for paying orgs once you account for a meaningful free-plan base, a Starter-heavy paid mix, and a few Pro/Business fleets — before managed-product attach.
 
 ---
 
-## 10 paying organizations
+## Paying-organization scenarios
 
-| Scenario | Avg $/org/mo | **MRR** | **ARR** |
-|---|---:|---:|---:|
-| All minimal (1 XS) | $17 | **$170** | **$2,040** |
-| All typical (1 M) | $25 | **$250** | **$3,000** |
-| All small team (3 M) | $45 | **$450** | **$5,400** |
-| Blended (~$29) | $29 | **$290** | **~$3,480** |
+"Paying" excludes Free-plan orgs. Blended ARPU below assumes a Starter-heavy mix with some Pro/Business and light managed-product attach.
 
----
-
-## 100 paying organizations
-
-| Scenario | Avg $/org/mo | **MRR** | **ARR** |
-|---|---:|---:|---:|
-| All minimal | $17 | **$1,700** | **$20,400** |
-| All typical | $25 | **$2,500** | **$30,000** |
-| All small team | $45 | **$4,500** | **$54,000** |
-| Blended (~$29) | $29 | **$2,900** | **~$34,800** |
-
----
-
-## 1,000 paying organizations
-
-| Scenario | Avg $/org/mo | **MRR** | **ARR** |
-|---|---:|---:|---:|
-| All minimal | $17 | **$17,000** | **$204,000** |
-| All typical | $25 | **$25,000** | **$300,000** |
-| All small team | $45 | **$45,000** | **$540,000** |
-| Blended (~$29) | $29 | **$29,000** | **~$348,000** |
+| Paying orgs | Avg $/org/mo | **MRR** | **ARR** |
+|---:|---:|---:|---:|
+| 10 | $15 | **$150** | **~$1,800** |
+| 100 | $15 | **$1,500** | **~$18,000** |
+| 1,000 | $15 | **$15,000** | **~$180,000** |
+| 1,000 (Pro-heavy, ~$22) | $22 | **$22,000** | **~$264,000** |
 
 ---
 
 ## Adjustments that move the forecast
 
-### Trial conversion
+### Free-to-paid conversion
 
-Only **paying** orgs count. At **70% conversion** from trial (blended ~$29/org):
-
-| Paying orgs | **MRR** | **ARR** |
-|---:|---:|---:|
-| 10 | **$203** | **~$2,436** |
-| 100 | **$2,030** | **~$24,360** |
-| 1,000 | **$20,300** | **~$243,600** |
+Only orgs that cross **2+ servers** or attach a managed product become paying. The free single-server tier is an acquisition funnel, not revenue — model conversion off the free base, not trials alone.
 
 ### Annual billing (−20%)
 
@@ -282,7 +252,7 @@ If roughly half of revenue is on annual plans, effective MRR is about **8–10% 
 
 ### Managed products uplift
 
-Example: 1,000 orgs, each with 1 M server + 1 Edge site → **$27/org** → **$27k MRR / ~$324k ARR**.
+Each Edge site (+$2), Cloud app (+$5), or function (+$2) stacks on the plan and requires a paid plan — a strong nudge from Free → Starter. Example: 1,000 paying orgs each attaching 1 Edge site → **+$2k MRR / +$24k ARR**.
 
 ### Edge usage billing
 
@@ -290,15 +260,14 @@ High-traffic Edge sites add variable revenue on top of the flat $2/site platform
 
 ### Enterprise
 
-A handful of large fleet deals (20–100+ servers) can dominate total revenue vs many small orgs.
+A handful of large fleet deals can dominate total revenue vs many small orgs.
 
 ---
 
 ## Planning formula
 
 ```
-MRR ≈ (paying orgs × $15 base)
-    + (billable BYO servers × tier fee)
+MRR ≈ Σ (paying orgs × plan fee by server count)
     + (Cloud apps × $5)
     + (Edge sites × $2)
     + (serverless functions × $2)
@@ -309,9 +278,9 @@ MRR ≈ (paying orgs × $15 base)
 
 | Outlook | Per-org/mo | MRR | ARR |
 |---|---:|---:|---:|
-| Pessimistic | $17–25 | $17k–25k | $204k–300k |
-| Realistic | $25–45 | $25k–45k | $300k–540k |
-| Optimistic | $45–105+ | $45k–105k+ | $540k–1.26M+ |
+| Pessimistic | $9–15 | $9k–15k | $108k–180k |
+| Realistic | $15–22 | $15k–22k | $180k–264k |
+| Optimistic | $22–39+ | $22k–39k+ | $264k–468k+ |
 
 ---
 
@@ -319,10 +288,10 @@ MRR ≈ (paying orgs × $15 base)
 
 | Line | Who pays infra | Dply charges |
 |---|---|---|
-| **BYO VMs** | Customer → provider | Base + tiered server fee |
-| **dply Cloud** | Dply / container backend | Base + $5/app |
-| **dply Edge** | Dply / CF (managed) or customer (BYO CF) | Base + $2/site (+ usage if enabled) |
-| **Serverless** | Customer → FaaS provider | Base + $2/function |
+| **BYO VMs** | Customer → provider | Flat plan by server count (Free → Business) |
+| **dply Cloud** | Dply / container backend | $5/app (paid plan required) |
+| **dply Edge** | Dply / CF (managed) or customer (BYO CF) | $2/site (+ usage if enabled; paid plan required) |
+| **Serverless** | Customer → FaaS provider | $2/function (paid plan required) |
 
 ---
 
@@ -330,27 +299,13 @@ MRR ≈ (paying orgs × $15 base)
 
 Competitors do **not** publish MRR. Figures below combine **public pricing** with **customer counts or signals** where available. Revenue ranges are **inference**, not verified financials.
 
-Use these for positioning and planning — not investor reporting.
+Dply now mirrors the flat-rate-by-server-count model these incumbents use, sitting directly inside their price cluster.
 
 ---
 
 ## Laravel Forge
 
-**Source:** [Forge pricing](https://laravel.com/forge/pricing); Laravel leadership interview ([Rewiz summary](https://rewiz.app/channels/@nunomaduro/laravels-president-explains-the-57m-deal-thomas-crary-interview), 2026); [Laravel blog](https://laravel.com/blog/nightwatch-found-78k-exceptions-in-27b-events-on-forge) (“tens of thousands of active customers”).
-
-### Public customer count
-
-| Product | Customers (approx.) | Notes |
-|---|---:|---|
-| **Forge** | **~27,000** | ~11 years in market (as of 2026 interview) |
-| Laravel Cloud | ~30,000 | Surpassed Forge in under 12 months |
-| Laravel Nightwatch | ~20,000 | Monitoring product |
-
-Forge is one product inside **Laravel LLC** (also Cloud, Vapor, Envoyer, Nova, Nightwatch, VPS). Company raised **$57M Series A** (Accel, 2024). Total Laravel commercial revenue is **higher** than Forge alone; third-party company-wide ARR estimates vary (~$6M–$46M) and are not Forge-specific.
-
-### Pricing model
-
-Flat-rate monthly — **not** per-server tiering:
+**Source:** [Forge pricing](https://laravel.com/forge/pricing); Laravel leadership interview (2026); Laravel blog ("tens of thousands of active customers").
 
 | Plan | USD/mo | Servers |
 |---|---:|---|
@@ -358,40 +313,13 @@ Flat-rate monthly — **not** per-server tiering:
 | Growth | $19 | Unlimited |
 | Business | $39 | Unlimited |
 
-Panel fee excludes VPS/provider costs. **Laravel VPS** (sold through Forge) adds separate revenue not broken out publicly.
-
-### Estimated Forge MRR (inference)
-
-Using **~27,000 customers** and blended ARPU ($15–$25/mo depending on Hobby vs Growth vs Business mix):
-
-| Blended ARPU | Est. MRR | Est. ARR |
-|---:|---:|---:|
-| $15/mo | ~$405k | ~$4.9M |
-| $19/mo | ~$513k | ~$6.2M |
-| $22/mo | ~$594k | ~$7.1M |
-| $25/mo | ~$675k | ~$8.1M |
-
-**Planning range:** roughly **$400k–700k/month** (~**$5M–8M/year**) for Forge panel subscriptions alone, before VPS upsell.
-
-### vs Dply Standard
-
-| Customer type | Forge | Dply Standard |
-|---|---|---|
-| 1 small server | $12–19/mo | ~$17/mo ($15 + XS) |
-| 1 mid server | $12–19/mo | ~$25/mo ($15 + M) |
-| 10 mid servers | **$19–39/mo** (Growth/Business) | **~$115/mo** ($15 + 10×$10) |
-
-Forge wins on **price for large BYO fleets** (unlimited servers on Growth). Dply wins on **revenue per heavy BYO customer** with base + per-server tiers.
+~27,000 customers; blended ARPU ~$15–25/mo → planning range **~$400k–700k/month** (~$5M–8M/year) for the panel alone, before VPS upsell.
 
 ---
 
 ## Ploi.io
 
-**Source:** [Ploi pricing](https://ploi.io/pricing); [2025 recap](https://ploi.io/news/recap-ploi-2025) (800+ Ploi Wrapped users); founder posts (no MRR disclosed). Bootstrapped since 2018; also runs **[Ploi Cloud](https://ploi.cloud/pricing)** (usage-based, separate revenue stream).
-
-### Pricing model
-
-Plan caps — flat monthly, not per-server tiering:
+**Source:** [Ploi pricing](https://ploi.io/pricing); [2025 recap](https://ploi.io/news/recap-ploi-2025); also runs [Ploi Cloud](https://ploi.cloud/pricing).
 
 | Plan | USD/mo | Servers |
 |---|---:|---|
@@ -400,48 +328,22 @@ Plan caps — flat monthly, not per-server tiering:
 | Pro | $16 | Up to 10 |
 | Unlimited | $36 | Unlimited |
 
-5-day Pro trial; annual ~10% off; lifetime deals (custom). Does not include provider/VPS fees.
-
-### Public signals (not revenue)
-
-- **800+** panel users created “Ploi Wrapped” in 2025 (engaged users, not total or paying count)
-- **~97** Trustpilot reviews
-- Founder has **never published MRR**
-
-### Estimated Ploi MRR (inference)
-
-Assuming **~$14–18 ARPU**/paying org and a bootstrapped Forge-class niche after ~8 years:
-
-| Scenario | Paying customers (guess) | Est. MRR |
-|---|---:|---:|
-| Low | 400–700 | ~$6k–12k |
-| Mid | 1,000–2,000 | ~$15k–35k |
-| High | 2,500–4,000 | ~$40k–70k |
-
-**Planning range:** roughly **$10k–40k/month** (~**$120k–480k/year**) for the classic Ploi panel, **plus** unknown Ploi Cloud + lifetime sales.
-
-### vs Dply Standard
-
-| Customer type | Ploi Unlimited | Dply (10 M servers) |
-|---|---:|---:|
-| Platform fee | **$36/mo** | **~$115/mo** |
-
-Ploi undercuts Dply on **large fleets** at the top plan. Dply scales with server count and size.
+Bootstrapped since 2018; MRR never disclosed. Planning range **~$10k–40k/month** for the classic panel, plus Ploi Cloud + lifetime sales.
 
 ---
 
 ## Competitor comparison summary
 
-| | **Laravel Forge** | **Ploi** | **Dply Standard** |
+| | **Laravel Forge** | **Ploi** | **Dply** |
 |---|---|---|---|
-| **Known scale** | ~27k customers (leadership) | Unknown; 800+ Wrapped users | Pre-revenue / early |
-| **Est. MRR** | ~$400k–700k | ~$10k–40k | See projections above |
-| **Pricing model** | $12 / $19 / $39 flat | $0 / $10 / $16 / $36 flat | $15 base + $2–40/server tier |
-| **Large fleet economics** | Cheap (unlimited on Growth) | Cheap (Unlimited $36) | Higher ARPU, scales with fleet |
-| **Managed hosting upsell** | Laravel VPS, Cloud | Ploi Cloud | Cloud, Edge, Serverless |
+| **Pricing model** | $12 / $19 / $39 flat | $0 / $10 / $16 / $36 by count | **$0 / $9 / $19 / $39 by count** |
+| **Free tier** | No (Hobby $12) | Yes (1 server) | **Yes (1 server)** |
+| **Large fleet economics** | Cheap (unlimited on Growth) | Cheap (Unlimited $36) | Cheap (Business $39) |
+| **Managed hosting upsell** | Laravel VPS, Cloud | Ploi Cloud | Cloud, Edge, Serverless (à la carte) |
 
 ### Strategic takeaway for Dply
 
-- **Indie / 1–3 server** customers: price-sensitive; Forge Growth ($19) and Ploi Pro ($16) set the anchor. Dply at ~$25–45 for small teams is competitive if product depth justifies it.
-- **Agency / 10+ server** customers: Forge and Ploi stay flat; Dply’s tier model earns ** materially more** per org — target teams that outgrow unlimited flat plans or need multi-product (Edge, Cloud) in one org.
-- **Revenue ceiling:** Forge’s ~27k × ~$20 suggests a mature BYO panel alone can reach **~$500k+ MRR** with a dominant framework brand; Ploi shows a long-tail bootstrapped floor in the ** tens of thousands MRR** range.
+- **Free 1-server tier** matches Ploi's funnel and undercuts Forge's $12 entry — strong top-of-funnel for acquisition.
+- **Starter $9 / Pro $19 / Business $39** brackets sit directly inside the Ploi/Forge cluster, so Dply competes on product depth (multi-product: Edge, Cloud, Serverless) rather than price.
+- **Managed products** are the differentiated upsell — they require a paid plan, pulling free/Starter accounts upward and adding per-unit revenue on top of the flat plan.
+- **Revenue ceiling:** a mature flat-rate panel with a dominant brand can reach **~$500k+ MRR** (Forge); the bootstrapped floor sits in the **tens of thousands MRR** range (Ploi). Dply's edge is bundling BYO + managed hosting in one org.

@@ -27,11 +27,10 @@ test('cost observatory sums dply fees and parsed provider notes', function () {
         'meta' => ['cost_monthly_note' => '$12/mo DO s-1vcpu-1gb'],
     ]);
 
-    $state = DesiredBillingState::fromCounts(
-        tierQuantities: ['xs' => 2, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0],
-        baseCents: 1500,
-        creditCents: 0,
-        tierPricesCents: ['xs' => 200, 's' => 500, 'm' => 1000, 'l' => 2000, 'xl' => 4000],
+    // Two servers → Starter ($9 flat) under the plan model.
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: ['key' => 'starter', 'label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3],
+        tierQuantities: ['xs' => 2],
     );
 
     $observatory = new OrganizationCostObservatory(
@@ -41,9 +40,9 @@ test('cost observatory sums dply fees and parsed provider notes', function () {
 
     $result = $observatory->forOrganization($org, $state);
 
-    expect($result['dply_platform_cents'])->toBe(1900)
+    expect($result['dply_platform_cents'])->toBe(900)
         ->and($result['provider_infrastructure_cents'])->toBe(1800)
-        ->and($result['stack_total_cents'])->toBe(3700)
+        ->and($result['stack_total_cents'])->toBe(2700)
         ->and($result['provider_partial'])->toBeFalse()
         ->and($result['comparison']['forge_baseline_cents'])->toBe(2400);
 });
@@ -57,11 +56,10 @@ test('cost observatory marks servers without notes as unknown', function () {
         'provider' => 'custom',
     ]);
 
-    $state = DesiredBillingState::fromCounts(
-        tierQuantities: ['xs' => 1, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0],
-        baseCents: 1500,
-        creditCents: 0,
-        tierPricesCents: ['xs' => 200, 's' => 500, 'm' => 1000, 'l' => 2000, 'xl' => 4000],
+    // One server → Free plan ($0).
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: ['key' => 'free', 'label' => 'Free', 'price_cents' => 0, 'max_servers' => 1],
+        tierQuantities: ['xs' => 1],
     );
 
     $observatory = new OrganizationCostObservatory(

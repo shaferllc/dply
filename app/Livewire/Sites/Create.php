@@ -10,6 +10,7 @@ use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
+use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
@@ -37,6 +38,7 @@ use Livewire\Component;
 class Create extends Component
 {
     use DetectsRepositoryRuntime;
+    use EnforcesSiteQuota;
     use RefreshesLinkedSourceControlAccounts;
 
     public Server $server;
@@ -1172,6 +1174,118 @@ class Create extends Component
         }
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
+    }
+
+    /**
+     * Bare-create submit for the choose-app flow (config/dply.php
+     * `choose_app_enabled`). Collects only name + primary hostname, creates
+     * the Site in STATUS_AWAITING_APP, then redirects to sites.choose-app
+     * where the user picks what application runs on it.
+     *
+     * VM hosts only — the blade only renders the bare form when the flag is
+     * on and the host is a VM, but we re-assert both here so the action is
+     * never reachable on a non-VM host or with the flag off.
+     */
+    public function storeBare(): mixed
+    {
+        $this->authorize('update', $this->server);
+        $this->authorize('create', Site::class);
+
+        if (! config('dply.choose_app_enabled') || ! $this->server->isVmHost()) {
+            abort(404);
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        abort_if($org === null, 403);
+        abort_if($this->server->organization_id === null, 403);
+        abort_if($this->server->organization_id !== $org->id, 403);
+
+        $this->form->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'primary_hostname' => [
+                'required',
+                'string',
+                'max:255',
+                'unique:site_domains,hostname',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                        $fail(__('Enter a valid domain name like app.example.com.'));
+                    }
+                },
+            ],
+        ]);
+
+        // Resolve slug uniqueness BEFORE the insert. ensureUniqueSlug() only
+        // dedupes pre-save; passing a colliding slug straight to create()
+        // trips the (server_id, slug) unique constraint. Mirror the loop
+        // used by WorkspaceSites::addSite().
+        $baseSlug = Str::slug($this->form->name) ?: 'site';
+        $slug = $baseSlug;
+        $i = 1;
+        while (Site::query()->where('server_id', $this->server->id)->where('slug', $slug)->exists()) {
+            $slug = $baseSlug.'-'.$i;
+            $i++;
+        }
+        $hostname = strtolower(trim($this->form->primary_hostname));
+
+        // Bare site: type defaults to PHP as a harmless placeholder; the
+        // chosen application on sites.choose-app overwrites type / runtime /
+        // document_root before anything is provisioned. No webserver / FPM
+        // is provisioned at this point.
+        $site = Site::query()->create([
+            'server_id' => $this->server->id,
+            'user_id' => auth()->id(),
+            'organization_id' => $this->server->organization_id,
+            'deploy_script_id' => $this->server->organization?->default_site_script_id,
+            'name' => $this->form->name,
+            'slug' => $slug,
+            'type' => SiteType::Php,
+            'document_root' => '/var/www/'.$slug.'/public',
+            'repository_path' => '/var/www/'.$slug,
+            'status' => Site::STATUS_AWAITING_APP,
+            'ssl_status' => Site::SSL_NONE,
+            'webhook_secret' => Str::random(48),
+            'deploy_strategy' => 'simple',
+            'releases_to_keep' => 5,
+            'laravel_scheduler' => false,
+            'deployment_environment' => 'production',
+            'restart_supervisor_programs_after_deploy' => false,
+            'meta' => [
+                'choose_app' => [
+                    'created_at' => now()->toISOString(),
+                    'created_by_user_id' => auth()->id(),
+                ],
+            ],
+        ]);
+
+        SiteDomain::query()->create([
+            'site_id' => $site->id,
+            'hostname' => $hostname,
+            'is_primary' => true,
+            'www_redirect' => false,
+        ]);
+
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'site.created',
+                $site,
+                null,
+                [
+                    'name' => $site->name,
+                    'slug' => $site->slug,
+                    'server_id' => (string) $this->server->id,
+                    'mode' => 'choose_app',
+                    'primary_hostname' => $hostname,
+                ],
+            );
+        }
+
+        return $this->redirect(route('sites.choose-app', [
+            'server' => $this->server,
+            'site' => $site,
+        ]), navigate: true);
     }
 
     private function refreshFunctionsDetection(): void

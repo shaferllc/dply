@@ -153,6 +153,7 @@ use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Caching;
 use App\Livewire\Sites\Cdn;
 use App\Livewire\Sites\Commits as SitesCommits;
+use App\Livewire\Sites\ChooseApp as SitesChooseApp;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
@@ -562,6 +563,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/create', SitesCreate::class)->name('sites.create');
     Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
+    Route::livewire('servers/{server}/sites/{site}/choose-app', SitesChooseApp::class)->name('sites.choose-app');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::middleware('feature:workspace.site_promote')->group(function (): void {
         Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');
@@ -575,7 +577,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
-    Route::livewire('servers/{server}/sites/{site}/commits', SitesCommits::class)->name('sites.commits');
+    // Commits were merged into the Repository page as a tab. Keep the route
+    // name working by redirecting to repository?tab=commits.
+    Route::get('servers/{server}/sites/{site}/commits', function (Server $server, Site $site) {
+        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'tab' => 'commits']);
+    })->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');

@@ -5,33 +5,28 @@
     $interval = $this->subscriptionInterval;
     $billableCount = $this->billableServers->count();
 
-    // Colors for the stacked-breakdown bar. Tied to ServerTier ordering so
-    // the visualization reads small → large left → right.
+    // Colors for the stacked-breakdown bar: plan first, then each managed
+    // product, then metered Edge usage.
     $tierBarColors = [
-        'base' => 'bg-brand-ink/80',
-        'xs' => 'bg-brand-sage/70',
-        's' => 'bg-brand-sage',
-        'm' => 'bg-brand-forest/80',
-        'l' => 'bg-brand-gold',
-        'xl' => 'bg-brand-rust/80',
+        'plan' => 'bg-brand-ink/80',
+        'serverless' => 'bg-violet-500/70',
+        'cloud' => 'bg-sky-500/70',
+        'edge' => 'bg-emerald-500/70',
         'edge_usage' => 'bg-brand-sage/50',
     ];
 
     $totalCents = max(1, $state->monthlyTotalCents);
     $segments = [
-        ['key' => 'base', 'label' => __('Base'), 'cents' => $state->baseCents],
+        ['key' => 'plan', 'label' => $state->planLabel, 'cents' => $state->planPriceCents],
     ];
-    foreach (['xs', 's', 'm', 'l', 'xl'] as $tierKey) {
-        $qty = $state->tierQuantities[$tierKey] ?? 0;
-        if ($qty <= 0) {
-            continue;
-        }
-        $unit = (int) (config('subscription.standard.tiers.'.$tierKey) ?? 0);
-        $segments[] = [
-            'key' => $tierKey,
-            'label' => strtoupper($tierKey).' × '.$qty,
-            'cents' => $unit * $qty,
-        ];
+    if ($state->serverlessSubtotalCents > 0) {
+        $segments[] = ['key' => 'serverless', 'label' => __('Serverless').' × '.$state->serverlessCount, 'cents' => $state->serverlessSubtotalCents];
+    }
+    if ($state->cloudSubtotalCents > 0) {
+        $segments[] = ['key' => 'cloud', 'label' => __('Cloud').' × '.$state->cloudCount, 'cents' => $state->cloudSubtotalCents];
+    }
+    if ($state->edgeSubtotalCents > 0) {
+        $segments[] = ['key' => 'edge', 'label' => __('Edge').' × '.$state->edgeCount, 'cents' => $state->edgeSubtotalCents];
     }
     if ($state->edgeUsageSubtotalCents > 0) {
         $segments[] = [
@@ -97,11 +92,11 @@
                 {{-- Usage run-rate — derived from the monthly total, no history. --}}
                 <div class="mt-4 rounded-lg bg-brand-cream/60 border border-brand-ink/10 px-4 py-3">
                     <p class="text-sm text-brand-ink">
-                        {{ __('Accruing') }}
-                        <span class="font-bold">${{ number_format($monthlyDollars / 30, 2) }}{{ __('/day') }}</span>
-                        {{ trans_choice('{0} — no billable servers yet|{1} at your current fleet of :count server|[2,*] at your current fleet of :count servers', $billableCount, ['count' => $billableCount]) }}.
+                        {{ __('Your plan') }}
+                        <span class="font-bold">{{ $state->planLabel }}</span>
+                        {{ trans_choice('{0} — no servers yet, free forever|{1} — :count server|[2,*] — :count servers', $billableCount, ['count' => $billableCount]) }}.
                     </p>
-                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('You pay per server-day. New servers are free for their first day.') }}</p>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('One flat price by server count. Your first server is free; managed products bill per unit on top.') }}</p>
                 </div>
 
                 {{-- Primary Subscribe CTA — the most important action on the

@@ -1,4 +1,7 @@
 <section class="space-y-6">
+    {{-- Nothing to show until a repository is connected; the page-level
+         "No repository connected" card already explains the next steps. --}}
+    @if ($currentRepositoryUrl !== '')
     <div class="dply-card overflow-hidden">
         <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
@@ -39,11 +42,11 @@
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent commits') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Latest five commits on the viewed branch. See the dedicated Commits page for the full history.') }}</p>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Latest five commits on the viewed branch. Open the Commits tab for the full history.') }}</p>
                 </div>
             </div>
-            <a href="{{ route('sites.commits', ['server' => $server, 'site' => $site]) }}" wire:navigate
-               class="shrink-0 text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('See all →') }}</a>
+            <button type="button" wire:click="$set('tab', 'commits')"
+               class="shrink-0 text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('See all →') }}</button>
         </div>
 
         <div class="px-6 py-6 sm:px-7">
@@ -117,4 +120,5 @@
             @endif
         </div>
     </div>
+    @endif
 </section>

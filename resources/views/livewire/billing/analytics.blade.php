@@ -203,7 +203,7 @@
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply platform') }}</p>
                             <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">${{ number_format($obsDplyCents / 100, 2) }}<span class="text-xs font-normal text-brand-moss">/mo</span></p>
-                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Base + tiers + managed products + Edge usage') }}</p>
+                            <p class="mt-1 text-[11px] text-brand-moss">{{ __('Plan + managed products + Edge usage') }}</p>
                         </div>
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider infrastructure') }}</p>

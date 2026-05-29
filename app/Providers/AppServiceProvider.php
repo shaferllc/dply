@@ -20,6 +20,7 @@ use App\Models\ProviderCredential;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
+use App\Exceptions\SiteQuotaExceededException;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Models\SiteProcess;
@@ -378,6 +379,26 @@ class AppServiceProvider extends ServiceProvider
         Server::created(function (Server $server): void {
             if ($server->status === Server::STATUS_READY && ! empty($server->ssh_private_key)) {
                 ProvisionDefaultUserSshKeysToServerJob::dispatch($server->id);
+            }
+        });
+
+        Site::creating(function (Site $site): void {
+            if (! Site::$enforceSiteQuota) {
+                return;
+            }
+
+            // Previews (Edge/Cloud) are scratch clones of a parent and never
+            // consume plan site quota.
+            if ($site->isEdgePreview() || $site->isCloudPreview()) {
+                return;
+            }
+
+            $organization = $site->organization_id
+                ? Organization::find($site->organization_id)
+                : $site->server?->organization;
+
+            if ($organization !== null && $organization->siteLimitReached()) {
+                throw SiteQuotaExceededException::forOrganization($organization);
             }
         });
 

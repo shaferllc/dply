@@ -35,7 +35,27 @@
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('No repository connected') }}</h3>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a GitHub, GitLab, or Bitbucket repository on the Connection tab to populate this page.') }}</p>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    @if ($site->canRechooseApp())
+                                        {{ __('This site doesn’t have an application yet. Install one (WordPress, Laravel, Statamic…) or deploy an existing repository.') }}
+                                    @else
+                                        {{ __('Connect a GitHub, GitLab, or Bitbucket repository on the Connection tab to populate this page.') }}
+                                    @endif
+                                </p>
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                    @if ($site->canRechooseApp())
+                                        <a href="{{ route('sites.choose-app', [$server, $site]) }}" wire:navigate
+                                            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
+                                            <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
+                                            {{ __('Choose an application') }}
+                                        </a>
+                                    @endif
+                                    <button type="button" wire:click="$set('tab', 'connection')"
+                                        class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                                        <x-heroicon-o-link class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Connect a repository') }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -45,6 +65,7 @@
             @php
                 $tabs = [
                     ['id' => 'overview',   'label' => __('Overview'),   'icon' => 'heroicon-o-home'],
+                    ['id' => 'commits',    'label' => __('Commits'),    'icon' => 'heroicon-o-clock'],
                     ['id' => 'files',      'label' => __('Files'),      'icon' => 'heroicon-o-folder'],
                     ['id' => 'branches',   'label' => __('Branches'),   'icon' => 'heroicon-o-rectangle-stack'],
                     ['id' => 'connection', 'label' => __('Connection'), 'icon' => 'heroicon-o-link'],
@@ -64,6 +85,7 @@
 
             <div wire:key="repository-tab-{{ $tab }}-{{ $branchInUse }}-{{ $filesPath }}">
                 @includeWhen($tab === 'overview',   'livewire.sites.repository.partials.overview')
+                @includeWhen($tab === 'commits',    'livewire.sites.repository.partials.commits')
                 @includeWhen($tab === 'files',      'livewire.sites.repository.partials.files')
                 @includeWhen($tab === 'branches',   'livewire.sites.repository.partials.branches')
                 @includeWhen($tab === 'connection', 'livewire.sites.repository.partials.connection')

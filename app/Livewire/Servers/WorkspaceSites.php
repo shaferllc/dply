@@ -91,6 +91,13 @@ class WorkspaceSites extends Component
     #[Computed]
     public function supportsQuickAdd(): bool
     {
+        // When the choose-app flow is enabled, VM hosts skip the inline
+        // quick-add modal and go through the full create page (bare site →
+        // choose-app picker). See docs/CHOOSE_APP_FLOW.md.
+        if (config('dply.choose_app_enabled') && $this->server->isVmHost()) {
+            return false;
+        }
+
         return ! $this->server->hostCapabilities()->supportsFunctionDeploy()
             && ! $this->server->isDockerHost()
             && ! $this->server->isKubernetesCluster();

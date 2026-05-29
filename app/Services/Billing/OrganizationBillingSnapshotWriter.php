@@ -45,13 +45,11 @@ final class OrganizationBillingSnapshotWriter
     private function categoryBreakdown(DesiredBillingState $state): array
     {
         return [
-            'base_cents' => $state->baseCents,
-            'server_cents' => $state->serverSubtotalCents,
+            'plan_cents' => $state->planPriceCents,
             'serverless_cents' => $state->serverlessSubtotalCents,
             'cloud_cents' => $state->cloudSubtotalCents,
             'edge_cents' => $state->edgeSubtotalCents,
             'edge_usage_cents' => $state->edgeUsageSubtotalCents,
-            'credit_cents' => $state->appliedCreditCents,
         ];
     }
 
@@ -62,8 +60,24 @@ final class OrganizationBillingSnapshotWriter
             return null;
         }
 
-        $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
+        // Any yearly plan or managed-product price means the subscription is
+        // billed annually. Mirrors BillingAnalytics::subscriptionInterval.
+        $yearlyIds = array_merge(
+            array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            [
+                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+            ],
+        );
 
-        return $yearlyBase !== '' && $subscription->hasPrice($yearlyBase) ? 'year' : 'month';
+        foreach ($yearlyIds as $priceId) {
+            $priceId = (string) $priceId;
+            if ($priceId !== '' && $subscription->hasPrice($priceId)) {
+                return 'year';
+            }
+        }
+
+        return 'month';
     }
 }

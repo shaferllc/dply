@@ -2,13 +2,13 @@
 
 namespace App\Livewire\Billing;
 
-use App\Enums\ServerTier;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StandardSubscriptionCreator;
+use App\Services\Billing\SubscriptionPlanResolver;
 use App\Services\Billing\VatInsightService;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
@@ -119,9 +119,7 @@ class Show extends Component
             return null;
         }
         if ($this->organization->onStandardSubscription()) {
-            $interval = $sub->hasPrice((string) (config('subscription.standard.stripe.base_yearly') ?? ''))
-                ? 'yearly'
-                : 'monthly';
+            $interval = $this->subscriptionIsYearly($sub) ? 'yearly' : 'monthly';
 
             return 'Standard ('.$interval.')';
         }
@@ -205,6 +203,14 @@ class Show extends Component
             $items = $creator->buildPriceList($computer->compute($this->organization), $interval);
         } catch (RuntimeException $e) {
             $this->addError('billing', __('Standard pricing is not configured yet. Contact support.'));
+
+            return null;
+        }
+
+        if ($items === []) {
+            // Free plan, no managed products — nothing for Stripe to bill, so
+            // there's no subscription to start. The org keeps using dply free.
+            $this->addError('billing', __('Your fleet is on the free plan — there\'s nothing to subscribe to yet. Add another server or a managed product to move onto a paid plan.'));
 
             return null;
         }
@@ -379,8 +385,21 @@ class Show extends Component
 
     public function getStandardPricingAvailableProperty(): bool
     {
-        return (string) (config('subscription.standard.stripe.base_monthly') ?? '') !== ''
-            || (string) (config('subscription.standard.stripe.base_yearly') ?? '') !== '';
+        // Standard pricing is "available" as soon as any paid plan price (at
+        // either interval) is configured in Stripe. The Free plan never needs
+        // a price, so its absence doesn't gate the subscribe UI.
+        $configured = array_merge(
+            array_values((array) config('subscription.standard.stripe.plans', [])),
+            array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+        );
+
+        foreach ($configured as $priceId) {
+            if ((string) $priceId !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -448,8 +467,8 @@ class Show extends Component
     }
 
     /**
-     * Structured line items for the "Your bill" hero. One entry for the org
-     * base, one per non-empty tier with quantity and per-unit price. Cents
+     * Structured line items for the "Your bill" hero. One entry for the flat
+     * plan (chosen by server count) plus one per managed product in use. Cents
      * preserved so the view can choose monthly/yearly presentation.
      *
      * @return list<array{label: string, quantity: int, unit_cents: int, line_cents: int}>
@@ -457,31 +476,18 @@ class Show extends Component
     public function getTierLineItemsProperty(): array
     {
         $state = $this->billingState;
-        $tierPrices = (array) config('subscription.standard.tiers', []);
 
         $items = [
             [
-                'label' => __('dply base'),
+                'label' => __('dply plan — :plan', ['plan' => $state->planLabel]),
                 'quantity' => 1,
-                'unit_cents' => $state->baseCents,
-                'line_cents' => $state->baseCents,
+                'unit_cents' => $state->planPriceCents,
+                'line_cents' => $state->planPriceCents,
+                'detail' => $state->serverCount() > 0
+                    ? trans_choice(':count server|:count servers', $state->serverCount(), ['count' => $state->serverCount()])
+                    : null,
             ],
         ];
-
-        foreach (ServerTier::ordered() as $tier) {
-            $qty = $state->quantityFor($tier);
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $unit = (int) ($tierPrices[$tier->value] ?? 0);
-            $items[] = [
-                'label' => __('dply server — :tier', ['tier' => strtoupper($tier->value)]),
-                'quantity' => $qty,
-                'unit_cents' => $unit,
-                'line_cents' => $unit * $qty,
-            ];
-        }
 
         if ($state->serverlessCount > 0) {
             $unit = (int) config('subscription.standard.serverless_cents', 200);
@@ -555,6 +561,27 @@ class Show extends Component
         return implode(' · ', $parts);
     }
 
+    /**
+     * Plan catalog for the interactive "what would it cost?" calculator,
+     * ordered cheapest → most expensive. Prices in dollars; `max` is the
+     * inclusive server-count ceiling (null = unlimited) so the Alpine widget
+     * can resolve a plan from a hypothetical fleet size.
+     *
+     * @return list<array{key: string, label: string, price: float, max: ?int}>
+     */
+    public function getPlanCatalogProperty(): array
+    {
+        return array_map(
+            fn (array $plan): array => [
+                'key' => $plan['key'],
+                'label' => $plan['label'],
+                'price' => $plan['price_cents'] / 100,
+                'max' => $plan['max_servers'],
+            ],
+            app(SubscriptionPlanResolver::class)->all(),
+        );
+    }
+
     public function getYearlyTotalCentsProperty(): int
     {
         $pct = (int) config('subscription.standard.annual_discount_pct', 20);
@@ -569,12 +596,33 @@ class Show extends Component
             return null;
         }
 
-        $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
-        if ($yearlyBase !== '' && $sub->hasPrice($yearlyBase)) {
-            return 'year';
+        return $this->subscriptionIsYearly($sub) ? 'year' : 'month';
+    }
+
+    /**
+     * Detect a yearly subscription from any yearly plan or managed-product
+     * price on it. A Free-plan org can carry only a yearly managed line (no
+     * plan line), so we can't key off a single price.
+     */
+    private function subscriptionIsYearly(\Laravel\Cashier\Subscription $sub): bool
+    {
+        $yearlyIds = array_merge(
+            array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            [
+                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+            ],
+        );
+
+        foreach ($yearlyIds as $priceId) {
+            $priceId = (string) $priceId;
+            if ($priceId !== '' && $sub->hasPrice($priceId)) {
+                return true;
+            }
         }
 
-        return 'month';
+        return false;
     }
 
     public function getNextInvoiceAtProperty(): ?CarbonInterface

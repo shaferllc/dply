@@ -56,7 +56,11 @@
         </button>
     </div>
 
-    <div class="px-6 sm:px-8 py-6 space-y-2">
+    <div class="px-6 sm:px-8 py-4 text-xs text-brand-moss">
+        {{ __('Add servers of any size — your plan is set by total server count, not size. Managed products are billed separately.') }}
+    </div>
+
+    <div class="px-6 sm:px-8 pb-6 space-y-2">
         @foreach ($tierSpecs as $key => $spec)
             <div class="flex items-center gap-4 rounded-lg hover:bg-brand-cream/30 transition-colors px-3 py-2">
                 <div class="flex-1 min-w-0">
@@ -64,10 +68,6 @@
                         <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-md bg-brand-sand/30 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-ink">{{ $key }}</span>
                         <span class="text-sm text-brand-ink">{{ $spec }}</span>
                     </div>
-                </div>
-                <div class="tabular-nums w-24 text-right leading-tight">
-                    <div class="text-sm text-brand-ink" x-text="fmt(previewTiers['{{ $key }}'] / 30) + '/day'"></div>
-                    <div class="text-xs text-brand-moss" x-text="fmt(previewTiers['{{ $key }}']) + '/mo'"></div>
                 </div>
                 <div class="inline-flex items-center gap-1">
                     <button type="button"
@@ -85,19 +85,19 @@
                         <span class="text-lg leading-none">+</span>
                     </button>
                 </div>
-                <div class="text-sm font-semibold text-brand-ink tabular-nums w-20 text-right" x-text="fmt((previewCounts['{{ $key }}'] || 0) * previewTiers['{{ $key }}'])"></div>
             </div>
         @endforeach
     </div>
 
     <div class="px-6 sm:px-8 py-5 bg-brand-cream/40 border-t border-brand-ink/10 text-sm">
         <div class="flex items-center justify-between">
-            <span class="text-brand-moss">{{ __('Organization base') }}</span>
-            <span class="font-semibold text-brand-ink tabular-nums" x-text="fmt(previewBase)"></span>
-        </div>
-        <div class="flex items-center justify-between mt-1.5">
-            <span class="text-brand-moss">{{ __('Server fees') }} (<span x-text="['xs','s','m','l','xl'].reduce((n,k) => n + (previewCounts[k]||0), 0)"></span> {{ __('servers') }})</span>
-            <span class="font-semibold text-brand-ink tabular-nums" x-text="fmt(previewServerSubtotal)"></span>
+            <span class="text-brand-moss">
+                {{ __('Plan') }} (<span x-text="previewServerCount"></span> <span x-text="previewServerCount === 1 ? '{{ __('server') }}' : '{{ __('servers') }}'"></span>)
+            </span>
+            <span class="font-semibold text-brand-ink tabular-nums">
+                <span x-text="previewPlan ? previewPlan.label : ''"></span>
+                · <span x-text="fmt(previewMonthlyTotal)"></span>
+            </span>
         </div>
         <div x-show="billingPreviewAnnual" x-cloak class="flex items-center justify-between mt-1.5 text-brand-forest">
             <span>{{ __('Annual discount') }} ({{ $annualPct }}%)</span>

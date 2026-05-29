@@ -53,7 +53,7 @@ test('registration assigns referrer from session', function () {
 
 test('invoice webhook marks conversion and records reward', function () {
     config([
-        'subscription.standard.stripe.base_monthly' => 'price_test_pro',
+        'subscription.standard.stripe.plans' => ['starter' => '', 'pro' => 'price_test_pro', 'business' => ''],
         'referral.bonus_credit_cents' => 0,
     ]);
 
@@ -106,8 +106,8 @@ test('invoice webhook marks conversion and records reward', function () {
 
 test('conversion service skips without pro price match', function () {
     config([
-        'subscription.standard.stripe.base_monthly' => 'price_real_pro',
-        'subscription.standard.stripe.base_yearly' => '',
+        'subscription.standard.stripe.plans' => ['starter' => '', 'pro' => 'price_real_pro', 'business' => ''],
+        'subscription.standard.stripe.plans_yearly' => ['starter' => '', 'pro' => '', 'business' => ''],
         'subscription.enterprise.stripe_price_id' => '',
     ]);
 

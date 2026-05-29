@@ -20,6 +20,14 @@ class SiteWorkspaceController
         abort_unless($site->server_id === $server->id, 404);
         Gate::authorize('view', $site);
 
+        // Choose-app flow: a site without an application installed must pick
+        // one before its workspace is usable — both freshly-created bare
+        // sites and existing repo-less web sites. Funnel it to the picker.
+        // Sites the user explicitly skipped render normally. VM hosts only.
+        if ($server->isVmHost() && $site->needsAppChoice()) {
+            return redirect()->route('sites.choose-app', ['server' => $server, 'site' => $site]);
+        }
+
         $section = ($section === null || $section === '') ? 'general' : $section;
 
         $component = $site->usesEdgeRuntime() ? EdgeSettings::class : Settings::class;

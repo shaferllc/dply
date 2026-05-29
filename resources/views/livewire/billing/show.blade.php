@@ -44,14 +44,20 @@
          x-data="{
              billingPreviewAnnual: @js($this->subscriptionInterval === 'year'),
              previewCounts: @js(collect($this->billingState->tierQuantities)->all()),
-             previewTiers: @js(collect(config('subscription.standard.tiers', []))->map(fn ($c) => $c / 100)->all()),
-             previewBase: @js(($this->billingState->baseCents) / 100),
+             previewPlans: @js($this->planCatalog),
              previewAnnualPct: @js((int) config('subscription.standard.annual_discount_pct', 20)),
-             get previewServerSubtotal() {
-                 return ['xs','s','m','l','xl'].reduce((sum, k) => sum + (this.previewCounts[k] || 0) * (this.previewTiers[k] || 0), 0);
+             get previewServerCount() {
+                 return ['xs','s','m','l','xl'].reduce((n, k) => n + (this.previewCounts[k] || 0), 0);
+             },
+             get previewPlan() {
+                 const count = this.previewServerCount;
+                 for (const plan of this.previewPlans) {
+                     if (plan.max === null || count <= plan.max) return plan;
+                 }
+                 return this.previewPlans[this.previewPlans.length - 1];
              },
              get previewMonthlyTotal() {
-                 return Math.max(0, this.previewBase + this.previewServerSubtotal);
+                 return Math.max(0, this.previewPlan ? this.previewPlan.price : 0);
              },
              get previewBilledTotal() {
                  return this.billingPreviewAnnual
@@ -81,7 +87,7 @@
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Billing') }}</p>
                                 <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Billing & plan') }}</h2>
                                 <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Usage-based pricing for :org. Flat base plus a per-server fee that scales with detected server size — same fee on any cloud.', ['org' => $organization->name]) }}
+                                    {{ __('Simple pricing for :org. One flat plan chosen by server count — your first server is free, any size on any cloud. Managed products bill per unit on top.', ['org' => $organization->name]) }}
                                 </p>
                             </div>
                         </div>

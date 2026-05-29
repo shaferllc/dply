@@ -2,7 +2,6 @@
 
 namespace App\Services\Billing;
 
-use App\Enums\ServerTier;
 use App\Models\Organization;
 use App\Models\Subscription;
 use InvalidArgumentException;
@@ -10,10 +9,18 @@ use RuntimeException;
 
 /**
  * Provisions a fresh Standard Stripe subscription for an organization,
- * seeded with line items derived from the org's current server fleet.
+ * seeded with line items derived from the org's current fleet.
+ *
+ * Line items under the plan model:
+ * - One **flat plan** price (Starter / Pro / Business), chosen by billable
+ *   server count. The Free plan has no Stripe price, so a Free-plan org never
+ *   contributes a plan line.
+ * - One line per **managed product** in use (serverless / Cloud / Edge), each
+ *   billed a la carte per unit on top of the plan — including for Free orgs.
+ * - A metered **Edge usage** line (monthly only).
  *
  * Stripe Checkout requires every line item in a subscription to share a
- * billing interval, so each per-server tier has both a monthly and a yearly
+ * billing interval, so each priced item has both a monthly and a yearly
  * Stripe Price. The creator picks the right set based on the chosen interval.
  */
 class StandardSubscriptionCreator
@@ -24,46 +31,30 @@ class StandardSubscriptionCreator
 
     public function __construct(
         private OrganizationBillingStateComputer $computer,
+        private SubscriptionPlanResolver $planResolver,
     ) {}
 
     /**
      * @return array<int, array{price: string, quantity: int}>
      *
-     * @throws RuntimeException when the base price for the requested interval is not configured.
+     * @throws RuntimeException when a paid plan's Stripe price is not configured.
      */
     public function buildPriceList(DesiredBillingState $desired, string $interval = self::INTERVAL_MONTH): array
     {
         $items = [];
 
-        // Free entry tier: when the org's base fee is waived (single XS server)
-        // the subscription carries no base line item — the per-server tier line
-        // alone keeps the subscription non-empty. The base price only needs to
-        // be configured (and is only validated) when the base is actually due.
-        if ($desired->baseCents > 0) {
-            $basePriceId = $this->basePriceIdForInterval($interval);
-            if ($basePriceId === '') {
-                throw new RuntimeException("Standard base price for interval '{$interval}' is not configured.");
+        // Flat plan line. The Free plan ($0) carries no Stripe price, so it
+        // contributes no line — managed-product lines below keep the
+        // subscription non-empty when a Free org still owes for managed units.
+        if ($desired->planPriceCents > 0) {
+            $planPriceId = $this->planResolver->stripePriceId($desired->planKey, $interval);
+            if ($planPriceId === '') {
+                throw new RuntimeException(
+                    "Standard plan '{$desired->planKey}' price for interval '{$interval}' is not configured."
+                );
             }
 
-            $items[] = ['price' => $basePriceId, 'quantity' => 1];
-        }
-
-        $tierPriceIds = $this->tierPriceIdsForInterval($interval);
-        foreach (ServerTier::ordered() as $tier) {
-            $qty = $desired->quantityFor($tier);
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $priceId = $tierPriceIds[$tier->value] ?? null;
-            if (! is_string($priceId) || $priceId === '') {
-                // Tier not yet wired up in Stripe for this interval; skip
-                // silently so a half-configured Stripe state doesn't blow up
-                // subscription creation.
-                continue;
-            }
-
-            $items[] = ['price' => $priceId, 'quantity' => $qty];
+            $items[] = ['price' => $planPriceId, 'quantity' => 1];
         }
 
         if ($desired->serverlessCount > 0) {
@@ -144,6 +135,14 @@ class StandardSubscriptionCreator
         $desired = $this->computer->compute($organization);
         $items = $this->buildPriceList($desired, $interval);
 
+        if ($items === []) {
+            // A Free-plan org with no managed products owes nothing — Stripe
+            // rejects empty subscriptions, so there is nothing to create.
+            throw new RuntimeException(
+                "Organization {$organization->id} has no billable units; no subscription to create."
+            );
+        }
+
         $builder = $organization->newSubscription('default');
         foreach ($items as $item) {
             $builder->price($item['price'], $item['quantity']);
@@ -153,26 +152,5 @@ class StandardSubscriptionCreator
         $subscription = $builder->create($paymentMethodId);
 
         return $subscription;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    public function tierPriceIdsForInterval(string $interval): array
-    {
-        return match ($interval) {
-            self::INTERVAL_MONTH => (array) config('subscription.standard.stripe.tiers', []),
-            self::INTERVAL_YEAR => (array) config('subscription.standard.stripe.tiers_yearly', []),
-            default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
-        };
-    }
-
-    private function basePriceIdForInterval(string $interval): string
-    {
-        return (string) match ($interval) {
-            self::INTERVAL_MONTH => config('subscription.standard.stripe.base_monthly') ?? '',
-            self::INTERVAL_YEAR => config('subscription.standard.stripe.base_yearly') ?? '',
-            default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
-        };
     }
 }

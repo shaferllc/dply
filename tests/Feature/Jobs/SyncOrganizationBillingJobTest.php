@@ -16,8 +16,10 @@ use Illuminate\Support\Facades\Config;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->basePriceId = 'price_test_base_monthly';
-    Config::set('subscription.standard.stripe.base_monthly', $this->basePriceId);
+    // A configured paid-plan price is what marks an org as on a Standard
+    // subscription under the plan model.
+    $this->planPriceId = 'price_test_starter_monthly';
+    Config::set('subscription.standard.stripe.plans.starter', $this->planPriceId);
 });
 
 test('handle is a no op when organization does not exist', function () {
@@ -48,7 +50,7 @@ test('handle is a no op when organization has no standard subscription', functio
 test('invokes syncer when organization has active standard subscription', function () {
     $org = Organization::factory()->create();
     Subscription::factory()
-        ->withPrice($this->basePriceId)
+        ->withPrice($this->planPriceId)
         ->active()
         ->create(['organization_id' => $org->id]);
 
@@ -68,7 +70,7 @@ test('invokes syncer when organization has active standard subscription', functi
 test('skips when subscription is canceled', function () {
     $org = Organization::factory()->create();
     Subscription::factory()
-        ->withPrice($this->basePriceId)
+        ->withPrice($this->planPriceId)
         ->canceled()
         ->create(['organization_id' => $org->id]);
 
@@ -107,6 +109,12 @@ function bindFakeSyncer(): object
     $fake = new class extends StripeSubscriptionSyncer
     {
         public array $calls = [];
+
+        public function __construct()
+        {
+            // Override the parent's resolver dependency — the fake never
+            // reconciles real Stripe state, so it needs no collaborators.
+        }
 
         public function reconcile(Organization $organization, DesiredBillingState $desired): array
         {

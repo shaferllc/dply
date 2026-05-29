@@ -31,6 +31,34 @@ class Site extends Model
 {
     use HasFactory, HasUlids;
 
+    /**
+     * When false, the plan site-quota guard in AppServiceProvider is skipped.
+     * Used by migration/import/system paths via {@see withoutSiteQuota} that
+     * legitimately materialize sites outside the self-serve creation flow.
+     */
+    public static bool $enforceSiteQuota = true;
+
+    /**
+     * Run a callback with the plan site-quota guard disabled. Restores the
+     * previous state afterward, even on exception.
+     *
+     * @template TReturn
+     *
+     * @param  \Closure(): TReturn  $callback
+     * @return TReturn
+     */
+    public static function withoutSiteQuota(\Closure $callback)
+    {
+        $previous = self::$enforceSiteQuota;
+        self::$enforceSiteQuota = false;
+
+        try {
+            return $callback();
+        } finally {
+            self::$enforceSiteQuota = $previous;
+        }
+    }
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_NGINX_ACTIVE = 'nginx_active';
@@ -98,6 +126,15 @@ class Site extends Model
     public const STATUS_SCAFFOLD_FAILED = 'scaffold_failed';
 
     public const STATUS_CUSTOM_ACTIVE = 'custom_active';
+
+    /**
+     * Bare VM site created by the choose-app flow (config/dply.php
+     * `choose_app_enabled`). Domain + server are set, but type / runtime /
+     * document_root are not yet chosen — the user picks an application on
+     * sites.choose-app, which transitions the site into its real status.
+     * See docs/CHOOSE_APP_FLOW.md.
+     */
+    public const STATUS_AWAITING_APP = 'awaiting_app';
 
     public const STATUS_ERROR = 'error';
 
@@ -1171,6 +1208,98 @@ class Site extends Model
         $scaffoldFramework = $this->meta['scaffold']['framework'] ?? null;
 
         return is_string($scaffoldFramework) && strtolower($scaffoldFramework) === 'wordpress';
+    }
+
+    /**
+     * Bare site waiting for the user to pick an application on
+     * sites.choose-app. Distinct from STATUS_PENDING, which means "app
+     * chosen, provisioning queued".
+     */
+    public function isAwaitingApp(): bool
+    {
+        return $this->status === self::STATUS_AWAITING_APP;
+    }
+
+    /**
+     * True when the workspace should force the user onto the choose-app
+     * picker before showing the normal site UI. Fires while the choose-app
+     * flow is enabled for any site without an application installed yet —
+     * both freshly-created bare sites (STATUS_AWAITING_APP) and pre-existing
+     * web sites that never had a repo or deploy. A site the user explicitly
+     * "skipped" is viewable and not forced back here — see
+     * {@see canRechooseApp()}.
+     */
+    public function needsAppChoice(): bool
+    {
+        if (! config('dply.choose_app_enabled')) {
+            return false;
+        }
+
+        if ((bool) data_get($this->meta, 'choose_app.skipped', false)) {
+            return false;
+        }
+
+        return $this->isAwaitingApp() || $this->lacksInstalledApp();
+    }
+
+    /**
+     * True when the choose-app picker should remain reachable for this site:
+     * it is still bare, the user picked "Blank / Skip", or it is an existing
+     * web site with no application installed. A successful real install
+     * (git repo set, a deploy, or a scaffold) clears this.
+     */
+    public function canRechooseApp(): bool
+    {
+        if (! config('dply.choose_app_enabled')) {
+            return false;
+        }
+
+        return $this->isAwaitingApp()
+            || (bool) data_get($this->meta, 'choose_app.skipped', false)
+            || $this->lacksInstalledApp();
+    }
+
+    /**
+     * True when this is a VM web site (PHP/Node) that has no application
+     * installed yet: no git repository, never deployed, and not already
+     * scaffolded or routed through the choose-app flow. Static, custom,
+     * container, serverless and edge sites are excluded — they either don't
+     * use a repo or have their own create flow. Sites mid-scaffold have
+     * their own journey and are excluded too.
+     */
+    private function lacksInstalledApp(): bool
+    {
+        if (! in_array($this->type, [SiteType::Php, SiteType::Node], true)) {
+            return false;
+        }
+
+        if ($this->usesFunctionsRuntime()
+            || $this->usesDockerRuntime()
+            || $this->usesKubernetesRuntime()
+            || $this->usesContainerRuntime()
+            || $this->usesEdgeRuntime()) {
+            return false;
+        }
+
+        if (in_array($this->status, [self::STATUS_SCAFFOLDING, self::STATUS_SCAFFOLD_FAILED], true)) {
+            return false;
+        }
+
+        // Already has an application by any of these signals.
+        if (data_get($this->meta, 'scaffold.framework') !== null) {
+            return false;
+        }
+        if (data_get($this->meta, 'choose_app.chosen_kind') !== null) {
+            return false;
+        }
+        if (is_string($this->git_repository_url) && trim($this->git_repository_url) !== '') {
+            return false;
+        }
+        if ($this->last_deploy_at !== null) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -33,15 +33,14 @@
                         <thead class="bg-brand-cream/60 text-brand-ink/70">
                             <tr>
                                 <th class="px-4 py-2.5 text-left font-semibold">{{ __('Server') }}</th>
-                                <th class="px-4 py-2.5 text-left font-semibold">{{ __('Tier') }}</th>
-                                <th class="px-4 py-2.5 text-right font-semibold">{{ __('Monthly fee') }}</th>
+                                <th class="px-4 py-2.5 text-left font-semibold">{{ __('Size') }}</th>
+                                <th class="px-4 py-2.5 text-right font-semibold">{{ __('Plan fee') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/5">
                             @foreach ($billable as $server)
                                 @php
                                     $tier = $server->billingTier();
-                                    $tierPrice = (int) (config('subscription.standard.tiers.'.$tier->value) ?? 0);
                                 @endphp
                                 <tr class="bg-white/40">
                                     <td class="px-4 py-3">
@@ -51,7 +50,7 @@
                                     <td class="px-4 py-3">
                                         <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-2 py-0.5 text-xs font-semibold uppercase text-brand-ink">{{ $tier->label() }}</span>
                                     </td>
-                                    <td class="px-4 py-3 text-right tabular-nums text-brand-ink font-medium">${{ number_format($tierPrice / 100, 2) }}</td>
+                                    <td class="px-4 py-3 text-right text-xs text-brand-moss">{{ __('Included in plan') }}</td>
                                 </tr>
                             @endforeach
                             @foreach ($excluded as $row)

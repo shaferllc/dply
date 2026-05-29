@@ -29,6 +29,7 @@ class OrganizationBillingStateComputer
     public function __construct(
         private EdgeOrganizationUsageReader $usageReader,
         private EdgeUsageCostCalculator $usageCostCalculator,
+        private SubscriptionPlanResolver $planResolver,
     ) {}
 
     public function compute(Organization $organization): DesiredBillingState
@@ -100,13 +101,14 @@ class OrganizationBillingStateComputer
         ]);
         $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents'] ?? 0);
 
-        $baseCents = $this->baseCentsFor($tierQuantities, $serverlessCount, $cloudCount, $edgeCount);
+        // The flat plan is chosen by billable BYO server count; size only
+        // feeds the display-only breakdown carried in $tierQuantities.
+        $serverCount = array_sum($tierQuantities);
+        $plan = $this->planResolver->resolveForServerCount($serverCount);
 
-        return DesiredBillingState::fromCounts(
+        return DesiredBillingState::fromPlanAndUsage(
+            plan: $plan,
             tierQuantities: $tierQuantities,
-            baseCents: $baseCents,
-            creditCents: (int) config('subscription.standard.included_credit_cents', 1000),
-            tierPricesCents: (array) config('subscription.standard.tiers', []),
             serverlessCount: $serverlessCount,
             serverlessUnitCents: (int) config('subscription.standard.serverless_cents', 200),
             cloudCount: $cloudCount,
@@ -116,36 +118,5 @@ class OrganizationBillingStateComputer
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
         );
-    }
-
-    /**
-     * Resolve the organization base fee for this cycle. The base is waived
-     * (free entry tier) while the org's only billable unit is a single XS
-     * server and there are no managed products — see the `free_entry_tier`
-     * config flag. Every other shape (more than one server, a larger server,
-     * or any managed product) pays the full base.
-     *
-     * @param  array<string, int>  $tierQuantities
-     */
-    private function baseCentsFor(array $tierQuantities, int $serverlessCount, int $cloudCount, int $edgeCount): int
-    {
-        $fullBaseCents = (int) config('subscription.standard.base_cents', 2500);
-
-        $freeEntryEnabled = filter_var(
-            config('subscription.standard.free_entry_tier', true),
-            FILTER_VALIDATE_BOOLEAN,
-        );
-
-        if (! $freeEntryEnabled) {
-            return $fullBaseCents;
-        }
-
-        $totalServers = array_sum($tierQuantities);
-        $hasManagedProducts = ($serverlessCount + $cloudCount + $edgeCount) > 0;
-        $onlyOneXsServer = $totalServers === 1
-            && ($tierQuantities[ServerTier::XS->value] ?? 0) === 1
-            && ! $hasManagedProducts;
-
-        return $onlyOneXsServer ? 0 : $fullBaseCents;
     }
 }

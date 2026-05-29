@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\MetricsIngestTrialPauseTest;
 
 use App\Models\Organization;
+use App\Models\Server;
 use App\Models\ServerMetricIngestEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -13,7 +14,19 @@ beforeEach(function () {
     Config::set('server_metrics.ingest.token', 'test-token');
     Config::set('subscription.standard.trial_days', 14);
     Config::set('subscription.standard.soft_pause_days', 30);
+    // The pause ladder only applies to orgs that owe money. Count servers
+    // immediately so the paid-fleet helper below takes effect.
+    Config::set('subscription.standard.min_billable_age_days', 0);
 });
+
+function payingFleet(Organization $org): void
+{
+    // Two servers → a paid (Starter) plan, so the org is subject to pausing.
+    Server::factory()->count(2)->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+    ]);
+}
 
 test('ingest succeeds for active trial org', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(5)]);
@@ -39,6 +52,7 @@ test('ingest still succeeds during soft pause', function () {
 
 test('ingest returns 402 during hard pause', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(45)]);
+    payingFleet($org);
 
     $this->postJson('/api/metrics', payloadFor($org), [
         'Authorization' => 'Bearer test-token',

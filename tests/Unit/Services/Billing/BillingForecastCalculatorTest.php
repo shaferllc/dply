@@ -14,11 +14,9 @@ uses(RefreshDatabase::class);
 test('forecast normalizes yearly subscriptions and projects month end', function () {
     config(['subscription.standard.annual_discount_pct' => 20]);
 
-    $state = DesiredBillingState::fromCounts(
-        tierQuantities: ['xs' => 0, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0],
-        baseCents: 1500,
-        creditCents: 0,
-        tierPricesCents: [],
+    // Plan-fee portion of $15 plus $4.50 of Edge usage → $19.50 monthly.
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: ['key' => 'custom', 'label' => 'Custom', 'price_cents' => 1500, 'max_servers' => null],
         edgeUsageSubtotalCents: 450,
     );
 
@@ -42,11 +40,8 @@ test('forecast normalizes yearly subscriptions and projects month end', function
 });
 
 test('forecast keeps monthly mrr and null delta without baseline snapshot', function () {
-    $state = DesiredBillingState::fromCounts(
-        tierQuantities: ['xs' => 0, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0],
-        baseCents: 2000,
-        creditCents: 0,
-        tierPricesCents: [],
+    $state = DesiredBillingState::fromPlanAndUsage(
+        plan: ['key' => 'custom', 'label' => 'Custom', 'price_cents' => 2000, 'max_servers' => null],
     );
 
     $forecast = app(BillingForecastCalculator::class)->calculate($state, 'month', null, now()->setDate(2026, 5, 20));

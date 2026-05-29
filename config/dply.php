@@ -171,6 +171,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Choose-an-application flow (VM post-creation app picker)
+    |--------------------------------------------------------------------------
+    | Gates the new flow where a VM site is created bare (domain + server) in
+    | STATUS_AWAITING_APP and the user then picks what runs on it (Git repo,
+    | WordPress, Laravel, Statamic, static, blank) on a dedicated
+    | sites.choose-app page. Default off; when off the existing import/scaffold
+    | wizard remains the fallback. VM hosts only for now — container/serverless
+    | keep their dedicated create flows. See docs/CHOOSE_APP_FLOW.md.
+    */
+    'choose_app_enabled' => filter_var(env('DPLY_CHOOSE_APP_ENABLED', false), FILTER_VALIDATE_BOOL),
+
+    /*
+    |--------------------------------------------------------------------------
     | Edge: usage-based billing (pass-through + margin)
     |--------------------------------------------------------------------------
     |

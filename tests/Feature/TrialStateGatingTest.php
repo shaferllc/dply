@@ -4,6 +4,7 @@ namespace Tests\Feature\TrialStateGatingTest;
 
 use App\Enums\TrialState;
 use App\Models\Organization;
+use App\Models\Server;
 use App\Models\Subscription;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -13,7 +14,25 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Config::set('subscription.standard.trial_days', 14);
     Config::set('subscription.standard.soft_pause_days', 30);
+    // The pause ladder only applies to orgs that actually owe money. Count
+    // servers without the grace delay so the helper fleet below is billable.
+    Config::set('subscription.standard.min_billable_age_days', 0);
 });
+
+/**
+ * Put an org over the Free-plan ceiling (2+ billable servers) so it owes for a
+ * paid plan and is therefore subject to the trial/pause ladder. A Free-zone org
+ * (≤1 server, no managed products) is never paused — it's just a free user.
+ */
+function billableFleet(Organization $org, int $count = 2): void
+{
+    for ($i = 0; $i < $count; $i++) {
+        Server::factory()->create([
+            'organization_id' => $org->id,
+            'status' => Server::STATUS_READY,
+        ]);
+    }
+}
 
 test('active trial state when trial in future', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->addDays(5)]);
@@ -25,18 +44,30 @@ test('active trial state when trial in future', function () {
 
 test('expired soft state within soft window', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(5)]);
+    billableFleet($org);
 
-    expect($org->trialState())->toBe(TrialState::ExpiredSoft);
-    expect($org->canDeploy())->toBeFalse();
-    expect($org->canSchedulerRun())->toBeFalse();
+    expect($org->fresh()->trialState())->toBe(TrialState::ExpiredSoft);
+    expect($org->fresh()->canDeploy())->toBeFalse();
+    expect($org->fresh()->canSchedulerRun())->toBeFalse();
 });
 
 test('expired hard state past soft window', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(31)]);
+    billableFleet($org);
 
-    expect($org->trialState())->toBe(TrialState::ExpiredHard);
-    expect($org->canDeploy())->toBeFalse();
-    expect($org->canSchedulerRun())->toBeFalse();
+    expect($org->fresh()->trialState())->toBe(TrialState::ExpiredHard);
+    expect($org->fresh()->canDeploy())->toBeFalse();
+    expect($org->fresh()->canSchedulerRun())->toBeFalse();
+});
+
+test('a free-zone org is never paused after its trial lapses', function () {
+    // One server, no managed products → Free plan ($0). Even long past the
+    // hard-pause window the org stays usable as a free user.
+    $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(120)]);
+    billableFleet($org, 1);
+
+    expect($org->fresh()->trialState())->toBe(TrialState::NoTrial);
+    expect($org->fresh()->canDeploy())->toBeTrue();
 });
 
 test('subscribed state overrides trial window', function () {
@@ -107,18 +138,20 @@ test('soft to hard transition at configured boundary', function () {
 
     $softOrg = Organization::factory()->create(['trial_ends_at' => now()->subDays(29)]);
     $hardOrg = Organization::factory()->create(['trial_ends_at' => now()->subDays(31)]);
+    billableFleet($softOrg);
+    billableFleet($hardOrg);
 
-    expect($softOrg->trialState())->toBe(TrialState::ExpiredSoft);
-    expect($hardOrg->trialState())->toBe(TrialState::ExpiredHard);
+    expect($softOrg->fresh()->trialState())->toBe(TrialState::ExpiredSoft);
+    expect($hardOrg->fresh()->trialState())->toBe(TrialState::ExpiredHard);
 });
 
 test('canceled subscription within grace keeps org subscribed', function () {
-    Config::set('subscription.standard.stripe.base_monthly', 'price_grace_base');
+    Config::set('subscription.standard.stripe.plans.starter', 'price_grace_plan');
     $org = Organization::factory()->create(['trial_ends_at' => null]);
 
     // Canceled but ends_at in the future = Cashier grace period; valid() true.
     Subscription::factory()
-        ->withPrice('price_grace_base')
+        ->withPrice('price_grace_plan')
         ->create([
             'organization_id' => $org->id,
             'stripe_status' => 'canceled',
@@ -131,6 +164,7 @@ test('canceled subscription within grace keeps org subscribed', function () {
 test('ended subscription within soft window is expired soft', function () {
     Config::set('subscription.standard.soft_pause_days', 30);
     $org = Organization::factory()->create(['trial_ends_at' => null]);
+    billableFleet($org);
     Subscription::factory()
         ->withPrice('price_x')
         ->create([
@@ -146,6 +180,7 @@ test('ended subscription within soft window is expired soft', function () {
 test('ended subscription past soft window is expired hard', function () {
     Config::set('subscription.standard.soft_pause_days', 30);
     $org = Organization::factory()->create(['trial_ends_at' => null]);
+    billableFleet($org);
     Subscription::factory()
         ->withPrice('price_x')
         ->create([
@@ -162,6 +197,7 @@ test('ended subscription reference beats trial dates', function () {
     // The recent subscription end is what should drive the pause ladder.
     Config::set('subscription.standard.soft_pause_days', 30);
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(400)]);
+    billableFleet($org);
     Subscription::factory()
         ->withPrice('price_x')
         ->create([
@@ -177,7 +213,8 @@ test('ended subscription reference beats trial dates', function () {
 
 test('lapsed from subscription is false for plain trial expiry', function () {
     $org = Organization::factory()->create(['trial_ends_at' => now()->subDays(5)]);
+    billableFleet($org);
 
-    expect($org->trialState())->toBe(TrialState::ExpiredSoft);
-    expect($org->lapsedFromSubscription())->toBeFalse();
+    expect($org->fresh()->trialState())->toBe(TrialState::ExpiredSoft);
+    expect($org->fresh()->lapsedFromSubscription())->toBeFalse();
 });
