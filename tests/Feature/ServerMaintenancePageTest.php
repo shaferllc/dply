@@ -32,15 +32,30 @@ function maintenanceUserWithServer(): array
     return [$user, $server];
 }
 
-test('server maintenance page is hidden without feature flag', function (): void {
+test('server maintenance page is hidden when feature and preview are off', function (): void {
     Feature::define('workspace.server_maintenance', fn (): bool => false);
+    Feature::define('workspace.server_maintenance_preview', fn (): bool => false);
     Feature::flushCache();
 
     [$user, $server] = maintenanceUserWithServer();
 
     $this->actingAs($user)
         ->get(route('servers.maintenance', $server))
-        ->assertStatus(400);
+        ->assertNotFound();
+});
+
+test('server maintenance page renders coming soon when feature off but preview on', function (): void {
+    Feature::define('workspace.server_maintenance', fn (): bool => false);
+    Feature::define('workspace.server_maintenance_preview', fn (): bool => true);
+    Feature::flushCache();
+
+    [$user, $server] = maintenanceUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.maintenance', $server))
+        ->assertOk()
+        ->assertSee(__('Coming soon'))
+        ->assertSee(__('Maintenance'));
 });
 
 test('server maintenance page renders controls', function (): void {

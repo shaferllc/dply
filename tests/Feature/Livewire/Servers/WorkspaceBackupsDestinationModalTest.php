@@ -10,9 +10,17 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    // The backups workspace is gated behind workspace.backups; the local .env
+    // may disable it to preview the coming-soon teaser, so pin it on here.
+    Feature::define('workspace.backups', fn (): bool => true);
+    Feature::flushCache();
+});
 
 /** @return array{User, Organization, Server} */
 function ownerWithServer(): array

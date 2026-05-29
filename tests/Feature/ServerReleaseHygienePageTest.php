@@ -45,15 +45,30 @@ function hygieneUserWithServer(): array
     return [$user, $server];
 }
 
-test('server release hygiene page is hidden without feature flag', function (): void {
+test('server release hygiene page is hidden when feature and preview are off', function (): void {
     Feature::define('workspace.release_hygiene', fn (): bool => false);
+    Feature::define('workspace.release_hygiene_preview', fn (): bool => false);
     Feature::flushCache();
 
     [$user, $server] = hygieneUserWithServer();
 
     $this->actingAs($user)
         ->get(route('servers.hygiene', $server))
-        ->assertStatus(400);
+        ->assertNotFound();
+});
+
+test('server release hygiene page renders coming soon when feature off but preview on', function (): void {
+    Feature::define('workspace.release_hygiene', fn (): bool => false);
+    Feature::define('workspace.release_hygiene_preview', fn (): bool => true);
+    Feature::flushCache();
+
+    [$user, $server] = hygieneUserWithServer();
+
+    $this->actingAs($user)
+        ->get(route('servers.hygiene', $server))
+        ->assertOk()
+        ->assertSee(__('Coming soon'))
+        ->assertSee(__('Release hygiene'));
 });
 
 test('server release hygiene page renders rollup', function (): void {
