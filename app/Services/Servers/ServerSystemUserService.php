@@ -197,6 +197,47 @@ class ServerSystemUserService
     }
 
     /**
+     * Updates shell and supplementary group membership for an existing account.
+     *
+     * @throws \RuntimeException
+     */
+    public function updateUser(
+        Server $server,
+        string $username,
+        ?string $shell = null,
+        ?bool $grantSudo = null,
+        ?bool $addWebGroup = null,
+    ): void {
+        $this->assertServerReady($server);
+        $u = $this->validatePasswdStyleUsername($username);
+        $this->assertUserExistsOnServer($server, $u);
+
+        if ($this->deletionPolicy->isProtected($server, $u)) {
+            throw new \RuntimeException(__('That account is protected and cannot be modified from dply.'));
+        }
+
+        if ($shell !== null) {
+            $shellPath = $this->validateShell($shell);
+            $this->runPrivileged($server, 'usermod -s '.escapeshellarg($shellPath).' '.escapeshellarg($u), 120);
+        }
+
+        if ($grantSudo !== null) {
+            $cmd = $grantSudo
+                ? 'gpasswd -a '.escapeshellarg($u).' sudo'
+                : 'gpasswd -d '.escapeshellarg($u).' sudo';
+            $this->runPrivileged($server, $cmd, 120);
+        }
+
+        if ($addWebGroup !== null) {
+            $webGroup = $this->validateWebServerGroup((string) config('site_settings.vm_site_file_web_group', 'www-data'));
+            $cmd = $addWebGroup
+                ? 'gpasswd -a '.escapeshellarg($u).' '.escapeshellarg($webGroup)
+                : 'gpasswd -d '.escapeshellarg($u).' '.escapeshellarg($webGroup);
+            $this->runPrivileged($server, $cmd, 120);
+        }
+    }
+
+    /**
      * Removes a Linux account from the host when policy allows.
      *
      * @throws \RuntimeException

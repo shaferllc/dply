@@ -19,7 +19,7 @@
     @endif
 
     <x-explainer>
-        <p>{{ __('Overview counts come from the inventory probe. Other tabs load live data over SSH when you open them. Install or upgrade Docker from Manage → Tools.') }}</p>
+        <p>{{ __('Inspect and manage Docker Engine on this server over SSH — containers, images, volumes, networks, compose projects, and cleanup. Overview counts come from the inventory probe; other tabs load live data when you open them.') }}</p>
     </x-explainer>
 
     @if ($opsReady && ! $isDeployer)

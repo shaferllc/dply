@@ -8,7 +8,7 @@
      past the staleness threshold) — clicking "Stop & revert" opens the
      confirm-action modal which then calls stopAndRevertWebserverSwitch().
      Mirrors {@see WorkspaceManage::stopAndRevertWebserverSwitch()}. --}}
-@if ($webserverSwitchRun !== null && ! $isDeployer && $opsReady)
+@if (($showWebserverSwitchConsole ?? true) && $webserverSwitchRun !== null && ! $isDeployer && $opsReady)
     @if ($webserverSwitchRun->isInFlight())
         @php
             $revertConfirmTitle = __('Stop and revert webserver switch?');

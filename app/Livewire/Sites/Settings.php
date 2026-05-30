@@ -30,6 +30,7 @@ use App\Models\SiteProcess;
 use App\Models\SiteTenantDomain;
 use App\Models\Snapshot;
 use App\Models\Workspace;
+use App\Services\Certificates\CertificateRepairService;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
@@ -2702,6 +2703,34 @@ class Settings extends Show
         $certificate->delete();
 
         $this->toastSuccess('Certificate removed.');
+        $this->site->load('certificates');
+    }
+
+    public function retryCertificate(string $certificateId): void
+    {
+        $this->repairCertificate($certificateId);
+    }
+
+    public function repairCertificate(string $certificateId, CertificateRepairService $repairService): void
+    {
+        $this->authorize('update', $this->site);
+
+        $certificate = $this->site->certificates()->findOrFail($certificateId);
+
+        try {
+            $repairService->repair($this->site, $certificate, auth()->id());
+        } catch (\InvalidArgumentException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+            $this->site->load('certificates');
+
+            return;
+        }
+
+        $this->toastSuccess(__('Certificate repair queued. Dply will re-apply webserver routing and retry Let\'s Encrypt.'));
         $this->site->load('certificates');
     }
 

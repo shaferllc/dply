@@ -124,6 +124,28 @@ it('reconciles fresh inventory using remote state as source of truth', function 
     expect($reconciled['php_new_site_default_version'])->toBe('8.4');
 });
 
+it('preserves a valid user cli default when inventory disagrees with remote detection', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'default_php_version' => '8.3',
+        'php_new_site_default_version' => '8.3',
+        'php_inventory' => [
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.4',
+        ],
+    ]);
+
+    $manager = new ServerPhpManager;
+
+    $reconciled = $manager->reconcileFreshInventory($server, [
+        'installed_versions' => ['8.4', '8.3'],
+        'detected_default_version' => '8.4',
+    ]);
+
+    expect($reconciled['default_php_version'])->toBe('8.3');
+    expect($reconciled['php_inventory']['detected_default_version'])->toBe('8.4');
+});
+
 it('preserves a valid user new site default when inventory disagrees with cached metadata', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
@@ -300,6 +322,117 @@ it('installs a supported version after revalidating fresh inventory', function (
     expect($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.4']);
 });
 
+it('treats install as success when the version is already present on the server', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.3'],
+            'detected_default_version' => '8.3',
+        ],
+    ]);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3', '8.5'],
+            'detected_default_version' => '8.3',
+        ]);
+    $manager->shouldNotReceive('executePackageAction');
+
+    $result = $manager->applyPackageAction($server, 'install', '8.5');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($result['message'])->toBe('PHP 8.5 is already installed.')
+        ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.5']);
+});
+
+it('syncs stale inventory before treating install as already present', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.3'],
+            'detected_default_version' => '8.3',
+        ],
+        'php_inventory_refresh' => [
+            'status' => 'stale',
+            'error' => 'metadata write failed',
+        ],
+    ]);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3', '8.5'],
+            'detected_default_version' => '8.3',
+        ]);
+    $manager->shouldReceive('syncInventorySnapshot')
+        ->once()
+        ->andReturn(true);
+    $manager->shouldNotReceive('executePackageAction');
+
+    $result = $manager->applyPackageAction($server, 'install', '8.5');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($result['message'])->toBe('PHP 8.5 is already installed.')
+        ->and($server->meta['php_inventory_refresh']['status'])->toBe('succeeded')
+        ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.5']);
+});
+
+it('syncs stale inventory before installing a missing version', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.3'],
+            'detected_default_version' => '8.3',
+        ],
+        'php_inventory_refresh' => [
+            'status' => 'stale',
+            'error' => 'metadata write failed',
+        ],
+    ]);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3'],
+            'detected_default_version' => '8.3',
+        ]);
+    $manager->shouldReceive('syncInventorySnapshot')
+        ->once()
+        ->andReturn(true);
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->withArgs(fn (Server $refreshedServer, string $action, string $version) => $refreshedServer->is($server) && $action === 'install' && $version === '8.4');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3', '8.4'],
+            'detected_default_version' => '8.3',
+        ]);
+
+    $result = $manager->applyPackageAction($server, 'install', '8.4');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($server->meta['php_inventory_refresh']['status'])->toBe('succeeded')
+        ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.3', '8.4']);
+});
+
 it('sets the cli default after revalidating fresh inventory', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
@@ -318,7 +451,7 @@ it('sets the cli default after revalidating fresh inventory', function () {
         ->andReturn([
             'supported' => true,
             'installed_versions' => ['8.4', '8.3'],
-            'detected_default_version' => '8.4',
+            'detected_default_version' => '8.3',
         ]);
     $manager->shouldReceive('executePackageAction')->once();
     $manager->shouldReceive('fetchRemoteInventory')
@@ -336,6 +469,74 @@ it('sets the cli default after revalidating fresh inventory', function () {
     expect($result['status'])->toBe('succeeded');
     expect($server->meta['default_php_version'])->toBe('8.4');
     expect($server->meta['php_new_site_default_version'])->toBe('8.3');
+});
+
+it('persists the selected cli default even when the post-action probe still reports the old default', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.3',
+        ],
+        'default_php_version' => '8.3',
+        'php_new_site_default_version' => '8.3',
+    ]);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.3',
+        ]);
+    $manager->shouldReceive('executePackageAction')->once();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.3',
+        ]);
+
+    $result = $manager->applyPackageAction($server, 'set_cli_default', '8.4');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($server->meta['default_php_version'])->toBe('8.4')
+        ->and($server->meta['php_inventory']['detected_default_version'])->toBe('8.4');
+});
+
+it('treats set cli default as success when the version is already the remote default', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.3',
+        ],
+        'default_php_version' => '8.3',
+    ]);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.4',
+        ]);
+    $manager->shouldNotReceive('executePackageAction');
+
+    $result = $manager->applyPackageAction($server, 'set_cli_default', '8.4');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($result['message'])->toBe('PHP 8.4 is already the CLI default.')
+        ->and($server->meta['default_php_version'])->toBe('8.4');
 });
 
 it('sets the new site default without changing the cli default', function () {
@@ -452,15 +653,56 @@ test('the remote inventory script counts fpm packages as installed versions', fu
         {
             return $this->privilegedShellScript($server, $quotedVersions);
         }
+
+        public function uninstallScript(string $version): string
+        {
+            return $this->uninstallPhpScript($version);
+        }
     };
 
     $script = $manager->inventoryScript($server, "'8.3' '8.4'");
 
+    $this->assertStringContainsString('php_runtime_installed', $script);
     $this->assertStringContainsString('"php${version}-cli"', $script);
     $this->assertStringContainsString('"php${version}-fpm"', $script);
-    $this->assertStringContainsString('command -v "php${version}"', $script);
-    $this->assertStringContainsString('command -v "php-fpm${version}"', $script);
-    $this->assertStringContainsString('[ -d "/etc/php/${version}" ]', $script);
+    $this->assertStringContainsString('"php${version}-*"', $script);
+    $this->assertStringNotContainsString('[ -d "/etc/php/${version}" ]', $script);
+
+    $uninstallScript = $manager->uninstallScript('8.5');
+
+    $this->assertStringContainsString('apt-get purge -y', $uninstallScript);
+    $this->assertStringContainsString('php${version}-*', $uninstallScript);
+    $this->assertStringContainsString('rm -rf "/etc/php/${version}"', $uninstallScript);
+});
+
+it('treats uninstall as success when the version is already absent from remote inventory', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.5'],
+            'detected_default_version' => '8.4',
+        ],
+        'default_php_version' => '8.4',
+    ]);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4'],
+            'detected_default_version' => '8.4',
+        ]);
+    $manager->shouldNotReceive('executePackageAction');
+
+    $result = $manager->applyPackageAction($server, 'uninstall', '8.5');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($result['message'])->toBe('PHP 8.5 is not installed.')
+        ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.4']);
 });
 
 it('blocks uninstall when the version is used by a site', function () {
@@ -493,12 +735,12 @@ it('blocks uninstall when the version is used by a site', function () {
     $manager->shouldNotReceive('executePackageAction');
 
     $this->expectException(\RuntimeException::class);
-    $this->expectExceptionMessage('PHP 8.3 is still used by 1 site.');
+    $this->expectExceptionMessage('Upgrade those sites to another installed PHP version before uninstalling');
 
     $manager->applyPackageAction($server, 'uninstall', '8.3');
 });
 
-it('blocks uninstall when the version is the cli default', function () {
+it('reassigns the cli default before uninstalling that version', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
         'php_inventory' => [
@@ -527,14 +769,37 @@ it('blocks uninstall when the version is the cli default', function () {
             'installed_versions' => ['8.4', '8.3'],
             'detected_default_version' => '8.3',
         ]);
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->with(Mockery::type(Server::class), 'set_cli_default', '8.4');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.4',
+        ]);
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->with(Mockery::type(Server::class), 'uninstall', '8.3');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4'],
+            'detected_default_version' => '8.4',
+        ]);
 
-    $this->expectException(\RuntimeException::class);
-    $this->expectExceptionMessage('PHP 8.3 is still the CLI default for this server.');
+    $result = $manager->applyPackageAction($server, 'uninstall', '8.3');
 
-    $manager->applyPackageAction($server, 'uninstall', '8.3');
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($server->meta['default_php_version'])->toBe('8.4')
+        ->and($server->meta['php_inventory']['installed_versions'])->toBe(['8.4']);
 });
 
-it('blocks uninstall when the remote detected cli default differs from stale persisted metadata', function () {
+it('reassigns the remote detected cli default before uninstall even when persisted metadata is stale', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
         'php_inventory' => [
@@ -563,14 +828,33 @@ it('blocks uninstall when the remote detected cli default differs from stale per
             'installed_versions' => ['8.4', '8.3'],
             'detected_default_version' => '8.3',
         ]);
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->with(Mockery::type(Server::class), 'set_cli_default', '8.4');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4', '8.3'],
+            'detected_default_version' => '8.4',
+        ]);
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->with(Mockery::type(Server::class), 'uninstall', '8.3');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4'],
+            'detected_default_version' => '8.4',
+        ]);
 
-    $this->expectException(\RuntimeException::class);
-    $this->expectExceptionMessage('PHP 8.3 is still the CLI default for this server.');
+    $result = $manager->applyPackageAction($server, 'uninstall', '8.3');
 
-    $manager->applyPackageAction($server, 'uninstall', '8.3');
+    expect($result['status'])->toBe('succeeded');
 });
 
-it('blocks uninstall when the version is the new site default', function () {
+it('reassigns the new site default before uninstalling that version', function () {
     $server = makeServerWithMeta([
         'server_role' => 'application',
         'php_inventory' => [
@@ -582,6 +866,15 @@ it('blocks uninstall when the version is the new site default', function () {
         'php_new_site_default_version' => '8.3',
     ]);
 
+    $lock = Mockery::mock();
+    $lock->shouldReceive('get')->once()->andReturn(true);
+    $lock->shouldReceive('release')->once();
+
+    Cache::shouldReceive('lock')
+        ->once()
+        ->with('server-php-package-action:'.$server->id, 630)
+        ->andReturn($lock);
+
     $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
     $manager->shouldReceive('fetchRemoteInventory')
         ->once()
@@ -590,9 +883,60 @@ it('blocks uninstall when the version is the new site default', function () {
             'installed_versions' => ['8.4', '8.3'],
             'detected_default_version' => '8.4',
         ]);
+    $manager->shouldNotReceive('executePackageAction')
+        ->with(Mockery::type(Server::class), 'set_cli_default', Mockery::any());
+    $manager->shouldReceive('executePackageAction')
+        ->once()
+        ->with(Mockery::type(Server::class), 'uninstall', '8.3');
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.4'],
+            'detected_default_version' => '8.4',
+        ]);
+
+    $result = $manager->applyPackageAction($server, 'uninstall', '8.3');
+
+    $server->refresh();
+
+    expect($result['status'])->toBe('succeeded')
+        ->and($server->meta['php_new_site_default_version'])->toBe('8.4');
+});
+
+it('blocks uninstall when the version is still a default and no other php version is installed', function () {
+    $server = makeServerWithMeta([
+        'server_role' => 'application',
+        'php_inventory' => [
+            'supported' => true,
+            'installed_versions' => ['8.3'],
+            'detected_default_version' => '8.3',
+        ],
+        'default_php_version' => '8.3',
+        'php_new_site_default_version' => '8.3',
+    ]);
+
+    $lock = Mockery::mock();
+    $lock->shouldReceive('get')->once()->andReturn(true);
+    $lock->shouldReceive('release')->once();
+
+    Cache::shouldReceive('lock')
+        ->once()
+        ->with('server-php-package-action:'.$server->id, 630)
+        ->andReturn($lock);
+
+    $manager = Mockery::mock(ServerPhpManager::class)->makePartial()->shouldAllowMockingProtectedMethods();
+    $manager->shouldReceive('fetchRemoteInventory')
+        ->once()
+        ->andReturn([
+            'supported' => true,
+            'installed_versions' => ['8.3'],
+            'detected_default_version' => '8.3',
+        ]);
+    $manager->shouldNotReceive('executePackageAction');
 
     $this->expectException(\RuntimeException::class);
-    $this->expectExceptionMessage('PHP 8.3 is still the default for new PHP sites on this server.');
+    $this->expectExceptionMessage('Install another PHP version before uninstalling PHP 8.3 while it is still a server default.');
 
     $manager->applyPackageAction($server, 'uninstall', '8.3');
 });

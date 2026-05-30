@@ -81,6 +81,34 @@ test('console action lookup forget refreshes inflight state after seed', functio
     expect($lookup->hasInflightWebserverSwitch($server))->toBeTrue();
 });
 
+test('console action lookup scopes banner to server workspace', function (): void {
+    $server = Server::factory()->create();
+
+    ConsoleAction::query()->create([
+        'subject_type' => $server->getMorphClass(),
+        'subject_id' => $server->id,
+        'kind' => 'edge_proxy',
+        'status' => ConsoleAction::STATUS_RUNNING,
+        'label' => 'Installing Envoy…',
+        'output' => ['v' => 1, 'lines' => []],
+    ]);
+
+    ConsoleAction::query()->create([
+        'subject_type' => $server->getMorphClass(),
+        'subject_id' => $server->id,
+        'kind' => 'webserver_switch',
+        'status' => ConsoleAction::STATUS_COMPLETED,
+        'label' => 'Switching webserver…',
+        'output' => ['v' => 1, 'lines' => []],
+    ]);
+
+    $lookup = app(ServerConsoleActionLookup::class);
+
+    expect($lookup->bannerFor($server, 'webserver')?->kind)->toBe('webserver_switch')
+        ->and($lookup->bannerFor($server, 'edge-proxy')?->kind)->toBe('edge_proxy')
+        ->and($lookup->bannerFor($server)?->kind)->toBe('edge_proxy');
+});
+
 test('console action lookup skips server refresh when banner is idle', function (): void {
     $server = Server::factory()->create();
     $lookup = app(ServerConsoleActionLookup::class);

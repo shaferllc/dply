@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Edge\EdgeLogApiController;
 use App\Http\Controllers\Api\Edge\EdgePreviewApiController;
 use App\Http\Controllers\Api\Edge\EdgeSiteApiController;
 use App\Http\Controllers\Api\Edge\EdgeUsageApiController;
+use App\Http\Controllers\Api\EdgeEnvController;
 use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Api\OperatorReadmeController;
 use App\Http\Controllers\Api\OperatorSummaryController;
 use App\Http\Controllers\Api\ServerController;
 use App\Http\Controllers\Api\ServerFirewallController;
+use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
 use Illuminate\Support\Facades\Route;
 
@@ -54,10 +56,20 @@ Route::prefix('v1')->group(function (): void {
 
     Route::middleware(['auth.api', 'throttle:api'])->group(function () use ($apiAbilities): void {
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
-        // POST /servers/{id}/deploy was removed when the deploy_command
-        // column was dropped — there's no field for it to write to or
-        // execute against. /run-command stays for ad-hoc remote execution.
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
+
+        Route::get('/servers/{server}/system-users', [ServerSystemUserApiController::class, 'index'])
+            ->middleware('ability:'.$apiAbilities['servers.system_users.index']);
+        Route::post('/servers/{server}/system-users/sync', [ServerSystemUserApiController::class, 'sync'])
+            ->middleware('ability:'.$apiAbilities['servers.system_users.sync']);
+        Route::post('/servers/{server}/system-users', [ServerSystemUserApiController::class, 'store'])
+            ->middleware('ability:'.$apiAbilities['servers.system_users.store']);
+        Route::patch('/servers/{server}/system-users/{username}', [ServerSystemUserApiController::class, 'update'])
+            ->middleware('ability:'.$apiAbilities['servers.system_users.update'])
+            ->where('username', '[a-zA-Z0-9._-]+');
+        Route::delete('/servers/{server}/system-users/{username}', [ServerSystemUserApiController::class, 'destroy'])
+            ->middleware('ability:'.$apiAbilities['servers.system_users.destroy'])
+            ->where('username', '[a-zA-Z0-9._-]+');
 
         Route::get('/servers/{server}/firewall', [ServerFirewallController::class, 'show'])->middleware('ability:'.$apiAbilities['firewall.show']);
         Route::post('/servers/{server}/firewall/apply', [ServerFirewallController::class, 'apply'])->middleware('ability:'.$apiAbilities['firewall.apply']);
@@ -136,14 +148,14 @@ Route::prefix('v1')->group(function (): void {
             // P-env: per-site environment variables. Values are
             // encrypted at rest + never returned by GET — list shows
             // keys + updated_at only.
-            Route::get('/sites/{site}/env', [\App\Http\Controllers\Api\EdgeEnvController::class, 'index'])
+            Route::get('/sites/{site}/env', [EdgeEnvController::class, 'index'])
                 ->middleware('ability:'.$apiAbilities['edge.env.index']);
-            Route::put('/sites/{site}/env', [\App\Http\Controllers\Api\EdgeEnvController::class, 'bulkUpdate'])
+            Route::put('/sites/{site}/env', [EdgeEnvController::class, 'bulkUpdate'])
                 ->middleware('ability:'.$apiAbilities['edge.env.update']);
-            Route::patch('/sites/{site}/env/{key}', [\App\Http\Controllers\Api\EdgeEnvController::class, 'upsert'])
+            Route::patch('/sites/{site}/env/{key}', [EdgeEnvController::class, 'upsert'])
                 ->middleware('ability:'.$apiAbilities['edge.env.upsert'])
                 ->where('key', '[A-Z][A-Z0-9_]{0,127}');
-            Route::delete('/sites/{site}/env/{key}', [\App\Http\Controllers\Api\EdgeEnvController::class, 'destroy'])
+            Route::delete('/sites/{site}/env/{key}', [EdgeEnvController::class, 'destroy'])
                 ->middleware('ability:'.$apiAbilities['edge.env.destroy'])
                 ->where('key', '[A-Z][A-Z0-9_]{0,127}');
         });

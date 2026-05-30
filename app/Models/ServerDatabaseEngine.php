@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -65,10 +66,6 @@ class ServerDatabaseEngine extends Model
      */
     public static function defaultPortFor(string $engine): int
     {
-        return match (true) {
-            str_starts_with($engine, 'postgres') => 5432,
-            str_starts_with($engine, 'sqlite') => 0,
-            default => 3306,
-        };
+        return DatabaseEngineInstallScripts::defaultPortFor($engine);
     }
 }

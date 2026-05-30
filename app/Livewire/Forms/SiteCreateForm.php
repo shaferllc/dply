@@ -38,6 +38,12 @@ class SiteCreateForm extends Form
 
     public string $type = 'php';
 
+    /**
+     * VM deploy target: native stack (PHP-FPM / static / Node proxy) or Docker
+     * container published on a host port and routed via the server webserver.
+     */
+    public string $deploy_stack = 'native';
+
     public string $document_root = '/var/www/app/public';
 
     public string $repository_path = self::DEFAULT_DEPLOY_PATH;

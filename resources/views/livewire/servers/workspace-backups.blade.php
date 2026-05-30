@@ -97,3 +97,5 @@
         @include('livewire.servers.partials.backups._workspace-content')
     </x-server-workspace-layout>
 @endif
+
+@include('livewire.partials.confirm-action-modal')

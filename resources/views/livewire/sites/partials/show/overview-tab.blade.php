@@ -170,14 +170,7 @@
                         @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
                             <p class="text-sm font-medium text-emerald-700">{{ __('No blocking preflight issues.') }}</p>
                         @else
-                            <div class="space-y-2">
-                                @foreach ($preflightErrors as $error)
-                                    <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{{ $error }}</p>
-                                @endforeach
-                                @foreach ($preflightWarnings as $warning)
-                                    <p class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{{ $warning }}</p>
-                                @endforeach
-                            </div>
+                            <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
                         @endif
                         </div>
                     </section>

@@ -10,6 +10,7 @@ class ContainerPublicationManager
 {
     public function __construct(
         private readonly LocalPublishedPortAllocator $portAllocator,
+        private readonly InternalPortAllocator $internalPortAllocator,
         private readonly TestingHostnameProvisioner $testingHostnameProvisioner,
     ) {}
 
@@ -37,6 +38,38 @@ class ContainerPublicationManager
                 'published_at' => now()->toIso8601String(),
             ]);
             $runtimeTarget['status'] = $runtimeTarget['status'] ?? 'pending';
+        } elseif ($site->usesVmDockerRuntime()) {
+            $port = (int) ($publication['port'] ?? 0);
+            if ($port <= 0) {
+                $allocated = $this->internalPortAllocator->allocate((string) $site->server_id);
+                if ($allocated === null) {
+                    throw new \RuntimeException('No free internal port available on this server (range 30000–39999 is full).');
+                }
+                $port = $allocated;
+            }
+
+            $preview = $this->testingHostnameProvisioner->provision($site);
+            $preview = $preview?->fresh();
+
+            $runtimeTarget['publication'] = array_merge($publication, [
+                'kind' => 'vm_host_port',
+                'hostname' => $preview?->hostname,
+                'url' => $preview?->hostname ? 'http://'.$preview->hostname : null,
+                'port' => $port,
+                'dns_provider' => $preview?->provider_type,
+                'status' => $preview?->dns_status ?? 'pending',
+                'published_at' => now()->toIso8601String(),
+            ]);
+            $runtimeTarget['status'] = $runtimeTarget['status'] ?? 'pending';
+            $runtimeTarget['vm_docker'] = true;
+
+            $meta['runtime_target'] = $runtimeTarget;
+            $site->forceFill([
+                'meta' => $meta,
+                'internal_port' => $port,
+            ])->save();
+
+            return;
         } else {
             $preview = $this->testingHostnameProvisioner->provision($site);
             $preview = $preview?->fresh();

@@ -26,20 +26,26 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class DeviceApproval extends Component
 {
-    public const DEFAULT_ABILITIES = ['edge.read', 'edge.deploy', 'edge.write'];
+    /** @var list<string> */
+    public array $selectedAbilities = [];
 
     #[Url(as: 'user_code', except: '')]
     public string $userCode = '';
 
     public ?string $organizationId = null;
 
-    /** @var list<string> */
-    public array $selectedAbilities = self::DEFAULT_ABILITIES;
-
     public ?string $resolvedUserCode = null;
 
     /** Set to one of: approved | denied — gates the "all done" view. */
     public ?string $completedState = null;
+
+    /**
+     * @return list<string>
+     */
+    public static function defaultAbilities(): array
+    {
+        return array_values(config('cli.device_flow_abilities', []));
+    }
 
     public function mount(): void
     {
@@ -48,8 +54,6 @@ class DeviceApproval extends Component
             $this->organizationId = (string) $org->id;
         }
 
-        // Default the selection to only the scopes this user's org role can
-        // actually grant — deploy/write are admin/deployer-gated below.
         $this->selectedAbilities = $this->grantableAbilities();
 
         if ($this->userCode !== '') {
@@ -80,15 +84,14 @@ class DeviceApproval extends Component
             return [];
         }
 
-        if ($org->hasAdminAccess($user)) {
-            return self::DEFAULT_ABILITIES;
-        }
+        $catalog = self::defaultAbilities();
+        $roleCap = match (true) {
+            $org->hasAdminAccess($user) => config('cli.device_flow_role_caps.admin', []),
+            $org->userIsDeployer($user) => config('cli.device_flow_role_caps.deployer', []),
+            default => config('cli.device_flow_role_caps.member', []),
+        };
 
-        if ($org->userIsDeployer($user)) {
-            return array_values(array_intersect(self::DEFAULT_ABILITIES, ['edge.read', 'edge.deploy']));
-        }
-
-        return array_values(array_intersect(self::DEFAULT_ABILITIES, ['edge.read']));
+        return array_values(array_intersect($catalog, $roleCap));
     }
 
     public function lookup(): void
@@ -139,7 +142,7 @@ class DeviceApproval extends Component
             return;
         }
 
-        $selected = array_values(array_intersect($this->selectedAbilities, self::DEFAULT_ABILITIES));
+        $selected = array_values(array_intersect($this->selectedAbilities, self::defaultAbilities()));
         if ($selected === []) {
             $this->addError('selectedAbilities', __('Pick at least one scope.'));
 
@@ -167,7 +170,7 @@ class DeviceApproval extends Component
         $created = ApiToken::createToken(
             $user,
             $org,
-            __('dply CLI'),
+            (string) config('cli.token_name', 'dply CLI'),
             null,
             $abilities,
             null,
@@ -257,11 +260,14 @@ class DeviceApproval extends Component
             : collect();
 
         $grantable = $this->grantableAbilities();
-        $availableScopes = array_values(array_filter([
-            ['ability' => 'edge.read', 'label' => __('Read Edge sites, deployments, and logs')],
-            ['ability' => 'edge.deploy', 'label' => __('Deploy, roll back, promote previews')],
-            ['ability' => 'edge.write', 'label' => __('Manage custom domains and cache')],
-        ], fn (array $scope): bool => in_array($scope['ability'], $grantable, true)));
+        $labels = (array) config('cli.device_flow_scope_labels', []);
+        $availableScopes = array_values(array_map(
+            fn (string $ability): array => [
+                'ability' => $ability,
+                'label' => __((string) ($labels[$ability] ?? $ability)),
+            ],
+            $grantable,
+        ));
 
         return view('livewire.auth.device-approval', [
             'organizations' => $organizations,

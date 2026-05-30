@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteWebserverConfigProfile;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\VmDockerSiteConfigSupport;
 
 class NginxSiteConfigBuilder
 {
@@ -38,6 +39,10 @@ class NginxSiteConfigBuilder
 
         $names = $hostnames->implode(' ');
         $basename = $site->nginxConfigBasename();
+
+        if (VmDockerSiteConfigSupport::applies($site)) {
+            return $this->vmDockerProxyBlock($site, $basename, $names, $profile, $listenPort);
+        }
 
         if ($site->isSuspended()) {
             return $this->suspendedBlock($site, $basename, $names);
@@ -573,5 +578,98 @@ NGINX;
     protected function escapeNginxDoubleQuoted(string $url): string
     {
         return str_replace(['\\', '"', '$'], ['\\\\', '\\"', '\\$'], $url);
+    }
+
+    protected function vmDockerProxyBlock(
+        Site $site,
+        string $basename,
+        string $names,
+        ?SiteWebserverConfigProfile $profile,
+        ?int $listenPort,
+    ): string {
+        if ($site->isSuspended()) {
+            return $this->suspendedBlock($site, $basename, $names);
+        }
+
+        $port = VmDockerSiteConfigSupport::upstreamPort($site);
+        $redirects = $site->redirects->sortBy('sort_order')->values();
+        $redirectBlock = '';
+        foreach ($redirects as $r) {
+            $kind = $r->kind instanceof SiteRedirectKind ? $r->kind : SiteRedirectKind::Http;
+            $from = SiteRedirectConfigSupport::sanitizeFromPath((string) $r->from_path);
+            if ($from === '') {
+                continue;
+            }
+            if ($kind === SiteRedirectKind::InternalRewrite) {
+                $to = SiteRedirectConfigSupport::sanitizeInternalTarget((string) $r->to_url);
+                if ($to === '') {
+                    continue;
+                }
+                $pattern = '^'.preg_quote($from, '#').'$';
+                $repl = SiteRedirectConfigSupport::escapeNginxRewriteReplacement($to);
+                $redirectBlock .= "    rewrite {$pattern} {$repl} last;\n";
+
+                continue;
+            }
+            $to = $this->escapeNginxDoubleQuoted((string) $r->to_url);
+            $code = (int) $r->status_code;
+            if ($to === '' || ! in_array($code, SiteRedirectConfigSupport::allowedHttpRedirectStatusCodes(), true)) {
+                continue;
+            }
+            $headers = SiteRedirectConfigSupport::normalizeResponseHeaders($r->response_headers ?? null);
+            if ($headers !== []) {
+                $redirectBlock .= "    location = {$from} {\n";
+                foreach ($headers as $h) {
+                    $hv = SiteRedirectConfigSupport::escapeNginxHeaderDirectiveValue($h['value']);
+                    $redirectBlock .= '        add_header '.$h['name'].' "'.$hv."\" always;\n";
+                }
+                $redirectBlock .= "        return {$code} \"{$to}\";\n    }\n";
+            } else {
+                $redirectBlock .= "    location = {$from} { return {$code} \"{$to}\"; }\n";
+            }
+        }
+
+        $useLayerIncludes = $profile && $profile->mode === SiteWebserverConfigProfile::MODE_LAYERED;
+        $mainSource = $profile ? ($profile->main_snippet_body ?? $site->nginx_extra_raw) : $site->nginx_extra_raw;
+        $extra = trim((string) ($mainSource ?? ''));
+        $layerPrefix = '';
+        if ($useLayerIncludes) {
+            $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
+            $layerPrefix = "    include {$base}/before/*.conf;\n";
+        }
+        if ($useLayerIncludes) {
+            $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
+            $mainBlock = $extra !== '' ? "\n    ".str_replace("\n", "\n    ", $extra)."\n" : "\n";
+            $extraBlock = $mainBlock."    include {$base}/after/*.conf;\n";
+        } else {
+            $extraBlock = $extra !== '' ? "\n    ".$extra."\n" : '';
+        }
+
+        $webRoot = rtrim($site->effectiveDocumentRootForNginx(), '/');
+        $nodeBa = $this->nginxBasicAuthNodeFragments($site, $webRoot);
+        $proxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
+
+        $config = <<<NGINX
+# Managed by Dply — {$basename} (vm docker)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {$names};
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
+{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$nodeBa['prefix_locations']}
+    location / {
+{$nodeBa['location_slash_auth']}        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+{$proxyCache}        proxy_pass http://127.0.0.1:{$port};
+    }
+{$extraBlock}
+}
+NGINX;
+
+        return $listenPort === null ? $config : $this->rewriteForListenPort($config, $listenPort);
     }
 }

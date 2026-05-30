@@ -1338,6 +1338,24 @@ class Site extends Model
         return $this->runtimeProfile() === 'docker_web';
     }
 
+    /**
+     * Docker workload on a BYO VM: compose deploy + host port, routed via the
+     * server's normal webserver (Caddy/Nginx) to {@see internal_port}.
+     */
+    public function usesVmDockerRuntime(): bool
+    {
+        if (! $this->usesDockerRuntime()) {
+            return false;
+        }
+
+        if ($this->server?->isDockerHost() || $this->usesLocalDockerHostRuntime()) {
+            return false;
+        }
+
+        return $this->runtimeTargetFamily() === 'byo_vm_docker'
+            || data_get($this->meta, 'runtime_target.vm_docker') === true;
+    }
+
     public function usesKubernetesRuntime(): bool
     {
         return $this->runtimeProfile() === 'kubernetes_web';
@@ -2045,7 +2063,7 @@ class Site extends Model
     {
         return match ($this->runtimeTargetFamily()) {
             'local_orbstack_kubernetes', 'digitalocean_kubernetes', 'aws_kubernetes', 'kubernetes' => 'kubernetes',
-            'local_orbstack_docker', 'digitalocean_docker', 'aws_docker', 'docker' => 'docker',
+            'local_orbstack_docker', 'digitalocean_docker', 'aws_docker', 'docker', 'byo_vm_docker' => 'docker',
             'digitalocean_functions', 'aws_lambda' => 'serverless',
             default => 'vm',
         };

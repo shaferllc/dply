@@ -21,9 +21,16 @@
                         'routers' => __('Routers'),
                         'services' => __('Services'),
                         'middlewares' => __('Middlewares'),
+                        'entrypoints' => __('Entry points'),
+                        'tcprouters' => __('TCP routers'),
+                        'tcpservices' => __('TCP services'),
+                        'udprouters' => __('UDP routers'),
+                        'udpservices' => __('UDP services'),
+                        'tls' => __('TLS'),
                         'providers' => __('Providers'),
                         'frontends' => __('Frontends'),
                         'backends' => __('Backends'),
+                        'clusters' => __('Clusters'),
                         'ssl' => __('SSL'),
                         'runtime' => __('Runtime'),
                         default => $engine_subtab,
@@ -49,11 +56,20 @@
                         'traefik/routers' => __('HTTP routers from /api/http/routers — rule, service, middleware chain, entry-points, status, provider.'),
                         'traefik/services' => __('HTTP services from /api/http/services — load balancer servers + server status.'),
                         'traefik/middlewares' => __('HTTP middlewares from /api/http/middlewares — basicAuth, headers, redirects, rate limits, etc.'),
+                        'traefik/entrypoints' => __('Entry points from /api/entrypoints — listen addresses and transport (HTTP/TCP/UDP).'),
+                        'traefik/tcprouters' => __('TCP routers from /api/tcp/routers — HostSNI rules and backend services.'),
+                        'traefik/tcpservices' => __('TCP services from /api/tcp/services — load balancer targets.'),
+                        'traefik/udprouters' => __('UDP routers from /api/udp/routers — packet routing rules.'),
+                        'traefik/udpservices' => __('UDP services from /api/udp/services — load balancer targets.'),
+                        'traefik/tls' => __('TLS certificate stores from /api/tls/stores.'),
                         'traefik/providers' => __('Config providers contributing routers/services (file, docker, kubernetes, etc.).'),
                         'haproxy/frontends' => __('Per-frontend stats from `show stat` — current sessions, total, rate, 2xx/5xx counts.'),
                         'haproxy/backends' => __('Per-backend rollup with member servers + per-server health check status.'),
                         'haproxy/ssl' => __('Loaded SSL certificate paths from `show ssl cert`.'),
                         'haproxy/runtime' => __('Runtime info from `show info` + memory pool summary from `show pools`.'),
+                        'envoy/listeners' => __('HTTP listeners from the admin API — bind addresses and names.'),
+                        'envoy/clusters' => __('Upstream clusters with host health from /clusters?format=json.'),
+                        'envoy/runtime' => __('Process info from /server_info — version, uptime, connections.'),
                         default => '',
                     };
                 @endphp
@@ -125,6 +141,8 @@
                     @php
                         $rows = $liveUnits[$engine_subtab] ?? [];
                         $liveStateProbed = $liveState !== null && $liveCapturedAt !== null;
+                        $liveStateStandby = (bool) data_get($liveState?->engineSpecific ?? [], 'standby', false);
+                        $liveStateStandbyReason = (string) data_get($liveState?->engineSpecific ?? [], 'standby_reason', '');
                         $liveStateErrors = array_values(array_filter((array) data_get($liveState?->engineSpecific ?? [], 'errors', [])));
                         $liveStateEmptyMessage = match ($key.'/'.$engine_subtab) {
                             'nginx/hosts' => __('No server blocks found in `nginx -T`.'),
@@ -142,8 +160,12 @@
                             'openlitespeed/listeners' => __('No listener blocks found in httpd_config.conf.'),
                             'openlitespeed/extapps' => __('No external applications referenced by vhosts.'),
                             'openlitespeed/cache' => __('No LSCache rtreport data found.'),
-                            'traefik/routers', 'traefik/services', 'traefik/middlewares', 'traefik/providers' => __('Nothing returned from the Traefik API for this view.'),
+                            'traefik/routers', 'traefik/services', 'traefik/middlewares', 'traefik/entrypoints',
+                            'traefik/entrypoints' => __('No entry points from the API — use Manage entry points above (reads traefik.yml).'),
+                            'traefik/providers' => __('No routers or services are registered yet. Enable providers above, add custom routers, or provision sites — then refresh.'),
+                            'traefik/tcprouters', 'traefik/tcpservices', 'traefik/udprouters', 'traefik/udpservices', 'traefik/tls' => __('Nothing returned from the Traefik API for this view.'),
                             'haproxy/frontends', 'haproxy/backends', 'haproxy/ssl', 'haproxy/runtime' => __('Nothing returned from HAProxy stats for this view.'),
+                            'envoy/listeners', 'envoy/clusters', 'envoy/runtime' => __('Nothing returned from the Envoy admin API for this view.'),
                             default => __('Nothing to show for this view.'),
                         };
                         // For the vhosts table, resolve each row name back to a Site so
@@ -199,7 +221,13 @@
                             </p>
                         </div>
                     @endif
-                    @if ($liveStateErrors !== [])
+                    @if ($liveStateStandby)
+                        <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50/70 px-6 py-4 text-sm text-amber-950">
+                            <p class="font-semibold">{{ __('Engine on standby') }}</p>
+                            <p class="mt-1 leading-relaxed">{{ $liveStateStandbyReason !== '' ? $liveStateStandbyReason : __('This edge proxy is not running on this server.') }}</p>
+                            <p class="mt-2 text-[13px] text-amber-900/80">{{ __('Live routing tables appear here when this engine is the active edge proxy on port :port.', ['port' => 80]) }}</p>
+                        </div>
+                    @elseif ($liveStateErrors !== [])
                         <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50/70 px-6 py-4 text-sm text-rose-900">
                             <p class="font-semibold">{{ __('Probe reported problems') }}</p>
                             <ul class="mt-2 list-inside list-disc space-y-1 font-mono text-xs">
@@ -321,10 +349,44 @@
                                                 <th class="px-4 py-2 font-medium">{{ __('Kind') }}</th>
                                                 @break
                                             @case('routers')
+                                            @case('tcprouters')
                                                 <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Rule') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Service') }}</th>
-                                                <th class="px-4 py-2 font-medium">{{ __('Middlewares') }}</th>
+                                                @if ($engine_subtab === 'routers')
+                                                    <th class="px-4 py-2 font-medium">{{ __('Middlewares') }}</th>
+                                                @endif
+                                                <th class="px-4 py-2 font-medium">{{ __('Entry points') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                                @break
+                                            @case('entrypoints')
+                                                <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Address') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Transport') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                                @break
+                                            @case('tcpservices')
+                                                <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Servers') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Provider') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                                @break
+                                            @case('udprouters')
+                                                <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Service') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Entry points') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                                @break
+                                            @case('udpservices')
+                                                <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Servers') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Provider') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                                @break
+                                            @case('tls')
+                                                <th class="px-4 py-2 font-medium">{{ __('Store') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Subject') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('SANs') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
                                                 @break
                                             @case('services')
@@ -357,6 +419,12 @@
                                                 <th class="px-4 py-2 font-medium">{{ __('Servers') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Sess (cur/tot)') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('5xx') }}</th>
+                                                @break
+                                            @case('clusters')
+                                                <th class="px-4 py-2 font-medium">{{ __('Cluster') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Hosts') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Healthy (cur/tot)') }}</th>
                                                 @break
                                             @case('ssl')
                                                 <th class="px-4 py-2 font-medium">{{ __('Path') }}</th>
@@ -561,10 +629,14 @@
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-moss">{{ $row['value'] ?? '—' }}</td>
                                                     @break
                                                 @case('routers')
+                                                @case('tcprouters')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['rule'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['service'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['middlewares'] ?? []) ?: '—' }}</td>
+                                                    @if ($engine_subtab === 'routers')
+                                                        <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['middlewares'] ?? []) ?: '—' }}</td>
+                                                    @endif
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['entry_points'] ?? []) ?: '—' }}</td>
                                                     <td class="px-4 py-2 text-xs">
                                                         @php $st = strtoupper((string) ($row['status'] ?? '')); @endphp
                                                         <span @class([
@@ -575,6 +647,36 @@
                                                             'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($st, ['ENABLED', 'WARNING', 'DISABLED', 'ERROR'], true),
                                                         ])>{{ $st ?: '—' }}</span>
                                                     </td>
+                                                    @break
+                                                @case('entrypoints')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['address'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['transport'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
+                                                    @break
+                                                @case('tcpservices')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['provider'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
+                                                    @break
+                                                @case('udprouters')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['service'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['entry_points'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
+                                                    @break
+                                                @case('udpservices')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['provider'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
+                                                    @break
+                                                @case('tls')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['store'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['subject'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['sans'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs">{{ $row['status'] ?? '—' }}</td>
                                                     @break
                                                 @case('services')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
@@ -634,6 +736,33 @@
                                                     </td>
                                                     <td class="px-4 py-2 font-mono tabular-nums text-xs text-brand-moss">{{ ($row['sessions_current'] ?? 0).' / '.number_format((int) ($row['sessions_total'] ?? 0)) }}</td>
                                                     <td class="px-4 py-2 tabular-nums text-xs text-rose-700">{{ number_format((int) ($row['hrsp_5xx'] ?? 0)) }}</td>
+                                                    @break
+                                                @case('clusters')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs">
+                                                        @php $st = strtoupper((string) ($row['status'] ?? '')); @endphp
+                                                        <span @class([
+                                                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
+                                                            'bg-emerald-50 text-emerald-700 ring-emerald-200' => $st === 'UP',
+                                                            'bg-amber-50 text-amber-800 ring-amber-200' => $st === 'DEGRADED',
+                                                            'bg-rose-50 text-rose-700 ring-rose-200' => str_contains($st, 'DOWN'),
+                                                            'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($st, ['UP', 'DEGRADED'], true) && ! str_contains($st, 'DOWN'),
+                                                        ])>{{ $st ?: '—' }}</span>
+                                                    </td>
+                                                    <td class="px-4 py-2 text-[11px] text-brand-moss">
+                                                        @foreach (($row['servers'] ?? []) as $srv)
+                                                            <div class="inline-flex items-center gap-1 mr-2">
+                                                                <span class="font-mono">{{ $srv['name'] }}</span>
+                                                                <span @class([
+                                                                    'text-[10px]',
+                                                                    'text-emerald-700' => strtoupper($srv['status'] ?? '') === 'UP',
+                                                                    'text-rose-700' => str_contains(strtoupper($srv['status'] ?? ''), 'DOWN'),
+                                                                ])>{{ $srv['status'] ?? '' }}</span>
+                                                            </div>
+                                                        @endforeach
+                                                        @if (empty($row['servers']))—@endif
+                                                    </td>
+                                                    <td class="px-4 py-2 font-mono tabular-nums text-xs text-brand-moss">{{ ($row['sessions_current'] ?? 0).' / '.number_format((int) ($row['sessions_total'] ?? 0)) }}</td>
                                                     @break
                                                 @case('ssl')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['path'] ?? '—' }}</td>

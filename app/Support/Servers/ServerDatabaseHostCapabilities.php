@@ -20,16 +20,16 @@ class ServerDatabaseHostCapabilities
     ) {}
 
     /**
-     * @return array{mysql: bool, postgres: bool, sqlite: bool}
+     * @return array{mysql: bool, mariadb: bool, postgres: bool, mongodb: bool, clickhouse: bool, sqlite: bool}
      */
     public function forServer(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
-            return ['mysql' => false, 'postgres' => false, 'sqlite' => false];
+            return DatabaseWorkspaceEngines::defaultCapabilities();
         }
 
         $ttl = max(0, (int) config('server_database.capabilities_cache_ttl_seconds', 120));
-        $key = 'server.'.$server->id.'.database_host_capabilities_v3';
+        $key = 'server.'.$server->id.'.database_host_capabilities_v5';
 
         if ($ttl === 0) {
             return $this->probe($server);
@@ -41,20 +41,24 @@ class ServerDatabaseHostCapabilities
     public function forget(Server $server): void
     {
         Cache::forget('server.'.$server->id.'.database_host_capabilities_v3');
+        Cache::forget('server.'.$server->id.'.database_host_capabilities_v4');
     }
 
     /**
-     * @return array{mysql: bool, postgres: bool, sqlite: bool}
+     * @return array{mysql: bool, mariadb: bool, postgres: bool, mongodb: bool, clickhouse: bool, sqlite: bool}
      */
     public function probe(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
-            return ['mysql' => false, 'postgres' => false, 'sqlite' => false];
+            return DatabaseWorkspaceEngines::defaultCapabilities();
         }
 
         return [
             'mysql' => $this->remoteExec->probeMysql($server),
+            'mariadb' => $this->remoteExec->probeMariadb($server),
             'postgres' => $this->remoteExec->probePostgres($server),
+            'mongodb' => $this->remoteExec->probeMongodb($server),
+            'clickhouse' => $this->remoteExec->probeClickhouse($server),
             'sqlite' => $this->remoteExec->probeSqlite($server),
         ];
     }

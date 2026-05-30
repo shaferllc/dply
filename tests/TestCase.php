@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 
@@ -17,6 +18,8 @@ abstract class TestCase extends BaseTestCase
 
     protected function setUp(): void
     {
+        $this->guardAgainstDestructiveDatabaseTarget();
+
         parent::setUp();
 
         // Production Livewire actions (e.g. server log tailing) call set_time_limit()
@@ -57,5 +60,51 @@ abstract class TestCase extends BaseTestCase
         }
 
         parent::tearDown();
+    }
+
+    /**
+     * RefreshDatabase runs migrate:fresh — refuse to run it against a non-test DB.
+     */
+    protected function guardAgainstDestructiveDatabaseTarget(): void
+    {
+        if (! $this->usesRefreshDatabase()) {
+            return;
+        }
+
+        // Runs before parent::setUp() — use env vars, not config().
+        $connection = (string) (getenv('DB_CONNECTION') ?: $_ENV['DB_CONNECTION'] ?? 'pgsql');
+        $database = (string) (getenv('DB_DATABASE') ?: $_ENV['DB_DATABASE'] ?? '');
+
+        if ($database === '' && $connection === 'pgsql') {
+            $database = 'dply_testing';
+        }
+
+        $allowed = array_values(array_filter(array_map(
+            trim(...),
+            explode(',', (string) (getenv('DPLY_TESTING_DATABASES') ?: $_ENV['DPLY_TESTING_DATABASES'] ?? 'dply_testing')),
+        )));
+
+        if ($allowed === []) {
+            $allowed = ['dply_testing'];
+        }
+
+        if (! in_array($database, $allowed, true)) {
+            throw new \RuntimeException(sprintf(
+                'Refusing to run RefreshDatabase tests against [%s] on connection [%s]. '
+                .'Use a dedicated test database (default: dply_testing). '
+                .'phpunit.xml sets DB_DATABASE=dply_testing — check .env DB_URL / DB_DATABASE overrides.',
+                $database,
+                $connection,
+            ));
+        }
+    }
+
+    protected function usesRefreshDatabase(): bool
+    {
+        return in_array(
+            RefreshDatabase::class,
+            class_uses_recursive(static::class),
+            true,
+        );
     }
 }

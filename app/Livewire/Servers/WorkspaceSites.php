@@ -43,6 +43,11 @@ class WorkspaceSites extends Component
     public bool $showRedeployAllModal = false;
 
     /**
+     * @var list<string>
+     */
+    public array $selectedSiteIds = [];
+
+    /**
      * @var list<array{id: string, label: string}>
      */
     public array $phpVersions = [];
@@ -140,10 +145,31 @@ class WorkspaceSites extends Component
         $this->showAddSiteModal = false;
     }
 
+    public function selectAllSites(): void
+    {
+        $this->selectedSiteIds = $this->server->sites
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    public function clearSiteSelection(): void
+    {
+        $this->selectedSiteIds = [];
+    }
+
     public function openRedeployAllModal(): void
     {
         abort_unless(Feature::active('workspace.bulk_site_actions'), 404);
         $this->authorize('update', $this->server);
+
+        if ($this->selectedBulkPreview['redeploy_count'] === 0) {
+            $this->toastError(__('No deployable sites are ready in your selection.'));
+
+            return;
+        }
+
         $this->showRedeployAllModal = true;
         $this->dispatch('open-modal', 'redeploy-all-sites');
     }
@@ -159,22 +185,42 @@ class WorkspaceSites extends Component
         abort_unless(Feature::active('workspace.bulk_site_actions'), 404);
         $this->authorize('update', $this->server);
 
-        $preview = $bulkActions->preview($this->server);
+        $preview = $this->selectedBulkPreview;
         if ($preview['redeploy_count'] === 0) {
             $this->closeRedeployAllModal();
-            $this->toastError(__('No deployable sites are ready on this server.'));
+            $this->toastError(__('No deployable sites are ready in your selection.'));
 
             return;
         }
 
-        $result = $bulkActions->redeployAll($this->server, auth()->user());
+        $result = $bulkActions->redeploySelected($this->server, $this->selectedSiteIds, auth()->user());
         $this->closeRedeployAllModal();
+        $this->selectedSiteIds = [];
 
         $this->toastSuccess(trans_choice(
             'Queued redeploy for :count site|Queued redeploy for :count sites',
             $result['queued'],
             ['count' => $result['queued']],
         ));
+    }
+
+    /**
+     * Bulk-action preview scoped to the current row selection.
+     *
+     * @return array{redeploy_count: int, renewable_count: int, site_names: list<string>}
+     */
+    #[Computed]
+    public function selectedBulkPreview(): array
+    {
+        if (! Feature::active('workspace.bulk_site_actions') || ! $this->server->isVmHost()) {
+            return [
+                'redeploy_count' => 0,
+                'renewable_count' => 0,
+                'site_names' => [],
+            ];
+        }
+
+        return app(ServerBulkSiteActions::class)->previewSelected($this->server, $this->selectedSiteIds);
     }
 
     public function updatedFormPrimaryHostname(string $value): void
@@ -353,20 +399,15 @@ class WorkspaceSites extends Component
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
     }
 
-    public function render(ServerBulkSiteActions $bulkActions): View
+    public function render(): View
     {
         $this->server->refresh();
         $this->server->load(['sites.domains']);
-
-        $bulkPreview = Feature::active('workspace.bulk_site_actions') && $this->server->isVmHost()
-            ? $bulkActions->preview($this->server)
-            : null;
 
         return view('livewire.servers.workspace-sites', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            'bulkPreview' => $bulkPreview,
             'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions'),
         ]);
     }

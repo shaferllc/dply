@@ -80,7 +80,15 @@
                 wire:click="setWorkspaceTab('change')"
                 icon="heroicon-o-arrow-path"
             >
-                {{ __('Change') }}
+                <span class="inline-flex items-center gap-2">
+                    {{ __('Change') }}
+                    @if ($inflightSwitch)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                            <x-spinner variant="forest" />
+                            {{ __('Working') }}
+                        </span>
+                    @endif
+                </span>
             </x-server-workspace-tab>
             <x-server-workspace-tab
                 id="ws-tab-health"
@@ -92,26 +100,28 @@
             </x-server-workspace-tab>
             <span class="mx-0.5 h-6 w-px shrink-0 self-center bg-brand-ink/10" aria-hidden="true"></span>
             @foreach ($engineTabCatalog as $key => $info)
-                @php
-                    $isEdgeProxyTab = ! empty($info['is_edge_proxy']);
-                    $isActiveEngine = $isEdgeProxyTab
-                        ? $key === $activeEdgeProxy
-                        : $key === $activeWebserver;
-                @endphp
+                @php $isActiveEngine = $key === $activeWebserver; @endphp
                 <x-server-workspace-tab
                     :id="'ws-tab-'.$key"
                     :active="$workspace_tab === $key"
                     wire:click="setWorkspaceTab('{{ $key }}')"
                     :icon="$info['icon']"
                 >
-                    {{ $info['label'] }}
-                    @if ($isActiveEngine)
-                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ $isEdgeProxyTab ? __('Edge') : __('Active') }}</span>
-                    @elseif (! empty($info['coming_soon']))
-                        <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
-                    @elseif (! $isEdgeProxyTab && $preflight->isBlocked($server, $key))
-                        <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
-                    @endif
+                    <span class="inline-flex items-center gap-2">
+                        {{ $info['label'] }}
+                        @if ($inflightSwitch && $switchTargetWebserver === $key)
+                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                                <x-spinner variant="forest" />
+                                {{ __('Working') }}
+                            </span>
+                        @elseif ($isActiveEngine)
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Active') }}</span>
+                        @elseif (! empty($info['coming_soon']))
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                        @elseif ($preflight->isBlocked($server, $key))
+                            <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ __('Unavailable') }}</span>
+                        @endif
+                    </span>
                 </x-server-workspace-tab>
             @endforeach
             <span class="mx-0.5 h-6 w-px shrink-0 self-center bg-brand-ink/10" aria-hidden="true"></span>
@@ -126,8 +136,7 @@
         </x-server-workspace-tablist>
     </div>
 
-    <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setWorkspaceTab">
-
+    <x-workspace-tab-panel-loading>
     @if ($workspace_tab === 'overview')
         <x-server-workspace-tab-panel
             id="ws-panel-overview"
@@ -180,7 +189,7 @@
         </x-server-workspace-tab-panel>
     @endif
 
-    </div>
+    </x-workspace-tab-panel-loading>
 
     @include('livewire.servers.partials.webserver.switch-modal')
 

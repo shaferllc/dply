@@ -503,6 +503,7 @@ BASH;
             'openlitespeed' => '/usr/local/lsws/conf/_dply_backups',
             'traefik' => '/etc/traefik/_dply_backups',
             'haproxy' => '/etc/haproxy/_dply_backups',
+            'envoy' => '/etc/envoy/_dply_backups',
             default => throw new \InvalidArgumentException("No backup dir mapped for {$engine}"),
         };
     }
@@ -584,6 +585,7 @@ BASH;
             // and "[ALERT]" prefixed lines on failure. Match the success
             // string explicitly; an empty output (exit 0) also counts.
             'haproxy' => str_contains($output, 'configuration file is valid') || (! str_contains($output, '[alert]') && ! str_contains($output, 'error')),
+            'envoy' => str_contains(strtolower($output), 'configuration is valid') || (! str_contains(strtolower($output), 'error') && ! str_contains(strtolower($output), 'failed')),
             default => ! str_contains($output, 'error'),
         };
     }

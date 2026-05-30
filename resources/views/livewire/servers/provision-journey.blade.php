@@ -523,7 +523,13 @@
                                                     <span x-show="copied" x-cloak class="text-emerald-300">{{ __('Copied') }}</span>
                                                 </button>
                                             </div>
-                                            <pre x-show="open" x-cloak class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-red-200 selection:bg-emerald-500/30">{{ $failedStep['output'] }}</pre>
+                                            <pre
+                                                x-show="open"
+                                                x-cloak
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
+                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-red-200 selection:bg-emerald-500/30"
+                                            >{{ $failedStep['output'] }}</pre>
                                         </div>
                                     @endif
                                 </div>
@@ -555,7 +561,11 @@
                                             $isStreamingDetail = str_starts_with($activeStep['key'] ?? '', 'script_') || ($activeStep['key'] ?? '') === 'setup';
                                         @endphp
                                         @if ($isStreamingDetail)
-                                            <pre class="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-brand-ink/10 bg-slate-950 px-3 py-2 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30">{{ $activeStep['detail'] }}</pre>
+                                            <pre
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
+                                                class="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-brand-ink/10 bg-slate-950 px-3 py-2 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
+                                            >{{ $activeStep['detail'] }}</pre>
                                         @else
                                             <p class="mt-3 text-sm leading-6 text-brand-moss whitespace-pre-line">{{ $activeStep['detail'] }}</p>
                                         @endif
@@ -618,7 +628,8 @@
                                             </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-effect="open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
                                                 class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $activeStep['output'] }}</pre>
                                         </details>
@@ -650,8 +661,8 @@
                                             </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
                                                 class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $liveTaskOutput }}</pre>
                                         </details>
@@ -688,7 +699,8 @@
                                             </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-effect="open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
                                                 class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $liveTaskOutput }}</pre>
                                         </details>
@@ -890,10 +902,10 @@
                                 <code class="rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->region ?: '—' }}</code>
                             </dd>
                         </div>
-                        <div>
+                        <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
-                            <dd class="mt-1">
-                                <code class="break-all rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->size ?: '—' }}</code>
+                            <dd class="mt-1 min-w-0">
+                                <code class="inline-block max-w-full overflow-x-auto whitespace-nowrap rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->size ?: '—' }}</code>
                             </dd>
                         </div>
                         @if ($server->setup_status)
@@ -1587,4 +1599,31 @@
             ])
         </x-slot>
     </x-server-workspace-layout>
+
+    @once
+        @script
+            <script>
+                Alpine.data('provisionConsoleScroll', () => ({
+                    pinned: true,
+                    onScroll() {
+                        const el = this.$el;
+                        this.pinned = (el.scrollHeight - el.scrollTop - el.clientHeight) < 16;
+                    },
+                    init() {
+                        this.scrollToBottom();
+                        Livewire.hook('morph.updated', () => {
+                            if (this.pinned) {
+                                this.scrollToBottom();
+                            }
+                        });
+                    },
+                    scrollToBottom() {
+                        this.$nextTick(() => {
+                            this.$el.scrollTop = this.$el.scrollHeight;
+                        });
+                    },
+                }));
+            </script>
+        @endscript
+    @endonce
 </div>

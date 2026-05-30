@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Jobs\RunServerConfigOpJob;
 use App\Livewire\Servers\WorkspaceConfiguration;
+use App\Livewire\Servers\WorkspaceEdgeProxy;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Models\Organization;
 use App\Models\Server;
@@ -74,6 +75,36 @@ test('webserver config subtab redirects to scoped configuration workspace', func
             'from' => 'webserver',
             'return_sub' => 'overview',
         ]));
+});
+
+test('edge proxy config subtab redirects to scoped configuration with edge-proxy from', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'traefik', 'sub' => 'config'])
+        ->test(WorkspaceEdgeProxy::class, ['server' => $server])
+        ->assertRedirect(route('servers.configuration', [
+            'server' => $server,
+            'scope' => 'traefik',
+            'from' => 'edge-proxy',
+            'return_sub' => 'overview',
+        ]));
+});
+
+test('configuration workspace shows back link when opened from edge proxy with legacy webserver from', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams([
+            'scope' => 'traefik',
+            'from' => 'webserver',
+            'return_sub' => 'logs',
+        ])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSee(__('Opened from :engine edge proxy', ['engine' => 'Traefik']))
+        ->assertSee(__('Back to :engine edge proxy', ['engine' => 'Traefik']))
+        ->assertSeeHtml('edge-proxy')
+        ->assertSeeHtml('tab=traefik&amp;sub=logs');
 });
 
 test('configuration workspace shows back link when opened from webserver config tab', function (): void {

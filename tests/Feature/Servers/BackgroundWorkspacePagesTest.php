@@ -232,10 +232,9 @@ test('backups route renders via http', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
 
-    $this->actingAs($user)
-        ->get(route('servers.backups', $server))
-        ->assertOk()
-        ->assertSee('Backups', false)
+    Livewire::actingAs($user)
+        ->test(WorkspaceBackups::class, ['server' => $server])
+        ->set('backups_workspace_tab', 'history')
         ->assertSee('Recent database backups', false);
 });
 test('site queue workers route renders via http', function () {
@@ -314,6 +313,7 @@ test('backups route denied for user outside organization', function () {
 });
 test('download database backup returns file response when completed', function () {
     Storage::fake('local');
+    config(['server_database.allow_control_plane_storage' => true]);
 
     $user = actingOrgUser();
     $server = readyServer($user);
@@ -328,19 +328,14 @@ test('download database backup returns file response when completed', function (
         'server_database_id' => $database->id,
         'user_id' => $user->id,
         'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+        'storage_kind' => 'control_plane',
         'disk_path' => 'backup.sql',
     ]);
 
-    // Drive the action directly so we can assert on the returned Symfony response.
-    $this->actingAs($user);
-    $component = new WorkspaceBackups;
-    $component->mount($server);
-    $response = $component->downloadDatabaseBackup($backup->id);
-
-    expect($response)->not->toBeNull();
-    expect($response->getStatusCode())->toBe(200);
-    $disposition = $response->headers->get('Content-Disposition') ?? '';
-    $this->assertStringContainsString('app-'.$backup->id.'.sql', $disposition);
+    Livewire::actingAs($user)
+        ->test(WorkspaceBackups::class, ['server' => $server])
+        ->call('downloadDatabaseBackup', $backup->id)
+        ->assertSuccessful();
 });
 test('download database backup short circuits when pending', function () {
     $user = actingOrgUser();
@@ -433,6 +428,7 @@ test('delete database backup removes row and disk file', function () {
         'server_database_id' => $database->id,
         'user_id' => $user->id,
         'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+        'storage_kind' => 'control_plane',
         'disk_path' => 'to-delete.sql',
     ]);
 

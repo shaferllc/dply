@@ -106,11 +106,39 @@ test('marks output as dply managed', function () {
     $this->assertStringContainsString('do NOT hand-edit', $out);
 });
 test('emits 503 fallback for unmatched hosts', function () {
-    // A frontend with no ACL match should return a clean 503 so
-    // misconfigured DNS / typos are obvious in the response body rather
-    // than HAProxy's default blank error page.
+    // Unmatched Host headers land on dply_unmatched via default_backend.
     $out = app(HAProxyEdgeConfigBuilder::class)->build(new Collection([]), 80, fn ($s) => 20000);
 
+    $this->assertStringContainsString('default_backend dply_unmatched', $out);
+    $this->assertStringContainsString('backend dply_unmatched', $out);
     $this->assertStringContainsString('http-request return status 503', $out);
     $this->assertStringContainsString('no backend matches this host', $out);
+    expect(substr($out, -1))->toBe("\n");
+});
+test('config ends with newline for haproxy -c', function () {
+    $user = makeUserWithOrg();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'app.example.com',
+        'is_primary' => true,
+    ]);
+
+    $out = app(HAProxyEdgeConfigBuilder::class)->build(
+        new Collection([$site->fresh()]),
+        80,
+        fn () => 25001,
+    );
+
+    expect(substr($out, -1))->toBe("\n");
+    $this->assertStringContainsString('use_backend bk_', $out);
+    $this->assertStringContainsString('default_backend dply_unmatched', $out);
 });

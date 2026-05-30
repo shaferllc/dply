@@ -1,12 +1,14 @@
 import * as commands from './commands.mjs';
+import * as serverCommands from './server-commands.mjs';
 import { c, info } from './print.mjs';
 
 const TOP_LEVEL = {
-  login: { handler: commands.login, summary: 'Save an API token + base URL after verifying it.' },
+  login: { handler: commands.login, summary: 'Browser device-flow login (opens this site automatically).' },
   logout: { handler: commands.logout, summary: 'Remove the saved token.' },
   whoami: { handler: commands.whoami, summary: 'Show the active token + linked repo.' },
   link: { handler: commands.link, summary: 'Link the current repo to an Edge site.' },
   sites: { handler: commands.sites, summary: 'List Edge sites visible to your token.' },
+  server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
 };
 
 const EDGE_COMMANDS = {
@@ -45,9 +47,40 @@ export async function run(argv) {
     return runEdge(rest);
   }
 
+  if (command === 'server') {
+    return runServer(rest);
+  }
+
   const entry = TOP_LEVEL[command];
   if (!entry) {
     throw unknown(command);
+  }
+
+  const { args, flags } = parse(rest);
+
+  return entry.handler(args, flags);
+}
+
+const SERVER_COMMANDS = {
+  list: { handler: serverCommands.serverList, summary: 'List servers in your organization.' },
+  'system-users': { handler: serverCommands.serverSystemUsers, summary: 'list | sync | add | update | remove' },
+};
+
+async function runServer(argv) {
+  if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h' || argv[0] === 'help') {
+    info(`${c.bold('dply server')} — BYO server commands`);
+    info('');
+    for (const [name, { summary }] of Object.entries(SERVER_COMMANDS)) {
+      info(`  ${name.padEnd(14)} ${c.dim(summary)}`);
+    }
+
+    return 0;
+  }
+
+  const [sub, ...rest] = argv;
+  const entry = SERVER_COMMANDS[sub];
+  if (!entry) {
+    throw unknown(`server ${sub}`);
   }
 
   const { args, flags } = parse(rest);
@@ -135,6 +168,10 @@ function printTopLevelHelp() {
   for (const [name, { summary }] of Object.entries(TOP_LEVEL)) {
     info(`  ${name.padEnd(10)} ${c.dim(summary)}`);
   }
+  info('');
+  info(c.bold('Server (BYO):'));
+  info(`  ${'server list'.padEnd(18)} ${c.dim('List VM servers')}`);
+  info(`  ${'server system-users'.padEnd(18)} ${c.dim('Manage Linux accounts (see `dply server system-users help`)')}`);
   info('');
   info(c.bold('Edge:'));
   for (const [name, { summary }] of Object.entries(EDGE_COMMANDS)) {

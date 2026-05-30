@@ -49,10 +49,32 @@ test('ols tls paths prefer active certificate domains', function (): void {
         'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
         'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
         'status' => SiteCertificate::STATUS_ACTIVE,
+        'last_installed_at' => now(),
         'domains_json' => ['app.example.com', 'www.app.example.com'],
     ]);
 
     $paths = OpenLiteSpeedTlsPaths::resolve($site->fresh());
 
     expect($paths['certFile'])->toBe('/etc/letsencrypt/live/app.example.com/fullchain.pem');
+});
+
+test('edge tls front readiness requires installed active certificate', function (): void {
+    $site = Site::factory()->create(['ssl_status' => Site::SSL_PENDING]);
+    SiteCertificate::query()->create([
+        'site_id' => $site->id,
+        'scope_type' => SiteCertificate::SCOPE_PREVIEW,
+        'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+        'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+        'status' => SiteCertificate::STATUS_PENDING,
+        'domains_json' => ['preview.example.test'],
+    ]);
+
+    expect(OpenLiteSpeedTlsPaths::siteEdgeTlsFrontReady($site))->toBeFalse();
+
+    SiteCertificate::query()->where('site_id', $site->id)->update([
+        'status' => SiteCertificate::STATUS_ACTIVE,
+        'last_installed_at' => now(),
+    ]);
+
+    expect(OpenLiteSpeedTlsPaths::siteEdgeTlsFrontReady($site->fresh()))->toBeTrue();
 });

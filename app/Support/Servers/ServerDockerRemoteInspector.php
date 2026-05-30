@@ -257,6 +257,93 @@ BASH, 90);
         return (bool) preg_match('/^[a-zA-Z0-9@][a-zA-Z0-9@:._\/-]{0,255}$/', $ref);
     }
 
+    public function isValidExecCommand(string $command): bool
+    {
+        $command = trim($command);
+
+        if ($command === '' || strlen($command) > 4000) {
+            return false;
+        }
+
+        return ! preg_match('/[\r\n\0]/', $command);
+    }
+
+    public function isValidComposeProjectName(string $project): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/', $project);
+    }
+
+    public function isValidComposeConfigPath(string $path): bool
+    {
+        if (! preg_match('/^\/[a-zA-Z0-9\/_.-]+$/', $path)) {
+            return false;
+        }
+
+        return ! str_contains($path, '..');
+    }
+
+    public function primaryComposeConfigFile(string $config): string
+    {
+        $config = trim($config);
+        if ($config === '') {
+            return '';
+        }
+
+        $parts = array_values(array_filter(array_map('trim', explode(',', $config))));
+
+        return $parts[0] ?? $config;
+    }
+
+    /**
+     * @return array{logs: string, error: ?string}
+     */
+    public function composeProjectLogs(Server $server, string $project, string $config, int $lines = 200): array
+    {
+        if (! $this->dockerCliPresent($server)) {
+            return ['logs' => '', 'error' => __('Docker CLI is not installed on this server.')];
+        }
+
+        if (! $this->isValidComposeProjectName($project)) {
+            return ['logs' => '', 'error' => __('Invalid compose project.')];
+        }
+
+        $config = $this->primaryComposeConfigFile($config);
+        if (! $this->isValidComposeConfigPath($config)) {
+            return ['logs' => '', 'error' => __('Invalid compose config path.')];
+        }
+
+        $lines = max(10, min(2000, $lines));
+        $projectEsc = escapeshellarg($project);
+        $configEsc = escapeshellarg($config);
+
+        try {
+            $out = $this->runDockerScript($server, 'docker-compose-logs-'.$project, <<<BASH
+PROJECT={$projectEsc}
+CONFIG={$configEsc}
+DIR=$(dirname "\$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "\$DIR" && docker compose -p "\$PROJECT" -f "\$CONFIG" logs --tail {$lines} 2>&1
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "\$DIR" && docker-compose -p "\$PROJECT" -f "\$CONFIG" logs --tail {$lines} 2>&1
+else
+  echo "__DPLY_COMPOSE_MISSING__"
+fi
+BASH, 120);
+        } catch (\Throwable $e) {
+            return ['logs' => '', 'error' => $e->getMessage()];
+        }
+
+        if (str_contains($out, '__DPLY_DOCKER_MISSING__')) {
+            return ['logs' => '', 'error' => __('Docker CLI is not installed on this server.')];
+        }
+
+        if (str_contains($out, '__DPLY_COMPOSE_MISSING__')) {
+            return ['logs' => '', 'error' => __('Docker Compose plugin is not installed on this server.')];
+        }
+
+        return ['logs' => $out, 'error' => null];
+    }
+
     private function runDockerScript(Server $server, string $taskName, string $body, int $timeout = 90): string
     {
         $script = <<<BASH

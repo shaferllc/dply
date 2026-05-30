@@ -50,16 +50,25 @@ export async function login(args, flags) {
 
 async function loginWithToken({ baseUrl, token }) {
   const probe = new ApiClient({ baseUrl, token });
-  let sites;
+  let summary = '';
+
   try {
-    sites = await probe.get('/edge/sites');
-  } catch (err) {
-    throw fail(`Token verification failed: ${err.message}`, err.status ?? 1);
+    const sites = await probe.get('/edge/sites');
+    summary = `${(sites?.data ?? []).length} edge site(s)`;
+  } catch {
+    try {
+      const servers = await probe.get('/servers');
+      summary = `${(servers?.data ?? []).length} server(s)`;
+    } catch (err) {
+      throw fail(`Token verification failed: ${err.message}`, err.status ?? 1);
+    }
   }
 
   await writeGlobalConfig({ token, baseUrl });
   ok(`Logged in. Token verified against ${c.cyan(baseUrl)}.`);
-  info(`${(sites?.data ?? []).length} edge site(s) visible to this token.`);
+  if (summary) {
+    info(`${summary} visible to this token.`);
+  }
 }
 
 async function loginWithDeviceFlow({ baseUrl, openBrowser }) {

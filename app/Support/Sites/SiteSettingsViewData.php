@@ -115,6 +115,7 @@ final class SiteSettingsViewData
         $preflightChecks = collect($deploymentPreflight['checks'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
         $preflightErrors = collect($deploymentPreflight['errors'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
         $preflightWarnings = collect($deploymentPreflight['warnings'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
+        $preflightActionableChecks = PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks);
         $dockerRuntimeDetails = $site->usesDockerRuntime() && is_array($dockerRuntime['runtime_details'] ?? null) ? $dockerRuntime['runtime_details'] : [];
         $dockerContainers = collect($dockerRuntimeDetails['containers'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
         $runtimeLogs = collect($runtimeTarget['logs'] ?? [])->filter(fn ($entry) => is_array($entry))->reverse()->values();
@@ -234,6 +235,7 @@ final class SiteSettingsViewData
                 'preflightChecks',
                 'preflightErrors',
                 'preflightWarnings',
+                'preflightActionableChecks',
                 'dockerRuntimeDetails',
                 'dockerContainers',
                 'runtimeLogs',

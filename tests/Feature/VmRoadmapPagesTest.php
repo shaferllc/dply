@@ -122,7 +122,8 @@ test('ssh access graph page renders', function (): void {
     $this->actingAs($user)
         ->get(route('servers.ssh-access', $server))
         ->assertOk()
-        ->assertSee(__('SSH access'));
+        ->assertSee(__('Access graph'))
+        ->assertSee(__('Access over time'));
 });
 
 test('security digest page renders', function (): void {

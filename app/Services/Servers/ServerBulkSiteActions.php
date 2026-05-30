@@ -39,13 +39,53 @@ final class ServerBulkSiteActions
     }
 
     /**
+     * @param  list<string>  $siteIds
+     * @return array{redeploy_count: int, renewable_count: int, site_names: list<string>}
+     */
+    public function previewSelected(Server $server, array $siteIds): array
+    {
+        $normalizedIds = $this->normalizeSiteIds($siteIds);
+        $deployable = $this->deployableSites($server)
+            ->filter(fn (Site $site): bool => in_array((string) $site->id, $normalizedIds, true));
+
+        $renewReport = $this->certificateInventory->forServer($server);
+        $renewable = collect($renewReport['items'] ?? [])
+            ->filter(fn (array $item): bool => (bool) ($item['can_renew'] ?? false))
+            ->count();
+
+        return [
+            'redeploy_count' => $deployable->count(),
+            'renewable_count' => $renewable,
+            'site_names' => $deployable->pluck('name')->map(fn ($name) => (string) $name)->values()->all(),
+        ];
+    }
+
+    /**
      * @return array{queued: int}
      */
     public function redeployAll(Server $server, User $actor): array
     {
+        return $this->redeploySelected(
+            $server,
+            $this->deployableSites($server)->pluck('id')->map(fn ($id) => (string) $id)->all(),
+            $actor,
+        );
+    }
+
+    /**
+     * @param  list<string>  $siteIds
+     * @return array{queued: int}
+     */
+    public function redeploySelected(Server $server, array $siteIds, User $actor): array
+    {
+        $normalizedIds = $this->normalizeSiteIds($siteIds);
         $queued = 0;
 
         foreach ($this->deployableSites($server) as $site) {
+            if (! in_array((string) $site->id, $normalizedIds, true)) {
+                continue;
+            }
+
             RunSiteDeploymentJob::dispatch(
                 $site->fresh(),
                 SiteDeployment::TRIGGER_MANUAL,
@@ -56,6 +96,18 @@ final class ServerBulkSiteActions
         }
 
         return ['queued' => $queued];
+    }
+
+    /**
+     * @param  list<string>  $siteIds
+     * @return list<string>
+     */
+    private function normalizeSiteIds(array $siteIds): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            static fn (mixed $id): string => trim((string) $id),
+            $siteIds,
+        ))));
     }
 
     /**

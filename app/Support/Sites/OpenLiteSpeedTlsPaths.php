@@ -15,6 +15,18 @@ use App\Models\SiteCertificate;
 final class OpenLiteSpeedTlsPaths
 {
     /**
+     * True when a Caddy :443 TLS front can reference on-disk Let's Encrypt material.
+     */
+    public static function siteEdgeTlsFrontReady(Site $site): bool
+    {
+        return SiteCertificate::query()
+            ->where('site_id', $site->id)
+            ->where('status', SiteCertificate::STATUS_ACTIVE)
+            ->whereNotNull('last_installed_at')
+            ->exists();
+    }
+
+    /**
      * @return array{keyFile: string, certFile: string}|null
      */
     public static function resolve(Site $site): ?array

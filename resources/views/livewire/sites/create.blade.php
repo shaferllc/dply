@@ -113,6 +113,32 @@
                             <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
                         </div>
 
+                        @if (! $functionsHost && ! $isContainerMode && $server->dockerEnginePresent())
+                            <div>
+                                <x-input-label :value="__('Deploy target')" />
+                                <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                                    <label @class([
+                                        'cursor-pointer rounded-xl border p-4 shadow-sm transition',
+                                        'border-sky-500 bg-sky-50/60 ring-1 ring-sky-500' => $form->deploy_stack === 'native',
+                                        'border-slate-200 bg-white hover:border-slate-300' => $form->deploy_stack !== 'native',
+                                    ])>
+                                        <input type="radio" wire:model.live="form.deploy_stack" value="native" class="sr-only" />
+                                        <p class="text-sm font-semibold text-slate-900">{{ __('Native stack') }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-slate-600">{{ __('PHP-FPM, static files, or a Node process on the VM — routed by the server webserver.') }}</p>
+                                    </label>
+                                    <label @class([
+                                        'cursor-pointer rounded-xl border p-4 shadow-sm transition',
+                                        'border-sky-500 bg-sky-50/60 ring-1 ring-sky-500' => $form->deploy_stack === 'docker',
+                                        'border-slate-200 bg-white hover:border-slate-300' => $form->deploy_stack !== 'docker',
+                                    ])>
+                                        <input type="radio" wire:model.live="form.deploy_stack" value="docker" class="sr-only" />
+                                        <p class="text-sm font-semibold text-slate-900">{{ __('Docker container') }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-slate-600">{{ __('Build and run via compose on a host port. Caddy/Nginx on the VM reverse-proxies to the container.') }}</p>
+                                    </label>
+                                </div>
+                            </div>
+                        @endif
+
                         <div>
                             <x-input-label for="type" :value="__('Stack')" />
                             <select id="type" wire:model.live="form.type" class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
@@ -121,7 +147,9 @@
                                 <option value="node">{{ __('Node (Nginx → reverse proxy)') }}</option>
                             </select>
                             <p class="mt-2 text-sm text-slate-600">
-                                @if ($form->type === 'php')
+                                @if ($form->deploy_stack === 'docker')
+                                    {{ __('Used to generate the Dockerfile/compose recipe. The container listens internally; Dply publishes it on a host port for the webserver proxy.') }}
+                                @elseif ($form->type === 'php')
                                     {{ __('Best for Laravel, WordPress, and other PHP apps that serve from a public web root.') }}
                                 @elseif ($form->type === 'static')
                                     {{ __('Best for HTML, CSS, JS, or a prebuilt frontend that should be served directly from disk.') }}
@@ -350,7 +378,7 @@
                             </details>
                         @endif
 
-                        @if ($form->type === 'php')
+                        @if ($form->type === 'php' && $form->deploy_stack !== 'docker')
                             <div>
                                 <x-input-label for="php_version" :value="__('PHP-FPM version')" />
                                 <select id="php_version" wire:model="form.php_version" class="mt-1 block w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
@@ -374,7 +402,13 @@
                             <div>
                                 <x-input-label for="app_port" :value="__('App listens on (localhost)')" />
                                 <x-text-input id="app_port" type="number" wire:model="form.app_port" class="mt-1 block w-full max-w-[8rem]" />
-                                <p class="mt-2 text-sm text-slate-600">{{ __('Nginx will proxy requests to this port on the server.') }}</p>
+                                <p class="mt-2 text-sm text-slate-600">
+                                    @if ($form->deploy_stack === 'docker')
+                                        {{ __('Port inside the container. Compose maps this to a host port in the 30000–39999 range for the webserver proxy.') }}
+                                    @else
+                                        {{ __('Nginx will proxy requests to this port on the server.') }}
+                                    @endif
+                                </p>
                             </div>
                         @endif
 

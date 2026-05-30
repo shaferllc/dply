@@ -17,7 +17,7 @@ final class DatabaseWorkspaceViewData
 {
     /**
      * @param  Collection<string, ServerDatabaseEngine>  $engineRows
-     * @param  array{mysql: bool, postgres: bool, sqlite: bool}  $capabilities
+     * @param  array{mysql: bool, mariadb: bool, postgres: bool, sqlite: bool}  $capabilities
      * @return array<string, mixed>
      */
     public static function for(
@@ -30,8 +30,10 @@ final class DatabaseWorkspaceViewData
         $card = 'dply-card overflow-hidden';
         $opsReady = $server->isReady() && $server->ssh_private_key;
         $isDeployer = auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
-        $engineLabels = ['mysql' => 'MySQL', 'postgres' => 'PostgreSQL', 'sqlite' => 'SQLite'];
-        $engines = ['mysql', 'postgres', 'sqlite'];
+        $engineLabels = collect(DatabaseWorkspaceEngines::ENGINE_TABS)
+            ->mapWithKeys(fn (string $engine): array => [$engine => DatabaseWorkspaceEngines::label($engine)])
+            ->all();
+        $engines = DatabaseWorkspaceEngines::ENGINE_TABS;
 
         $engineWorking = $engineRows->contains(fn (ServerDatabaseEngine $row): bool => in_array($row->status, [
             ServerDatabaseEngine::STATUS_PENDING,
@@ -52,13 +54,22 @@ final class DatabaseWorkspaceViewData
 
         if ($includeDiscoveryContext) {
             $localMysql = $server->serverDatabases->where('engine', 'mysql')->pluck('name')->all();
+            $localMariadb = $server->serverDatabases->where('engine', 'mariadb')->pluck('name')->all();
             $localPg = $server->serverDatabases->where('engine', 'postgres')->pluck('name')->all();
             $mysqlOnlyOnServer = array_values(array_diff($component->remote_mysql_databases, $localMysql));
+            $mariadbOnlyOnServer = array_values(array_diff($component->remote_mysql_databases, $localMariadb));
+            $localMongo = $server->serverDatabases->where('engine', 'mongodb')->pluck('name')->all();
+            $localClickhouse = $server->serverDatabases->where('engine', 'clickhouse')->pluck('name')->all();
             $pgOnlyOnServer = array_values(array_diff($component->remote_postgres_databases, $localPg));
+            $mongoOnlyOnServer = array_values(array_diff($component->remote_mongodb_databases, $localMongo));
+            $clickhouseOnlyOnServer = array_values(array_diff($component->remote_clickhouse_databases, $localClickhouse));
 
             $data = array_merge($data, compact(
                 'mysqlOnlyOnServer',
+                'mariadbOnlyOnServer',
                 'pgOnlyOnServer',
+                'mongoOnlyOnServer',
+                'clickhouseOnlyOnServer',
             ));
         }
 

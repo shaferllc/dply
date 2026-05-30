@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Actions\Servers\CloneServerOnDigitalOcean;
 use App\Enums\ServerProvider;
 use App\Jobs\AddEdgeProxyJob;
+use App\Jobs\ApplyEdgeBackendConfigsJob;
 use App\Jobs\RefreshServerInventoryJob;
 use App\Jobs\RemoveEdgeProxyJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
@@ -29,6 +30,7 @@ use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\SshConnection;
+use App\Support\Servers\EdgeProxyWorkspaceViewData;
 use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
@@ -413,6 +415,11 @@ BASH;
 
         $service = config('server_manage.service_actions', []);
         $danger = config('server_manage.dangerous_actions', []);
+        if ($key === 'apply_edge_backend_configs') {
+            $this->applyEdgeBackendConfigs();
+
+            return;
+        }
         $def = $service[$key] ?? $danger[$key] ?? null;
         if (! is_array($def) || empty($def['script'])) {
             $this->remote_error = __('Unknown action.');
@@ -1285,14 +1292,22 @@ BASH;
         $this->authorize('update', $this->server);
 
         $target = strtolower(trim($target));
-        if (! in_array($target, ['traefik', 'haproxy'], true)) {
+        $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
+        if (! isset($catalog[$target])) {
             $this->toastError(__('Unknown edge proxy: :t.', ['t' => $target]));
 
             return;
         }
 
-        if (WebserverWorkspaceViewData::isComingSoonEdgeProxy($target)) {
-            $label = WebserverWorkspaceViewData::edgeProxyCatalog()[$target]['label'] ?? $target;
+        if (EdgeProxyWorkspaceViewData::isComingSoonEdgeProxy($target)) {
+            $label = $catalog[$target]['label'] ?? $target;
+            $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
+
+            return;
+        }
+
+        if (! in_array($target, EdgeProxyWorkspaceViewData::installableEdgeProxies(), true)) {
+            $label = $catalog[$target]['label'] ?? $target;
             $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
 
             return;
@@ -1304,9 +1319,15 @@ BASH;
             return;
         }
 
+        $currentEdge = $this->server->edgeProxy();
+        $isSwitch = $currentEdge !== null && $currentEdge !== $target;
+        $targetLabel = $catalog[$target]['label'] ?? $target;
+
         $this->seedQueuedEdgeProxyAction(
-            label: __('Adding edge proxy: :target …', ['target' => $target]),
-            meta: ['op' => 'add', 'target' => $target],
+            label: $isSwitch
+                ? __('Switching edge proxy to :target …', ['target' => $targetLabel])
+                : __('Adding edge proxy: :target …', ['target' => $targetLabel]),
+            meta: ['op' => $isSwitch ? 'switch' : 'add', 'target' => $target, 'from' => $currentEdge],
         );
 
         AddEdgeProxyJob::dispatch(
@@ -1316,6 +1337,56 @@ BASH;
         );
 
         $this->toastSuccess(__('Edge proxy queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * Rebuild every site's Caddy backend + TLS configs and the active edge
+     * routing file (Envoy / HAProxy / Traefik). Repair when preview URLs or
+     * HTTPS fronts drift after cutover.
+     */
+    public function applyEdgeBackendConfigs(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot run service actions on servers.'));
+
+            return;
+        }
+
+        $edge = $this->server->edgeProxy();
+        if ($edge === null) {
+            $this->toastError(__('No edge proxy is active on this server.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before running actions.'));
+
+            return;
+        }
+
+        $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
+        $edgeLabel = $catalog[$edge]['label'] ?? ucfirst($edge);
+
+        $this->seedQueuedEdgeProxyAction(
+            label: __('Applying webserver config (edge backends + :edge routing)…', ['edge' => $edgeLabel]),
+            meta: ['op' => 'apply_backends', 'target' => $edge],
+        );
+
+        ApplyEdgeBackendConfigsJob::dispatch(
+            serverId: $this->server->id,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Edge backend sync queued. Progress shows in the banner above.'));
     }
 
     /**
@@ -1382,7 +1453,7 @@ BASH;
             'meta' => $meta,
         ];
 
-        return ConsoleAction::query()->create([
+        $action = ConsoleAction::query()->create([
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'kind' => 'edge_proxy',
@@ -1391,6 +1462,10 @@ BASH;
             'user_id' => request()->user()?->id,
             'output' => $output,
         ]);
+
+        app(ServerConsoleActionLookup::class)->forget($this->server);
+
+        return $action;
     }
 
     public function pollManageWorkspace(): void

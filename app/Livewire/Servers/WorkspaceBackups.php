@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\AuthorsBackupDestinations;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -17,7 +18,10 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
+use App\Services\Servers\DatabaseBackupDownloader;
+use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\DatabaseBackupSettings;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
@@ -42,6 +46,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class WorkspaceBackups extends Component
 {
     use AuthorsBackupDestinations;
+    use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
@@ -53,6 +58,17 @@ class WorkspaceBackups extends Component
 
     /** Form state for "Run database backup now". */
     public string $run_database_id = '';
+
+    /** Optional one-off S3 destination override (empty = server default). */
+    public string $run_database_backup_configuration_id = '';
+
+    /** Server default: remote_server or destination. */
+    public string $db_backup_default_kind = DatabaseBackupSettings::KIND_REMOTE_SERVER;
+
+    public string $db_backup_configuration_id = '';
+
+    /** Display field (GB); persisted as bytes in server meta. */
+    public string $db_backup_remote_max_gb = '';
 
     /** Form state for "Run site files backup now". */
     public string $run_site_id = '';
@@ -115,6 +131,7 @@ class WorkspaceBackups extends Component
 
         $this->bootWorkspace($server);
         $this->destinationForm = $this->emptyDestinationForm();
+        $this->hydrateDatabaseBackupSettings();
 
         // Site sidebar's "Backups" entry navigates here with ?site={id}; honoring it pre-filters
         // the page so operators don't see noise from other sites on the same server.
@@ -184,6 +201,50 @@ class WorkspaceBackups extends Component
         $this->toastSuccess(__('Backup destination added — selected on this schedule.'));
     }
 
+    public function saveDatabaseBackupSettings(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $this->validate([
+            'db_backup_default_kind' => 'required|in:remote_server,destination',
+            'db_backup_configuration_id' => 'nullable|string',
+            'db_backup_remote_max_gb' => 'nullable|numeric|min:0.1|max:10000',
+        ]);
+
+        if ($this->db_backup_default_kind === DatabaseBackupSettings::KIND_DESTINATION && $this->db_backup_configuration_id === '') {
+            $this->addError('db_backup_configuration_id', __('Pick a backup destination when using S3 storage.'));
+
+            return;
+        }
+
+        $maxBytes = null;
+        if ($this->db_backup_remote_max_gb !== '') {
+            $maxBytes = (int) round((float) $this->db_backup_remote_max_gb * 1024 * 1024 * 1024);
+        }
+
+        $settings = new DatabaseBackupSettings(
+            defaultKind: $this->db_backup_default_kind,
+            backupConfigurationId: $this->db_backup_configuration_id !== '' ? $this->db_backup_configuration_id : null,
+            remoteMaxBytes: $maxBytes,
+        );
+
+        $meta = $this->server->meta ?? [];
+        $meta['database_backup'] = $settings->toMetaArray();
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
+
+        $this->toastSuccess(__('Database backup storage settings saved.'));
+    }
+
+    protected function hydrateDatabaseBackupSettings(): void
+    {
+        $settings = DatabaseBackupSettings::fromServer($this->server);
+        $this->db_backup_default_kind = $settings->defaultKind;
+        $this->db_backup_configuration_id = $settings->backupConfigurationId ?? '';
+        $bytes = $settings->remoteMaxBytes ?? (int) config('server_database.remote_backup_max_bytes_per_server', 10 * 1024 * 1024 * 1024);
+        $this->db_backup_remote_max_gb = (string) round($bytes / 1024 / 1024 / 1024, 1);
+    }
+
     public function runDatabaseBackup(): void
     {
         $this->authorize('update', $this->server);
@@ -204,6 +265,12 @@ class WorkspaceBackups extends Component
             'user_id' => auth()->id(),
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
+
+        app(DatabaseBackupExporter::class)->prepareBackupRow(
+            $backup,
+            $this->server,
+            $this->run_database_backup_configuration_id !== '' ? $this->run_database_backup_configuration_id : null,
+        );
 
         ExportServerDatabaseBackupJob::dispatch($backup->id);
 
@@ -319,7 +386,7 @@ class WorkspaceBackups extends Component
         $this->toastSuccess(__('Backup schedule added.'));
     }
 
-    public function downloadDatabaseBackup(string $backupId): StreamedResponse|Response|null
+    public function downloadDatabaseBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
     {
         $this->authorize('update', $this->server);
         $backup = ServerDatabaseBackup::query()
@@ -328,23 +395,16 @@ class WorkspaceBackups extends Component
             ->with('serverDatabase')
             ->firstOrFail();
 
-        if ($backup->status !== ServerDatabaseBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->toastError(__('Backup is not ready yet.'));
-
-            return null;
-        }
-
-        $disk = Storage::disk(config('server_database.backup_disk', 'local'));
-        if (! $disk->exists($backup->disk_path)) {
-            $this->toastError(__('Backup file is missing from storage.'));
-
-            return null;
-        }
-
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
         $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
-        return $disk->download($backup->disk_path, $filename);
+        try {
+            return $downloader->response($backup, $filename);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return null;
+        }
     }
 
     public function downloadFileBackup(string $backupId): StreamedResponse|Response|null
@@ -577,6 +637,13 @@ class WorkspaceBackups extends Component
             'user_id' => auth()->id(),
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
+
+        app(DatabaseBackupExporter::class)->prepareBackupRow(
+            $backup,
+            $this->server,
+            $schedule->backup_configuration_id,
+        );
+
         ExportServerDatabaseBackupJob::dispatch($backup->id);
         $this->toastSuccess(__('Backup queued for :name.', ['name' => $database->name]));
     }
@@ -648,16 +715,11 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        if (! empty($backup->disk_path)) {
-            $disk = Storage::disk(config('server_database.backup_disk', 'local'));
-            if ($disk->exists($backup->disk_path)) {
-                $disk->delete($backup->disk_path);
-            }
-        }
+        app(DatabaseBackupExporter::class)->deleteArtifact($backup);
         $snapshot = [
             'backup_id' => (string) $backup->id,
             'server_database_id' => (string) $backup->server_database_id,
-            'disk_path' => $backup->disk_path,
+            'storage_kind' => $backup->storage_kind,
             'status' => $backup->status,
         ];
         $backup->delete();

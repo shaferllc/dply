@@ -9,6 +9,7 @@ use App\Livewire\Servers\WorkspaceManage;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
+use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -32,8 +33,14 @@ trait RunsAllowlistedManageAction
     /** Polling target while a queued manage task is in flight. */
     public ?string $manageRemoteTaskId = null;
 
-    public function runAllowlistedManageAction(string $key, ?string $containerId = null, ?string $imageRef = null): void
-    {
+    public function runAllowlistedManageAction(
+        string $key,
+        ?string $containerId = null,
+        ?string $imageRef = null,
+        ?string $execCommand = null,
+        ?string $composeProject = null,
+        ?string $composeConfig = null,
+    ): void {
         $this->authorize('update', $this->server);
 
         if ($this->currentUserIsDeployer()) {
@@ -74,6 +81,33 @@ trait RunsAllowlistedManageAction
                 return;
             }
             $script = str_replace('__DPLY_IMAGE_REF__', $imageRef, $script);
+        }
+
+        if (str_contains($script, '__DPLY_EXEC_COMMAND__')) {
+            if (! is_string($execCommand) || ! $this->isValidDockerExecCommand($execCommand)) {
+                $this->toastError(__('Invalid command.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_EXEC_COMMAND__', escapeshellarg($execCommand), $script);
+        }
+
+        if (str_contains($script, '__DPLY_COMPOSE_PROJECT__')) {
+            if (! is_string($composeProject) || ! $this->isValidDockerComposeProjectName($composeProject)) {
+                $this->toastError(__('Invalid compose project.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_COMPOSE_PROJECT__', $composeProject, $script);
+        }
+
+        if (str_contains($script, '__DPLY_COMPOSE_CONFIG__')) {
+            if (! is_string($composeConfig) || ! $this->isValidDockerComposeConfigPath($composeConfig)) {
+                $this->toastError(__('Invalid compose config path.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_COMPOSE_CONFIG__', $composeConfig, $script);
         }
 
         $meta = $this->server->meta ?? [];
@@ -236,5 +270,20 @@ trait RunsAllowlistedManageAction
     protected function isValidDockerImageRef(string $imageRef): bool
     {
         return (bool) preg_match('/^[a-zA-Z0-9@][a-zA-Z0-9@:._\/-]{0,255}$/', $imageRef);
+    }
+
+    protected function isValidDockerExecCommand(string $command): bool
+    {
+        return app(ServerDockerRemoteInspector::class)->isValidExecCommand($command);
+    }
+
+    protected function isValidDockerComposeProjectName(string $project): bool
+    {
+        return app(ServerDockerRemoteInspector::class)->isValidComposeProjectName($project);
+    }
+
+    protected function isValidDockerComposeConfigPath(string $path): bool
+    {
+        return app(ServerDockerRemoteInspector::class)->isValidComposeConfigPath($path);
     }
 }

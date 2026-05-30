@@ -58,7 +58,7 @@ $serverWorkspaceSections = [
         'workspace.run_preview' => 'Coming soon preview',
     ],
     'Access & security' => [
-        'workspace.ssh_access_graph' => 'SSH access graph',
+        'workspace.ssh_access_graph' => 'Access graph',
         'workspace.ssh_access_graph_preview' => 'Coming soon preview',
         'workspace.ssh_sessions' => 'Temporary SSH sessions',
         'workspace.system_users' => 'System users',

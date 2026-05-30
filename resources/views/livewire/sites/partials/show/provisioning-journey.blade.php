@@ -50,6 +50,16 @@
                                     @endif
                                     <button
                                         type="button"
+                                        wire:click="openRestartProvisioningFreshModal"
+                                        wire:loading.attr="disabled"
+                                        wire:target="openRestartProvisioningFreshModal,restartProvisioningFresh"
+                                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
+                                    >
+                                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
+                                        {{ __('Restart fresh') }}
+                                    </button>
+                                    <button
+                                        type="button"
                                         wire:click="openCancelProvisioningModal"
                                         wire:loading.attr="disabled"
                                         wire:target="openCancelProvisioningModal"
@@ -261,14 +271,44 @@
                                 </div>
                             </dl>
                             @if ($targetUrl)
-                                <div class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4">
+                                <div
+                                    x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($targetUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
+                                    class="mt-5 rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white px-4 py-4"
+                                >
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">{{ __('Testing URL') }}</p>
-                                    <p class="mt-2 break-all font-mono text-xs text-emerald-950">{{ $targetUrl }}</p>
+                                    <div class="mt-2 flex min-w-0 items-center gap-1.5 font-mono text-xs text-emerald-950">
+                                        <span
+                                            class="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap"
+                                            title="{{ $targetUrl }}"
+                                        >{{ $targetUrl }}</span>
+                                        <a
+                                            href="{{ $targetUrl }}"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            title="{{ __('Open URL') }}"
+                                            class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
+                                        >
+                                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </a>
+                                        <button
+                                            type="button"
+                                            x-on:click.stop="copy()"
+                                            :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
+                                            class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
+                                        >
+                                            <x-heroicon-o-clipboard x-show="!copied" class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-s-check x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                                        </button>
+                                    </div>
                                     <p class="mt-2 text-xs leading-5 text-emerald-800/80">{{ __('Use this first while the customer domain catches up.') }}</p>
                                 </div>
                             @endif
                             </div>
                         </section>
+
+                        @if (($preflightActionableChecks ?? collect())->isNotEmpty())
+                            <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
+                        @endif
 
                         <section class="dply-card overflow-hidden">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">

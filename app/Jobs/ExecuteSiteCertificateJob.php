@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\User;
 use App\Services\Certificates\CertificateRequestService;
+use App\Support\Sites\CertbotOutputParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -63,6 +64,13 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             $this->completeConsoleAction();
             $this->recordAudit($certificate, 'site.ssl.issued', null);
         } catch (\Throwable $e) {
+            $certificate->refresh();
+            $summary = is_string($certificate->last_output)
+                ? CertbotOutputParser::failureSummary($certificate->last_output)
+                : '';
+            if ($summary !== '' && ! str_contains($e->getMessage(), $summary)) {
+                $emit->error($summary, 'ssl');
+            }
             $emit->error($e->getMessage(), 'ssl');
             $this->failConsoleAction($e->getMessage());
             Log::warning('ExecuteSiteCertificateJob failed', [

@@ -6,11 +6,12 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Jobs\Concerns\WritesConsoleAction;
+use App\Jobs\Concerns\WritesPerSiteWebserverConfigs;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Services\RemoteCli\RiskLevel;
-use App\Services\Sites\CaddySiteConfigBuilder;
+use App\Services\Servers\TraefikDashboardExposure;
 use App\Services\SshConnection;
 use Illuminate\Bus\Queueable;
 use Illuminate\Bus\UniqueLock;
@@ -23,18 +24,11 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Remove the L7 edge proxy in front of the server's webserver. The
- * recovery target is Caddy-on-:80 — when an edge proxy was added,
- * Caddy was installed as the per-site backend on high ports; removing
- * the edge proxy means transitioning Caddy from backend role back to
- * edge role. We rewrite per-site Caddy configs to bind :80, drop the
- * -backend.caddy fragments, reload Caddy, then stop + disable the edge
- * proxy.
+ * Remove the L7 edge proxy (Traefik / HAProxy / Envoy) and restore the webserver
+ * that was active before the edge proxy was added (`meta.edge_proxy_previous_webserver`).
  *
- * Side effect: `meta.webserver` is updated to 'caddy' since Caddy is
- * what's actually serving :80 after this. If the operator wants a
- * different webserver (nginx/apache/openlitespeed), they run the
- * SwitchServerWebserverJob next.
+ * Caddy backends on high ports are torn down; site configs are regenerated for
+ * the previous engine on :80; the edge proxy unit is stopped and disabled.
  */
 class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 {
@@ -44,6 +38,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
     use Queueable;
     use SerializesModels;
     use WritesConsoleAction;
+    use WritesPerSiteWebserverConfigs;
 
     public int $tries = 1;
 
@@ -88,7 +83,6 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
         $edgeProxy = $server->edgeProxy();
         if ($edgeProxy === null) {
-            // No edge proxy active — nothing to remove. Treat as success.
             $this->beginConsoleAction()->info('No edge proxy is active on this server.');
             $this->completeConsoleAction();
 
@@ -97,6 +91,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
+        $previousWebserver = $this->resolveEdgeProxyPreviousWebserver($server);
 
         try {
             $sites = Site::query()
@@ -104,28 +99,30 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
                 ->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'server'])
                 ->get();
 
-            $emitter->info(sprintf('[restore]  rewriting %d caddy config(s) for :80', $sites->count()));
-            $this->executeStageRestoreCaddy($server, $sites);
+            $emitter->info(sprintf('[cleanup]  removing %s edge-proxy artifacts', $edgeProxy));
+            $this->executeStageRemoveEdgeArtifacts($server, $edgeProxy, $sites);
 
-            $emitter->info('[validate] caddy validate');
-            $this->executeStageValidate($server);
+            $emitter->info(sprintf('[restore]  rewriting %d site config(s) for %s on :80', $sites->count(), $previousWebserver));
+            $this->executeStageRestoreSites($server, $sites, $previousWebserver);
 
-            $emitter->info(sprintf('[cutover]  stop %s, reload caddy on :80', $edgeProxy));
-            $this->executeStageCutover($server, $edgeProxy);
+            $emitter->info(sprintf('[validate] %s config check', $previousWebserver));
+            $this->validateWebserverConfig($server, $previousWebserver);
+
+            $emitter->info(sprintf('[cutover]  stop %s, bind %s to :80', $edgeProxy, $previousWebserver));
+            $this->executeStageCutover($server, $edgeProxy, $previousWebserver);
 
             $meta = is_array($server->meta) ? $server->meta : [];
-            unset($meta['edge_proxy']);
-            $meta['webserver'] = 'caddy';
+            unset($meta['edge_proxy'], $meta['edge_proxy_previous_webserver']);
+            $meta['webserver'] = $previousWebserver;
             $server->update(['meta' => $meta]);
 
-            // Re-probe systemd inventory so meta.manage_units reflects the
-            // post-remove state (caddy back on :80, edge proxy stopped+disabled).
             SyncServerSystemdServicesJob::dispatch($server->id);
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
             $this->recordAudit($server, $edgeProxy, ServerWebserverAuditEvent::ACTION_EDGE_PROXY_REMOVED, [
                 'edge_proxy' => $edgeProxy,
+                'restored_webserver' => $previousWebserver,
                 'sites_affected' => $sites->count(),
             ], $startedAt, ServerWebserverAuditEvent::RESULT_SUCCESS);
         } catch (\Throwable $e) {
@@ -133,6 +130,7 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
             $this->failConsoleAction($e->getMessage());
             $this->recordAudit($server, $edgeProxy, ServerWebserverAuditEvent::ACTION_EDGE_PROXY_FAILED, [
                 'edge_proxy' => $edgeProxy,
+                'restored_webserver' => $previousWebserver,
                 'reason' => $e->getMessage(),
             ], $startedAt);
         }
@@ -146,80 +144,161 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
     /**
      * @param  Collection<int, Site>  $sites
      */
-    protected function executeStageRestoreCaddy(Server $server, $sites): void
+    protected function executeStageRemoveEdgeArtifacts(Server $server, string $edgeProxy, Collection $sites): void
     {
         $ssh = new SshConnection($server);
 
         foreach ($sites as $site) {
-            $basename = $this->basenameFor($site);
-
-            // Write the :80-bound Caddy config — same builder caddy-edge uses.
-            $config = app(CaddySiteConfigBuilder::class)->build($site, null);
-            $this->writeRemoteFile($server, $ssh, '/etc/caddy/sites-enabled/'.$basename.'.caddy', $config);
-
-            // Drop the -backend.caddy fragment so it doesn't double-bind on
-            // reload (its high port is still defined inside).
+            $basename = $this->basenameForSite($site);
             $ssh->exec($this->privilegedCommand(
                 $server,
                 'rm -f /etc/caddy/sites-enabled/'.escapeshellarg($basename).'-backend.caddy'
             ), 15);
         }
-    }
 
-    protected function executeStageValidate(Server $server): void
-    {
-        $ssh = new SshConnection($server);
-        $out = $ssh->exec(
-            $this->privilegedCommand($server, 'caddy validate --config /etc/caddy/Caddyfile 2>&1'),
-            60,
-        );
-        $exit = $ssh->lastExecExitCode();
-        if ($exit !== null && $exit !== 0) {
-            throw new \RuntimeException(sprintf(
-                'caddy validate failed (exit %d): %s',
-                $exit,
-                trim(substr($out, -500)),
-            ));
+        if ($edgeProxy === 'traefik') {
+            foreach ($sites as $site) {
+                $basename = $this->basenameForSite($site);
+                $ssh->exec($this->privilegedCommand(
+                    $server,
+                    'rm -f /etc/traefik/dynamic/'.escapeshellarg($basename.'.yml')
+                ), 15);
+            }
+            $ssh->exec($this->privilegedCommand(
+                $server,
+                'rm -f '.escapeshellarg(TraefikDashboardExposure::MANAGED_PATH)
+            ), 15);
+        }
+
+        if ($edgeProxy === 'haproxy') {
+            $ssh->exec($this->privilegedCommand(
+                $server,
+                sprintf(
+                    '[ -f %1$s.dply-bak ] && cp %1$s.dply-bak %1$s || true',
+                    escapeshellarg('/etc/haproxy/haproxy.cfg'),
+                ),
+            ), 15);
+        }
+
+        if ($edgeProxy === 'envoy') {
+            $ssh->exec($this->privilegedCommand(
+                $server,
+                sprintf(
+                    '[ -f %1$s.dply-bak ] && cp %1$s.dply-bak %1$s || true',
+                    escapeshellarg('/etc/envoy/envoy.yaml'),
+                ),
+            ), 15);
         }
     }
 
-    protected function executeStageCutover(Server $server, string $edgeProxy): void
+    /**
+     * @param  Collection<int, Site>  $sites
+     */
+    protected function executeStageRestoreSites(Server $server, Collection $sites, string $previousWebserver): void
     {
-        $ssh = new SshConnection($server);
-        $edgeUnit = $edgeProxy === 'traefik' ? 'traefik' : 'haproxy';
-
-        // Stop the edge proxy first so it releases :80.
-        $ssh->exec(
-            $this->privilegedCommand($server, sprintf('systemctl stop %s 2>/dev/null || true', escapeshellarg($edgeUnit))),
-            30,
-        );
-
-        // Reload Caddy to pick up the new :80-bound configs. If Caddy isn't
-        // running, enable+start.
-        $cmd = '(systemctl is-active --quiet caddy && systemctl reload caddy) || systemctl enable --now caddy';
-        $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
-        $exit = $ssh->lastExecExitCode();
-        if ($exit !== null && $exit !== 0) {
-            throw new \RuntimeException(sprintf(
-                'Failed to reload Caddy on :80 (exit %d): %s',
-                $exit,
-                trim(substr($out, -500)),
-            ));
+        if ($sites->isEmpty()) {
+            return;
         }
 
-        // Disable the edge proxy at boot so it doesn't auto-start and
-        // collide with Caddy's :80 binding.
-        $ssh->exec(
-            $this->privilegedCommand($server, sprintf('systemctl disable %s 2>/dev/null || true', escapeshellarg($edgeUnit))),
-            30,
-        );
+        $ssh = new SshConnection($server);
+        $this->ensureTargetConfigDirs($server, $ssh, $previousWebserver);
+
+        foreach ($sites as $site) {
+            $basename = $this->basenameForSite($site);
+
+            if ($previousWebserver !== 'caddy') {
+                $ssh->exec($this->privilegedCommand(
+                    $server,
+                    'rm -f /etc/caddy/sites-enabled/'.escapeshellarg($basename).'.caddy'
+                ), 15);
+            }
+
+            $config = $this->buildSiteConfigFor($site, $previousWebserver, listenPort: null);
+            $path = $this->siteConfigPathFor($site, $previousWebserver);
+            $this->writeRemoteFile($server, $ssh, $path, $config);
+            $this->ensureSiteEnabled($server, $ssh, $site, $previousWebserver);
+
+            if ($previousWebserver === 'openlitespeed') {
+                $repo = rtrim($site->effectiveRepositoryPath(), '/');
+                $ssh->exec($this->privilegedCommand($server, 'mkdir -p '.escapeshellarg($repo.'/logs')), 15);
+            }
+        }
+
+        if ($previousWebserver === 'openlitespeed') {
+            $this->writeOlsHttpdConfig($server, $ssh, $sites, listenPort: 80);
+        }
+
+        if ($previousWebserver === 'caddy') {
+            foreach ($sites as $site) {
+                $basename = $this->basenameForSite($site);
+                $ssh->exec($this->privilegedCommand(
+                    $server,
+                    'rm -f /etc/caddy/sites-enabled/'.escapeshellarg($basename).'-backend.caddy'
+                ), 15);
+            }
+            $this->ensureCaddyRuntimeOwnership($server, $ssh);
+        }
     }
 
-    private function basenameFor(Site $site): string
+    protected function executeStageCutover(Server $server, string $edgeProxy, string $previousWebserver): void
     {
-        return method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        $ssh = new SshConnection($server);
+        $edgeUnit = $this->systemdUnitForWebserver($edgeProxy);
+        $webserverUnit = $this->systemdUnitForWebserver($previousWebserver);
+
+        if ($edgeUnit !== null) {
+            $ssh->exec(
+                $this->privilegedCommand($server, sprintf('systemctl stop %s 2>/dev/null || true', escapeshellarg($edgeUnit))),
+                30,
+            );
+            $this->waitForPortFree($server, $ssh, 80);
+        }
+
+        if ($previousWebserver === 'caddy') {
+            if ($webserverUnit !== null) {
+                $this->ensureCaddyRuntimeOwnership($server, $ssh);
+                $cmd = '(systemctl is-active --quiet caddy && systemctl reload caddy) || systemctl enable --now caddy';
+                $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
+                $exit = $ssh->lastExecExitCode();
+                if ($exit !== null && $exit !== 0) {
+                    throw new \RuntimeException(sprintf(
+                        'Failed to reload Caddy on :80 (exit %d): %s',
+                        $exit,
+                        trim(substr((string) $out, -500)),
+                    ));
+                }
+            }
+        } elseif ($webserverUnit !== null) {
+            $caddyUnit = $this->systemdUnitForWebserver('caddy');
+            if ($caddyUnit !== null) {
+                $ssh->exec($this->privilegedCommand(
+                    $server,
+                    sprintf('systemctl stop %s 2>/dev/null || true; systemctl disable %s 2>/dev/null || true', escapeshellarg($caddyUnit), escapeshellarg($caddyUnit)),
+                ), 30);
+            }
+
+            $cmd = sprintf(
+                'systemctl enable %1$s 2>/dev/null || true; systemctl restart %1$s 2>&1; systemctl is-active %1$s',
+                escapeshellarg($webserverUnit),
+            );
+            $out = $ssh->exec($this->privilegedCommand($server, $cmd), 60);
+            $exit = $ssh->lastExecExitCode();
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException(sprintf(
+                    'Failed to start %s on :80 (exit %d): %s',
+                    $previousWebserver,
+                    $exit,
+                    trim(substr((string) $out, -500)),
+                ));
+            }
+        }
+
+        if ($edgeUnit !== null) {
+            $ssh->exec(
+                $this->privilegedCommand($server, sprintf('systemctl disable %s 2>/dev/null || true', escapeshellarg($edgeUnit))),
+                30,
+            );
+        }
     }
 
     /**

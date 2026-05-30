@@ -198,6 +198,11 @@ class ServerPhpManager
             $detectedDefault = $installedIds[0] ?? null;
         }
 
+        $cliDefault = $this->normalizeVersionId($meta['default_php_version'] ?? null);
+        if ($cliDefault === null || ! in_array($cliDefault, $installedIds, true)) {
+            $cliDefault = $detectedDefault;
+        }
+
         $newSiteDefault = $this->normalizeVersionId($meta['php_new_site_default_version'] ?? null);
         if ($newSiteDefault === null || ! in_array($newSiteDefault, $installedIds, true)) {
             $newSiteDefault = $detectedDefault;
@@ -208,7 +213,7 @@ class ServerPhpManager
             'installed_versions' => $installedIds,
             'detected_default_version' => $detectedDefault,
         ];
-        $meta['default_php_version'] = $detectedDefault;
+        $meta['default_php_version'] = $cliDefault;
         $meta['php_new_site_default_version'] = $newSiteDefault;
 
         return $meta;
@@ -224,7 +229,7 @@ class ServerPhpManager
      *         new_site_default: ?string,
      *         detected_default_version: ?string
      *     },
-     *     version_rows: list<array{id: string, label: string, is_supported: bool, is_installed: bool, site_count: int}>
+     *     version_rows: list<array{id: string, label: string, is_supported: bool, is_installed: bool, site_count: int, migration_target_version: ?string}>
      * }
      */
     public function workspaceData(Server $server): array
@@ -233,6 +238,7 @@ class ServerPhpManager
         $inventory = $this->cachedInventory($server);
         $defaults = $this->currentDefaults($server, $inventory);
         $rows = [];
+        $migrator = app(ServerPhpSiteRuntimeMigrator::class);
 
         foreach ($supportedVersions as $version) {
             $rows[$version['id']] = [
@@ -241,6 +247,7 @@ class ServerPhpManager
                 'is_supported' => true,
                 'is_installed' => false,
                 'site_count' => 0,
+                'migration_target_version' => null,
             ];
         }
 
@@ -251,7 +258,23 @@ class ServerPhpManager
                 'is_supported' => $version['is_supported'],
                 'is_installed' => true,
                 'site_count' => $version['site_count'],
+                'migration_target_version' => null,
             ];
+        }
+
+        $installedIds = array_values(array_filter(
+            array_keys($rows),
+            fn (string $id): bool => (bool) ($rows[$id]['is_installed'] ?? false),
+        ));
+
+        foreach ($rows as $id => $row) {
+            if ($row['is_installed'] ?? false) {
+                $rows[$id]['uninstall_fallback_version'] = $migrator->resolveMigrationTargetVersion($installedIds, $id);
+            }
+
+            if ((int) ($row['site_count'] ?? 0) > 0 && ($row['is_installed'] ?? false)) {
+                $rows[$id]['migration_target_version'] = $rows[$id]['uninstall_fallback_version'];
+            }
         }
 
         return [
@@ -423,11 +446,35 @@ class ServerPhpManager
         }
     }
 
+    public function isInventoryStale(Server $server): bool
+    {
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $refreshMeta = is_array($meta['php_inventory_refresh'] ?? null) ? $meta['php_inventory_refresh'] : [];
+
+        return ($refreshMeta['status'] ?? null) === 'stale';
+    }
+
+    public function shouldSyncInventoryBeforePackageAction(Server $server): bool
+    {
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $refreshMeta = is_array($meta['php_inventory_refresh'] ?? null) ? $meta['php_inventory_refresh'] : [];
+        $status = $refreshMeta['status'] ?? null;
+
+        return in_array($status, ['stale', 'failed'], true);
+    }
+
     /**
+     * @param  callable(string $step, string $action, string $version): void|null  $onProgress
      * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
-    public function applyPackageAction(Server $server, string $action, string $version, ?callable $afterLockAcquired = null): array
-    {
+    public function applyPackageAction(
+        Server $server,
+        string $action,
+        string $version,
+        ?callable $onProgress = null,
+        bool $migrateSitesBeforeUninstall = false,
+        ?string $actingUserId = null,
+    ): array {
         $version = $this->normalizeVersionId($version) ?? '';
         $action = trim($action);
 
@@ -443,58 +490,300 @@ class ServerPhpManager
         }
 
         try {
-            $afterLockAcquired?->__invoke($action, $version);
-
             $server = $server->fresh();
             if ($server === null || ! $server->isReady() || empty($server->ssh_private_key) || blank($server->ip_address)) {
                 throw new \RuntimeException('Provisioning and SSH must be ready before managing PHP packages.');
             }
 
+            $shouldSyncInventory = $this->shouldSyncInventoryBeforePackageAction($server);
+
+            if ($shouldSyncInventory) {
+                $onProgress?->__invoke('sync_inventory', $action, $version);
+            }
+
             $preflightInventory = $this->fetchRemoteInventory($server);
+
+            if ($shouldSyncInventory) {
+                $this->syncInventorySnapshot($server, $preflightInventory);
+                $server = $server->fresh() ?? $server;
+            }
+
+            if ($action === 'install' && $this->isVersionInstalledInInventory($version, $preflightInventory)) {
+                return $this->completePackageActionWithInventory(
+                    $server,
+                    $action,
+                    $version,
+                    $preflightInventory,
+                    null,
+                    __('PHP :version is already installed.', ['version' => $version]),
+                );
+            }
+
+            if ($action === 'set_cli_default' && $this->isCliDefaultInInventory($version, $preflightInventory)) {
+                return $this->completePackageActionWithInventory(
+                    $server,
+                    $action,
+                    $version,
+                    $preflightInventory,
+                    null,
+                    __('PHP :version is already the CLI default.', ['version' => $version]),
+                );
+            }
+
+            if ($action === 'uninstall' && ! $this->isVersionInstalledInInventory($version, $preflightInventory)) {
+                return $this->completePackageActionWithInventory(
+                    $server,
+                    $action,
+                    $version,
+                    $preflightInventory,
+                    null,
+                    __('PHP :version is not installed.', ['version' => $version]),
+                );
+            }
+
+            if ($action === 'uninstall' && $migrateSitesBeforeUninstall) {
+                $this->migrateSitesBlockingUninstall($server, $version, $preflightInventory, $onProgress, $actingUserId);
+                $server = $server->fresh() ?? $server;
+            }
+
+            if ($action === 'uninstall') {
+                $preflightInventory = $this->reassignDefaultsBeforeUninstall(
+                    $server,
+                    $version,
+                    $preflightInventory,
+                    $onProgress,
+                );
+                $server = $server->fresh() ?? $server;
+            }
+
+            if ($action === 'migrate_sites') {
+                $this->guardPackageAction($server, $action, $version, $preflightInventory);
+
+                return $this->runSiteMigrationPackageAction(
+                    $server,
+                    $version,
+                    $preflightInventory,
+                    $onProgress,
+                    $actingUserId,
+                );
+            }
+
             $this->guardPackageAction($server, $action, $version, $preflightInventory);
+
+            $onProgress?->__invoke('execute', $action, $version);
 
             $commandOutput = $this->executePackageAction($server, $action, $version);
 
             $freshInventory = $this->fetchRemoteInventory($server->fresh());
-            $meta = $this->reconcileFreshInventory($server->fresh(), $freshInventory);
 
-            if ($action === 'set_new_site_default') {
-                $meta['php_new_site_default_version'] = $version;
-            }
-
-            $meta['php_inventory_refresh'] = [
-                'status' => 'succeeded',
-                'started_at' => data_get($server->meta, 'php_inventory_refresh.started_at'),
-                'refreshed_at' => now()->toIso8601String(),
-                'error' => null,
-                'failed_at' => null,
-                'stale_at' => null,
-            ];
-
-            try {
-                $this->persistRefreshedInventoryMeta($server->fresh(), $meta);
-
-                return [
-                    'status' => 'succeeded',
-                    'message' => $this->packageActionSuccessMessage($action, $version),
-                    'output' => $this->packageActionOutput($commandOutput, $freshInventory),
-                ];
-            } catch (\Throwable $e) {
-                $this->persistRefreshMeta($server->fresh(), [
-                    'status' => 'stale',
-                    'error' => $e->getMessage(),
-                    'stale_at' => now()->toIso8601String(),
-                ]);
-
-                return [
-                    'status' => 'stale',
-                    'message' => __('Remote PHP state changed, but Dply could not save the refreshed snapshot.'),
-                    'output' => $this->packageActionOutput($commandOutput, $freshInventory),
-                ];
-            }
+            return $this->completePackageActionWithInventory(
+                $server,
+                $action,
+                $version,
+                $freshInventory,
+                $commandOutput,
+                $this->packageActionSuccessMessage($action, $version),
+            );
         } finally {
             ServerPhpMutationLock::releaseIfOwned($lock, $acquired);
         }
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $freshInventory
+     * @return array<string, mixed>
+     */
+    protected function refreshedInventoryMeta(
+        Server $server,
+        array $freshInventory,
+        ?string $cliDefaultVersion = null,
+        ?string $newSiteDefaultVersion = null,
+    ): array {
+        $meta = $this->reconcileFreshInventory($server->fresh(), $freshInventory);
+
+        if ($cliDefaultVersion !== null) {
+            $meta['default_php_version'] = $cliDefaultVersion;
+            if (is_array($meta['php_inventory'] ?? null)) {
+                $meta['php_inventory']['detected_default_version'] = $cliDefaultVersion;
+            }
+        }
+
+        if ($newSiteDefaultVersion !== null) {
+            $meta['php_new_site_default_version'] = $newSiteDefaultVersion;
+        }
+
+        $meta['php_inventory_refresh'] = [
+            'status' => 'succeeded',
+            'started_at' => data_get($server->meta, 'php_inventory_refresh.started_at'),
+            'refreshed_at' => now()->toIso8601String(),
+            'error' => null,
+            'failed_at' => null,
+            'stale_at' => null,
+        ];
+
+        return $meta;
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $freshInventory
+     */
+    protected function syncInventorySnapshot(Server $server, array $freshInventory): bool
+    {
+        try {
+            $this->persistRefreshedInventoryMeta(
+                $server->fresh(),
+                $this->refreshedInventoryMeta($server, $freshInventory),
+            );
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $freshInventory
+     * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
+     */
+    protected function completePackageActionWithInventory(
+        Server $server,
+        string $action,
+        string $version,
+        array $freshInventory,
+        ?string $commandOutput,
+        string $message,
+    ): array {
+        $newSiteDefaultVersion = $action === 'set_new_site_default' ? $version : null;
+        $cliDefaultVersion = $action === 'set_cli_default' ? $version : null;
+
+        try {
+            $this->persistRefreshedInventoryMeta(
+                $server->fresh(),
+                $this->refreshedInventoryMeta($server, $freshInventory, $cliDefaultVersion, $newSiteDefaultVersion),
+            );
+
+            return [
+                'status' => 'succeeded',
+                'message' => $message,
+                'output' => $this->packageActionOutput($commandOutput, $freshInventory),
+            ];
+        } catch (\Throwable $e) {
+            $this->persistRefreshMeta($server->fresh(), [
+                'status' => 'stale',
+                'error' => $e->getMessage(),
+                'stale_at' => now()->toIso8601String(),
+            ]);
+
+            return [
+                'status' => 'stale',
+                'message' => __('Remote PHP state changed, but Dply could not save the refreshed snapshot.'),
+                'output' => $this->packageActionOutput($commandOutput, $freshInventory),
+            ];
+        }
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $inventory
+     */
+    protected function isVersionInstalledInInventory(string $version, array $inventory): bool
+    {
+        return in_array($version, $this->normalizeVersionList($inventory['installed_versions'] ?? []), true);
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $inventory
+     */
+    protected function isCliDefaultInInventory(string $version, array $inventory): bool
+    {
+        $normalized = $this->normalizeVersionId($version);
+
+        return $normalized !== null
+            && $normalized === $this->normalizeVersionId($inventory['detected_default_version'] ?? null);
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $preflightInventory
+     */
+    protected function migrateSitesBlockingUninstall(
+        Server $server,
+        string $version,
+        array $preflightInventory,
+        ?callable $onProgress,
+        ?string $actingUserId,
+    ): void {
+        $migrator = app(ServerPhpSiteRuntimeMigrator::class);
+        $siteCount = $migrator->countSitesUsingVersion($server, $version);
+
+        if ($siteCount === 0) {
+            return;
+        }
+
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $target = $migrator->resolveMigrationTargetVersion($installedIds, $version);
+
+        if ($target === null) {
+            throw new \RuntimeException('Install another PHP version before uninstalling PHP '.$version.' while sites still use it.');
+        }
+
+        $onProgress?->__invoke('migrate_sites', 'uninstall', $version);
+        $migrator->migrateSitesUsingVersion($server, $version, $target, $actingUserId);
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $preflightInventory
+     * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
+     */
+    protected function runSiteMigrationPackageAction(
+        Server $server,
+        string $version,
+        array $preflightInventory,
+        ?callable $onProgress,
+        ?string $actingUserId,
+    ): array {
+        $migrator = app(ServerPhpSiteRuntimeMigrator::class);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $target = $migrator->resolveMigrationTargetVersion($installedIds, $version);
+
+        if ($target === null) {
+            throw new \RuntimeException('Install another PHP version before moving sites off PHP '.$version.'.');
+        }
+
+        $onProgress?->__invoke('migrate_sites', 'migrate_sites', $version);
+        $summary = $migrator->migrateSitesUsingVersion($server, $version, $target, $actingUserId);
+
+        return $this->completePackageActionWithInventory(
+            $server,
+            'migrate_sites',
+            $version,
+            $preflightInventory,
+            $this->siteMigrationOutput($summary),
+            trans_choice(
+                ':count site moved to PHP :target. Webserver configs are queued to apply on each site.|:count sites moved to PHP :target. Webserver configs are queued to apply on each site.',
+                $summary['migrated_count'],
+                ['count' => $summary['migrated_count'], 'target' => $summary['target_version']],
+            ),
+        );
+    }
+
+    /**
+     * @param  array{migrated_count: int, target_version: string, site_names: list<string>}  $summary
+     */
+    protected function siteMigrationOutput(array $summary): string
+    {
+        $lines = [
+            __('Moved :count site(s) to PHP :target.', [
+                'count' => $summary['migrated_count'],
+                'target' => $summary['target_version'],
+            ]),
+        ];
+
+        if ($summary['site_names'] !== []) {
+            $lines[] = __('Sites: :names', ['names' => implode(', ', $summary['site_names'])]);
+        }
+
+        $lines[] = __('Queued webserver config apply for each site.');
+
+        return implode("\n", $lines);
     }
 
     public function isMutationInFlight(Server $server): bool
@@ -502,7 +791,7 @@ class ServerPhpManager
         return ServerPhpMutationLock::isHeld($server);
     }
 
-    protected function normalizeVersionId(mixed $value): ?string
+    public function normalizeVersionId(mixed $value): ?string
     {
         if (! is_string($value) && ! is_numeric($value)) {
             return null;
@@ -523,7 +812,7 @@ class ServerPhpManager
     /**
      * @return list<string>
      */
-    protected function normalizeVersionList(mixed $value): array
+    public function normalizeVersionList(mixed $value): array
     {
         if (! is_array($value)) {
             return [];
@@ -599,36 +888,47 @@ class ServerPhpManager
             'is_supported_environment' => (bool) ($inventory['supported'] ?? true),
         ]);
 
-        if ($action === 'uninstall') {
-            $defaults['cli_default'] = $detectedDefaultVersion;
-        }
-
         if (! ($inventory['supported'] ?? true)) {
             throw new \RuntimeException('This server does not report a supported PHP package environment.');
         }
 
         match ($action) {
-            'install' => $this->guardInstallAction($version, $supportedIds, $installedIds),
+            'install' => $this->guardInstallAction($version, $supportedIds),
             'set_cli_default' => $this->guardSetCliDefaultAction($version, $installedIds),
             'set_new_site_default' => $this->guardSetNewSiteDefaultAction($version, $installedIds),
             'patch' => $this->guardPatchAction($version, $installedIds),
+            'migrate_sites' => $this->guardMigrateSitesAction($server, $version, $installedIds),
             'uninstall' => $this->guardUninstallAction($version, $installedIds, $siteCount, $defaults),
             default => throw new \RuntimeException('Unknown PHP package action.'),
         };
     }
 
     /**
-     * @param  list<string>  $supportedIds
      * @param  list<string>  $installedIds
      */
-    protected function guardInstallAction(string $version, array $supportedIds, array $installedIds): void
+    protected function guardMigrateSitesAction(Server $server, string $version, array $installedIds): void
+    {
+        if (! in_array($version, $installedIds, true)) {
+            throw new \RuntimeException('PHP '.$version.' is not installed.');
+        }
+
+        if (app(ServerPhpSiteRuntimeMigrator::class)->countSitesUsingVersion($server, $version) === 0) {
+            throw new \RuntimeException('No PHP sites on this server are using PHP '.$version.'.');
+        }
+
+        $target = app(ServerPhpSiteRuntimeMigrator::class)->resolveMigrationTargetVersion($installedIds, $version);
+        if ($target === null) {
+            throw new \RuntimeException('Install another PHP version before moving sites off PHP '.$version.'.');
+        }
+    }
+
+    /**
+     * @param  list<string>  $supportedIds
+     */
+    protected function guardInstallAction(string $version, array $supportedIds): void
     {
         if (! in_array($version, $supportedIds, true)) {
             throw new \RuntimeException('PHP '.$version.' is not supported on this server.');
-        }
-
-        if (in_array($version, $installedIds, true)) {
-            throw new \RuntimeException('PHP '.$version.' is already installed.');
         }
     }
 
@@ -673,19 +973,85 @@ class ServerPhpManager
         }
 
         if ($siteCount > 0) {
-            throw new \RuntimeException(trans_choice('PHP :version is still used by :count site.|PHP :version is still used by :count sites.', $siteCount, [
-                'version' => $version,
-                'count' => $siteCount,
-            ]));
+            throw new \RuntimeException(trans_choice(
+                'PHP :version is still used by :count site. Upgrade those sites to another installed PHP version before uninstalling, or choose migrate sites and uninstall.|PHP :version is still used by :count sites. Upgrade those sites to another installed PHP version before uninstalling, or choose migrate sites and uninstall.',
+                $siteCount,
+                ['version' => $version, 'count' => $siteCount],
+            ));
         }
 
-        if (($defaults['cli_default'] ?? null) === $version) {
-            throw new \RuntimeException('PHP '.$version.' is still the CLI default for this server.');
+        if (($defaults['cli_default'] ?? null) === $version || ($defaults['new_site_default'] ?? null) === $version) {
+            throw new \RuntimeException('Install another PHP version before uninstalling PHP '.$version.' while it is still a server default.');
+        }
+    }
+
+    /**
+     * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $preflightInventory
+     * @return array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}
+     */
+    protected function reassignDefaultsBeforeUninstall(
+        Server $server,
+        string $version,
+        array $preflightInventory,
+        ?callable $onProgress,
+    ): array {
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $fallback = app(ServerPhpSiteRuntimeMigrator::class)->resolveMigrationTargetVersion($installedIds, $version);
+
+        if ($fallback === null) {
+            return $preflightInventory;
         }
 
-        if (($defaults['new_site_default'] ?? null) === $version) {
-            throw new \RuntimeException('PHP '.$version.' is still the default for new PHP sites on this server.');
+        $detectedCli = $this->normalizeVersionId($preflightInventory['detected_default_version'] ?? null);
+        $defaults = $this->currentDefaults($server, [
+            'installed_versions' => array_map(
+                fn (string $id): array => [
+                    'id' => $id,
+                    'label' => 'PHP '.$id,
+                    'is_supported' => true,
+                    'site_count' => 0,
+                ],
+                $installedIds,
+            ),
+            'detected_default_version' => $detectedCli,
+            'is_supported_environment' => (bool) ($preflightInventory['supported'] ?? true),
+        ]);
+
+        $needsCliReassign = ($defaults['cli_default'] ?? null) === $version || $detectedCli === $version;
+        $needsNewSiteReassign = ($defaults['new_site_default'] ?? null) === $version;
+
+        if (! $needsCliReassign && ! $needsNewSiteReassign) {
+            return $preflightInventory;
         }
+
+        $cliPersist = null;
+        $newSitePersist = null;
+
+        if ($needsCliReassign) {
+            $onProgress?->__invoke('reassign_cli_default', 'uninstall', $version);
+            $this->executePackageAction($server, 'set_cli_default', $fallback);
+            $preflightInventory = $this->fetchRemoteInventory($server->fresh() ?? $server);
+            $cliPersist = $fallback;
+        }
+
+        if ($needsNewSiteReassign) {
+            $onProgress?->__invoke('reassign_new_site_default', 'uninstall', $version);
+            $newSitePersist = $fallback;
+        }
+
+        if ($cliPersist !== null || $newSitePersist !== null) {
+            $this->persistRefreshedInventoryMeta(
+                $server->fresh() ?? $server,
+                $this->refreshedInventoryMeta(
+                    $server->fresh() ?? $server,
+                    $preflightInventory,
+                    $cliPersist,
+                    $newSitePersist,
+                ),
+            );
+        }
+
+        return $preflightInventory;
     }
 
     /**
@@ -714,7 +1080,20 @@ class ServerPhpManager
         return app(ServerSshConnectionRunner::class)->run(
             $server,
             function ($ssh) use ($server, $action, $version): string {
-                return $ssh->exec($this->packageActionScript($server, $action, $version), 600);
+                $output = $ssh->exec($this->packageActionScript($server, $action, $version), 600);
+                $exitCode = $ssh->lastExecExitCode();
+
+                if ($exitCode !== null && $exitCode !== 0) {
+                    $trimmed = trim($output);
+
+                    throw new \RuntimeException(
+                        $trimmed !== ''
+                            ? $trimmed
+                            : __('Remote PHP command failed (exit :code).', ['code' => $exitCode]),
+                    );
+                }
+
+                return $output;
             },
             $this->useRootSsh(),
             $this->fallbackToDeployUserSsh()
@@ -739,10 +1118,10 @@ class ServerPhpManager
     /**
      * @param  array{supported: bool, installed_versions: list<string>, detected_default_version: ?string}  $inventory
      */
-    protected function packageActionOutput(string $commandOutput, array $inventory): string
+    protected function packageActionOutput(?string $commandOutput, array $inventory): string
     {
         $parts = [];
-        $trimmedCommandOutput = trim($commandOutput);
+        $trimmedCommandOutput = trim($commandOutput ?? '');
 
         if ($trimmedCommandOutput !== '') {
             $parts[] = $trimmedCommandOutput;
@@ -837,6 +1216,29 @@ class ServerPhpManager
     {
         $inner = <<<'BASH'
 bash -lc '
+php_runtime_installed() {
+  local version="$1"
+  if dpkg-query -W -f='\''${Status}'\'' "php${version}-cli" 2>/dev/null | grep -q "install ok installed"; then
+    return 0
+  fi
+  if dpkg-query -W -f='\''${Status}'\'' "php${version}-fpm" 2>/dev/null | grep -q "install ok installed"; then
+    return 0
+  fi
+  if dpkg-query -W -f='\''${Package}\n'\'' "php${version}-*" 2>/dev/null | grep -qE "^php${version}-"; then
+    return 0
+  fi
+  if command -v "php${version}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v "php-fpm${version}" >/dev/null 2>&1; then
+    return 0
+  fi
+  if [ -x "/usr/bin/php${version}" ] || [ -x "/usr/sbin/php-fpm${version}" ]; then
+    return 0
+  fi
+  return 1
+}
+
 supported_versions=(__SUPPORTED_VERSIONS__)
 supported=false
 installed_versions=()
@@ -844,14 +1246,7 @@ installed_versions=()
 if command -v dpkg-query >/dev/null 2>&1; then
   supported=true
   for version in "${supported_versions[@]}"; do
-    if \
-      dpkg-query -W -f='\${Status}' "php${version}-cli" 2>/dev/null | grep -q "install ok installed" \
-      || dpkg-query -W -f='\${Status}' "php${version}-fpm" 2>/dev/null | grep -q "install ok installed" \
-      || command -v "php${version}" >/dev/null 2>&1 \
-      || command -v "php-fpm${version}" >/dev/null 2>&1 \
-      || [ -x "/usr/bin/php${version}" ] \
-      || [ -x "/usr/sbin/php-fpm${version}" ] \
-      || [ -d "/etc/php/${version}" ]; then
+    if php_runtime_installed "$version"; then
       installed_versions+=("$version")
     fi
   done
@@ -860,7 +1255,7 @@ if command -v dpkg-query >/dev/null 2>&1; then
     version="$(basename "$(dirname "$d")")"
     case " ${installed_versions[*]} " in
       *" ${version} "*) ;;
-      *) installed_versions+=("$version") ;;
+      *) php_runtime_installed "$version" && installed_versions+=("$version") ;;
     esac
   done
 elif command -v php >/dev/null 2>&1; then
@@ -897,7 +1292,7 @@ BASH;
     {
         return match ($action) {
             'install', 'patch', 'uninstall' => 630,
-            'set_cli_default', 'set_new_site_default' => 150,
+            'set_cli_default', 'set_new_site_default', 'migrate_sites' => 630,
             default => 630,
         };
     }
@@ -908,6 +1303,7 @@ BASH;
             'install' => __('PHP :version installed.', ['version' => $version]),
             'set_cli_default' => __('PHP :version is now the CLI default.', ['version' => $version]),
             'set_new_site_default' => __('PHP :version is now the default for new PHP sites.', ['version' => $version]),
+            'migrate_sites' => __('Sites moved off PHP :version.', ['version' => $version]),
             'patch' => __('PHP :version patched.', ['version' => $version]),
             'uninstall' => __('PHP :version uninstalled.', ['version' => $version]),
             default => __('PHP action completed.'),
@@ -920,18 +1316,61 @@ BASH;
 
         $inner = match ($action) {
             'install' => "DEBIAN_FRONTEND=noninteractive apt-get install -y php{$version}-cli php{$version}-fpm",
-            'set_cli_default' => "update-alternatives --set php /usr/bin/php{$version}",
+            'set_cli_default' => $this->setCliDefaultScript($version),
             'set_new_site_default' => "printf %s {$versionArg} >/dev/null",
             'patch' => "DEBIAN_FRONTEND=noninteractive apt-get install --only-upgrade -y php{$version}-cli php{$version}-fpm",
-            'uninstall' => "DEBIAN_FRONTEND=noninteractive apt-get remove -y php{$version}-cli php{$version}-fpm",
+            'uninstall' => $this->uninstallPhpScript($version),
             default => throw new \RuntimeException('Unknown PHP package action.'),
         };
 
+        $script = str_contains($inner, "\n")
+            ? 'bash -lc '.escapeshellarg($inner)
+            : $inner;
+
         if (trim((string) $server->ssh_user) === '' || trim((string) $server->ssh_user) === 'root') {
-            return $inner;
+            return $script;
         }
 
-        return 'sudo -n bash -lc '.escapeshellarg($inner);
+        return 'sudo -n '.$script;
+    }
+
+    protected function setCliDefaultScript(string $version): string
+    {
+        $versionDigits = preg_replace('/\D/', '', $version) ?? $version;
+
+        return implode("\n", [
+            'set -e',
+            "target=/usr/bin/php{$version}",
+            'if [ ! -x "$target" ]; then',
+            '  echo "PHP binary not found: $target" >&2',
+            '  exit 1',
+            'fi',
+            "priority={$versionDigits}",
+            'if update-alternatives --query php >/dev/null 2>&1; then',
+            '  update-alternatives --install /usr/bin/php php "$target" "$priority" 2>/dev/null || true',
+            '  update-alternatives --set php "$target"',
+            'else',
+            '  update-alternatives --install /usr/bin/php php "$target" "$priority"',
+            'fi',
+        ]);
+    }
+
+    protected function uninstallPhpScript(string $version): string
+    {
+        return implode("\n", [
+            'set -e',
+            "version={$version}",
+            'packages="$(dpkg-query -W -f=\'${Package}\n\' "php${version}-*" 2>/dev/null | grep -E "^php${version}-" || true)"',
+            'if [ -n "$packages" ]; then',
+            '  DEBIAN_FRONTEND=noninteractive apt-get purge -y $packages',
+            'fi',
+            'if [ -d "/etc/php/${version}" ]; then',
+            '  rm -rf "/etc/php/${version}"',
+            'fi',
+            'if command -v update-alternatives >/dev/null 2>&1; then',
+            '  update-alternatives --auto php 2>/dev/null || true',
+            'fi',
+        ]);
     }
 
     protected function useRootSsh(): bool

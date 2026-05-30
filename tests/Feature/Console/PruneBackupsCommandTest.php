@@ -45,6 +45,7 @@ test('prunes database backups older than retention days', function () {
     $old = ServerDatabaseBackup::create([
         'server_database_id' => $database->id,
         'status' => 'completed',
+        'storage_kind' => 'control_plane',
         'disk_path' => 'old.sql',
     ]);
     $old->created_at = now()->subDays(60);
@@ -53,6 +54,7 @@ test('prunes database backups older than retention days', function () {
     $fresh = ServerDatabaseBackup::create([
         'server_database_id' => $database->id,
         'status' => 'completed',
+        'storage_kind' => 'control_plane',
         'disk_path' => 'new.sql',
     ]);
 
@@ -103,6 +105,7 @@ test('dry run reports without deleting', function () {
     $old = ServerDatabaseBackup::create([
         'server_database_id' => $database->id,
         'status' => 'completed',
+        'storage_kind' => 'control_plane',
         'disk_path' => 'old.sql',
     ]);
     $old->created_at = now()->subDays(60);
@@ -129,6 +132,7 @@ test('retention floor of seven days is enforced', function () {
     $threeDays = ServerDatabaseBackup::create([
         'server_database_id' => $database->id,
         'status' => 'completed',
+        'storage_kind' => 'control_plane',
     ]);
     $threeDays->created_at = now()->subDays(3);
     $threeDays->save();

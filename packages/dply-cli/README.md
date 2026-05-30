@@ -1,9 +1,7 @@
-# `dply` — command-line interface for the dply Edge platform
+# `dply` — command-line interface for dply
 
-Zero-dependency Node CLI for the public Edge REST API. Lets you script
-everything the dashboard does: deploy, roll back, promote previews,
-manage custom domains, list per-deploy aliases, purge cache, pull usage
-stats.
+Zero-dependency Node CLI for the dply REST API. Script Edge deploys,
+BYO server operations, and more from your terminal.
 
 ## Install
 
@@ -11,40 +9,35 @@ stats.
 npm install -g @dply/cli
 ```
 
-Requires Node 18+. The CLI uses the built-in `fetch` — no native
-modules, no transitive deps.
+Requires Node 18+. Uses built-in `fetch` — no native modules.
 
-## First-time setup
+## Sign in (seamless device flow)
 
 ```sh
-dply login                                     # opens browser, approve in dply
-dply sites                                     # confirm the token sees your sites
-cd path/to/your-edge-repo
-dply link <site-id>                             # writes .dply/site.json
+dply login --base-url https://your-dply.example
 ```
 
-`dply login` uses the **OAuth device flow** — the same pattern as
-GitHub CLI, Vercel CLI, and Stripe CLI:
-
-1. The CLI prints a short code (e.g. `WXYZ-ABCD`) and a verification URL.
-2. Your default browser opens to that URL on `https://dply.dev` (or
-   your self-hosted instance). Confirm the code matches what's in your
-   terminal, pick the organization, click **Approve**.
-3. The CLI polls the API, picks up the freshly-minted token, and
-   writes it to `~/.dply/config.json` (mode 0600).
+1. The CLI prints a short code and opens your browser to the dply instance.
+2. Sign in if needed, confirm the code, pick your organization and scopes, click **Approve**.
+3. The terminal polls automatically and saves the token to `~/.dply/config.json` (mode 0600).
 
 Flags:
 
-- `--base-url https://your-dply.example` — point at a self-hosted instance.
-- `--no-open` — don't try to open a browser; just print the URL.
-- `--token <plaintext>` — **headless / CI fallback**: skip the browser
-  approval flow and save a token you generated manually in
-  Settings → API tokens. Useful for CI scripts where there's no
-  browser. Token must have `edge.read` + `edge.deploy` + `edge.write`
-  for full CLI functionality.
+| Flag | Purpose |
+| --- | --- |
+| `--base-url URL` | Self-hosted instance (defaults to env `DPLY_API_BASE_URL` or the public cloud) |
+| `--no-open` | Print the URL only — don't launch a browser |
+| `--token PLAINTEXT` | CI / headless: skip the browser and save a token from Settings → API keys |
 
-After `dply link`, every command in that repo (or any child directory)
-defaults to that site. Override with `--site <id>` or `DPLY_EDGE_SITE`.
+Revoke CLI sessions anytime from **Profile → CLI** in the web app.
+
+## Verify
+
+```sh
+dply whoami
+dply server list
+dply sites          # Edge sites, when your token includes edge scopes
+```
 
 ## Commands
 
@@ -52,44 +45,55 @@ defaults to that site. Override with `--site <id>` or `DPLY_EDGE_SITE`.
 
 | Command | Purpose |
 | --- | --- |
-| `dply login [--base-url …] [--no-open]` | Browser-approval (device-flow) login |
-| `dply login --token … [--base-url …]` | Headless / CI fallback: save + verify a pre-generated token |
-| `dply logout` | Forget the saved token |
-| `dply whoami` | Show the active token + linked repo |
-| `dply link [site-id]` | Link cwd to an Edge site (no arg: lists sites) |
-| `dply sites` | List Edge sites visible to your token |
+| `dply login` | Browser device-flow login |
+| `dply logout` | Remove saved credentials |
+| `dply whoami` | Show active base URL + linked Edge repo |
+| `dply link [site-id]` | Link cwd to an Edge site |
+| `dply sites` | List Edge sites |
+| `dply server …` | BYO server commands (see below) |
+| `dply edge …` | Edge platform commands (see below) |
+
+### Server (BYO)
+
+| Command | Purpose |
+| --- | --- |
+| `dply server list` | List servers in your organization |
+| `dply server system-users list --server ID` | List Linux accounts (dply snapshot) |
+| `dply server system-users sync --server ID` | SSH-sync `/etc/passwd` into dply |
+| `dply server system-users add USER --server ID` | Queue user creation (`--sudo`, `--shell`, `--no-web-group`) |
+| `dply server system-users update USER --server ID` | Queue shell / sudo / web-group changes |
+| `dply server system-users remove USER --server ID` | Queue user removal |
+
+Pass `--server` with a server ULID or a unique server name. Mutations queue over SSH — same as the server workspace UI.
 
 ### Edge
 
 | Command | Purpose |
 | --- | --- |
-| `dply edge deploy [--commit X] [--branch Y] [--prod]` | Queue a deploy (`--prod` prints the production URL) |
-| `dply edge lint [--path dply.yaml]` | Validate repo config (same rules as deploy) |
-| `dply edge open [--dashboard]` | Open the live site or dashboard in your browser |
+| `dply edge deploy [--commit X] [--branch Y] [--prod]` | Queue a deploy |
 | `dply edge deployments [--limit N]` | List recent deployments |
-| `dply edge rollback <deployment-id>` | Re-point production at a prior deployment |
-| `dply edge promote <preview-site-id>` | Copy a preview into prod and flip the host map |
-| `dply edge previews list` | List active preview sites |
-| `dply edge previews create --commit X [--branch Y]` | Create an ad-hoc preview from a commit |
-| `dply edge previews rm <preview-id>` | Tear down a preview |
-| `dply edge domains list` | List custom domains + verification state |
-| `dply edge domains add <hostname>` | Attach a custom hostname (returns CNAME target) |
-| `dply edge domains verify <hostname>` | Re-check DNS for an attached hostname |
-| `dply edge domains rm <hostname>` | Detach a custom hostname |
-| `dply edge aliases` | List per-deploy stable URLs (commit + deploy-id aliases) |
-| `dply edge purge --tag <tag>` | Purge edge cache entries by `Cache-Tag` |
-| `dply edge usage [--days N]` | Show traffic / billing usage (default 30 days) |
-| `dply edge logs --tail [--interval ms] [--window s] [--once]` | Poll request logs (live tail via dashboard Echo in Wave B) |
+| `dply edge lint [--path dply.yaml]` | Validate repo config |
+| `dply edge open [--dashboard]` | Open live URL or workspace |
+| `dply edge rollback <deployment-id>` | Roll production back |
+| `dply edge promote <preview-site-id>` | Promote preview to production |
+| `dply edge previews list \| create \| rm` | Preview management |
+| `dply edge domains list \| add \| verify \| rm` | Custom domains |
+| `dply edge aliases` | Per-deploy stable URLs |
+| `dply edge purge --tag X` | Purge cache by tag |
+| `dply edge usage [--days N]` | Traffic / billing usage |
+| `dply edge logs --tail [--interval ms] [--window s] [--once]` | Request logs |
+| `dply edge env list \| set \| rm \| push \| pull` | Environment variables |
 
 ## Config files
 
 | Path | Purpose |
 | --- | --- |
-| `~/.dply/config.json` | Global token + default base URL (0600 mode) |
-| `.dply/site.json` | Per-repo site link — checked in or `.gitignore`d, your call |
+| `~/.dply/config.json` | Global token + base URL |
+| `.dply/site.json` | Per-repo Edge site link |
 
-Commands resolve the active site in this order: `--site` flag,
-`DPLY_EDGE_SITE` env var, nearest `.dply/site.json` walking up from cwd.
+## Scopes
+
+Device login offers scopes based on your org role (Edge, servers, sites, system users, …). Manage active CLI tokens under **Profile → CLI**.
 
 ## Exit codes
 
@@ -97,13 +101,4 @@ Commands resolve the active site in this order: `--site` flag,
 | --- | --- |
 | 0 | Success |
 | 1 | API or runtime error |
-| 2 | Bad arguments / not logged in / no site context |
-
-Useful for scripting:
-
-```sh
-if ! dply edge deploy --commit "$GIT_SHA"; then
-  echo "deploy failed — check dply dashboard"
-  exit 1
-fi
-```
+| 2 | Bad arguments / not logged in |

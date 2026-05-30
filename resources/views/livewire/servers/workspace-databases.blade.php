@@ -16,17 +16,22 @@
     @endif
 
     <x-explainer>
-        <p>{{ __('This workspace manages relational databases on this server — MySQL, MariaDB, and PostgreSQL — and the per-app credentials that grant access to them. Engines are installed via apt + systemd; databases live inside whatever engines are running.') }}</p>
+        <p>{{ __('This workspace manages databases on this server — MySQL, MariaDB, PostgreSQL, MongoDB, ClickHouse, and SQLite — plus per-app credentials. Engines install via apt + systemd (or file-based SQLite). For Redis/Valkey caching, use the Caches workspace.') }}</p>
         <p>{{ __('Engine state is read live via SSH; database + credential rows live in the dply database. The "Discovered on server" panel reconciles both directions: databases the engine knows about that dply hasn\'t recorded yet.') }}</p>
     </x-explainer>
 
     @if ($opsReady)
-        @if ($engineWorking)
-            @include('livewire.servers.partials.databases._banner')
+        @if ($databaseConsoleBannerRun)
+            <div class="mb-4">
+                @include('livewire.partials.console-action-banner-static', [
+                    'run' => $databaseConsoleBannerRun,
+                    'kindLabels' => (array) config('console_actions.kinds', []),
+                ])
+            </div>
         @endif
 
-        <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" class="sm:min-w-0 sm:flex-1">
+        <div class="min-w-0">
+            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll class="w-full">
                 <x-server-workspace-tab
                     id="db-tab-basics"
                     icon="heroicon-o-circle-stack"
@@ -98,64 +103,9 @@
                     {{ __('Notifications') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
-
-            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:pb-0.5">
-                <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
-                    <x-slot name="trigger">
-                        <button
-                            type="button"
-                            aria-label="{{ __('Workspace actions') }}"
-                            aria-haspopup="true"
-                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                        >
-                            <span wire:loading.remove wire:target="refreshDatabaseCapabilities,synchronizeDatabases">{{ __('Actions') }}</span>
-                            <span wire:loading wire:target="refreshDatabaseCapabilities,synchronizeDatabases" class="inline-flex items-center gap-2">
-                                <x-spinner variant="forest" />
-                                {{ __('Working…') }}
-                            </span>
-                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-ink/70" />
-                        </button>
-                    </x-slot>
-                    <x-slot name="content">
-                        <button
-                            type="button"
-                            wire:click="refreshDatabaseCapabilities"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshDatabaseCapabilities"
-                            title="{{ __('Re-run engine detection (cached for a few minutes)') }}"
-                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <span wire:loading.remove wire:target="refreshDatabaseCapabilities">{{ __('Recheck engines') }}</span>
-                            <span wire:loading wire:target="refreshDatabaseCapabilities">{{ __('Rechecking…') }}</span>
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="synchronizeDatabases"
-                            wire:loading.attr="disabled"
-                            wire:target="synchronizeDatabases"
-                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <span wire:loading.remove wire:target="synchronizeDatabases">{{ __('Synchronize databases') }}</span>
-                            <span wire:loading wire:target="synchronizeDatabases">{{ __('Scanning…') }}</span>
-                        </button>
-                    </x-slot>
-                </x-dropdown>
-            </div>
         </div>
 
-        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setWorkspaceTab">
-            <div
-                class="pointer-events-none absolute inset-x-0 top-0 z-10 hidden items-center justify-center pt-12"
-                wire:loading.delay.shortest.flex
-                wire:target="setWorkspaceTab"
-                aria-live="polite"
-            >
-                <div class="dply-card flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-brand-ink shadow-lg">
-                    <x-spinner variant="forest" />
-                    <span>{{ __('Loading…') }}</span>
-                </div>
-            </div>
-
+        <x-workspace-tab-panel-loading>
             @if ($workspace_tab === 'databases')
                 <x-server-workspace-tab-panel
                     id="db-panel-basics"
@@ -197,7 +147,7 @@
                     @include('livewire.servers.partials.databases.notifications-tab')
                 </x-server-workspace-tab-panel>
             @endif
-        </div>
+        </x-workspace-tab-panel-loading>
     @else
         @include('livewire.servers.partials.workspace-ops-not-ready')
     @endif
@@ -401,7 +351,7 @@
                             <x-input-error :messages="$errors->get('edit_description')" class="mt-1" />
                         </div>
 
-                        @if ($editing_db_engine === 'mysql')
+                        @if (\App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($editing_db_engine))
                             <div class="grid gap-5 sm:grid-cols-2">
                                 <div>
                                     <x-input-label for="edit-mysql-charset" :value="__('MySQL charset')" />

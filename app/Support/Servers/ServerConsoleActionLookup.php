@@ -19,6 +19,11 @@ use Illuminate\Support\Collection;
 final class ServerConsoleActionLookup
 {
     /**
+     * @var array<string, Collection<int, ConsoleAction>>
+     */
+    private array $rowsCache = [];
+
+    /**
      * @var array<string, array{
      *     rows: Collection<int, ConsoleAction>,
      *     banner: ?ConsoleAction,
@@ -27,7 +32,7 @@ final class ServerConsoleActionLookup
      *     inflight_edge_proxy: bool
      * }>
      */
-    private array $cache = [];
+    private array $stateCache = [];
 
     /**
      * @return array{
@@ -38,41 +43,27 @@ final class ServerConsoleActionLookup
      *     inflight_edge_proxy: bool
      * }
      */
-    public function stateFor(Server $server): array
+    public function stateFor(Server $server, ?string $workspace = null): array
     {
-        $key = (string) $server->id;
-        if (isset($this->cache[$key])) {
-            return $this->cache[$key];
+        $cacheKey = (string) $server->id.':'.($workspace ?? 'all');
+        if (isset($this->stateCache[$cacheKey])) {
+            return $this->stateCache[$cacheKey];
         }
 
-        $rows = ConsoleAction::query()
-            ->where('subject_type', $server->getMorphClass())
-            ->where('subject_id', $server->id)
-            ->whereIn('kind', ['webserver_switch', 'edge_proxy', 'manage_action'])
-            ->whereNull('dismissed_at')
-            ->orderByDesc('created_at')
-            ->limit(25)
-            ->get();
+        $rows = $this->rowsFor($server);
+        $bannerRows = $this->filterRowsForWorkspace($rows, $workspace);
 
-        $banner = $rows
-            ->sortBy(fn (ConsoleAction $action): array => [
-                $action->isInFlight() ? 0 : 1,
-                -1 * (int) $action->created_at?->getTimestamp(),
-            ])
-            ->first();
+        $banner = $this->pickBannerRun($bannerRows, $server);
 
         $switchRows = $rows->where('kind', 'webserver_switch');
         $webserverSwitch = $switchRows->first(fn (ConsoleAction $action): bool => $action->isInFlight())
             ?? $switchRows->sortByDesc(fn (ConsoleAction $action): int => (int) $action->created_at?->getTimestamp())->first();
 
-        if ($banner !== null) {
-            $banner->setRelation('subject', $server);
-        }
         if ($webserverSwitch !== null) {
             $webserverSwitch->setRelation('subject', $server);
         }
 
-        return $this->cache[$key] = [
+        return $this->stateCache[$cacheKey] = [
             'rows' => $rows,
             'banner' => $banner,
             'webserver_switch' => $webserverSwitch,
@@ -87,9 +78,9 @@ final class ServerConsoleActionLookup
         ];
     }
 
-    public function bannerFor(Server $server): ?ConsoleAction
+    public function bannerFor(Server $server, ?string $workspace = null): ?ConsoleAction
     {
-        return $this->stateFor($server)['banner'];
+        return $this->stateFor($server, $workspace)['banner'];
     }
 
     public function webserverSwitchFor(Server $server): ?ConsoleAction
@@ -109,12 +100,18 @@ final class ServerConsoleActionLookup
 
     public function forget(Server $server): void
     {
-        unset($this->cache[(string) $server->id]);
+        $prefix = (string) $server->id.':';
+        foreach (array_keys($this->stateCache) as $key) {
+            if (str_starts_with($key, $prefix)) {
+                unset($this->stateCache[$key]);
+            }
+        }
+        unset($this->rowsCache[(string) $server->id]);
     }
 
-    public function shouldRefreshServerMeta(Server $server): bool
+    public function shouldRefreshServerMeta(Server $server, ?string $workspace = null): bool
     {
-        $banner = $this->bannerFor($server);
+        $banner = $this->bannerFor($server, $workspace);
         if ($banner === null) {
             return false;
         }
@@ -125,5 +122,62 @@ final class ServerConsoleActionLookup
 
         return $banner->finished_at !== null
             && $banner->finished_at->gt(now()->subSeconds(12));
+    }
+
+    /**
+     * @return Collection<int, ConsoleAction>
+     */
+    private function rowsFor(Server $server): Collection
+    {
+        $key = (string) $server->id;
+        if (isset($this->rowsCache[$key])) {
+            return $this->rowsCache[$key];
+        }
+
+        return $this->rowsCache[$key] = ConsoleAction::query()
+            ->where('subject_type', $server->getMorphClass())
+            ->where('subject_id', $server->id)
+            ->whereIn('kind', ['webserver_switch', 'edge_proxy', 'manage_action'])
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get();
+    }
+
+    /**
+     * @param  Collection<int, ConsoleAction>  $rows
+     * @return Collection<int, ConsoleAction>
+     */
+    private function filterRowsForWorkspace(Collection $rows, ?string $workspace): Collection
+    {
+        if ($workspace === null) {
+            return $rows;
+        }
+
+        $kinds = config("console_actions.server_workspace_kinds.{$workspace}");
+        if (! is_array($kinds) || $kinds === []) {
+            return $rows;
+        }
+
+        return $rows->whereIn('kind', $kinds)->values();
+    }
+
+    /**
+     * @param  Collection<int, ConsoleAction>  $rows
+     */
+    private function pickBannerRun(Collection $rows, Server $server): ?ConsoleAction
+    {
+        $banner = $rows
+            ->sortBy(fn (ConsoleAction $action): array => [
+                $action->isInFlight() ? 0 : 1,
+                -1 * (int) $action->created_at?->getTimestamp(),
+            ])
+            ->first();
+
+        if ($banner !== null) {
+            $banner->setRelation('subject', $server);
+        }
+
+        return $banner;
     }
 }

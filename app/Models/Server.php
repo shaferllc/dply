@@ -185,7 +185,7 @@ class Server extends Model
     /**
      * The L7 edge proxy (if any) sitting in front of this server's webserver.
      * Returns null when the webserver handles :80 directly; otherwise one
-     * of {'traefik', 'haproxy'}.
+     * of {'traefik', 'haproxy', 'envoy'}.
      *
      * When this is non-null, dply runs Caddy as the per-site backend on
      * ephemeral high ports and the edge proxy on :80 — see
@@ -196,7 +196,7 @@ class Server extends Model
         $meta = is_array($this->meta) ? $this->meta : [];
         $proxy = $meta['edge_proxy'] ?? null;
 
-        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy'], true) ? $proxy : null;
+        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy', 'envoy'], true) ? $proxy : null;
     }
 
     public function hasEdgeProxy(): bool
@@ -468,6 +468,20 @@ class Server extends Model
     public function isDockerHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_DOCKER;
+    }
+
+    public function dockerEnginePresent(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $manageDocker = is_array($meta['manage_docker'] ?? null) ? $meta['manage_docker'] : [];
+        if (! empty($manageDocker['present'])) {
+            return true;
+        }
+
+        $manageTools = is_array($meta['manage_tools'] ?? null) ? $meta['manage_tools'] : [];
+        $dockerTool = is_array($manageTools['docker'] ?? null) ? $manageTools['docker'] : [];
+
+        return ! empty($dockerTool['present']);
     }
 
     public function isKubernetesCluster(): bool

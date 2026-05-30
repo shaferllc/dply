@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DockerDeployEngineTest;
 
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Server;
@@ -14,6 +15,7 @@ use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\LocalDockerRuntimeManager;
 use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeRemoteShell;
 
 uses(RefreshDatabase::class);
@@ -180,4 +182,74 @@ test('it persists discovered local docker publication and runtime details', func
     expect(data_get($site->meta, 'runtime_target.publication.container_ip'))->toBe('192.168.107.2');
     expect(data_get($site->meta, 'docker_runtime.runtime_details.containers.0.orb_hostname'))->toBe('laravel.repo.orb.local');
     expect(data_get($site->meta, 'docker_runtime.runtime_details.containers.0.ipv4'))->toBe('192.168.107.2');
+});
+
+test('it queues webserver config apply after vm docker deploy', function () {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $organization = Organization::factory()->create();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $organization->id,
+        'ssh_private_key' => 'test-private-key',
+        'meta' => [
+            'webserver' => 'nginx',
+            'manage_docker' => ['present' => true],
+        ],
+    ]);
+    $project = Project::query()->create([
+        'user_id' => $user->id,
+        'organization_id' => $organization->id,
+        'name' => 'VM Docker Demo',
+        'slug' => 'vm-docker-demo',
+        'kind' => Project::KIND_BYO_SITE,
+    ]);
+
+    $site = Site::factory()->create([
+        'project_id' => $project->id,
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $organization->id,
+        'type' => 'node',
+        'slug' => 'vm-docker-demo',
+        'git_repository_url' => 'git@github.com:example/demo.git',
+        'git_branch' => 'main',
+        'repository_path' => '/var/www/vm-docker-demo',
+        'meta' => [
+            'runtime_profile' => 'docker_web',
+            'runtime_target' => [
+                'family' => 'byo_vm_docker',
+                'platform' => 'byo',
+                'mode' => 'docker',
+                'vm_docker' => true,
+                'publication' => ['port' => 30088],
+            ],
+        ],
+    ]);
+
+    $shell = new FakeRemoteShell(function (string $command): ?string {
+        if (str_contains($command, 'git rev-parse HEAD')) {
+            return "abc123vm\n";
+        }
+
+        if (str_contains($command, 'docker compose -f docker-compose.dply.yml up -d --build')) {
+            return "Container vm-docker-demo Started\n";
+        }
+
+        return null;
+    });
+
+    $this->mock(SshConnectionFactory::class, function ($mock) use ($shell): void {
+        $mock->shouldReceive('forServer')->once()->andReturn($shell);
+    });
+
+    app(DockerDeployEngine::class)->run(new DeployContext(
+        project: $project->fresh('site'),
+        trigger: 'manual',
+        apiIdempotencyHash: null,
+        auditUserId: null,
+    ));
+
+    Queue::assertPushed(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 });

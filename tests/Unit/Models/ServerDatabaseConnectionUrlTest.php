@@ -8,6 +8,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+test('generateConnectionSafePassword uses only url-safe characters', function () {
+    $password = ServerDatabase::generateConnectionSafePassword(32);
+
+    expect(strlen($password))->toBe(32)
+        ->and($password)->toMatch('/^[A-Za-z0-9]+$/')
+        ->and(rawurlencode($password))->toBe($password);
+});
+
 test('mysql connection url encodes special characters', function () {
     $server = Server::factory()->create();
 
@@ -59,6 +67,42 @@ test('sqlite connection url uses file path from host column', function () {
 
     expect($db->connectionUrl())->toBe('sqlite:/var/lib/dply/sqlite/app_db.db');
     expect($db->defaultPort())->toBe(0);
+});
+
+test('mongodb connection url uses port 27017 and authSource', function () {
+    $server = Server::factory()->create();
+
+    $db = new ServerDatabase([
+        'server_id' => $server->id,
+        'name' => 'app_db',
+        'engine' => 'mongodb',
+        'username' => 'appuser',
+        'password' => 'secret',
+        'host' => '127.0.0.1',
+    ]);
+
+    $url = $db->connectionUrl();
+
+    expect($url)->toStartWith('mongodb://')
+        ->and($url)->toContain('127.0.0.1:27017')
+        ->and($url)->toContain('/app_db')
+        ->and($url)->toContain('authSource=app_db');
+});
+
+test('clickhouse connection url uses port 8123', function () {
+    $server = Server::factory()->create();
+
+    $db = new ServerDatabase([
+        'server_id' => $server->id,
+        'name' => 'analytics',
+        'engine' => 'clickhouse',
+        'username' => 'reader',
+        'password' => 'secret',
+        'host' => '127.0.0.1',
+    ]);
+
+    expect($db->connectionUrl())->toStartWith('clickhouse://')
+        ->and($db->connectionUrl())->toContain('127.0.0.1:8123/analytics');
 });
 
 test('sqlite connection url falls back to default root when host missing', function () {

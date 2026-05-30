@@ -144,9 +144,9 @@ return [
         'insights_preview' => env('FEATURE_WORKSPACE_INSIGHTS_PREVIEW', true),
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
-        // exit: ship once Docker workspace container/image actions validated on three hosts
+        // GA — remote Docker inspector (containers, images, volumes, networks, compose, maintenance)
         'docker' => env('FEATURE_WORKSPACE_DOCKER', true),
-        // exit: ship alongside Docker GA; teaser only when docker is off
+        // teaser only when docker is off
         'docker_preview' => env('FEATURE_WORKSPACE_DOCKER_PREVIEW', true),
         // exit: GA — server-scoped database + site-files backup runs and schedules
         'backups' => env('FEATURE_WORKSPACE_BACKUPS', false),
@@ -174,7 +174,7 @@ return [
     */
     'surface' => [
         // exit: VM launch is dark; flip to true once container/cloud surface is GA
-        'cloud' => env('FEATURE_SURFACE_CLOUD', true),
+        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
         // GA 2026-05: cross-server views (Health, Deploys, Domains, EnvSearch)
         // ship as the org-wide ops counterpart to /infrastructure. Saved-view
         // persistence is a follow-up enhancement, not a launch gate.
@@ -188,7 +188,7 @@ return [
         // exit: ship as a standalone product launch with its own positioning
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
-        'edge' => env('FEATURE_SURFACE_EDGE', true),
+        'edge' => env('FEATURE_SURFACE_EDGE', false),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
         'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
         // exit: offer the dply-managed serverless option (dply runs the function

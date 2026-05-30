@@ -191,6 +191,17 @@ class Create extends Component
 
         $this->form->applyPathDefaults();
 
+        $deployStack = request()->query('deploy_stack');
+        if (
+            is_string($deployStack)
+            && $deployStack === 'docker'
+            && $server->dockerEnginePresent()
+            && ! $server->isDockerHost()
+            && ! $server->isKubernetesCluster()
+        ) {
+            $this->form->deploy_stack = 'docker';
+        }
+
         // Build the list of database engines the user can pick from. The
         // default ServerDatabaseEngine row pre-selects in the picker; the
         // form->database_engine column override only applies when the
@@ -225,6 +236,16 @@ class Create extends Component
             [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES],
             true,
         );
+    }
+
+    /**
+     * Docker container deploy on a regular VM (compose + host port + webserver proxy).
+     */
+    public function usesVmDockerDeployStack(): bool
+    {
+        return $this->form->deploy_stack === 'docker'
+            && ! $this->isContainerMode()
+            && $this->server->dockerEnginePresent();
     }
 
     private function initializeContainerMode(SourceControlRepositoryBrowser $repositoryBrowser): void
@@ -928,7 +949,7 @@ class Create extends Component
             ],
         ];
 
-        if ($this->form->type === 'php' && ! $functionsHost && ! $containerHost) {
+        if ($this->form->type === 'php' && ! $functionsHost && ! $containerHost && ! $this->usesVmDockerDeployStack()) {
             $rules['php_version'] = ['required', 'string', 'max:10'];
 
             if ($phpVersionIds !== []) {
@@ -1009,6 +1030,20 @@ class Create extends Component
             $meta['docker_runtime'] = [
                 'app_type' => $this->form->type,
             ];
+        } elseif ($this->usesVmDockerDeployStack()) {
+            $meta['runtime_profile'] = 'docker_web';
+            $meta['runtime_target'] = [
+                'family' => 'byo_vm_docker',
+                'platform' => 'byo',
+                'provider' => $this->server->provider?->value ?? 'byo',
+                'mode' => 'docker',
+                'status' => 'pending',
+                'logs' => [],
+                'vm_docker' => true,
+            ];
+            $meta['docker_runtime'] = [
+                'app_type' => $this->form->type,
+            ];
         } elseif ($kubernetesHost) {
             $meta['runtime_profile'] = 'kubernetes_web';
             $meta['runtime_target'] = [
@@ -1047,6 +1082,7 @@ class Create extends Component
             : $this->form->type;
         $allocatesInternalPort = ! $functionsHost
             && ! $containerHost
+            && ! $this->usesVmDockerDeployStack()
             && ! in_array($effectiveRuntime, ['php', 'static'], true);
         $internalPort = null;
         if ($allocatesInternalPort) {

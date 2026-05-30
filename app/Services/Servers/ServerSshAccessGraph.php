@@ -12,6 +12,7 @@ use App\Models\SiteDeploymentEphemeralCredential;
 use App\Models\TeamSshKey;
 use App\Models\UserSshKey;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Read-only SSH access graph — who has keys on this server, sync state, and review dates.
@@ -25,18 +26,21 @@ final class ServerSshAccessGraph
      *     alerts: list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>,
      *     sync: array{disabled: bool, last_status: ?string, last_finished_at: ?Carbon},
      *     drift: array{status: ?string, finished_at: ?Carbon},
-     *     summary: array{total: int, by_source: array<string, int>, review_overdue: int, never_synced: int, active_sessions: int},
+     *     summary: array{total: int, by_source: array<string, int>, review_overdue: int, never_synced: int, active_sessions: int, platform_access_recent: int},
      *     sessions: list<array<string, mixed>>,
      *     rows: list<array<string, mixed>>,
      * }
      */
-    public function forServer(Server $server): array
+    public function forServer(Server $server, ?ServerSshAccessContext $context = null): array
     {
-        $keys = $server->authorizedKeys()
-            ->with('managedKey')
-            ->orderBy('target_linux_user')
-            ->orderBy('name')
-            ->get();
+        $context ??= ServerSshAccessContext::load($server);
+
+        $keys = $context->authorizedKeys
+            ->sortBy([
+                ['target_linux_user', 'asc'],
+                ['name', 'asc'],
+            ])
+            ->values();
 
         $rows = [];
         $bySource = [];
@@ -87,6 +91,11 @@ final class ServerSshAccessGraph
             }
         }
 
+        $activeSessions = $this->mapActiveSessions($context->activeSessions());
+        $platformAccessRecent = $context->remoteAccessEvents
+            ->filter(fn ($event) => $event->started_at !== null && $event->started_at->gte(now()->subDays(30)))
+            ->count();
+
         return [
             'overall' => $overall,
             'alert_count' => count($alerts),
@@ -98,25 +107,21 @@ final class ServerSshAccessGraph
                 'by_source' => $bySource,
                 'review_overdue' => $reviewOverdue,
                 'never_synced' => $neverSynced,
-                'active_sessions' => count($this->activeSessions($server)),
+                'active_sessions' => count($activeSessions),
+                'platform_access_recent' => $platformAccessRecent,
             ],
-            'sessions' => $this->activeSessions($server),
+            'sessions' => $activeSessions,
             'rows' => $rows,
         ];
     }
 
     /**
+     * @param  Collection<int, ServerSshSession>  $sessions
      * @return list<array<string, mixed>>
      */
-    private function activeSessions(Server $server): array
+    private function mapActiveSessions($sessions): array
     {
-        return ServerSshSession::query()
-            ->where('server_id', $server->id)
-            ->whereNull('revoked_at')
-            ->where('expires_at', '>', now())
-            ->with('createdBy')
-            ->orderBy('expires_at')
-            ->get()
+        return $sessions
             ->map(fn (ServerSshSession $session): array => [
                 'id' => (string) $session->id,
                 'name' => (string) $session->name,

@@ -19,6 +19,10 @@ class ServerDatabaseAdminCredential extends Model
         'postgres_superuser',
         'postgres_password',
         'postgres_use_sudo',
+        'mongodb_admin_username',
+        'mongodb_admin_password',
+        'clickhouse_admin_username',
+        'clickhouse_admin_password',
     ];
 
     protected function casts(): array
@@ -27,6 +31,8 @@ class ServerDatabaseAdminCredential extends Model
             'mysql_root_password' => 'encrypted',
             'postgres_password' => 'encrypted',
             'postgres_use_sudo' => 'boolean',
+            'mongodb_admin_password' => 'encrypted',
+            'clickhouse_admin_password' => 'encrypted',
         ];
     }
 

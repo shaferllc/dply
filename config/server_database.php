@@ -53,10 +53,26 @@ return [
     'install_queue' => env('SERVER_DATABASE_INSTALL_QUEUE'),
 
     /**
-     * Disk used to store completed database backups. 'local' keeps them on the Dply web app's filesystem;
-     * set to any disk in config/filesystems.php (e.g. 's3') to ship backups off-host.
+     * When false (default), export jobs never persist backups on the Dply app host — only on the
+     * customer server (remote_server) or an org-configured S3-compatible destination.
+     */
+    'allow_control_plane_storage' => filter_var(env('SERVER_DATABASE_ALLOW_CONTROL_PLANE_STORAGE', false), FILTER_VALIDATE_BOOLEAN),
+
+    /**
+     * Legacy control-plane disk (dev/tests only). Ignored unless allow_control_plane_storage is true.
      */
     'backup_disk' => env('SERVER_DATABASE_BACKUP_DISK', 'local'),
+
+    /**
+     * Root directory on the BYO server where database backups are written when storage_kind=remote_server.
+     */
+    'remote_backup_root' => (string) env('SERVER_DATABASE_REMOTE_BACKUP_ROOT', '/var/lib/dply/database-backups'),
+
+    /**
+     * Max total bytes of database backups allowed under remote_backup_root/{server_id}/ on the VM.
+     * Oldest files are deleted when a new export would exceed this cap.
+     */
+    'remote_backup_max_bytes_per_server' => (int) env('SERVER_DATABASE_REMOTE_BACKUP_MAX_BYTES', 10 * 1024 * 1024 * 1024),
 
     /**
      * Hard cap on a single SQLite .db backup snapshot (bytes). Backups above this fail with a clear error

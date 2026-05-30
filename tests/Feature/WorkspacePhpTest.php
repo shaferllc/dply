@@ -614,14 +614,14 @@ test('php workspace surfaces package action failures', function () {
         ]);
     $manager->shouldReceive('applyPackageAction')
         ->once()
-        ->andThrow(new \RuntimeException('PHP 8.3 is still used by 1 site.'));
+        ->andThrow(new \RuntimeException('PHP 8.3 is still used by 1 site. Upgrade those sites to another installed PHP version before uninstalling, or choose migrate sites and uninstall.'));
     $this->app->instance(ServerPhpManager::class, $manager);
 
     Livewire::actingAs($user)
         ->test(WorkspacePhp::class, ['server' => $server])
         ->call('runPhpPackageAction', 'uninstall', '8.3')
-        ->assertDispatched('notify', message: 'PHP 8.3 is still used by 1 site.', type: 'error')
-        ->assertSet('remote_error', 'PHP 8.3 is still used by 1 site.');
+        ->assertDispatched('notify', message: 'PHP 8.3 is still used by 1 site. Upgrade those sites to another installed PHP version before uninstalling, or choose migrate sites and uninstall.', type: 'error')
+        ->assertSet('remote_error', 'PHP 8.3 is still used by 1 site. Upgrade those sites to another installed PHP version before uninstalling, or choose migrate sites and uninstall.');
 });
 
 test('php workspace rejects package actions while another server mutation is running', function () {

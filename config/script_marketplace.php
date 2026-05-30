@@ -1078,6 +1078,45 @@ done
 SH,
     ],
 
+    // ─── Container-inner (for Run workspace container scope) ─────────────────
+    'container-inner-artisan-migrate' => [
+        'name' => 'Container: php artisan migrate --force',
+        'run_as_user' => 'root',
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+php artisan migrate --force
+SH,
+    ],
+    'container-inner-composer-install' => [
+        'name' => 'Container: composer install --no-dev',
+        'run_as_user' => 'root',
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+SH,
+    ],
+    'container-inner-npm-ci-build' => [
+        'name' => 'Container: npm ci && npm run build',
+        'run_as_user' => 'root',
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+npm ci
+npm run build
+SH,
+    ],
+    'container-inner-env' => [
+        'name' => 'Container: print env (sorted)',
+        'run_as_user' => 'root',
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+env | sort
+SH,
+    ],
+
     // ─── Security & access ────────────────────────────────────────────────────
     'sshd-config-test' => [
         'name' => 'sshd: config test',

@@ -16,9 +16,32 @@
     </div>
     <div class="px-6 py-6 sm:px-7">
     @if (! $orgAllowsCredentialShares)
-        <p class="mt-2 text-sm text-brand-moss">{{ __('Public credential share links are disabled for this organization.') }}</p>
+        <x-empty-state
+            borderless
+            icon="heroicon-o-lock-closed"
+            tone="amber"
+            :title="__('Credential sharing disabled')"
+            :description="__('Public credential share links are turned off for this organization. Ask an admin to enable them in organization settings.')"
+        />
     @elseif ($databases->isEmpty())
-        <p class="mt-3 text-sm text-brand-moss">{{ __('Add a database to share its credentials.') }}</p>
+        <x-empty-state
+            borderless
+            icon="heroicon-o-share"
+            tone="sage"
+            :title="__('No database to share yet')"
+            :description="__('Create a tracked database on Basics, then generate a single-use read-only link with expiry and view limits.')"
+        >
+            <x-slot:actions>
+                <button
+                    type="button"
+                    wire:click="setWorkspaceTab('databases')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Go to Basics') }}
+                </button>
+            </x-slot:actions>
+        </x-empty-state>
     @else
         <form wire:submit="createCredentialShare" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">

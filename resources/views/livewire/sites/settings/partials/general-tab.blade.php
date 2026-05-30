@@ -17,9 +17,38 @@
 
     <div class="px-6 py-6 sm:px-7">
         @if ($testingHostname !== '')
-            <div class="mb-5 rounded-xl border border-brand-ink/10 bg-white p-4">
+            @php
+                $testingUrl = 'http://'.$testingHostname;
+            @endphp
+            <div
+                x-data="{ copied: false, copy() { navigator.clipboard.writeText(@js($testingUrl)); this.copied = true; setTimeout(() => { this.copied = false; }, 1500); } }"
+                class="mb-5 rounded-xl border border-brand-ink/10 bg-white p-4"
+            >
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $runtimeMode === 'vm' ? __('Testing URL') : __('Temporary hostname') }}</p>
-                <p class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $testingHostname }}</p>
+                <div class="mt-2 flex min-w-0 items-center gap-1.5 font-mono text-sm text-brand-ink">
+                    <span
+                        class="block min-w-0 flex-1 overflow-x-auto whitespace-nowrap"
+                        title="{{ $testingUrl }}"
+                    >{{ $testingHostname }}</span>
+                    <a
+                        href="{{ $testingUrl }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="{{ __('Open URL') }}"
+                        class="shrink-0 text-brand-mist hover:text-brand-sage"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
+                    </a>
+                    <button
+                        type="button"
+                        x-on:click.stop="copy()"
+                        :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
+                        class="shrink-0 text-brand-mist hover:text-brand-sage"
+                    >
+                        <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
+                        <x-heroicon-s-check x-show="copied" x-cloak class="h-4 w-4 text-brand-sage" aria-hidden="true" />
+                    </button>
+                </div>
             </div>
         @endif
         <div class="grid gap-5">
@@ -129,7 +158,12 @@
                     @endif
                 </dd>
             </div>
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+            <div @class([
+                'rounded-xl border p-4',
+                'border-brand-ink/10 bg-brand-sand/15' => $preflightErrors->isEmpty() && $preflightWarnings->isEmpty(),
+                'border-rose-200 bg-rose-50/40' => $preflightErrors->isNotEmpty(),
+                'border-amber-200 bg-amber-50/40' => $preflightErrors->isEmpty() && $preflightWarnings->isNotEmpty(),
+            ])>
                 <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Preflight') }}</dt>
                 <dd class="mt-2 text-sm font-medium">
                     @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
@@ -138,23 +172,34 @@
                             {{ __('Ready') }}
                         </span>
                     @elseif ($preflightErrors->isNotEmpty())
-                        <span class="inline-flex items-center gap-1.5 text-rose-700">
+                        <a href="#site-preflight-issues" class="inline-flex items-center gap-1.5 text-rose-700 hover:text-rose-900">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-600"></span>
                             {{ trans_choice('{1} :count blocker|[2,*] :count blockers', $preflightErrors->count(), ['count' => $preflightErrors->count()]) }}
-                        </span>
+                        </a>
                     @else
-                        <span class="inline-flex items-center gap-1.5 text-amber-700">
+                        <a href="#site-preflight-issues" class="inline-flex items-center gap-1.5 text-amber-700 hover:text-amber-900">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
                             {{ trans_choice('{1} :count warning|[2,*] :count warnings', $preflightWarnings->count(), ['count' => $preflightWarnings->count()]) }}
-                        </span>
+                        </a>
                     @endif
                 </dd>
+                @if ($preflightErrors->isNotEmpty() || $preflightWarnings->isNotEmpty())
+                    <p class="mt-2 text-xs text-brand-moss">
+                        <a href="#site-preflight-issues" class="font-medium text-brand-forest underline decoration-brand-sage/40 hover:decoration-brand-sage">{{ __('View and fix') }}</a>
+                    </p>
+                @endif
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
                 <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('SSL') }}</dt>
                 <dd class="mt-2 text-sm font-medium text-brand-ink">{{ $site->currentSslSummary() }}</dd>
             </div>
         </dl>
+
+        @if (($preflightActionableChecks ?? collect())->isNotEmpty())
+            <div class="mt-5">
+                <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
+            </div>
+        @endif
 
         @if (in_array($site->runtime, ['node', 'static'], true))
             <div class="mt-5 rounded-xl border border-brand-sage/30 bg-brand-sage/10 p-3 text-xs text-brand-ink">

@@ -67,6 +67,10 @@ export class ApiClient {
   delete(path, init) {
     return this.request(path, { ...init, method: 'DELETE' });
   }
+
+  patch(path, body, init = {}) {
+    return this.request(path, { ...init, method: 'PATCH', body });
+  }
 }
 
 function apiError(message, status, body) {

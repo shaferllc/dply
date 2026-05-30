@@ -4,6 +4,8 @@ namespace App\Services\Webserver;
 
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Engine-aware webserver template validator.
@@ -162,38 +164,31 @@ class WebserverConfigValidator
     }
 
     /**
-     * Traefik: `traefik --configFile=<file> --validate` — schema check
-     * against the static config. Dynamic file-provider config is YAML/TOML
-     * with no built-in CLI checker, so the structural fallback covers it.
+     * Traefik static templates: YAML/TOML parse only. Traefik v3.1 ships
+     * without a `traefik --validate` CLI (that flag errors at runtime).
      *
      * @return array{ok: bool, message: string}
      */
     private function validateTraefik(string $config): array
     {
-        $binary = $this->firstAvailableBinary(['traefik']);
-        if ($binary === null) {
+        $firstLine = ltrim(strtok($config, "\n") ?: '');
+        if (str_starts_with($firstLine, '[')) {
             return $this->fallbackStructuralCheck($config, 'Traefik');
         }
 
-        // YAML or TOML — pick a suffix Traefik recognizes. Heuristic on
-        // the first non-empty line: a leading `[` reads as TOML; anything
-        // else we treat as YAML.
-        $firstLine = ltrim(strtok($config, "\n") ?: '');
-        $suffix = str_starts_with($firstLine, '[') ? 'toml' : 'yml';
-        $path = $this->tempFile('traefik', $suffix, $config);
-
         try {
-            $result = Process::timeout(15)->run([$binary, '--configFile='.$path, '--validate']);
-            $out = trim($result->errorOutput().' '.$result->output());
-
-            return $result->successful()
-                ? ['ok' => true, 'message' => $out !== '' ? $out : __('Traefik static config is valid.')]
-                : ['ok' => false, 'message' => $out !== '' ? $out : __('traefik --validate failed (exit :code).', ['code' => $result->exitCode()])];
-        } catch (\Throwable $e) {
-            return ['ok' => false, 'message' => $this->binaryError('Traefik', $binary, $e)];
-        } finally {
-            @unlink($path);
+            $parsed = Yaml::parse($config);
+            if (! is_array($parsed)) {
+                return ['ok' => false, 'message' => __('Traefik static config must be a YAML mapping at the root.')];
+            }
+        } catch (ParseException $e) {
+            return ['ok' => false, 'message' => __('Invalid Traefik YAML: :msg', ['msg' => $e->getMessage()])];
         }
+
+        return [
+            'ok' => true,
+            'message' => __('Traefik static config YAML parses correctly. Traefik validates the full config when the service restarts on the server.'),
+        ];
     }
 
     /**

@@ -62,7 +62,7 @@ test('install runs apt and marks running', function () {
     });
 
     $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
-        $mock->shouldReceive('runInlineBash')->once()
+        $mock->shouldReceive('runInlineBashWithOutputCallback')->once()
             ->andReturn(new ProcessOutput("install ok\nmysql 8.0.39\n", 0, false));
     });
 
@@ -100,7 +100,7 @@ test('install blocks on resource preflight', function () {
 
     // Apt must NOT run when preflight fails.
     $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
-        $mock->shouldNotReceive('runInlineBash');
+        $mock->shouldNotReceive('runInlineBashWithOutputCallback');
     });
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {

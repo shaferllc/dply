@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Services\Deploy\EphemeralDeployCredentialContext;
+use App\Services\Servers\ServerRemoteAccessLogger;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Net\SFTP;
 use phpseclib3\Net\SSH2;
@@ -68,6 +69,8 @@ class SshConnection implements RemoteShell
             }
 
             if ($key !== null && $this->ssh->login($user, $key)) {
+                app(ServerRemoteAccessLogger::class)->touch($this->server, $user, $this->credentialRole);
+
                 return true;
             }
 
@@ -86,6 +89,8 @@ class SshConnection implements RemoteShell
             return false;
         }
 
+        app(ServerRemoteAccessLogger::class)->touch($this->server, $user, $this->credentialRole);
+
         return true;
     }
 
@@ -97,6 +102,8 @@ class SshConnection implements RemoteShell
         if ($this->ssh === null && ! $this->connect()) {
             throw new \RuntimeException('SSH connection failed for server: '.$this->server->name);
         }
+
+        app(ServerRemoteAccessLogger::class)->recordCommand($this->server, $command);
 
         $this->ssh->setTimeout($timeoutSeconds);
         $output = $this->ssh->exec($command);
@@ -128,6 +135,8 @@ class SshConnection implements RemoteShell
         if ($this->ssh === null && ! $this->connect()) {
             throw new \RuntimeException('SSH connection failed for server: '.$this->server->name);
         }
+
+        app(ServerRemoteAccessLogger::class)->recordCommand($this->server, $command);
 
         $this->ssh->setTimeout($timeoutSeconds);
         $buffer = '';
@@ -191,6 +200,9 @@ class SshConnection implements RemoteShell
         if (! $loggedIn) {
             throw new \RuntimeException('SFTP login failed for server: '.$this->server->name);
         }
+
+        app(ServerRemoteAccessLogger::class)->touch($this->server, $user, $this->credentialRole);
+        app(ServerRemoteAccessLogger::class)->recordCommand($this->server, 'sftp:put '.$remotePath);
 
         $dir = dirname($remotePath);
         if ($dir !== '.' && $dir !== '/') {

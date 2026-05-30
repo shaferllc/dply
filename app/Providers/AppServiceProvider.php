@@ -8,6 +8,7 @@ use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
 use App\Listeners\RecordLivewireDispatchedJob;
+use App\Listeners\RecordServerRemoteAccessContext;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
 use App\Listeners\SyncBillingOnSubscriptionWebhook;
 use App\Listeners\UpdateDispatchedJobLifecycle;
@@ -118,6 +119,7 @@ use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
 use App\Support\Edge\EdgeFilesystemRegistrar;
 use App\Support\Edge\EdgePlatformCredentials;
+use App\Support\Servers\EnvoyAdminScript;
 use App\Support\Servers\ServerConsoleActionLookup;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -285,6 +287,8 @@ class AppServiceProvider extends ServiceProvider
 
         $this->mergeServerMonitoringInstallScript();
 
+        $this->mergeEnvoyServiceActionScripts();
+
         Cashier::useCustomerModel(Organization::class);
         Cashier::useSubscriptionModel(Subscription::class);
         Cashier::useSubscriptionItemModel(SubscriptionItem::class);
@@ -299,6 +303,9 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(JobProcessing::class, [UpdateDispatchedJobLifecycle::class, 'handleProcessing']);
         Event::listen(JobProcessed::class, [UpdateDispatchedJobLifecycle::class, 'handleProcessed']);
         Event::listen(JobFailed::class, [UpdateDispatchedJobLifecycle::class, 'handleFailed']);
+        Event::listen(JobProcessing::class, [RecordServerRemoteAccessContext::class, 'handleProcessing']);
+        Event::listen(JobProcessed::class, [RecordServerRemoteAccessContext::class, 'handleProcessed']);
+        Event::listen(JobFailed::class, [RecordServerRemoteAccessContext::class, 'handleFailed']);
 
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);
@@ -582,6 +589,35 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable) {
             // Keep config/server_services.php fallback when the guest file is unavailable.
         }
+    }
+
+    /**
+     * Envoy start/restart must free :80 and wait for admin :9901 — a bare
+     * systemctl restart leaves the unit crash-looping when :80 is taken.
+     */
+    private function mergeEnvoyServiceActionScripts(): void
+    {
+        $script = 'sudo -n bash -lc '.escapeshellarg(EnvoyAdminScript::startServiceScript());
+        $flags = [
+            'script' => $script,
+            'refresh_webserver_live_state_after_finish' => true,
+            'rerun_probe_after_finish' => true,
+        ];
+
+        foreach (['start_envoy', 'restart_envoy', 'reload_envoy'] as $key) {
+            config([
+                "server_manage.service_actions.{$key}" => array_merge(
+                    (array) config("server_manage.service_actions.{$key}", []),
+                    $flags,
+                ),
+            ]);
+        }
+
+        config([
+            'server_manage.service_actions.start_envoy.description' => 'Stop competing edge/primary webservers, move Caddy off :80 (backend ports only), validate envoy.yaml, start envoy, and wait for admin :9901.',
+            'server_manage.service_actions.restart_envoy.description' => 'Safe Envoy restart: frees :80 (including legacy Caddy front configs), validates config, waits for admin :9901.',
+            'server_manage.service_actions.reload_envoy.description' => 'Safe Envoy reload (restart): frees :80 (including legacy Caddy front configs), validates config, waits for admin :9901.',
+        ]);
     }
 
     /**

@@ -20,21 +20,29 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseExtraUser;
+use App\Notifications\ServerDatabaseCredentialsNotification;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
+use App\Services\Servers\DatabaseBackupDownloader;
+use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\DatabaseWorkspaceViewData;
+use App\Support\Servers\PostgresExtensionCatalog;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -59,6 +67,8 @@ class WorkspaceDatabases extends Component
 
     public string $new_db_engine = 'mysql';
 
+    public bool $engine_create_form_open = false;
+
     public string $new_db_username = '';
 
     public string $new_db_password = '';
@@ -81,6 +91,15 @@ class WorkspaceDatabases extends Component
     /** @var list<string> */
     public array $remote_postgres_databases = [];
 
+    /** @var list<string> */
+    public array $remote_mongodb_databases = [];
+
+    /** @var list<string> */
+    public array $remote_clickhouse_databases = [];
+
+    /** @var list<string> */
+    public array $postgres_installed_extensions = [];
+
     public ?string $credentials_modal_db_id = null;
 
     public ?string $connection_url_modal_db_id = null;
@@ -97,6 +116,14 @@ class WorkspaceDatabases extends Component
     public string $admin_postgres_password = '';
 
     public bool $admin_postgres_use_sudo = true;
+
+    public string $admin_mongodb_username = 'admin';
+
+    public string $admin_mongodb_password = '';
+
+    public string $admin_clickhouse_username = 'default';
+
+    public string $admin_clickhouse_password = '';
 
     public string $extra_db_id = '';
 
@@ -177,6 +204,8 @@ class WorkspaceDatabases extends Component
             $this->admin_mysql_root_username = $ac->mysql_root_username;
             $this->admin_postgres_superuser = $ac->postgres_superuser;
             $this->admin_postgres_use_sudo = $ac->postgres_use_sudo;
+            $this->admin_mongodb_username = $ac->mongodb_admin_username ?: 'admin';
+            $this->admin_clickhouse_username = $ac->clickhouse_admin_username ?: 'default';
         }
 
         $meta = $server->meta ?? [];
@@ -227,20 +256,67 @@ class WorkspaceDatabases extends Component
      */
     public string $engine_subtab = 'overview';
 
+    /** @var list<string> */
+    public const ENGINE_SUBTABS = ['overview', 'databases', 'admin', 'connections', 'backups', 'extensions', 'info', 'danger'];
+
     public function setWorkspaceTab(string $tab): void
     {
-        $allowed = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
+        $allowed = DatabaseWorkspaceEngines::WORKSPACE_TABS;
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'databases';
         // Reset sub-tab on every top-level switch so engines always open on the
         // actionable view — without this the operator clicking from MySQL→Info
         // then Postgres would land on Postgres→Info, hiding the actions.
         $this->engine_subtab = 'overview';
+        $this->engine_create_form_open = false;
+    }
+
+    public function openEngineDatabaseCreate(string $engine): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! in_array($engine, DatabaseWorkspaceEngines::ENGINE_TABS, true)) {
+            return;
+        }
+
+        $capabilities = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
+        if (! ($capabilities[$engine] ?? false)) {
+            $this->toastError(__(':engine is not installed on this server.', ['engine' => DatabaseWorkspaceEngines::label($engine)]));
+
+            return;
+        }
+
+        $this->workspace_tab = $engine;
+        $this->engine_subtab = 'databases';
+        $this->new_db_engine = $engine;
+        $this->resetCreateDatabaseFormFields();
+        $this->engine_create_form_open = true;
+    }
+
+    public function closeEngineDatabaseCreate(): void
+    {
+        $this->engine_create_form_open = false;
+    }
+
+    public function prepareSqliteCreate(): void
+    {
+        $this->openEngineDatabaseCreate('sqlite');
+    }
+
+    protected function resetCreateDatabaseFormFields(): void
+    {
+        $this->new_db_name = '';
+        $this->new_db_user_mode = 'new';
+        $this->new_db_existing_user_reference = '';
+        $this->new_db_username = '';
+        $this->new_db_password = '';
+        $this->new_db_description = null;
+        $this->new_mysql_charset = null;
+        $this->new_mysql_collation = null;
     }
 
     public function setEngineSubtab(string $subtab): void
     {
-        $allowed = ['overview', 'info'];
-        $this->engine_subtab = in_array($subtab, $allowed, true) ? $subtab : 'overview';
+        $this->engine_subtab = in_array($subtab, self::ENGINE_SUBTABS, true) ? $subtab : 'overview';
     }
 
     /**
@@ -291,9 +367,20 @@ class WorkspaceDatabases extends Component
             return;
         }
 
-        InstallDatabaseEngineJob::dispatch($row->id);
-        $this->toastSuccess(__('Installing :engine — refresh in a moment to see status.', ['engine' => $engine]));
         $this->workspace_tab = $engine;
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_install',
+            __('Installing :engine on :host …', [
+                'engine' => $engineLabel,
+                'host' => $this->server->name,
+            ]),
+        );
+
+        InstallDatabaseEngineJob::dispatch($row->id, auth()->id());
+        $this->toastSuccess(__('Installing :engine — progress shows in the banner above.', ['engine' => $engineLabel]));
     }
 
     /**
@@ -348,10 +435,21 @@ class WorkspaceDatabases extends Component
             'error_message' => __('Stopped by operator — reverting partial install.'),
         ]);
 
-        UninstallDatabaseEngineJob::dispatch($row->id);
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->workspace_tab = $engine;
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_uninstall',
+            __('Reverting :engine install on :host …', [
+                'engine' => $engineLabel,
+                'host' => $this->server->name,
+            ]),
+        );
 
-        $this->toastSuccess(__('Stopping :engine install and reverting. Apt purge runs in the background.', [
-            'engine' => $engine,
+        UninstallDatabaseEngineJob::dispatch($row->id, auth()->id());
+
+        $this->toastSuccess(__('Stopping :engine install and reverting — progress shows in the banner above.', [
+            'engine' => $engineLabel,
         ]));
     }
 
@@ -374,8 +472,55 @@ class WorkspaceDatabases extends Component
             return;
         }
 
-        UninstallDatabaseEngineJob::dispatch($row->id);
-        $this->toastSuccess(__('Uninstall queued for :engine.', ['engine' => $engine]));
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->workspace_tab = $engine;
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_uninstall',
+            __('Uninstalling :engine on :host …', [
+                'engine' => $engineLabel,
+                'host' => $this->server->name,
+            ]),
+        );
+
+        UninstallDatabaseEngineJob::dispatch($row->id, auth()->id());
+        $this->toastSuccess(__('Uninstalling :engine — progress shows in the banner above.', ['engine' => $engineLabel]));
+    }
+
+    /**
+     * Seed a queued ConsoleAction on the engine row before dispatch so the banner
+     * appears immediately (mirrors webserver switch + site config apply).
+     */
+    protected function seedQueuedDatabaseEngineConsoleAction(
+        ServerDatabaseEngine $row,
+        string $kind,
+        string $label,
+    ): ConsoleAction {
+        ConsoleAction::query()
+            ->where('subject_type', $row->getMorphClass())
+            ->where('subject_id', $row->getKey())
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->update(['dismissed_at' => now()]);
+
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $row->getMorphClass())
+            ->where('subject_id', $row->getKey())
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $row->getMorphClass(),
+            'subject_id' => $row->getKey(),
+            'kind' => $kind,
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'user_id' => auth()->id(),
+            'label' => $label,
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
     }
 
     public function refreshDatabaseCapabilities(ServerDatabaseHostCapabilities $capabilities): void
@@ -387,12 +532,22 @@ class WorkspaceDatabases extends Component
 
     public function generateNewDbPassword(): void
     {
-        $this->new_db_password = Str::password(24);
+        $this->new_db_password = ServerDatabase::generateConnectionSafePassword();
+    }
+
+    public function generateAdminMysqlRootPassword(): void
+    {
+        $this->admin_mysql_root_password = ServerDatabase::generateConnectionSafePassword();
+    }
+
+    public function generateAdminPostgresPassword(): void
+    {
+        $this->admin_postgres_password = ServerDatabase::generateConnectionSafePassword();
     }
 
     public function updatedNewDbEngine(string $value): void
     {
-        if ($value !== 'mysql') {
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($value)) {
             $this->new_db_user_mode = 'new';
             $this->new_db_existing_user_reference = '';
         }
@@ -514,7 +669,7 @@ class WorkspaceDatabases extends Component
         $rules = [
             'edit_description' => 'nullable|string|max:2000',
         ];
-        if ($db->engine === 'mysql') {
+        if (DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
             $rules['edit_mysql_charset'] = 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/';
             $rules['edit_mysql_collation'] = 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/';
         }
@@ -530,7 +685,7 @@ class WorkspaceDatabases extends Component
             $db->description = $this->edit_description ?: null;
         }
 
-        if ($db->engine === 'mysql') {
+        if (DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
             $newCharset = $this->edit_mysql_charset ?: null;
             $newCollation = $this->edit_mysql_collation ?: null;
             if ($db->mysql_charset !== $newCharset) {
@@ -662,40 +817,155 @@ class WorkspaceDatabases extends Component
         $this->generated_database_credentials = null;
     }
 
+    public function hideGeneratedDatabasePassword(): void
+    {
+        if ($this->generated_database_credentials === null) {
+            return;
+        }
+
+        unset($this->generated_database_credentials['password']);
+        $this->generated_database_credentials['password_hidden'] = true;
+    }
+
     public function closeShareLinkModal(): void
     {
         $this->share_link_modal_url = null;
         $this->share_link_modal_db_name = null;
     }
 
-    public function saveAdminCredentials(ServerDatabaseAuditLogger $auditLogger): void
+    public function saveAdminCredentials(string $engine, ServerDatabaseAuditLogger $auditLogger): void
     {
         $this->authorize('update', $this->server);
-        $this->validate([
-            'admin_mysql_root_username' => 'required|string|max:64',
-            'admin_postgres_superuser' => 'required|string|max:64',
-            'admin_postgres_use_sudo' => 'boolean',
-            'admin_mysql_root_password' => 'nullable|string|max:500',
-            'admin_postgres_password' => 'nullable|string|max:500',
-        ]);
+        $engine = strtolower(trim($engine));
 
         $cred = ServerDatabaseAdminCredential::query()->firstOrNew(['server_id' => $this->server->id]);
-        $cred->mysql_root_username = $this->admin_mysql_root_username;
-        $cred->postgres_superuser = $this->admin_postgres_superuser;
-        $cred->postgres_use_sudo = $this->admin_postgres_use_sudo;
-        if ($this->admin_mysql_root_password !== '') {
-            $cred->mysql_root_password = $this->admin_mysql_root_password;
+
+        if (DatabaseWorkspaceEngines::isMysqlFamily($engine)) {
+            $this->validate([
+                'admin_mysql_root_username' => 'required|string|max:64',
+                'admin_mysql_root_password' => 'nullable|string|max:500',
+            ]);
+            $cred->mysql_root_username = $this->admin_mysql_root_username;
+            if ($this->admin_mysql_root_password !== '') {
+                $cred->mysql_root_password = $this->admin_mysql_root_password;
+            }
+            $this->admin_mysql_root_password = '';
+        } elseif ($engine === 'postgres') {
+            $this->validate([
+                'admin_postgres_superuser' => 'required|string|max:64',
+                'admin_postgres_use_sudo' => 'boolean',
+                'admin_postgres_password' => 'nullable|string|max:500',
+            ]);
+            $cred->postgres_superuser = $this->admin_postgres_superuser;
+            $cred->postgres_use_sudo = $this->admin_postgres_use_sudo;
+            if ($this->admin_postgres_password !== '') {
+                $cred->postgres_password = $this->admin_postgres_password;
+            }
+            $this->admin_postgres_password = '';
+        } elseif ($engine === 'mongodb') {
+            $this->validate([
+                'admin_mongodb_username' => 'required|string|max:64',
+                'admin_mongodb_password' => 'nullable|string|max:500',
+            ]);
+            $cred->mongodb_admin_username = $this->admin_mongodb_username;
+            if ($this->admin_mongodb_password !== '') {
+                $cred->mongodb_admin_password = $this->admin_mongodb_password;
+            }
+            $this->admin_mongodb_password = '';
+        } elseif ($engine === 'clickhouse') {
+            $this->validate([
+                'admin_clickhouse_username' => 'required|string|max:64',
+                'admin_clickhouse_password' => 'nullable|string|max:500',
+            ]);
+            $cred->clickhouse_admin_username = $this->admin_clickhouse_username;
+            if ($this->admin_clickhouse_password !== '') {
+                $cred->clickhouse_admin_password = $this->admin_clickhouse_password;
+            }
+            $this->admin_clickhouse_password = '';
+        } else {
+            return;
         }
-        if ($this->admin_postgres_password !== '') {
-            $cred->postgres_password = $this->admin_postgres_password;
-        }
+
         $cred->save();
 
-        $this->admin_mysql_root_password = '';
-        $this->admin_postgres_password = '';
+        $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_ADMIN_CREDENTIALS_SAVED, ['engine' => $engine], auth()->user());
+        $this->toastSuccess(__('Saved :engine admin credentials.', ['engine' => DatabaseWorkspaceEngines::label($engine)]));
+    }
 
-        $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_ADMIN_CREDENTIALS_SAVED, [], auth()->user());
-        $this->toastSuccess(__('Saved database admin credentials.'));
+    public function generateAdminMongodbPassword(): void
+    {
+        $this->admin_mongodb_password = ServerDatabase::generateConnectionSafePassword();
+    }
+
+    public function generateAdminClickhousePassword(): void
+    {
+        $this->admin_clickhouse_password = ServerDatabase::generateConnectionSafePassword();
+    }
+
+    public function clearStoredMongodbPassword(): void
+    {
+        $this->authorize('update', $this->server);
+        $cred = ServerDatabaseAdminCredential::query()->where('server_id', $this->server->id)->first();
+        if ($cred) {
+            $cred->mongodb_admin_password = null;
+            $cred->save();
+        }
+        $this->toastSuccess(__('Cleared stored MongoDB admin password.'));
+    }
+
+    public function clearStoredClickhousePassword(): void
+    {
+        $this->authorize('update', $this->server);
+        $cred = ServerDatabaseAdminCredential::query()->where('server_id', $this->server->id)->first();
+        if ($cred) {
+            $cred->clickhouse_admin_password = null;
+            $cred->save();
+        }
+        $this->toastSuccess(__('Cleared stored ClickHouse admin password.'));
+    }
+
+    public function loadPostgresExtensions(
+        PostgresExtensionManager $manager,
+        ServerDatabaseHostCapabilities $capabilitiesService,
+    ): void {
+        if ($this->workspace_tab !== 'postgres') {
+            return;
+        }
+
+        $caps = $capabilitiesService->forServer($this->server);
+        if (! ($caps['postgres'] ?? false)) {
+            return;
+        }
+
+        try {
+            $this->postgres_installed_extensions = $manager->listInstalled($this->server);
+        } catch (\Throwable) {
+            $this->postgres_installed_extensions = [];
+        }
+    }
+
+    public function installPostgresExtension(
+        string $key,
+        PostgresExtensionManager $manager,
+        ServerDatabaseAuditLogger $auditLogger,
+    ): void {
+        $this->authorize('update', $this->server);
+        if (! in_array($key, PostgresExtensionCatalog::KEYS, true)) {
+            $this->toastError(__('Unknown PostgreSQL extension.'));
+
+            return;
+        }
+
+        try {
+            $out = $manager->install($this->server, $key);
+            $this->postgres_installed_extensions = $manager->listInstalled($this->server);
+            $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_IMPORT_RAN, [
+                'postgres_extension' => $key,
+            ], auth()->user());
+            $this->toastSuccess(__('Extension installed.').' '.Str::limit($out, 300));
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
     }
 
     public function clearStoredMysqlRootPassword(): void
@@ -851,8 +1121,11 @@ class WorkspaceDatabases extends Component
         $this->toastSuccess(__('Share link created.'));
     }
 
-    public function queueExport(string $databaseId, ServerDatabaseAuditLogger $auditLogger): void
-    {
+    public function queueExport(
+        string $databaseId,
+        ServerDatabaseAuditLogger $auditLogger,
+        DatabaseBackupExporter $exporter,
+    ): void {
         $this->authorize('update', $this->server);
         $db = ServerDatabase::query()->where('server_id', $this->server->id)->whereKey($databaseId)->firstOrFail();
         $backup = ServerDatabaseBackup::query()->create([
@@ -860,11 +1133,12 @@ class WorkspaceDatabases extends Component
             'user_id' => auth()->id(),
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
+        $exporter->prepareBackupRow($backup, $this->server);
         dispatch(new ExportServerDatabaseBackupJob($backup->id));
         $this->toastSuccess(__('Export queued. Refresh this page in a few moments and download from the backup list.'));
     }
 
-    public function downloadBackup(string $backupId): StreamedResponse|Response|null
+    public function downloadBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
     {
         $this->authorize('update', $this->server);
         $backup = ServerDatabaseBackup::query()
@@ -873,23 +1147,46 @@ class WorkspaceDatabases extends Component
             ->with('serverDatabase')
             ->firstOrFail();
 
-        if ($backup->status !== ServerDatabaseBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->toastError(__('Backup is not ready yet.'));
-
-            return null;
-        }
-
-        $disk = Storage::disk(config('server_database.backup_disk', 'local'));
-        if (! $disk->exists($backup->disk_path)) {
-            $this->toastError(__('Backup file is missing from storage.'));
-
-            return null;
-        }
-
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
         $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
-        return $disk->download($backup->disk_path, $filename);
+        try {
+            return $downloader->response($backup, $filename);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return null;
+        }
+    }
+
+    public function deleteDatabaseBackup(string $backupId, DatabaseBackupExporter $exporter): void
+    {
+        $this->authorize('update', $this->server);
+
+        $backup = ServerDatabaseBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
+            ->first();
+
+        if ($backup === null) {
+            return;
+        }
+
+        $exporter->deleteArtifact($backup);
+
+        $snapshot = [
+            'backup_id' => (string) $backup->id,
+            'server_database_id' => (string) $backup->server_database_id,
+            'storage_kind' => $backup->storage_kind,
+            'status' => $backup->status,
+        ];
+        $backup->delete();
+
+        if ($this->server->organization) {
+            audit_log($this->server->organization, auth()->user(), 'backup.database.deleted', $this->server, $snapshot, null);
+        }
+
+        $this->toastSuccess(__('Backup deleted.'));
     }
 
     public function importSql(
@@ -950,6 +1247,16 @@ class WorkspaceDatabases extends Component
         } catch (\Throwable) {
             $this->remote_postgres_databases = [];
         }
+        try {
+            $this->remote_mongodb_databases = $provisioner->listMongodbDatabaseNames($this->server);
+        } catch (\Throwable) {
+            $this->remote_mongodb_databases = [];
+        }
+        try {
+            $this->remote_clickhouse_databases = $provisioner->listClickhouseDatabaseNames($this->server);
+        } catch (\Throwable) {
+            $this->remote_clickhouse_databases = [];
+        }
 
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_SYNC_RAN, [
             'mysql_count' => count($this->remote_mysql_databases),
@@ -961,7 +1268,18 @@ class WorkspaceDatabases extends Component
     public function prefillDatabaseFromDiscovery(string $name, string $engine): void
     {
         $this->authorize('update', $this->server);
-        $engine = $engine === 'postgres' ? 'postgres' : 'mysql';
+        if ($engine === 'postgres') {
+            $engine = 'postgres';
+        } elseif (in_array($engine, ['mariadb', 'mongodb', 'clickhouse'], true)) {
+            // keep as passed
+        } else {
+            $capabilities = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
+            if (($capabilities['mariadb'] ?? false) && ! ($capabilities['mysql'] ?? false)) {
+                $engine = 'mariadb';
+            } else {
+                $engine = 'mysql';
+            }
+        }
         $this->workspace_tab = 'advanced';
         $this->new_db_name = $name;
         $this->new_db_engine = $engine;
@@ -982,20 +1300,20 @@ class WorkspaceDatabases extends Component
 
         $capabilities = $capabilitiesService->forServer($this->server);
         if (! ($capabilities[$this->new_db_engine] ?? false)) {
-            $engineLabel = match ($this->new_db_engine) {
-                'mysql' => 'MySQL/MariaDB',
-                'postgres' => 'PostgreSQL',
-                'sqlite' => 'SQLite',
-                default => $this->new_db_engine,
-            };
-            $this->addError('new_db_engine', __(':engine is not installed on this server.', ['engine' => $engineLabel]));
+            $this->addError('new_db_engine', __(':engine is not installed on this server.', ['engine' => DatabaseWorkspaceEngines::label($this->new_db_engine)]));
 
             return;
         }
 
         $rules = [
-            'new_db_name' => 'required|string|max:64|regex:/^[a-zA-Z0-9_]+$/',
-            'new_db_engine' => 'required|in:mysql,postgres,sqlite',
+            'new_db_name' => [
+                'required',
+                'string',
+                'max:64',
+                'regex:/^[a-zA-Z0-9_]+$/',
+                Rule::unique('server_databases', 'name')->where('server_id', $this->server->id),
+            ],
+            'new_db_engine' => 'required|in:'.implode(',', DatabaseWorkspaceEngines::ENGINE_TABS),
             'new_db_host' => 'required|string|max:512',
             'new_db_description' => 'nullable|string|max:2000',
             'new_mysql_charset' => 'nullable|string|max:64|regex:/^[a-zA-Z0-9_]*$/',
@@ -1010,7 +1328,7 @@ class WorkspaceDatabases extends Component
             // provisioner against server_database.sqlite_root).
             $rules['new_db_username'] = 'nullable';
             $rules['new_db_password'] = 'nullable';
-        } elseif ($this->new_db_user_mode === 'existing' && $this->new_db_engine === 'mysql') {
+        } elseif ($this->new_db_user_mode === 'existing' && DatabaseWorkspaceEngines::isMysqlFamily($this->new_db_engine)) {
             $rules['new_db_existing_user_reference'] = 'required|string|max:100';
             $rules['new_db_username'] = 'nullable';
             $rules['new_db_password'] = 'nullable';
@@ -1025,19 +1343,23 @@ class WorkspaceDatabases extends Component
                 ? 'required|string|max:200'
                 : 'nullable';
         }
-        $this->validate($rules);
+        $this->validate($rules, [
+            'new_db_name.unique' => __('A database named :name is already tracked on this server.', ['name' => $this->new_db_name]),
+        ], [
+            'new_db_name' => __('Name'),
+        ]);
 
         // Force 'new' for non-MySQL engines so a stale form value
         // (operator switched from MySQL → SQLite without re-rendering)
         // can't trip the existing-user branch below.
-        if ($this->new_db_engine !== 'mysql') {
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($this->new_db_engine)) {
             $this->new_db_user_mode = 'new';
         }
 
         $existingMysqlUser = null;
         if ($this->new_db_user_mode === 'existing') {
-            if ($this->new_db_engine !== 'mysql') {
-                $this->addError('new_db_user_mode', __('Existing user selection is currently supported for MySQL only.'));
+            if (! DatabaseWorkspaceEngines::isMysqlFamily($this->new_db_engine)) {
+                $this->addError('new_db_user_mode', __('Existing user selection is currently supported for MySQL/MariaDB only.'));
 
                 return;
             }
@@ -1066,7 +1388,7 @@ class WorkspaceDatabases extends Component
         $password = $existingMysqlUser['password'] ?? $this->new_db_password;
         $passwordGenerated = false;
         if (! $isSqlite && ($password === null || $password === '')) {
-            $password = Str::password(24);
+            $password = ServerDatabase::generateConnectionSafePassword();
             $passwordGenerated = true;
         }
 
@@ -1132,24 +1454,24 @@ class WorkspaceDatabases extends Component
             );
 
             $notificationDispatcher->notifyIfSubscribed($this->server, 'created', $db, auth()->user());
+            $credentialsEmailed = $this->maybeEmailCreatedDatabaseCredentials($db, $isSqlite ? null : (string) $password);
             $this->toastSuccess(__('Database provisioned on the server.').' '.Str::limit($out, 500));
             $this->generated_database_credentials = [
                 'name' => $db->name,
                 'engine' => $db->engine,
                 'username' => $db->username,
-                'password' => $db->password,
+                'password' => $isSqlite ? null : (string) $password,
                 'host' => $db->host,
                 'username_generated' => $usernameGenerated,
                 'password_generated' => $passwordGenerated,
+                'credentials_emailed' => $credentialsEmailed,
+                'password_hidden' => false,
             ];
-            $this->new_db_name = '';
-            $this->new_db_user_mode = 'new';
-            $this->new_db_existing_user_reference = '';
-            $this->new_db_username = '';
-            $this->new_db_password = '';
-            $this->new_db_description = null;
-            $this->new_mysql_charset = null;
-            $this->new_mysql_collation = null;
+            $this->engine_create_form_open = false;
+            $this->engine_subtab = 'databases';
+            $this->resetCreateDatabaseFormFields();
+        } catch (UniqueConstraintViolationException) {
+            $this->addError('new_db_name', __('A database named :name is already tracked on this server.', ['name' => $this->new_db_name]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
@@ -1234,7 +1556,7 @@ class WorkspaceDatabases extends Component
         ServerDatabaseDriftAnalyzer $driftAnalyzer,
         ServerDatabaseHostCapabilities $capabilitiesService,
     ): View {
-        $allowedTabs = ['databases', 'advanced', 'notifications', 'mysql', 'postgres', 'sqlite'];
+        $allowedTabs = DatabaseWorkspaceEngines::WORKSPACE_TABS;
         if (! in_array($this->workspace_tab, $allowedTabs, true)) {
             $this->workspace_tab = 'databases';
         }
@@ -1243,7 +1565,7 @@ class WorkspaceDatabases extends Component
         $needsBasics = $tab === 'databases';
         $needsAdvanced = $tab === 'advanced';
         $needsNotifications = $tab === 'notifications';
-        $needsEngine = in_array($tab, ['mysql', 'postgres', 'sqlite'], true);
+        $needsEngine = in_array($tab, DatabaseWorkspaceEngines::ENGINE_TABS, true);
         $activeEngine = $needsEngine ? $tab : null;
 
         if ($needsBasics || $needsEngine) {
@@ -1257,7 +1579,7 @@ class WorkspaceDatabases extends Component
             ]);
         }
 
-        $capabilities = ['mysql' => false, 'postgres' => false, 'sqlite' => false];
+        $capabilities = DatabaseWorkspaceEngines::defaultCapabilities();
         if (! $needsNotifications) {
             try {
                 $capabilities = $capabilitiesService->forServer($this->server);
@@ -1268,7 +1590,7 @@ class WorkspaceDatabases extends Component
         }
 
         if ($needsBasics && ! ($capabilities[$this->new_db_engine] ?? false)) {
-            foreach (['mysql', 'postgres', 'sqlite'] as $engine) {
+            foreach (DatabaseWorkspaceEngines::ENGINE_TABS as $engine) {
                 if ($capabilities[$engine] ?? false) {
                     $this->new_db_engine = $engine;
                     break;
@@ -1281,7 +1603,7 @@ class WorkspaceDatabases extends Component
             ->get()
             ->keyBy('engine');
 
-        if ($needsEngine && in_array($activeEngine, ['mysql', 'postgres'], true) && $this->drift_snapshot === null) {
+        if ($needsEngine && in_array($activeEngine, DatabaseWorkspaceEngines::MANAGEABLE, true) && $this->drift_snapshot === null) {
             try {
                 $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
                 $this->driftProbeErrorNotified = false;
@@ -1333,26 +1655,27 @@ class WorkspaceDatabases extends Component
                 : $databaseImportMaxBytes;
         }
 
-        $dbRunsByEngine = [];
-        if ($needsEngine && $activeEngine !== null) {
-            if (in_array($activeEngine, ['mysql', 'postgres'], true)) {
-                $row = $engineRows->get($activeEngine);
-                if ($row !== null) {
-                    $run = $this->latestConsoleActionFor($row, 'db_');
-                    if ($run !== null) {
-                        $dbRunsByEngine[$activeEngine] = $run;
-                    }
+        $databaseConsoleBannerRun = null;
+        if ($needsEngine) {
+            foreach (array_merge(DatabaseWorkspaceEngines::MYSQL_FAMILY, ['postgres', 'mongodb', 'clickhouse']) as $engine) {
+                $row = $engineRows->get($engine);
+                if ($row === null) {
+                    continue;
                 }
-            } else {
-                $run = $this->latestConsoleActionFor($this->server, 'db_');
-                if ($run !== null) {
-                    $dbRunsByEngine['sqlite'] = $run;
+                $run = $this->latestConsoleActionFor($row, 'db_');
+                if ($run !== null && ($databaseConsoleBannerRun === null || $run->created_at > $databaseConsoleBannerRun->created_at)) {
+                    $databaseConsoleBannerRun = $run;
                 }
+            }
+
+            $sqliteRun = $this->latestConsoleActionFor($this->server, 'db_');
+            if ($sqliteRun !== null && ($databaseConsoleBannerRun === null || $sqliteRun->created_at > $databaseConsoleBannerRun->created_at)) {
+                $databaseConsoleBannerRun = $sqliteRun;
             }
         }
 
         $manageActionRun = null;
-        if ($activeEngine === 'mysql' && $this->engine_subtab === 'info') {
+        if (DatabaseWorkspaceEngines::isMysqlFamily((string) $activeEngine) && $this->engine_subtab === 'info') {
             $manageActionRun = ConsoleAction::query()
                 ->where('subject_type', $this->server->getMorphClass())
                 ->where('subject_id', $this->server->id)
@@ -1377,7 +1700,7 @@ class WorkspaceDatabases extends Component
                 'recentBackupsByEngine' => $recentBackupsByEngine,
                 'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
                 'databaseImportMaxBytes' => $databaseImportMaxBytes,
-                'dbRunsByEngine' => $dbRunsByEngine,
+                'databaseConsoleBannerRun' => $databaseConsoleBannerRun,
                 'serviceActions' => config('server_manage.service_actions', []),
                 'manageActionRun' => $manageActionRun,
                 'deletionSummary' => $this->showRemoveServerModal
@@ -1424,7 +1747,7 @@ class WorkspaceDatabases extends Component
             $databaseId = substr($reference, 8);
             $database = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
-                ->where('engine', 'mysql')
+                ->whereIn('engine', DatabaseWorkspaceEngines::MYSQL_FAMILY)
                 ->find($databaseId);
 
             if (! $database) {
@@ -1442,7 +1765,7 @@ class WorkspaceDatabases extends Component
             $extraId = substr($reference, 6);
             $extra = ServerDatabaseExtraUser::query()
                 ->whereKey($extraId)
-                ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id)->where('engine', 'mysql'))
+                ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id)->whereIn('engine', DatabaseWorkspaceEngines::MYSQL_FAMILY))
                 ->first();
 
             if (! $extra) {
@@ -1459,6 +1782,24 @@ class WorkspaceDatabases extends Component
         return null;
     }
 
+    protected function maybeEmailCreatedDatabaseCredentials(ServerDatabase $database, ?string $plainPassword): bool
+    {
+        $user = auth()->user();
+        $organization = $this->server->organization;
+
+        if ($user === null || $organization === null || ! $organization->email_database_credentials_enabled) {
+            return false;
+        }
+
+        Notification::send($user, new ServerDatabaseCredentialsNotification(
+            server: $this->server,
+            database: $database,
+            password: $plainPassword,
+        ));
+
+        return true;
+    }
+
     /**
      * @return list<array{id: string, label: string}>
      */
@@ -1466,7 +1807,7 @@ class WorkspaceDatabases extends Component
     {
         $options = [];
 
-        foreach ($this->server->serverDatabases->where('engine', 'mysql')->sortBy('name') as $database) {
+        foreach ($this->server->serverDatabases->whereIn('engine', DatabaseWorkspaceEngines::MYSQL_FAMILY)->sortBy('name') as $database) {
             $options[] = [
                 'id' => 'primary:'.$database->id,
                 'label' => __('Primary user for :database (:username@localhost)', [

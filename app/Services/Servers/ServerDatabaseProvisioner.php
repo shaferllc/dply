@@ -5,6 +5,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseExtraUser;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
 
 class ServerDatabaseProvisioner
@@ -76,6 +77,61 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
+    /**
+     * @return list<string>
+     */
+    public function listMongodbDatabaseNames(Server $server): array
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $js = "print(JSON.stringify(db.adminCommand('listDatabases').databases.map(d => d.name).filter(n => !['admin','local','config'].includes(n))))";
+        [$out, $exit] = $this->remoteExec->mongoshRunWithExit($server, $js, 90);
+        $out = trim($out);
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException('Could not list MongoDB databases: '.Str::limit($out, 800));
+        }
+
+        $decoded = json_decode($out, true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $names = array_values(array_filter(array_map('strval', $decoded)));
+
+        sort($names);
+
+        return array_values(array_unique($names));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listClickhouseDatabaseNames(Server $server): array
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $sql = "SELECT name FROM system.databases WHERE name NOT IN ('system','INFORMATION_SCHEMA','information_schema','default') ORDER BY name FORMAT TabSeparated";
+        [$out, $exit] = $this->remoteExec->clickhouseRunWithExit($server, $sql, 90);
+        $out = trim($out);
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException('Could not list ClickHouse databases: '.Str::limit($out, 800));
+        }
+
+        $names = [];
+        foreach (preg_split("/\r\n|\n|\r/", $out) as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                $names[] = $line;
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
     public function dropFromServer(ServerDatabase $db): string
     {
         $server = $db->server;
@@ -95,7 +151,7 @@ class ServerDatabaseProvisioner
             $cmd = 'rm -f '.escapeshellarg($path);
             [$out] = $this->remoteExec->shellRunWithExit($server, $cmd, 30);
 
-            return $out;
+            return $out[0];
         }
 
         if ($db->engine === 'postgres') {
@@ -109,14 +165,36 @@ class ServerDatabaseProvisioner
             return $out."\n".$out2."\n".$out3;
         }
 
-        $sql =
-            'DROP DATABASE IF EXISTS `'.str_replace('`', '``', $name).'`; '.
-            'DROP USER IF EXISTS \''.str_replace(['\\', "'"], ['\\\\', "\\'"], $user).'\'@\'localhost\'; '.
-            'FLUSH PRIVILEGES;';
+        if ($db->engine === 'mongodb') {
+            $dbName = $this->sanitizeMongoIdentifier($name);
+            $user = $this->sanitizeMongoIdentifier($user);
+            $js = "db.getSiblingDB('{$dbName}').dropDatabase(); db.getSiblingDB('admin').dropUser('{$user}');";
+            [$out] = $this->remoteExec->mongoshRunWithExit($server, $js, 120);
 
-        [$out] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+            return $out[0];
+        }
 
-        return $out;
+        if ($db->engine === 'clickhouse') {
+            $dbName = $this->sanitizeClickhouseIdentifier($name);
+            $user = $this->sanitizeClickhouseIdentifier($user);
+            $sql = "DROP DATABASE IF EXISTS `{$dbName}`; DROP USER IF EXISTS `{$user}`;";
+            [$out] = $this->remoteExec->clickhouseRunWithExit($server, $sql, 120);
+
+            return $out[0];
+        }
+
+        if (DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
+            $sql =
+                'DROP DATABASE IF EXISTS `'.str_replace('`', '``', $name).'`; '.
+                'DROP USER IF EXISTS \''.str_replace(['\\', "'"], ['\\\\', "\\'"], $user).'\'@\'localhost\'; '.
+                'FLUSH PRIVILEGES;';
+
+            [$out] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+
+            return $out[0];
+        }
+
+        throw new \InvalidArgumentException("Unsupported database engine for drop: {$db->engine}");
     }
 
     public function createOnServer(ServerDatabase $db): string
@@ -161,24 +239,58 @@ class ServerDatabaseProvisioner
             return $out."\n".$this->remoteExec->postgresRun($server, $dbSql, 120)[0];
         }
 
-        $charset = $this->sanitizeMysqlIdentifier((string) ($db->mysql_charset ?: 'utf8mb4'), 'utf8mb4');
-        $coll = $this->sanitizeMysqlIdentifier((string) ($db->mysql_collation ?: 'utf8mb4_unicode_ci'), 'utf8mb4_unicode_ci');
+        if ($db->engine === 'mongodb') {
+            $dbName = $this->sanitizeMongoIdentifier($name);
+            $userName = $this->sanitizeMongoIdentifier($user);
+            $passJs = json_encode($pass, JSON_THROW_ON_ERROR);
+            $js = "const d='{$dbName}'; const u='{$userName}'; const p={$passJs}; ".
+                "db.getSiblingDB(d).createCollection('_dply_init'); ".
+                "db.getSiblingDB(d).createUser({user: u, pwd: p, roles: [{role: 'readWrite', db: d}]});";
+            [$out, $exit] = $this->remoteExec->mongoshRunWithExit($server, $js, 120);
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException(Str::limit($out, 800));
+            }
 
-        $passSql = str_replace(['\\', "'"], ['\\\\', "\\'"], $pass);
-        $sql =
-            "CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET {$charset} COLLATE {$coll}; ".
-            "CREATE USER IF NOT EXISTS '{$user}'@'localhost' IDENTIFIED BY '{$passSql}'; ".
-            "GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'localhost'; FLUSH PRIVILEGES;";
+            return $out;
+        }
 
-        [$out] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+        if ($db->engine === 'clickhouse') {
+            $dbName = $this->sanitizeClickhouseIdentifier($name);
+            $userName = $this->sanitizeClickhouseIdentifier($user);
+            $passSql = str_replace("'", "\\'", $pass);
+            $sql = "CREATE DATABASE IF NOT EXISTS `{$dbName}`; ".
+                "CREATE USER IF NOT EXISTS `{$userName}` IDENTIFIED BY '{$passSql}'; ".
+                "GRANT ALL ON `{$dbName}`.* TO `{$userName}`;";
+            [$out, $exit] = $this->remoteExec->clickhouseRunWithExit($server, $sql, 120);
+            if ($exit !== null && $exit !== 0) {
+                throw new \RuntimeException(Str::limit($out, 800));
+            }
 
-        return $out;
+            return $out;
+        }
+
+        if (DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
+            $charset = $this->sanitizeMysqlIdentifier((string) ($db->mysql_charset ?: 'utf8mb4'), 'utf8mb4');
+            $coll = $this->sanitizeMysqlIdentifier((string) ($db->mysql_collation ?: 'utf8mb4_unicode_ci'), 'utf8mb4_unicode_ci');
+
+            $passSql = str_replace(['\\', "'"], ['\\\\', "\\'"], $pass);
+            $sql =
+                "CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET {$charset} COLLATE {$coll}; ".
+                "CREATE USER IF NOT EXISTS '{$user}'@'localhost' IDENTIFIED BY '{$passSql}'; ".
+                "GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'localhost'; FLUSH PRIVILEGES;";
+
+            [$out] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+
+            return $out[0];
+        }
+
+        throw new \InvalidArgumentException("Unsupported database engine for create: {$db->engine}");
     }
 
     public function createMysqlDatabaseForExistingUser(ServerDatabase $db, string $grantHost = 'localhost'): string
     {
-        if ($db->engine !== 'mysql') {
-            throw new \InvalidArgumentException('Existing user selection is currently supported for MySQL only.');
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
+            throw new \InvalidArgumentException('Existing user selection is currently supported for MySQL/MariaDB only.');
         }
 
         $server = $db->server;
@@ -206,8 +318,8 @@ class ServerDatabaseProvisioner
      */
     public function createExtraMysqlUser(ServerDatabase $db, ServerDatabaseExtraUser $extra): string
     {
-        if ($db->engine !== 'mysql') {
-            throw new \InvalidArgumentException('Extra users are implemented for MySQL in this release.');
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
+            throw new \InvalidArgumentException('Extra users are implemented for MySQL/MariaDB in this release.');
         }
 
         $server = $db->server;
@@ -232,8 +344,8 @@ class ServerDatabaseProvisioner
      */
     public function dropExtraMysqlUser(ServerDatabase $db, ServerDatabaseExtraUser $extra): string
     {
-        if ($db->engine !== 'mysql') {
-            throw new \InvalidArgumentException('Only MySQL extra users are supported.');
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
+            throw new \InvalidArgumentException('Only MySQL/MariaDB extra users are supported.');
         }
 
         $server = $db->server;
@@ -259,7 +371,8 @@ class ServerDatabaseProvisioner
     {
         return match ($db->engine) {
             'postgres' => $this->createExtraPostgresUser($db, $extra),
-            default => $this->createExtraMysqlUser($db, $extra),
+            'mysql', 'mariadb' => $this->createExtraMysqlUser($db, $extra),
+            default => throw new \InvalidArgumentException('Extra users are supported for MySQL, MariaDB, and PostgreSQL only.'),
         };
     }
 
@@ -267,7 +380,8 @@ class ServerDatabaseProvisioner
     {
         return match ($db->engine) {
             'postgres' => $this->dropExtraPostgresUser($db, $extra),
-            default => $this->dropExtraMysqlUser($db, $extra),
+            'mysql', 'mariadb' => $this->dropExtraMysqlUser($db, $extra),
+            default => throw new \InvalidArgumentException('Extra users are supported for MySQL, MariaDB, and PostgreSQL only.'),
         };
     }
 
@@ -410,6 +524,14 @@ class ServerDatabaseProvisioner
     }
 
     /**
+     * Public accessor for SSH backup/export paths that must stay jailed.
+     */
+    public function resolvedSqlitePath(ServerDatabase $db): string
+    {
+        return $this->safeSqlitePath($db);
+    }
+
+    /**
      * Resolve and sanity-check the SQLite file path on the host.
      * The path is stored in `server_databases.host` (repurposed for
      * SQLite — no host:port concept). We require it to sit under the
@@ -504,5 +626,23 @@ class ServerDatabaseProvisioner
         }
 
         return $fallback;
+    }
+
+    private function sanitizeMongoIdentifier(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $value)) {
+            return $value;
+        }
+
+        throw new \InvalidArgumentException('Invalid MongoDB identifier.');
+    }
+
+    private function sanitizeClickhouseIdentifier(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[a-zA-Z0-9_]+$/', $value)) {
+            return $value;
+        }
+
+        throw new \InvalidArgumentException('Invalid ClickHouse identifier.');
     }
 }

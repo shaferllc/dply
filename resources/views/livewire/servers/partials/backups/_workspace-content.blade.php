@@ -137,6 +137,59 @@
 
     @if ($backups_workspace_tab === 'overview')
     <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="space-y-6">
+    <section class="dply-card overflow-hidden">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Storage') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where database backups are kept') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Exports never land on the Dply control plane by default. Choose your server’s disk (with a space cap) or an org S3-compatible destination from Settings → Backup configurations.') }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <form wire:submit="saveDatabaseBackupSettings" class="space-y-4 p-6 sm:p-7">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-sm font-medium text-brand-ink">{{ __('Default storage') }}</label>
+                    <select wire:model.live="db_backup_default_kind" class="{{ $input }} mt-1">
+                        <option value="remote_server">{{ __('On this server') }}</option>
+                        <option value="destination">{{ __('S3-compatible destination') }}</option>
+                    </select>
+                </div>
+                @if ($db_backup_default_kind === 'destination')
+                    <div>
+                        <label class="block text-sm font-medium text-brand-ink">{{ __('Destination') }}</label>
+                        <select wire:model="db_backup_configuration_id" class="{{ $input }} mt-1">
+                            <option value="">{{ __('Pick a destination…') }}</option>
+                            @foreach ($backupConfigurations as $cfg)
+                                <option value="{{ $cfg->id }}">{{ $cfg->name }} ({{ \App\Models\BackupConfiguration::labelForProvider($cfg->provider) }})</option>
+                            @endforeach
+                        </select>
+                        @error('db_backup_configuration_id')
+                            <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @else
+                    <div>
+                        <label class="block text-sm font-medium text-brand-ink">{{ __('Max space on server (GB)') }}</label>
+                        <input type="number" step="0.1" min="0.1" wire:model="db_backup_remote_max_gb" class="{{ $input }} mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">
+                            {{ __('Files live under :root — oldest backups are removed when this cap is exceeded.', ['root' => config('server_database.remote_backup_root')]) }}
+                        </p>
+                    </div>
+                @endif
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="{{ $btnPrimary }}">{{ __('Save storage settings') }}</button>
+            </div>
+        </form>
+    </section>
+
     {{-- Run now -------------------------------------------------------------------- --}}
     <div class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
@@ -162,6 +215,14 @@
                             <option value="{{ $db->id }}">{{ $db->name }} ({{ $db->engine }})</option>
                         @endforeach
                     </select>
+                    @if ($backupConfigurations->isNotEmpty())
+                        <select wire:model="run_database_backup_configuration_id" class="{{ $input }}">
+                            <option value="">{{ __('Use server default storage') }}</option>
+                            @foreach ($backupConfigurations as $cfg)
+                                <option value="{{ $cfg->id }}">{{ __('Send to :name', ['name' => $cfg->name]) }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                     <button type="button" wire:click="runDatabaseBackup" wire:loading.attr="disabled" wire:target="runDatabaseBackup" class="{{ $btnPrimary }}" @disabled(! $opsReady || $run_database_id === '')>
                         <span wire:loading.remove wire:target="runDatabaseBackup" class="inline-flex items-center gap-2">
                             <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -510,13 +571,17 @@
                                 @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
-                                @if ($backup->status === 'completed' && ! empty($backup->disk_path))
+                                @if ($backup->isDownloadable())
                                     <button type="button" wire:click="downloadDatabaseBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
                                         <x-heroicon-m-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ __('Download') }}
                                     </button>
                                 @endif
-                                <button type="button" wire:click="deleteDatabaseBackup('{{ $backup->id }}')" wire:confirm="{{ __('Delete this backup?') }}" class="{{ $btnDanger }}">
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('deleteDatabaseBackup', [@js($backup->id)], @js(__('Delete backup')), @js(__('Permanently remove this backup record and delete the file from storage. This cannot be undone.')), @js(__('Delete')), true)"
+                                    class="{{ $btnDanger }}"
+                                >
                                     <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>
@@ -577,7 +642,11 @@
                                         {{ __('Download') }}
                                     </button>
                                 @endif
-                                <button type="button" wire:click="deleteFileBackup('{{ $backup->id }}')" wire:confirm="{{ __('Delete this backup?') }}" class="{{ $btnDanger }}">
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('deleteFileBackup', [@js($backup->id)], @js(__('Delete backup')), @js(__('Permanently remove this backup record and delete the archive from storage. This cannot be undone.')), @js(__('Delete')), true)"
+                                    class="{{ $btnDanger }}"
+                                >
                                     <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>

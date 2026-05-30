@@ -9,6 +9,10 @@ class ServerDatabaseDumpOutputValidator
 {
     public static function looksLikeFailedDump(string $engine, string $output): bool
     {
+        if ($engine === 'mongodb') {
+            return str_contains($output, 'Failed:') || str_contains($output, 'error');
+        }
+
         if ($engine === 'postgres') {
             if (preg_match('/^pg_dump:\\s/m', $output)) {
                 return true;

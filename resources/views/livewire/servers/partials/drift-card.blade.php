@@ -32,7 +32,14 @@
             </div>
         </div>
     @else
-        <p class="mt-3 text-sm text-brand-moss">{{ __('Click Refresh drift to see what differs between Dply and the server.') }}</p>
+        <x-empty-state
+            borderless
+            compact
+            icon="heroicon-o-arrow-path"
+            tone="sage"
+            :title="__('Drift not checked yet')"
+            :description="__('Click Refresh drift above to compare databases tracked in Dply with names visible on the server.')"
+        />
     @endif
     </div>
 </div>

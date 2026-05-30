@@ -20,7 +20,11 @@ class SiteWebserverConfigApplier
     {
         $site->loadMissing('server');
 
-        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+            throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
+        }
+
+        if ($site->usesDockerRuntime() && ! $site->usesVmDockerRuntime()) {
             throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
         }
 
@@ -28,6 +32,35 @@ class SiteWebserverConfigApplier
             throw new \RuntimeException('This host runtime does not support managed webserver config.');
         }
 
+        $edgeProxy = $site->server->edgeProxy();
+        if (is_string($edgeProxy) && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+            return app(SiteEdgeBackendProvisioner::class)->provision($site, $emit ?? new ConsoleEmitter);
+        }
+
         return $this->registry->for($site->webserver())->provision($site, $emit ?? new ConsoleEmitter);
+    }
+
+    public function remove(Site $site): string
+    {
+        $site->loadMissing('server');
+
+        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+            throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
+        }
+
+        if ($site->usesDockerRuntime() && ! $site->usesVmDockerRuntime()) {
+            throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
+        }
+
+        if (! $site->server || ! $site->server->hostCapabilities()->supportsSsh()) {
+            throw new \RuntimeException('This host runtime does not support managed webserver config.');
+        }
+
+        $edgeProxy = $site->server->edgeProxy();
+        if (is_string($edgeProxy) && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+            return app(SiteEdgeBackendProvisioner::class)->remove($site);
+        }
+
+        return $this->registry->for($site->webserver())->remove($site);
     }
 }

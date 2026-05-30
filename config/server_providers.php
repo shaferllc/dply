@@ -26,20 +26,20 @@ return [
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', true), // https://aws.amazon.com/ec2/
         'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
         /** DNS / CDN — API token only (not a compute host in v1). */
-        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', true), // https://www.cloudflare.com/
-        'gandi' => env('DPLY_SERVER_PROVIDER_GANDI', true), // https://www.gandi.net/
-        'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', true), // https://www.namecheap.com/
-        'vercel_dns' => env('DPLY_SERVER_PROVIDER_VERCEL_DNS', true), // https://vercel.com/docs/projects/domains
+        'cloudflare' => env('DPLY_SERVER_PROVIDER_CLOUDFLARE', false), // https://www.cloudflare.com/
+        'gandi' => env('DPLY_SERVER_PROVIDER_GANDI', false), // https://www.gandi.net/
+        'namecheap' => env('DPLY_SERVER_PROVIDER_NAMECHEAP', false), // https://www.namecheap.com/
+        'vercel_dns' => env('DPLY_SERVER_PROVIDER_VERCEL_DNS', false), // https://vercel.com/docs/projects/domains
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
-        'ghcr' => env('DPLY_SERVER_PROVIDER_GHCR', true), // GitHub Container Registry — image pull creds for Cloud apps
+        'ghcr' => env('DPLY_SERVER_PROVIDER_GHCR', false), // GitHub Container Registry — image pull creds for Cloud apps
         'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/
         'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // https://cloud.google.com/compute
         'azure' => env('DPLY_SERVER_PROVIDER_AZURE', false), // https://azure.microsoft.com/en-us/products/virtual-machines/
         'oracle' => env('DPLY_SERVER_PROVIDER_ORACLE', false), // https://www.oracle.com/cloud/compute/
         'custom' => env('DPLY_SERVER_PROVIDER_CUSTOM', true), // Custom/manual server entry
         /** Inventory-import sources (not compute targets). dply reads existing fleets to migrate them. */
-        'ploi' => env('DPLY_SERVER_PROVIDER_PLOI', true), // https://ploi.io/
-        'forge' => env('DPLY_SERVER_PROVIDER_FORGE', true), // https://forge.laravel.com/
+        'ploi' => env('DPLY_SERVER_PROVIDER_PLOI', false), // https://ploi.io/
+        'forge' => env('DPLY_SERVER_PROVIDER_FORGE', false), // https://forge.laravel.com/
 
     ],
 ];

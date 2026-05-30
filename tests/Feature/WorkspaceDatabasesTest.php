@@ -5,17 +5,22 @@ namespace Tests\Feature\WorkspaceDatabasesTest;
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Servers\WorkspaceDatabases;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseEngine;
 use App\Models\User;
+use App\Notifications\ServerDatabaseCredentialsNotification;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -42,7 +47,7 @@ test('create database with optional credentials calls provisioner', function () 
     [$user, $server] = actingOwnerWithServer();
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'postgres' => true, 'sqlite' => true]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -82,7 +87,7 @@ test('create database can reuse existing mysql user', function () {
     ]);
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'postgres' => true, 'sqlite' => true]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -109,11 +114,63 @@ test('create database can reuse existing mysql user', function () {
     ]);
 });
 
+test('open engine database create switches to engine tab and opens form', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openEngineDatabaseCreate', 'postgres')
+        ->assertSet('workspace_tab', 'postgres')
+        ->assertSet('engine_subtab', 'databases')
+        ->assertSet('engine_create_form_open', true)
+        ->assertSet('new_db_engine', 'postgres')
+        ->assertSet('new_db_name', '')
+        ->call('closeEngineDatabaseCreate')
+        ->assertSet('engine_create_form_open', false);
+});
+
+test('create database from postgres tab stays on postgres and closes form', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock): void {
+        $mock->shouldReceive('createOnServer')->once()->andReturn('postgres ok');
+    });
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'postgres'])
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openEngineDatabaseCreate', 'postgres')
+        ->set('new_db_name', 'analytics')
+        ->call('createDatabase')
+        ->assertSet('workspace_tab', 'postgres')
+        ->assertSet('engine_create_form_open', false)
+        ->assertSet('engine_subtab', 'databases')
+        ->assertSet('generated_database_credentials.name', 'analytics')
+        ->assertSet('generated_database_credentials.engine', 'postgres')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('server_databases', [
+        'server_id' => $server->id,
+        'name' => 'analytics',
+        'engine' => 'postgres',
+    ]);
+});
+
 test('new db name auto formats on type', function () {
     [$user, $server] = actingOwnerWithServer();
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'postgres' => true, 'sqlite' => true]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -135,7 +192,7 @@ test('create sqlite database uses canonical path', function () {
     [$user, $server] = actingOwnerWithServer();
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -160,6 +217,109 @@ test('create sqlite database uses canonical path', function () {
     ]);
 });
 
+test('create database emails credentials when org toggle enabled', function () {
+    Notification::fake();
+
+    [$user, $server] = actingOwnerWithServer();
+    $server->organization->update(['email_database_credentials_enabled' => true]);
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock): void {
+        $mock->shouldReceive('createOnServer')->once()->andReturn('postgres ok');
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('new_db_name', 'emailed_db')
+        ->set('new_db_engine', 'postgres')
+        ->call('createDatabase')
+        ->assertSet('generated_database_credentials.credentials_emailed', true);
+
+    Notification::assertSentTo($user, ServerDatabaseCredentialsNotification::class);
+});
+
+test('create database does not email credentials when org toggle disabled', function () {
+    Notification::fake();
+
+    [$user, $server] = actingOwnerWithServer();
+    $server->organization->update(['email_database_credentials_enabled' => false]);
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock): void {
+        $mock->shouldReceive('createOnServer')->once()->andReturn('postgres ok');
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('new_db_name', 'no_email_db')
+        ->set('new_db_engine', 'postgres')
+        ->call('createDatabase')
+        ->assertSet('generated_database_credentials.credentials_emailed', false);
+
+    Notification::assertNotSentTo($user, ServerDatabaseCredentialsNotification::class);
+});
+
+test('hide generated database password clears plaintext from banner state', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('generated_database_credentials', [
+            'name' => 'demo',
+            'engine' => 'postgres',
+            'username' => 'demo_user',
+            'password' => 'secret-pass',
+            'host' => '127.0.0.1',
+            'username_generated' => true,
+            'password_generated' => true,
+            'credentials_emailed' => false,
+            'password_hidden' => false,
+        ])
+        ->call('hideGeneratedDatabasePassword')
+        ->assertSet('generated_database_credentials.password_hidden', true)
+        ->assertSet('generated_database_credentials.password', null);
+});
+
+test('create database rejects duplicate name on server', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    ServerDatabase::query()->create([
+        'server_id' => $server->id,
+        'name' => 'testing',
+        'engine' => 'postgres',
+        'username' => 'testing_user',
+        'password' => 'secret',
+        'host' => '127.0.0.1',
+    ]);
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock): void {
+        $mock->shouldNotReceive('createOnServer');
+        $mock->shouldNotReceive('createMysqlDatabaseForExistingUser');
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('new_db_name', 'testing')
+        ->set('new_db_engine', 'postgres')
+        ->call('createDatabase')
+        ->assertHasErrors(['new_db_name']);
+
+    expect(ServerDatabase::query()->where('server_id', $server->id)->where('name', 'testing')->count())->toBe(1);
+});
+
 test('create database blocks engine when not installed', function () {
     [$user, $server] = actingOwnerWithServer();
 
@@ -167,7 +327,7 @@ test('create database blocks engine when not installed', function () {
     // new_db_engine to a capable value, so the createDatabase guard
     // is the path under test.
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -252,13 +412,16 @@ test('databases page uses basics first layout', function () {
     ]);
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'postgres' => true, 'sqlite' => true]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => true, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
     $this->mock(ServerDatabaseDriftAnalyzer::class, function ($mock): void {
         $mock->shouldReceive('analyze')->andReturn([
             'mysql' => ['only_in_dply' => [], 'only_on_server' => []],
+            'mariadb' => ['only_in_dply' => [], 'only_on_server' => []],
+            'mongodb' => ['only_in_dply' => [], 'only_on_server' => []],
+            'clickhouse' => ['only_in_dply' => [], 'only_on_server' => []],
             'postgres' => ['only_in_dply' => [], 'only_on_server' => []],
         ]);
     });
@@ -271,7 +434,7 @@ test('databases page uses basics first layout', function () {
         ->assertSee('Notifications')
         ->assertSee('MySQL')
         ->assertSee('New database')
-        ->assertSee('Advanced MySQL options')
+        ->assertSee('Advanced MySQL/MariaDB options')
         ->assertDontSee('See credentials')
         ->assertDontSee('MySQL admin credentials')
         ->assertDontSee('MySQL drift')
@@ -280,13 +443,17 @@ test('databases page uses basics first layout', function () {
         ->assertDontSee('Export SQL (queued)')
         ->call('setWorkspaceTab', 'mysql')
         ->assertSet('workspace_tab', 'mysql')
+        ->call('setEngineSubtab', 'admin')
         ->assertSee('MySQL admin credentials')
+        ->call('setEngineSubtab', 'databases')
         ->assertSee('MySQL databases')
         ->assertSee('app_db')
+        ->call('setEngineSubtab', 'connections')
         ->assertSee('Connection snippet')
         ->assertSee('Share credentials')
-        ->assertSee('Destructive actions')
         ->assertSee('MySQL drift')
+        ->call('setEngineSubtab', 'danger')
+        ->assertSee('Destructive actions')
         ->assertSee('Remove from Dply')
         ->assertSee('Drop on server')
         ->call('setWorkspaceTab', 'advanced')
@@ -442,6 +609,39 @@ test('run sqlite sql executes and records output', function () {
     ]);
 });
 
+test('sqlite tab exposes inline backup and run sql actions for tracked databases', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    ServerDatabase::query()->create([
+        'server_id' => $server->id,
+        'name' => 'inventory',
+        'engine' => 'sqlite',
+        'username' => '',
+        'password' => '',
+        'host' => '/var/lib/dply/sqlite/inventory.db',
+    ]);
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => true]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('workspace_tab', 'sqlite')
+        ->set('engine_subtab', 'databases')
+        ->assertSee(__('Overview'))
+        ->assertSee(__('Databases'))
+        ->assertSee(__('Connections'))
+        ->assertSee(__('Backups'))
+        ->assertSee(__('Info'))
+        ->assertSee(__('Danger'))
+        ->assertSee('inventory')
+        ->assertSee(__('Backup'))
+        ->assertSee(__('Run SQL'))
+        ->assertSee(__('More'));
+});
+
 test('run sqlite sql refuses non sqlite database', function () {
     [$user, $server] = actingOwnerWithServer();
 
@@ -471,7 +671,7 @@ test('install database engine dispatches job and creates row', function () {
     [$user, $server] = actingOwnerWithServer();
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -482,10 +682,20 @@ test('install database engine dispatches job and creates row', function () {
         ->assertSet('workspace_tab', 'mysql');
 
     Queue::assertPushed(InstallDatabaseEngineJob::class);
-    $this->assertDatabaseHas('server_database_engines', [
-        'server_id' => $server->id,
-        'engine' => 'mysql',
-        'status' => ServerDatabaseEngine::STATUS_PENDING,
+
+    $row = ServerDatabaseEngine::query()
+        ->where('server_id', $server->id)
+        ->where('engine', 'mysql')
+        ->first();
+
+    expect($row)->not->toBeNull();
+    expect($row->status)->toBe(ServerDatabaseEngine::STATUS_PENDING);
+
+    $this->assertDatabaseHas('console_actions', [
+        'subject_type' => $row->getMorphClass(),
+        'subject_id' => $row->id,
+        'kind' => 'db_engine_install',
+        'status' => ConsoleAction::STATUS_QUEUED,
     ]);
 });
 
@@ -494,7 +704,7 @@ test('install database engine rejects unsupported engine', function () {
     [$user, $server] = actingOwnerWithServer();
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -518,7 +728,7 @@ test('uninstall database engine dispatches job', function () {
     ]);
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => true, 'sqlite' => false]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -543,7 +753,7 @@ test('stop and revert marks row failed and dispatches uninstall', function () {
     ]);
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -572,7 +782,7 @@ test('stop and revert refuses running engine', function () {
     ]);
 
     $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
-        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'postgres' => true, 'sqlite' => false]);
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => true, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
         $mock->shouldReceive('forget')->zeroOrMoreTimes();
     });
 
@@ -582,4 +792,34 @@ test('stop and revert refuses running engine', function () {
 
     expect($row->fresh()->status)->toBe(ServerDatabaseEngine::STATUS_RUNNING);
     Queue::assertNotPushed(UninstallDatabaseEngineJob::class);
+});
+
+test('delete database backup from databases workspace removes row and artifact', function () {
+    Storage::fake('local');
+
+    [$user, $server] = actingOwnerWithServer();
+
+    $database = ServerDatabase::query()->create([
+        'server_id' => $server->id,
+        'name' => 'app',
+        'engine' => 'mysql',
+        'username' => '',
+        'password' => '',
+    ]);
+
+    Storage::disk('local')->put('databases/app.sql', 'dump');
+    $backup = ServerDatabaseBackup::query()->create([
+        'server_database_id' => $database->id,
+        'user_id' => $user->id,
+        'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+        'storage_kind' => 'control_plane',
+        'disk_path' => 'databases/app.sql',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('deleteDatabaseBackup', $backup->id);
+
+    expect(ServerDatabaseBackup::find($backup->id))->toBeNull();
+    expect(Storage::disk('local')->exists('databases/app.sql'))->toBeFalse();
 });

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class ServerDatabase extends Model
 {
@@ -54,11 +56,15 @@ class ServerDatabase extends Model
 
     public function defaultPort(): int
     {
-        return match ($this->engine) {
-            'postgres' => 5432,
-            'sqlite' => 0, // file-based, no port
-            default => 3306,
-        };
+        return DatabaseWorkspaceEngines::defaultPortForEngine($this->engine);
+    }
+
+    /**
+     * Letters + digits only so mysql/postgresql URLs stay readable (no % escapes).
+     */
+    public static function generateConnectionSafePassword(int $length = 32): string
+    {
+        return Str::password($length, symbols: false);
     }
 
     /**
@@ -81,6 +87,8 @@ class ServerDatabase extends Model
 
         return match ($this->engine) {
             'postgres' => "postgresql://{$user}:{$pass}@{$host}:{$port}/{$name}",
+            'mongodb' => "mongodb://{$user}:{$pass}@{$host}:{$port}/{$name}?authSource={$name}",
+            'clickhouse' => "clickhouse://{$user}:{$pass}@{$host}:{$port}/{$name}",
             default => "mysql://{$user}:{$pass}@{$host}:{$port}/{$name}",
         };
     }

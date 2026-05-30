@@ -38,6 +38,56 @@ class ServerDatabaseRemoteExec
 
     public function probeMysql(Server $server): bool
     {
+        if (! $this->serverHasMysqlServerPackage($server)) {
+            return false;
+        }
+
+        return $this->probeMysqlProtocolConnectivity($server);
+    }
+
+    public function probeMariadb(Server $server): bool
+    {
+        if (! $this->serverHasMariadbServerPackage($server)) {
+            return false;
+        }
+
+        return $this->probeMysqlProtocolConnectivity($server);
+    }
+
+    protected function serverHasMysqlServerPackage(Server $server): bool
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return false;
+        }
+
+        $script = <<<'BASH'
+dpkg-query -W -f='${Status}' mysql-server 2>/dev/null | grep -q 'install ok installed' && echo YES
+BASH;
+
+        return str_contains(
+            trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg($script), 20)),
+            'YES',
+        );
+    }
+
+    protected function serverHasMariadbServerPackage(Server $server): bool
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return false;
+        }
+
+        $script = <<<'BASH'
+dpkg-query -W -f='${Status}' mariadb-server 2>/dev/null | grep -q 'install ok installed' && echo YES
+BASH;
+
+        return str_contains(
+            trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg($script), 20)),
+            'YES',
+        );
+    }
+
+    protected function probeMysqlProtocolConnectivity(Server $server): bool
+    {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             return false;
         }
@@ -98,6 +148,94 @@ BASH;
         $out = trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg('command -v sqlite3 >/dev/null && echo OK'), 30));
 
         return str_contains($out, 'OK');
+    }
+
+    public function probeMongodb(Server $server): bool
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return false;
+        }
+
+        $cred = $this->adminCredential($server);
+        $ping = 'db.adminCommand({ping:1})';
+        if ($cred && $cred->mongodb_admin_password) {
+            $user = $cred->mongodb_admin_username ?: 'admin';
+            $inner = 'command -v mongosh >/dev/null && systemctl is-active --quiet mongod && '.
+                'mongosh -u '.escapeshellarg($user).
+                ' -p '.escapeshellarg($cred->mongodb_admin_password).
+                ' --authenticationDatabase admin --quiet --eval '.escapeshellarg($ping).
+                ' >/dev/null 2>&1 && echo OK';
+        } else {
+            $inner = 'command -v mongosh >/dev/null && systemctl is-active --quiet mongod && '.
+                'mongosh --quiet --eval '.escapeshellarg($ping).' >/dev/null 2>&1 && echo OK';
+        }
+
+        $out = trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), 45));
+
+        return str_contains($out, 'OK');
+    }
+
+    public function probeClickhouse(Server $server): bool
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return false;
+        }
+
+        $cred = $this->adminCredential($server);
+        $user = $cred?->clickhouse_admin_username ?: 'default';
+        $pass = $cred?->clickhouse_admin_password ?? '';
+        $auth = $pass !== ''
+            ? 'clickhouse-client --user '.escapeshellarg($user).' --password '.escapeshellarg($pass)
+            : 'clickhouse-client --user '.escapeshellarg($user);
+        $cmd = $auth.' --query "SELECT 1" >/dev/null 2>&1 && echo OK';
+        $out = trim($this->execWithCandidates($server, 'bash -lc '.escapeshellarg($cmd), 45));
+
+        return str_contains($out, 'OK');
+    }
+
+    /**
+     * @return array{0: string, 1: int|null}
+     */
+    public function mongoshRunWithExit(Server $server, string $javascript, int $timeout = 120): array
+    {
+        $cred = $this->adminCredential($server);
+        $prefix = 'mongosh --quiet';
+        if ($cred && $cred->mongodb_admin_password) {
+            $user = $cred->mongodb_admin_username ?: 'admin';
+            $prefix = 'mongosh --quiet -u '.escapeshellarg($user).
+                ' -p '.escapeshellarg($cred->mongodb_admin_password).
+                ' --authenticationDatabase admin';
+        }
+        $inner = $prefix.' --eval '.escapeshellarg($javascript).' 2>&1';
+
+        return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
+     * @return array{0: string, 1: int|null}
+     */
+    public function clickhouseRunWithExit(Server $server, string $sql, int $timeout = 120): array
+    {
+        $cred = $this->adminCredential($server);
+        $user = $cred?->clickhouse_admin_username ?: 'default';
+        $pass = $cred?->clickhouse_admin_password ?? '';
+        $auth = $pass !== ''
+            ? 'clickhouse-client --user '.escapeshellarg($user).' --password '.escapeshellarg($pass)
+            : 'clickhouse-client --user '.escapeshellarg($user);
+        $inner = $auth.' --multiquery --query '.escapeshellarg($sql).' 2>&1';
+
+        return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    public function mongodump(Server $server, string $database, string $username, string $password, int $timeout = 600): string
+    {
+        $inner = 'mongodump --db '.escapeshellarg($database).
+            ' --username '.escapeshellarg($username).
+            ' --password '.escapeshellarg($password).
+            ' --authenticationDatabase '.escapeshellarg($database).
+            ' --archive 2>&1';
+
+        return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
     public function mysqlExecute(Server $server, string $sql, int $timeout = 120): string
@@ -258,6 +396,98 @@ BASH;
         $cmd = 'echo '.escapeshellarg($b64).' | base64 -d | sqlite3 -header -column '.escapeshellarg($path).' 2>&1';
 
         return $this->shellRunWithExit($server, $cmd, $timeout);
+    }
+
+    /**
+     * Write a consistent SQLite snapshot to a path on the server (no bytes cross SSH).
+     *
+     * @throws \RuntimeException on non-zero remote exit or oversize file
+     */
+    public function sqliteBackupToPath(Server $server, string $sourcePath, string $destPath, int $maxBytes, int $timeout = 300): int
+    {
+        $dir = dirname($destPath);
+        $script = 'set -e; '.
+            'mkdir -p '.escapeshellarg($dir).' && '.
+            'sqlite3 '.escapeshellarg($sourcePath).' ".backup '.escapeshellarg($destPath).'" >/dev/null && '.
+            'stat -c%s '.escapeshellarg($destPath);
+
+        [$out, $exit] = $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($script), $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        $bytes = (int) trim($out);
+        if ($bytes <= 0) {
+            throw new \RuntimeException('SQLite backup produced an empty file.');
+        }
+
+        if ($bytes > $maxBytes) {
+            $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($destPath)), 30);
+
+            throw new \RuntimeException(sprintf(
+                'SQLite backup exceeds the %d byte cap; raise SERVER_DATABASE_SQLITE_BACKUP_MAX_BYTES if needed.',
+                $maxBytes
+            ));
+        }
+
+        return $bytes;
+    }
+
+    public function mysqldumpToPath(Server $server, string $database, string $username, string $password, string $destPath, int $timeout = 600): int
+    {
+        $dir = dirname($destPath);
+        $inner = 'mkdir -p '.escapeshellarg($dir).' && '.
+            'env MYSQL_PWD='.escapeshellarg($password).' mysqldump -u '.escapeshellarg($username).
+            ' --single-transaction --quick --routines=false '.escapeshellarg($database).
+            ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
+
+        [$out, $exit] = $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        return max(0, (int) trim($out));
+    }
+
+    public function pgDumpToPath(Server $server, string $database, string $username, string $password, string $destPath, int $timeout = 600): int
+    {
+        $dir = dirname($destPath);
+        $inner = 'mkdir -p '.escapeshellarg($dir).' && '.
+            'env PGPASSWORD='.escapeshellarg($password).' pg_dump -h 127.0.0.1 -U '.escapeshellarg($username).
+            ' '.escapeshellarg($database).
+            ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
+
+        [$out, $exit] = $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        return max(0, (int) trim($out));
+    }
+
+    /**
+     * Delete oldest files under a server backup tree until total size is at or below $maxBytes.
+     */
+    public function pruneRemoteBackupTree(Server $server, string $serverTreeRoot, int $maxBytes, int $timeout = 120): void
+    {
+        if ($maxBytes <= 0) {
+            return;
+        }
+
+        $inner = 'ROOT='.escapeshellarg($serverTreeRoot).'; '.
+            'MAX='.escapeshellarg((string) $maxBytes).'; '.
+            'if [ ! -d "$ROOT" ]; then exit 0; fi; '.
+            'total() { find "$ROOT" -type f -printf \'%s\\n\' 2>/dev/null | awk \'{s+=$1} END {print s+0}\'; }; '.
+            'while [ "$(total)" -gt "$MAX" ]; do '.
+            'oldest="$(find "$ROOT" -type f -printf \'%T@ %p\\n\' 2>/dev/null | sort -n | head -1 | cut -d\' \' -f2-)"; '.
+            'if [ -z "$oldest" ] || [ ! -f "$oldest" ]; then break; fi; '.
+            'rm -f "$oldest"; '.
+            'done';
+
+        $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($inner), $timeout);
     }
 
     /**

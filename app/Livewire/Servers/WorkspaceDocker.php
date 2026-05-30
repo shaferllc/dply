@@ -11,13 +11,17 @@ use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
+use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\SshConnectionFactory;
+use App\Support\Servers\DockerContainerShellSupport;
 use App\Support\Servers\DockerWorkspaceViewData;
 use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -46,6 +50,7 @@ class WorkspaceDocker extends Component
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RunsAllowlistedManageAction;
+    use RunsServerInventoryProbe;
 
     /** @var list<array{id: string, name: string, image: string, status: string, state: string, ports: string}>|null */
     public ?array $containers = null;
@@ -111,6 +116,37 @@ class WorkspaceDocker extends Component
 
     public bool $inspectModalLoading = false;
 
+    public ?string $execModalContainerId = null;
+
+    public ?string $execModalContainerName = null;
+
+    public string $execModalCommand = '';
+
+    public ?string $shellModalContainerId = null;
+
+    public ?string $shellModalContainerName = null;
+
+    public string $shellModalCommand = '';
+
+    public ?string $shellModalError = null;
+
+    public bool $shellModalRunning = false;
+
+    /**
+     * @var array<int, array{cmd: string, out: string, exit: ?int, error: ?string}>
+     */
+    public array $shellModalHistory = [];
+
+    public ?string $composeLogsModalProject = null;
+
+    public ?string $composeLogsModalConfig = null;
+
+    public string $composeLogsModalContent = '';
+
+    public ?string $composeLogsModalError = null;
+
+    public bool $composeLogsModalLoading = false;
+
     #[Url(as: 'tab', except: 'overview', history: true)]
     public string $workspace_tab = 'overview';
 
@@ -131,6 +167,10 @@ class WorkspaceDocker extends Component
         }
 
         $this->bootWorkspace($server);
+
+        if (! $this->comingSoonPreview && $this->workspace_tab !== 'overview') {
+            $this->loadTabIfNeeded($this->workspace_tab);
+        }
     }
 
     public function bootedRequiresFeature(): void
@@ -199,6 +239,291 @@ class WorkspaceDocker extends Component
         $this->openDockerManageAction($actionKey, [$actionKey, $containerId]);
     }
 
+    public function openContainerExec(string $containerId, string $containerName): void
+    {
+        if (! app(ServerDockerRemoteInspector::class)->isValidContainerRef($containerId)) {
+            $this->toastError(__('Invalid container.'));
+
+            return;
+        }
+
+        $this->execModalContainerId = $containerId;
+        $this->execModalContainerName = $containerName;
+        $this->execModalCommand = '';
+    }
+
+    public function closeContainerExecModal(): void
+    {
+        $this->execModalContainerId = null;
+        $this->execModalContainerName = null;
+        $this->execModalCommand = '';
+    }
+
+    public function submitContainerExec(): void
+    {
+        if ($this->execModalContainerId === null) {
+            return;
+        }
+
+        $command = trim($this->execModalCommand);
+        $inspector = app(ServerDockerRemoteInspector::class);
+
+        if (! $inspector->isValidExecCommand($command)) {
+            $this->toastError(__('Enter a single-line command (max 4000 characters).'));
+
+            return;
+        }
+
+        $def = config('server_manage.service_actions.docker_container_exec', []);
+        $confirm = __('Run `:command` inside container `:name`? Output appears in the console banner.', [
+            'command' => $command,
+            'name' => $this->execModalContainerName,
+        ]);
+
+        $this->openConfirmActionModal(
+            'runAllowlistedManageAction',
+            ['docker_container_exec', $this->execModalContainerId, null, $command],
+            (string) ($def['label'] ?? __('Run command in container')),
+            $confirm,
+            (string) ($def['label'] ?? __('Run command')),
+            false,
+        );
+
+        $this->closeContainerExecModal();
+    }
+
+    public function openContainerShell(string $containerId, string $containerName): void
+    {
+        if (! app(ServerDockerRemoteInspector::class)->isValidContainerRef($containerId)) {
+            $this->toastError(__('Invalid container.'));
+
+            return;
+        }
+
+        $this->shellModalContainerId = $containerId;
+        $this->shellModalContainerName = $containerName;
+        $this->shellModalCommand = '';
+        $this->shellModalError = null;
+        $this->shellModalRunning = false;
+        $this->shellModalHistory = [];
+    }
+
+    public function closeContainerShell(): void
+    {
+        $this->shellModalContainerId = null;
+        $this->shellModalContainerName = null;
+        $this->shellModalCommand = '';
+        $this->shellModalError = null;
+        $this->shellModalRunning = false;
+        $this->shellModalHistory = [];
+    }
+
+    public function clearContainerShellHistory(): void
+    {
+        $this->shellModalHistory = [];
+        $this->shellModalError = null;
+    }
+
+    public function insertContainerShellCommand(string $command): void
+    {
+        $this->shellModalCommand = $command;
+    }
+
+    public function runContainerShellQuickAction(int $index): void
+    {
+        $actions = DockerContainerShellSupport::quickActions();
+        if (! isset($actions[$index])) {
+            return;
+        }
+
+        $this->shellModalCommand = $actions[$index]['cmd'];
+        $this->runContainerShellCommand();
+    }
+
+    public function runContainerShellCommand(): void
+    {
+        if ($this->shellModalContainerId === null) {
+            return;
+        }
+
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->shellModalError = __('Deployers cannot run shell commands on servers.');
+
+            return;
+        }
+
+        if ($this->shellModalRunning) {
+            $this->shellModalError = __('A command is already running. Wait for it to complete.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->shellModalError = __('Provisioning and SSH must be ready before running commands.');
+
+            return;
+        }
+
+        $cmd = trim($this->shellModalCommand);
+        $inspector = app(ServerDockerRemoteInspector::class);
+
+        if (! $inspector->isValidExecCommand($cmd)) {
+            $this->shellModalError = __('Enter a single-line command (max 4000 characters).');
+
+            return;
+        }
+
+        $this->shellModalError = null;
+        $this->shellModalRunning = true;
+        $startedAt = microtime(true);
+
+        try {
+            $ssh = app(SshConnectionFactory::class)->forServer($this->server);
+            $remote = DockerContainerShellSupport::remoteExecCommand($this->shellModalContainerId, $cmd);
+            [$out, $exit] = $ssh->execWithCallbackAndExit(
+                $remote,
+                static fn (string $chunk) => null,
+                120,
+            );
+
+            $this->shellModalHistory[] = [
+                'cmd' => $cmd,
+                'out' => Str::limit($out, 16000, "\n… (output truncated)"),
+                'exit' => $exit,
+                'error' => null,
+            ];
+
+            $this->logContainerShellAudit($cmd, $exit, null, $startedAt);
+        } catch (\Throwable $e) {
+            $message = Str::limit($e->getMessage(), 200);
+            $this->shellModalHistory[] = [
+                'cmd' => $cmd,
+                'out' => '',
+                'exit' => null,
+                'error' => $message,
+            ];
+            $this->logContainerShellAudit($cmd, null, $message, $startedAt);
+        } finally {
+            $this->shellModalRunning = false;
+        }
+
+        if (count($this->shellModalHistory) > 30) {
+            $this->shellModalHistory = array_slice($this->shellModalHistory, -30);
+        }
+
+        $this->shellModalCommand = '';
+        $this->dispatch('scroll-console-bottom');
+    }
+
+    protected function logContainerShellAudit(string $command, ?int $exit, ?string $error, float $startedAt): void
+    {
+        $organization = $this->server->organization;
+        if ($organization === null) {
+            return;
+        }
+
+        $duration = (int) round((microtime(true) - $startedAt) * 1000);
+        $status = $error !== null ? 'failed' : ($exit === 0 ? 'success' : 'nonzero_exit');
+
+        audit_log(
+            $organization,
+            auth()->user(),
+            'server.docker.container_shell_command',
+            $this->server,
+            null,
+            [
+                'container_id' => $this->shellModalContainerId,
+                'container_name' => $this->shellModalContainerName,
+                'command' => Str::limit($command, 1000),
+                'exit_code' => $exit,
+                'status' => $status,
+                'duration_ms' => $duration,
+                'error' => $error !== null ? Str::limit($error, 500) : null,
+            ],
+        );
+    }
+
+    public function confirmDockerComposeAction(string $actionKey, string $project, string $config): void
+    {
+        $allowed = [
+            'docker_compose_up',
+            'docker_compose_down',
+            'docker_compose_restart',
+        ];
+
+        if (! in_array($actionKey, $allowed, true)) {
+            $this->toastError(__('Unknown action.'));
+
+            return;
+        }
+
+        $inspector = app(ServerDockerRemoteInspector::class);
+        $config = $inspector->primaryComposeConfigFile($config);
+
+        if (! $inspector->isValidComposeProjectName($project) || ! $inspector->isValidComposeConfigPath($config)) {
+            $this->toastError(__('Invalid compose project.'));
+
+            return;
+        }
+
+        $def = config('server_manage.service_actions.'.$actionKey, []);
+        if (! is_array($def)) {
+            $this->toastError(__('Unknown action.'));
+
+            return;
+        }
+
+        $confirm = str_replace(':project', $project, (string) ($def['confirm'] ?? ''));
+
+        $this->openConfirmActionModal(
+            'runAllowlistedManageAction',
+            [$actionKey, null, null, null, $project, $config],
+            (string) ($def['label'] ?? $actionKey),
+            $confirm,
+            (string) ($def['label'] ?? $actionKey),
+            $actionKey === 'docker_compose_down',
+        );
+    }
+
+    public function openComposeLogs(string $project, string $config): void
+    {
+        $inspector = app(ServerDockerRemoteInspector::class);
+        $config = $inspector->primaryComposeConfigFile($config);
+
+        if (! $inspector->isValidComposeProjectName($project) || ! $inspector->isValidComposeConfigPath($config)) {
+            $this->toastError(__('Invalid compose project.'));
+
+            return;
+        }
+
+        $this->composeLogsModalProject = $project;
+        $this->composeLogsModalConfig = $config;
+        $this->composeLogsModalContent = '';
+        $this->composeLogsModalError = null;
+        $this->composeLogsModalLoading = true;
+
+        try {
+            $result = $inspector->composeProjectLogs($this->server, $project, $config);
+            $this->composeLogsModalContent = $result['logs'];
+            $this->composeLogsModalError = $result['error'];
+        } catch (\Throwable $e) {
+            $this->composeLogsModalError = $e->getMessage();
+        } finally {
+            $this->composeLogsModalLoading = false;
+        }
+    }
+
+    public function closeComposeLogsModal(): void
+    {
+        $this->composeLogsModalProject = null;
+        $this->composeLogsModalConfig = null;
+        $this->composeLogsModalContent = '';
+        $this->composeLogsModalError = null;
+        $this->composeLogsModalLoading = false;
+    }
+
     public function confirmDockerImageAction(string $actionKey, string $imageRef): void
     {
         $allowed = ['docker_image_rm'];
@@ -210,6 +535,16 @@ class WorkspaceDocker extends Component
         }
 
         $this->openDockerManageAction($actionKey, [$actionKey, null, $imageRef]);
+    }
+
+    public function confirmDockerInstall(): void
+    {
+        $this->openDockerManageAction('install_docker', ['install_docker']);
+    }
+
+    public function confirmDockerUpgrade(): void
+    {
+        $this->openDockerManageAction('repair_docker', ['repair_docker']);
     }
 
     public function confirmDockerImagePull(): void
@@ -383,6 +718,11 @@ class WorkspaceDocker extends Component
                 : null,
             'dockerConsoleRun' => $dockerConsoleRun,
             'serviceActions' => $serviceActions,
+            'shellSshCommand' => $this->shellModalContainerId !== null
+                ? DockerContainerShellSupport::localInteractiveSshOneLiner($this->server, $this->shellModalContainerId)
+                : '',
+            'shellQuickActions' => DockerContainerShellSupport::quickActions(),
+            'managedSites' => $viewData['managed_sites'],
         ]);
     }
 
@@ -407,6 +747,11 @@ class WorkspaceDocker extends Component
             (string) ($def['label'] ?? $key),
             false,
         );
+    }
+
+    protected function forceExtendedInventoryProbe(): bool
+    {
+        return true;
     }
 
     private function loadTabIfNeeded(string $tab, bool $force = false): void

@@ -86,6 +86,7 @@ final class SiteShowViewData
         $preflightChecks = collect($deploymentPreflight['checks'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
         $preflightErrors = collect($deploymentPreflight['errors'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
         $preflightWarnings = collect($deploymentPreflight['warnings'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
+        $preflightActionableChecks = PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks);
 
         $runtimeOperationConsoles = self::runtimeOperationConsoles($runtimeLogs);
         $runtimeErrorConsole = $runtimeOperationConsoles->first(fn (array $console): bool => in_array($console['action'], ['errors'], true) || $console['status'] === 'failed');
@@ -219,6 +220,7 @@ final class SiteShowViewData
                 'preflightChecks',
                 'preflightErrors',
                 'preflightWarnings',
+                'preflightActionableChecks',
                 'runtimeOperationConsoles',
                 'runtimeErrorConsole',
                 'previewDomain',

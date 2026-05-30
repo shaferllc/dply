@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Servers;
 
 use App\Livewire\Servers\WorkspaceWebserver;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Services\Servers\WebserverSwitchPreflight;
@@ -58,18 +59,7 @@ final class WebserverWorkspaceViewData
      */
     public static function edgeProxyCatalog(): array
     {
-        $catalog = [
-            'traefik' => ['label' => 'Traefik', 'icon' => 'heroicon-o-arrow-path-rounded-square', 'systemd' => 'traefik'],
-            'haproxy' => ['label' => 'HAProxy', 'icon' => 'heroicon-o-scale', 'systemd' => 'haproxy'],
-        ];
-
-        foreach (self::comingSoonEdgeProxies() as $key) {
-            if (isset($catalog[$key])) {
-                $catalog[$key]['coming_soon'] = true;
-            }
-        }
-
-        return $catalog;
+        return EdgeProxyWorkspaceViewData::edgeProxyCatalog();
     }
 
     /**
@@ -77,16 +67,12 @@ final class WebserverWorkspaceViewData
      */
     public static function comingSoonEdgeProxies(): array
     {
-        $keys = config('server_workspace.edge_proxy_coming_soon', []);
-
-        return is_array($keys) ? array_values(array_map('strtolower', $keys)) : [];
+        return EdgeProxyWorkspaceViewData::comingSoonEdgeProxies();
     }
 
     public static function isComingSoonEdgeProxy(string $key): bool
     {
-        $key = strtolower(trim($key));
-
-        return in_array($key, self::comingSoonEdgeProxies(), true);
+        return EdgeProxyWorkspaceViewData::isComingSoonEdgeProxy($key);
     }
 
     /**
@@ -124,13 +110,7 @@ final class WebserverWorkspaceViewData
         // `coming_soon` engines render a "Soon" badge in the tab strip until
         // their switch + config flows ship; nginx is GA today.
         $webserverCatalog = self::webserverCatalog();
-
-        $edgeProxyCatalog = self::edgeProxyCatalog();
-        $activeEdgeProxy = $server->edgeProxy();
         $engineTabCatalog = $webserverCatalog;
-        foreach ($edgeProxyCatalog as $key => $info) {
-            $engineTabCatalog[$key] = $info + ['is_edge_proxy' => true];
-        }
 
         $certs = self::parseCertbotCerts($certbot);
 
@@ -250,7 +230,7 @@ final class WebserverWorkspaceViewData
         };
 
         $consoleActions = app(ServerConsoleActionLookup::class);
-        $consoleState = $consoleActions->stateFor($server);
+        $consoleState = $consoleActions->stateFor($server, 'webserver');
 
         $inflightSwitch = $consoleState['inflight_webserver_switch'];
         $preflight = app(WebserverSwitchPreflight::class);
@@ -268,11 +248,25 @@ final class WebserverWorkspaceViewData
             && $webserverBannerRun->isInFlight()
             && ! $webserverBannerRun->isStale();
 
+        $inflightEdgeProxy = $consoleState['inflight_edge_proxy'];
+        $edgeProxyActionTarget = $inflightEdgeProxy && $webserverBannerRun?->kind === 'edge_proxy'
+            ? (self::consoleActionMeta($webserverBannerRun)['target'] ?? null)
+            : null;
+
+        $switchTargetWebserver = self::consoleActionMeta($webserverSwitchRun)['to'] ?? null;
+
         $activeToolActionOps = $component->activeManageActionOperations();
         $pendingToolActionKey = $component->pendingToolActionKey;
         $caddyModulesBuildState = $component->caddyModulesBuildState();
 
-        return compact(
+        $activeEdgeProxy = $server->edgeProxy();
+        $edgeProxyCatalog = self::edgeProxyCatalog();
+        $edgeProxyPreviousWebserver = EdgeProxyWorkspaceViewData::previousWebserverKey($server);
+        $edgeProxyPreviousLabel = EdgeProxyWorkspaceViewData::previousWebserverLabel($server);
+
+        $showWebserverSwitchConsole = true;
+
+        return array_merge(compact(
             'card',
             'opsReady',
             'isDeployer',
@@ -288,6 +282,8 @@ final class WebserverWorkspaceViewData
             'webserverCatalog',
             'edgeProxyCatalog',
             'activeEdgeProxy',
+            'edgeProxyPreviousWebserver',
+            'edgeProxyPreviousLabel',
             'engineTabCatalog',
             'certs',
             'statePill',
@@ -305,11 +301,15 @@ final class WebserverWorkspaceViewData
             'recentSwitches',
             'webserverBannerRun',
             'webserverSwitchRun',
+            'switchTargetWebserver',
             'actionInFlight',
+            'inflightEdgeProxy',
+            'edgeProxyActionTarget',
             'activeToolActionOps',
             'pendingToolActionKey',
             'caddyModulesBuildState',
-        );
+            'showWebserverSwitchConsole',
+        ));
     }
 
     /**
@@ -349,5 +349,24 @@ final class WebserverWorkspaceViewData
         }
 
         return $certs;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function consoleActionMeta(?ConsoleAction $run): array
+    {
+        if ($run === null) {
+            return [];
+        }
+
+        $output = $run->output;
+        if (! is_array($output)) {
+            return [];
+        }
+
+        $meta = $output['meta'] ?? null;
+
+        return is_array($meta) ? $meta : [];
     }
 }

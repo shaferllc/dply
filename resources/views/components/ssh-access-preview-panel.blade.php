@@ -39,7 +39,7 @@
         </div>
 
         <div class="relative mt-4 font-mono text-[11px] leading-relaxed sm:text-xs">
-            <p class="text-slate-500">{{ __('# SSH access graph preview — :host', ['host' => $hostLabel]) }}</p>
+            <p class="text-slate-500">{{ __('# Access graph preview — :host', ['host' => $hostLabel]) }}</p>
             <p class="mt-3 text-violet-300/90">{{ __('~ $ dply ssh:who') }}</p>
             <p class="text-slate-400">{{ __('KEY              SOURCE        SYNC') }}</p>
             <p class="text-slate-400">{{ __('alice@laptop     profile       in sync') }}</p>
@@ -85,13 +85,13 @@
                     'font-semibold tracking-tight text-brand-ink',
                     'mt-4 text-xl sm:text-2xl' => ! $compact,
                     'mt-3 text-base' => $compact,
-                ])>{{ __('SSH access') }}</h2>
+                ])>{{ __('Access graph') }}</h2>
                 <p @class([
                     'leading-6 text-brand-moss',
                     'mt-2 text-sm sm:text-[15px]' => ! $compact,
                     'mt-1.5 text-xs' => $compact,
                 ])>
-                    {{ __('See exactly who can SSH into this server — profile, org, team, ephemeral, and server-local keys — with live sync status, and grant time-boxed sessions that auto-revoke.') }}
+                    {{ __('See who had SSH access on this server over time — including your keys — with live sync status, access lanes, and time-boxed sessions that auto-revoke.') }}
                 </p>
             </div>
         </div>

@@ -342,7 +342,11 @@ class SiteWebserverConfigEditorService
             return false;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        if ($site->usesDockerRuntime() && ! $site->usesVmDockerRuntime()) {
             return false;
         }
 

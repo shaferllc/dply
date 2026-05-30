@@ -12,9 +12,12 @@ use App\Models\Server;
 use App\Models\ServerRecipe;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\SshConnection;
+use App\Support\Servers\DockerContainerShellSupport;
+use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -81,9 +84,74 @@ class WorkspaceRun extends Component
 
     public ?string $command_error = null;
 
+    #[Url(as: 'container', except: '')]
+    public string $container_scope_id = '';
+
+    #[Url(as: 'container_name', except: '')]
+    public string $container_scope_name = '';
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->normalizeContainerScope();
+
+        if ($this->usesContainerScope() && $this->libraryTagFilter === '') {
+            $this->libraryTagFilter = 'container-inner';
+        }
+    }
+
+    public function usesContainerScope(): bool
+    {
+        return trim($this->container_scope_id) !== '';
+    }
+
+    public function clearContainerScope(): void
+    {
+        $this->container_scope_id = '';
+        $this->container_scope_name = '';
+        $this->libraryTagFilter = '';
+    }
+
+    protected function normalizeContainerScope(): void
+    {
+        $id = trim($this->container_scope_id);
+        if ($id === '') {
+            $this->container_scope_id = '';
+            $this->container_scope_name = '';
+
+            return;
+        }
+
+        $inspector = app(ServerDockerRemoteInspector::class);
+        if (! $inspector->isValidContainerRef($id) || ! $this->server->dockerEnginePresent()) {
+            $this->container_scope_id = '';
+            $this->container_scope_name = '';
+
+            return;
+        }
+
+        $this->container_scope_id = $id;
+        $this->container_scope_name = trim($this->container_scope_name) !== ''
+            ? trim($this->container_scope_name)
+            : $id;
+    }
+
+    protected function remoteCommandForScope(string $hostCommand): string
+    {
+        if (! $this->usesContainerScope()) {
+            return $hostCommand;
+        }
+
+        return DockerContainerShellSupport::remoteExecCommand($this->container_scope_id, $hostCommand);
+    }
+
+    protected function commandScopeLabel(): string
+    {
+        if (! $this->usesContainerScope()) {
+            return $this->server->ssh_user.'@'.$this->server->ip_address;
+        }
+
+        return 'docker://'.$this->container_scope_name;
     }
 
     /* ------------------------------------------------------------------
@@ -207,13 +275,14 @@ class WorkspaceRun extends Component
 
         try {
             $this->resetRemoteSshStreamTargets();
+            $remote = $this->remoteCommandForScope($this->adhoc_command);
             $this->remoteSshStreamSetMeta(
-                __('Ad-hoc command'),
-                $this->server->ssh_user.'@'.$this->server->ip_address.'  '.$this->adhoc_command
+                $this->usesContainerScope() ? __('Ad-hoc command (container)') : __('Ad-hoc command'),
+                $this->commandScopeLabel().'  '.$this->adhoc_command
             );
             $ssh = new SshConnection($this->server);
             $this->command_output = $ssh->execWithCallback(
-                $this->adhoc_command,
+                $remote,
                 fn (string $chunk) => $this->remoteSshStreamAppendStdout($chunk),
                 300
             );
@@ -237,11 +306,12 @@ class WorkspaceRun extends Component
         try {
             $ssh = new SshConnection($this->server);
             $b64 = base64_encode($recipe->script);
-            $remoteCmd = 'echo '.escapeshellarg($b64).' | base64 -d | /usr/bin/env bash 2>&1';
+            $inner = 'echo '.escapeshellarg($b64).' | base64 -d | /usr/bin/env bash 2>&1';
+            $remoteCmd = $this->remoteCommandForScope($inner);
             $this->resetRemoteSshStreamTargets();
             $this->remoteSshStreamSetMeta(
-                __('Saved command').': '.$recipe->name,
-                $this->server->ssh_user.'@'.$this->server->ip_address.'  '.$remoteCmd
+                ($this->usesContainerScope() ? __('Saved command (container)') : __('Saved command')).': '.$recipe->name,
+                $this->commandScopeLabel().'  '.$remoteCmd
             );
             $this->command_output = $ssh->execWithCallback(
                 $remoteCmd,

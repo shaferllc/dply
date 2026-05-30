@@ -10,6 +10,7 @@ use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
+use App\Services\Servers\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 
 /**
@@ -93,11 +94,19 @@ class RunBackupScheduleCommand extends Command
 
     private function dispatchDatabaseBackup(ServerBackupSchedule $schedule): void
     {
+        $schedule->loadMissing('server');
+
         $backup = ServerDatabaseBackup::create([
             'server_database_id' => $schedule->target_id,
             'user_id' => null,
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
+
+        app(DatabaseBackupExporter::class)->prepareBackupRow(
+            $backup,
+            $schedule->server,
+            $schedule->backup_configuration_id,
+        );
 
         ExportServerDatabaseBackupJob::dispatch($backup->id);
         $this->info('Dispatched database backup '.$backup->id);

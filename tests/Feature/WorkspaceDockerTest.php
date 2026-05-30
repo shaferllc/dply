@@ -11,9 +11,11 @@ use App\Models\Server;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Tests\Support\FakeRemoteShell;
 
 uses(RefreshDatabase::class);
 
@@ -161,4 +163,89 @@ test('docker workspace maintenance tab shows system df', function (): void {
         ->call('setWorkspaceTab', 'maintenance')
         ->assertSee('Images')
         ->assertSee('1.2GB');
+});
+
+test('docker workspace container exec validates command before confirm', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerExec', 'abc123', 'web')
+        ->set('execModalCommand', '')
+        ->call('submitContainerExec')
+        ->assertSet('execModalContainerId', 'abc123');
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerExec', 'abc123', 'web')
+        ->set('execModalCommand', 'php artisan migrate')
+        ->call('submitContainerExec')
+        ->assertSet('execModalContainerId', null);
+});
+
+test('docker workspace compose up dispatches remote job', function (): void {
+    config(['server_manage.queue_remote_tasks' => true]);
+    Queue::fake();
+
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('runAllowlistedManageAction', 'docker_compose_up', null, null, null, 'my-app', '/srv/my-app/docker-compose.dply.yml')
+        ->assertSet('manageRemoteTaskId', fn ($id) => is_string($id) && strlen($id) > 0);
+
+    Queue::assertPushed(ServerManageRemoteSshJob::class);
+});
+
+test('docker workspace opens compose logs modal', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock): void {
+        $mock->shouldReceive('runInlineBash')
+            ->andReturn(ProcessOutput::make("web-1 | started\n"));
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openComposeLogs', 'my-app', '/srv/my-app/docker-compose.dply.yml')
+        ->assertSet('composeLogsModalProject', 'my-app')
+        ->assertSet('composeLogsModalError', null)
+        ->assertSet('composeLogsModalContent', fn ($value) => str_contains((string) $value, 'web-1'));
+});
+
+test('docker workspace container shell runs commands and keeps history', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    $shell = new FakeRemoteShell(function (string $command): ?string {
+        if (str_contains($command, 'docker exec') && str_contains($command, 'pwd')) {
+            return "/app\n";
+        }
+
+        return null;
+    });
+
+    $this->mock(SshConnectionFactory::class, function ($mock) use ($shell): void {
+        $mock->shouldReceive('forServer')->andReturn($shell);
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerShell', 'abc123', 'web')
+        ->assertSet('shellModalContainerId', 'abc123')
+        ->set('shellModalCommand', 'pwd')
+        ->call('runContainerShellCommand')
+        ->assertSet('shellModalHistory', fn (array $history): bool => count($history) === 1
+            && ($history[0]['cmd'] ?? '') === 'pwd'
+            && str_contains((string) ($history[0]['out'] ?? ''), '/app'));
+});
+
+test('docker workspace container shell opens with empty history', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerShell', 'abc123', 'web')
+        ->assertSet('shellModalContainerId', 'abc123')
+        ->assertSet('shellModalContainerName', 'web')
+        ->assertSet('shellModalHistory', []);
 });

@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Index extends Component
@@ -242,6 +243,17 @@ class Index extends Component
             : auth()->user()->providerCredentials()->whereNull('organization_id');
 
         return (int) $query->where('provider', $provider)->count();
+    }
+
+    #[On('provider-credential-created')]
+    public function refreshAfterProviderCredentialStored(?string $provider = null, mixed $credentialId = null): void
+    {
+        if (is_string($provider) && $provider !== '') {
+            $ids = self::credentialProviderIds($this->capabilityForTab());
+            if (in_array($provider, $ids, true)) {
+                $this->active_provider = $provider;
+            }
+        }
     }
 
     public function render(): View

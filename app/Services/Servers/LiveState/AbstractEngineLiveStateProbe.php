@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Servers\LiveState;
 
 use App\Models\Server;
+use App\Support\Servers\EdgeProxyWorkspaceViewData;
+use App\Support\Servers\SystemdServiceStandbyReasonResolver;
 use Carbon\CarbonImmutable;
 
 /**
@@ -33,6 +35,42 @@ abstract class AbstractEngineLiveStateProbe implements EngineLiveStateProbe
      * catch a runaway exception as a last-resort safety net.
      */
     abstract protected function runFreshProbe(Server $server): EngineLiveState;
+
+    /**
+     * Edge-proxy engines are mutually exclusive — when this engine is not
+     * active, skip the admin API / stats socket and return standby copy
+     * instead of a probe error.
+     */
+    protected function inactiveEdgeProxyLiveState(Server $server): ?EngineLiveState
+    {
+        if (! in_array($this->engineKey(), ['traefik', 'haproxy', 'envoy'], true)) {
+            return null;
+        }
+
+        if ($server->edgeProxy() === $this->engineKey()) {
+            return null;
+        }
+
+        $hint = app(SystemdServiceStandbyReasonResolver::class)
+            ->inactiveEngineHint($server, $this->engineKey(), true);
+
+        if ($hint === null) {
+            $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
+            $label = $catalog[$this->engineKey()]['label'] ?? ucfirst($this->engineKey());
+            $hint = __(':engine is not the active edge proxy on this server.', ['engine' => $label]);
+        }
+
+        return new EngineLiveState(
+            engine: $this->engineKey(),
+            capturedAt: CarbonImmutable::now(),
+            isFresh: true,
+            units: [],
+            engineSpecific: [
+                'standby' => true,
+                'standby_reason' => $hint,
+            ],
+        );
+    }
 
     public function probe(Server $server, bool $forceFresh = false): EngineLiveState
     {

@@ -42,14 +42,30 @@
                             $ref = $row['id'];
                             $name = $row['name'];
                             $imageRef = $row['image'];
+                            $linkedSite = \App\Support\Servers\DockerManagedSiteIndex::siteForContainer($row, $managedSites);
                         @endphp
                         <tr wire:key="docker-container-{{ $ref }}">
-                            <td class="px-4 py-3 font-mono text-xs text-brand-ink sm:px-6">{{ $name }}</td>
+                            <td class="px-4 py-3 sm:px-6">
+                                <div class="font-mono text-xs text-brand-ink">{{ $name }}</div>
+                                @if ($linkedSite)
+                                    <a href="{{ $linkedSite['url'] }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
+                                        <x-heroicon-o-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {{ __('Site: :name', ['name' => $linkedSite['name']]) }}
+                                    </a>
+                                @endif
+                            </td>
                             <td class="max-w-[10rem] truncate px-4 py-3 font-mono text-xs text-brand-moss" title="{{ $imageRef }}">{{ $imageRef }}</td>
                             <td class="px-4 py-3 text-brand-moss">{{ $row['status'] }}</td>
                             <td class="max-w-[8rem] truncate px-4 py-3 font-mono text-[11px] text-brand-moss" title="{{ $row['ports'] ?? '' }}">{{ $row['ports'] ?? '—' }}</td>
                             <td class="px-4 py-3 text-right">
                                 <div class="inline-flex flex-wrap justify-end gap-1.5">
+                                    <button type="button" wire:click="openContainerShell(@js($ref), @js($name))" @disabled(! $running) class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">{{ __('Shell') }}</button>
+                                    @feature('workspace.run')
+                                        @if ($running)
+                                            <a href="{{ route('servers.run', ['server' => $server, 'container' => $ref, 'container_name' => $name]) }}" wire:navigate class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-forest hover:bg-brand-sand/40">{{ __('Run') }}</a>
+                                        @endif
+                                    @endfeature
+                                    <button type="button" wire:click="openContainerExec(@js($ref), @js($name))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Exec') }}</button>
                                     <button type="button" wire:click="openContainerLogs(@js($ref), @js($name))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Logs') }}</button>
                                     <button type="button" wire:click="openContainerInspect(@js($ref), @js($name))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Inspect') }}</button>
                                     @if (! $running)
@@ -70,5 +86,5 @@
 </section>
 
 <p class="mt-3 text-xs text-brand-moss">
-    {{ __('Interactive exec is not run from this page. Copy from Inspect or use Run → Marketplace recipes for shell access.') }}
+    {{ __('Shell opens a rolling command session (docker exec over SSH). Exec runs a single confirmed command. When Run workspace is enabled, Run opens the library with container scope for longer scripts.') }}
 </p>

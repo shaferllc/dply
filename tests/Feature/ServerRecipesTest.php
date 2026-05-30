@@ -25,6 +25,41 @@ function userWithOrganization(): User
     return $user;
 }
 
+test('run page accepts container scope from query string', function () {
+    $user = userWithOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()?->id,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+        'meta' => [
+            'manage_docker' => ['present' => true],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['container' => 'abc123', 'container_name' => 'web'])
+        ->test(WorkspaceRun::class, ['server' => $server])
+        ->assertSet('container_scope_id', 'abc123')
+        ->assertSet('container_scope_name', 'web')
+        ->assertSet('libraryTagFilter', 'container-inner')
+        ->assertSee(__('Container scope'));
+});
+
+test('run page clears invalid container scope', function () {
+    $user = userWithOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()?->id,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['container' => '../bad', 'container_name' => 'web'])
+        ->test(WorkspaceRun::class, ['server' => $server])
+        ->assertSet('container_scope_id', '')
+        ->assertSet('container_scope_name', '');
+});
+
 test('run page explains boundaries', function () {
     $user = userWithOrganization();
     $server = Server::factory()->ready()->create([

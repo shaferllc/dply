@@ -8,8 +8,11 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\User;
+use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
+use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
+use App\Support\Servers\DatabaseBackupSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
@@ -44,40 +47,47 @@ function makeSqliteSetup(): array
     return [$user, $server, $db];
 }
 
-test('sqlite backup writes db file and completes', function () {
-    Storage::fake('local');
-
+test('sqlite backup is stored on the remote server by default', function () {
     [$user, $server, $db] = makeSqliteSetup();
-    $payload = "SQLite format 3\0fake-binary-payload";
+    $payloadBytes = 128;
 
-    $this->mock(ServerDatabaseRemoteExec::class, function ($mock) use ($payload): void {
-        $mock->shouldReceive('sqliteBackup')->once()->andReturn($payload);
-        $mock->shouldNotReceive('mysqldump');
-        $mock->shouldNotReceive('pgDump');
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock) use ($db): void {
+        $mock->shouldReceive('resolvedSqlitePath')->andReturn($db->host);
+    });
+
+    $this->mock(ServerDatabaseRemoteExec::class, function ($mock) use ($payloadBytes): void {
+        $mock->shouldReceive('sqliteBackupToPath')->once()->andReturn($payloadBytes);
+        $mock->shouldReceive('pruneRemoteBackupTree')->once();
+        $mock->shouldNotReceive('sqliteBackup');
     });
 
     $backup = ServerDatabaseBackup::query()->create([
         'server_database_id' => $db->id,
         'user_id' => $user->id,
         'status' => ServerDatabaseBackup::STATUS_PENDING,
+        'storage_kind' => DatabaseBackupSettings::KIND_REMOTE_SERVER,
     ]);
 
     (new ExportServerDatabaseBackupJob($backup->id))
-        ->handle(app(ServerDatabaseRemoteExec::class), app(ServerDatabaseAuditLogger::class));
+        ->handle(app(DatabaseBackupExporter::class), app(ServerDatabaseAuditLogger::class));
 
     $backup->refresh();
     expect($backup->status)->toBe(ServerDatabaseBackup::STATUS_COMPLETED);
-    expect($backup->bytes)->toBe(strlen($payload));
-    expect($backup->disk_path)->toBe('database-backups/'.$server->id.'/'.$backup->id.'.db');
-    Storage::disk('local')->assertExists($backup->disk_path);
-    expect(Storage::disk('local')->get($backup->disk_path))->toBe($payload);
+    expect($backup->bytes)->toBe($payloadBytes);
+    expect($backup->storage_kind)->toBe(DatabaseBackupSettings::KIND_REMOTE_SERVER);
+    expect($backup->remote_path)->toContain('/database-backups/'.$server->id.'/'.$db->id.'/'.$backup->id.'.db');
+    expect($backup->disk_path)->toBeNull();
 });
 
-test('backup lands on configured disk', function () {
-    Storage::fake('public');
-    config(['server_database.backup_disk' => 'public']);
+test('control plane storage requires explicit config flag', function () {
+    config(['server_database.allow_control_plane_storage' => true]);
+    Storage::fake('local');
 
     [$user, $server, $db] = makeSqliteSetup();
+
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock) use ($db): void {
+        $mock->shouldReceive('resolvedSqlitePath')->andReturn($db->host);
+    });
 
     $this->mock(ServerDatabaseRemoteExec::class, function ($mock): void {
         $mock->shouldReceive('sqliteBackup')->once()->andReturn('payload');
@@ -87,46 +97,46 @@ test('backup lands on configured disk', function () {
         'server_database_id' => $db->id,
         'user_id' => $user->id,
         'status' => ServerDatabaseBackup::STATUS_PENDING,
+        'storage_kind' => DatabaseBackupSettings::KIND_CONTROL_PLANE,
     ]);
 
     (new ExportServerDatabaseBackupJob($backup->id))
-        ->handle(app(ServerDatabaseRemoteExec::class), app(ServerDatabaseAuditLogger::class));
+        ->handle(app(DatabaseBackupExporter::class), app(ServerDatabaseAuditLogger::class));
 
-    Storage::disk('public')->assertExists('database-backups/'.$server->id.'/'.$backup->id.'.db');
+    $backup->refresh();
+    expect($backup->disk_path)->toBe('database-backups/'.$server->id.'/'.$backup->id.'.db');
+    Storage::disk('local')->assertExists($backup->disk_path);
 });
 
-test('retention prunes older backups', function () {
-    Storage::fake('local');
+test('retention prunes older remote backups', function () {
+    [$user, $server, $db] = makeSqliteSetup();
     config(['server_database.backup_retention_per_database' => 2]);
 
-    [$user, $server, $db] = makeSqliteSetup();
-
-    $this->mock(ServerDatabaseRemoteExec::class, function ($mock): void {
-        $mock->shouldReceive('sqliteBackup')->andReturn('payload');
+    $this->mock(ServerDatabaseProvisioner::class, function ($mock) use ($db): void {
+        $mock->shouldReceive('resolvedSqlitePath')->andReturn($db->host);
     });
 
-    // Three sequential backups; retention=2 → after the third one, the
-    // oldest completed row + file should be gone.
+    $this->mock(ServerDatabaseRemoteExec::class, function ($mock): void {
+        $mock->shouldReceive('sqliteBackupToPath')->andReturn(64);
+        $mock->shouldReceive('pruneRemoteBackupTree');
+        $mock->shouldReceive('shellRunWithExit')->andReturn(['', 0]);
+    });
+
     $backups = [];
     foreach (range(1, 3) as $i) {
         $b = ServerDatabaseBackup::query()->create([
             'server_database_id' => $db->id,
             'user_id' => $user->id,
             'status' => ServerDatabaseBackup::STATUS_PENDING,
+            'storage_kind' => DatabaseBackupSettings::KIND_REMOTE_SERVER,
             'created_at' => now()->addSeconds($i),
         ]);
         (new ExportServerDatabaseBackupJob($b->id))
-            ->handle(app(ServerDatabaseRemoteExec::class), app(ServerDatabaseAuditLogger::class));
+            ->handle(app(DatabaseBackupExporter::class), app(ServerDatabaseAuditLogger::class));
         $backups[] = $b->fresh();
     }
 
-    // The first one should be pruned.
     expect($backups[0]->fresh())->toBeNull();
-    Storage::disk('local')->assertMissing('database-backups/'.$server->id.'/'.$backups[0]->id.'.db');
-
-    // The two newest survive.
     expect($backups[1]->fresh())->not->toBeNull();
     expect($backups[2]->fresh())->not->toBeNull();
-    Storage::disk('local')->assertExists('database-backups/'.$server->id.'/'.$backups[1]->id.'.db');
-    Storage::disk('local')->assertExists('database-backups/'.$server->id.'/'.$backups[2]->id.'.db');
 });

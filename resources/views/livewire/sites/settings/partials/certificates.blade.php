@@ -243,6 +243,21 @@
                         </div>
 
                         <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">
+                            @if (in_array($certificate->status, [SiteCertificate::STATUS_FAILED, SiteCertificate::STATUS_EXPIRED], true))
+                                <button
+                                    type="button"
+                                    wire:click="repairCertificate('{{ $certificate->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="repairCertificate('{{ $certificate->id }}')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10 disabled:opacity-60"
+                                    title="{{ __('Re-apply webserver routing and retry Let\'s Encrypt for this certificate') }}"
+                                >
+                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" wire:loading.remove wire:target="repairCertificate('{{ $certificate->id }}')" />
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="repairCertificate('{{ $certificate->id }}')" />
+                                    <span wire:loading wire:target="repairCertificate('{{ $certificate->id }}')">{{ __('Repairing…') }}</span>
+                                    <span wire:loading.remove wire:target="repairCertificate('{{ $certificate->id }}')">{{ __('Repair') }}</span>
+                                </button>
+                            @endif
                             <button
                                 type="button"
                                 wire:click="removeCertificate('{{ $certificate->id }}')"

@@ -35,10 +35,10 @@ function bulkSitesUserWithServer(): array
     return [$user, $server, $org];
 }
 
-test('bulk site actions panel renders on server sites page', function (): void {
+test('bulk site actions appear when sites are selected on server sites page', function (): void {
     [$user, $server] = bulkSitesUserWithServer();
 
-    Site::factory()->create([
+    Site::factory()->count(2)->create([
         'server_id' => $server->id,
         'organization_id' => $server->organization_id,
         'user_id' => $user->id,
@@ -48,11 +48,16 @@ test('bulk site actions panel renders on server sites page', function (): void {
     $this->actingAs($user)
         ->get(route('servers.sites', $server))
         ->assertOk()
-        ->assertSee(__('Bulk site operations'))
-        ->assertSee(__('Redeploy 1 site'));
+        ->assertSee(__('Site directory'))
+        ->assertDontSee(__('Redeploy 2 sites'));
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSites::class, ['server' => $server])
+        ->set('selectedSiteIds', $server->fresh()->sites->pluck('id')->map(fn ($id) => (string) $id)->all())
+        ->assertSee(__('Redeploy 2 sites'));
 });
 
-test('redeploy all queues deploy jobs', function (): void {
+test('redeploy selected queues deploy jobs', function (): void {
     Queue::fake();
 
     [$user, $server] = bulkSitesUserWithServer();
@@ -64,8 +69,11 @@ test('redeploy all queues deploy jobs', function (): void {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
+    $selectedIds = $server->fresh()->sites->pluck('id')->map(fn ($id) => (string) $id)->all();
+
     Livewire::actingAs($user)
         ->test(WorkspaceSites::class, ['server' => $server])
+        ->set('selectedSiteIds', $selectedIds)
         ->call('confirmRedeployAll')
         ->assertHasNoErrors();
 

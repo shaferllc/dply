@@ -5,7 +5,24 @@
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
     <h2 class="text-base font-semibold text-brand-ink">{{ __('Connection snippet') }}</h2>
     @if ($database === null)
-        <p class="mt-2 text-sm text-brand-moss">{{ __('Add a database to see a ready-to-paste .env block here.') }}</p>
+        <x-empty-state
+            class="mt-4"
+            icon="heroicon-o-code-bracket"
+            tone="sage"
+            :title="__('No connection snippet yet')"
+            :description="__('Create a database on Basics, then return here for a ready-to-paste .env block for apps on this server.')"
+        >
+            <x-slot:actions>
+                <button
+                    type="button"
+                    wire:click="setWorkspaceTab('databases')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Go to Basics') }}
+                </button>
+            </x-slot:actions>
+        </x-empty-state>
     @else
         <p class="mt-2 text-sm text-brand-moss">{{ __('Drop into your app .env for a tracked database — localhost apps on the same server.') }}</p>
         @switch($database->engine)

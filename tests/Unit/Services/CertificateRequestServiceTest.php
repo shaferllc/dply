@@ -111,6 +111,37 @@ test('auto ssl targets only the primary preview domain once', function () {
     expect($second)->toBeNull();
 });
 
+test('auto ssl reuses a failed preview certificate instead of creating duplicates', function () {
+    $site = Site::factory()->create();
+    $primary = SitePreviewDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'preview-primary.dply.cc',
+        'is_primary' => true,
+        'auto_ssl' => true,
+        'dns_status' => 'ready',
+    ]);
+
+    $failed = SiteCertificate::query()->create([
+        'site_id' => $site->id,
+        'preview_domain_id' => $primary->id,
+        'scope_type' => SiteCertificate::SCOPE_PREVIEW,
+        'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+        'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+        'domains_json' => [$primary->hostname],
+        'status' => SiteCertificate::STATUS_FAILED,
+        'last_output' => 'certbot failed',
+    ]);
+
+    $service = service();
+    $retried = $service->queuePrimaryPreviewAutoSsl($site->fresh(['previewDomains']));
+
+    expect($retried)->not->toBeNull()
+        ->and($retried->id)->toBe($failed->id)
+        ->and($retried->status)->toBe(SiteCertificate::STATUS_PENDING)
+        ->and($retried->last_output)->toBeNull();
+    expect(SiteCertificate::query()->where('site_id', $site->id)->count())->toBe(1);
+});
+
 test('imported certificate can be stored without ssh install', function () {
     $server = Server::factory()->create([
         'status' => Server::STATUS_READY,

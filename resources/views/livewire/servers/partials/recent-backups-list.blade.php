@@ -14,9 +14,24 @@
     </div>
     <div class="px-6 py-6 sm:px-7">
     @if ($backups->isEmpty())
-        <p class="text-sm text-brand-moss">
-            {{ __('No backups yet. Click Backup on a database above to create one.') }}
-        </p>
+        <x-empty-state
+            borderless
+            icon="heroicon-o-archive-box"
+            tone="sage"
+            :title="__('No backups yet')"
+            :description="__('Run Backup from a database row on Overview. Completed exports appear here for download or delete.')"
+        >
+            <x-slot:actions>
+                <button
+                    type="button"
+                    wire:click="setEngineSubtab('overview')"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-arrow-left class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Go to Overview') }}
+                </button>
+            </x-slot:actions>
+        </x-empty-state>
     @else
         <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
@@ -25,6 +40,7 @@
                         <th class="px-4 py-3">{{ __('Date') }}</th>
                         <th class="px-4 py-3">{{ __('Database') }}</th>
                         <th class="px-4 py-3">{{ __('Size') }}</th>
+                        <th class="px-4 py-3">{{ __('Stored') }}</th>
                         <th class="px-4 py-3">{{ __('Status') }}</th>
                         <th class="px-4 py-3 text-end">{{ __('Actions') }}</th>
                     </tr>
@@ -45,6 +61,16 @@
                                     —
                                 @endif
                             </td>
+                            <td class="whitespace-nowrap px-4 py-3 text-xs text-brand-moss">
+                                @php
+                                    $storedLabel = match ($backup->storage_kind) {
+                                        'destination' => __('S3 destination'),
+                                        'control_plane' => __('Dply app (legacy)'),
+                                        default => __('On server'),
+                                    };
+                                @endphp
+                                {{ $storedLabel }}
+                            </td>
                             <td class="whitespace-nowrap px-4 py-3">
                                 @switch($backup->status)
                                     @case(\App\Models\ServerDatabaseBackup::STATUS_COMPLETED)
@@ -64,17 +90,24 @@
                                 @endswitch
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-end">
-                                @if ($backup->status === \App\Models\ServerDatabaseBackup::STATUS_COMPLETED)
+                                <div class="inline-flex items-center justify-end gap-3">
+                                    @if ($backup->isDownloadable())
+                                        <button
+                                            type="button"
+                                            wire:click="downloadBackup(@js($backup->id))"
+                                            class="text-xs font-medium text-brand-forest hover:underline"
+                                        >
+                                            {{ __('Download') }}
+                                        </button>
+                                    @endif
                                     <button
                                         type="button"
-                                        wire:click="downloadBackup(@js($backup->id))"
-                                        class="text-xs font-medium text-brand-forest hover:underline"
+                                        wire:click="openConfirmActionModal('deleteDatabaseBackup', [@js($backup->id)], @js(__('Delete backup')), @js(__('Permanently remove this backup record and delete the file from storage. This cannot be undone.')), @js(__('Delete')), true)"
+                                        class="text-xs font-medium text-red-700 hover:underline"
                                     >
-                                        {{ __('Download') }}
+                                        {{ __('Delete') }}
                                     </button>
-                                @else
-                                    <span class="text-xs text-brand-mist">—</span>
-                                @endif
+                                </div>
                             </td>
                         </tr>
                     @endforeach

@@ -86,7 +86,7 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Authorize') }}</p>
                         <h1 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Approve dply CLI?') }}</h1>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Approving creates an API token for the CLI to use against your organization. You can revoke it any time from Profile → API keys.') }}
+                            {{ __('Approving creates an API token for the CLI to use against your organization. You can revoke it any time from Profile → CLI.') }}
                         </p>
                     </div>
                 </div>

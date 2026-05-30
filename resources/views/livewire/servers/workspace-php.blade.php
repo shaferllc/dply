@@ -184,7 +184,11 @@
                             $isCliDefault = ($phpSummary['cli_default'] ?? null) === $row['id'];
                             $isNewSiteDefault = ($phpSummary['new_site_default'] ?? null) === $row['id'];
                             $siteCount = (int) ($row['site_count'] ?? 0);
-                            $disableUninstall = ! $isInstalled || $siteCount > 0 || $isCliDefault || $isNewSiteDefault;
+                            $migrationTarget = $row['migration_target_version'] ?? null;
+                            $uninstallFallback = $row['uninstall_fallback_version'] ?? null;
+                            $disableUninstall = ! $isInstalled || ($siteCount > 0 && $migrationTarget === null);
+                            $canMigrateSites = $isInstalled && $siteCount > 0 && is_string($migrationTarget) && $migrationTarget !== '';
+                            $canMigrateAndUninstall = $canMigrateSites;
                             $actionTarget = fn (string $action) => "runPhpPackageAction('{$action}', '{$row['id']}')";
                             $configTarget = fn (string $target) => "openPhpConfigEditor('{$row['id']}', '{$target}')";
                             // Combined target list for row-level loading state. Lets the whole row
@@ -194,9 +198,11 @@
                             $rowTargets = implode(',', [
                                 $actionTarget('install'),
                                 $actionTarget('patch'),
+                                $actionTarget('migrate_sites'),
                                 $actionTarget('set_cli_default'),
                                 $actionTarget('set_new_site_default'),
                                 $actionTarget('uninstall'),
+                                'runPhpMigrateAndUninstall',
                                 $configTarget('cli_ini'),
                                 $configTarget('fpm_ini'),
                                 $configTarget('pool_config'),
@@ -261,13 +267,16 @@
                                         @if ($disableUninstall && $isInstalled)
                                             <span class="text-brand-mist/60">·</span>
                                             <span class="italic">
-                                                @if ($siteCount > 0)
+                                                @if ($siteCount > 0 && $migrationTarget === null)
+                                                    {{ __('uninstall blocked: no other PHP version installed') }}
+                                                @elseif ($siteCount > 0)
                                                     {{ __('uninstall blocked: sites in use') }}
-                                                @elseif ($isCliDefault)
-                                                    {{ __('uninstall blocked: CLI default') }}
-                                                @elseif ($isNewSiteDefault)
-                                                    {{ __('uninstall blocked: new-site default') }}
                                                 @endif
+                                            </span>
+                                        @elseif ($isInstalled && is_string($uninstallFallback) && $uninstallFallback !== '' && ($isCliDefault || $isNewSiteDefault))
+                                            <span class="text-brand-mist/60">·</span>
+                                            <span class="italic">
+                                                {{ __('Uninstall moves defaults to PHP :version', ['version' => $uninstallFallback]) }}
                                             </span>
                                         @endif
                                     </p>
@@ -343,19 +352,46 @@
                                                         <span wire:loading.remove wire:target="{{ $actionTarget('set_new_site_default') }}">{{ __('Set new-site default') }}</span>
                                                         <span wire:loading wire:target="{{ $actionTarget('set_new_site_default') }}">{{ __('Setting new-site default…') }}</span>
                                                     </button>
+                                                    @if ($canMigrateSites)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('migrate_sites', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('migrate_sites') }}"
+                                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                        >
+                                                            <x-heroicon-o-arrow-up-circle class="h-4 w-4 shrink-0 text-brand-moss" />
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('migrate_sites') }}">{{ trans_choice('Upgrade :count site to PHP :target|Upgrade :count sites to PHP :target', $siteCount, ['count' => $siteCount, 'target' => $migrationTarget]) }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('migrate_sites') }}">{{ __('Upgrading sites…') }}</span>
+                                                        </button>
+                                                    @endif
                                                     <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
-                                                    <button
-                                                        type="button"
-                                                        wire:click="runPhpPackageAction('uninstall', '{{ $row['id'] }}')"
-                                                        wire:loading.attr="disabled"
-                                                        wire:target="{{ $actionTarget('uninstall') }}"
-                                                        @disabled($disableUninstall)
-                                                        class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    >
-                                                        <x-heroicon-o-trash class="h-4 w-4 shrink-0" />
-                                                        <span wire:loading.remove wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstall') }}</span>
-                                                        <span wire:loading wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstalling…') }}</span>
-                                                    </button>
+                                                    @if ($canMigrateAndUninstall)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openMigrateAndUninstallPhpModal('{{ $row['id'] }}', {{ $siteCount }}, '{{ $migrationTarget }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="runPhpMigrateAndUninstall,openMigrateAndUninstallPhpModal"
+                                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                                                        >
+                                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" />
+                                                            <span wire:loading.remove wire:target="runPhpMigrateAndUninstall">{{ trans_choice('Migrate :count site and uninstall|Migrate :count sites and uninstall', $siteCount, ['count' => $siteCount]) }}</span>
+                                                            <span wire:loading wire:target="runPhpMigrateAndUninstall">{{ __('Migrating sites and uninstalling…') }}</span>
+                                                        </button>
+                                                    @else
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('uninstall', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('uninstall') }}"
+                                                            @disabled($disableUninstall)
+                                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" />
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstall') }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstalling…') }}</span>
+                                                        </button>
+                                                    @endif
                                                 </x-slot>
                                             </x-dropdown>
 
@@ -727,3 +763,5 @@
         @endif
     </x-slot>
 </x-server-workspace-layout>
+
+@include('livewire.partials.confirm-action-modal')

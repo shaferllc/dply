@@ -25,6 +25,7 @@
         'profile.source-control',
         'profile.ssh-keys',
         'profile.api-keys',
+        'profile.cli',
         'profile.backup-configurations',
         'profile.notification-channels',
         'organizations.index',
@@ -109,6 +110,12 @@
                                     <x-heroicon-o-bolt class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
                                 {{ __('API keys') }}
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('profile.cli')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-command-line class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('CLI') }}
                             </x-dropdown-link>
                             <x-dropdown-link :href="route('profile.backup-configurations')" wire:navigate>
                                 <x-slot name="icon">
@@ -260,6 +267,14 @@
             >
                 <x-heroicon-o-bolt class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('API keys') }}
+            </a>
+            <a
+                href="{{ route('profile.cli') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('profile.cli') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-command-line class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('CLI') }}
             </a>
             <a
                 href="{{ route('profile.backup-configurations') }}"

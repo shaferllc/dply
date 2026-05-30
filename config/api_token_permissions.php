@@ -39,6 +39,8 @@ return [
         'servers.read',
         'sites.read',
         'sites.deploy',
+        'system_users.read',
+        'system_users.write',
     ],
 
     /*
@@ -61,6 +63,12 @@ return [
         'insights.org_summary' => 'insights.read',
         'imports.migrations_index' => 'imports.read',
         'imports.migrations_show' => 'imports.read',
+
+        'servers.system_users.index' => 'system_users.read',
+        'servers.system_users.sync' => 'system_users.write',
+        'servers.system_users.store' => 'system_users.write',
+        'servers.system_users.update' => 'system_users.write',
+        'servers.system_users.destroy' => 'system_users.delete',
 
         'edge.sites.index' => 'edge.read',
         'edge.sites.show' => 'edge.read',

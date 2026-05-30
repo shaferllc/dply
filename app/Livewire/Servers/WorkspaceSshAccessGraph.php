@@ -9,7 +9,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Models\ServerSshSession;
 use App\Models\UserSshKey;
-use App\Services\Servers\ServerSshAccessGraph;
+use App\Services\Servers\ServerSshAccessWorkspaceData;
 use App\Services\Servers\ServerSshSessionManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
@@ -37,6 +37,9 @@ class WorkspaceSshAccessGraph extends Component
     public string $session_linux_user = '';
 
     public ?string $revoke_session_id = null;
+
+    /** Time window for the access-over-time chart: 7d, 30d, or 90d. */
+    public string $timeline_range = '30d';
 
     public function mount(Server $server): void
     {
@@ -136,16 +139,24 @@ class WorkspaceSshAccessGraph extends Component
         $this->toastSuccess(__('SSH session revoked.'));
     }
 
-    public function render(ServerSshAccessGraph $graph): View
+    public function updatedTimelineRange(string $value): void
+    {
+        if (! in_array($value, ['7d', '30d', '90d'], true)) {
+            $this->timeline_range = '30d';
+        }
+    }
+
+    public function render(ServerSshAccessWorkspaceData $workspaceData): View
     {
         if ($this->comingSoonPreview) {
             return view('livewire.servers.workspace-ssh-access-graph-preview');
         }
 
-        $this->server->refresh();
+        $payload = $workspaceData->for($this->server, auth()->user(), $this->timeline_range);
 
         return view('livewire.servers.workspace-ssh-access-graph', [
-            'report' => $graph->forServer($this->server),
+            'report' => $payload['report'],
+            'timeline' => $payload['timeline'],
             'sessionsEnabled' => Feature::active('workspace.ssh_sessions'),
             'durationPresets' => config('server_ssh_sessions.duration_presets', [4, 8, 24, 72, 168]),
         ]);

@@ -12,8 +12,10 @@ use App\Jobs\RunSetupScriptJob;
 use App\Jobs\SyncServerSystemdServicesJob;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\User;
+use App\Notifications\ServerDatabaseCredentialsNotification;
 use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Notifications\SiteDatabaseCredentialsNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -109,6 +111,32 @@ test('database credentials email for sqlite omits credentials block', function (
     $this->assertStringNotContainsString('Username:', $rendered);
     $this->assertStringNotContainsString('Password:', $rendered);
 });
+test('server database credentials email carries password for postgres', function () {
+    [$user, $org, $server] = makeServer(['email_database_credentials_enabled' => true]);
+
+    $database = ServerDatabase::query()->create([
+        'server_id' => $server->id,
+        'name' => 'analytics',
+        'engine' => 'postgres',
+        'username' => 'analytics_user',
+        'password' => 'pg-secret',
+        'host' => '127.0.0.1',
+    ]);
+
+    $notif = new ServerDatabaseCredentialsNotification(
+        server: $server,
+        database: $database,
+        password: 'pg-secret',
+    );
+
+    $mail = $notif->toMail($user);
+    $rendered = collect($mail->introLines)->implode("\n");
+
+    expect($rendered)->toContain('PostgreSQL')
+        ->and($rendered)->toContain('analytics')
+        ->and($rendered)->toContain('pg-secret');
+});
+
 test('postgres email uses 5432 default port', function () {
     $notif = new SiteDatabaseCredentialsNotification(
         site: makeSite(),

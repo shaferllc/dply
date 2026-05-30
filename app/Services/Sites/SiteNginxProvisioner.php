@@ -10,6 +10,7 @@ use App\Models\SiteWebserverConfigProfile;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
+use App\Support\Servers\NginxServiceScript;
 use Illuminate\Support\Str;
 
 class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -69,15 +70,16 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $emit->step('nginx', 'writing site config file: '.$confFile);
         }
 
-        $emit->step('nginx', 'running nginx -t and reloading');
+        $emit->step('nginx', 'running nginx -t and applying config');
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_NGINX_EXIT:%%s" "$?"',
             $this->privilegedCommand(
                 $server,
                 sprintf(
-                    'ln -sf %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)',
+                    'ln -sf %1$s %2$s && %3$s',
                     escapeshellarg($confFile),
-                    escapeshellarg($linkFile)
+                    escapeshellarg($linkFile),
+                    NginxServiceScript::testAndReloadOrStartScript(),
                 )
             ),
         ), 120);
@@ -411,9 +413,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->privilegedCommand(
                 $server,
                 sprintf(
-                    'rm -f %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)',
+                    'rm -f %1$s %2$s && %3$s',
                     escapeshellarg($linkFile),
-                    escapeshellarg($confFile)
+                    escapeshellarg($confFile),
+                    NginxServiceScript::testAndReloadOrStartScript(),
                 )
             ),
         ), 120);

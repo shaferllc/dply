@@ -26,6 +26,8 @@ final class SystemdServiceStandbyReasonResolver
         'lshttpd' => ['group' => self::GROUP_WEBSERVER, 'engine' => 'openlitespeed', 'label' => 'OpenLiteSpeed'],
         'traefik' => ['group' => self::GROUP_EDGE_PROXY, 'engine' => 'traefik', 'label' => 'Traefik'],
         'haproxy' => ['group' => self::GROUP_EDGE_PROXY, 'engine' => 'haproxy', 'label' => 'HAProxy'],
+        'envoy' => ['group' => self::GROUP_EDGE_PROXY, 'engine' => 'envoy', 'label' => 'Envoy'],
+        'openresty' => ['group' => self::GROUP_EDGE_PROXY, 'engine' => 'openresty', 'label' => 'OpenResty'],
     ];
 
     /**
@@ -124,7 +126,7 @@ final class SystemdServiceStandbyReasonResolver
         }
 
         if ($group === self::GROUP_EDGE_PROXY) {
-            $catalog = WebserverWorkspaceViewData::edgeProxyCatalog();
+            $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
             if (isset($catalog[$engineKey]['label'])) {
                 return (string) $catalog[$engineKey]['label'];
             }

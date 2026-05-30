@@ -132,6 +132,67 @@ return [
             'failed' => 'PHP inventory refresh failed.',
             'stale' => 'PHP inventory refresh did not finish.',
         ],
+        'php_install' => [
+            'running' => 'Installing PHP on :host …',
+            'completed' => 'PHP install complete.',
+            'failed' => 'PHP install failed.',
+            'stale' => 'PHP install did not finish.',
+        ],
+        'php_set_cli_default' => [
+            'running' => 'Setting PHP CLI default on :host …',
+            'completed' => 'PHP CLI default updated.',
+            'failed' => 'PHP CLI default update failed.',
+            'stale' => 'PHP CLI default update did not finish.',
+        ],
+        'php_set_new_site_default' => [
+            'running' => 'Setting PHP new-site default on :host …',
+            'completed' => 'PHP new-site default updated.',
+            'failed' => 'PHP new-site default update failed.',
+            'stale' => 'PHP new-site default update did not finish.',
+        ],
+        'php_patch' => [
+            'running' => 'Patching PHP on :host …',
+            'completed' => 'PHP patch complete.',
+            'failed' => 'PHP patch failed.',
+            'stale' => 'PHP patch did not finish.',
+        ],
+        'php_uninstall' => [
+            'running' => 'Uninstalling PHP on :host …',
+            'completed' => 'PHP uninstall complete.',
+            'failed' => 'PHP uninstall failed.',
+            'stale' => 'PHP uninstall did not finish.',
+        ],
+        'php_migrate_sites' => [
+            'running' => 'Moving PHP sites on :host …',
+            'completed' => 'PHP sites upgraded.',
+            'failed' => 'PHP site upgrade failed.',
+            'stale' => 'PHP site upgrade did not finish.',
+        ],
+        'db_engine_install' => [
+            'running' => 'Installing database engine on :host …',
+            'completed' => 'Database engine installed.',
+            'failed' => 'Database engine install failed.',
+            'stale' => 'Database engine install did not finish.',
+        ],
+        'db_engine_uninstall' => [
+            'running' => 'Uninstalling database engine on :host …',
+            'completed' => 'Database engine uninstalled.',
+            'failed' => 'Database engine uninstall failed.',
+            'stale' => 'Database engine uninstall did not finish.',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server workspace console kinds
+    |--------------------------------------------------------------------------
+    | Each server workspace page shows only console runs whose kind is listed
+    | here. Prevents an edge-proxy install banner from appearing on Webserver
+    | (and vice versa) when both share the same Server subject.
+    */
+    'server_workspace_kinds' => [
+        'webserver' => ['webserver_switch', 'manage_action'],
+        'edge-proxy' => ['edge_proxy'],
     ],
 
     /*

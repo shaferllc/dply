@@ -32,6 +32,7 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
+use App\Services\Certificates\CertificateRepairService;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
@@ -50,6 +51,7 @@ use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
+use App\Services\Sites\SiteProvisioningRestarter;
 use App\Services\Sites\SiteReleaseRollback;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -707,6 +709,54 @@ class Show extends Component
         $this->toastSuccess(__('Site provisioning has been queued again.'));
     }
 
+    public function openRestartProvisioningFreshModal(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->site->usesEdgeRuntime()) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'restartProvisioningFresh',
+            [],
+            __('Restart provisioning from scratch?'),
+            __('This removes the testing DNS record, any certificates issued so far, and web server configuration written for this site on the server, then runs the full install again. Domains and site settings in Dply are kept.'),
+            __('Restart fresh'),
+            true,
+        );
+    }
+
+    public function restartProvisioningFresh(SiteProvisioningRestarter $restarter): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->refresh();
+
+        if ($this->site->usesEdgeRuntime()) {
+            $this->toastError(__('Use Edge build controls to restart an Edge site.'));
+
+            return;
+        }
+
+        if ($this->site->isReadyForWorkspace()) {
+            $this->toastError(__('This site is already configured. Delete it from site settings if you want to remove it entirely.'));
+
+            return;
+        }
+
+        try {
+            $restarter->restart($this->site->fresh(['server', 'domains', 'previewDomains', 'certificates']));
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site->refresh();
+        $this->toastSuccess(__('Site wiped clean and provisioning restarted from scratch.'));
+    }
+
     public function openCancelProvisioningModal(): void
     {
         $this->authorize('update', $this->site);
@@ -909,7 +959,7 @@ class Show extends Component
         $site->forceFill(['meta' => $meta])->save();
     }
 
-    public function retryCertificate(string $certificateId): void
+    public function retryCertificate(string $certificateId, CertificateRepairService $repairService): void
     {
         $this->authorize('update', $this->site);
         $certificate = SiteCertificate::query()
@@ -917,13 +967,18 @@ class Show extends Component
             ->findOrFail($certificateId);
 
         try {
-            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+            $repairService->repair($this->site, $certificate, auth()->id());
             $this->site->refresh();
-            $this->toastSuccess(__('Certificate retry finished.'));
+            $this->toastSuccess(__('Certificate repair finished.'));
         } catch (\Throwable $e) {
             $this->site->refresh();
             $this->toastError($e->getMessage());
         }
+    }
+
+    public function repairCertificate(string $certificateId, CertificateRepairService $repairService): void
+    {
+        $this->retryCertificate($certificateId, $repairService);
     }
 
     public function saveGit(): void

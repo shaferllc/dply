@@ -1,48 +1,86 @@
 @props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1.5'])
 
 @php
-$alignmentClasses = match ($align) {
-    'left' => 'ltr:origin-top-left rtl:origin-top-right start-0',
-    'top' => 'origin-top',
-    default => 'ltr:origin-top-right rtl:origin-top-left end-0',
-};
-
 $width = match ($width) {
     '48' => 'w-48',
     default => $width,
 };
 @endphp
 
-{{-- Use @@ so Blade outputs a literal @ for Alpine (@click, @close); raw @ can be parsed as Blade directives. --}}
+{{--
+    Menus teleport to <body> with fixed positioning so they are not clipped by
+    workspace cards, table rows, or tab panels that use overflow-hidden.
+    See components/tooltip.blade.php for the same pattern.
+--}}
 <div
-    class="relative"
-    :class="open ? 'z-50' : ''"
-    x-data="{ open: false }"
-    x-effect="
-        const row = $el.closest('tr');
-        if (! row) return;
-        row.style.position = 'relative';
-        row.style.zIndex = open ? '30' : '';
-    "
-    @@click.outside="open = false"
-    @@close.stop="open = false"
+    class="relative inline-flex"
+    x-data="{
+        open: false,
+        align: @js($align),
+        position: { top: 0, left: 0 },
+        compute() {
+            const menu = this.$refs.menu;
+            const trigger = this.$refs.triggerWrap;
+            if (! menu || ! trigger) {
+                return;
+            }
+            const r = trigger.getBoundingClientRect();
+            const mw = menu.offsetWidth || 1;
+            const mh = menu.offsetHeight || 1;
+            const gap = 8;
+            let top = r.bottom + gap;
+            let left = r.left;
+            if (this.align === 'right') {
+                left = r.right - mw;
+            } else if (this.align === 'left') {
+                left = r.left;
+            } else if (this.align === 'top') {
+                top = r.top - mh - gap;
+                left = r.left + (r.width / 2) - (mw / 2);
+            }
+            const margin = 8;
+            left = Math.max(margin, Math.min(left, window.innerWidth - mw - margin));
+            top = Math.max(margin, Math.min(top, window.innerHeight - mh - margin));
+            this.position = { top, left };
+        },
+        toggle() {
+            this.open = ! this.open;
+            if (this.open) {
+                this.$nextTick(() => this.compute());
+            }
+        },
+        close() {
+            this.open = false;
+        },
+    }"
+    @@click.outside="close()"
+    @@close.stop="close()"
 >
-    <div @@click="open = ! open">
+    <div x-ref="triggerWrap" @@click.stop="toggle()">
         {{ $trigger }}
     </div>
 
-    <div x-show="open"
+    <template x-teleport="body">
+        <div
+            x-ref="menu"
+            x-show="open"
+            x-cloak
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0 scale-[0.98] translate-y-0.5"
             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
             x-transition:leave="transition ease-in duration-100"
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-[0.98]"
-            class="absolute z-50 mt-2 {{ $width }} {{ $alignmentClasses }}"
+            @@click="close()"
+            @@scroll.window.passive="open && compute()"
+            @@resize.window.passive="open && compute()"
+            x-bind:style="`top: ${position.top}px; left: ${position.left}px;`"
+            class="fixed z-[80] {{ $width }}"
             style="display: none;"
-            @@click="open = false">
-        <div class="dply-dropdown-panel {{ $contentClasses }}">
-            {{ $content }}
+        >
+            <div class="dply-dropdown-panel {{ $contentClasses }}">
+                {{ $content }}
+            </div>
         </div>
-    </div>
+    </template>
 </div>

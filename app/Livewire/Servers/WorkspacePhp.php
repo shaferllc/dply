@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
@@ -22,6 +23,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspacePhp extends Component
 {
+    use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;
     use RunsServerConsoleActions;
@@ -74,7 +76,7 @@ class WorkspacePhp extends Component
 
     public ?string $phpConfigEditorCompareB = null;
 
-    public function runPhpPackageAction(string $action, string $version): void
+    public function runPhpPackageAction(string $action, string $version, bool $migrateSitesBeforeUninstall = false): void
     {
         $this->authorize('update', $this->server);
 
@@ -106,14 +108,48 @@ class WorkspacePhp extends Component
                 __(':verb PHP :version on :host', [
                     'verb' => ucfirst($actionVerb), 'version' => $version, 'host' => $this->server->name,
                 ]),
-                function (ConsoleEmitter $emit) use ($action, $version, $actionVerb): array {
+                function (ConsoleEmitter $emit) use ($action, $version, $migrateSitesBeforeUninstall): array {
                     $result = app(ServerPhpManager::class)->applyPackageAction(
                         $this->server,
                         $action,
                         $version,
-                        function () use ($emit, $actionVerb, $version): void {
-                            $emit->step('php', sprintf('apt %s php%s', $actionVerb, $version));
+                        function (string $step) use ($emit, $action, $version): void {
+                            if ($step === 'sync_inventory') {
+                                $emit->step('php', __('Refreshing PHP inventory'));
+
+                                return;
+                            }
+
+                            if ($step === 'migrate_sites') {
+                                $emit->step('php', __('Moving sites to the latest installed PHP version'));
+
+                                return;
+                            }
+
+                            if ($step === 'reassign_cli_default') {
+                                $emit->step('php', __('Moving CLI default to another installed PHP version'));
+
+                                return;
+                            }
+
+                            if ($step === 'reassign_new_site_default') {
+                                $emit->step('php', __('Moving new-site default to another installed PHP version'));
+
+                                return;
+                            }
+
+                            $command = match ($action) {
+                                'install' => "apt install php{$version}",
+                                'patch' => "apt upgrade php{$version}",
+                                'uninstall' => __('Purging PHP :version packages and config', ['version' => $version]),
+                                'set_cli_default' => "update-alternatives --set php /usr/bin/php{$version}",
+                                'set_new_site_default' => __('Saving new-site default'),
+                                default => "{$action} php{$version}",
+                            };
+                            $emit->step('php', is_string($command) ? $command : (string) $command);
                         },
+                        $migrateSitesBeforeUninstall,
+                        auth()->id(),
                     );
                     foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
                         if ($line !== '') {
@@ -137,6 +173,27 @@ class WorkspacePhp extends Component
             $this->remote_error = $msg;
             $this->toastError($msg);
         }
+    }
+
+    public function openMigrateAndUninstallPhpModal(string $version, int $siteCount, string $targetVersion): void
+    {
+        $this->openConfirmActionModal(
+            'runPhpMigrateAndUninstall',
+            [$version],
+            __('Migrate sites and uninstall PHP :version?', ['version' => $version]),
+            trans_choice(
+                'This moves :count site to PHP :target, queues a webserver config apply for each site, then uninstalls PHP :version from the server.|This moves :count sites to PHP :target, queues a webserver config apply for each site, then uninstalls PHP :version from the server.',
+                $siteCount,
+                ['count' => $siteCount, 'target' => $targetVersion, 'version' => $version],
+            ),
+            __('Migrate sites and uninstall'),
+            true,
+        );
+    }
+
+    public function runPhpMigrateAndUninstall(string $version): void
+    {
+        $this->runPhpPackageAction('uninstall', $version, migrateSitesBeforeUninstall: true);
     }
 
     public function refreshPhpInventory(): void

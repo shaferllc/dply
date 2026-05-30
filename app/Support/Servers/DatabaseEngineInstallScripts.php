@@ -4,17 +4,9 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
-use App\Services\Servers\ServerProvisionCommandBuilder;
-
 /**
  * Database-engine-side mirror of {@see CacheServiceInstallScripts}. Holds the install / uninstall
- * / version-probe / config-path bash for the engines the workspace can manage at runtime
- * (mysql/mariadb/postgres). The actual apt-install bash is the same shape as what
- * {@see ServerProvisionCommandBuilder} runs at server-build time, just
- * extracted so the install/uninstall jobs don't re-enter the full role flow.
- *
- * The supported list is a *runtime-installable* subset. SQLite isn't here — it's just a binary
- * that gets installed alongside any of the others; there's nothing to "install" as an engine.
+ * / version-probe / config-path bash for the engines the workspace can manage at runtime.
  */
 final class DatabaseEngineInstallScripts
 {
@@ -23,11 +15,7 @@ final class DatabaseEngineInstallScripts
      */
     public static function supportedEngines(): array
     {
-        // Limited to the variants we've validated apt-install scripts for. Operators picking
-        // exact upstream versions (mysql80 vs mysql84 etc.) can do that at provision time;
-        // post-provision, the workspace surfaces these latest-stable choices to keep the UX
-        // simple. New variants are easy to add by extending the match arms below.
-        return ['mysql', 'mariadb', 'postgres'];
+        return ['mysql', 'mariadb', 'postgres', 'mongodb', 'clickhouse'];
     }
 
     public static function installScript(string $engine): string
@@ -54,6 +42,36 @@ apt-get install -y postgresql
 systemctl enable --now postgresql
 psql --version
 BASH,
+            'mongodb' => <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+set -e
+apt-get update -y
+apt-get install -y gnupg curl ca-certificates
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  if [ "${ID}" = "ubuntu" ] && [ -n "${VERSION_CODENAME}" ]; then
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    apt-get update -y
+    apt-get install -y mongodb-org || true
+  fi
+fi
+apt-get install -y mongodb-org 2>/dev/null || apt-get install -y mongodb 2>/dev/null || true
+systemctl enable --now mongod 2>/dev/null || true
+(mongosh --version 2>/dev/null || mongo --version 2>/dev/null) | head -n1
+BASH,
+            'clickhouse' => <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+set -e
+apt-get update -y
+apt-get install -y apt-transport-https ca-certificates curl gnupg
+curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" > /etc/apt/sources.list.d/clickhouse.list
+apt-get update -y
+apt-get install -y clickhouse-server clickhouse-client
+systemctl enable --now clickhouse-server
+clickhouse-client --version 2>/dev/null | head -n1
+BASH,
             default => throw new \InvalidArgumentException("Unsupported database engine: {$engine}"),
         };
     }
@@ -79,20 +97,32 @@ systemctl disable --now postgresql || true
 apt-get purge -y postgresql 'postgresql-*' postgresql-client 'postgresql-client-*' postgresql-contrib || true
 apt-get autoremove -y
 BASH,
+            'mongodb' => <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+systemctl disable --now mongod || true
+apt-get purge -y mongodb-org mongodb-org-database mongodb-org-server mongodb-org-mongos mongodb-org-tools mongodb || true
+rm -f /etc/apt/sources.list.d/mongodb-org-7.0.list 2>/dev/null || true
+apt-get autoremove -y
+BASH,
+            'clickhouse' => <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+systemctl disable --now clickhouse-server || true
+apt-get purge -y clickhouse-server clickhouse-client clickhouse-common-static || true
+rm -f /etc/apt/sources.list.d/clickhouse.list 2>/dev/null || true
+apt-get autoremove -y
+BASH,
             default => throw new \InvalidArgumentException("Unsupported database engine: {$engine}"),
         };
     }
 
-    /**
-     * Best-effort version detection — returns "" when the CLI tool isn't on PATH (the install
-     * job leaves `version` null in that case).
-     */
     public static function versionProbeScript(string $engine): string
     {
         return match ($engine) {
             'mysql' => 'mysql --version 2>/dev/null | awk "{print \$3}" || echo ""',
             'mariadb' => '(mariadb --version 2>/dev/null || mysql --version 2>/dev/null) | head -n1',
             'postgres' => 'psql --version 2>/dev/null | awk "{print \$3}" || echo ""',
+            'mongodb' => '(mongosh --version 2>/dev/null || mongo --version 2>/dev/null) | head -n1',
+            'clickhouse' => 'clickhouse-client --version 2>/dev/null | head -n1',
             default => 'echo ""',
         };
     }
@@ -103,20 +133,19 @@ BASH,
             'mysql' => 'mysql',
             'mariadb' => 'mariadb',
             'postgres' => 'postgresql',
+            'mongodb' => 'mongod',
+            'clickhouse' => 'clickhouse-server',
             default => throw new \InvalidArgumentException("Unsupported database engine: {$engine}"),
         };
     }
 
-    /**
-     * Path to the engine's main config file. Used by the read-only viewer (Phase 3) and by any
-     * future tuning forms. MySQL/MariaDB share the Debian conf-dir layout; Postgres ships its
-     * config inside the version-specific directory under /etc/postgresql/.
-     */
     public static function configFilePathFor(string $engine): string
     {
         return match ($engine) {
             'mysql', 'mariadb' => '/etc/mysql/mariadb.conf.d/99-dply.cnf',
-            'postgres' => '/etc/postgresql/main/postgresql.conf', // resolved per-version at read time
+            'postgres' => '/etc/postgresql/main/postgresql.conf',
+            'mongodb' => '/etc/mongod.conf',
+            'clickhouse' => '/etc/clickhouse-server/config.xml',
             default => throw new \InvalidArgumentException("Unsupported database engine: {$engine}"),
         };
     }
@@ -125,7 +154,24 @@ BASH,
     {
         return match ($engine) {
             'postgres' => 5432,
+            'mongodb' => 27017,
+            'clickhouse' => 8123,
+            'sqlite' => 0,
             default => 3306,
         };
+    }
+
+    public static function timescaledbRepoBootstrapScript(): string
+    {
+        return <<<'BASH'
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y gnupg curl ca-certificates lsb-release
+curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /usr/share/keyrings/timescaledb.gpg
+ARCH=$(dpkg --print-architecture)
+CODENAME=$(lsb_release -cs 2>/dev/null || echo jammy)
+echo "deb [signed-by=/usr/share/keyrings/timescaledb.gpg arch=${ARCH}] https://packagecloud.io/timescale/timescaledb/ubuntu/ ${CODENAME} main" > /etc/apt/sources.list.d/timescaledb.list
+apt-get update -y
+BASH;
     }
 }

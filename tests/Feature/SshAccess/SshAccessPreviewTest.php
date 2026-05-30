@@ -37,7 +37,7 @@ test('ssh access route renders coming soon panel when preview active', function 
         ->get(route('servers.ssh-access', $server))
         ->assertOk()
         ->assertSee(__('Coming soon'))
-        ->assertSee(__('SSH access'))
+        ->assertSee(__('Access graph'))
         ->assertSee(__('Time-boxed sessions'));
 });
 

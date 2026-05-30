@@ -53,19 +53,37 @@
 
                         @if ($latestCertificate && in_array($latestCertificate->status, [
                             \App\Models\SiteCertificate::STATUS_FAILED,
+                            \App\Models\SiteCertificate::STATUS_EXPIRED,
                             \App\Models\SiteCertificate::STATUS_PENDING,
                             \App\Models\SiteCertificate::STATUS_ISSUED,
                         ], true))
                             <div class="flex flex-wrap gap-3">
-                                <button
-                                    type="button"
-                                    wire:click="retryCertificate('{{ $latestCertificate->id }}')"
-                                    wire:loading.attr="disabled"
-                                    class="inline-flex items-center justify-center rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
-                                >
-                                    <span wire:loading.remove wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retry certificate') }}</span>
-                                    <span wire:loading wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retrying…') }}</span>
-                                </button>
+                                @if (in_array($latestCertificate->status, [
+                                    \App\Models\SiteCertificate::STATUS_FAILED,
+                                    \App\Models\SiteCertificate::STATUS_EXPIRED,
+                                ], true))
+                                    <button
+                                        type="button"
+                                        wire:click="repairCertificate('{{ $latestCertificate->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="repairCertificate('{{ $latestCertificate->id }}')"
+                                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                    >
+                                        <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" wire:loading.remove wire:target="repairCertificate('{{ $latestCertificate->id }}')" />
+                                        <span wire:loading.remove wire:target="repairCertificate('{{ $latestCertificate->id }}')">{{ __('Repair certificate') }}</span>
+                                        <span wire:loading wire:target="repairCertificate('{{ $latestCertificate->id }}')">{{ __('Repairing…') }}</span>
+                                    </button>
+                                @else
+                                    <button
+                                        type="button"
+                                        wire:click="retryCertificate('{{ $latestCertificate->id }}')"
+                                        wire:loading.attr="disabled"
+                                        class="inline-flex items-center justify-center rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                    >
+                                        <span wire:loading.remove wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retry certificate') }}</span>
+                                        <span wire:loading wire:target="retryCertificate('{{ $latestCertificate->id }}')">{{ __('Retrying…') }}</span>
+                                    </button>
+                                @endif
                                 <a
                                     href="{{ route('sites.settings', [$server, $site, 'section' => 'certificates']) }}"
                                     wire:navigate

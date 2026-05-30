@@ -133,11 +133,24 @@
                         @endif
                     @endif
                 @else
-                    {{-- Non-active engine panel: blocker (if any) + switch CTA. Wrap
-                         both in the same px-6/sm:px-8 + py rhythm the active-engine
-                         lifecycle rows use, so the button doesn't sit flush to the
-                         card edge and the blocker box gets the same gutter. --}}
+                    {{-- Non-active engine panel: blocker (if any) + switch CTA, or edge-proxy add/remove. --}}
                     <div class="space-y-4 bg-white px-6 py-5 sm:px-8">
+                        @if ($isEdgeProxyPanel)
+                            @php
+                                $isActiveEdge = $key === $activeEdgeProxy;
+                                $inflightEdge = $this->hasInflightEdgeProxyAction();
+                                $inflightSwitch = $inflightSwitch ?? $this->hasInflightWebserverSwitch();
+                            @endphp
+                            @include('livewire.servers.partials.webserver._edge-proxy-target-action', [
+                                'actionInFlight' => $actionInFlight,
+                                'inflightEdge' => $inflightEdge,
+                                'inflightSwitch' => $inflightSwitch,
+                                'edgeProxyActionTarget' => $edgeProxyActionTarget ?? null,
+                            ])
+                            <p class="text-[11px] text-brand-mist sm:max-w-prose">
+                                {{ __('Switch replaces the active edge proxy on :port in one cutover. Caddy stays the per-site backend on high ports.', ['port' => 80]) }}
+                            </p>
+                        @else
                         @if ($isBlocked && $blockerReason)
                             <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
                                 <p class="font-semibold">{{ __('Switching to :name is currently unavailable.', ['name' => $info['label']]) }}</p>
@@ -191,6 +204,7 @@
                                 </p>
                             @endif
                         </div>
+                        @endif
                     </div>
                 @endif
             </div>

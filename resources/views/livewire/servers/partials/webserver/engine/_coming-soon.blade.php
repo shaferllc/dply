@@ -11,6 +11,8 @@
         'openlitespeed' => __('LSAPI for the fastest PHP execution, built-in LSCache module with per-vhost cache rules, and a familiar Apache-style config. The standard pick for WordPress-heavy hosting.'),
         'traefik' => __('Cloud-native L7 reverse proxy with automatic service discovery, middleware chains, and a dashboard API. Sits in front of Caddy site backends on ephemeral high ports.'),
         'haproxy' => __('Battle-tested load balancer and ACL router with fine-grained frontend/backend rules. Ideal when you need sticky sessions, health checks, or classic HAProxy config patterns.'),
+        'envoy' => __('Cloud-native L7 proxy with dynamic listeners/clusters, rich metrics, and gRPC-friendly routing. Would sit on :80 in front of Caddy backends when install ships.'),
+        'openresty' => __('nginx + LuaJIT at the edge for programmable auth, rate limits, and custom routing — separate from choosing nginx as the primary webserver.'),
         default => '',
     };
 
@@ -50,6 +52,18 @@
             ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host-based routing to Caddy backends on high ports.')],
             ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate haproxy.cfg with backups.')],
             ['icon' => 'heroicon-o-cpu-chip', 'title' => __('Runtime stats'), 'body' => __('Socket stats and runtime info from the server.')],
+        ],
+        'envoy' => [
+            ['icon' => 'heroicon-o-arrows-right-left', 'title' => __('Listeners & clusters'), 'body' => __('Dynamic xDS-style routing to Caddy backends.')],
+            ['icon' => 'heroicon-o-chart-bar', 'title' => __('Observability'), 'body' => __('Rich stats, access logs, and admin interface.')],
+            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host-based forwarding to per-site high ports.')],
+            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Validate and edit envoy.yaml with backups.')],
+        ],
+        'openresty' => [
+            ['icon' => 'heroicon-o-code-bracket-square', 'title' => __('Lua routing'), 'body' => __('Programmable edge logic without per-site nginx hand-edits.')],
+            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host maps to Caddy backends on high ports.')],
+            ['icon' => 'heroicon-o-shield-check', 'title' => __('Edge auth & limits'), 'body' => __('JWT gates, ACLs, and rate limits at :80.')],
+            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit nginx/OpenResty configs with validate + backup.')],
         ],
         default => [],
     };

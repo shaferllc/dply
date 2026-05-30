@@ -8,6 +8,8 @@ use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Services\Servers\ServerPhpManager;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\OpenLiteSpeedTlsPaths;
+use App\Support\Sites\VmDockerSiteConfigSupport;
 use Illuminate\Support\Collection;
 
 class CaddySiteConfigBuilder
@@ -26,6 +28,10 @@ class CaddySiteConfigBuilder
             ->values();
         if ($hostnames->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
+        }
+
+        if (VmDockerSiteConfigSupport::applies($site)) {
+            return $this->vmDockerReverseProxyBlock($site, $listenPort, $hostnames);
         }
 
         // Bind each hostname to the listen port (e.g. example.test:8080). A bare
@@ -281,5 +287,83 @@ CADDY;
         }
 
         return implode("\n", $lines)."\n";
+    }
+
+    /**
+     * @param  Collection<int, string>  $hostnames
+     */
+    protected function vmDockerReverseProxyBlock(Site $site, ?int $listenPort, Collection $hostnames): string
+    {
+        $hosts = $listenPort === null
+            ? $hostnames->implode(', ')
+            : $hostnames->map(fn (string $host): string => $host.':'.$listenPort)->implode(', ');
+        $basename = $site->webserverConfigBasename();
+        $port = VmDockerSiteConfigSupport::upstreamPort($site);
+        $redirectLines = $this->redirectLines($site);
+        $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $dotfileDeny = $this->caddyDotfileDenyBlock();
+
+        if ($site->isSuspended()) {
+            return $this->suspendedSiteBlock($hosts, $basename, $site);
+        }
+
+        return <<<CADDY
+{$hosts} {
+{$redirectLines}{$basicAuth}{$dotfileDeny}    encode zstd gzip
+    log {
+        output file /var/log/caddy/{$basename}-access.log
+    }
+    reverse_proxy 127.0.0.1:{$port}
+}
+CADDY;
+    }
+
+    /**
+     * HTTPS-only Caddy front for edge-proxy mode: terminates TLS on :443 and
+     * forwards to the per-site backend on a high port. Envoy/HAProxy keep :80.
+     */
+    public function buildEdgeTlsFront(Site $site, int $backendPort): string
+    {
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
+        if (! OpenLiteSpeedTlsPaths::siteEdgeTlsFrontReady($site)) {
+            return '';
+        }
+
+        if (! OpenLiteSpeedTlsPaths::siteExpectsTls($site)) {
+            return '';
+        }
+
+        $paths = OpenLiteSpeedTlsPaths::resolve($site);
+        if ($paths === null) {
+            return '';
+        }
+
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'previewDomains']);
+
+        $hostnames = collect($site->webserverHostnames())
+            ->filter()
+            ->unique()
+            ->values();
+        if ($hostnames->isEmpty()) {
+            return '';
+        }
+
+        $httpsHosts = $hostnames
+            ->map(fn (string $host): string => 'https://'.$host)
+            ->implode(', ');
+        $basename = $site->webserverConfigBasename();
+
+        return <<<CADDY
+{$httpsHosts} {
+    tls {$paths['certFile']} {$paths['keyFile']}
+    log {
+        output file /var/log/caddy/{$basename}-tls-access.log
+    }
+    reverse_proxy 127.0.0.1:{$backendPort}
+}
+CADDY;
     }
 }

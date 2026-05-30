@@ -113,6 +113,7 @@ return [
         '/usr/local/lsws/conf/',
         '/etc/traefik/',
         '/etc/haproxy/',
+        '/etc/envoy/',
         '/etc/mysql/',
         '/etc/mariadb/',
         '/etc/redis/',
@@ -259,6 +260,16 @@ return [
             'access_log' => '/var/log/haproxy.log',
             'error_log' => null,
             'journal_unit' => 'haproxy',
+        ],
+        'envoy' => [
+            'main' => '/etc/envoy/envoy.yaml',
+            'globs' => [],
+            'validate' => '(sudo -n envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1 || envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1)',
+            'reload' => '(sudo -n systemctl restart envoy || systemctl restart envoy) 2>&1',
+            'log_dir' => null,
+            'access_log' => null,
+            'error_log' => null,
+            'journal_unit' => 'envoy',
         ],
     ],
 
@@ -791,10 +802,10 @@ BASH
         ],
         'start_traefik' => [
             'label' => 'Start Traefik',
-            'description' => 'systemctl start traefik.',
+            'description' => 'systemctl enable --now traefik.',
             'confirm' => 'Start the Traefik service?',
             'timeout' => 60,
-            'script' => '(sudo -n systemctl start traefik || systemctl start traefik) 2>&1',
+            'script' => '(sudo -n systemctl enable --now traefik || systemctl enable --now traefik) 2>&1',
             'rerun_probe_after_finish' => true,
         ],
         'stop_traefik' => [
@@ -884,6 +895,81 @@ BASH
             'confirm' => 'Disable HAProxy from starting at boot? The running service will keep running until stopped.',
             'timeout' => 60,
             'script' => '(sudo -n systemctl disable haproxy || systemctl disable haproxy) 2>&1',
+        ],
+
+        // Envoy service actions. Static config changes require a restart;
+        // `envoy --mode validate` is the native parse-only check.
+        'restart_envoy' => [
+            'label' => 'Restart Envoy',
+            'description' => 'systemctl restart envoy. Brief connection drop while the daemon restarts.',
+            'confirm' => 'Restart Envoy now? Sites may briefly show errors.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart envoy || systemctl restart envoy) 2>&1
+else
+  (sudo -n service envoy restart || service envoy restart) 2>&1
+fi
+BASH
+        ],
+        'reload_envoy' => [
+            'label' => 'Reload Envoy',
+            'description' => 'Restarts Envoy to pick up /etc/envoy/envoy.yaml changes.',
+            'confirm' => 'Restart Envoy to apply configuration changes?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart envoy || systemctl restart envoy) 2>&1
+else
+  (sudo -n service envoy restart || service envoy restart) 2>&1
+fi
+BASH
+        ],
+        'envoy_test_config' => [
+            'label' => 'Test Envoy config',
+            'description' => 'Runs `envoy --mode validate -c /etc/envoy/envoy.yaml` (parse-only).',
+            'confirm' => 'Test the Envoy configuration now?',
+            'timeout' => 60,
+            'script' => '(sudo -n envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1 || envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1)',
+        ],
+        'apply_edge_backend_configs' => [
+            'label' => 'Apply webserver config',
+            'description' => 'Rebuild every site\'s Caddy *-backend and *-tls configs, remove legacy :80 Caddy files, regenerate edge routing, and reload Caddy + the edge proxy. Use when preview URLs or HTTPS stop working after edge cutover.',
+            'confirm' => 'Regenerate Caddy backend configs, TLS :443 fronts, and edge routing for every site on this server?',
+            'timeout' => 600,
+            'refresh_webserver_live_state_after_finish' => true,
+            'rerun_probe_after_finish' => true,
+            'script' => 'echo "[dply] dispatched via ApplyEdgeBackendConfigsJob"',
+        ],
+        'start_envoy' => [
+            'label' => 'Start Envoy',
+            'description' => 'systemctl start envoy.',
+            'confirm' => 'Start the Envoy service?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl start envoy || systemctl start envoy) 2>&1',
+            'rerun_probe_after_finish' => true,
+        ],
+        'stop_envoy' => [
+            'label' => 'Stop Envoy',
+            'description' => 'systemctl stop envoy. Sites routed through Envoy will be unavailable.',
+            'confirm' => 'Stop Envoy? Sites routed through Envoy will be unavailable until you start it again.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl stop envoy || systemctl stop envoy) 2>&1',
+            'rerun_probe_after_finish' => true,
+        ],
+        'enable_envoy' => [
+            'label' => 'Enable Envoy at boot',
+            'description' => 'systemctl enable envoy.',
+            'confirm' => 'Enable Envoy to start automatically at boot?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl enable envoy || systemctl enable envoy) 2>&1',
+        ],
+        'disable_envoy' => [
+            'label' => 'Disable Envoy at boot',
+            'description' => 'systemctl disable envoy. Does not stop the running service.',
+            'confirm' => 'Disable Envoy from starting at boot? The running service will keep running until stopped.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl disable envoy || systemctl disable envoy) 2>&1',
         ],
 
         // ---------------------------------------------------------------
@@ -1065,6 +1151,28 @@ BASH,
             'confirm' => 'Query HAProxy runtime info?',
             'timeout' => 10,
             'script' => '(sudo -n bash -c "echo show info | socat /run/haproxy/admin.sock stdio" 2>&1 || echo "(socat not installed or stats socket missing)")',
+        ],
+
+        'envoy_version' => [
+            'label' => 'Envoy version',
+            'description' => '`envoy --version` — build version.',
+            'confirm' => 'Show Envoy version?',
+            'timeout' => 10,
+            'script' => '(sudo -n envoy --version 2>&1 || envoy --version 2>&1 || /usr/local/bin/envoy --version 2>&1)',
+        ],
+        'envoy_show_config' => [
+            'label' => 'Show Envoy config',
+            'description' => 'Dump /etc/envoy/envoy.yaml — full edge config with listeners and clusters.',
+            'confirm' => 'Show Envoy config?',
+            'timeout' => 10,
+            'script' => '(sudo -n cat /etc/envoy/envoy.yaml 2>&1 || cat /etc/envoy/envoy.yaml 2>&1)',
+        ],
+        'envoy_show_runtime_info' => [
+            'label' => 'Envoy runtime info',
+            'description' => 'Query the admin interface at 127.0.0.1:9901/server_info.',
+            'confirm' => 'Query Envoy runtime info?',
+            'timeout' => 10,
+            'script' => '(sudo -n curl -sf http://127.0.0.1:9901/server_info 2>&1 || curl -sf http://127.0.0.1:9901/server_info 2>&1 || echo "(admin interface unavailable — is envoy running?)")',
         ],
 
         'apt_upgrade' => [
@@ -1384,6 +1492,102 @@ if [ -z "$CID" ]; then
 fi
 sudo -n docker rm -f "$CID"
 echo "Removed container $CID"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_exec' => [
+            'label' => 'Run command in container',
+            'description' => 'Non-interactive docker exec sh -c for one container.',
+            'confirm' => 'Run this command inside the container? Output streams to the console banner below.',
+            'timeout' => 900,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker exec "$CID" sh -c __DPLY_EXEC_COMMAND__
+BASH,
+        ],
+
+        'docker_compose_up' => [
+            'label' => 'Compose up',
+            'description' => 'docker compose up -d for one tracked project.',
+            'confirm' => 'Start or recreate services for compose project :project?',
+            'timeout' => 1800,
+            'script' => <<<'BASH'
+set -e
+PROJECT=__DPLY_COMPOSE_PROJECT__
+CONFIG=__DPLY_COMPOSE_CONFIG__
+if [ -z "$PROJECT" ] || [ -z "$CONFIG" ]; then
+  echo "Missing compose project or config." >&2
+  exit 1
+fi
+DIR=$(dirname "$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker compose -p "$PROJECT" -f "$CONFIG" up -d --build
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker-compose -p "$PROJECT" -f "$CONFIG" up -d --build
+else
+  echo "docker compose not available." >&2
+  exit 1
+fi
+docker compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || docker-compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || true
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_compose_down' => [
+            'label' => 'Compose down',
+            'description' => 'docker compose down for one tracked project.',
+            'confirm' => 'Stop and remove containers for compose project :project? Named volumes are kept.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+PROJECT=__DPLY_COMPOSE_PROJECT__
+CONFIG=__DPLY_COMPOSE_CONFIG__
+if [ -z "$PROJECT" ] || [ -z "$CONFIG" ]; then
+  echo "Missing compose project or config." >&2
+  exit 1
+fi
+DIR=$(dirname "$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker compose -p "$PROJECT" -f "$CONFIG" down
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker-compose -p "$PROJECT" -f "$CONFIG" down
+else
+  echo "docker compose not available." >&2
+  exit 1
+fi
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_compose_restart' => [
+            'label' => 'Compose restart',
+            'description' => 'docker compose restart for one tracked project.',
+            'confirm' => 'Restart all services in compose project :project?',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+PROJECT=__DPLY_COMPOSE_PROJECT__
+CONFIG=__DPLY_COMPOSE_CONFIG__
+if [ -z "$PROJECT" ] || [ -z "$CONFIG" ]; then
+  echo "Missing compose project or config." >&2
+  exit 1
+fi
+DIR=$(dirname "$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker compose -p "$PROJECT" -f "$CONFIG" restart
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker-compose -p "$PROJECT" -f "$CONFIG" restart
+else
+  echo "docker compose not available." >&2
+  exit 1
+fi
+docker compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || docker-compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || true
 BASH,
             'rerun_probe_after_finish' => true,
         ],
@@ -1859,6 +2063,9 @@ BASH
             ],
             '/etc/haproxy/' => [
                 'engine' => 'haproxy',
+            ],
+            '/etc/envoy/' => [
+                'engine' => 'envoy',
             ],
             '/etc/mysql/' => [
                 'validate' => $mysqlConfigValidateScript,

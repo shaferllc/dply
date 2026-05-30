@@ -79,6 +79,27 @@ test('credentials index forbidden for deployer', function () {
     $response->assertForbidden();
 });
 
+test('credentials index refreshes provider cards after credential created in modal', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        ->assertSee('Not connected');
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Production DO',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(CredentialsIndex::class, ['organization' => $org])
+        ->dispatch('provider-credential-created', provider: 'digitalocean', credentialId: $credential->id)
+        ->assertSee('1 credential');
+});
+
 test('credentials store validates required fields', function () {
     $user = userWithOrganization();
 

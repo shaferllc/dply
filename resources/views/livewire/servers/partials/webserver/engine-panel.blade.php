@@ -23,25 +23,29 @@
         'caddy' => ['routes', 'upstreams', 'certs', 'admin'],
         'nginx' => ['hosts', 'upstreams', 'certs', 'modules', 'workers'],
         'apache' => ['vhosts', 'modules', 'certs', 'workers'],
-        'traefik' => ['routers', 'services', 'middlewares', 'providers'],
+        'traefik' => [
+            'routers', 'services', 'middlewares', 'entrypoints',
+            'tcprouters', 'tcpservices', 'udprouters', 'udpservices', 'tls', 'providers',
+        ],
         'haproxy' => ['frontends', 'backends', 'ssl', 'runtime'],
+        'envoy' => ['listeners', 'clusters', 'runtime'],
     ];
     $tabsForThisEngine = $liveStateTabsByEngine[$key] ?? [];
-    $isLiveStateView = $isActive && in_array($engine_subtab, $tabsForThisEngine, true);
+    $isLiveStateView = ($isActive || $isEdgeProxyPanel) && in_array($engine_subtab, $tabsForThisEngine, true);
 
     // Coming-soon engines (flagged in the catalog and not yet active) render a
     // preview teaser instead of the actionable switch / lifecycle panels.
     $isComingSoon = ! $isActive && ! empty($info['coming_soon']);
 
     // Instant sub-tab paint: entangle engine_subtab client-side, defer SSH via wire:init.
-    $optimisticEngineSubtabs = $isActive && ! $isComingSoon;
+    $optimisticEngineSubtabs = ($isActive || $isEdgeProxyPanel) && ! $isComingSoon;
     $liveStateTabKeys = $liveStateTabsByEngine[$key] ?? [];
 @endphp
 @if ($optimisticEngineSubtabs)
     <div x-data="{ subtab: @entangle('engine_subtab').live }">
 @endif
 @include('livewire.servers.partials.webserver.engine._header-tabs')
-@if ($isActive)
+@if ($isActive || $isEdgeProxyPanel)
     <div
         wire:key="engine-subtab-boot-{{ $key }}-{{ $engine_subtab }}"
         wire:init="loadActiveEngineSubtabData"
@@ -62,6 +66,9 @@
             @break
         @case('haproxy')
             @include('livewire.servers.partials.webserver.engine.haproxy')
+            @break
+        @case('envoy')
+            @include('livewire.servers.partials.webserver.engine.envoy')
             @break
         @case('traefik')
             @include('livewire.servers.partials.webserver.engine.traefik')

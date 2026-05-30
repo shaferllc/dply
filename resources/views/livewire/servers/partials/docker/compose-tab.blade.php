@@ -30,14 +30,36 @@
                         <th class="px-4 py-3 sm:px-6">{{ __('Project') }}</th>
                         <th class="px-4 py-3">{{ __('Status') }}</th>
                         <th class="px-4 py-3">{{ __('Config files') }}</th>
+                        <th class="px-4 py-3 text-right">{{ __('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-brand-ink/10 bg-white">
                     @foreach ($composeProjects as $row)
-                        <tr wire:key="docker-compose-{{ $row['name'] }}">
-                            <td class="px-4 py-3 font-mono text-xs text-brand-ink sm:px-6">{{ $row['name'] }}</td>
+                        @php
+                            $project = $row['name'];
+                            $config = $row['config'];
+                            $linkedSite = \App\Support\Servers\DockerManagedSiteIndex::siteForComposeProject($row, $managedSites);
+                        @endphp
+                        <tr wire:key="docker-compose-{{ $project }}">
+                            <td class="px-4 py-3 sm:px-6">
+                                <div class="font-mono text-xs text-brand-ink">{{ $project }}</div>
+                                @if ($linkedSite)
+                                    <a href="{{ $linkedSite['url'] }}" wire:navigate class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
+                                        <x-heroicon-o-globe-alt class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {{ __('Site: :name', ['name' => $linkedSite['name']]) }}
+                                    </a>
+                                @endif
+                            </td>
                             <td class="px-4 py-3 text-brand-moss">{{ $row['status'] }}</td>
-                            <td class="max-w-md truncate px-4 py-3 font-mono text-[11px] text-brand-moss" title="{{ $row['config'] }}">{{ $row['config'] }}</td>
+                            <td class="max-w-md truncate px-4 py-3 font-mono text-[11px] text-brand-moss" title="{{ $config }}">{{ $config }}</td>
+                            <td class="px-4 py-3 text-right">
+                                <div class="inline-flex flex-wrap justify-end gap-1.5">
+                                    <button type="button" wire:click="openComposeLogs(@js($project), @js($config))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Logs') }}</button>
+                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_up', @js($project), @js($config))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Up') }}</button>
+                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_restart', @js($project), @js($config))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
+                                    <button type="button" wire:click="confirmDockerComposeAction('docker_compose_down', @js($project), @js($config))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Down') }}</button>
+                                </div>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -46,4 +68,6 @@
     @endif
 </section>
 
-<p class="mt-3 text-xs text-brand-moss">{{ __('dply site deploys using Compose live under each site workspace. This tab lists all compose projects the Docker CLI knows about on the host.') }}</p>
+<p class="mt-3 text-xs text-brand-moss">
+    {{ __('dply site deploys on Docker hosts write docker-compose.dply.yml under each site checkout. Up rebuilds and starts services; Down stops containers for the project.') }}
+</p>

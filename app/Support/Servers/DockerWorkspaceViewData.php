@@ -14,6 +14,10 @@ final class DockerWorkspaceViewData
      *     docker: array<string, mixed>,
      *     checked_at: ?Carbon,
      *     docker_present: bool,
+     *     managed_sites: array{
+     *         sites: list<array{id: string, name: string, slug: string, compose_project: string, url: string}>,
+     *         project_to_site: array<string, array{id: string, name: string, slug: string, url: string}>,
+     *     },
      * }
      */
     public static function for(Server $server): array
@@ -44,6 +48,7 @@ final class DockerWorkspaceViewData
             'docker' => $docker,
             'checked_at' => $checkedAt,
             'docker_present' => ! empty($docker['present']),
+            'managed_sites' => DockerManagedSiteIndex::for($server),
         ];
     }
 }

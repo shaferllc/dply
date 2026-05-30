@@ -18,6 +18,27 @@
         <p>{{ __('Site deploys are NOT run from here — each site\'s page has its own deploy button so deploys can run with site-scoped context. The banner below points at the right surfaces.') }}</p>
     </x-explainer>
 
+    @if ($container_scope_id !== '')
+        <div class="rounded-2xl border border-brand-gold/40 bg-brand-cream/50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container scope') }}</p>
+                    <p class="mt-1 font-mono text-sm text-brand-forest">{{ $container_scope_name }}</p>
+                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                        {{ __('Ad-hoc commands and saved recipes run inside this container via docker exec. Host-level marketplace presets (docker ps, prune, etc.) still target the VM unless you save a container-inner recipe.') }}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="clearContainerScope"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    {{ __('Clear container scope') }}
+                </button>
+            </div>
+        </div>
+    @endif
+
     {{-- Top-of-page banner clarifying scope. The page used to be
          called "Deploy" and operators kept landing here looking for
          site deploys. The banner explicitly redirects them to the
@@ -255,13 +276,17 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('One-off') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
+                            @if ($container_scope_id !== '')
+                                {{ __('Type a command to run inside the scoped container. Output streams below; nothing is saved unless you add it as a saved command.') }}
+                            @else
+                                {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
+                            @endif
                         </p>
                     </div>
                 </div>
                 <div class="px-6 py-6 sm:px-7">
                 <form wire:submit="runAdhocCommand" class="space-y-3">
-                    <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="uname -a"></textarea>
+                    <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="{{ $container_scope_id !== '' ? 'php artisan migrate --force' : 'uname -a' }}"></textarea>
                     <div class="flex flex-wrap items-center gap-3">
                         <x-primary-button type="submit" class="!py-2">
                             {{ __('Run command') }}

@@ -35,12 +35,13 @@
                     </x-server-workspace-tab>
                     @php
                         $configReturnSub = ($engine_subtab === 'config' || $engine_subtab === '') ? 'overview' : $engine_subtab;
+                        $configFrom = ! empty($isEdgeProxyPanel) ? 'edge-proxy' : 'webserver';
                     @endphp
                     <x-server-workspace-tab
                         as="a"
                         :id="'ws-subtab-'.$key.'-config'"
                         :active="false"
-                        href="{{ route('servers.configuration', ['server' => $server, 'scope' => $key, 'from' => 'webserver', 'return_sub' => $configReturnSub]) }}"
+                        href="{{ route('servers.configuration', ['server' => $server, 'scope' => $key, 'from' => $configFrom, 'return_sub' => $configReturnSub]) }}"
                         wire:navigate
                         icon="heroicon-o-pencil-square"
                     >
@@ -92,7 +93,15 @@
                             'routers' => ['label' => __('Routers'), 'icon' => 'heroicon-o-arrow-path-rounded-square'],
                             'services' => ['label' => __('Services'), 'icon' => 'heroicon-o-server'],
                             'middlewares' => ['label' => __('Middlewares'), 'icon' => 'heroicon-o-shield-check'],
+                            'entrypoints' => ['label' => __('Entry points'), 'icon' => 'heroicon-o-signal'],
+                            'tcprouters' => ['label' => __('TCP routers'), 'icon' => 'heroicon-o-arrows-right-left'],
+                            'tcpservices' => ['label' => __('TCP services'), 'icon' => 'heroicon-o-server-stack'],
+                            'udprouters' => ['label' => __('UDP routers'), 'icon' => 'heroicon-o-bolt'],
+                            'udpservices' => ['label' => __('UDP services'), 'icon' => 'heroicon-o-server-stack'],
+                            'tls' => ['label' => __('TLS'), 'icon' => 'heroicon-o-lock-closed'],
                             'providers' => ['label' => __('Providers'), 'icon' => 'heroicon-o-cube'],
+                            'static' => ['label' => __('Static'), 'icon' => 'heroicon-o-cog-6-tooth'],
+                            'dynamic' => ['label' => __('Dynamic'), 'icon' => 'heroicon-o-document-duplicate'],
                         ],
                         'haproxy' => [
                             'frontends' => ['label' => __('Frontends'), 'icon' => 'heroicon-o-arrow-path-rounded-square'],
@@ -100,10 +109,15 @@
                             'ssl' => ['label' => __('SSL'), 'icon' => 'heroicon-o-lock-closed'],
                             'runtime' => ['label' => __('Runtime'), 'icon' => 'heroicon-o-cpu-chip'],
                         ],
+                        'envoy' => [
+                            'listeners' => ['label' => __('Listeners'), 'icon' => 'heroicon-o-signal'],
+                            'clusters' => ['label' => __('Clusters'), 'icon' => 'heroicon-o-server-stack'],
+                            'runtime' => ['label' => __('Runtime'), 'icon' => 'heroicon-o-cpu-chip'],
+                        ],
                         default => [],
                     };
                 @endphp
-                @if ($isActive && $liveStateSubTabs !== [])
+                @if (($isActive || $isEdgeProxyPanel) && $liveStateSubTabs !== [])
                     @foreach ($liveStateSubTabs as $stKey => $stInfo)
                         <x-server-workspace-tab
                             :id="'ws-subtab-'.$key.'-'.$stKey"

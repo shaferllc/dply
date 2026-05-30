@@ -125,9 +125,28 @@
                 </span>
                 <span class="min-w-0">
                     <span class="block text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Change webserver') }}</span>
-                    <span class="mt-1 block text-[13px] leading-5 text-brand-moss">{{ __('Switch engines or add an edge proxy in front of port :80.', ['port' => 80]) }}</span>
+                    <span class="mt-1 block text-[13px] leading-5 text-brand-moss">{{ __('Switch nginx, Caddy, Apache, or OpenLiteSpeed on port :80.', ['port' => 80]) }}</span>
                 </span>
             </button>
+            <a
+                href="{{ route('servers.edge-proxy', $server) }}"
+                wire:navigate
+                class="group {{ $card }} flex items-start gap-3 p-5 transition hover:border-brand-forest/25 hover:shadow-md sm:p-6"
+            >
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-brand-ink group-hover:text-brand-forest">{{ __('Edge proxy') }}</span>
+                    <span class="mt-1 block text-[13px] leading-5 text-brand-moss">
+                        @if ($activeEdgeProxy !== null)
+                            {{ __(':name is routing :80 — open controls or remove.', ['name' => $edgeProxyCatalog[$activeEdgeProxy]['label'] ?? ucfirst($activeEdgeProxy), 'port' => 80]) }}
+                        @else
+                            {{ __('Optional Traefik, HAProxy, or more in front of port :80.', ['port' => 80]) }}
+                        @endif
+                    </span>
+                </span>
+            </a>
             <button
                 type="button"
                 wire:click="setWorkspaceTab('health')"

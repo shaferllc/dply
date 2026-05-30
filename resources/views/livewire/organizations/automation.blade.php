@@ -140,8 +140,8 @@
                         <label class="flex cursor-pointer items-start gap-3 px-6 py-4 transition-colors hover:bg-brand-sand/15 sm:px-7">
                             <input type="checkbox" wire:model.live="email_database_credentials_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
                             <span class="min-w-0 flex-1">
-                                <span class="text-sm font-medium text-brand-ink">{{ __('Email database credentials when a site is scaffolded') }}</span>
-                                <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Includes a plain-text database password. Off by default — credentials in mailboxes are an attack surface.') }}</span>
+                                <span class="text-sm font-medium text-brand-ink">{{ __('Email database credentials when created') }}</span>
+                                <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ __('Includes a plain-text database password when a site is scaffolded or a server database is created in the workspace. Off by default — credentials in mailboxes are an attack surface.') }}</span>
                             </span>
                         </label>
                     </div>

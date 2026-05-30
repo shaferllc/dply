@@ -17,6 +17,7 @@ use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerConfigFileCatalog;
 use App\Services\Servers\ServerConfigFileEditor;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\EdgeProxyWorkspaceViewData;
 use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -396,7 +397,8 @@ class WorkspaceConfiguration extends Component
      */
     public function configReturnContext(): ?array
     {
-        if ($this->config_from !== 'webserver' || $this->config_scope === '') {
+        $from = $this->resolvedConfigFrom();
+        if (! in_array($from, ['webserver', 'edge-proxy'], true) || $this->config_scope === '') {
             return null;
         }
 
@@ -407,10 +409,27 @@ class WorkspaceConfiguration extends Component
 
         $catalog = array_merge(
             WebserverWorkspaceViewData::webserverCatalog(),
-            WebserverWorkspaceViewData::edgeProxyCatalog(),
+            EdgeProxyWorkspaceViewData::edgeProxyCatalog(),
         );
         $engineLabel = (string) ($catalog[$engine]['label'] ?? ucfirst($engine));
         $returnSub = $this->sanitizedConfigReturnSub($engine);
+
+        if ($from === 'edge-proxy') {
+            return [
+                'engine' => $engine,
+                'engine_label' => $engineLabel,
+                'back_label' => __('Back to :engine edge proxy', ['engine' => $engineLabel]),
+                'back_url' => route('servers.edge-proxy', [
+                    'server' => $this->server,
+                    'tab' => $engine,
+                    'sub' => $returnSub,
+                ]),
+                'title' => __('Opened from :engine edge proxy', ['engine' => $engineLabel]),
+                'description' => __('The edge proxy Config tab sends you here to edit allowlisted :engine files with validate, diff, backup, and restore. The file list is filtered to this stack — use “Show all files” to browse everything on the server. When you are done, use the back link to return to overview, live state, logs, and service controls.', [
+                    'engine' => $engineLabel,
+                ]),
+            ];
+        }
 
         return [
             'engine' => $engine,
@@ -433,7 +452,23 @@ class WorkspaceConfiguration extends Component
      */
     public static function webserverConfigurationScopes(): array
     {
-        return ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'];
+        return ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy'];
+    }
+
+    /**
+     * Edge proxy engines (Traefik, HAProxy, …) must return to the edge-proxy
+     * workspace even when older links used from=webserver.
+     */
+    private function resolvedConfigFrom(): string
+    {
+        $from = strtolower(trim($this->config_from));
+        $engine = strtolower(trim($this->config_scope));
+
+        if ($from === 'webserver' && isset(EdgeProxyWorkspaceViewData::edgeProxyCatalog()[$engine])) {
+            return 'edge-proxy';
+        }
+
+        return $from;
     }
 
     private function sanitizedConfigReturnSub(string $engine): string
@@ -448,8 +483,14 @@ class WorkspaceConfiguration extends Component
             'caddy' => ['overview', 'logs', 'info', 'routes', 'upstreams', 'certs', 'snippets', 'admin'],
             'apache' => ['overview', 'logs', 'info', 'vhosts', 'modules', 'cache', 'certs', 'workers'],
             'openlitespeed' => ['overview', 'logs', 'info', 'vhosts', 'listeners', 'extapps', 'modules', 'cache'],
-            'traefik' => ['overview', 'logs', 'info', 'routers', 'services', 'middlewares', 'providers'],
+            'traefik' => [
+                'overview', 'logs', 'info',
+                'routers', 'services', 'middlewares', 'entrypoints',
+                'tcprouters', 'tcpservices', 'udprouters', 'udpservices', 'tls', 'providers',
+                'static', 'dynamic',
+            ],
             'haproxy' => ['overview', 'logs', 'info', 'frontends', 'backends', 'ssl', 'runtime'],
+            'envoy' => ['overview', 'logs', 'info', 'listeners', 'clusters', 'runtime'],
         ];
 
         $allowed = $allowedByEngine[$engine] ?? ['overview'];

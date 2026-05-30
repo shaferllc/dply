@@ -23,6 +23,7 @@ use App\Http\Controllers\OrganizationComplianceExportController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\SiteWorkspaceController;
+use App\Http\Controllers\TraefikDashboardProxyController;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
@@ -123,6 +124,7 @@ use App\Livewire\Servers\WorkspaceDeployPolicy;
 use App\Livewire\Servers\WorkspaceDeployPolicyPreview;
 use App\Livewire\Servers\WorkspaceDocker;
 use App\Livewire\Servers\WorkspaceDockerPreview;
+use App\Livewire\Servers\WorkspaceEdgeProxy;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFilesPreview;
 use App\Livewire\Servers\WorkspaceFirewall;
@@ -156,6 +158,7 @@ use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
 use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
+use App\Livewire\Settings\CliAuthentications as SettingsCliAuthentications;
 use App\Livewire\Settings\Hub as SettingsHub;
 use App\Livewire\Settings\NotificationChannels as SettingsNotificationChannels;
 use App\Livewire\Settings\Security as SettingsSecurity;
@@ -411,6 +414,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/profile/source-control', SettingsSourceControl::class)->name('profile.source-control');
     Route::livewire('/profile/ssh-keys', SettingsSshKeys::class)->name('profile.ssh-keys');
     Route::livewire('/profile/api-keys', SettingsApiKeys::class)->name('profile.api-keys');
+    Route::livewire('/profile/cli', SettingsCliAuthentications::class)->name('profile.cli');
     Route::livewire('/profile/backup-configurations', SettingsBackupConfigurations::class)->name('profile.backup-configurations');
     Route::livewire('/profile/notification-channels', SettingsNotificationChannels::class)->name('profile.notification-channels');
     Route::livewire('/profile/notification-channels/bulk-assign', BulkNotificationAssignments::class)->name('profile.notification-channels.bulk-assign');
@@ -721,9 +725,19 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
     Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
+    Route::livewire('servers/{server}/edge-proxy', WorkspaceEdgeProxy::class)->name('servers.edge-proxy');
     Route::get('servers/{server}/webserver/caddy/admin-api/{path?}', CaddyAdminApiProxyController::class)
         ->where('path', '.*')
         ->name('servers.webserver.caddy.admin-api');
+    Route::get('servers/{server}/traefik/dashboard/{path?}', TraefikDashboardProxyController::class)
+        ->where('path', '.*')
+        ->name('servers.traefik.dashboard');
+    Route::get('servers/{server}/traefik/api/{path?}', TraefikDashboardProxyController::class)
+        ->where('path', '.*')
+        ->name('servers.traefik.api');
+    Route::get('servers/{server}/traefik/assets/{path}', TraefikDashboardProxyController::class)
+        ->where('path', '.*')
+        ->name('servers.traefik.dashboard.assets');
     Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
