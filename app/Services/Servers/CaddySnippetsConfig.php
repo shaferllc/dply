@@ -40,19 +40,38 @@ class CaddySnippetsConfig
      *
      * @return array{snippets: list<array{name: string, body: string, raw: string}>, unreadable: bool}
      */
-    public function read(Server $server): array
+    public function read(Server $server, ?ConsoleEmitter $emitter = null): array
     {
+        $emit = $emitter ?? new ConsoleEmitter(null);
+        $emit->step('caddy-snippets', 'Reading '.self::REMOTE_PATH);
+
         try {
             $ssh = new SshConnection($server);
             $contents = $ssh->exec('sudo -n cat '.escapeshellarg(self::REMOTE_PATH).' 2>/dev/null', 15);
             if ($contents === '' || $ssh->lastExecExitCode() !== 0) {
+                $emit->error('Could not read '.self::REMOTE_PATH.' (exit '.($ssh->lastExecExitCode() ?? '?').')');
+
                 return ['snippets' => [], 'unreadable' => true];
             }
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $emit->error('SSH failed: '.$e->getMessage());
+
             return ['snippets' => [], 'unreadable' => true];
         }
 
-        return ['snippets' => $this->findSnippetBlocks($contents), 'unreadable' => false];
+        $snippets = $this->findSnippetBlocks($contents);
+        if ($snippets === []) {
+            $emit->info('No `(name) { … }` snippet blocks found in the Caddyfile.');
+        } else {
+            $names = implode(', ', array_map(
+                fn (array $snippet): string => '('.$snippet['name'].')',
+                $snippets,
+            ));
+            $emit->info('Found '.count($snippets).' snippet block(s): '.$names);
+        }
+        $emit->success('Caddyfile read complete.');
+
+        return ['snippets' => $snippets, 'unreadable' => false];
     }
 
     /**

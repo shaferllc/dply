@@ -26,11 +26,11 @@ trait ConfirmsActionWithModal
 
     public bool $confirmActionModalDestructive = false;
 
-    /** @var list<array{label: string, value: string, mono?: bool}>|null */
+    /** @var list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}>|null */
     public ?array $confirmActionModalDetails = null;
 
     /**
-     * @param  list<array{label: string, value: string, mono?: bool}>|null  $details
+     * @param  list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}>|null  $details
      */
     public function openConfirmActionModal(
         string $method,

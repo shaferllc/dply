@@ -1,3 +1,330 @@
+            @if ($key === 'nginx' && $engine_subtab === 'modules' && $isActive && $engineHasFullControls($key))
+                <div class="space-y-4 mb-6" wire:key="nginx-modules-config">
+                    <div class="{{ $card }}">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Modules') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('nginx dynamic modules') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Install `libnginx-mod-*` packages and enable loadable modules via modules-enabled — same workflow as Debian/Ubuntu dynamic modules. Each change runs `nginx -t` and reloads; failed validates auto-revert the symlink.') }}
+                                    <a href="https://docs.nginx.com/nginx/admin-guide/dynamic-modules/dynamic-modules/" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-forest underline decoration-brand-forest/30 hover:decoration-brand-forest">{{ __('nginx dynamic modules guide') }}</a>
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="loadNginxModulesConfig"
+                                wire:loading.attr="disabled"
+                                wire:target="loadNginxModulesConfig"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                            >
+                                <span wire:loading.remove wire:target="loadNginxModulesConfig" class="inline-flex">
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                </span>
+                                <span wire:loading wire:target="loadNginxModulesConfig" class="inline-flex">
+                                    <x-spinner class="h-3.5 w-3.5" />
+                                </span>
+                                {{ __('Reload from server') }}
+                            </button>
+                        </div>
+
+                        <div class="px-6 py-6 sm:px-7">
+                        @if ($nginx_modules_flash)
+                            <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $nginx_modules_flash }}</div>
+                        @endif
+                        @if ($nginx_modules_error)
+                            <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                                <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $nginx_modules_error }}</pre>
+                            </div>
+                        @endif
+
+                        @if (! $nginx_modules_loaded)
+                            <p class="mt-5 text-sm text-brand-moss">
+                                <span wire:loading wire:target="loadNginxModulesConfig" class="inline-flex items-center gap-2">
+                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Listing modules…') }}
+                                </span>
+                                <span wire:loading.remove wire:target="loadNginxModulesConfig">
+                                    {{ __('Click "Reload from server" to list installable and enabled modules.') }}
+                                </span>
+                            </p>
+                        @elseif ($nginx_modules_supports_dynamic)
+                            @php
+                                $filtered = $nginx_modules_filter === 'all'
+                                    ? $nginx_modules_list
+                                    : array_values(array_filter($nginx_modules_list, fn ($m) => $m['type'] === $nginx_modules_filter));
+                                $enabledCount = count(array_filter($nginx_modules_list, fn ($m) => $m['enabled']));
+                                $filters = [
+                                    'all' => __('All'),
+                                    'tls' => __('TLS'),
+                                    'stream' => __('Stream'),
+                                    'mail' => __('Mail'),
+                                    'geo' => __('Geo'),
+                                    'content' => __('Content'),
+                                    'auth' => __('Authentication'),
+                                    'perf' => __('Perf'),
+                                    'observability' => __('Observability'),
+                                    'other' => __('Other'),
+                                ];
+                            @endphp
+                            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 pt-4">
+                                <p class="text-xs text-brand-moss">
+                                    {{ __(':enabled of :total dynamic modules enabled', ['enabled' => $enabledCount, 'total' => count($nginx_modules_list)]) }}
+                                </p>
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach ($filters as $filterKey => $filterLabel)
+                                        <button
+                                            type="button"
+                                            wire:click="setNginxModulesFilter('{{ $filterKey }}')"
+                                            @class([
+                                                'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition',
+                                                'border-brand-forest bg-brand-forest text-brand-cream' => $nginx_modules_filter === $filterKey,
+                                                'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $nginx_modules_filter !== $filterKey,
+                                            ])
+                                        >
+                                            {{ $filterLabel }}
+                                            @if ($filterKey !== 'all')
+                                                <span class="text-[10px] opacity-70">{{ count(array_filter($nginx_modules_list, fn ($m) => $m['type'] === $filterKey)) }}</span>
+                                            @endif
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="mt-4 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-brand-sand/30 text-[11px] uppercase tracking-wide text-brand-mist">
+                                        <tr>
+                                            <th class="px-4 py-2 font-medium">{{ __('Module') }}</th>
+                                            <th class="px-4 py-2 font-medium">{{ __('Package') }}</th>
+                                            <th class="px-4 py-2 font-medium">{{ __('Type') }}</th>
+                                            <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
+                                            <th class="px-4 py-2 font-medium text-right">{{ __('Action') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-brand-ink/5">
+                                        @foreach ($filtered as $mod)
+                                            <tr wire:key="nginx-mod-{{ $mod['name'] }}">
+                                                <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $mod['name'] }}</td>
+                                                <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $mod['package'] ?: '—' }}</td>
+                                                <td class="px-4 py-2 text-xs">
+                                                    <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $mod['type'] }}</span>
+                                                </td>
+                                                <td class="px-4 py-2 text-xs">
+                                                    @if (! $mod['installed'])
+                                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{{ __('not installed') }}</span>
+                                                    @elseif ($mod['enabled'])
+                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('enabled') }}</span>
+                                                    @else
+                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold text-brand-moss">{{ __('disabled') }}</span>
+                                                    @endif
+                                                    @if ($mod['protected'])
+                                                        <span class="ml-1 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700" title="{{ __('Required for dply — disabling is blocked.') }}">{{ __('protected') }}</span>
+                                                    @endif
+                                                </td>
+                                                <td class="px-4 py-2 text-right">
+                                                    @if ($mod['protected'] && $mod['enabled'])
+                                                        <span class="text-brand-mist text-[11px]">—</span>
+                                                    @elseif ($mod['enabled'])
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openConfirmActionModal('toggleNginxModule', ['{{ $mod['name'] }}', false], @js(__('Disable module: :name', ['name' => $mod['name']])), @js(__('Remove the modules-enabled symlink for :name? nginx reloads after the change and reverts automatically if `nginx -t` fails.', ['name' => $mod['name']])), @js(__('Disable')), true)"
+                                                            @disabled($isDeployer || $actionInFlight)
+                                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/30 px-2 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        >
+                                                            <x-heroicon-o-no-symbol class="h-3 w-3" />
+                                                            {{ __('Disable') }}
+                                                        </button>
+                                                    @else
+                                                        <button
+                                                            type="button"
+                                                            wire:click="toggleNginxModule('{{ $mod['name'] }}', true)"
+                                                            @disabled($isDeployer || $actionInFlight)
+                                                            class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        >
+                                                            <x-heroicon-o-power class="h-3 w-3" />
+                                                            {{ $mod['installed'] ? __('Enable') : __('Install & enable') }}
+                                                        </button>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            @if ($nginx_modules_builtins !== [])
+                                <details class="mt-6 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
+                                    <summary class="cursor-pointer text-sm font-semibold text-brand-ink">{{ __('Built-in modules (:n)', ['n' => count($nginx_modules_builtins)]) }}</summary>
+                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Compiled into this nginx binary (`nginx -V`). These cannot be toggled from Dply.') }}</p>
+                                    <ul class="mt-3 flex flex-wrap gap-2">
+                                        @foreach ($nginx_modules_builtins as $builtin)
+                                            <li class="rounded-md bg-white px-2 py-1 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">{{ $builtin['name'] }}</li>
+                                        @endforeach
+                                    </ul>
+                                </details>
+                            @endif
+                        @endif
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if ($key === 'nginx' && $engine_subtab === 'hosts' && $isActive && $engineHasFullControls($key))
+                <div class="space-y-4 mb-6" wire:key="nginx-custom-hosts-config">
+                    <div class="{{ $card }} p-6 sm:p-8">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <h3 class="text-base font-semibold text-brand-ink">{{ __('Custom nginx hosts') }}</h3>
+                                <p class="mt-1 text-sm text-brand-moss">
+                                    {{ __('Add ad-hoc `server {}` blocks as `dply-custom-*.conf` under sites-available. Dply-managed site vhosts are provisioned separately — use this for standalone hostnames or legacy configs.') }}
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    wire:click="openAddNginxCustomHostForm"
+                                    @disabled($isDeployer || $actionInFlight)
+                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    {{ __('Add host') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    wire:click="loadNginxCustomHostsConfig"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadNginxCustomHostsConfig"
+                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                >
+                                    <span wire:loading.remove wire:target="loadNginxCustomHostsConfig" class="inline-flex">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                    </span>
+                                    <span wire:loading wire:target="loadNginxCustomHostsConfig" class="inline-flex">
+                                        <x-spinner class="h-3.5 w-3.5" />
+                                    </span>
+                                    {{ __('Reload from server') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        @if ($nginx_custom_hosts_flash)
+                            <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $nginx_custom_hosts_flash }}</div>
+                        @endif
+                        @if ($nginx_custom_hosts_error)
+                            <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                                <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $nginx_custom_hosts_error }}</pre>
+                            </div>
+                        @endif
+
+                        @if ($nginx_custom_hosts_show_add)
+                            <form wire:submit.prevent="submitAddNginxCustomHost" class="mt-5 rounded-xl border border-brand-forest/30 bg-brand-sand/30 p-4 sm:p-5">
+                                <p class="text-sm font-semibold text-brand-ink">{{ __('Add custom host') }}</p>
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Creates sites-available/dply-custom-{slug}.conf and symlinks it into sites-enabled.') }}</p>
+
+                                <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <label class="block sm:col-span-2">
+                                        <span class="block text-xs font-medium text-brand-ink">{{ __('Slug') }}</span>
+                                        <input type="text" wire:model.lazy="nginx_custom_hosts_new.slug" placeholder="legacy-api" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" required />
+                                    </label>
+                                    <label class="block sm:col-span-2">
+                                        <span class="block text-xs font-medium text-brand-ink">{{ __('Server names') }}</span>
+                                        <input type="text" wire:model.lazy="nginx_custom_hosts_new.server_names" placeholder="api.example.com www.example.com" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" required />
+                                    </label>
+                                    <label class="block">
+                                        <span class="block text-xs font-medium text-brand-ink">{{ __('Listen (one per line)') }}</span>
+                                        <textarea wire:model.lazy="nginx_custom_hosts_new.listen" rows="3" spellcheck="false" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"></textarea>
+                                    </label>
+                                    <label class="block">
+                                        <span class="block text-xs font-medium text-brand-ink">{{ __('Document root') }}</span>
+                                        <input type="text" wire:model.lazy="nginx_custom_hosts_new.root" placeholder="/var/www/example/public" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" required />
+                                    </label>
+                                    <label class="block sm:col-span-2">
+                                        <span class="block text-xs font-medium text-brand-ink">{{ __('Upstream (optional)') }}</span>
+                                        <input type="text" wire:model.lazy="nginx_custom_hosts_new.upstream" placeholder="unix:/run/php/php8.3-fpm.sock" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
+                                        <span class="mt-1 block text-[11px] text-brand-mist">{{ __('fastcgi_pass or proxy_pass target — PHP socket, upstream name, or http:// backend.') }}</span>
+                                    </label>
+                                </div>
+
+                                <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 pt-3">
+                                    <button type="button" wire:click="cancelAddNginxCustomHostForm" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
+                                    <button type="submit" wire:loading.attr="disabled" wire:target="submitAddNginxCustomHost" @disabled($actionInFlight) class="inline-flex items-center gap-2 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60">
+                                        <span wire:loading.remove wire:target="submitAddNginxCustomHost" class="inline-flex"><x-heroicon-o-plus class="h-3.5 w-3.5" /></span>
+                                        <span wire:loading wire:target="submitAddNginxCustomHost" class="inline-flex"><x-spinner variant="cream" class="h-3.5 w-3.5" /></span>
+                                        {{ __('Create and reload') }}
+                                    </button>
+                                </div>
+                            </form>
+                        @endif
+
+                        @if (! $nginx_custom_hosts_loaded)
+                            <p class="mt-5 text-sm text-brand-moss">
+                                <span wire:loading wire:target="loadNginxCustomHostsConfig" class="inline-flex items-center gap-2">
+                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading custom host files…') }}
+                                </span>
+                                <span wire:loading.remove wire:target="loadNginxCustomHostsConfig">
+                                    {{ __('Click "Reload from server" to fetch custom hosts.') }}
+                                </span>
+                            </p>
+                        @elseif ($nginx_custom_hosts_form === [])
+                            <p class="mt-5 text-sm text-brand-moss">{{ __('No custom hosts yet — add one above or create a site from the Sites workspace.') }}</p>
+                        @endif
+                    </div>
+
+                    @if ($nginx_custom_hosts_loaded && $nginx_custom_hosts_form !== [])
+                        <div class="space-y-4">
+                            @foreach ($nginx_custom_hosts_form as $hostSlug => $hostFields)
+                                <form wire:submit.prevent="saveNginxCustomHost(@js($hostSlug))" class="{{ $card }} p-5 sm:p-6" wire:key="nginx-custom-host-{{ $hostSlug }}">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <p class="font-mono text-sm font-semibold text-brand-ink">dply-custom-{{ $hostSlug }}.conf</p>
+                                            <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Custom host') }}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            wire:click="openConfirmActionModal('removeNginxCustomHost', [@js($hostSlug)], @js(__('Remove custom host: :slug', ['slug' => $hostSlug])), @js(__('Delete sites-available/dply-custom-:slug.conf and its sites-enabled symlink?', ['slug' => $hostSlug])), @js(__('Remove')), true)"
+                                            @disabled($isDeployer || $actionInFlight)
+                                            class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            {{ __('Remove') }}
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <label class="block sm:col-span-2">
+                                            <span class="block text-xs font-medium text-brand-ink">{{ __('Server names') }}</span>
+                                            <textarea wire:model.lazy="nginx_custom_hosts_form.{{ $hostSlug }}.server_names" rows="2" spellcheck="false" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white p-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-sage/30"></textarea>
+                                        </label>
+                                        <label class="block">
+                                            <span class="block text-xs font-medium text-brand-ink">{{ __('Listen') }}</span>
+                                            <textarea wire:model.lazy="nginx_custom_hosts_form.{{ $hostSlug }}.listen" rows="3" spellcheck="false" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"></textarea>
+                                        </label>
+                                        <label class="block">
+                                            <span class="block text-xs font-medium text-brand-ink">{{ __('Document root') }}</span>
+                                            <input type="text" wire:model.lazy="nginx_custom_hosts_form.{{ $hostSlug }}.root" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
+                                        </label>
+                                        <label class="block sm:col-span-2">
+                                            <span class="block text-xs font-medium text-brand-ink">{{ __('Upstream') }}</span>
+                                            <input type="text" wire:model.lazy="nginx_custom_hosts_form.{{ $hostSlug }}.upstream" class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white font-mono text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
+                                        </label>
+                                    </div>
+
+                                    <div class="mt-4 flex justify-end border-t border-brand-ink/10 pt-3">
+                                        <button type="submit" wire:loading.attr="disabled" wire:target="saveNginxCustomHost(@js($hostSlug))" @disabled($isDeployer || $actionInFlight) class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60">
+                                            <span wire:loading.remove wire:target="saveNginxCustomHost(@js($hostSlug))" class="inline-flex"><x-heroicon-o-check class="h-4 w-4" /></span>
+                                            <span wire:loading wire:target="saveNginxCustomHost(@js($hostSlug))" class="inline-flex"><x-spinner variant="cream" class="h-4 w-4" /></span>
+                                            {{ __('Save and reload nginx') }}
+                                        </button>
+                                    </div>
+                                </form>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
+
             @if ($key === 'nginx' && $engine_subtab === 'upstreams' && $isActive && $engineHasFullControls($key))
                 @php $nginxPoolParams = \App\Services\Servers\NginxUpstreamsConfig::POOL_PARAMS; @endphp
                 <div class="space-y-4 mb-6" wire:key="nginx-upstreams-config">

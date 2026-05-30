@@ -17,6 +17,7 @@ use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerConfigFileCatalog;
 use App\Services\Servers\ServerConfigFileEditor;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
@@ -36,6 +37,7 @@ class WorkspaceConfiguration extends Component
     use InteractsWithServerWorkspace;
     use ManagesServerConfigRevisions;
 
+    #[Url(as: 'file', except: null, history: true)]
     public ?string $config_selected_path = null;
 
     public string $config_contents = '';
@@ -45,6 +47,12 @@ class WorkspaceConfiguration extends Component
     public ?bool $config_validate_ok = null;
 
     public bool $config_truncated_on_load = false;
+
+    public bool $config_file_loaded = false;
+
+    public bool $config_loaded_from_cache = false;
+
+    public ?string $config_content_cached_at = null;
 
     public ?string $config_last_backup = null;
 
@@ -59,6 +67,14 @@ class WorkspaceConfiguration extends Component
 
     #[Url(as: 'q', except: '')]
     public string $config_search = '';
+
+    /** When set to `webserver`, show a back link to the webserver workspace. */
+    #[Url(as: 'from', except: '')]
+    public string $config_from = '';
+
+    /** Webserver engine sub-tab to restore when using the back link. */
+    #[Url(as: 'return_sub', except: '')]
+    public string $config_return_sub = '';
 
     public ?string $pending_load_console_id = null;
 
@@ -79,9 +95,33 @@ class WorkspaceConfiguration extends Component
 
     public ?string $configCatalogError = null;
 
+    private bool $configRestoredFromUrl = false;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->tryHydrateSelectedFileFromCacheOnMount();
+    }
+
+    public function configFileContentLoading(): bool
+    {
+        return $this->config_selected_path !== null && ! $this->config_file_loaded;
+    }
+
+    public function reloadSelectedConfigFile(): void
+    {
+        if ($this->config_selected_path === null) {
+            return;
+        }
+
+        $path = (string) $this->config_selected_path;
+        RunServerConfigOpJob::forgetFileContentCache((string) $this->server->id, $path);
+        unset($this->config_drafts[$path]);
+        $this->markPathCachedInCatalog($path, false);
+        $this->config_file_loaded = false;
+        $this->config_loaded_from_cache = false;
+        $this->config_content_cached_at = null;
+        $this->loadConfigFile($path, forceRefresh: true);
     }
 
     public function updatedConfigSearch(): void
@@ -132,16 +172,18 @@ class WorkspaceConfiguration extends Component
                 10,
                 fn () => $catalog->groupedFiles($this->server, $scope, $search),
             );
+            $this->refreshCachedFlagsOnCatalog();
         } catch (\Throwable) {
             $this->groupedConfigFiles = [];
             $this->configCatalogError = (string) __('Could not discover config files — confirm the server is reachable.');
         } finally {
             $this->configCatalogLoading = false;
             $this->configCatalogLoaded = true;
+            $this->maybeRestoreConfigFileFromUrl();
         }
     }
 
-    public function loadConfigFile(string $path): void
+    public function loadConfigFile(string $path, bool $forceRefresh = false): void
     {
         if (! $this->guardConfigAction(allowReadOnly: true)) {
             return;
@@ -159,36 +201,24 @@ class WorkspaceConfiguration extends Component
             $this->stashConfigDraft((string) $this->config_selected_path, $this->config_contents);
         }
 
-        if (isset($this->config_drafts[$path])) {
-            $this->config_selected_path = $path;
-            $this->config_contents = $this->config_drafts[$path];
-            $this->config_original_contents = $this->config_contents;
-            $this->config_truncated_on_load = false;
-            $this->config_validate_output = null;
-            $this->config_validate_ok = null;
-            $this->closeConfigSaveDiff();
-            $this->closeConfigRevisionDiff();
-            $this->refreshRemoteConfigBackups();
-            $this->refreshConfigRevisionState();
+        $this->config_selected_path = $path;
+
+        if (! $forceRefresh && isset($this->config_drafts[$path])) {
+            $this->applyLoadedConfigFile($path, $this->config_drafts[$path], truncated: false, fromCache: false);
 
             return;
         }
+
+        if (! $forceRefresh && $this->hydrateConfigFileFromCache($path)) {
+            return;
+        }
+
+        $this->enterPendingConfigFileLoad($path);
 
         $consoleId = $this->seedConfigurationConsoleAction(
             (string) __('Load config: :path', ['path' => basename($path)]),
         );
         $this->pending_load_console_id = $consoleId;
-        $this->pending_load_path = $path;
-        $this->config_selected_path = $path;
-        $this->config_contents = '';
-        $this->config_truncated_on_load = false;
-        $this->config_validate_output = null;
-        $this->config_validate_ok = null;
-        $this->config_last_backup = null;
-        $this->config_backups = [];
-        $this->config_original_contents = '';
-        $this->closeConfigSaveDiff();
-        $this->closeConfigRevisionDiff();
 
         RunServerConfigOpJob::dispatch(
             $this->server->id,
@@ -350,11 +380,81 @@ class WorkspaceConfiguration extends Component
                 'opsReady' => $this->serverOpsReady(),
                 'isDeployer' => $this->currentUserIsDeployer(),
                 'configConsoleRun' => $configConsoleRun,
+                'configReturnContext' => $this->configReturnContext(),
                 'deletionSummary' => $this->showRemoveServerModal
                     ? ServerRemovalAdvisor::summary($this->server)
                     : null,
             ],
         ));
+    }
+
+    /**
+     * Contextual back navigation when the operator arrived from the webserver
+     * workspace Config tab (scope filter + return_sub preserve where they came from).
+     *
+     * @return array{engine: string, engine_label: string, back_label: string, back_url: string, title: string, description: string}|null
+     */
+    public function configReturnContext(): ?array
+    {
+        if ($this->config_from !== 'webserver' || $this->config_scope === '') {
+            return null;
+        }
+
+        $engine = strtolower(trim($this->config_scope));
+        if (! in_array($engine, self::webserverConfigurationScopes(), true)) {
+            return null;
+        }
+
+        $catalog = array_merge(
+            WebserverWorkspaceViewData::webserverCatalog(),
+            WebserverWorkspaceViewData::edgeProxyCatalog(),
+        );
+        $engineLabel = (string) ($catalog[$engine]['label'] ?? ucfirst($engine));
+        $returnSub = $this->sanitizedConfigReturnSub($engine);
+
+        return [
+            'engine' => $engine,
+            'engine_label' => $engineLabel,
+            'back_label' => __('Back to :engine webserver', ['engine' => $engineLabel]),
+            'back_url' => route('servers.webserver', [
+                'server' => $this->server,
+                'tab' => $engine,
+                'sub' => $returnSub,
+            ]),
+            'title' => __('Opened from :engine webserver', ['engine' => $engineLabel]),
+            'description' => __('The webserver Config tab sends you here to edit allowlisted :engine files with validate, diff, backup, and restore. The file list is filtered to this stack — use “Show all files” to browse everything on the server. When you are done, use the back link to return to overview, live state, logs, and service controls.', [
+                'engine' => $engineLabel,
+            ]),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function webserverConfigurationScopes(): array
+    {
+        return ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'];
+    }
+
+    private function sanitizedConfigReturnSub(string $engine): string
+    {
+        $sub = strtolower(trim($this->config_return_sub));
+        if ($sub === '' || $sub === 'config') {
+            return 'overview';
+        }
+
+        $allowedByEngine = [
+            'nginx' => ['overview', 'logs', 'info', 'hosts', 'upstreams', 'certs', 'modules', 'workers'],
+            'caddy' => ['overview', 'logs', 'info', 'routes', 'upstreams', 'certs', 'snippets', 'admin'],
+            'apache' => ['overview', 'logs', 'info', 'vhosts', 'modules', 'certs', 'workers'],
+            'openlitespeed' => ['overview', 'logs', 'info', 'vhosts', 'listeners', 'extapps', 'cache'],
+            'traefik' => ['overview', 'logs', 'info', 'routers', 'services', 'middlewares', 'providers'],
+            'haproxy' => ['overview', 'logs', 'info', 'frontends', 'backends', 'ssl', 'runtime'],
+        ];
+
+        $allowed = $allowedByEngine[$engine] ?? ['overview'];
+
+        return in_array($sub, $allowed, true) ? $sub : 'overview';
     }
 
     protected function stashConfigDraft(string $path, string $contents): void
@@ -370,6 +470,40 @@ class WorkspaceConfiguration extends Component
 
         $this->configCatalogLoaded = false;
         $this->loadConfigCatalog();
+    }
+
+    /**
+     * After a full-page load with ?file=…, re-fetch file contents once the
+     * catalog has finished discovering allowlisted paths.
+     */
+    protected function maybeRestoreConfigFileFromUrl(): void
+    {
+        if ($this->configRestoredFromUrl || $this->config_selected_path === null || $this->config_selected_path === '') {
+            return;
+        }
+
+        if ($this->pending_load_console_id !== null) {
+            return;
+        }
+
+        if ($this->config_file_loaded) {
+            $this->configRestoredFromUrl = true;
+
+            return;
+        }
+
+        $path = $this->config_selected_path;
+
+        try {
+            $this->assertCatalogPath($path);
+        } catch (\InvalidArgumentException) {
+            $this->config_selected_path = null;
+
+            return;
+        }
+
+        $this->configRestoredFromUrl = true;
+        $this->loadConfigFile($path);
     }
 
     protected function configCatalogCacheKey(?string $scope, ?string $search): string
@@ -423,23 +557,26 @@ class WorkspaceConfiguration extends Component
             );
             if (is_array($cached)) {
                 $path = $this->pending_load_path;
-                $this->config_selected_path = $path;
-                $this->config_contents = (string) ($cached['contents'] ?? '');
-                $this->config_original_contents = $this->config_contents;
-                $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
-                $this->stashConfigDraft($path, $this->config_contents);
+                $this->applyLoadedConfigFile(
+                    $path,
+                    (string) ($cached['contents'] ?? ''),
+                    truncated: (bool) ($cached['truncated'] ?? false),
+                    fromCache: false,
+                );
                 Cache::forget($this->configCatalogCacheKey(
                     $this->config_scope !== '' ? $this->config_scope : null,
                     $this->config_search !== '' ? $this->config_search : null,
                 ));
-                $this->refreshRemoteConfigBackups();
-                $this->refreshConfigRevisionState();
+                $this->refreshCachedFlagsOnCatalog();
             }
 
             $row->forceFill(['dismissed_at' => now()])->save();
         } elseif ($row->status === ConsoleAction::STATUS_FAILED) {
             $this->toastError(__('Failed to load config file.'));
             $this->config_selected_path = null;
+            $this->config_file_loaded = false;
+            $this->config_loaded_from_cache = false;
+            $this->config_content_cached_at = null;
             $this->config_contents = '';
             $this->config_original_contents = '';
             $row->forceFill(['dismissed_at' => now()])->save();
@@ -536,5 +673,112 @@ class WorkspaceConfiguration extends Component
         ]);
 
         return (string) $row->id;
+    }
+
+    protected function tryHydrateSelectedFileFromCacheOnMount(): void
+    {
+        if ($this->config_selected_path === null || $this->config_selected_path === '' || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        try {
+            $this->assertCatalogPath((string) $this->config_selected_path);
+        } catch (\InvalidArgumentException) {
+            $this->config_selected_path = null;
+
+            return;
+        }
+
+        $this->hydrateConfigFileFromCache((string) $this->config_selected_path);
+    }
+
+    protected function hydrateConfigFileFromCache(string $path): bool
+    {
+        $cached = Cache::get(RunServerConfigOpJob::fileContentCacheKey((string) $this->server->id, $path));
+        if (! is_array($cached) || ! array_key_exists('contents', $cached)) {
+            return false;
+        }
+
+        $this->applyLoadedConfigFile(
+            $path,
+            (string) $cached['contents'],
+            truncated: (bool) ($cached['truncated'] ?? false),
+            fromCache: true,
+            cachedAt: is_string($cached['cached_at'] ?? null) ? $cached['cached_at'] : null,
+        );
+
+        return true;
+    }
+
+    protected function applyLoadedConfigFile(
+        string $path,
+        string $contents,
+        bool $truncated,
+        bool $fromCache,
+        ?string $cachedAt = null,
+    ): void {
+        $this->config_selected_path = $path;
+        $this->config_contents = $contents;
+        $this->config_original_contents = $contents;
+        $this->config_truncated_on_load = $truncated;
+        $this->config_file_loaded = true;
+        $this->config_loaded_from_cache = $fromCache;
+        $this->config_content_cached_at = $fromCache ? $cachedAt : null;
+        $this->pending_load_path = null;
+        $this->pending_load_console_id = null;
+        $this->config_validate_output = null;
+        $this->config_validate_ok = null;
+        $this->closeConfigSaveDiff();
+        $this->closeConfigRevisionDiff();
+        $this->stashConfigDraft($path, $contents);
+        $this->refreshCachedFlagsOnCatalog();
+        $this->refreshRemoteConfigBackups();
+        $this->refreshConfigRevisionState();
+    }
+
+    protected function enterPendingConfigFileLoad(string $path): void
+    {
+        $this->pending_load_path = $path;
+        $this->pending_load_console_id = null;
+        $this->config_file_loaded = false;
+        $this->config_loaded_from_cache = false;
+        $this->config_content_cached_at = null;
+        $this->config_contents = '';
+        $this->config_truncated_on_load = false;
+        $this->config_validate_output = null;
+        $this->config_validate_ok = null;
+        $this->config_last_backup = null;
+        $this->config_backups = [];
+        $this->config_original_contents = '';
+        $this->closeConfigSaveDiff();
+        $this->closeConfigRevisionDiff();
+    }
+
+    protected function refreshCachedFlagsOnCatalog(): void
+    {
+        if ($this->groupedConfigFiles === []) {
+            return;
+        }
+
+        $serverId = (string) $this->server->id;
+
+        foreach ($this->groupedConfigFiles as $groupKey => $group) {
+            foreach ($group['files'] as $index => $file) {
+                $path = (string) ($file['path'] ?? '');
+                $this->groupedConfigFiles[$groupKey]['files'][$index]['cached'] = $path !== ''
+                    && Cache::has(RunServerConfigOpJob::fileContentCacheKey($serverId, $path));
+            }
+        }
+    }
+
+    protected function markPathCachedInCatalog(string $path, bool $cached): void
+    {
+        foreach ($this->groupedConfigFiles as $groupKey => $group) {
+            foreach ($group['files'] as $index => $file) {
+                if (($file['path'] ?? '') === $path) {
+                    $this->groupedConfigFiles[$groupKey]['files'][$index]['cached'] = $cached;
+                }
+            }
+        }
     }
 }

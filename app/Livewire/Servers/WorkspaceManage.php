@@ -29,6 +29,8 @@ use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\SshConnection;
+use App\Support\Servers\ServerConsoleActionLookup;
+use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -98,6 +100,15 @@ class WorkspaceManage extends Component
      * When set, {@see syncManageRemoteTaskFromCache} polls cache until the queued SSH task finishes.
      */
     public ?string $manageRemoteTaskId = null;
+
+    /** Set by {@see WorkspaceWebserver::repairCaddyPhpFpmUpstream()} before {@see runAllowlistedAction()}. */
+    public ?string $allowlistedActionPhpVersion = null;
+
+    /** Server default PHP when it differs from the Caddy upstream socket version. */
+    public ?string $allowlistedActionPhpVersionFallback = null;
+
+    /** Stale PHP version from Caddy upstream when site configs need rewriting. */
+    public ?string $allowlistedActionUpstreamPhpVersion = null;
 
     /** Full task name for the in-flight queued SSH job (used to trigger post-run reprobe). */
     public ?string $manageRemoteTaskName = null;
@@ -413,7 +424,19 @@ BASH;
 
         $script = (string) $def['script'];
         $meta = $this->server->meta ?? [];
-        if (in_array($key, ['restart_php_fpm', 'reload_php_fpm'], true)) {
+        if ($key === 'repair_caddy_php_fpm_upstream') {
+            $v = $this->allowlistedActionPhpVersion;
+            if (! is_string($v) || preg_match('/^\d+\.\d+$/', $v) !== 1) {
+                $this->remote_error = __('Could not determine PHP version for this repair.');
+
+                return;
+            }
+            $script = 'export DPLY_PHP_VERSION='.escapeshellarg($v)."\n".$script;
+            $upstream = $this->allowlistedActionUpstreamPhpVersion;
+            if (is_string($upstream) && preg_match('/^\d+\.\d+$/', $upstream) === 1 && $upstream !== $v) {
+                $script = 'export DPLY_UPSTREAM_PHP_VERSION='.escapeshellarg($upstream)."\n".$script;
+            }
+        } elseif (in_array($key, ['restart_php_fpm', 'reload_php_fpm'], true)) {
             $v = (string) ($meta['default_php_version'] ?? '8.3');
             if (! preg_match('/^\d+\.\d+$/', $v)) {
                 $v = '8.3';
@@ -516,6 +539,10 @@ BASH;
             }
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
+        } finally {
+            if (! $this->shouldQueueManageRemoteTasks()) {
+                $this->pendingToolActionKey = null;
+            }
         }
     }
 
@@ -927,6 +954,13 @@ BASH;
             return;
         }
 
+        if (WebserverWorkspaceViewData::isComingSoonEngine($target)) {
+            $label = WebserverWorkspaceViewData::webserverCatalog()[$target]['label'] ?? $target;
+            $this->toastError(__(':engine switching is coming soon.', ['engine' => $label]));
+
+            return;
+        }
+
         $this->switch_plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
         $this->switch_tls_to_caddy = false;
         $this->dispatch('open-modal', 'webserver-switch-modal');
@@ -1080,6 +1114,54 @@ BASH;
             return;
         }
 
+        $row->forceFill([
+            'status' => ConsoleAction::STATUS_FAILED,
+            'finished_at' => now(),
+            'error' => 'Aborted by operator',
+            'dismissed_at' => now(),
+        ])->save();
+
+        $this->dispatchWebserverSwitchRevert($row, __('Stopping the switch and reverting :to → :from. Progress shows in the banner.'));
+    }
+
+    /**
+     * After a switch fails (e.g. cutover could not start Caddy), uninstall the
+     * partial target and bring the original webserver back on :80.
+     */
+    public function cleanupFailedWebserverSwitch(string $runId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'webserver_switch')
+            ->whereNull('dismissed_at')
+            ->first();
+
+        if ($row === null || $row->isInFlight()) {
+            $this->toastError(__('No failed webserver switch to clean up.'));
+
+            return;
+        }
+
+        if ($row->status !== ConsoleAction::STATUS_FAILED) {
+            $this->toastError(__('Cleanup is only available for a failed switch.'));
+
+            return;
+        }
+
+        $row->forceFill(['dismissed_at' => now()])->save();
+
+        $this->dispatchWebserverSwitchRevert($row, __('Cleaning up the failed switch and restoring :from on :80. Progress shows in the banner.'));
+    }
+
+    /**
+     * @return array{from: string, to: string}|null
+     */
+    private function webserverSwitchEndpointsFromRow(ConsoleAction $row): ?array
+    {
         $output = is_array($row->output) ? $row->output : [];
         $meta = is_array($output['meta'] ?? null) ? $output['meta'] : [];
         $serverWebserver = strtolower((string) ($this->server->meta['webserver'] ?? 'nginx'));
@@ -1091,23 +1173,24 @@ BASH;
         }
 
         if ($to === '' || $to === $from) {
-            $this->toastError(__('Cannot determine the revert target from the failed switch.'));
+            return null;
+        }
+
+        return ['from' => $from, 'to' => $to];
+    }
+
+    private function dispatchWebserverSwitchRevert(ConsoleAction $row, string $toastTemplate): void
+    {
+        $endpoints = $this->webserverSwitchEndpointsFromRow($row);
+        if ($endpoints === null) {
+            $this->toastError(__('Cannot determine which webserver to restore from this switch run.'));
 
             return;
         }
 
-        // Mark the stuck row failed + dismissed so hasInflightWebserverSwitch()
-        // releases and the seed below isn't auto-dismissed by its own pre-clean.
-        $row->forceFill([
-            'status' => ConsoleAction::STATUS_FAILED,
-            'finished_at' => now(),
-            'error' => 'Aborted by operator',
-            'dismissed_at' => now(),
-        ])->save();
+        $from = $endpoints['from'];
+        $to = $endpoints['to'];
 
-        // Seed a fresh row so the banner immediately switches to the revert
-        // progress view rather than going blank between dispatch and worker
-        // pickup. Same kind so the banner partial transparently picks it up.
         $this->seedQueuedWebserverSwitchAction(
             label: __('Reverting webserver switch: :to → :from …', ['to' => $to, 'from' => $from]),
             from: $to,
@@ -1121,10 +1204,7 @@ BASH;
             userId: auth()->id(),
         );
 
-        $this->toastSuccess(__('Stopping the switch and reverting :to → :from. Progress shows in the banner.', [
-            'to' => $to,
-            'from' => $from,
-        ]));
+        $this->toastSuccess(__($toastTemplate, ['to' => $to, 'from' => $from]));
     }
 
     /**
@@ -1143,13 +1223,7 @@ BASH;
      */
     public function hasInflightWebserverSwitch(): bool
     {
-        return ConsoleAction::query()
-            ->where('subject_type', $this->server->getMorphClass())
-            ->where('subject_id', $this->server->getKey())
-            ->where('kind', 'webserver_switch')
-            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
-            ->whereNull('dismissed_at')
-            ->exists();
+        return app(ServerConsoleActionLookup::class)->hasInflightWebserverSwitch($this->server);
     }
 
     /**
@@ -1159,13 +1233,7 @@ BASH;
      */
     public function hasInflightEdgeProxyAction(): bool
     {
-        return ConsoleAction::query()
-            ->where('subject_type', $this->server->getMorphClass())
-            ->where('subject_id', $this->server->getKey())
-            ->where('kind', 'edge_proxy')
-            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
-            ->whereNull('dismissed_at')
-            ->exists();
+        return app(ServerConsoleActionLookup::class)->hasInflightEdgeProxy($this->server);
     }
 
     /**
@@ -1183,6 +1251,14 @@ BASH;
 
             return;
         }
+
+        if (WebserverWorkspaceViewData::isComingSoonEdgeProxy($target)) {
+            $label = WebserverWorkspaceViewData::edgeProxyCatalog()[$target]['label'] ?? $target;
+            $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
+
+            return;
+        }
+
         if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
             $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
 
@@ -1385,6 +1461,14 @@ BASH;
         }
 
         return $ops;
+    }
+
+    /**
+     * @return array<string, array{status: string, message: string, label: string}>
+     */
+    public function activeManageActionOperations(): array
+    {
+        return $this->activeToolActionOperations();
     }
 
     /**
@@ -1593,6 +1677,24 @@ BASH;
             ?? null;
 
         return is_array($entry) && (bool) ($entry['rerun_probe_after_finish'] ?? false);
+    }
+
+    protected function shouldRefreshWebserverLiveStateAfterRemoteTask(?string $taskName): bool
+    {
+        if (! is_string($taskName) || $taskName === '') {
+            return false;
+        }
+
+        if (! preg_match('/^manage-action:(.+)$/', $taskName, $matches)) {
+            return false;
+        }
+
+        $key = $matches[1];
+        $entry = config('server_manage.service_actions', [])[$key]
+            ?? config('server_manage.dangerous_actions', [])[$key]
+            ?? null;
+
+        return is_array($entry) && (bool) ($entry['refresh_webserver_live_state_after_finish'] ?? false);
     }
 
     protected function runPostMiseInventoryRefresh(): void

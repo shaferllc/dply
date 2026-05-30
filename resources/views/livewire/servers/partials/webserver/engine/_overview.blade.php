@@ -1,5 +1,8 @@
-            @if ($engine_subtab === 'overview')
-            <div class="{{ $card }} overflow-hidden">
+            @if (($optimisticEngineSubtabs ?? false) || $engine_subtab === 'overview')
+            <div
+                @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'overview'" x-cloak @endif
+                class="{{ $card }} overflow-hidden"
+            >
                 {{-- Header — engine icon + name + version + status pill.
                      Matches the redesigned Overview-tab panel for consistency. --}}
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
@@ -13,8 +16,16 @@
                             @if ($version !== '')
                                 <p class="font-mono text-[11px] text-brand-mist">{{ $version }}</p>
                             @endif
-                            @if (! $isActive && ! $isEdgeProxyPanel)
-                                <p class="mt-0.5 text-[12px] text-brand-moss">{{ __('Not the active webserver on this server.') }}</p>
+                            @if (! $isActive)
+                                @php
+                                    $inactiveEngineHint = app(\App\Support\Servers\SystemdServiceStandbyReasonResolver::class)
+                                        ->inactiveEngineHint($server, $key, $isEdgeProxyPanel);
+                                @endphp
+                                <p class="mt-0.5 text-[12px] text-brand-moss">
+                                    {{ $inactiveEngineHint ?? ($isEdgeProxyPanel
+                                        ? __('Not the active edge proxy on this server.')
+                                        : __('Not the active webserver on this server.')) }}
+                                </p>
                             @endif
                             @if (! $isActive && ! $isEdgeProxyPanel)
                                 @php
@@ -78,22 +89,13 @@
                                                 @foreach ($visibleRows as [$actionKey, $dangerous])
                                                     @if (! empty($serviceActions[$actionKey]))
                                                         @php $action = $serviceActions[$actionKey]; @endphp
-                                                        <button
-                                                            type="button"
-                                                            @if ($dangerous) wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), true)" @else wire:click="runAllowlistedAction('{{ $actionKey }}')" @endif
-                                                            wire:loading.attr="disabled"
-                                                            wire:target="openConfirmActionModal,runAllowlistedAction"
-                                                            @disabled($actionInFlight)
-                                                            title="{{ $actionInFlight ? __('Another action is running — wait for it to finish.') : ($action['description'] ?? '') }}"
-                                                            @class([
-                                                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60',
-                                                                'border-brand-ink/15 bg-white text-brand-ink shadow-sm hover:bg-brand-sand/40' => ! $dangerous,
-                                                                'border-rose-200 bg-rose-50/30 text-rose-800 hover:bg-rose-50' => $dangerous,
-                                                            ])
-                                                        >
-                                                            <x-dynamic-component :component="$iconForAction($actionKey)" class="h-3.5 w-3.5 opacity-80" aria-hidden="true" />
-                                                            {{ $action['label'] }}
-                                                        </button>
+                                                        @include('livewire.servers.partials.webserver._service-action-button', [
+                                                            'actionKey' => $actionKey,
+                                                            'dangerous' => $dangerous,
+                                                            'action' => $action,
+                                                            'actionInFlight' => $actionInFlight,
+                                                            'variant' => 'lifecycle',
+                                                        ])
                                                     @endif
                                                 @endforeach
                                             </div>
@@ -113,18 +115,13 @@
                                                 @foreach ($tools as [$actionKey, $dangerous])
                                                     @if (! empty($serviceActions[$actionKey]))
                                                         @php $action = $serviceActions[$actionKey]; @endphp
-                                                        <button
-                                                            type="button"
-                                                            @if ($dangerous) wire:click="openConfirmActionModal('runAllowlistedAction', ['{{ $actionKey }}'], @js($action['label']), @js($action['confirm']), @js($action['label']), true)" @else wire:click="runAllowlistedAction('{{ $actionKey }}')" @endif
-                                                            wire:loading.attr="disabled"
-                                                            wire:target="openConfirmActionModal,runAllowlistedAction"
-                                                            @disabled($actionInFlight)
-                                                            title="{{ $actionInFlight ? __('Another action is running — wait for it to finish.') : ($action['description'] ?? '') }}"
-                                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-                                                        >
-                                                            <x-dynamic-component :component="$iconForAction($actionKey)" class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
-                                                            {{ $action['label'] }}
-                                                        </button>
+                                                        @include('livewire.servers.partials.webserver._service-action-button', [
+                                                            'actionKey' => $actionKey,
+                                                            'dangerous' => $dangerous,
+                                                            'action' => $action,
+                                                            'actionInFlight' => $actionInFlight,
+                                                            'variant' => 'tools',
+                                                        ])
                                                     @endif
                                                 @endforeach
                                             </div>
@@ -264,7 +261,25 @@
                         <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss">
                             <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
                             <p class="mt-2">{{ __('No health data yet. The agent will start posting :engine metrics on the next push.', ['engine' => $info['label']]) }}</p>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Existing servers may need a one-shot config backfill before the stats endpoint is reachable.') }}</p>
+                            @if ($key === 'caddy')
+                                <p class="mt-1 text-[11px] text-brand-mist">
+                                    {{ __('Charts need the Monitor tab agent installed and pushing samples. Caddy is scraped from the admin API :endpoint — do not set :admin_off in the global Caddyfile.', ['endpoint' => '/metrics (:2019)', 'admin_off' => 'admin off']) }}
+                                </p>
+                                <p class="mt-2">
+                                    <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">
+                                        {{ __('Open Monitor → install or verify guest push') }}
+                                    </a>
+                                </p>
+                            @elseif (in_array($key, ['nginx', 'apache'], true))
+                                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Existing servers may need a one-shot config backfill before the stats endpoint is reachable.') }}</p>
+                            @else
+                                <p class="mt-1 text-[11px] text-brand-mist">
+                                    <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2 hover:text-brand-forest/80">
+                                        {{ __('Open Monitor') }}
+                                    </a>
+                                    {{ __('to install or verify the metrics agent.') }}
+                                </p>
+                            @endif
                         </div>
                     @else
                         <div class="mt-5 grid gap-4 sm:grid-cols-3">

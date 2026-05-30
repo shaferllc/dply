@@ -60,7 +60,17 @@
                                                         @endif
                                                     </span>
                                                     <span class="min-w-0 flex-1">
-                                                        <span class="block truncate font-medium text-brand-ink">{{ $f['label'] }}</span>
+                                                        <span class="flex min-w-0 items-center gap-1.5">
+                                                            <span class="block truncate font-medium text-brand-ink">{{ $f['label'] }}</span>
+                                                            @php
+                                                                $descResolver = app(\App\Services\Servers\ConfigFileDescriptionResolver::class);
+                                                                $fileRole = $descResolver->roleFor($f['path'], $key, 'webserver');
+                                                                $fileRoleLabel = $descResolver->roleLabel($fileRole);
+                                                            @endphp
+                                                            @if ($fileRoleLabel)
+                                                                <x-config-file-role-pill :label="$fileRoleLabel" :role="$fileRole" />
+                                                            @endif
+                                                        </span>
                                                         <span class="block truncate font-mono text-[10px] text-brand-mist">{{ $f['path'] }}</span>
                                                         @php $fileDescription = app(\App\Services\Servers\WebserverConfigDocLinks::class)->describe($key, $f['path']); @endphp
                                                         @if ($fileDescription)
@@ -147,6 +157,7 @@
                                             @endif
                                             <button
                                                 type="button"
+                                                x-on:click="$dispatch('config-editor-sync')"
                                                 wire:click="validateWebserverConfigBuffer"
                                                 wire:loading.attr="disabled"
                                                 wire:target="validateWebserverConfigBuffer"
@@ -163,6 +174,7 @@
                                             </button>
                                             <button
                                                 type="button"
+                                                x-on:click="$dispatch('config-editor-sync')"
                                                 wire:click="saveWebserverConfig"
                                                 wire:loading.attr="disabled"
                                                 wire:target="saveWebserverConfig"
@@ -180,18 +192,11 @@
                                         </div>
                                     </div>
 
-                                    {{-- wire:key tied to the path forces Livewire to recreate this
-                                         textarea when a new file is loaded. Without it, the morph
-                                         step preserves the existing (empty) value attribute when
-                                         the @else branch re-mounts and the buffer never paints
-                                         the freshly-loaded contents. --}}
-                                    <textarea
-                                        wire:model.live.debounce.500ms="config_contents"
-                                        wire:key="config-textarea-{{ $config_selected_path }}"
-                                        rows="22"
-                                        spellcheck="false"
-                                        class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100 shadow-inner focus:border-brand-forest focus:ring-brand-sage/30"
-                                    >{{ $config_contents }}</textarea>
+                                    @include('livewire.servers.partials.configuration.code-editor', [
+                                        'path' => $config_selected_path,
+                                        'readOnly' => false,
+                                        'autocomplete' => [],
+                                    ])
 
                                     @include('livewire.servers.partials.webserver.engine._config-revisions')
 

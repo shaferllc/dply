@@ -118,6 +118,7 @@ use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
 use App\Support\Edge\EdgeFilesystemRegistrar;
 use App\Support\Edge\EdgePlatformCredentials;
+use App\Support\Servers\ServerConsoleActionLookup;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
@@ -165,6 +166,7 @@ class AppServiceProvider extends ServiceProvider
         // server's sites (+ config profiles + certificates) independently. A
         // shared, request-memoized loader collapses those into one query set.
         $this->app->scoped(ServerWebserverSitesProvider::class);
+        $this->app->scoped(ServerConsoleActionLookup::class);
 
         // Scoped: queue jobs may override SSH private key for one deploy via
         // EphemeralDeployCredentialManager without touching the server key.

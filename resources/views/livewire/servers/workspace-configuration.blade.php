@@ -21,6 +21,23 @@
         ])
     @endif
 
+    @if ($configReturnContext)
+        <div class="mb-5 flex flex-col gap-4 rounded-2xl border border-brand-sage/25 bg-brand-sage/10 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold text-brand-ink">{{ $configReturnContext['title'] }}</p>
+                <p class="mt-1.5 max-w-3xl text-sm leading-relaxed text-brand-moss">{{ $configReturnContext['description'] }}</p>
+            </div>
+            <a
+                href="{{ $configReturnContext['back_url'] }}"
+                wire:navigate
+                class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+            >
+                <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ $configReturnContext['back_label'] }}
+            </a>
+        </div>
+    @endif
+
     <x-explainer>
         <p>{{ __('Pick a file, edit in the editor, validate the buffer, review the diff, then save. Paths are restricted to the server allowlist. Deployers can browse and view files read-only.') }}</p>
     </x-explainer>
@@ -32,7 +49,7 @@
             <div wire:init="loadConfigCatalog" class="hidden" aria-hidden="true"></div>
         @endif
 
-        @if ($pending_load_console_id !== null)
+        @if ($pending_load_console_id !== null || $pending_validate_console_id !== null || $this->configFileContentLoading())
             <div wire:poll.2s class="hidden" aria-hidden="true"></div>
         @endif
 
@@ -47,10 +64,16 @@
                     <p class="mt-1 max-w-3xl text-sm leading-relaxed text-brand-moss">{{ __('Load → edit → validate → review diff → save. Saves snapshot the live file, atomically install, re-validate, and auto-restore when validation rejects the new file.') }}</p>
                 </div>
                 @if ($config_scope !== '')
-                    <button type="button" wire:click="clearConfigScope" class="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
-                        <x-heroicon-o-x-mark class="h-3 w-3" />
-                        {{ __('Clear scope filter') }}
-                    </button>
+                    <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-funnel class="h-3 w-3" />
+                            {{ __('Filtered: :scope', ['scope' => \Illuminate\Support\Str::headline($config_scope)]) }}
+                        </span>
+                        <button type="button" wire:click="clearConfigScope" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                            <x-heroicon-o-x-mark class="h-3 w-3" />
+                            {{ __('Show all files') }}
+                        </button>
+                    </div>
                 @endif
             </div>
 
@@ -66,13 +89,17 @@
                 />
             </div>
 
-            <div class="mt-5 grid gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
-                @include('livewire.servers.partials.configuration.file-picker')
+            <div class="mt-5 grid h-[60vh] gap-5 md:grid-cols-[280px_minmax(0,1fr)]">
+                <div class="min-h-0">
+                    @include('livewire.servers.partials.configuration.file-picker')
+                </div>
 
-                @include('livewire.servers.partials.configuration.editor-panel', [
-                    'configAutocomplete' => $configAutocomplete,
-                    'configFileType' => $configFileType,
-                ])
+                <div class="min-h-0">
+                    @include('livewire.servers.partials.configuration.editor-panel', [
+                        'configAutocomplete' => $configAutocomplete,
+                        'configFileType' => $configFileType,
+                    ])
+                </div>
             </div>
             </div>
         </div>

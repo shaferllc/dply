@@ -18,6 +18,12 @@ $width = match ($width) {
     class="relative"
     :class="open ? 'z-50' : ''"
     x-data="{ open: false }"
+    x-effect="
+        const row = $el.closest('tr');
+        if (! row) return;
+        row.style.position = 'relative';
+        row.style.zIndex = open ? '30' : '';
+    "
     @@click.outside="open = false"
     @@close.stop="open = false"
 >

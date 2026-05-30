@@ -23,6 +23,10 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    config(['server_workspace.webserver_coming_soon' => []]);
+});
+
 function makeUser(): User
 {
     $user = User::factory()->create();
@@ -357,15 +361,31 @@ test('cancel clears switch plan', function () {
 });
 
 test('top level webserver workspace renders picker grid', function () {
+    config(['server_workspace.webserver_coming_soon' => ['caddy', 'apache', 'openlitespeed']]);
+    config(['server_workspace.edge_proxy_coming_soon' => ['traefik', 'haproxy']]);
+
     $user = makeUser();
     $server = makeServer($user);
 
     $this->actingAs($user)
-        ->get(route('servers.webserver', $server))
+        ->get(route('servers.webserver', $server).'?tab=change')
         ->assertOk()
         ->assertSee('Webserver')
-        ->assertSee('Switch to Caddy')
-        ->assertSee('Switch to Apache');
+        ->assertSee('Coming soon')
+        ->assertDontSee('Switch to Caddy')
+        ->assertDontSee('Switch to Apache');
+});
+
+test('workspace rejects coming soon switch target', function () {
+    config(['server_workspace.webserver_coming_soon' => ['caddy']]);
+
+    $user = makeUser();
+    $server = makeServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('openSwitchWebserver', 'caddy')
+        ->assertSet('switch_plan', null);
 });
 
 test('legacy manage web redirects to top level webserver', function () {
@@ -519,6 +539,70 @@ test('stop and revert dispatches job and dismisses failed row', function () {
     expect($banner)->not->toBeNull();
     expect($banner->output['meta']['from'] ?? null)->toBe('caddy');
     expect($banner->output['meta']['to'] ?? null)->toBe('nginx');
+});
+
+test('cleanup failed switch dispatches revert job', function () {
+    Queue::fake();
+    $user = makeUser();
+    $server = makeServer($user);
+
+    $row = ConsoleAction::query()->create([
+        'subject_type' => $server->getMorphClass(),
+        'subject_id' => $server->id,
+        'kind' => 'webserver_switch',
+        'status' => ConsoleAction::STATUS_FAILED,
+        'finished_at' => now(),
+        'error' => 'Failed to start caddy during cutover',
+        'label' => 'Switching webserver: nginx → caddy …',
+        'output' => [
+            'v' => 1,
+            'meta' => ['from' => 'nginx', 'to' => 'caddy'],
+            'lines' => [],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('cleanupFailedWebserverSwitch', (string) $row->id);
+
+    $row->refresh();
+    expect($row->dismissed_at)->not->toBeNull();
+
+    Queue::assertPushed(RevertServerWebserverSwitchJob::class, function (RevertServerWebserverSwitchJob $job) use ($server) {
+        return $job->serverId === $server->id
+            && $job->target === 'caddy'
+            && $job->from === 'nginx';
+    });
+});
+
+test('cleanup failed switch errors when row is still in flight', function () {
+    Queue::fake();
+    $user = makeUser();
+    $server = makeServer($user);
+
+    $row = ConsoleAction::query()->create([
+        'subject_type' => $server->getMorphClass(),
+        'subject_id' => $server->id,
+        'kind' => 'webserver_switch',
+        'status' => ConsoleAction::STATUS_RUNNING,
+        'started_at' => now(),
+        'label' => 'Switching webserver: nginx → caddy …',
+        'output' => ['v' => 1, 'meta' => ['from' => 'nginx', 'to' => 'caddy'], 'lines' => []],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('cleanupFailedWebserverSwitch', (string) $row->id);
+
+    Queue::assertNotPushed(RevertServerWebserverSwitchJob::class);
+});
+
+test('switch job validates caddy as caddy user and restarts on cutover', function () {
+    $source = file_get_contents(app_path('Jobs/SwitchServerWebserverJob.php'));
+
+    expect($source)
+        ->toContain('CaddyRuntimeOwnership::validateCommand()')
+        ->toContain('systemctl enable %1$s 2>/dev/null || true; systemctl restart %1$s');
 });
 
 test('stop and revert errors when no inflight row', function () {

@@ -1,11 +1,15 @@
 @php
     // Coming-soon teaser shown in place of the actionable engine panel for
-    // engines flagged `coming_soon` in the catalog (and not yet the active
-    // webserver). No switch / lifecycle controls — this is a preview only.
+    // engines flagged `coming_soon` in the catalog (and not yet active).
+    // No switch / lifecycle controls — this is a preview only.
+    $isEdgeProxyPreview = ! empty($info['is_edge_proxy']);
+
     $engineBlurb = match ($key) {
         'caddy' => __('Automatic HTTPS out of the box, simple Caddyfile syntax, HTTP/3 by default. Great for opinionated setups where you want sensible defaults over fine-grained tuning.'),
         'apache' => __('Battle-tested with the broadest module catalog and per-directory `.htaccess` support. Higher per-request footprint than nginx but unbeatable compatibility with legacy stacks.'),
         'openlitespeed' => __('LSAPI for the fastest PHP execution, built-in LSCache module with per-vhost cache rules, and a familiar Apache-style config. The standard pick for WordPress-heavy hosting.'),
+        'traefik' => __('Cloud-native L7 reverse proxy with automatic service discovery, middleware chains, and a dashboard API. Sits in front of Caddy site backends on ephemeral high ports.'),
+        'haproxy' => __('Battle-tested load balancer and ACL router with fine-grained frontend/backend rules. Ideal when you need sticky sessions, health checks, or classic HAProxy config patterns.'),
         default => '',
     };
 
@@ -28,6 +32,18 @@
             ['icon' => 'heroicon-o-cpu-chip', 'title' => __('LSAPI execution'), 'body' => __('The fastest PHP execution path, managed in-app.')],
             ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate OLS config with backups.')],
         ],
+        'traefik' => [
+            ['icon' => 'heroicon-o-arrow-path-rounded-square', 'title' => __('Router inspector'), 'body' => __('Live routers, services, and middlewares from the API.')],
+            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site backends'), 'body' => __('Route hostnames to Caddy backends on high ports.')],
+            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Static config editor'), 'body' => __('Edit and validate traefik.yml with backups.')],
+            ['icon' => 'heroicon-o-shield-check', 'title' => __('TLS termination'), 'body' => __('Terminate HTTPS on :80 before site backends.')],
+        ],
+        'haproxy' => [
+            ['icon' => 'heroicon-o-scale', 'title' => __('Frontend / backend map'), 'body' => __('Inspect ACLs, stick tables, and backend health.')],
+            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host-based routing to Caddy backends on high ports.')],
+            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate haproxy.cfg with backups.')],
+            ['icon' => 'heroicon-o-cpu-chip', 'title' => __('Runtime stats'), 'body' => __('Socket stats and runtime info from the server.')],
+        ],
         default => [],
     };
 @endphp
@@ -41,9 +57,9 @@
                     <x-dynamic-component :component="$info['icon']" class="h-5 w-5 text-brand-forest" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $isEdgeProxyPreview ? __('Edge proxy') : __('Engine') }}</p>
                     <h3 class="text-lg font-semibold text-brand-ink">{{ $info['label'] }}</h3>
-                    <p class="mt-0.5 text-[12px] text-brand-moss">{{ __('Not yet available on this server.') }}</p>
+                    <p class="mt-0.5 text-[12px] text-brand-moss">{{ $isEdgeProxyPreview ? __('Preview — not yet installable on this server.') : __('Not yet available on this server.') }}</p>
                 </div>
             </div>
             <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sand/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
@@ -75,7 +91,11 @@
 
             <div class="mt-6 flex flex-col gap-3 border-t border-brand-ink/8 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-brand-moss">
-                    {{ __(':engine support is on the way — switching will land here when it ships.', ['engine' => $info['label']]) }}
+                    @if ($isEdgeProxyPreview)
+                        {{ __(':engine install and lifecycle controls are on the way — add/remove will land here when it ships.', ['engine' => $info['label']]) }}
+                    @else
+                        {{ __(':engine support is on the way — switching will land here when it ships.', ['engine' => $info['label']]) }}
+                    @endif
                 </p>
                 <span class="inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-ink/[0.04] px-3 py-1.5 text-xs font-medium text-brand-mist">
                     <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

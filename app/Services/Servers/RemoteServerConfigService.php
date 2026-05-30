@@ -145,13 +145,34 @@ BASH;
     {
         $this->assertPathAllowed($path);
 
+        $engine = app(ServerConfigFileCatalog::class)->webserverEngineForPath($path);
+        if ($engine !== null) {
+            return app(RemoteWebserverConfigService::class)->validateContent(
+                $server,
+                $engine,
+                $path,
+                $contents,
+                $emitter,
+            );
+        }
+
         $hook = $this->validationHookFor($path);
+        if ($hook !== null && ! empty($hook['engine'])) {
+            return app(RemoteWebserverConfigService::class)->validateContent(
+                $server,
+                (string) $hook['engine'],
+                $path,
+                $contents,
+                $emitter,
+            );
+        }
+
         if ($hook === null || empty($hook['validate'])) {
-            $emitter?->info('No validation hook for this path.');
+            $emitter?->warn('No validation hook for this path.');
 
             return [
                 'output' => __('No validator configured for this path.'),
-                'ok' => true,
+                'ok' => false,
             ];
         }
 

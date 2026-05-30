@@ -194,6 +194,11 @@
                                     @if ($rowVersion !== '')
                                         <p class="mt-3 text-[11px] text-brand-mist">{{ __('Version') }}: <span class="font-mono text-brand-moss">{{ $rowVersion }}</span></p>
                                     @endif
+                                    @if (! empty($confirmRow['standby_reason']) && in_array($kind, ['start', 'enable'], true))
+                                        <p class="mt-3 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-950">
+                                            {{ $confirmRow['standby_reason'] }}
+                                        </p>
+                                    @endif
                                 </div>
                             @endif
 

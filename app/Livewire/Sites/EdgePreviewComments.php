@@ -7,14 +7,17 @@ namespace App\Livewire\Sites;
 use App\Actions\Edge\PromoteEdgePreview;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\ManagesDeployContract;
 use App\Models\EdgeDeployment;
 use App\Models\EdgePreviewComment;
 use App\Models\EdgePreviewReviewApproval;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\DeployContract\DeployContractState;
 use App\Services\Edge\EdgePreviewReviewState;
 use App\Support\Edge\EdgeDeploymentConfirmSummary;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -26,6 +29,7 @@ class EdgePreviewComments extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesDeployContract;
 
     public Server $server;
 
@@ -40,6 +44,26 @@ class EdgePreviewComments extends Component
     public string $replyBody = '';
 
     public string $approvalNote = '';
+
+    protected function contractParentSite(): Site
+    {
+        $parent = $this->parentSite();
+        if ($parent === null) {
+            abort(404);
+        }
+
+        return $parent;
+    }
+
+    public function runDeployContractFromReviewHub(): void
+    {
+        $this->runDeployContract((string) $this->site->id);
+    }
+
+    public function confirmWaiveDeployContractFromReviewHub(): void
+    {
+        $this->confirmWaiveDeployContract((string) $this->site->id);
+    }
 
     public function mount(Server $server, Site $site): void
     {
@@ -228,6 +252,14 @@ class EdgePreviewComments extends Component
             return;
         }
 
+        $contractState = app(DeployContractState::class);
+        $contract = $contractState->forPreview($parent, $this->site);
+        if ($blocked = $contractState->promoteBlockedMessage($contract)) {
+            $this->toastError($blocked);
+
+            return;
+        }
+
         $previewDeployment = EdgeDeployment::query()
             ->where('site_id', $this->site->id)
             ->where('status', EdgeDeployment::STATUS_LIVE)
@@ -243,6 +275,7 @@ class EdgePreviewComments extends Component
         $rows = array_merge(
             EdgeDeploymentConfirmSummary::promoteRows($parent, $this->site, $previewDeployment),
             $reviewState->confirmModalRows($review),
+            $contractState->confirmModalRows($contract),
         );
 
         $this->openConfirmActionModal(
@@ -286,7 +319,7 @@ class EdgePreviewComments extends Component
         $this->toastSuccess(__('Preview promoted — production is now serving the preview build.'));
     }
 
-    public function render(EdgePreviewReviewState $reviewState): View
+    public function render(EdgePreviewReviewState $reviewState, DeployContractState $contractState): View
     {
         $threads = EdgePreviewComment::query()
             ->where('site_id', $this->site->id)
@@ -302,6 +335,9 @@ class EdgePreviewComments extends Component
 
         $review = $reviewState->forPreview($this->site);
         $parent = $this->parentSite();
+        $contract = $parent !== null
+            ? $contractState->forPreview($parent, $this->site)
+            : ['enabled' => false, 'ready_to_promote' => true];
         $userApproval = EdgePreviewReviewApproval::query()
             ->where('site_id', $this->site->id)
             ->where('user_id', auth()->id())
@@ -310,6 +346,8 @@ class EdgePreviewComments extends Component
         return view('livewire.sites.edge-preview-comments', [
             'threads' => $threads,
             'review' => $review,
+            'contract' => $contract,
+            'deployContractEnabled' => Feature::active('global.deploy_contract'),
             'parentSite' => $parent,
             'userHasApproved' => $userApproval !== null,
         ]);

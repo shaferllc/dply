@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
+use App\Services\DeployContract\DeployContractPolicyLoader;
 use App\Services\Edge\Config\EdgeRepoConfigLinter;
 use App\Services\Edge\Config\EdgeRepoConfigLoader;
 use App\Services\Edge\Ssr\EdgeSsrFrameworkRegistry;
 use App\Support\Edge\EdgeRepoRoot;
 use App\Support\Edge\FakeEdgeProvision;
+use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
@@ -170,6 +172,11 @@ class EdgeBuildRunner
                 // same binding name.
                 $wranglerBindings = app(WranglerBindingsExtractor::class)->extract($checkout);
                 $repoArr = $repoConfig->toArray();
+                $contract = app(DeployContractPolicyLoader::class)->loadFromDirectory($checkout);
+                if ($contract !== null) {
+                    $repoArr['contract'] = $contract;
+                    $this->appendBuildLog($buildLog, "[dply-contract] Loaded promote requirements from repo.\n");
+                }
                 $yamlBindings = is_array($repoArr['bindings'] ?? null) ? $repoArr['bindings'] : [];
 
                 // Merge dply.yaml `bindings:` + wrangler.toml discoveries.
@@ -339,7 +346,7 @@ class EdgeBuildRunner
                         }
                     }
                     if ($missing !== []) {
-                        $this->appendBuildLog($buildLog, "[dply.yaml] env.secret: missing dashboard values for ".implode(', ', $missing).". Set them in Edge → Environment before the next deploy.\n");
+                        $this->appendBuildLog($buildLog, '[dply.yaml] env.secret: missing dashboard values for '.implode(', ', $missing).". Set them in Edge → Environment before the next deploy.\n");
                     } else {
                         $this->appendBuildLog($buildLog, '[dply.yaml] env.secret: all '.count($envSecretNames).' name(s) present in dashboard storage.'."\n");
                     }
@@ -735,7 +742,7 @@ class EdgeBuildRunner
      * stderr → stdout tail → tail of build.log → bare exit code so the
      * "Build failed:" callout in the UI is never empty.
      */
-    private function summarizeBuildFailure(\Illuminate\Process\ProcessResult $build, string $buildLogPath): string
+    private function summarizeBuildFailure(ProcessResult $build, string $buildLogPath): string
     {
         $exit = $build->exitCode();
 
@@ -974,12 +981,12 @@ class EdgeBuildRunner
         $env = 'export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 COREPACK_DEFAULT_TO_LATEST=0';
 
         if ($this->packageJsonHasPackageManager($checkout)) {
-            return $env." && corepack enable && corepack prepare --activate && yarn install --frozen-lockfile";
+            return $env.' && corepack enable && corepack prepare --activate && yarn install --frozen-lockfile';
         }
 
         // Yarn 4 runs on Node ≥ 18 — no version-specific traps as severe
         // as pnpm's. Pin to yarn@4 broadly; modern lockfiles need v4+.
-        return $env." && corepack enable && corepack prepare yarn@4 --activate && yarn install --frozen-lockfile";
+        return $env.' && corepack enable && corepack prepare yarn@4 --activate && yarn install --frozen-lockfile';
     }
 
     private function packageJsonHasPackageManager(string $checkout): bool

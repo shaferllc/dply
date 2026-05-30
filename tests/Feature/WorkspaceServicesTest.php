@@ -72,6 +72,40 @@ test('services workspace tabs lazy render their sections', function () {
         ->assertDontSee('activity-tab-test');
 });
 
+test('opening systemd confirm highlights only the target inventory row', function () {
+    Queue::getFacadeRoot()->except([SyncServerSystemdServicesJob::class]);
+
+    [$user, $server] = actingOwnerWithReadyServer();
+
+    ServerSystemdServiceState::query()->create([
+        'server_id' => $server->id,
+        'unit' => 'fail2ban.service',
+        'label' => 'fail2ban',
+        'active_state' => 'active',
+        'sub_state' => 'running',
+        'can_manage' => true,
+        'captured_at' => now(),
+    ]);
+
+    ServerSystemdServiceState::query()->create([
+        'server_id' => $server->id,
+        'unit' => 'nginx.service',
+        'label' => 'nginx',
+        'active_state' => 'inactive',
+        'sub_state' => 'dead',
+        'can_manage' => true,
+        'captured_at' => now(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceServices::class, ['server' => $server])
+        ->call('openSystemdActionConfirm', 'stop', 'fail2ban.service')
+        ->assertSet('systemdActiveRowUnit', 'fail2ban.service')
+        ->assertSet('systemdActiveRowAction', 'stop')
+        ->assertSeeHtml('aria-busy="true"')
+        ->assertSee('Stopping');
+});
+
 test('services workspace shows ops not ready without ssh', function () {
     [$user, $server] = actingOwnerWithReadyServer();
     $server->update(['ssh_private_key' => null]);

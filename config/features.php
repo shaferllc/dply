@@ -217,6 +217,8 @@ return [
         'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
         // exit: ship after replay validated against password-protected previews
         'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
+        // exit: ship when Edge promote gate + waiver audit validated E2E
+        'deploy_contract' => env('FEATURE_GLOBAL_DEPLOY_CONTRACT', true),
         // exit: ship when LLM + heuristic triage validated across BYO + Edge failures
         'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
         // exit: emergency hard stop for BYO VM create/deploy/webhooks; never retire

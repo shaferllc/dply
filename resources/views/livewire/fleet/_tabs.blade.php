@@ -9,6 +9,7 @@
         ['name' => 'fleet.intelligence', 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
         ['name' => 'fleet.blast-radius', 'label' => __('Blast radius'), 'icon' => 'heroicon-o-share'],
         ['name' => 'fleet.previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-link'],
+        ['name' => 'fleet.deploy-contracts', 'label' => __('Contracts'), 'icon' => 'heroicon-o-clipboard-document-check'],
     ];
     if (ops_copilot_active()) {
         $tabs[] = ['name' => 'fleet.copilot', 'label' => __('Copilot'), 'icon' => 'heroicon-o-sparkles'];

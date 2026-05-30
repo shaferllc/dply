@@ -9,12 +9,17 @@ use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\Servers\ServerConsoleActionLookup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use Tests\Concerns\WithFeatures;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    config(['server_workspace.edge_proxy_coming_soon' => []]);
+});
 
 uses(WithFeatures::class);
 
@@ -144,11 +149,11 @@ test('has inflight edge proxy action reads console actions', function () {
     $user = makeUser();
     $server = makeServer($user);
 
-    $component = Livewire::actingAs($user)
-        ->test(WorkspaceWebserver::class, ['server' => $server]);
-
-    // Before: nothing inflight.
-    expect($component->instance()->hasInflightEdgeProxyAction())->toBeFalse();
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->tap(function ($component) {
+            expect($component->instance()->hasInflightEdgeProxyAction())->toBeFalse();
+        });
 
     ConsoleAction::query()->create([
         'subject_type' => $server->getMorphClass(),
@@ -160,5 +165,70 @@ test('has inflight edge proxy action reads console actions', function () {
         'output' => ['v' => 1, 'lines' => []],
     ]);
 
-    expect($component->instance()->hasInflightEdgeProxyAction())->toBeTrue();
+    app()->forgetInstance(ServerConsoleActionLookup::class);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->tap(function ($component) {
+            expect($component->instance()->hasInflightEdgeProxyAction())->toBeTrue();
+        });
+});
+
+test('webserver overview shows coming soon and preview for edge proxies', function () {
+    config(['server_workspace.edge_proxy_coming_soon' => ['traefik', 'haproxy']]);
+
+    $user = makeUser();
+    $server = makeServer($user);
+
+    $this->actingAs($user)
+        ->get(route('servers.webserver', $server).'?tab=change')
+        ->assertOk()
+        ->assertSee('Edge proxy')
+        ->assertSee('Coming soon')
+        ->assertSee('Preview')
+        ->assertDontSee('Add Traefik')
+        ->assertDontSee('Add HAProxy');
+});
+
+test('add edge proxy rejects coming soon target', function () {
+    config(['server_workspace.edge_proxy_coming_soon' => ['traefik']]);
+
+    Queue::fake();
+    $user = makeUser();
+    $server = makeServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('addEdgeProxy', 'traefik');
+
+    Queue::assertNotPushed(AddEdgeProxyJob::class);
+});
+
+test('preview tab opens coming soon edge proxy panel', function () {
+    config(['server_workspace.edge_proxy_coming_soon' => ['traefik']]);
+
+    $user = makeUser();
+    $server = makeServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('setWorkspaceTab', 'traefik')
+        ->assertSet('workspace_tab', 'traefik')
+        ->assertSee('Router inspector');
+});
+
+test('webserver workspace supports change and health tabs', function () {
+    $user = makeUser();
+    $server = makeServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('setWorkspaceTab', 'change')
+        ->assertSet('workspace_tab', 'change')
+        ->assertSee('Switch webserver')
+        ->call('setWorkspaceTab', 'health')
+        ->assertSet('workspace_tab', 'health')
+        ->assertSee('TLS certificates on this server')
+        ->call('setWorkspaceTab', 'not-a-tab')
+        ->assertSet('workspace_tab', 'overview');
 });

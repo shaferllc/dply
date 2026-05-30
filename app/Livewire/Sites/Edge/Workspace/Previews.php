@@ -17,6 +17,7 @@ use App\Models\EdgeDeployment;
 use App\Models\EdgeDeployReplay;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\DeployContract\DeployContractState;
 use App\Support\Edge\EdgePreviewPolicy;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;
@@ -70,6 +71,17 @@ class Previews extends Component
             ->unique('preview_site_id')
             ->keyBy('preview_site_id');
 
+        $contractState = app(DeployContractState::class);
+        $deployContracts = collect();
+        if (Feature::active('global.deploy_contract')) {
+            foreach (CreateEdgePreviewSite::listForParent($this->site) as $previewSite) {
+                $deployContracts->put(
+                    (string) $previewSite->id,
+                    $contractState->forPreview($this->site, $previewSite),
+                );
+            }
+        }
+
         return view('livewire.sites.edge.workspace.previews', array_merge(
             EdgeSiteViewData::context($this->site, 'edge-previews'),
             [
@@ -81,6 +93,8 @@ class Previews extends Component
                 'sourcePath' => $sourcePath,
                 'latestReplays' => $latestReplays,
                 'deployReplayEnabled' => Feature::active('global.edge_deploy_replay'),
+                'deployContractEnabled' => Feature::active('global.deploy_contract'),
+                'deployContracts' => $deployContracts,
             ],
         ));
     }

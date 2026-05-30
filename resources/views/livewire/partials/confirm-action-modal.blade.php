@@ -43,7 +43,14 @@
                                     <dd @class([
                                         'min-w-0 flex-1 break-all text-brand-ink',
                                         'font-mono text-xs' => ! empty($row['mono']),
-                                    ])>{{ $row['value'] }}</dd>
+                                        'whitespace-pre-wrap text-sm leading-relaxed' => ! empty($row['multiline']),
+                                    ])>
+                                        @if (! empty($row['link']))
+                                            <a href="{{ $row['value'] }}" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-forest underline-offset-2 hover:underline">{{ $row['value'] }}</a>
+                                        @else
+                                            {{ $row['value'] }}
+                                        @endif
+                                    </dd>
                                 </div>
                             @endforeach
                         </dl>

@@ -20,6 +20,7 @@ use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Bus\Queueable;
 use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -483,27 +484,8 @@ SOURCES
 fi
 command -v caddy >/dev/null 2>&1 || { echo "[dply] caddy binary not on PATH after install" >&2; exit 127; }
 
-# Ensure the caddy system user/group and working dirs exist, regardless of which
-# branch above we took. The cloudsmith .deb postinst normally creates these, but
-# the "already installed" skip-branch above never re-runs that postinst — so a
-# server that ended up with the binary but no `caddy` account (e.g. partial
-# prior install, user removed by hand) would surface as systemd exit 217/USER
-# ("Failed to determine user credentials") the moment caddy.service tries to
-# start. Creating them here keeps the installer self-healing across retries.
-getent group caddy >/dev/null 2>&1 || groupadd --system caddy
-id -u caddy >/dev/null 2>&1 || useradd --system --gid caddy --no-create-home \
-  --home-dir /var/lib/caddy --shell /usr/sbin/nologin caddy
-
-# /var/log/caddy and /var/lib/caddy must be writable by the caddy user — without
-# this Caddy fails at startup with "open /var/log/caddy/...-access.log:
-# permission denied". `chown -R` (not just `install -d -o`) so stale files left
-# inside the dirs by a prior root-run / earlier package version also get fixed;
-# `install -d -o` only touches the leaf directory's perms, not the contents.
-mkdir -p /var/lib/caddy /var/log/caddy
-chown -R caddy:caddy /var/lib/caddy /var/log/caddy
-chmod 0755 /var/log/caddy
-chmod 0750 /var/lib/caddy
-BASH;
+BASH
+            .CaddyRuntimeOwnership::shell();
     }
 
     /**
@@ -696,6 +678,10 @@ BASH;
         if ($this->target === 'openlitespeed') {
             $this->writeOlsHttpdConfig($server, $ssh, $sites, listenPort: 8080);
         }
+
+        if ($this->target === 'caddy') {
+            $this->ensureCaddyRuntimeOwnership($server, $ssh);
+        }
     }
 
     /**
@@ -706,7 +692,7 @@ BASH;
     {
         $cmd = match ($this->target) {
             'nginx' => 'nginx -t',
-            'caddy' => 'caddy validate --config /etc/caddy/Caddyfile',
+            'caddy' => CaddyRuntimeOwnership::validateCommand(),
             'apache' => 'apachectl configtest',
             // `lshttpd -t` parses the active httpd_config.conf and per-vhost
             // configs in dry-run mode (no port binding) — same model as
@@ -728,6 +714,10 @@ BASH;
                 $exit,
                 trim(substr($out, -500)),
             ));
+        }
+
+        if ($this->target === 'caddy') {
+            $this->ensureCaddyRuntimeOwnership($server, $ssh);
         }
     }
 
@@ -780,8 +770,16 @@ BASH;
             $this->waitForPortFree($server, $ssh, 80, $fromUnit);
         }
         if ($toUnit !== null) {
-            $cmd = sprintf('systemctl enable --now %1$s && systemctl reload %1$s', escapeshellarg($toUnit));
-            $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
+            if ($this->target === 'caddy') {
+                $this->ensureCaddyRuntimeOwnership($server, $ssh);
+            }
+            // `restart` (not `enable --now` + `reload`): a failed first start leaves
+            // the unit inactive and `reload` errors with "cannot reload".
+            $cmd = sprintf(
+                'systemctl enable %1$s 2>/dev/null || true; systemctl restart %1$s 2>&1; systemctl is-active %1$s',
+                escapeshellarg($toUnit),
+            );
+            $out = $ssh->exec($this->privilegedCommand($server, $cmd), 60);
             $exit = $ssh->lastExecExitCode();
             if ($exit !== null && $exit !== 0) {
                 $diag = $this->captureUnitDiagnostics($server, $ssh, $toUnit);
@@ -885,8 +883,9 @@ BASH;
 
     /**
      * Render a per-site config string for the target webserver. Dispatches to
-     * the appropriate builder; listenPort=8080 produces a :8080-bound test
-     * variant for validation; listenPort=null produces the production config.
+     * the appropriate builder; listenPort=8080 binds each site hostname on
+     * that port for validation (not a catch-all `:8080` block); listenPort=null
+     * produces the production config.
      */
     private function buildSiteConfigFor(Site $site, string $target, ?int $listenPort): string
     {
@@ -929,7 +928,7 @@ BASH;
         $cmd = match ($this->target) {
             'nginx' => 'mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled',
             'apache' => 'mkdir -p /etc/apache2/sites-available /etc/apache2/sites-enabled',
-            'caddy' => 'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && (grep -Fq \'import /etc/caddy/sites-enabled/*.caddy\' /etc/caddy/Caddyfile || printf "\nimport /etc/caddy/sites-enabled/*.caddy\n" >> /etc/caddy/Caddyfile)',
+            'caddy' => 'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && (grep -Fq \'import /etc/caddy/sites-enabled/*.caddy\' /etc/caddy/Caddyfile || printf "\nimport /etc/caddy/sites-enabled/*.caddy\n" >> /etc/caddy/Caddyfile) && '.CaddyRuntimeOwnership::shell(),
             // OLS keeps per-vhost configs under conf/vhosts/<name>/vhconf.conf;
             // executeStageProvision writes the top-level httpd_config.conf
             // after the per-site loop via writeOlsHttpdConfig().
@@ -981,6 +980,11 @@ BASH;
      *
      * @param  Collection<int, Site>  $sites
      */
+    private function ensureCaddyRuntimeOwnership(Server $server, SshConnection $ssh): void
+    {
+        $ssh->exec($this->privilegedCommand($server, CaddyRuntimeOwnership::shell()), 30);
+    }
+
     private function writeOlsHttpdConfig(
         Server $server,
         SshConnection $ssh,

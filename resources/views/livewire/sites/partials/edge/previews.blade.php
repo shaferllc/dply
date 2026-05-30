@@ -341,6 +341,12 @@
                                         </button>
                                     @endif
                                 </div>
+                                @include('livewire.sites.partials.edge.deploy-contract-panel', [
+                                    'preview' => $preview,
+                                    'previewIsLive' => $previewIsLive,
+                                    'deployContractEnabled' => $deployContractEnabled ?? false,
+                                    'deployContract' => ($deployContracts ?? collect())->get((string) $preview->id, []),
+                                ])
                                 @if (($deployReplayEnabled ?? false) && $previewIsLive)
                                     @php
                                         $replay = ($latestReplays ?? collect())->get((string) $preview->id);

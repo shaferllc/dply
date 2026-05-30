@@ -24,6 +24,8 @@ trait ManagesWebserverConfigRevisions
 
     public ?string $pending_write_console_id = null;
 
+    public ?string $pending_validate_console_id = null;
+
     public bool $webserverConfigSaveDiffOpen = false;
 
     public ?string $webserverConfigDiffRevisionId = null;
@@ -350,5 +352,43 @@ trait ManagesWebserverConfigRevisions
         }
 
         $this->pending_write_console_id = null;
+    }
+
+    protected function pickupQueuedConfigValidate(): void
+    {
+        if ($this->pending_validate_console_id === null) {
+            return;
+        }
+
+        $row = ConsoleAction::query()->find($this->pending_validate_console_id);
+        if ($row === null) {
+            $this->pending_validate_console_id = null;
+
+            return;
+        }
+
+        if (! in_array($row->status, [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], true)) {
+            return;
+        }
+
+        $cached = Cache::pull(
+            RunWebserverConfigOpJob::validateResultCacheKey($this->pending_validate_console_id),
+        );
+
+        if (is_array($cached)) {
+            $this->config_validate_output = (string) ($cached['output'] ?? '');
+            $this->config_validate_ok = (bool) ($cached['ok'] ?? false);
+        } elseif ($row->status === ConsoleAction::STATUS_FAILED) {
+            $this->config_validate_output = (string) ($row->error ?? __('Validation failed.'));
+            $this->config_validate_ok = false;
+        }
+
+        if ($this->config_validate_ok) {
+            $this->toastSuccess(__('Config validated.'));
+        } elseif ($this->config_validate_output !== null) {
+            $this->toastError(__('Config validation reported problems — see output below.'));
+        }
+
+        $this->pending_validate_console_id = null;
     }
 }

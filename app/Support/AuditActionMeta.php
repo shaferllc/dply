@@ -179,6 +179,8 @@ final class AuditActionMeta
             'site.edge.deletion_scheduled' => ['label' => 'Edge site deletion scheduled', 'icon' => 'heroicon-o-clock', 'tone' => 'warning'],
             'site.edge.deployment.cancelled' => ['label' => 'Edge deployment cancelled', 'icon' => 'heroicon-o-x-circle', 'tone' => 'warning'],
             'site.edge.preview.promoted' => ['label' => 'Preview promoted', 'icon' => 'heroicon-o-arrow-up-circle', 'tone' => 'success'],
+            'site.deploy_contract.run' => ['label' => 'Deploy contract run', 'icon' => 'heroicon-o-clipboard-document-check', 'tone' => 'neutral'],
+            'site.deploy_contract.waived' => ['label' => 'Deploy contract waived', 'icon' => 'heroicon-o-exclamation-triangle', 'tone' => 'warning'],
             'site.edge.deploy_hook.created' => ['label' => 'Deploy hook created', 'icon' => 'heroicon-o-link', 'tone' => 'success'],
             'site.edge.deploy_hook.revoked' => ['label' => 'Deploy hook revoked', 'icon' => 'heroicon-o-link-slash', 'tone' => 'danger'],
             'site.edge.cache.purged_by_tag' => ['label' => 'Edge cache purged by tag', 'icon' => 'heroicon-o-arrow-path', 'tone' => 'info'],

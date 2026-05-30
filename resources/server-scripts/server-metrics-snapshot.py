@@ -628,24 +628,47 @@ def _collect_apache() -> dict | None:
         return None
 
 
+def _caddy_admin_metrics_url() -> str | None:
+    """Resolve Caddy admin /metrics URL from the global Caddyfile when possible."""
+    default = "http://127.0.0.1:2019/metrics"
+    try:
+        with open("/etc/caddy/Caddyfile", encoding="utf-8", errors="replace") as handle:
+            for raw in handle:
+                line = raw.strip()
+                if not line.startswith("admin "):
+                    continue
+                parts = line.split()
+                listen = parts[1] if len(parts) > 1 else "localhost:2019"
+                if listen.lower() == "off":
+                    return None
+                host, _, port = listen.partition(":")
+                if host in ("localhost", "::1"):
+                    host = "127.0.0.1"
+                if not port:
+                    port = "2019"
+                return f"http://{host}:{port}/metrics"
+    except OSError:
+        pass
+    return default
+
+
 def _collect_caddy() -> dict | None:
-    # Caddy admin API on :2019 exposes Prometheus exposition at /metrics.
-    # We parse only a tiny subset: caddy_http_requests_total (sum) and the
-    # current process uptime. Full Prom parser would be overkill here.
+    # Caddy admin API exposes Prometheus exposition at /metrics.
     if not _systemctl_active("caddy"):
         return None
-    body = _http_get("http://127.0.0.1:2019/metrics")
-    if not body:
+    metrics_url = _caddy_admin_metrics_url()
+    if metrics_url is None:
+        return None
+    body = _http_get(metrics_url)
+    if not body or ("caddy_" not in body and "# HELP caddy" not in body):
         return None
     requests_total = 0
     errors_5xx_total = 0
-    saw_anything = False
+    in_flight = 0
     for line in body.splitlines():
         if line.startswith("#") or not line.strip():
             continue
-        # caddy_http_requests_total{code="200",method="GET",...} 42
         if line.startswith("caddy_http_requests_total"):
-            saw_anything = True
             try:
                 value = float(line.rsplit(" ", 1)[1])
             except (IndexError, ValueError):
@@ -653,10 +676,14 @@ def _collect_caddy() -> dict | None:
             requests_total += int(value)
             if 'code="5' in line:
                 errors_5xx_total += int(value)
-    if not saw_anything:
-        return None
+        elif line.startswith("caddy_http_requests_in_flight"):
+            try:
+                in_flight = max(in_flight, int(float(line.rsplit(" ", 1)[1])))
+            except (IndexError, ValueError):
+                continue
     return {
         "engine": "caddy",
+        "active_connections": in_flight,
         "requests_total": requests_total,
         "errors_5xx_total": errors_5xx_total,
     }

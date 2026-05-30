@@ -15,10 +15,11 @@ class ServerConfigFileCatalog
     public function __construct(
         protected RemoteWebserverConfigService $webserverConfig,
         protected ServerManageSshExecutor $executor,
+        protected ConfigFileDescriptionResolver $descriptions,
     ) {}
 
     /**
-     * @return array<string, array{label: string, files: list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string}>}>
+     * @return array<string, array{label: string, files: list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string, hint?: string, role?: string, role_label?: string}>}>
      */
     public function groupedFiles(Server $server, ?string $scope = null, ?string $search = null): array
     {
@@ -54,14 +55,14 @@ class ServerConfigFileCatalog
                             continue;
                         }
                         $seen[$path] = true;
-                        $files[] = [
-                            'path' => $path,
-                            'label' => (string) ($row['label'] ?? basename($path)),
-                            'size' => (int) ($row['size'] ?? 0),
-                            'mtime' => $row['mtime'] ?? null,
-                            'group' => $groupKey,
-                            'engine' => $engine,
-                        ];
+                        $files[] = $this->fileRow(
+                            $path,
+                            (string) ($row['label'] ?? basename($path)),
+                            (int) ($row['size'] ?? 0),
+                            $row['mtime'] ?? null,
+                            $groupKey,
+                            $engine,
+                        );
                     }
                 }
             } else {
@@ -78,13 +79,13 @@ class ServerConfigFileCatalog
                         continue;
                     }
                     $seen[$path] = true;
-                    $files[] = [
-                        'path' => $path,
-                        'label' => (string) ($entry['label'] ?? basename($path)),
-                        'size' => 0,
-                        'mtime' => null,
-                        'group' => $groupKey,
-                    ];
+                    $files[] = $this->fileRow(
+                        $path,
+                        (string) ($entry['label'] ?? basename($path)),
+                        0,
+                        null,
+                        $groupKey,
+                    );
                 }
 
                 foreach ($probes as $index => $probe) {
@@ -98,13 +99,13 @@ class ServerConfigFileCatalog
                             continue;
                         }
                         $seen[$path] = true;
-                        $files[] = [
-                            'path' => $path,
-                            'label' => basename($path),
-                            'size' => (int) ($row['size'] ?? 0),
-                            'mtime' => $row['mtime'] ?? null,
-                            'group' => $groupKey,
-                        ];
+                        $files[] = $this->fileRow(
+                            $path,
+                            basename($path),
+                            (int) ($row['size'] ?? 0),
+                            $row['mtime'] ?? null,
+                            $groupKey,
+                        );
                     }
                 }
             }
@@ -114,7 +115,8 @@ class ServerConfigFileCatalog
                 $files = array_values(array_filter(
                     $files,
                     fn (array $f): bool => str_contains(strtolower($f['path']), $needle)
-                        || str_contains(strtolower($f['label']), $needle),
+                        || str_contains(strtolower($f['label']), $needle)
+                        || str_contains(strtolower($f['hint'] ?? ''), $needle),
                 ));
             }
 
@@ -132,7 +134,7 @@ class ServerConfigFileCatalog
     }
 
     /**
-     * @return list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string}>
+     * @return list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string, hint?: string, role?: string, role_label?: string}>
      */
     public function flatFiles(Server $server, ?string $scope = null, ?string $search = null): array
     {
@@ -244,7 +246,7 @@ class ServerConfigFileCatalog
             }
 
             if (! empty($groupDef['discover_engines'])) {
-                foreach ($this->enginesForDiscovery($server) as $engine) {
+                foreach ($this->enginesForDiscovery($server, $scope) as $engine) {
                     if ($scope !== null && $scope !== '' && $scope !== $groupKey && $scope !== $engine) {
                         continue;
                     }
@@ -429,13 +431,53 @@ class ServerConfigFileCatalog
     }
 
     /**
+     * @return array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string, hint?: string, role?: string, role_label?: string}
+     */
+    private function fileRow(
+        string $path,
+        string $label,
+        int $size,
+        ?int $mtime,
+        string $group,
+        ?string $engine = null,
+    ): array {
+        $row = [
+            'path' => $path,
+            'label' => $label,
+            'size' => $size,
+            'mtime' => $mtime,
+            'group' => $group,
+        ];
+
+        if ($engine !== null && $engine !== '') {
+            $row['engine'] = $engine;
+        }
+
+        $hint = $this->descriptions->hintFor($path, $engine, $group);
+        if ($hint !== null && $hint !== '') {
+            $row['hint'] = $hint;
+        }
+
+        $role = $this->descriptions->roleFor($path, $engine, $group);
+        if ($role !== null && $role !== '') {
+            $row['role'] = $role;
+            $roleLabel = $this->descriptions->roleLabel($role);
+            if ($roleLabel !== null && $roleLabel !== '') {
+                $row['role_label'] = $roleLabel;
+            }
+        }
+
+        return $row;
+    }
+
+    /**
      * Only probe webserver engines that the stack summary says are installed.
      * When the stack is unknown (fresh import / still provisioning), fail open
      * and probe every supported engine so the picker isn't empty.
      *
      * @return list<string>
      */
-    private function enginesForDiscovery(Server $server): array
+    private function enginesForDiscovery(Server $server, ?string $scope = null): array
     {
         $engines = $this->webserverConfig->supportedEngines();
         $installed = ServerInstalledServices::tagsFor($server);
@@ -444,10 +486,22 @@ class ServerConfigFileCatalog
             return $engines;
         }
 
-        return array_values(array_filter(
+        $filtered = array_values(array_filter(
             $engines,
             fn (string $engine): bool => array_key_exists($engine, $installed),
         ));
+
+        // Configuration ?scope=caddy (from the webserver Config tab) is an explicit
+        // request to edit that stack — probe it even when stack_summary still
+        // lists another webserver (failed switch, parallel install, etc.).
+        $scopeEngine = strtolower(trim((string) $scope));
+        if ($scopeEngine !== ''
+            && in_array($scopeEngine, $engines, true)
+            && ! in_array($scopeEngine, $filtered, true)) {
+            $filtered[] = $scopeEngine;
+        }
+
+        return $filtered;
     }
 
     private function enginePathPrefix(string $engine): ?string

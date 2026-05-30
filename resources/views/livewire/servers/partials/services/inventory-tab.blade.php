@@ -176,47 +176,35 @@
                                 $nameLine .= ' ('.$ver.')';
                             }
                             $rowUnit = $row['unit'] ?? '';
+                            $rowIsBusy = $this->systemdInventoryRowIsBusy($rowUnit);
                             $rowBusy = ($systemdRowBusyUnit ?? '') !== '' && ($systemdRowBusyUnit ?? '') === $rowUnit;
                             $otherBusy = (($systemdRowBusyUnit ?? '') !== '' && ! $rowBusy) || ($systemdBulkBusy ?? false);
                             $bootUnk = trim((string) ($row['boot_state'] ?? '')) === '';
-                            // Optimistic pending action surface. When set, render
-                            // "Starting…" / "Stopping…" / "Restarting…" / "Reloading…"
-                            // immediately after the user clicks, before the SSH
-                            // round-trip + inventory sync confirms the new state.
-                            $pendingAction = $row['pending_action'] ?? null;
-                            $pendingLabel = match ($pendingAction) {
+                            $systemdRowWireTargets = $this->systemdInventoryRowWireTargets($rowUnit);
+                            $busyAction = $rowIsBusy
+                                ? ($systemdActiveRowAction ?? $systemdRowBusyAction ?? $row['pending_action'] ?? null)
+                                : null;
+                            $pendingLabel = match ($busyAction) {
                                 'start' => __('Starting…'),
                                 'stop' => __('Stopping…'),
                                 'restart' => __('Restarting…'),
                                 'reload' => __('Reloading…'),
                                 'enable' => __('Enabling at boot…'),
                                 'disable' => __('Disabling at boot…'),
-                                default => null,
+                                default => __('Working…'),
                             };
-                            // While an action is in flight on this unit, lock
-                            // out every other action button on the same row so
-                            // the operator can't queue a Stop on top of a Start
-                            // (or open the kebab to do it via a different path).
-                            $rowPending = $pendingLabel !== null;
+                            $rowPending = $rowIsBusy;
                         @endphp
                         <tr
                             wire:key="systemd-svc-{{ $rowUnit }}"
-                            wire:loading.class="opacity-60 pointer-events-none"
-                            wire:target="openSystemdStatusModalForService({{ json_encode($rowUnit) }}),openSystemdLogsModalForService({{ json_encode($rowUnit) }}),openSystemdNotifyModalForService({{ json_encode($rowUnit) }}),runSystemdServiceAction({{ json_encode($rowUnit) }})"
-                            x-data="{
-                                rowLoading: false,
-                                fireRowLoading() {
-                                    this.rowLoading = true;
-                                    clearTimeout(this._rl);
-                                    // 8 s covers most SSH-driven action / status round-trips.
-                                    // The persistent server-side $rowBusy or modal-visible
-                                    // state takes over for genuinely long actions; this is
-                                    // just the click→first-feedback bridge.
-                                    this._rl = setTimeout(() => { this.rowLoading = false; }, 8000);
-                                },
-                            }"
-                            :class="rowLoading ? 'opacity-60 pointer-events-none' : ''"
-                            @class(['bg-red-50/40' => $isFailed, 'transition-opacity duration-150'])
+                            wire:loading.class="pointer-events-none relative z-10 bg-amber-50/90 opacity-70 ring-1 ring-inset ring-amber-200/70"
+                            wire:target="{{ $systemdRowWireTargets }}"
+                            @class([
+                                'bg-red-50/40' => $isFailed && ! $rowIsBusy,
+                                'relative z-10 bg-amber-50/90 opacity-70 pointer-events-none ring-1 ring-inset ring-amber-200/70' => $rowIsBusy,
+                                'transition-[background-color,opacity] duration-150' => true,
+                            ])
+                            @if ($rowIsBusy) aria-busy="true" @endif
                         >
                             <td class="p-4 align-top">
                             <input
@@ -230,12 +218,31 @@
                             <td class="relative p-0">
                                 <span class="absolute inset-y-3 left-0 w-1 rounded-full {{ $pendingLabel ? 'bg-amber-500 animate-pulse' : ($isFailed ? 'bg-red-500' : ($isActive ? 'bg-emerald-500' : 'bg-brand-mist/60')) }}" title="{{ $row['active'] ?? '' }} / {{ $row['sub'] ?? '' }}"></span>
                             </td>
-                            <td class="p-4 align-top">
+                            <td class="relative p-4 align-top">
+                                @if ($rowIsBusy)
+                                    <div
+                                        class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2.5 bg-amber-50/95"
+                                        role="status"
+                                        aria-live="polite"
+                                    >
+                                        <x-spinner variant="forest" size="lg" />
+                                        <span class="text-[11px] font-semibold uppercase tracking-wide text-brand-forest">{{ $pendingLabel }}</span>
+                                    </div>
+                                @endif
+                                <div
+                                    wire:loading.flex
+                                    wire:target="{{ $systemdRowWireTargets }}"
+                                    class="pointer-events-none absolute inset-0 z-20 items-center justify-center gap-2.5 bg-amber-50/95"
+                                    role="status"
+                                >
+                                    <x-spinner variant="forest" size="lg" />
+                                    <span class="text-[11px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Working…') }}</span>
+                                </div>
                                 <p class="font-medium text-brand-ink">{{ $nameLine }}</p>
                                 <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                                    @if ($pendingLabel)
-                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
-                                            <span class="inline-block size-2.5 shrink-0 animate-spin rounded-full border-2 border-amber-300 border-t-amber-700" aria-hidden="true"></span>
+                                    @if ($rowIsBusy)
+                                        <span class="inline-flex items-center gap-1 rounded-md bg-amber-200/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-950 ring-1 ring-amber-300/80">
+                                            <span class="inline-block size-2.5 shrink-0 animate-spin rounded-full border-2 border-amber-600/30 border-t-amber-800" aria-hidden="true"></span>
                                             {{ $pendingLabel }}
                                         </span>
                                     @elseif ($isFailed)
@@ -248,6 +255,9 @@
                                         <span class="text-[10px] font-medium uppercase tracking-wide text-brand-moss">{{ __('Boot') }}: {{ $row['boot_state'] }}</span>
                                     @endif
                                 </div>
+                                @if (! empty($row['standby_reason']))
+                                    <p class="mt-1.5 text-xs leading-snug text-amber-900/90">{{ $row['standby_reason'] }}</p>
+                                @endif
                                 @if (! $canManage)
                                     <p class="mt-0.5 text-xs text-brand-moss">{{ __('View only') }}</p>
                                 @elseif (! empty($row['status_only']))
@@ -278,7 +288,7 @@
                                     <span class="text-brand-mist">—</span>
                                 @endif
                             </td>
-                            <td class="p-4 align-top text-right">
+                            <td class="relative p-4 align-top text-right">
                                 @php
                                     $rowManageExtras = $mayMutate && $opsReady && ! ($deployerSystemdLocked ?? true);
                                     $rowAlerts = ! $isDeployer && $server->organization_id;
@@ -288,68 +298,54 @@
                                     $hasMoreMenu = $rowManageExtras || $rowAlerts || (! empty($row['custom']));
                                 @endphp
                                 <div class="flex flex-nowrap items-center justify-end gap-2">
-                                    {{-- Persistent SSH-running pill, driven server-side once
-                                         the actual remote task is firing for THIS unit. The
-                                         row's Alpine rowLoading flag handles the briefer
-                                         click → modal-open window by dimming the whole tr. --}}
-                                    @if ($rowBusy || ($systemdBulkBusy ?? false))
-                                        <span class="inline-flex items-center gap-1.5 text-[11px] font-medium text-brand-moss">
-                                            <span class="inline-block size-3.5 animate-spin rounded-full border-2 border-brand-ink/20 border-t-brand-ink" aria-hidden="true"></span>
-                                            {{ __('Working…') }}
-                                        </span>
-                                    @endif
-                                    {{-- One primary action stays visible: Start when inactive,
-                                         Restart when active and manageable, Status for view-only.
-                                         Everything else (Stop, Status, Reload, Boot toggles,
-                                         Notify, Notification channels, Remove custom) lives in
-                                         the per-row More menu below. --}}
+                                    {{-- Primary action: Start / Restart / Status. Row overlay handles loading. --}}
                                     @if ($mayMutate && ! $isActive)
+                                        @php
+                                            $startUsesConfirm = ! empty($row['standby_reason']);
+                                        @endphp
                                         <button
                                             type="button"
-                                            @click="fireRowLoading()"
-                                            wire:click="runSystemdServiceAction(@js($rowUnit), 'start')"
+                                            @if ($startUsesConfirm)
+                                                wire:click="openSystemdActionConfirm('start', @js($rowUnit))"
+                                            @else
+                                                wire:click="runSystemdServiceAction(@js($rowUnit), 'start')"
+                                            @endif
                                             wire:loading.attr="disabled"
-                                            wire:target="runSystemdServiceAction"
-                                            @disabled(! $opsReady || $otherBusy || $rowBusy || $rowPending)
+                                            @disabled(! $opsReady || $otherBusy || $rowPending)
                                             class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            @if ($startUsesConfirm)
+                                                title="{{ $row['standby_reason'] }}"
+                                            @endif
                                         >
-                                            <x-heroicon-o-play class="h-3.5 w-3.5 shrink-0 text-emerald-700" wire:loading.remove wire:target="runSystemdServiceAction" aria-hidden="true" />
-                                            <span wire:loading wire:target="runSystemdServiceAction" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
-                                            <span wire:loading.remove wire:target="runSystemdServiceAction">{{ __('Start') }}</span>
-                                            <span wire:loading wire:target="runSystemdServiceAction">{{ __('Working…') }}</span>
+                                            <x-heroicon-o-play class="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+                                            {{ __('Start') }}
                                         </button>
                                     @elseif ($mayMutate)
                                         <button
                                             type="button"
-                                            @click="fireRowLoading()"
                                             wire:click="openSystemdActionConfirm('restart', @js($rowUnit))"
                                             wire:loading.attr="disabled"
-                                            wire:target="openSystemdActionConfirm"
-                                            @disabled(! $opsReady || $otherBusy || $rowBusy || $rowPending)
+                                            wire:target="openSystemdActionConfirm('restart', @js($rowUnit))"
+                                            @disabled(! $opsReady || $otherBusy || $rowPending)
                                             class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.remove wire:target="openSystemdActionConfirm" aria-hidden="true" />
-                                            <span wire:loading wire:target="openSystemdActionConfirm" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
-                                            <span wire:loading.remove wire:target="openSystemdActionConfirm">{{ __('Restart') }}</span>
-                                            <span wire:loading wire:target="openSystemdActionConfirm">{{ __('Working…') }}</span>
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.remove wire:target="openSystemdActionConfirm('restart', @js($rowUnit))" aria-hidden="true" />
+                                            <span wire:loading wire:target="openSystemdActionConfirm('restart', @js($rowUnit))" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
+                                            <span wire:loading.remove wire:target="openSystemdActionConfirm('restart', @js($rowUnit))">{{ __('Restart') }}</span>
                                         </button>
                                     @else
                                         <button
                                             type="button"
-                                            @click="fireRowLoading()"
                                             wire:click="openSystemdStatusModalForService(@js($rowUnit))"
                                             wire:loading.attr="disabled"
-                                            wire:target="openSystemdStatusModalForService"
                                             @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy)
                                             class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
-                                            <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.remove wire:target="openSystemdStatusModalForService" aria-hidden="true" />
-                                            <span wire:loading wire:target="openSystemdStatusModalForService" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
-                                            <span wire:loading.remove wire:target="openSystemdStatusModalForService">{{ __('Status') }}</span>
-                                            <span wire:loading wire:target="openSystemdStatusModalForService">{{ __('Working…') }}</span>
+                                            <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" aria-hidden="true" />
+                                            {{ __('Status') }}
                                         </button>
                                     @endif
-                                    <div class="shrink-0">
+                                    <div class="relative shrink-0">
                                         <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
                                             <x-slot name="trigger">
                                                 <button
@@ -365,12 +361,9 @@
                                             <x-slot name="content">
                                                 @php
                                                     // Each menu item: icon on the left, label,
-                                                    // and a tiny spinner that swaps in for the
-                                                    // icon while the wire:click round-trip is in
-                                                    // flight. The row-level "Working…" pill at
-                                                    // the top of the actions cell handles the
-                                                    // long-running SSH portion that fires after
-                                                    // a confirm modal closes.
+                                                    // and a tiny spinner while that menu action's
+                                                    // wire round-trip is in flight. Long SSH work
+                                                    // uses the full-row overlay on this unit only.
                                                     $menuItem = 'flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50';
                                                     $menuItemDanger = 'flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50';
                                                     $iconClasses = 'h-4 w-4 shrink-0 text-brand-ink/70';
@@ -382,7 +375,6 @@
                                                          Surfaced here so it's still one click away. --}}
                                                     <button
                                                         type="button"
-                                                        @click="fireRowLoading()"
                                                         wire:click="openSystemdStatusModalForService(@js($rowUnit))"
                                                         wire:loading.attr="disabled"
                                                         wire:target="openSystemdStatusModalForService(@js($rowUnit))"
@@ -402,7 +394,6 @@
                                                          are read-only. --}}
                                                     <button
                                                         type="button"
-                                                        @click="fireRowLoading()"
                                                         wire:click="openSystemdLogsModalForService(@js($rowUnit))"
                                                         wire:loading.attr="disabled"
                                                         wire:target="openSystemdLogsModalForService(@js($rowUnit))"
@@ -418,29 +409,25 @@
                                                 @if ($mayMutate)
                                                     <button
                                                         type="button"
-                                                        @click="fireRowLoading()"
                                                         wire:click="openSystemdActionConfirm('stop', @js($rowUnit))"
                                                         wire:loading.attr="disabled"
-                                                        wire:target="openSystemdActionConfirm"
+                                                        wire:target="openSystemdActionConfirm('stop', @js($rowUnit))"
                                                         @disabled(! $opsReady || $otherBusy || $rowBusy || $rowPending)
                                                         class="{{ $menuItemDanger }}"
                                                     >
-                                                        <x-heroicon-o-stop-circle class="{{ $iconClassesDanger }}" wire:loading.remove wire:target="openSystemdActionConfirm" aria-hidden="true" />
-                                                        <span wire:loading wire:target="openSystemdActionConfirm" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                        <x-heroicon-o-stop-circle class="{{ $iconClassesDanger }}" aria-hidden="true" />
                                                         {{ __('Stop') }}
                                                     </button>
                                                 @endif
                                                     @if ($rowManageExtras)
                                                         <button
                                                             type="button"
-                                                            @click="fireRowLoading()"
                                                             wire:click="openSystemdActionConfirm('reload', @js($rowUnit))"
                                                             wire:loading.attr="disabled"
-                                                            wire:target="openSystemdActionConfirm"
+                                                            wire:target="openSystemdActionConfirm('reload', @js($rowUnit))"
                                                             class="{{ $menuItem }}"
                                                         >
-                                                            <x-heroicon-o-arrow-path class="{{ $iconClasses }}" wire:loading.remove wire:target="openSystemdActionConfirm" aria-hidden="true" />
-                                                            <span wire:loading wire:target="openSystemdActionConfirm" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                            <x-heroicon-o-arrow-path class="{{ $iconClasses }}" aria-hidden="true" />
                                                             {{ __('Reload') }}
                                                         </button>
                                                     @endif
@@ -448,28 +435,24 @@
                                                         @if ($showBootEnable)
                                                             <button
                                                                 type="button"
-                                                                @click="fireRowLoading()"
                                                                 wire:click="openSystemdActionConfirm('enable', @js($rowUnit))"
                                                                 wire:loading.attr="disabled"
-                                                                wire:target="openSystemdActionConfirm"
+                                                                wire:target="openSystemdActionConfirm('enable', @js($rowUnit))"
                                                                 class="{{ $menuItem }}"
                                                             >
-                                                                <x-heroicon-o-bolt class="{{ $iconClasses }}" wire:loading.remove wire:target="openSystemdActionConfirm" aria-hidden="true" />
-                                                                <span wire:loading wire:target="openSystemdActionConfirm" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                                <x-heroicon-o-bolt class="{{ $iconClasses }}" aria-hidden="true" />
                                                                 {{ __('Enable at boot') }}
                                                             </button>
                                                         @endif
                                                         @if ($showBootDisable)
                                                             <button
                                                                 type="button"
-                                                                @click="fireRowLoading()"
                                                                 wire:click="openSystemdActionConfirm('disable', @js($rowUnit))"
                                                                 wire:loading.attr="disabled"
-                                                                wire:target="openSystemdActionConfirm"
+                                                                wire:target="openSystemdActionConfirm('disable', @js($rowUnit))"
                                                                 class="{{ $menuItem }}"
                                                             >
-                                                                <x-heroicon-o-no-symbol class="{{ $iconClasses }}" wire:loading.remove wire:target="openSystemdActionConfirm" aria-hidden="true" />
-                                                                <span wire:loading wire:target="openSystemdActionConfirm" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                                <x-heroicon-o-no-symbol class="{{ $iconClasses }}" aria-hidden="true" />
                                                                 {{ __('Disable at boot') }}
                                                             </button>
                                                         @endif
@@ -480,7 +463,6 @@
                                                         @endif
                                                         <button
                                                             type="button"
-                                                            @click="fireRowLoading()"
                                                             wire:click="openSystemdNotifyModalForService(@js($rowUnit))"
                                                             wire:loading.attr="disabled"
                                                             wire:target="openSystemdNotifyModalForService(@js($rowUnit))"
@@ -500,15 +482,13 @@
                                                         <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
                                                         <button
                                                             type="button"
-                                                            @click="fireRowLoading()"
                                                             wire:click="openSystemdActionConfirm('remove-custom', @js($rowUnit))"
                                                             wire:loading.attr="disabled"
-                                                            wire:target="openSystemdActionConfirm"
+                                                            wire:target="openSystemdActionConfirm('remove-custom', @js($rowUnit))"
                                                             @disabled($isDeployer)
                                                             class="{{ $menuItemDanger }}"
                                                         >
-                                                            <x-heroicon-o-trash class="{{ $iconClassesDanger }}" wire:loading.remove wire:target="openSystemdActionConfirm" aria-hidden="true" />
-                                                            <span wire:loading wire:target="openSystemdActionConfirm" class="{{ $spinnerClasses }}" aria-hidden="true"></span>
+                                                            <x-heroicon-o-trash class="{{ $iconClassesDanger }}" aria-hidden="true" />
                                                             {{ __('Remove custom unit') }}
                                                         </button>
                                                     @endif

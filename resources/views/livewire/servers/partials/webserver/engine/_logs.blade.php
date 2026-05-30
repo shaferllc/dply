@@ -3,7 +3,8 @@
                  engine. Live toggle wires a poll so the buffer refreshes every
                  4s while the operator watches a request flow through.
                  ============================================================= --}}
-            @if ($engine_subtab === 'logs' && $isActive && $engineHasFullControls($key))
+            @if ((($optimisticEngineSubtabs ?? false) || $engine_subtab === 'logs') && $isActive && $engineHasFullControls($key))
+                <div @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'logs'" x-cloak @endif>
                 @php
                     $layout = $webserverConfigLayout[$key] ?? [];
                     $hasAccessLog = ! empty($layout['access_log']);
@@ -78,5 +79,6 @@
 
                         <pre class="mt-4 max-h-[60vh] overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-4 font-mono text-xs leading-relaxed text-emerald-100" x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">{{ $log_output !== '' ? $log_output : __('Click Refresh (or toggle Live) to fetch the log.') }}</pre>
                     @endif
+                </div>
                 </div>
             @endif

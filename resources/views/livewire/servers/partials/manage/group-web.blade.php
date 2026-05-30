@@ -23,12 +23,7 @@
     }
 
     // Catalog of all webservers dply knows about. Order = display order.
-    $webserverCatalog = [
-        'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
-        'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
-        'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
-        'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
-    ];
+    $webserverCatalog = \App\Support\Servers\WebserverWorkspaceViewData::webserverCatalog();
 
     // Parse certbot output into a structured table (best-effort regex).
     $certs = [];
@@ -170,49 +165,23 @@
                 @continue($key === $activeWebserver)
                 @php
                     $isBlocked = $preflight->isBlocked($server, $key);
+                    $isComingSoon = ! empty($info['coming_soon']);
                 @endphp
                 <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                    <div class="flex items-start gap-2">
-                        <x-dynamic-component :component="$info['icon']" class="mt-0.5 h-5 w-5 shrink-0 text-brand-forest" />
-                        <div class="min-w-0">
-                            <p class="font-semibold text-brand-ink">{{ $info['label'] }}</p>
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex min-w-0 items-start gap-2">
+                            <x-dynamic-component :component="$info['icon']" class="mt-0.5 h-5 w-5 shrink-0 text-brand-forest" />
+                            <p class="min-w-0 font-semibold text-brand-ink">{{ $info['label'] }}</p>
                         </div>
+                        @if ($isComingSoon)
+                            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                {{ __('Soon') }}
+                            </span>
+                        @endif
                     </div>
 
-                    @if ($inflightSwitch)
-                        <div class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-brand-sand/40 px-3 py-1.5 text-xs font-semibold text-brand-mist">
-                            <x-spinner variant="forest" size="sm" />
-                            <span>{{ __('Switching in progress…') }}</span>
-                        </div>
-                    @else
-                        <button
-                            type="button"
-                            wire:click="openSwitchWebserver('{{ $key }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="openSwitchWebserver"
-                            @disabled($isDeployer || ! $opsReady || $isBlocked)
-                            @class([
-                                'mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60',
-                                'bg-brand-forest text-brand-cream shadow-sm shadow-brand-forest/20 hover:bg-brand-forest/90' => ! $isBlocked,
-                                'cursor-not-allowed bg-brand-sand/40 text-brand-mist' => $isBlocked,
-                            ])
-                            title="{{ $isBlocked ? __('Unavailable — see preflight blocker') : '' }}"
-                        >
-                            <span class="inline-flex items-center gap-1.5" wire:loading.remove wire:target="openSwitchWebserver">
-                                @if ($isBlocked)
-                                    <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
-                                    {{ __('Unavailable') }}
-                                @else
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                    {{ __('Switch to :name', ['name' => $info['label']]) }}
-                                @endif
-                            </span>
-                            <span class="inline-flex items-center gap-1.5" wire:loading wire:target="openSwitchWebserver">
-                                <x-spinner variant="cream" size="sm" />
-                                {{ __('Preparing…') }}
-                            </span>
-                        </button>
-                    @endif
+                    @include('livewire.servers.partials.webserver._switch-target-action')
                 </div>
             @endforeach
         </div>

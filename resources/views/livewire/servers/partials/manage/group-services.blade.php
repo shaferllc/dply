@@ -110,6 +110,10 @@
                                     ? ['restart_php_fpm']
                                     : ($unitActions[$unitName] ?? []);
                             @endphp
+                            @php
+                                $standbyReason = app(\App\Support\Servers\SystemdServiceStandbyReasonResolver::class)
+                                    ->reasonForUnit($server, $unitName, $u['active_state'] ?? null);
+                            @endphp
                             <tr>
                                 <td class="px-4 py-2">
                                     <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $pill['classes'] }}">
@@ -117,7 +121,12 @@
                                         {{ $pill['label'] }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $unitName }}</td>
+                                <td class="px-4 py-2">
+                                    <p class="font-mono text-xs text-brand-ink">{{ $unitName }}</p>
+                                    @if ($standbyReason)
+                                        <p class="mt-1 text-[11px] leading-snug text-amber-900/90">{{ $standbyReason }}</p>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-2 text-xs text-brand-moss">{{ $formatSince($u['active_enter_at'] ?? null) }}</td>
                                 <td class="px-4 py-2 text-xs text-brand-moss">{{ $formatBytes($u['memory_current_bytes'] ?? null) }}</td>
                                 <td class="px-4 py-2 text-right">

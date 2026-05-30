@@ -35,7 +35,9 @@
     </x-page-header>
 
     @php
-        $ready = ! empty($review['ready_to_promote']);
+        $reviewReady = ! empty($review['ready_to_promote']);
+        $contractReady = empty($contract['enabled']) || ! empty($contract['ready_to_promote']);
+        $ready = $reviewReady && $contractReady;
         $statusTone = $ready ? 'border-brand-sage/30 bg-brand-sage/8' : 'border-amber-200 bg-amber-50/60';
     @endphp
 
@@ -74,6 +76,19 @@
             @endcan
         </div>
     </section>
+
+    @if ($deployContractEnabled && $parentSite)
+        <section class="mt-6">
+            @include('livewire.sites.partials.edge.deploy-contract-panel', [
+                'preview' => $site,
+                'previewIsLive' => true,
+                'deployContractEnabled' => true,
+                'deployContract' => $contract,
+                'runContractMethod' => 'runDeployContractFromReviewHub',
+                'waiveContractMethod' => 'confirmWaiveDeployContractFromReviewHub',
+            ])
+        </section>
+    @endif
 
     @can('update', $site)
         <section class="dply-card mt-6 overflow-hidden">

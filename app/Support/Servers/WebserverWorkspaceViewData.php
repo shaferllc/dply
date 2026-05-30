@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Support\Servers;
 
 use App\Livewire\Servers\WorkspaceWebserver;
-use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Services\Servers\WebserverSwitchPreflight;
@@ -16,6 +15,80 @@ use App\Services\Servers\WebserverSwitchPreflight;
  */
 final class WebserverWorkspaceViewData
 {
+    /**
+     * @return array<string, array{label: string, icon: string, systemd: string, coming_soon?: bool}>
+     */
+    public static function webserverCatalog(): array
+    {
+        $catalog = [
+            'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
+            'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
+            'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
+            'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
+        ];
+
+        foreach (self::comingSoonEngines() as $key) {
+            if (isset($catalog[$key])) {
+                $catalog[$key]['coming_soon'] = true;
+            }
+        }
+
+        return $catalog;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function comingSoonEngines(): array
+    {
+        $keys = config('server_workspace.webserver_coming_soon', []);
+
+        return is_array($keys) ? array_values(array_map('strtolower', $keys)) : [];
+    }
+
+    public static function isComingSoonEngine(string $key): bool
+    {
+        $key = strtolower(trim($key));
+
+        return in_array($key, self::comingSoonEngines(), true);
+    }
+
+    /**
+     * @return array<string, array{label: string, icon: string, systemd: string, coming_soon?: bool}>
+     */
+    public static function edgeProxyCatalog(): array
+    {
+        $catalog = [
+            'traefik' => ['label' => 'Traefik', 'icon' => 'heroicon-o-arrow-path-rounded-square', 'systemd' => 'traefik'],
+            'haproxy' => ['label' => 'HAProxy', 'icon' => 'heroicon-o-scale', 'systemd' => 'haproxy'],
+        ];
+
+        foreach (self::comingSoonEdgeProxies() as $key) {
+            if (isset($catalog[$key])) {
+                $catalog[$key]['coming_soon'] = true;
+            }
+        }
+
+        return $catalog;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function comingSoonEdgeProxies(): array
+    {
+        $keys = config('server_workspace.edge_proxy_coming_soon', []);
+
+        return is_array($keys) ? array_values(array_map('strtolower', $keys)) : [];
+    }
+
+    public static function isComingSoonEdgeProxy(string $key): bool
+    {
+        $key = strtolower(trim($key));
+
+        return in_array($key, self::comingSoonEdgeProxies(), true);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -50,21 +123,13 @@ final class WebserverWorkspaceViewData
 
         // `coming_soon` engines render a "Soon" badge in the tab strip until
         // their switch + config flows ship; nginx is GA today.
-        $webserverCatalog = [
-            'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
-            'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy', 'coming_soon' => true],
-            'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2', 'coming_soon' => true],
-            'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd', 'coming_soon' => true],
-        ];
+        $webserverCatalog = self::webserverCatalog();
 
-        $edgeProxyCatalog = [
-            'traefik' => ['label' => 'Traefik', 'icon' => 'heroicon-o-arrow-path-rounded-square', 'systemd' => 'traefik'],
-            'haproxy' => ['label' => 'HAProxy', 'icon' => 'heroicon-o-scale', 'systemd' => 'haproxy'],
-        ];
+        $edgeProxyCatalog = self::edgeProxyCatalog();
         $activeEdgeProxy = $server->edgeProxy();
         $engineTabCatalog = $webserverCatalog;
-        if ($activeEdgeProxy !== null && isset($edgeProxyCatalog[$activeEdgeProxy])) {
-            $engineTabCatalog[$activeEdgeProxy] = $edgeProxyCatalog[$activeEdgeProxy] + ['is_edge_proxy' => true];
+        foreach ($edgeProxyCatalog as $key => $info) {
+            $engineTabCatalog[$key] = $info + ['is_edge_proxy' => true];
         }
 
         $certs = self::parseCertbotCerts($certbot);
@@ -184,7 +249,10 @@ final class WebserverWorkspaceViewData
             default => '',
         };
 
-        $inflightSwitch = $component->hasInflightWebserverSwitch();
+        $consoleActions = app(ServerConsoleActionLookup::class);
+        $consoleState = $consoleActions->stateFor($server);
+
+        $inflightSwitch = $consoleState['inflight_webserver_switch'];
         $preflight = app(WebserverSwitchPreflight::class);
         $recentSwitches = ServerWebserverAuditEvent::query()
             ->with('user:id,name')
@@ -193,28 +261,16 @@ final class WebserverWorkspaceViewData
             ->limit(5)
             ->get();
 
-        $webserverBannerRun = ConsoleAction::query()
-            ->where('subject_type', $server->getMorphClass())
-            ->where('subject_id', $server->id)
-            ->whereIn('kind', ['webserver_switch', 'edge_proxy', 'manage_action'])
-            ->whereNull('dismissed_at')
-            ->orderByRaw("CASE WHEN status IN ('queued','running') THEN 0 ELSE 1 END")
-            ->orderByDesc('created_at')
-            ->first();
-
-        $webserverSwitchRun = ($webserverBannerRun !== null && $webserverBannerRun->kind === 'webserver_switch')
-            ? $webserverBannerRun
-            : ConsoleAction::query()
-                ->where('subject_type', $server->getMorphClass())
-                ->where('subject_id', $server->id)
-                ->where('kind', 'webserver_switch')
-                ->whereNull('dismissed_at')
-                ->orderByDesc('created_at')
-                ->first();
+        $webserverBannerRun = $consoleState['banner'];
+        $webserverSwitchRun = $consoleState['webserver_switch'];
 
         $actionInFlight = $webserverBannerRun !== null
             && $webserverBannerRun->isInFlight()
             && ! $webserverBannerRun->isStale();
+
+        $activeToolActionOps = $component->activeManageActionOperations();
+        $pendingToolActionKey = $component->pendingToolActionKey;
+        $caddyModulesBuildState = $component->caddyModulesBuildState();
 
         return compact(
             'card',
@@ -250,6 +306,9 @@ final class WebserverWorkspaceViewData
             'webserverBannerRun',
             'webserverSwitchRun',
             'actionInFlight',
+            'activeToolActionOps',
+            'pendingToolActionKey',
+            'caddyModulesBuildState',
         );
     }
 

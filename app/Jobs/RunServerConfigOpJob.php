@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\RemoteServerConfigService;
 use App\Services\Servers\RemoteWebserverConfigService;
+use App\Services\Servers\ServerConfigFileCatalog;
 use App\Services\Servers\ServerConfigFileEditor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -64,12 +65,13 @@ class RunServerConfigOpJob implements ShouldQueue
         $emitter = new ConsoleEmitter($this->consoleActionId);
 
         try {
-            $result = $this->isWebserverPath()
+            $engine = $this->resolvedWebserverEngine();
+            $result = $engine !== null
                 ? match ($this->op) {
-                    'write' => $webserverService->write($server, (string) $this->engine, $this->path, $this->contents, $emitter),
-                    'validate' => $webserverService->validateContent($server, (string) $this->engine, $this->path, $this->contents, $emitter),
-                    'restore' => $webserverService->restoreBackup($server, (string) $this->engine, $this->backupPath, $this->path, $emitter),
-                    'read' => $webserverService->read($server, (string) $this->engine, $this->path, $emitter),
+                    'write' => $webserverService->write($server, $engine, $this->path, $this->contents, $emitter),
+                    'validate' => $webserverService->validateContent($server, $engine, $this->path, $this->contents, $emitter),
+                    'restore' => $webserverService->restoreBackup($server, $engine, $this->backupPath, $this->path, $emitter),
+                    'read' => $webserverService->read($server, $engine, $this->path, $emitter),
                     default => throw new \InvalidArgumentException('Unknown op: '.$this->op),
                 }
             : match ($this->op) {
@@ -91,6 +93,7 @@ class RunServerConfigOpJob implements ShouldQueue
                 $result,
                 now()->addMinutes(5),
             );
+            self::storeFileContentCache($this->serverId, $this->path, $result);
             $this->markConsole(ConsoleAction::STATUS_COMPLETED, error: null);
 
             return;
@@ -114,6 +117,11 @@ class RunServerConfigOpJob implements ShouldQueue
                 ['contents' => $this->contents],
                 now()->addMinutes(5),
             );
+
+            self::storeFileContentCache($this->serverId, $this->path, [
+                'contents' => $this->contents,
+                'truncated' => false,
+            ]);
         }
 
         if ($ok && $this->op === 'validate') {
@@ -145,14 +153,50 @@ class RunServerConfigOpJob implements ShouldQueue
         return 'dply.server-config-validate:'.$consoleActionId;
     }
 
+    public static function fileContentCacheKey(string $serverId, string $path): string
+    {
+        return 'dply.server-config-file-content:'.$serverId.':'.hash('xxh128', $path);
+    }
+
+    /**
+     * @param  array{contents?: string, truncated?: bool, size?: int|null}  $result
+     */
+    public static function storeFileContentCache(string $serverId, string $path, array $result): void
+    {
+        Cache::put(
+            self::fileContentCacheKey($serverId, $path),
+            [
+                'contents' => (string) ($result['contents'] ?? ''),
+                'truncated' => (bool) ($result['truncated'] ?? false),
+                'cached_at' => now()->toIso8601String(),
+                'size' => $result['size'] ?? null,
+            ],
+            now()->addMinutes((int) config('server_manage.config_file_content_cache_minutes', 30)),
+        );
+    }
+
+    public static function forgetFileContentCache(string $serverId, string $path): void
+    {
+        Cache::forget(self::fileContentCacheKey($serverId, $path));
+    }
+
     public function failed(?\Throwable $e): void
     {
         $this->markConsole(ConsoleAction::STATUS_FAILED, error: $e?->getMessage() ?? 'Job failed.');
     }
 
+    private function resolvedWebserverEngine(): ?string
+    {
+        if (is_string($this->engine) && $this->engine !== '') {
+            return $this->engine;
+        }
+
+        return app(ServerConfigFileCatalog::class)->webserverEngineForPath($this->path);
+    }
+
     private function isWebserverPath(): bool
     {
-        return is_string($this->engine) && $this->engine !== '';
+        return $this->resolvedWebserverEngine() !== null;
     }
 
     private function markConsole(string $status, bool $started = false, ?string $error = null): void

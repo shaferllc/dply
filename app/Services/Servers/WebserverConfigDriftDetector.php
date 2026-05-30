@@ -207,7 +207,7 @@ class WebserverConfigDriftDetector
         return match ($engine) {
             'openlitespeed' => '/usr/local/lsws/conf/vhosts/'.$basename.'/vhconf.conf',
             'caddy' => '/etc/caddy/sites-enabled/'.$basename.'.caddy',
-            'nginx' => '/etc/nginx/sites-enabled/'.$basename,
+            'nginx' => rtrim((string) config('sites.nginx_sites_enabled'), '/').'/'.$basename.'.conf',
             'apache' => '/etc/apache2/sites-enabled/'.$basename.'.conf',
             default => null,
         };

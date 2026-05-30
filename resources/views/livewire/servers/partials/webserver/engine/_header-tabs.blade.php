@@ -9,11 +9,12 @@
                  $unit, $pill, $version, $actionTriad, $isBlocked,
                  $blockerReason, $hasControls) are set in the dispatcher
                  (engine-panel.blade.php) so every sub-partial sees them. --}}
-            <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])">
+            <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $info['label']])" scroll class="w-full">
                 <x-server-workspace-tab
                     :id="'ws-subtab-'.$key.'-overview'"
                     :active="$engine_subtab === 'overview'"
-                    wire:click="setEngineSubtab('overview')"
+                    :subtab-key="($optimisticEngineSubtabs ?? false) ? 'overview' : null"
+                    :wire-click="($optimisticEngineSubtabs ?? false) ? null : 'setEngineSubtab(\'overview\')'"
                     icon="heroicon-o-presentation-chart-line"
                 >
                     {{ __('Overview') }}
@@ -26,15 +27,21 @@
                     <x-server-workspace-tab
                         :id="'ws-subtab-'.$key.'-logs'"
                         :active="$engine_subtab === 'logs'"
-                        wire:click="setEngineSubtab('logs')"
+                        :subtab-key="($optimisticEngineSubtabs ?? false) ? 'logs' : null"
+                        :wire-click="($optimisticEngineSubtabs ?? false) ? null : 'setEngineSubtab(\'logs\')'"
                         icon="heroicon-o-document-text"
                     >
                         {{ __('Logs') }}
                     </x-server-workspace-tab>
+                    @php
+                        $configReturnSub = ($engine_subtab === 'config' || $engine_subtab === '') ? 'overview' : $engine_subtab;
+                    @endphp
                     <x-server-workspace-tab
+                        as="a"
                         :id="'ws-subtab-'.$key.'-config'"
-                        :active="$engine_subtab === 'config'"
-                        wire:click="setEngineSubtab('config')"
+                        :active="false"
+                        href="{{ route('servers.configuration', ['server' => $server, 'scope' => $key, 'from' => 'webserver', 'return_sub' => $configReturnSub]) }}"
+                        wire:navigate
                         icon="heroicon-o-pencil-square"
                     >
                         {{ __('Config') }}
@@ -62,12 +69,14 @@
                             'upstreams' => ['label' => __('Upstreams'), 'icon' => 'heroicon-o-server'],
                             'certs' => ['label' => __('Certs'), 'icon' => 'heroicon-o-lock-closed'],
                             'snippets' => ['label' => __('Snippets'), 'icon' => 'heroicon-o-code-bracket-square'],
+                            'modules' => ['label' => __('Modules'), 'icon' => 'heroicon-o-puzzle-piece'],
                             'admin' => ['label' => __('Admin'), 'icon' => 'heroicon-o-cpu-chip'],
                         ],
                         'nginx' => [
                             'hosts' => ['label' => __('Hosts'), 'icon' => 'heroicon-o-server-stack'],
                             'upstreams' => ['label' => __('Upstreams'), 'icon' => 'heroicon-o-server'],
                             'certs' => ['label' => __('Certs'), 'icon' => 'heroicon-o-lock-closed'],
+                            'modules' => ['label' => __('Modules'), 'icon' => 'heroicon-o-puzzle-piece'],
                             'workers' => ['label' => __('Workers'), 'icon' => 'heroicon-o-cpu-chip'],
                         ],
                         'apache' => [
@@ -96,7 +105,8 @@
                         <x-server-workspace-tab
                             :id="'ws-subtab-'.$key.'-'.$stKey"
                             :active="$engine_subtab === $stKey"
-                            wire:click="setEngineSubtab('{{ $stKey }}')"
+                            :subtab-key="($optimisticEngineSubtabs ?? false) ? $stKey : null"
+                            :wire-click="($optimisticEngineSubtabs ?? false) ? null : 'setEngineSubtab(\''.$stKey.'\')'"
                             :icon="$stInfo['icon']"
                         >
                             {{ $stInfo['label'] }}
@@ -106,7 +116,8 @@
                 <x-server-workspace-tab
                     :id="'ws-subtab-'.$key.'-info'"
                     :active="$engine_subtab === 'info'"
-                    wire:click="setEngineSubtab('info')"
+                    :subtab-key="($optimisticEngineSubtabs ?? false) ? 'info' : null"
+                    :wire-click="($optimisticEngineSubtabs ?? false) ? null : 'setEngineSubtab(\'info\')'"
                     icon="heroicon-o-information-circle"
                 >
                     {{ __('Info') }}

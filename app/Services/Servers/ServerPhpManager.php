@@ -95,6 +95,72 @@ class ServerPhpManager
     }
 
     /**
+     * @return list<string>
+     */
+    public function installedVersionIds(Server $server): array
+    {
+        return array_column($this->cachedInventory($server)['installed_versions'], 'id');
+    }
+
+    public function latestInstalledVersion(Server $server): ?string
+    {
+        $ids = $this->installedVersionIds($server);
+        if ($ids === []) {
+            return null;
+        }
+
+        usort($ids, static fn (string $a, string $b): int => version_compare($b, $a));
+
+        return $ids[0];
+    }
+
+    /**
+     * SSH probe for PHP packages actually present on the host (ignores stale meta).
+     *
+     * @return list<string>
+     */
+    public function probeInstalledVersionIds(Server $server): array
+    {
+        try {
+            return $this->normalizeVersionList(
+                $this->fetchRemoteInventory($server)['installed_versions'] ?? [],
+            );
+        } catch (\Throwable) {
+            return $this->installedVersionIds($server);
+        }
+    }
+
+    public function probeLatestInstalledVersion(Server $server): ?string
+    {
+        $ids = $this->probeInstalledVersionIds($server);
+        if ($ids === []) {
+            return null;
+        }
+
+        usort($ids, static fn (string $a, string $b): int => version_compare($b, $a));
+
+        return $ids[0];
+    }
+
+    /**
+     * Pick the PHP-FPM version Caddy should target: keep the configured
+     * version when it is installed, otherwise the newest installed build.
+     */
+    public function resolveCaddyPhpVersion(Server $server, ?string $configured): string
+    {
+        $configured = $this->normalizeVersionId($configured) ?? '8.3';
+        $installed = $this->installedVersionIds($server);
+
+        if (in_array($configured, $installed, true)) {
+            return $configured;
+        }
+
+        return $this->latestInstalledVersion($server)
+            ?? $this->normalizeVersionId(data_get($server->meta, 'default_php_version'))
+            ?? '8.3';
+    }
+
+    /**
      * @return array{cli_default: ?string, new_site_default: ?string}
      */
     public function currentDefaults(Server $server, ?array $inventory = null): array
@@ -780,6 +846,14 @@ if command -v dpkg-query >/dev/null 2>&1; then
       || [ -d "/etc/php/${version}" ]; then
       installed_versions+=("$version")
     fi
+  done
+  for d in /etc/php/*/fpm; do
+    [ -d "$d" ] || continue
+    version="$(basename "$(dirname "$d")")"
+    case " ${installed_versions[*]} " in
+      *" ${version} "*) ;;
+      *) installed_versions+=("$version") ;;
+    esac
   done
 elif command -v php >/dev/null 2>&1; then
   supported=true

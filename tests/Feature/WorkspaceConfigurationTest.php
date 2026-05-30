@@ -68,7 +68,37 @@ test('webserver config subtab redirects to scoped configuration workspace', func
     Livewire::actingAs($user)
         ->withQueryParams(['tab' => 'nginx', 'sub' => 'config'])
         ->test(WorkspaceWebserver::class, ['server' => $server])
-        ->assertRedirect(route('servers.configuration', ['server' => $server, 'scope' => 'nginx']));
+        ->assertRedirect(route('servers.configuration', [
+            'server' => $server,
+            'scope' => 'nginx',
+            'from' => 'webserver',
+            'return_sub' => 'overview',
+        ]));
+});
+
+test('configuration workspace shows back link when opened from webserver config tab', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams([
+            'scope' => 'nginx',
+            'from' => 'webserver',
+            'return_sub' => 'hosts',
+        ])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSee(__('Opened from :engine webserver', ['engine' => 'nginx']))
+        ->assertSee(__('Back to :engine webserver', ['engine' => 'nginx']))
+        ->assertSeeHtml('tab=nginx&amp;sub=hosts');
+});
+
+test('configuration workspace applies scope filter from url', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['scope' => 'nginx'])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSet('config_scope', 'nginx')
+        ->assertSee(__('Filtered: :scope', ['scope' => 'Nginx']));
 });
 
 test('load config file queues read job', function (): void {
@@ -89,6 +119,94 @@ test('load config file queues read job', function (): void {
             && $job->path === '/etc/ssh/sshd_config'
             && $job->engine === null;
     });
+});
+
+test('configuration workspace restores selected file from url query param', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Queue::fake();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['file' => '/etc/ssh/sshd_config'])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSet('config_selected_path', '/etc/ssh/sshd_config')
+        ->call('loadConfigCatalog')
+        ->assertSet('pending_load_path', '/etc/ssh/sshd_config');
+
+    Queue::assertPushed(RunServerConfigOpJob::class, function (RunServerConfigOpJob $job) use ($server): bool {
+        return $job->serverId === $server->id
+            && $job->op === 'read'
+            && $job->path === '/etc/ssh/sshd_config';
+    });
+});
+
+test('invalid file query param is cleared on mount', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Queue::fake();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['file' => '/etc/passwd'])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSet('config_selected_path', null)
+        ->assertSet('pending_load_path', null);
+
+    Queue::assertNothingPushed();
+});
+
+test('selected file from url shows loading until contents arrive', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Queue::fake();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['file' => '/etc/ssh/sshd_config'])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSet('config_file_loaded', false)
+        ->assertSet('config_selected_path', '/etc/ssh/sshd_config')
+        ->assertSee(__('Fetching file contents…'));
+});
+
+test('configuration workspace hydrates cached file contents on reload', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Queue::fake();
+
+    RunServerConfigOpJob::storeFileContentCache((string) $server->id, '/etc/ssh/sshd_config', [
+        'contents' => "Port 22\n",
+        'truncated' => false,
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['file' => '/etc/ssh/sshd_config'])
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->assertSet('config_file_loaded', true)
+        ->assertSet('config_loaded_from_cache', true)
+        ->assertSet('config_contents', "Port 22\n")
+        ->assertSee(__('Cached copy'));
+
+    Queue::assertNothingPushed();
+});
+
+test('reload selected config file bypasses cache', function (): void {
+    [$user, $server] = configurationWorkspaceUserWithServer();
+
+    Queue::fake();
+
+    RunServerConfigOpJob::storeFileContentCache((string) $server->id, '/etc/ssh/sshd_config', [
+        'contents' => "Port 22\n",
+        'truncated' => false,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceConfiguration::class, ['server' => $server])
+        ->call('loadConfigFile', '/etc/ssh/sshd_config')
+        ->assertSet('config_loaded_from_cache', true)
+        ->call('reloadSelectedConfigFile')
+        ->assertSet('config_loaded_from_cache', false)
+        ->assertSet('pending_load_path', '/etc/ssh/sshd_config');
+
+    Queue::assertPushed(RunServerConfigOpJob::class, fn (RunServerConfigOpJob $job): bool => $job->op === 'read');
 });
 
 test('disallowed config path is rejected', function (): void {

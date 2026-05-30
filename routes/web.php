@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
 use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
@@ -50,6 +51,7 @@ use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Edge\Templates;
 use App\Livewire\Edge\Usage;
 use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
+use App\Livewire\Fleet\DeployContracts as FleetDeployContracts;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
 use App\Livewire\Fleet\Domains as FleetDomains;
 use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
@@ -351,6 +353,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
         Route::livewire('/fleet/blast-radius', FleetBlastRadius::class)->name('fleet.blast-radius');
         Route::livewire('/fleet/previews', FleetPreviews::class)->name('fleet.previews');
+        Route::livewire('/fleet/deploy-contracts', FleetDeployContracts::class)->name('fleet.deploy-contracts');
         Route::livewire('/fleet/copilot', FleetOpsCopilot::class)
             ->middleware('feature:global.ops_copilot')
             ->name('fleet.copilot');
@@ -718,6 +721,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
     Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
     Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
+    Route::get('servers/{server}/webserver/caddy/admin-api/{path?}', CaddyAdminApiProxyController::class)
+        ->where('path', '.*')
+        ->name('servers.webserver.caddy.admin-api');
     Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {

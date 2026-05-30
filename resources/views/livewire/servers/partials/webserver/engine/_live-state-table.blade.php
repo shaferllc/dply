@@ -1,5 +1,5 @@
 
-            @if ($isLiveStateView)
+            @if ($isLiveStateView || ($optimisticEngineSubtabs ?? false))
                 @php
                     $liveStatePayload = data_get($server->meta ?? [], 'webserver_live_state.'.$key);
                     $liveState = \App\Services\Servers\LiveState\EngineLiveState::fromArray($liveStatePayload);
@@ -34,12 +34,13 @@
                         'openlitespeed/extapps' => __('External LSAPI / proxy app processors referenced by vhosts. Marks missing lsphpXX binaries.'),
                         'openlitespeed/cache' => __('LSCache hit counts and hit-rate per .rtreport file.'),
                         'caddy/routes' => __('Every route across http.servers.* — host matcher, listen addresses, and the handler chain (reverse_proxy/file_server/headers/etc.).'),
-                        'caddy/upstreams' => __('Reverse-proxy backends with live health, request count, and consecutive fail count from /reverse_proxy/upstreams.'),
+                        'caddy/upstreams' => __('Reverse-proxy backends with live health, request count, and consecutive fail count from /reverse_proxy/upstreams. Down PHP-FPM unix sockets can be repaired from this table.'),
                         'caddy/certs' => __('TLS automation policies + Caddy\'s local CA. Per-site issued certs live on disk under /var/lib/caddy/.local/share/caddy/certificates/.'),
                         'caddy/admin' => __('Caddy build version, admin endpoint state, listening sockets, and the size of the active config payload.'),
                         'nginx/hosts' => __('Every server block from `nginx -T` with its server_name, listen, root, and first fastcgi_pass/proxy_pass upstream.'),
                         'nginx/upstreams' => __('Every `upstream` block — name + member servers (host:port).'),
                         'nginx/certs' => __('ssl_certificate paths across all server blocks with the openssl-derived expiry.'),
+                        'nginx/modules' => __('Built-in modules from `nginx -V` plus dynamic modules loaded via modules-enabled.'),
                         'nginx/workers' => __('Active connections + accepts/handled/requests counters from the stub_status endpoint (127.0.0.1:9091).'),
                         'apache/vhosts' => __('Vhost map from `apachectl -S` — ServerName, port, config file:line, and any ServerAlias.'),
                         'apache/modules' => __('Loaded modules from `apachectl -M` with static/shared kind.'),
@@ -56,7 +57,14 @@
                         default => '',
                     };
                 @endphp
-                <div class="{{ $card }}" wire:key="livestate-{{ $key }}-{{ $engine_subtab }}">
+                <div
+                    @if ($optimisticEngineSubtabs ?? false)
+                        x-show="@js($liveStateTabKeys).includes(subtab)"
+                        x-cloak
+                    @endif
+                    class="{{ $card }}"
+                    wire:key="livestate-{{ $key }}-{{ $engine_subtab }}"
+                >
                     <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-table-cells class="h-5 w-5" aria-hidden="true" />
@@ -72,6 +80,28 @@
                             @if ($liveCapturedAt)
                                 <p class="mt-1 text-[11px] tabular-nums text-brand-mist">
                                     {{ __('As of :time', ['time' => $liveCapturedAt->diffForHumans()]) }}
+                                    <span
+                                        wire:loading
+                                        wire:target="refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal"
+                                        class="ml-1 inline-flex items-center gap-1 text-brand-forest"
+                                    >
+                                        <x-spinner variant="forest" class="h-3 w-3" /> {{ __('Refreshing…') }}
+                                    </span>
+                                    <span wire:loading.remove wire:target="refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal">
+                                        @if ($liveState && ! $liveState->isFresh)
+                                            <span class="ml-1 inline-flex items-center rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 ring-1 ring-sky-200">{{ __('Cached') }}</span>
+                                        @endif
+                                    </span>
+                                </p>
+                            @else
+                                <p class="mt-1 inline-flex items-center gap-1 text-[11px] text-brand-forest">
+                                    <span
+                                        wire:loading
+                                        wire:target="refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal"
+                                        class="inline-flex items-center gap-1"
+                                    >
+                                        <x-spinner variant="forest" class="h-3 w-3" /> {{ __('Probing server…') }}
+                                    </span>
                                 </p>
                             @endif
                         </div>
@@ -94,10 +124,42 @@
 
                     @php
                         $rows = $liveUnits[$engine_subtab] ?? [];
+                        $liveStateProbed = $liveState !== null && $liveCapturedAt !== null;
+                        $liveStateErrors = array_values(array_filter((array) data_get($liveState?->engineSpecific ?? [], 'errors', [])));
+                        $liveStateEmptyMessage = match ($key.'/'.$engine_subtab) {
+                            'nginx/hosts' => __('No server blocks found in `nginx -T`.'),
+                            'nginx/upstreams' => __('No `upstream` blocks found in the flattened nginx config.'),
+                            'nginx/certs' => __('No SSL certificates found — no server block declares ssl_certificate.'),
+                            'nginx/modules' => __('No modules reported — run `nginx -V` or enable dynamic modules.'),
+                            'nginx/workers' => __('stub_status is unreachable on 127.0.0.1:9091.'),
+                            'apache/vhosts' => __('No virtual hosts reported by `apachectl -S`.'),
+                            'apache/modules' => __('No loaded modules reported by `apachectl -M`.'),
+                            'apache/certs' => __('No SSLCertificateFile paths found in enabled sites.'),
+                            'apache/workers' => __('mod_status is unreachable on 127.0.0.1:9092.'),
+                            'caddy/routes' => __('No routes returned from the Caddy admin API — add a custom route above or create a site.'),
+                            'caddy/upstreams', 'caddy/certs', 'caddy/admin' => __('Nothing matched for this Caddy view.'),
+                            'openlitespeed/vhosts' => __('No virtual hosts found under /usr/local/lsws/conf/vhosts/.'),
+                            'openlitespeed/listeners' => __('No listener blocks found in httpd_config.conf.'),
+                            'openlitespeed/extapps' => __('No external applications referenced by vhosts.'),
+                            'openlitespeed/cache' => __('No LSCache rtreport data found.'),
+                            'traefik/routers', 'traefik/services', 'traefik/middlewares', 'traefik/providers' => __('Nothing returned from the Traefik API for this view.'),
+                            'haproxy/frontends', 'haproxy/backends', 'haproxy/ssl', 'haproxy/runtime' => __('Nothing returned from HAProxy stats for this view.'),
+                            default => __('Nothing to show for this view.'),
+                        };
                         // For the vhosts table, resolve each row name back to a Site so
                         // we can render a "Manage on site" link (PHP version, SSL, env, …
                         // all live there, not here). Names follow the
                         // `dply-<site_id>-<slug>` pattern emitted by Site::nginxConfigBasename().
+                        $caddyDownPhpFpmUpstreams = [];
+                        if ($key === 'caddy' && $engine_subtab === 'upstreams' && ! empty($rows)) {
+                            foreach ($rows as $upstreamRow) {
+                                $addr = (string) ($upstreamRow['address'] ?? '');
+                                if (empty($upstreamRow['healthy']) && \App\Support\Servers\CaddyPhpFpmUpstreamAddress::isPhpFpmSocket($addr)) {
+                                    $caddyDownPhpFpmUpstreams[] = $upstreamRow;
+                                }
+                            }
+                        }
+                        $repairCaddyPhpFpmAction = config('server_manage.service_actions.repair_caddy_php_fpm_upstream');
                         $sitesByVhostName = [];
                         if ($engine_subtab === 'vhosts' && ! empty($rows) && $key === 'openlitespeed') {
                             $ids = [];
@@ -115,11 +177,52 @@
                             }
                         }
                     @endphp
+                    @php
+                        $liveStateWireLoadingTargets = 'refreshEngineLiveState,setEngineSubtab,setWorkspaceTab,repairCaddyPhpFpmUpstream,confirmActionModal';
+                    @endphp
                     <div class="px-6 py-6 sm:px-7">
-                    @if (empty($rows))
+                    <div
+                        wire:loading
+                        wire:target="{{ $liveStateWireLoadingTargets }}"
+                        class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                    >
+                        <x-spinner variant="forest" class="mx-auto h-5 w-5" />
+                        <p class="mt-2">{{ __('Probing server…') }}</p>
+                    </div>
+
+                    <div wire:loading.remove wire:target="{{ $liveStateWireLoadingTargets }}">
+                    @if ($caddyDownPhpFpmUpstreams !== [] && $opsReady && ! $isDeployer)
+                        <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm text-amber-950">
+                            <p class="font-semibold">{{ __('PHP-FPM upstream unreachable') }}</p>
+                            <p class="mt-1 leading-relaxed">
+                                {{ __('Caddy reports these unix PHP-FPM backends as down — usually php-fpm is stopped, the socket path does not match your sites, or the caddy user cannot read the socket. Repair starts the FPM service for the upstream socket (or the server default PHP when that version is missing). If Caddy still points at an old socket, update each site\'s PHP version and re-apply webserver config.') }}
+                            </p>
+                        </div>
+                    @endif
+                    @if ($liveStateErrors !== [])
+                        <div class="mt-5 rounded-xl border border-rose-200 bg-rose-50/70 px-6 py-4 text-sm text-rose-900">
+                            <p class="font-semibold">{{ __('Probe reported problems') }}</p>
+                            <ul class="mt-2 list-inside list-disc space-y-1 font-mono text-xs">
+                                @foreach ($liveStateErrors as $err)
+                                    <li>{{ $err }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @elseif ($engine_live_state_loading && empty($rows))
+                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                            <x-spinner variant="forest" class="mx-auto h-5 w-5" />
+                            <p class="mt-2">{{ __('Probing server…') }}</p>
+                        </div>
+                    @elseif (! $liveStateProbed && empty($rows))
                         <div class="mt-5 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss">
                             <x-heroicon-o-signal-slash class="mx-auto h-5 w-5 text-brand-mist" />
-                            <p class="mt-2">{{ __('No data yet — click "Refresh now" to probe the server.') }}</p>
+                            <p class="mt-2">{{ __('No data yet — open this tab or click "Refresh now" to probe the server.') }}</p>
+                        </div>
+                    @elseif ($liveStateProbed && empty($rows))
+                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                            <x-heroicon-o-check-circle class="mx-auto h-5 w-5 text-emerald-600" />
+                            <p class="mt-2 font-medium text-brand-ink">{{ __('In sync — nothing to list') }}</p>
+                            <p class="mt-1 max-w-md mx-auto text-[13px] leading-relaxed">{{ $liveStateEmptyMessage }}</p>
                         </div>
                     @else
                         <div class="mt-5 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
@@ -177,6 +280,9 @@
                                                     <th class="px-4 py-2 font-medium">{{ __('Healthy') }}</th>
                                                     <th class="px-4 py-2 font-medium">{{ __('Requests') }}</th>
                                                     <th class="px-4 py-2 font-medium">{{ __('Fails') }}</th>
+                                                    @if ($key === 'caddy')
+                                                        <th class="px-4 py-2 font-medium text-right">{{ __('Actions') }}</th>
+                                                    @endif
                                                 @endif
                                                 @break
                                             @case('certs')
@@ -340,7 +446,31 @@
                                                         <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                         <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
                                                     @else
-                                                        <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['address'] ?? '—' }}</td>
+                                                        @php
+                                                            $upstreamAddress = (string) ($row['address'] ?? '');
+                                                            $canRepairPhpFpm = $key === 'caddy'
+                                                                && empty($row['healthy'])
+                                                                && \App\Support\Servers\CaddyPhpFpmUpstreamAddress::isPhpFpmSocket($upstreamAddress);
+                                                            $repairPhpVersions = $canRepairPhpFpm
+                                                                ? \App\Support\Servers\CaddyPhpFpmUpstreamAddress::repairPhpVersions(
+                                                                    $upstreamAddress,
+                                                                    app(\App\Services\Servers\ServerPhpManager::class)->probeInstalledVersionIds($server),
+                                                                    app(\App\Services\Servers\ServerPhpManager::class)->probeLatestInstalledVersion($server),
+                                                                )
+                                                                : null;
+                                                            $repairModalDetails = [];
+                                                            if (is_array($repairPhpVersions)) {
+                                                                $repairModalDetails[] = ['label' => __('Upstream'), 'value' => $upstreamAddress, 'mono' => true];
+                                                                if ($repairPhpVersions['upstream'] !== null) {
+                                                                    $repairModalDetails[] = ['label' => __('Caddy config'), 'value' => 'php'.$repairPhpVersions['upstream'].'-fpm'];
+                                                                }
+                                                                $repairModalDetails[] = ['label' => __('Will use'), 'value' => 'php'.$repairPhpVersions['primary'].'-fpm'];
+                                                                if ($repairPhpVersions['needs_config_update']) {
+                                                                    $repairModalDetails[] = ['label' => __('Also rewrites Caddy configs'), 'value' => __('Yes — stale php:version sockets are updated to the latest installed PHP.')];
+                                                                }
+                                                            }
+                                                        @endphp
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $upstreamAddress !== '' ? $upstreamAddress : '—' }}</td>
                                                         <td class="px-4 py-2 text-xs">
                                                             @if (! empty($row['healthy']))
                                                                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('healthy') }}</span>
@@ -353,6 +483,24 @@
                                                             @php $fails = (int) ($row['fails'] ?? 0); @endphp
                                                             <span class="{{ $fails > 0 ? 'text-rose-700' : '' }}">{{ number_format($fails) }}</span>
                                                         </td>
+                                                        @if ($key === 'caddy')
+                                                            <td class="px-4 py-2 text-right text-xs">
+                                                                @if ($canRepairPhpFpm && $opsReady && ! $isDeployer && is_array($repairCaddyPhpFpmAction))
+                                                                    <button
+                                                                        type="button"
+                                                                        wire:click="openConfirmActionModal('repairCaddyPhpFpmUpstream', [@js($upstreamAddress)], @js(__('Repair PHP-FPM for Caddy')), @js($repairCaddyPhpFpmAction['confirm'] ?? ''), @js(__('Repair PHP-FPM')), false, @js($repairModalDetails))"
+                                                                        wire:loading.attr="disabled"
+                                                                        wire:target="openConfirmActionModal,repairCaddyPhpFpmUpstream,confirmActionModal"
+                                                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                                                    >
+                                                                        <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" />
+                                                                        {{ __('Repair PHP-FPM') }}
+                                                                    </button>
+                                                                @else
+                                                                    <span class="text-brand-mist">—</span>
+                                                                @endif
+                                                            </td>
+                                                        @endif
                                                     @endif
                                                     @break
                                                 @case('hosts')
@@ -378,9 +526,9 @@
                                                         @php $kind = (string) ($row['kind'] ?? ''); @endphp
                                                         <span @class([
                                                             'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ring-1',
-                                                            'bg-emerald-50 text-emerald-700 ring-emerald-200' => $kind === 'static',
-                                                            'bg-sky-50 text-sky-700 ring-sky-200' => $kind === 'shared',
-                                                            'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($kind, ['static', 'shared'], true),
+                                                            'bg-emerald-50 text-emerald-700 ring-emerald-200' => in_array($kind, ['static', 'builtin'], true),
+                                                            'bg-sky-50 text-sky-700 ring-sky-200' => in_array($kind, ['shared', 'dynamic'], true),
+                                                            'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! in_array($kind, ['static', 'shared', 'builtin', 'dynamic'], true),
                                                         ])>{{ $kind ?: '—' }}</span>
                                                     </td>
                                                     @break
@@ -503,6 +651,7 @@
                             </table>
                         </div>
                     @endif
+                    </div>{{-- wire:loading.remove --}}
                     </div>
                 </div>
             @endif

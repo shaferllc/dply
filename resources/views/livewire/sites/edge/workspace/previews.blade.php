@@ -127,6 +127,8 @@
     @include('livewire.sites.partials.edge.previews', [
         'latestReplays' => $latestReplays ?? collect(),
         'deployReplayEnabled' => $deployReplayEnabled ?? false,
+        'deployContractEnabled' => $deployContractEnabled ?? false,
+        'deployContracts' => $deployContracts ?? collect(),
     ])
     @unless ($edgeIsPreviewChild)
         @include('livewire.sites.partials.edge.preview-settings')

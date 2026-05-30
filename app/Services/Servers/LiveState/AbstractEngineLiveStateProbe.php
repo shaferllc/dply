@@ -73,16 +73,29 @@ abstract class AbstractEngineLiveStateProbe implements EngineLiveStateProbe
             return null;
         }
 
+        $ttl = max(1, (int) config('server_manage.webserver_live_state_cache_seconds', 60));
+        if ($state->capturedAt->lt(CarbonImmutable::now()->subSeconds($ttl))) {
+            return null;
+        }
+
         // Force isFresh=false on cache reads regardless of how the payload
         // was originally written — the UI uses this to render the "X
         // minutes ago" stamp differently from a freshly-pulled snapshot.
-        return new EngineLiveState(
+        $cached = new EngineLiveState(
             engine: $state->engine,
             capturedAt: $state->capturedAt,
             isFresh: false,
             units: $state->units,
             engineSpecific: $state->engineSpecific,
         );
+
+        // Persist is_fresh=false so blade reads (which load meta directly,
+        // not through readCache) can show the Cached badge on revisit.
+        if ($state->isFresh) {
+            $this->writeCache($server, $cached);
+        }
+
+        return $cached;
     }
 
     protected function writeCache(Server $server, EngineLiveState $state): void

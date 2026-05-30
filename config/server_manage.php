@@ -1,6 +1,9 @@
 <?php
 
 use App\Services\Servers\ServerConfigFileCatalog;
+use App\Support\Servers\CaddyRuntimeOwnership;
+
+$caddyRuntimeOwnershipScript = trim(CaddyRuntimeOwnership::shell());
 
 /**
  * Apache syntax check — Debian ships `apache2ctl`; RHEL uses `httpd -t`.
@@ -8,6 +11,42 @@ use App\Services\Servers\ServerConfigFileCatalog;
  */
 $apacheConfigtestScript = <<<'BASH'
 if command -v apache2ctl >/dev/null 2>&1; then (sudo -n apache2ctl configtest 2>&1 || apache2ctl configtest 2>&1); elif command -v apachectl >/dev/null 2>&1; then (sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1); elif command -v httpd >/dev/null 2>&1; then (sudo -n httpd -t 2>&1 || httpd -t 2>&1); else echo "Apache is not installed on this host — cannot run configtest." >&2; exit 1; fi
+BASH;
+
+/**
+ * PHP ini / FPM pool validation. $PATHX is set by the config editor dry-run
+ * script before this hook runs — FPM paths use php-fpm -t; CLI ini uses php -c.
+ */
+$phpConfigValidateScript = <<<'BASH'
+if echo "$PATHX" | grep -q '/fpm/'; then
+  (sudo -n php-fpm8.4 -t 2>&1 || php-fpm8.4 -t 2>&1 || sudo -n php-fpm8.3 -t 2>&1 || php-fpm8.3 -t 2>&1 || sudo -n php-fpm -t 2>&1 || php-fpm -t 2>&1)
+else
+  (sudo -n php -c "$PATHX" -m 2>&1 || php -c "$PATHX" -m 2>&1)
+fi
+BASH;
+
+/**
+ * MySQL/MariaDB cnf validation — works for my.cnf and mariadb.conf.d fragments.
+ */
+$mysqlConfigValidateScript = <<<'BASH'
+if command -v mysqld >/dev/null 2>&1; then
+  (sudo -n mysqld --validate-config --defaults-file="$PATHX" 2>&1 || mysqld --validate-config --defaults-file="$PATHX" 2>&1)
+elif command -v mariadbd >/dev/null 2>&1; then
+  (sudo -n mariadbd --validate-config --defaults-file="$PATHX" 2>&1 || mariadbd --validate-config --defaults-file="$PATHX" 2>&1)
+else
+  echo "MySQL/MariaDB is not installed on this host — cannot validate." >&2
+  exit 1
+fi
+BASH;
+
+/** APT drop-in snippet syntax check via apt-config. */
+$aptConfigValidateScript = <<<'BASH'
+APT_CONFIG="$PATHX" apt-config dump >/dev/null 2>&1 && echo "[ok] APT configuration syntax looks valid."
+BASH;
+
+/** Redis config — uses the staged path ($PATHX) after dry-run swap. */
+$redisConfigValidateScript = <<<'BASH'
+(sudo -n redis-server "$PATHX" --test-memory 1 2>&1 || redis-server "$PATHX" --test-memory 1 2>&1)
 BASH;
 
 /**
@@ -32,6 +71,9 @@ return [
 
     /** How often the worker writes partial SSH output to cache while the command runs. */
     'remote_task_cache_flush_seconds' => (float) env('SERVER_MANAGE_REMOTE_TASK_CACHE_FLUSH', 0.5),
+
+    /** Seconds before a cached webserver live-state probe (nginx -T, etc.) is treated as stale. */
+    'webserver_live_state_cache_seconds' => (int) env('DPLY_WEBSERVER_LIVE_STATE_CACHE_SECONDS', 60),
 
     /**
      * When true, a new manage task for the same server + task name invalidates the previous job so it
@@ -86,6 +128,9 @@ return [
 
     /** Max bytes read when previewing a config file over SSH. */
     'config_preview_max_bytes' => 48_000,
+
+    /** Minutes to keep per-path config file contents in cache for faster reloads. */
+    'config_file_content_cache_minutes' => 30,
 
     /**
      * Configuration files to preview (first N bytes via head -c).
@@ -320,6 +365,136 @@ else
 fi
 BASH,
             'rerun_probe_after_finish' => true,
+        ],
+        'repair_caddy_php_fpm_upstream' => [
+            'label' => 'Repair PHP-FPM for Caddy',
+            'description' => 'Start php{version}-fpm, fix Caddy log/runtime ownership, grant caddy socket access, reload Caddy.',
+            'confirm' => 'Start or restart PHP-FPM for this upstream, ensure the caddy user can reach the unix socket, and reload Caddy?',
+            'timeout' => 240,
+            'rerun_probe_after_finish' => true,
+            'refresh_webserver_live_state_after_finish' => true,
+            'script' => $caddyRuntimeOwnershipScript."\n".<<<'BASH'
+V="${DPLY_PHP_VERSION:-8.3}"
+UPSTREAM="${DPLY_UPSTREAM_PHP_VERSION:-}"
+UNIT="php${V}-fpm"
+SOCK="/run/php/php${V}-fpm.sock"
+ADDED_WWWDATA=0
+
+php_fpm_unit_exists() {
+  local ver="$1"
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl list-unit-files "php${ver}-fpm.service" 2>/dev/null | grep -q "^php${ver}-fpm.service"
+    return $?
+  fi
+  [ -d "/etc/php/${ver}/fpm" ]
+}
+
+detect_latest_php_fpm() {
+  local versions=""
+  for d in /etc/php/*/fpm; do
+    [ -d "$d" ] || continue
+    local ver
+    ver="$(basename "$(dirname "$d")")"
+    php_fpm_unit_exists "$ver" || continue
+    versions="${versions}${ver}"$'\n'
+  done
+  printf '%s' "$versions" | awk 'NF' | sort -V | tail -n 1
+}
+
+restart_php_fpm() {
+  local ver="$1"
+  local unit="php${ver}-fpm"
+  if command -v systemctl >/dev/null 2>&1; then
+    if ! php_fpm_unit_exists "$ver"; then
+      return 1
+    fi
+    (sudo -n systemctl enable "$unit" 2>/dev/null || true)
+    (sudo -n systemctl restart "$unit" || systemctl restart "$unit") 2>&1
+    return $?
+  fi
+  (sudo -n service "$unit" restart || service "$unit" restart) 2>&1
+}
+
+rewrite_caddy_php_sockets() {
+  local from="$1"
+  local to="$2"
+  local changed=0
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    if grep -q "php${from}-fpm" "$f" 2>/dev/null; then
+      (sudo -n sed -i "s/php${from}-fpm/php${to}-fpm/g" "$f" || sed -i "s/php${from}-fpm/php${to}-fpm/g" "$f") 2>&1
+      changed=1
+    fi
+  done < <(find /etc/caddy -type f \( -name '*.caddy' -o -name 'Caddyfile' \) 2>/dev/null)
+  if [ "$changed" = "1" ]; then
+    echo "[dply] Updated Caddy configs from php${from}-fpm to php${to}-fpm."
+  fi
+}
+
+rewrite_all_stale_caddy_php() {
+  local target="$1"
+  for from in $(grep -rohE 'php[0-9]+\.[0-9]+-fpm' /etc/caddy 2>/dev/null | sed 's/-fpm//' | sed 's/php//' | sort -u); do
+    [ "$from" = "$target" ] && continue
+    rewrite_caddy_php_sockets "$from" "$target"
+  done
+}
+
+if ! php_fpm_unit_exists "$V"; then
+  AUTO="$(detect_latest_php_fpm)"
+  if [ -n "$AUTO" ]; then
+    echo "[dply] php${V}-fpm is not installed — using php${AUTO}-fpm instead." >&2
+    if [ -z "$UPSTREAM" ]; then
+      UPSTREAM="$V"
+    fi
+    V="$AUTO"
+    UNIT="php${V}-fpm"
+    SOCK="/run/php/php${V}-fpm.sock"
+  fi
+fi
+
+if [ -n "$UPSTREAM" ] && [ "$UPSTREAM" != "$V" ]; then
+  rewrite_caddy_php_sockets "$UPSTREAM" "$V"
+else
+  rewrite_all_stale_caddy_php "$V"
+fi
+
+if ! restart_php_fpm "$V"; then
+  echo "[error] php${V}-fpm is not installed on this server." >&2
+  exit 1
+fi
+if getent group www-data >/dev/null 2>&1 && id -u caddy >/dev/null 2>&1; then
+  if ! id -nG caddy 2>/dev/null | tr ' ' '\n' | grep -qx www-data; then
+    (sudo -n usermod -aG www-data caddy || usermod -aG www-data caddy) 2>&1
+    ADDED_WWWDATA=1
+  fi
+fi
+if [ ! -S "$SOCK" ]; then
+  echo "[error] PHP-FPM socket not found: $SOCK" >&2
+  exit 1
+fi
+if sudo -u caddy test -S "$SOCK" 2>/dev/null; then
+  echo "[ok] caddy can access $SOCK"
+else
+  echo "[warn] caddy still cannot read $SOCK — check pool listen.owner and listen.mode" >&2
+fi
+if command -v systemctl >/dev/null 2>&1; then
+  if [ "$ADDED_WWWDATA" = "1" ]; then
+    (sudo -n systemctl restart caddy || systemctl restart caddy) 2>&1
+  else
+    (sudo -n systemctl reload caddy || sudo -n systemctl restart caddy || systemctl reload caddy || systemctl restart caddy) 2>&1
+  fi
+else
+  if [ "$ADDED_WWWDATA" = "1" ]; then
+    (sudo -n service caddy restart || service caddy restart) 2>&1
+  else
+    (sudo -n service caddy reload || service caddy reload) 2>&1
+  fi
+fi
+if command -v caddy >/dev/null 2>&1; then
+  (sudo -n caddy validate --config /etc/caddy/Caddyfile 2>&1 || caddy validate --config /etc/caddy/Caddyfile 2>&1)
+fi
+echo "[ok] PHP ${V} FPM repair finished — refresh Upstreams to verify health."
+BASH
         ],
 
         // Note: every *_test_config script wraps the parse-only validator in a
@@ -1613,9 +1788,9 @@ BASH
             'label' => 'PHP',
             'file_type' => 'ini',
             'entries' => [
-                ['label' => 'php.ini (CLI)', 'path' => '/etc/php/8.3/cli/php.ini', 'file_type' => 'ini'],
-                ['label' => 'php.ini (FPM)', 'path' => '/etc/php/8.3/fpm/php.ini', 'file_type' => 'ini'],
-                ['label' => 'www.conf (FPM pool)', 'path' => '/etc/php/8.3/fpm/pool.d/www.conf', 'file_type' => 'ini'],
+                ['label' => 'php.ini (CLI)', 'path' => '/etc/php/8.3/cli/php.ini', 'file_type' => 'ini', 'hint' => 'PHP settings for CLI — deploy scripts, artisan, and cron.'],
+                ['label' => 'php.ini (FPM)', 'path' => '/etc/php/8.3/fpm/php.ini', 'file_type' => 'ini', 'hint' => 'PHP settings for FPM — affects every web request.'],
+                ['label' => 'www.conf (FPM pool)', 'path' => '/etc/php/8.3/fpm/pool.d/www.conf', 'file_type' => 'ini', 'hint' => 'Default FPM pool — workers, user, and socket PHP sites use.'],
             ],
             'globs' => [
                 '/etc/php/*/fpm/php.ini',
@@ -1626,8 +1801,8 @@ BASH
             'label' => 'Redis & DB',
             'file_type' => 'conf',
             'entries' => [
-                ['label' => 'redis.conf', 'path' => '/etc/redis/redis.conf'],
-                ['label' => 'my.cnf', 'path' => '/etc/mysql/my.cnf'],
+                ['label' => 'redis.conf', 'path' => '/etc/redis/redis.conf', 'hint' => 'Redis server — memory, persistence, bind address, and eviction.'],
+                ['label' => 'my.cnf', 'path' => '/etc/mysql/my.cnf', 'hint' => 'MySQL/MariaDB server defaults and global options.'],
             ],
             'globs' => [
                 '/etc/mysql/mariadb.conf.d/*.cnf',
@@ -1637,16 +1812,16 @@ BASH
             'label' => 'System',
             'file_type' => 'conf',
             'entries' => [
-                ['label' => 'sshd_config', 'path' => '/etc/ssh/sshd_config'],
-                ['label' => 'unattended-upgrades', 'path' => '/etc/apt/apt.conf.d/50unattended-upgrades'],
-                ['label' => '20auto-upgrades', 'path' => '/etc/apt/apt.conf.d/20auto-upgrades'],
+                ['label' => 'sshd_config', 'path' => '/etc/ssh/sshd_config', 'hint' => 'SSH daemon — ports, auth methods, and access controls.'],
+                ['label' => 'unattended-upgrades', 'path' => '/etc/apt/apt.conf.d/50unattended-upgrades', 'hint' => 'Which packages auto-update and reboot policy.'],
+                ['label' => '20auto-upgrades', 'path' => '/etc/apt/apt.conf.d/20auto-upgrades', 'hint' => 'Enables or pauses unattended security upgrades.'],
             ],
         ],
         'supervisor' => [
             'label' => 'Supervisor',
             'file_type' => 'ini',
             'entries' => [
-                ['label' => 'supervisord.conf', 'path' => '/etc/supervisor/supervisord.conf'],
+                ['label' => 'supervisord.conf', 'path' => '/etc/supervisor/supervisord.conf', 'hint' => 'Supervisor main config — socket, logging, and include paths.'],
             ],
             'globs' => [
                 '/etc/supervisor/conf.d/*.conf',
@@ -1665,24 +1840,60 @@ BASH
                 'failure_contains' => ['fatal', 'missing', 'bad configuration'],
                 'validate_timeout' => 30,
             ],
-            '/etc/redis/redis.conf' => [
-                'validate' => '(sudo -n redis-server /etc/redis/redis.conf --test-memory 1 2>&1 || redis-server /etc/redis/redis.conf --test-memory 1 2>&1)',
-                'success_contains' => [],
-                'failure_contains' => ['err', 'fatal', 'failed'],
-                'validate_timeout' => 30,
-            ],
         ],
         'prefixes' => [
-            '/etc/php/' => [
-                'validate' => '(sudo -n php-fpm8.4 -t 2>&1 || php-fpm8.4 -t 2>&1 || sudo -n php-fpm8.3 -t 2>&1 || php-fpm8.3 -t 2>&1 || php-fpm -t 2>&1)',
-                'success_contains' => ['successful', 'test is successful'],
-                'failure_contains' => ['error', 'failed', 'emerg'],
+            '/etc/nginx/' => [
+                'engine' => 'nginx',
+            ],
+            '/etc/caddy/' => [
+                'engine' => 'caddy',
+            ],
+            '/etc/apache2/' => [
+                'engine' => 'apache',
+            ],
+            '/usr/local/lsws/conf/' => [
+                'engine' => 'openlitespeed',
+            ],
+            '/etc/traefik/' => [
+                'engine' => 'traefik',
+            ],
+            '/etc/haproxy/' => [
+                'engine' => 'haproxy',
+            ],
+            '/etc/mysql/' => [
+                'validate' => $mysqlConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['error', 'unknown variable', 'failed', 'cannot'],
                 'validate_timeout' => 45,
+            ],
+            '/etc/mariadb/' => [
+                'validate' => $mysqlConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['error', 'unknown variable', 'failed', 'cannot'],
+                'validate_timeout' => 45,
+            ],
+            '/etc/redis/' => [
+                'validate' => $redisConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['err', 'fatal', 'failed', 'wrong number'],
+                'validate_timeout' => 30,
+            ],
+            '/etc/php/' => [
+                'validate' => $phpConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['error', 'failed', 'emerg', 'parse error', 'unknown'],
+                'validate_timeout' => 45,
+            ],
+            '/etc/apt/apt.conf.d/' => [
+                'validate' => $aptConfigValidateScript,
+                'success_contains' => ['[ok]'],
+                'failure_contains' => ['error', 'invalid', 'couldn\'t', 'could not'],
+                'validate_timeout' => 30,
             ],
             '/etc/supervisor/' => [
                 'validate' => '(sudo -n supervisorctl reread 2>&1 && sudo -n supervisorctl status 2>&1 || supervisorctl reread 2>&1)',
                 'success_contains' => [],
-                'failure_contains' => ['error', 'no such file', 'invalid'],
+                'failure_contains' => ['error', 'no such file', 'invalid', 'parse error'],
                 'validate_timeout' => 30,
             ],
         ],

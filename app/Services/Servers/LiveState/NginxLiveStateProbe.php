@@ -63,6 +63,7 @@ class NginxLiveStateProbe extends AbstractEngineLiveStateProbe
                 'hosts' => $this->buildHostUnits($configDump),
                 'upstreams' => $this->buildUpstreamUnits($configDump),
                 'certs' => $this->buildCertUnits($configDump, $certExpiries),
+                'modules' => $this->buildModuleUnits($sections['modules'] ?? ''),
                 'workers' => $this->buildWorkerUnits($stubStatus, $version),
             ],
             engineSpecific: array_filter([
@@ -90,6 +91,17 @@ echo '###dply-section:status###'
 curl -fsS --max-time 3 http://127.0.0.1:9091/ 2>/dev/null
 echo
 echo '###dply-section:end###'
+echo '###dply-section:modules###'
+# Built-in modules from configure args + dynamic modules currently loaded.
+nginx -V 2>&1
+echo '---DPLY_DYNAMIC---'
+if [ -d /etc/nginx/modules-enabled ]; then
+  for f in /etc/nginx/modules-enabled/*.conf; do
+    [ -f "$f" ] || continue
+    grep -h '^\s*load_module' "$f" 2>/dev/null | awk '{print $2}' | tr -d ';'
+  done | sort -u
+fi
+echo '###dply-section:end###'
 echo '###dply-section:certs###'
 # For each ssl_certificate path mentioned in the flattened config, dump its
 # "Not After" + the path itself. openssl handles both single-cert and chain
@@ -111,7 +123,7 @@ BASH;
      */
     private function splitSections(string $output): array
     {
-        $heads = ['version', 'test', 'config', 'status', 'certs'];
+        $heads = ['version', 'test', 'config', 'status', 'certs', 'modules'];
         $end = '###dply-section:end###';
         $out = [];
         foreach ($heads as $name) {
@@ -213,6 +225,43 @@ BASH;
         }
 
         return array_values($byPath);
+    }
+
+    /**
+     * @return list<array{name: string, kind: string}>
+     */
+    private function buildModuleUnits(string $section): array
+    {
+        [$nginxV, $dynamicBlob] = array_pad(explode('---DPLY_DYNAMIC---', $section, 2), 2, '');
+        $rows = [];
+
+        if (preg_match('/configure arguments:\s*(.+)$/m', $nginxV, $m) === 1) {
+            if (preg_match_all('/--with(?:out)?-([a-z0-9_]+)_module\b/', $m[1], $matches) !== false) {
+                foreach ($matches[1] ?? [] as $stem) {
+                    $rows[] = [
+                        'name' => str_replace('_', '-', $stem),
+                        'kind' => 'builtin',
+                    ];
+                }
+            }
+        }
+
+        foreach (preg_split('/\R/', trim($dynamicBlob)) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $name = basename($line, '.so');
+            $name = preg_replace('/^ngx_(http_|stream_)?/', '', $name) ?? $name;
+            $rows[] = [
+                'name' => $name,
+                'kind' => 'dynamic',
+            ];
+        }
+
+        usort($rows, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+
+        return $rows;
     }
 
     /**

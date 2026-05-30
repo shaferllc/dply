@@ -31,6 +31,7 @@ test('refresh engine live state invokes probe and caches result', function () {
     $server = Server::factory()->ready()->create([
         'user_id' => $user->id,
         'organization_id' => $user->currentOrganization()->id,
+        'ssh_private_key' => 'test-key',
         'meta' => ['webserver' => 'openlitespeed'],
     ]);
 
@@ -57,6 +58,7 @@ test('refresh engine live state invokes probe and caches result', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->set('workspace_tab', 'openlitespeed')
+        ->set('engine_subtab', 'vhosts')
         ->call('refreshEngineLiveState');
 
     expect($stub->calls)->toBe(1);

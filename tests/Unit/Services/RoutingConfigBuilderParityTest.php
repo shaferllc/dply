@@ -43,8 +43,34 @@ test('caddy backend builder keeps redirects for traefik backends', function () {
 
     $config = app(CaddySiteConfigBuilder::class)->build($site, 23001);
 
-    $this->assertStringContainsString(':23001 {', $config);
+    $this->assertStringContainsString('example.test:23001, www.example.test:23001, tenant.example.test:23001 {', $config);
     $this->assertStringContainsString('redir /old https://example.test/new 301', $config);
+});
+
+test('caddy switch-staging port binds hostnames not a catch-all port', function () {
+    $siteA = Site::factory()->create(['slug' => 'alpha', 'type' => SiteType::Static]);
+    SiteDomain::query()->create([
+        'site_id' => $siteA->id,
+        'hostname' => 'alpha.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+
+    $siteB = Site::factory()->create(['slug' => 'beta', 'type' => SiteType::Static]);
+    SiteDomain::query()->create([
+        'site_id' => $siteB->id,
+        'hostname' => 'beta.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+
+    $configA = app(CaddySiteConfigBuilder::class)->build($siteA->fresh(['domains']), 8080);
+    $configB = app(CaddySiteConfigBuilder::class)->build($siteB->fresh(['domains']), 8080);
+
+    expect($configA)->toMatch('/^alpha\.example\.test:8080 \{/m')
+        ->and($configB)->toMatch('/^beta\.example\.test:8080 \{/m');
+    $this->assertDoesNotMatchRegularExpression('/^:8080\s*\{/m', $configA);
+    $this->assertDoesNotMatchRegularExpression('/^:8080\s*\{/m', $configB);
 });
 
 test('openlitespeed builder uses all webserver hostnames and redirects', function () {
@@ -131,7 +157,7 @@ test('suspended caddy backend block for traefik uses file server', function () {
     $suspendedRoot = $site->suspendedStaticRoot();
 
     $backend = app(CaddySiteConfigBuilder::class)->build($site, 23001);
-    $this->assertStringContainsString(':23001', $backend);
+    $this->assertStringContainsString('example.test:23001', $backend);
     $this->assertStringContainsString($suspendedRoot, $backend);
     $this->assertStringContainsString('file_server', $backend);
     $this->assertStringNotContainsString('reverse_proxy', $backend);

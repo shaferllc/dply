@@ -118,6 +118,14 @@ class RunWebserverConfigOpJob implements ShouldQueue
             );
         }
 
+        if ($ok && $this->op === 'validate') {
+            Cache::put(
+                self::validateResultCacheKey($this->consoleActionId),
+                $result,
+                now()->addMinutes(5),
+            );
+        }
+
         $this->markConsole(
             $ok ? ConsoleAction::STATUS_COMPLETED : ConsoleAction::STATUS_FAILED,
             error: $errBlob,
@@ -132,6 +140,11 @@ class RunWebserverConfigOpJob implements ShouldQueue
     public static function writeResultCacheKey(string $consoleActionId): string
     {
         return 'dply.webserver-config-write:'.$consoleActionId;
+    }
+
+    public static function validateResultCacheKey(string $consoleActionId): string
+    {
+        return 'dply.webserver-config-validate:'.$consoleActionId;
     }
 
     public function failed(?\Throwable $e): void

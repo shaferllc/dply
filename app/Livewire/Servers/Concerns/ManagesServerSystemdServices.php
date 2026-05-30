@@ -13,6 +13,7 @@ use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerSystemdServicesCatalog;
+use App\Support\Servers\SystemdServiceStandbyReasonResolver;
 use App\Support\ServerSystemdServiceNotificationKeys;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -106,8 +107,17 @@ trait ManagesServerSystemdServices
         if (! in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable', 'bulk-restart', 'bulk-stop', 'remove-custom'], true)) {
             return;
         }
+        $unitString = (string) $unit;
+        if (
+            $unitString !== ''
+            && in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable'], true)
+        ) {
+            $this->markSystemdInventoryActiveRow($unitString, $kind);
+        } else {
+            $this->clearSystemdInventoryActiveRow();
+        }
         $this->systemdActionConfirmKind = $kind;
-        $this->systemdActionConfirmUnit = (string) $unit;
+        $this->systemdActionConfirmUnit = $unitString;
         $this->showSystemdActionConfirm = true;
     }
 
@@ -116,13 +126,16 @@ trait ManagesServerSystemdServices
         $this->showSystemdActionConfirm = false;
         $this->systemdActionConfirmKind = '';
         $this->systemdActionConfirmUnit = '';
+        $this->clearSystemdInventoryActiveRow();
     }
 
     public function confirmSystemdAction(): void
     {
         $kind = $this->systemdActionConfirmKind;
         $unit = $this->systemdActionConfirmUnit;
-        $this->closeSystemdActionConfirm();
+        $this->showSystemdActionConfirm = false;
+        $this->systemdActionConfirmKind = '';
+        $this->systemdActionConfirmUnit = '';
 
         match (true) {
             $kind === 'bulk-restart' => $this->bulkSystemdRestart(),
@@ -223,6 +236,15 @@ trait ManagesServerSystemdServices
     public ?string $systemdPendingActionUnit = null;
 
     public ?string $systemdRowBusyUnit = null;
+
+    /** @var 'start'|'restart'|'stop'|'reload'|'enable'|'disable'|null */
+    public ?string $systemdRowBusyAction = null;
+
+    /** Normalized unit for the inventory row loading overlay (confirm modal + SSH). */
+    public ?string $systemdActiveRowUnit = null;
+
+    /** @var 'start'|'restart'|'stop'|'reload'|'enable'|'disable'|null */
+    public ?string $systemdActiveRowAction = null;
 
     public bool $systemdBulkBusy = false;
 
@@ -363,8 +385,57 @@ trait ManagesServerSystemdServices
     protected function clearSystemdActionBusyState(): void
     {
         $this->systemdRowBusyUnit = null;
+        $this->systemdRowBusyAction = null;
         $this->systemdPendingActionUnit = null;
         $this->systemdBulkBusy = false;
+        $this->clearSystemdInventoryActiveRow();
+    }
+
+    /**
+     * Whether the inventory table should show the loading overlay on this unit's row.
+     */
+    public function systemdInventoryRowIsBusy(string $unit): bool
+    {
+        $normalized = app(ServerSystemdServicesCatalog::class)->normalizeUnit($unit);
+        if ($normalized === '') {
+            return false;
+        }
+
+        return ($this->systemdActiveRowUnit !== null && $this->systemdActiveRowUnit === $normalized)
+            || ($this->systemdRowBusyUnit !== null && $this->systemdRowBusyUnit === $normalized);
+    }
+
+    /**
+     * Livewire wire:loading / wire:target scopes for a single inventory row.
+     */
+    public function systemdInventoryRowWireTargets(string $unit): string
+    {
+        $encoded = json_encode($unit, JSON_THROW_ON_ERROR);
+        $targets = [];
+        foreach (['start', 'restart', 'stop', 'reload', 'enable', 'disable'] as $kind) {
+            $targets[] = "openSystemdActionConfirm('{$kind}', {$encoded})";
+            $targets[] = "runSystemdServiceAction({$encoded}, '{$kind}')";
+        }
+
+        return implode(', ', $targets);
+    }
+
+    protected function markSystemdInventoryActiveRow(string $unit, string $action): void
+    {
+        try {
+            $normalized = app(ServerSystemdServicesCatalog::class)
+                ->assertAllowedOnServer($this->server->fresh(), $unit);
+            $this->systemdActiveRowUnit = $normalized;
+            $this->systemdActiveRowAction = $action;
+        } catch (\InvalidArgumentException) {
+            $this->clearSystemdInventoryActiveRow();
+        }
+    }
+
+    protected function clearSystemdInventoryActiveRow(): void
+    {
+        $this->systemdActiveRowUnit = null;
+        $this->systemdActiveRowAction = null;
     }
 
     public function openCustomSystemdModal(): void
@@ -726,8 +797,9 @@ trait ManagesServerSystemdServices
         $catalog = app(ServerSystemdServicesCatalog::class);
 
         $deployerBlocked = $this->systemdDeployerWorkspaceBlocked();
+        $standbyResolver = app(SystemdServiceStandbyReasonResolver::class);
 
-        $this->systemdInventory = $states->map(function (ServerSystemdServiceState $s) use ($countsBySlug, $catalog, $deployerBlocked) {
+        $this->systemdInventory = $states->map(function (ServerSystemdServiceState $s) use ($countsBySlug, $catalog, $deployerBlocked, $standbyResolver) {
             $slug = ServerSystemdServiceNotificationKeys::slugFromUnit($s->unit);
             $statusOnly = $catalog->isUnitStatusOnlyForServer($this->server, $s->unit);
             $isFailed = $s->active_state === 'failed' || $s->sub_state === 'failed';
@@ -762,6 +834,7 @@ trait ManagesServerSystemdServices
                 'boot_menu_show_disable' => $catalog->bootMenuShowDisableAtBoot($s->unit_file_state),
                 'alert_subscription_count' => $countsBySlug[$slug] ?? 0,
                 'inline_disable_at_boot' => $catalog->shouldOfferInlineDisableAtBoot($s->unit),
+                'standby_reason' => $standbyResolver->reasonForUnit($this->server, $s->unit, $s->active_state),
             ];
         })->all();
 
@@ -972,6 +1045,9 @@ trait ManagesServerSystemdServices
         $script = $this->systemdActionBash($normalized, $action);
         $this->systemdPendingKind = 'action';
         $this->systemdRowBusyUnit = $normalized;
+        $this->systemdRowBusyAction = $action;
+        $this->systemdActiveRowUnit = $normalized;
+        $this->systemdActiveRowAction = $action;
         $this->systemdPendingActionUnit = $normalized;
         $this->startSystemdActionBanner($action, $normalized);
 
@@ -987,6 +1063,8 @@ trait ManagesServerSystemdServices
                 'pending_action' => $action,
                 'pending_action_at' => now(),
             ]);
+
+        $this->patchSystemdInventoryPendingAction($normalized, $action);
 
         set_time_limit((int) config('server_services.systemd_action_timeout', 180) + 30);
         $timeout = (int) config('server_services.systemd_action_timeout', 180);
@@ -1125,6 +1203,16 @@ trait ManagesServerSystemdServices
         $this->systemdBulkBusy = true;
         $bulkLabel = trans_choice(':count selected unit|:count selected units', count($normalized), ['count' => count($normalized)]);
         $this->startSystemdActionBanner('bulk-'.$action, (string) $bulkLabel);
+        foreach ($normalized as $unit) {
+            ServerSystemdServiceState::query()
+                ->where('server_id', $this->server->id)
+                ->where('unit', $unit)
+                ->update([
+                    'pending_action' => $action,
+                    'pending_action_at' => now(),
+                ]);
+            $this->patchSystemdInventoryPendingAction($unit, $action);
+        }
         $timeout = max(60, count($normalized) * (int) config('server_services.systemd_action_timeout', 180));
 
         try {
@@ -1430,6 +1518,23 @@ trait ManagesServerSystemdServices
      * SyncServerSystemdServicesJob runs and the wire:poll.5s picks up the fresh state — a
      * window of several seconds, longer if the queue worker is slow.
      */
+    /**
+     * @param  'start'|'restart'|'stop'|'reload'|'enable'|'disable'  $action
+     */
+    protected function patchSystemdInventoryPendingAction(string $unit, string $action): void
+    {
+        $this->systemdInventory = array_map(
+            static function (array $row) use ($unit, $action): array {
+                if (($row['unit'] ?? '') === $unit) {
+                    $row['pending_action'] = $action;
+                }
+
+                return $row;
+            },
+            $this->systemdInventory,
+        );
+    }
+
     protected function clearPendingActionAndRehydrate(): void
     {
         $unit = $this->systemdPendingActionUnit;

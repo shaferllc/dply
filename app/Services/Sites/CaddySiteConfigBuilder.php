@@ -6,6 +6,7 @@ use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\SiteRedirectConfigSupport;
 use Illuminate\Support\Collection;
 
@@ -19,17 +20,22 @@ class CaddySiteConfigBuilder
 
         $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
 
-        $hostnames = collect($listenPort === null ? $site->webserverHostnames() : [])
+        $hostnames = collect($site->webserverHostnames())
             ->filter()
             ->unique()
             ->values();
         if ($hostnames->isEmpty()) {
-            if ($listenPort === null) {
-                throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
-            }
+            throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
         }
 
-        $hosts = $listenPort === null ? $hostnames->implode(', ') : ':'.$listenPort;
+        // Bind each hostname to the listen port (e.g. example.test:8080). A bare
+        // `:8080` site block is catch-all on that port — importing several of
+        // those during a webserver switch makes `caddy validate` fail with
+        // "ambiguous site definition". Nginx/Apache keep server names and only
+        // change the listen port; Caddy needs host:port pairs for the same model.
+        $hosts = $listenPort === null
+            ? $hostnames->implode(', ')
+            : $hostnames->map(fn (string $host): string => $host.':'.$listenPort)->implode(', ');
         $basename = $site->webserverConfigBasename();
 
         if ($site->isSuspended()) {
@@ -37,9 +43,13 @@ class CaddySiteConfigBuilder
         }
 
         $root = $site->effectiveDocumentRoot();
+        $site->loadMissing('server');
+        $phpVersion = $site->server !== null
+            ? app(ServerPhpManager::class)->resolveCaddyPhpVersion($site->server, $site->phpVersion())
+            : ($site->phpVersion() ?? '8.3');
         $phpSock = str_replace(
             '{version}',
-            $site->phpVersion() ?? '8.3',
+            $phpVersion,
             config('sites.php_fpm_socket')
         );
         $redirectLines = $this->redirectLines($site);

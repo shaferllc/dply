@@ -148,6 +148,7 @@ return [
                 ],
                 'Delivery' => [
                     'global.edge_deploy_replay' => 'Edge shadow replay',
+                    'global.deploy_contract' => 'Deploy contract (promote gate)',
                 ],
             ],
         ],

@@ -8,8 +8,10 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
+use App\Models\Site;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Bus\Queueable;
 use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -100,6 +102,9 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         $emitter->info(sprintf('[stop]      stopping %s if running', $this->target));
         $this->bestEffortStopUnit($server, $ssh, $this->target);
 
+        $emitter->info(sprintf('[cleanup]   removing dply %s site configs', $this->target));
+        $this->bestEffortRemoveTargetSiteConfigs($server, $ssh, $this->target);
+
         $emitter->info(sprintf('[uninstall] removing %s package + repo files', $this->target));
         $this->bestEffortUninstall($server, $ssh, $this->target);
 
@@ -160,6 +165,35 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         }
 
         $this->recordAudit($server, ServerWebserverAuditEvent::RESULT_FAILURE, microtime(true), $message);
+    }
+
+    private function bestEffortRemoveTargetSiteConfigs(Server $server, SshConnection $ssh, string $webserver): void
+    {
+        if (strtolower($webserver) !== 'caddy') {
+            return;
+        }
+
+        $paths = Site::query()
+            ->where('server_id', $server->id)
+            ->get()
+            ->map(function (Site $site): string {
+                $basename = method_exists($site, 'webserverConfigBasename')
+                    ? (string) $site->webserverConfigBasename()
+                    : (string) $site->slug;
+
+                return '/etc/caddy/sites-enabled/'.$basename.'.caddy';
+            })
+            ->unique()
+            ->values();
+
+        if ($paths->isEmpty()) {
+            return;
+        }
+
+        $rm = $paths
+            ->map(fn (string $path): string => 'rm -f '.escapeshellarg($path))
+            ->implode('; ');
+        $ssh->exec($this->privilegedCommand($rm.'; '.CaddyRuntimeOwnership::shell()), 30);
     }
 
     private function bestEffortStopUnit(Server $server, SshConnection $ssh, string $webserver): void

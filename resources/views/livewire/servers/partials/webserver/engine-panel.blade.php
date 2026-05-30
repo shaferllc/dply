@@ -21,7 +21,7 @@
     $liveStateTabsByEngine = [
         'openlitespeed' => ['vhosts', 'listeners', 'extapps', 'cache'],
         'caddy' => ['routes', 'upstreams', 'certs', 'admin'],
-        'nginx' => ['hosts', 'upstreams', 'certs', 'workers'],
+        'nginx' => ['hosts', 'upstreams', 'certs', 'modules', 'workers'],
         'apache' => ['vhosts', 'modules', 'certs', 'workers'],
         'traefik' => ['routers', 'services', 'middlewares', 'providers'],
         'haproxy' => ['frontends', 'backends', 'ssl', 'runtime'],
@@ -31,9 +31,24 @@
 
     // Coming-soon engines (flagged in the catalog and not yet active) render a
     // preview teaser instead of the actionable switch / lifecycle panels.
-    $isComingSoon = ! $isEdgeProxyPanel && ! $isActive && ! empty($info['coming_soon']);
+    $isComingSoon = ! $isActive && ! empty($info['coming_soon']);
+
+    // Instant sub-tab paint: entangle engine_subtab client-side, defer SSH via wire:init.
+    $optimisticEngineSubtabs = $isActive && ! $isComingSoon;
+    $liveStateTabKeys = $liveStateTabsByEngine[$key] ?? [];
 @endphp
+@if ($optimisticEngineSubtabs)
+    <div x-data="{ subtab: @entangle('engine_subtab').live }">
+@endif
 @include('livewire.servers.partials.webserver.engine._header-tabs')
+@if ($isActive)
+    <div
+        wire:key="engine-subtab-boot-{{ $key }}-{{ $engine_subtab }}"
+        wire:init="loadActiveEngineSubtabData"
+        class="hidden"
+        aria-hidden="true"
+    ></div>
+@endif
 @if ($isComingSoon)
     @include('livewire.servers.partials.webserver.engine._coming-soon')
     @include('livewire.servers.partials.webserver.engine._info')
@@ -63,4 +78,7 @@
     @endswitch
     @include('livewire.servers.partials.webserver.engine._live-state-table')
     @include('livewire.servers.partials.webserver.engine._info')
+@endif
+@if ($optimisticEngineSubtabs ?? false)
+    </div>
 @endif
