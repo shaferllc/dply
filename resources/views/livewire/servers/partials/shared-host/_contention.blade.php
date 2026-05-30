@@ -54,6 +54,13 @@
                                 </a>
                             @endif
                         @endif
+                        @foreach ($event['secondary_actions'] ?? [] as $action)
+                            @if (Route::has($action['route'] ?? ''))
+                                <a href="{{ route($action['route'], $action['params'] ?? []) }}" wire:navigate class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-xs font-medium text-brand-moss hover:bg-brand-sand/40">
+                                    {{ $action['label'] ?? '' }}
+                                </a>
+                            @endif
+                        @endforeach
                     </div>
                 </li>
             @endforeach

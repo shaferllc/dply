@@ -201,6 +201,7 @@ return [
         'Product' => [
             'global.byo_repo_config' => 'dply.yaml BYO sync',
             'global.ops_copilot' => 'Ops Copilot (deploy triage)',
+            'global.ai_llm' => 'AI LLM synthesis (Copilot, Shared Host, Docs Ask)',
         ],
         'Operations' => [
             'global.maintenance_mode' => 'Maintenance mode',

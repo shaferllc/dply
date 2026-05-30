@@ -204,7 +204,7 @@ class WorkspaceMonitor extends Component
         $this->validate([
             'notifAddChannelId' => ['required', 'string', 'exists:notification_channels,id'],
             'notifAddEventKeys' => ['required', 'array', 'min:1'],
-            'notifAddEventKeys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring'],
+            'notifAddEventKeys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring,server.shared_host_alerts'],
         ], [], [
             'notifAddChannelId' => __('channel'),
             'notifAddEventKeys' => __('notification types'),

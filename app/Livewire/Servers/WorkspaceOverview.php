@@ -370,9 +370,11 @@ class WorkspaceOverview extends Component
             'costCardSummary' => Feature::active('workspace.server_cost')
                 ? app(ServerCostCard::class)->overviewSummary($this->server)
                 : null,
-            'sharedHostSummary' => Feature::active('workspace.shared_host')
+            'sharedHostSummary' => workspace_shared_host_active()
                 ? app(SharedHostReport::class)->overviewSummary($this->server)
-                : null,
+                : (workspace_shared_host_preview_active()
+                    ? app(SharedHostReport::class)->overviewSummary($this->server, preview: true)
+                    : null),
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,
             'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,

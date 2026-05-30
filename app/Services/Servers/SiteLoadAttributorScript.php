@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Support\Servers\SiteLoadAttributionHistory;
+
 /**
  * Builds and parses the SSH site-load attribution scan for multi-site VM hosts.
  */
@@ -140,7 +142,7 @@ SH;
         $meta = $existingMeta;
         $meta[(string) config('server_shared_host.attribution.meta_key', 'shared_host_attribution_snapshot')] = $snapshot;
 
-        return $meta;
+        return app(SiteLoadAttributionHistory::class)->appendSnapshot($snapshot, $meta);
     }
 
     private function shellLiteral(string $value): string

@@ -4,6 +4,7 @@ use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Services\Ai\LlmSynthesizer;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Pennant\Feature;
@@ -153,6 +154,11 @@ if (! function_exists('server_workspace_nav_for_server')) {
             }
             if (($item['key'] ?? null) === 'daemons' && $needsSupervisorSetup) {
                 $item['needs_setup'] = true;
+            }
+
+            $minSites = (int) ($item['requires_min_sites'] ?? 0);
+            if ($minSites > 1 && $server->sites()->count() < $minSites) {
+                continue;
             }
 
             $filtered[] = $item;
@@ -419,6 +425,15 @@ if (! function_exists('workspace_shared_host_preview_active')) {
     }
 }
 
+if (! function_exists('workspace_shared_host_active')) {
+    function workspace_shared_host_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('workspace.shared_host')
+            : Feature::for($organization)->active('workspace.shared_host');
+    }
+}
+
 if (! function_exists('multi_surface_active')) {
     /**
      * True when the current org has at least one non-VM product surface
@@ -518,6 +533,22 @@ if (! function_exists('ops_copilot_active')) {
         return $organization === null
             ? Feature::active('global.ops_copilot')
             : Feature::for($organization)->active('global.ops_copilot');
+    }
+}
+
+if (! function_exists('ai_llm_active')) {
+    /**
+     * True when platform LLM synthesis is enabled for the org.
+     */
+    function ai_llm_active(?Organization $organization = null): bool
+    {
+        if (! app(LlmSynthesizer::class)->isConfigured()) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('global.ai_llm')
+            : Feature::for($organization)->active('global.ai_llm');
     }
 }
 

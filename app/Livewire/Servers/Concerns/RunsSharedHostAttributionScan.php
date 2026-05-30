@@ -7,6 +7,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Services\Servers\SiteLoadAttributorScript;
 use App\Services\SshConnection;
+use App\Support\Servers\SharedHostBudgetMonitor;
 use App\Support\Servers\SiteLoadAttributor;
 
 trait RunsSharedHostAttributionScan
@@ -80,6 +81,7 @@ trait RunsSharedHostAttributionScan
             $meta = app(SiteLoadAttributorScript::class)->mergeIntoMeta($snapshot, $this->server->meta ?? []);
             $this->server->update(['meta' => $meta]);
             $this->server->refresh();
+            app(SharedHostBudgetMonitor::class)->evaluate($this->server->fresh());
             $this->toastSuccess(__('Site load attribution scan completed.'));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());

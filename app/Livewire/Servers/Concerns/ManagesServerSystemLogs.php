@@ -7,10 +7,12 @@ use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\ServerSystemLogReader;
+use App\Support\Servers\AccessLogVisitorClassifier;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Url;
 
 trait ManagesServerSystemLogs
 {
@@ -23,6 +25,23 @@ trait ManagesServerSystemLogs
     public bool $logFilterUseRegex = false;
 
     public bool $logFilterInvert = false;
+
+    /** Access-log visitor bucket: all, humans, crawlers, bots, ai, noise (humans + unknown). */
+    #[Url(as: 'traffic', except: 'all')]
+    public string $logTrafficFilter = 'all';
+
+    /**
+     * Per-bucket counts for the current access-log fetch (before text/regex filter).
+     *
+     * @var array{human: int, crawler: int, bot: int, ai: int, unknown: int}
+     */
+    public array $logTrafficBreakdown = [
+        'human' => 0,
+        'crawler' => 0,
+        'bot' => 0,
+        'ai' => 0,
+        'unknown' => 0,
+    ];
 
     /** Client-side validation message for invalid regex (when regex mode is on). */
     public ?string $logFilterError = null;
@@ -215,8 +234,31 @@ trait ManagesServerSystemLogs
         }
 
         $this->logKey = $key;
+        $this->logTrafficFilter = 'all';
         $this->cachedAvailableLogSources = null;
         $this->loadSystemLog();
+    }
+
+    public function setLogTrafficFilter(string $filter): void
+    {
+        $this->logTrafficFilter = AccessLogVisitorClassifier::normalizeFilter($filter);
+        $this->applyLogFilterToOutput();
+    }
+
+    public function updatedLogTrafficFilter(): void
+    {
+        $this->logTrafficFilter = AccessLogVisitorClassifier::normalizeFilter($this->logTrafficFilter);
+        $this->applyLogFilterToOutput();
+    }
+
+    public function resetLogViewerFilters(): void
+    {
+        $this->logFilter = '';
+        $this->logFilterUseRegex = false;
+        $this->logFilterInvert = false;
+        $this->logFilterError = null;
+        $this->logTrafficFilter = 'all';
+        $this->applyLogFilterToOutput();
     }
 
     public function updatedLogFilter(): void
@@ -275,6 +317,13 @@ trait ManagesServerSystemLogs
         $this->remoteLogError = null;
         $this->logTotalLines = 0;
         $this->logFilteredLines = 0;
+        $this->logTrafficBreakdown = [
+            'human' => 0,
+            'crawler' => 0,
+            'bot' => 0,
+            'ai' => 0,
+            'unknown' => 0,
+        ];
         $this->logLastFetchedAt = null;
         $this->logLastFetchTruncated = false;
         $this->logLastFetchRawBytes = 0;
@@ -682,6 +731,25 @@ trait ManagesServerSystemLogs
 
         $this->logTotalLines = count($lines);
 
+        if ($this->currentLogIsAccessLog()) {
+            $this->logTrafficBreakdown = AccessLogVisitorClassifier::breakdown($lines);
+            $trafficFilter = AccessLogVisitorClassifier::normalizeFilter($this->logTrafficFilter);
+            if ($trafficFilter !== 'all') {
+                $lines = array_values(array_filter(
+                    $lines,
+                    static fn (string $line): bool => AccessLogVisitorClassifier::lineMatchesFilter($line, $trafficFilter),
+                ));
+            }
+        } else {
+            $this->logTrafficBreakdown = [
+                'human' => 0,
+                'crawler' => 0,
+                'bot' => 0,
+                'ai' => 0,
+                'unknown' => 0,
+            ];
+        }
+
         $f = trim($this->logFilter);
         if ($f === '') {
             $filtered = $lines;
@@ -769,6 +837,13 @@ trait ManagesServerSystemLogs
 
             return false;
         });
+    }
+
+    protected function currentLogIsAccessLog(): bool
+    {
+        $def = $this->availableLogSources()[$this->logKey] ?? [];
+
+        return AccessLogVisitorClassifier::isAccessLogSource($this->logKey, $def);
     }
 
     private function buildSafeRegexPattern(string $body): ?string

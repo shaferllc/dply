@@ -177,7 +177,7 @@ return [
         // exit: ship alongside run GA; teaser only when run is off
         'run_preview' => env('FEATURE_WORKSPACE_RUN_PREVIEW', true),
         // exit: ship once attribution validated on 3 OS stacks + 2+ site fixtures; security review on SSH ps script
-        'shared_host' => env('FEATURE_WORKSPACE_SHARED_HOST', false),
+        'shared_host' => env('FEATURE_WORKSPACE_SHARED_HOST', true),
         // exit: ship alongside shared host GA; teaser only when shared host is off
         'shared_host_preview' => env('FEATURE_WORKSPACE_SHARED_HOST_PREVIEW', true),
 
@@ -241,6 +241,8 @@ return [
         'deploy_contract' => env('FEATURE_GLOBAL_DEPLOY_CONTRACT', true),
         // exit: ship when LLM + heuristic triage validated across BYO + Edge failures
         'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
+        // exit: ship when platform LLM synthesis validated + rate limits tuned
+        'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
         // exit: emergency hard stop for BYO VM create/deploy/webhooks; never retire
         'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
         // exit: emergency pause for Edge build/deploy pipeline; never retire

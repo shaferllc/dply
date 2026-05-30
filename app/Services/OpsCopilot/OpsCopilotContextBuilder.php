@@ -134,9 +134,8 @@ final class OpsCopilotContextBuilder
                 static fn (OpsCopilotSuggestion $suggestion): array => $suggestion->toArray(),
                 $suggestions,
             ),
-            'llm_enabled' => (bool) config('dply_ops_copilot.llm.enabled')
-                && is_string(config('dply_ops_copilot.llm.api_key'))
-                && config('dply_ops_copilot.llm.api_key') !== '',
+            'llm_enabled' => ai_llm_active($organization)
+                && (bool) config('dply_ai.features.ops_copilot', true),
         ];
     }
 

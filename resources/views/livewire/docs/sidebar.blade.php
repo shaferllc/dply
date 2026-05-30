@@ -118,6 +118,43 @@
         </div>
     @endif
 
+    @if ($docsAskEnabled && ! $isIndex && ($html !== '' || $virtualSummary))
+        <div class="border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Ask about this page') }}</p>
+            <form wire:submit="submitDocsAsk" class="mt-2 space-y-2">
+                <label for="docs-ask-question" class="sr-only">{{ __('Question') }}</label>
+                <textarea
+                    id="docs-ask-question"
+                    wire:model="askQuestion"
+                    rows="2"
+                    placeholder="{{ __('How do I…?') }}"
+                    class="w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 dark:border-brand-mist/20 dark:bg-zinc-900 dark:text-brand-cream"
+                ></textarea>
+                <button
+                    type="submit"
+                    wire:loading.attr="disabled"
+                    wire:target="submitDocsAsk"
+                    class="inline-flex items-center rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-ink disabled:opacity-60"
+                >
+                    <span wire:loading.remove wire:target="submitDocsAsk">{{ __('Ask') }}</span>
+                    <span wire:loading wire:target="submitDocsAsk">{{ __('Thinking…') }}</span>
+                </button>
+            </form>
+            @if ($askError)
+                <p class="mt-2 text-xs text-rose-700 dark:text-rose-300">{{ $askError }}</p>
+            @endif
+            @if ($askAnswer !== '')
+                <div class="mt-3 rounded-xl border border-brand-sage/25 bg-brand-sage/5 p-3">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Answer') }} · {{ $askConfidence }}</p>
+                    <p class="mt-2 text-sm leading-relaxed text-brand-ink dark:text-brand-cream">{{ $askAnswer }}</p>
+                    @if ($askCitedHeadings !== [])
+                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Referenced sections:') }} {{ implode(', ', $askCitedHeadings) }}</p>
+                    @endif
+                </div>
+            @endif
+        </div>
+    @endif
+
     <div class="flex-1 overflow-y-auto px-4 py-4">
         @if ($isIndex)
             <p class="text-sm text-brand-moss">{{ __('Choose a guide to read in this panel, or open the full documentation index.') }}</p>

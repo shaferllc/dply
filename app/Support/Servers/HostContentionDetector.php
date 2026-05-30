@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\SiteDeployment;
 use Illuminate\Support\Carbon;
+use Laravel\Pennant\Feature;
 
 /**
  * Correlates deploy activity and server metrics into shared-host contention events.
@@ -16,24 +17,15 @@ final class HostContentionDetector
 {
     public function __construct(
         private SiteLoadAttributor $attributor,
+        private SharedHostBudgetEvaluator $budgetEvaluator,
     ) {}
 
     /**
-     * @return list<array{
-     *     id: string,
-     *     severity: string,
-     *     title: string,
-     *     message: string,
-     *     occurred_at: Carbon,
-     *     site_slug: ?string,
-     *     site_name: ?string,
-     *     site_href: ?string,
-     *     action_label: ?string,
-     *     action_route: ?string,
-     *     action_params: array<string, mixed>,
-     * }>
+     * @param  array<string, mixed>|null  $attribution
+     * @param  array<string, mixed>|null  $budgetSettings
+     * @return list<array<string, mixed>>
      */
-    public function events(Server $server, ?array $attribution = null): array
+    public function events(Server $server, ?array $attribution = null, ?array $budgetSettings = null): array
     {
         $server->loadMissing('sites');
         if ($server->sites->count() < 2) {
@@ -41,10 +33,13 @@ final class HostContentionDetector
         }
 
         $maxEvents = (int) config('server_shared_host.contention.max_events', 7);
-        $events = [];
+        $attribution ??= $this->attributor->forServer($server);
 
-        $events = array_merge($events, $this->deployCpuSpikeEvents($server));
-        $events = array_merge($events, $this->dominantSiteEvents($server, $attribution ?? $this->attributor->forServer($server)));
+        $events = array_merge(
+            $this->deployCpuSpikeEvents($server),
+            $this->dominantSiteEvents($server, $attribution),
+            $this->budgetBreachEvents($server, $attribution, $budgetSettings),
+        );
 
         usort($events, static fn (array $a, array $b): int => ($b['occurred_at'] ?? now()) <=> ($a['occurred_at'] ?? now()));
 
@@ -103,6 +98,7 @@ final class HostContentionDetector
 
             $events[] = [
                 'id' => 'deploy-cpu-'.$deployment->id,
+                'kind' => 'deploy_cpu',
                 'severity' => $peakCpu >= 95 ? 'critical' : 'warning',
                 'title' => __('Deploy correlated with CPU spike'),
                 'message' => __(':site deploy raised host CPU to :cpu% within :minutes minutes — other sites on this server may have slowed down.', [
@@ -117,6 +113,7 @@ final class HostContentionDetector
                 'action_label' => __('Open deploys'),
                 'action_route' => $site !== null ? 'sites.deployments' : 'servers.sites',
                 'action_params' => $site !== null ? ['server' => $server, 'site' => $site] : ['server' => $server],
+                'secondary_actions' => $this->secondaryActions($server),
             ];
         }
 
@@ -157,6 +154,7 @@ final class HostContentionDetector
 
             $events[] = [
                 'id' => 'dominant-'.(string) ($row['slug'] ?? 'site'),
+                'kind' => 'dominant_site',
                 'severity' => 'warning',
                 'title' => __('Noisy neighbor detected'),
                 'message' => $dominantCpu
@@ -172,13 +170,81 @@ final class HostContentionDetector
                 'site_slug' => (string) ($row['slug'] ?? ''),
                 'site_name' => $siteName,
                 'site_href' => (string) ($row['href'] ?? route('servers.sites', $server)),
-                'action_label' => __('Promote to standby'),
-                'action_route' => 'sites.promote',
+                'action_label' => Feature::active('workspace.site_promote') ? __('Promote to standby') : __('Open site'),
+                'action_route' => Feature::active('workspace.site_promote') ? 'sites.promote' : 'sites.show',
                 'action_params' => $this->promoteParams($server, (string) ($row['slug'] ?? '')),
+                'secondary_actions' => array_merge($this->secondaryActions($server), [
+                    [
+                        'label' => __('Maintenance'),
+                        'route' => 'servers.maintenance',
+                        'params' => ['server' => $server],
+                    ],
+                ]),
             ];
         }
 
         return $events;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attribution
+     * @param  array<string, mixed>|null  $budgetSettings
+     * @return list<array<string, mixed>>
+     */
+    private function budgetBreachEvents(Server $server, array $attribution, ?array $budgetSettings): array
+    {
+        if ($budgetSettings !== null && ! ($budgetSettings['alerts_enabled'] ?? true)) {
+            return [];
+        }
+
+        $rows = is_array($attribution['rows'] ?? null) ? $attribution['rows'] : [];
+        $usePeak = ($attribution['range'] ?? 'current') !== 'current';
+        $breaches = $this->budgetEvaluator->breaches($server, $rows, $usePeak);
+        $events = [];
+
+        foreach ($breaches as $breach) {
+            $events[] = [
+                'id' => (string) ($breach['id'] ?? uniqid('budget-', true)),
+                'kind' => 'budget',
+                'severity' => (string) ($breach['severity'] ?? 'warning'),
+                'title' => (string) ($breach['title'] ?? __('Soft budget exceeded')),
+                'message' => (string) ($breach['message'] ?? ''),
+                'occurred_at' => now(),
+                'site_slug' => (string) ($breach['slug'] ?? ''),
+                'site_name' => (string) ($breach['name'] ?? ''),
+                'site_href' => route('servers.shared-host', $server).'#budgets',
+                'action_label' => __('Adjust budgets'),
+                'action_route' => 'servers.shared-host',
+                'action_params' => ['server' => $server],
+                'secondary_actions' => $this->secondaryActions($server),
+            ];
+        }
+
+        return $events;
+    }
+
+    /**
+     * @return list<array{label: string, route: string, params: array<string, mixed>}>
+     */
+    private function secondaryActions(Server $server): array
+    {
+        $actions = [
+            [
+                'label' => __('Cron jobs'),
+                'route' => 'servers.cron',
+                'params' => ['server' => $server],
+            ],
+        ];
+
+        if (Feature::active('workspace.server_cost')) {
+            $actions[] = [
+                'label' => __('Cost & right-size'),
+                'route' => 'servers.cost',
+                'params' => ['server' => $server],
+            ];
+        }
+
+        return $actions;
     }
 
     /**

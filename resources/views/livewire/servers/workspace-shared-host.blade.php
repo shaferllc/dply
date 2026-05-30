@@ -100,6 +100,13 @@
                 </div>
             </section>
 
+            @include('livewire.servers.partials.shared-host._fairness-advisor', [
+                'advisor' => $advisor ?? [],
+                'llmRun' => $llmRun ?? null,
+                'llmNarrative' => $llmNarrative ?? null,
+                'llmCanRun' => $llmCanRun ?? false,
+            ])
+
             @include('livewire.servers.partials.shared-host._attribution', [
                 'attribution' => $attribution,
                 'tonePalette' => $tonePalette,
@@ -107,6 +114,11 @@
 
             @include('livewire.servers.partials.shared-host._shared-map', [
                 'sharedMap' => $sharedMap,
+            ])
+
+            @include('livewire.servers.partials.shared-host._budgets', [
+                'report' => $report,
+                'server' => $server,
             ])
 
             @include('livewire.servers.partials.shared-host._contention', [

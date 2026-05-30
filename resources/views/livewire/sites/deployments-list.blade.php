@@ -104,6 +104,16 @@
                                 @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
                                     <span class="mt-1 block font-mono text-[10px] text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
                                 @endif
+                                @if ($deployment->status === 'failed' && ops_copilot_active())
+                                    <a
+                                        href="{{ route('fleet.copilot', ['site' => $site->id]) }}"
+                                        wire:navigate
+                                        class="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:text-brand-sage"
+                                    >
+                                        {{ __('Explain failure') }}
+                                        <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                                    </a>
+                                @endif
                             </td>
                             <td class="px-4 py-3 text-slate-600">
                                 @if ($deployment->started_at)

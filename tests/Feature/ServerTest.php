@@ -2234,6 +2234,37 @@ test('server logs regex filter matches lines', function () {
         ->assertSet('logFilterError', __('Invalid regular expression.'));
 });
 
+test('server logs traffic filter classifies access log visitors', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $human = '127.0.0.1 - - [30/May/2026:10:00:00 +0000] "GET / HTTP/1.1" 200 1234 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X) Chrome/120.0.0.0 Safari/537.36"';
+    $bot = '127.0.0.1 - - [30/May/2026:10:00:01 +0000] "GET / HTTP/1.1" 200 55 "-" "curl/8.0"';
+    $ai = '127.0.0.1 - - [30/May/2026:10:00:02 +0000] "GET / HTTP/1.1" 403 0 "-" "ClaudeBot/1.0"';
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceLogs::class, ['server' => $server->fresh()])
+        ->set('logKey', 'site_'.$site->id.'_access')
+        ->set('remoteLogRaw', implode("\n", [$human, $bot, $ai]))
+        ->call('setLogTrafficFilter', 'all')
+        ->assertSet('logTrafficBreakdown.human', 1)
+        ->assertSet('logTrafficBreakdown.bot', 1)
+        ->assertSet('logTrafficBreakdown.ai', 1)
+        ->call('setLogTrafficFilter', 'humans')
+        ->assertSet('logFilteredLines', 1)
+        ->call('setLogTrafficFilter', 'ai')
+        ->assertSet('logFilteredLines', 1);
+});
+
 test('server show settings tab renders', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();

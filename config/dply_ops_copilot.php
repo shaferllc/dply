@@ -15,11 +15,11 @@ return [
     'log_excerpt_bytes' => (int) env('DPLY_OPS_COPILOT_LOG_EXCERPT_BYTES', 24_000),
 
     'llm' => [
-        'enabled' => filter_var(env('DPLY_OPS_COPILOT_LLM_ENABLED', false), FILTER_VALIDATE_BOOL),
-        'provider' => env('DPLY_OPS_COPILOT_LLM_PROVIDER', 'openai'),
-        'model' => env('DPLY_OPS_COPILOT_LLM_MODEL', 'gpt-4o-mini'),
-        'api_key' => env('DPLY_OPS_COPILOT_LLM_API_KEY'),
-        'timeout_seconds' => (int) env('DPLY_OPS_COPILOT_LLM_TIMEOUT', 45),
+        'enabled' => filter_var(env('DPLY_OPS_COPILOT_LLM_ENABLED', env('DPLY_AI_LLM_ENABLED', false)), FILTER_VALIDATE_BOOL),
+        'provider' => env('DPLY_OPS_COPILOT_LLM_PROVIDER', env('DPLY_AI_LLM_PROVIDER', 'openai')),
+        'model' => env('DPLY_OPS_COPILOT_LLM_MODEL', env('DPLY_AI_LLM_MODEL', 'gpt-4o-mini')),
+        'api_key' => env('DPLY_OPS_COPILOT_LLM_API_KEY', env('DPLY_AI_LLM_API_KEY')),
+        'timeout_seconds' => (int) env('DPLY_OPS_COPILOT_LLM_TIMEOUT', env('DPLY_AI_LLM_TIMEOUT', 45)),
     ],
 
     /*

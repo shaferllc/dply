@@ -17,6 +17,7 @@ return [
                 'server.ssh_login' => 'SSH login',
                 'server.insights_alerts' => 'Insights alerts',
                 'server.monitoring' => 'Server monitoring',
+                'server.shared_host_alerts' => 'Shared host contention & budget alerts',
                 'server.container_launch.completed' => 'Container app deploy ready',
                 'server.container_launch.failed' => 'Container app deploy failed (action required)',
                 'server.provisioned' => 'Server provisioned',

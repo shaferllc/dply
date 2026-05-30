@@ -6,6 +6,7 @@ use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\CloudPollStatusCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
+use App\Console\Commands\EvaluateSharedHostBudgetsCommand;
 use App\Console\Commands\ExpirePausedImportMigrationsCommand;
 use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
@@ -107,6 +108,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
+
+        $schedule->command(EvaluateSharedHostBudgetsCommand::class)
+            ->everyFifteenMinutes()
+            ->when(fn (): bool => (bool) config('features.workspace.shared_host', true));
 
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
 

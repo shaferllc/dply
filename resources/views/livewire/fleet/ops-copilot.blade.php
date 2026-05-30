@@ -81,6 +81,11 @@
                                     <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                         {{ $suggestion['confidence'] }}
                                     </span>
+                                    @if (($suggestion['source'] ?? 'heuristic') === 'llm')
+                                        <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-forest/20">
+                                            {{ __('AI') }}
+                                        </span>
+                                    @endif
                                 </div>
                                 <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $suggestion['summary'] }}</p>
                                 @if (! empty($suggestion['doc_slug']))
@@ -92,6 +97,69 @@
                                 @endif
                             </article>
                         @endforeach
+                    </div>
+                @endif
+
+                @if ($llmCanRun ?? false)
+                    <div
+                        class="rounded-2xl border border-brand-forest/20 bg-brand-sand/30 p-5 shadow-sm"
+                        @if ($llmRun?->isPending()) wire:poll.3s="refreshLlmRun" @endif
+                    >
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('AI analysis') }}</h3>
+                                <p class="mt-1 text-sm text-brand-moss">{{ __('Optional LLM synthesis reads the same deploy context and suggests fixes when heuristics miss.') }}</p>
+                            </div>
+                            <button
+                                type="button"
+                                wire:click="generateLlmAnalysis"
+                                wire:loading.attr="disabled"
+                                wire:target="generateLlmAnalysis"
+                                @disabled($llmRun?->isPending())
+                                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-forest/30 bg-white px-3 py-2 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-sage/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <span wire:loading.remove wire:target="generateLlmAnalysis">{{ __('Generate analysis') }}</span>
+                                <span wire:loading wire:target="generateLlmAnalysis">{{ __('Analyzing…') }}</span>
+                            </button>
+                        </div>
+
+                        @if ($llmRun?->isPending())
+                            <p class="mt-4 text-sm text-brand-moss">{{ __('AI analysis is running…') }}</p>
+                        @elseif ($llmRun?->status === 'failed')
+                            <p class="mt-4 text-sm text-rose-800">{{ $llmRun->error_message ?? __('AI analysis failed.') }}</p>
+                        @elseif ($llmNarrative)
+                            <p class="mt-4 text-sm leading-relaxed text-brand-ink">{{ $llmNarrative }}</p>
+                        @endif
+
+                        @if (count($llmSuggestions ?? []) > 0)
+                            <div class="mt-4 space-y-3">
+                                @foreach ($llmSuggestions as $suggestion)
+                                    <article class="rounded-xl border border-brand-forest/15 bg-white p-4 shadow-sm">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <h4 class="text-sm font-semibold text-brand-ink">{{ $suggestion['title'] }}</h4>
+                                            <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Suggested by AI') }}</span>
+                                        </div>
+                                        <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $suggestion['summary'] }}</p>
+                                        @if (! empty($suggestion['actions']))
+                                            <div class="mt-3 flex flex-wrap gap-2">
+                                                @foreach ($suggestion['actions'] as $action)
+                                                    <a href="{{ $action['url'] }}" wire:navigate class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-brand-sand/40 px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/70">
+                                                        {{ $action['label'] }}
+                                                    </a>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                        @if (! empty($suggestion['doc_slug']))
+                                            <p class="mt-3">
+                                                <x-docs-link :slug="$suggestion['doc_slug']" class="text-xs font-semibold text-brand-sage hover:text-brand-forest">
+                                                    {{ __('Read docs') }}
+                                                </x-docs-link>
+                                            </p>
+                                        @endif
+                                    </article>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @endif
 
@@ -160,9 +228,6 @@
                     </details>
                 @endif
 
-                @if ($context['llm_enabled'])
-                    <p class="text-xs text-brand-moss">{{ __('LLM synthesis is enabled for this environment — heuristic suggestions may be augmented in a future release.') }}</p>
-                @endif
             @endif
         </section>
     </div>

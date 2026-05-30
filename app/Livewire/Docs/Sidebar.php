@@ -2,15 +2,20 @@
 
 namespace App\Livewire\Docs;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Services\Docs\DocsAskService;
 use App\Services\Docs\MarkdownDocRenderer;
 use App\Support\Docs\ContextualDocResolver;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Route;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class Sidebar extends Component
 {
+    use DispatchesToastNotifications;
+
     /** @var list<array{label: string, slug: string|null}> */
     public array $breadcrumbs = [];
 
@@ -39,16 +44,25 @@ class Sidebar extends Component
     /** @var list<array{slug: string, title: string, url: string|null}> */
     public array $indexEntries = [];
 
-    public function mount(): void
-    {
-        $this->resetToIndex();
-    }
+    public string $askQuestion = '';
+
+    public string $askAnswer = '';
+
+    public string $askConfidence = '';
+
+    /** @var list<string> */
+    public array $askCitedHeadings = [];
+
+    public ?string $askError = null;
+
+    public bool $askLoading = false;
 
     #[On('docs-sidebar-open')]
     public function open(?string $slug = null, ?string $docRoute = null, ?string $docSlug = null): void
     {
         $resolver = app(ContextualDocResolver::class);
         $this->slug = $resolver->resolve($slug, $docRoute, $docSlug);
+        $this->resetAskState();
         $this->loadSlug($resolver);
         $this->visible = true;
     }
@@ -57,12 +71,14 @@ class Sidebar extends Component
     public function handleClose(): void
     {
         $this->visible = false;
+        $this->resetAskState();
     }
 
     public function loadGuide(string $slug): void
     {
         $resolver = app(ContextualDocResolver::class);
         $this->slug = $slug;
+        $this->resetAskState();
         $this->loadSlug($resolver);
     }
 
@@ -74,11 +90,62 @@ class Sidebar extends Component
     public function close(): void
     {
         $this->visible = false;
+        $this->resetAskState();
+    }
+
+    public function submitDocsAsk(DocsAskService $docsAsk): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            $this->askError = __('Sign in to an organization to use Docs Ask.');
+
+            return;
+        }
+
+        $this->askLoading = true;
+        $this->askError = null;
+        $this->askAnswer = '';
+        $this->askCitedHeadings = [];
+
+        $routeName = Route::currentRouteName();
+        $result = $docsAsk->ask(
+            organization: $org,
+            user: auth()->user(),
+            slug: $this->slug,
+            question: $this->askQuestion,
+            routeName: is_string($routeName) ? $routeName : null,
+        );
+
+        $this->askLoading = false;
+
+        if ($result['error'] !== null) {
+            $this->askError = $result['error'];
+            if ($result['answer'] === '') {
+                return;
+            }
+        }
+
+        $this->askAnswer = $result['answer'];
+        $this->askConfidence = $result['confidence'];
+        $this->askCitedHeadings = $result['cited_headings'];
     }
 
     public function render(): View
     {
-        return view('livewire.docs.sidebar');
+        return view('livewire.docs.sidebar', [
+            'docsAskEnabled' => ai_llm_active(auth()->user()?->currentOrganization())
+                && (bool) config('dply_ai.features.docs_ask', true),
+        ]);
+    }
+
+    private function resetAskState(): void
+    {
+        $this->askQuestion = '';
+        $this->askAnswer = '';
+        $this->askConfidence = '';
+        $this->askCitedHeadings = [];
+        $this->askError = null;
+        $this->askLoading = false;
     }
 
     private function resetToIndex(): void
@@ -95,6 +162,7 @@ class Sidebar extends Component
         $this->guideLinks = [];
         $this->guideGroupLabel = '';
         $this->breadcrumbs = $resolver->breadcrumbsForSlug('docs-index');
+        $this->resetAskState();
     }
 
     private function loadSlug(ContextualDocResolver $resolver): void

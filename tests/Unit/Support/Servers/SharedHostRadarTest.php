@@ -11,7 +11,10 @@ use App\Models\SiteBinding;
 use App\Models\User;
 use App\Services\Servers\SiteLoadAttributorScript;
 use App\Support\Servers\HostContentionDetector;
+use App\Support\Servers\SharedHostBudgetEvaluator;
+use App\Support\Servers\SharedHostBudgetSettings;
 use App\Support\Servers\SharedStackMapBuilder;
+use App\Support\Servers\SiteLoadAttributionHistory;
 use App\Support\Servers\SiteLoadAttributor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -164,6 +167,120 @@ test('host contention detector flags dominant site from attribution', function (
 
     $events = app(HostContentionDetector::class)->events($server->fresh('sites'), $attribution);
 
-    expect($events)->not->toBeEmpty()
-        ->and($events[0]['title'])->toBe(__('Noisy neighbor detected'));
+    expect(collect($events)->pluck('title'))->toContain(__('Noisy neighbor detected'));
+});
+
+test('attribution history appends and rolls up 24h peaks', function (): void {
+    $history = app(SiteLoadAttributionHistory::class);
+    $meta = $history->appendSnapshot([
+        'checked_at' => now()->subHours(2)->toIso8601String(),
+        'sites' => [
+            ['slug' => 'alpha', 'cpu_pct' => 20.0, 'mem_kb' => 102400, 'mem_mb' => 100.0],
+        ],
+        'total' => ['cpu_pct' => 40.0, 'mem_kb' => 204800, 'mem_mb' => 200.0],
+    ]);
+    $meta = $history->appendSnapshot([
+        'checked_at' => now()->subHour()->toIso8601String(),
+        'sites' => [
+            ['slug' => 'alpha', 'cpu_pct' => 55.0, 'mem_kb' => 204800, 'mem_mb' => 200.0],
+        ],
+        'total' => ['cpu_pct' => 60.0, 'mem_kb' => 307200, 'mem_mb' => 300.0],
+    ], $meta);
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => array_merge($meta, ['host_kind' => 'vm']),
+    ]);
+
+    Site::factory()->count(2)->sequence(
+        ['slug' => 'alpha', 'name' => 'Alpha'],
+        ['slug' => 'beta', 'name' => 'Beta'],
+    )->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+    ]);
+
+    $rollup = app(SiteLoadAttributor::class)->forServer($server->fresh('sites'), '24h');
+
+    expect($rollup['scan_count'])->toBe(2)
+        ->and($rollup['rows'][0]['cpu_pct'])->toBe(55.0);
+});
+
+test('budget evaluator detects cpu share breach', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => [
+            'host_kind' => 'vm',
+            'shared_host_budgets' => [
+                'alerts_enabled' => true,
+                'sites' => [
+                    'alpha' => ['cpu_share_pct' => 40, 'mem_share_pct' => 50],
+                ],
+            ],
+        ],
+    ]);
+
+    Site::factory()->count(2)->sequence(
+        ['slug' => 'alpha', 'name' => 'Alpha'],
+        ['slug' => 'beta', 'name' => 'Beta'],
+    )->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+    ]);
+
+    $breaches = app(SharedHostBudgetEvaluator::class)->breaches($server->fresh('sites'), [[
+        'slug' => 'alpha',
+        'name' => 'Alpha',
+        'cpu_share_pct' => 72.0,
+        'mem_share_pct' => 30.0,
+    ]]);
+
+    expect($breaches)->toHaveCount(1)
+        ->and($breaches[0]['metric'])->toBe('cpu');
+});
+
+test('budget settings persist per site thresholds', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => ['host_kind' => 'vm'],
+    ]);
+
+    Site::factory()->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'slug' => 'alpha',
+        'name' => 'Alpha',
+    ]);
+    Site::factory()->create([
+        'server_id' => $server->id,
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'slug' => 'beta',
+        'name' => 'Beta',
+    ]);
+
+    app(SharedHostBudgetSettings::class)->update($server, [
+        'alerts_enabled' => true,
+        'site_rows' => [
+            ['slug' => 'alpha', 'cpu_share_pct' => 35, 'mem_share_pct' => 45],
+            ['slug' => 'beta', 'cpu_share_pct' => 55, 'mem_share_pct' => 55],
+        ],
+    ]);
+
+    $settings = app(SharedHostBudgetSettings::class)->forServer($server->fresh('sites'));
+
+    expect($settings['site_rows'][0]['cpu_share_pct'])->toBe(35.0)
+        ->and($settings['site_rows'][1]['mem_share_pct'])->toBe(55.0);
 });

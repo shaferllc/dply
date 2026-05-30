@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Servers\SharedHostBudgetSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -23,7 +24,7 @@ beforeEach(function (): void {
 });
 
 test('shared host preview sidebar shows soon badge when full feature is off', function (): void {
-    [$user, $server] = sharedHostPreviewUserWithServer();
+    [$user, $server] = sharedHostPreviewUserWithServer(siteCount: 2);
 
     $this->actingAs($user)
         ->get(route('servers.overview', $server))
@@ -114,8 +115,39 @@ test('shared host workspace renders attribution panel with feature on and two si
         ->test(WorkspaceSharedHost::class, ['server' => $server])
         ->assertOk()
         ->assertSee(__('Site load attribution'))
+        ->assertSee(__('Fairness Advisor'))
         ->assertSee(__('Shared stack map'))
         ->assertSee(__('Contention timeline'));
+});
+
+test('shared host nav is hidden for solo tenant servers', function (): void {
+    Feature::define('workspace.shared_host', fn (): bool => true);
+    Feature::flushCache();
+
+    [$user, $server] = sharedHostPreviewUserWithServer(siteCount: 1);
+
+    $this->actingAs($user)
+        ->get(route('servers.overview', $server))
+        ->assertOk()
+        ->assertDontSee('/shared-host', false);
+});
+
+test('shared host workspace saves budget settings', function (): void {
+    Feature::define('workspace.shared_host', fn (): bool => true);
+    Feature::flushCache();
+
+    [$user, $server] = sharedHostPreviewUserWithServer(siteCount: 2);
+    $server->load('sites');
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSharedHost::class, ['server' => $server])
+        ->set('budgetSiteRows.0.cpu_share_pct', 33)
+        ->call('saveSharedHostBudgets')
+        ->assertHasNoErrors();
+
+    $settings = app(SharedHostBudgetSettings::class)->forServer($server->fresh('sites'));
+
+    expect($settings['site_rows'][0]['cpu_share_pct'])->toBe(33.0);
 });
 
 function sharedHostPreviewUserWithServer(int $siteCount = 0): array
