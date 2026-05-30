@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\WebserverSwitchTest;
 
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\SwitchServerWebserverJob;
 use App\Livewire\Servers\WorkspaceWebserver;
@@ -12,6 +13,7 @@ use App\Models\ServerCacheService;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Models\SitePreviewDomain;
 use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
@@ -249,10 +251,15 @@ test('workspace manage opens switch modal', function () {
 
     $component = Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
-        ->call('openSwitchWebserver', 'caddy');
+        ->call('openSwitchWebserver', 'caddy')
+        ->assertSet('switch_plan', null)
+        ->assertSet('switch_preflight_target', 'caddy');
+
+    $component->call('loadSwitchPlan');
 
     expect($component->get('switch_plan'))->not->toBeNull();
     expect($component->get('switch_plan')['to'])->toBe('caddy');
+    expect($component->get('switch_preflight_target'))->toBeNull();
 });
 
 test('workspace manage rejects blocked target', function () {
@@ -278,6 +285,7 @@ test('workspace manage rejects blocked target', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->call('openSwitchWebserver', 'caddy')
+        ->call('loadSwitchPlan')
         ->call('confirmSwitchWebserver');
 
     Queue::assertNotPushed(SwitchServerWebserverJob::class);
@@ -291,6 +299,7 @@ test('workspace manage dispatches job on confirm', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->call('openSwitchWebserver', 'caddy')
+        ->call('loadSwitchPlan')
         ->set('switch_tls_to_caddy', true)
         ->call('confirmSwitchWebserver')
         ->assertSet('switch_plan', null);
@@ -310,6 +319,7 @@ test('confirm seeds queued console action for banner', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->call('openSwitchWebserver', 'caddy')
+        ->call('loadSwitchPlan')
         ->call('confirmSwitchWebserver');
 
     // The banner-static partial queries for a non-dismissed ConsoleAction
@@ -325,6 +335,19 @@ test('confirm seeds queued console action for banner', function () {
 
     expect($action)->not->toBeNull();
     expect($action->status)->toBe(ConsoleAction::STATUS_QUEUED);
+});
+
+test('confirm shows switching in progress after modal confirm', function () {
+    Queue::fake();
+    $user = makeUser();
+    $server = makeServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceWebserver::class, ['server' => $server])
+        ->call('openSwitchWebserver', 'openlitespeed')
+        ->call('loadSwitchPlan')
+        ->call('confirmSwitchWebserver')
+        ->assertSee(__('Switching webserver: :from → :to …', ['from' => 'nginx', 'to' => 'openlitespeed']));
 });
 
 test('workspace manage refuses concurrent switch', function () {
@@ -344,7 +367,8 @@ test('workspace manage refuses concurrent switch', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->call('openSwitchWebserver', 'caddy')
-        ->assertSet('switch_plan', null);
+        ->assertSet('switch_plan', null)
+        ->assertSet('switch_preflight_target', null);
     // refused before opening
 });
 
@@ -357,6 +381,7 @@ test('cancel clears switch plan', function () {
         ->call('openSwitchWebserver', 'caddy')
         ->call('cancelSwitchWebserver')
         ->assertSet('switch_plan', null)
+        ->assertSet('switch_preflight_target', null)
         ->assertSet('switch_tls_to_caddy', false);
 });
 
@@ -440,6 +465,12 @@ test('recent switches audit hidden when empty', function () {
 test('job records audit event on success', function () {
     $user = makeUser();
     $server = makeServer($user);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
 
     // Run the job synchronously with the SSH-bearing stages no-op'd. The
     // orchestration shape (preflight → audit → meta update) is what we're
@@ -470,6 +501,53 @@ test('job records audit event on success', function () {
     expect($audit->payload['from'])->toBe('nginx');
     expect($audit->payload['to'])->toBe('caddy');
     expect($server->fresh()->meta['webserver'])->toBe('caddy');
+    expect($site->fresh()->status)->toBe(Site::STATUS_CADDY_ACTIVE);
+});
+
+test('job requeues preview ssl after switch away from caddy', function () {
+    Queue::fake();
+    $user = makeUser();
+    $server = makeServer($user, ['webserver' => 'caddy']);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+        'status' => Site::STATUS_CADDY_ACTIVE,
+    ]);
+    $preview = SitePreviewDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'preview.example.test',
+        'auto_ssl' => true,
+        'is_primary' => true,
+        'managed_by_dply' => true,
+    ]);
+    $certificate = SiteCertificate::query()->create([
+        'site_id' => $site->id,
+        'preview_domain_id' => $preview->id,
+        'scope_type' => SiteCertificate::SCOPE_PREVIEW,
+        'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+        'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+        'domains_json' => [$preview->hostname],
+        'status' => SiteCertificate::STATUS_FAILED,
+    ]);
+
+    $job = new class(serverId: $server->id, target: 'apache', tlsToCaddy: false, userId: $user->id) extends SwitchServerWebserverJob
+    {
+        protected function executeStageInstall(Server $server, ConsoleEmitter $emitter): void {}
+
+        protected function executeStageProvision(Server $server, array $preflight): void {}
+
+        protected function executeStageValidate(Server $server): void {}
+
+        protected function executeStageCutover(Server $server, string $from): void {}
+
+        protected function executeStageDisableOld(Server $server, string $from): void {}
+    };
+    $job->handle();
+
+    expect($site->fresh()->status)->toBe(Site::STATUS_APACHE_ACTIVE);
+    expect($certificate->fresh()->status)->toBe(SiteCertificate::STATUS_PENDING);
+    Queue::assertPushed(ExecuteSiteCertificateJob::class, fn (ExecuteSiteCertificateJob $job) => $job->certificateId === $certificate->id);
 });
 
 test('confirm persists from and to in console action meta', function () {
@@ -480,6 +558,7 @@ test('confirm persists from and to in console action meta', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->call('openSwitchWebserver', 'caddy')
+        ->call('loadSwitchPlan')
         ->call('confirmSwitchWebserver');
 
     $action = ConsoleAction::query()

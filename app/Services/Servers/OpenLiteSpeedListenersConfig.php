@@ -39,7 +39,7 @@ class OpenLiteSpeedListenersConfig
      *
      * @var list<string>
      */
-    public const MANAGED_NAMES = ['Default'];
+    public const MANAGED_NAMES = ['Default', 'DefaultSsl'];
 
     /**
      * Identity directives — fixed when the listener is created. address +

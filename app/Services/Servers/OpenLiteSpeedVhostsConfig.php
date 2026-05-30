@@ -12,10 +12,10 @@ use App\Services\SshConnection;
 /**
  * Read + write per-vhost `vhconf.conf` files for OpenLiteSpeed sites.
  *
- * Each vhost is wired into `httpd_config.conf` via a `vhTemplate <name>` block
- * which points at `/usr/local/lsws/conf/vhosts/<basename>/vhconf.conf`. The
- * actual vhost directives (docRoot, index, logs, cache, gzip/br) live in
- * that per-vhost file, not in httpd_config.conf.
+ * Each vhost is registered in `httpd_config.conf` either as a native
+ * `virtualhost { configFile … }` stanza (current dply format) or a legacy
+ * `vhTemplate { templateFile … }` block. The editable directives live in
+ * the per-vhost `vhconf.conf`, not in httpd_config.conf.
  *
  * dply OWNS these files — they're regenerated end-to-end by the site
  * provisioner on every site Apply and webserver switch. Edits made here
@@ -155,14 +155,11 @@ class OpenLiteSpeedVhostsConfig
         }
 
         $vhosts = [];
-        foreach ($this->findVhostTemplates($httpd) as $vhBlock) {
-            $name = $this->extractTemplateName($vhBlock);
-            $confPath = $this->extractScalarOutside($vhBlock, 'templateFile');
-            $vhRoot = $this->extractScalarOutside($vhBlock, 'vhRoot');
-            $members = $this->extractMembers($vhBlock);
-            if ($name === null || $confPath === null) {
-                continue;
-            }
+        foreach ($this->parseHttpdIndex($httpd) as $entry) {
+            $name = $entry['name'];
+            $confPath = $entry['conf_path'];
+            $vhRoot = $entry['vh_root'];
+            $members = $entry['domains'];
 
             // Pull the per-vhost vhconf.conf — defaults to dply provisioner's
             // path when the template doesn't override it. Skip with the
@@ -192,6 +189,52 @@ class OpenLiteSpeedVhostsConfig
         }
 
         return ['vhosts' => $vhosts, 'unreadable_httpd' => false];
+    }
+
+    /**
+     * Index vhosts declared in httpd_config.conf — supports both dply's native
+     * `virtualhost` stanzas and legacy `vhTemplate` blocks.
+     *
+     * @return list<array{name: string, conf_path: string, vh_root: ?string, domains: list<string>}>
+     */
+    public function parseHttpdIndex(string $httpd): array
+    {
+        $entries = [];
+        $seen = [];
+
+        foreach ($this->findVhostTemplates($httpd) as $vhBlock) {
+            $name = $this->extractTemplateName($vhBlock);
+            $confPath = $this->extractScalarOutside($vhBlock, 'templateFile');
+            $vhRoot = $this->extractScalarOutside($vhBlock, 'vhRoot');
+            if ($name === null || $confPath === null || isset($seen[$name])) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name,
+                'conf_path' => $confPath,
+                'vh_root' => $vhRoot,
+                'domains' => $this->extractMembers($vhBlock),
+            ];
+            $seen[$name] = true;
+        }
+
+        foreach ($this->findVirtualHostBlocks($httpd) as $vhBlock) {
+            $name = $this->extractVirtualHostName($vhBlock);
+            $confPath = $this->extractScalarOutside($vhBlock, 'configFile');
+            $vhRoot = $this->extractScalarOutside($vhBlock, 'vhRoot');
+            if ($name === null || $confPath === null || isset($seen[$name])) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name,
+                'conf_path' => $confPath,
+                'vh_root' => $vhRoot,
+                'domains' => $this->extractMapDomainsForVhost($httpd, $name),
+            ];
+            $seen[$name] = true;
+        }
+
+        return $entries;
     }
 
     /**
@@ -401,6 +444,48 @@ class OpenLiteSpeedVhostsConfig
         }
 
         return array_values($m[0] ?? []);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function findVirtualHostBlocks(string $contents): array
+    {
+        if (preg_match_all('/^[\t ]*virtualhost\s+\S+\s*\{.*?^[\t ]*\}/sm', $contents, $m) === false) {
+            return [];
+        }
+
+        return array_values($m[0] ?? []);
+    }
+
+    private function extractVirtualHostName(string $block): ?string
+    {
+        if (preg_match('/^[\t ]*virtualhost\s+(\S+)/m', $block, $m) !== 1) {
+            return null;
+        }
+
+        return $m[1];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractMapDomainsForVhost(string $httpd, string $vhostName): array
+    {
+        $pattern = '/^[\t ]*map\s+'.preg_quote($vhostName, '/').'\s+(\S+)/m';
+        if (preg_match_all($pattern, $httpd, $matches) === false) {
+            return [];
+        }
+
+        $domains = [];
+        foreach ($matches[1] ?? [] as $host) {
+            $host = trim((string) $host);
+            if ($host !== '') {
+                $domains[] = $host;
+            }
+        }
+
+        return array_values(array_unique($domains));
     }
 
     private function extractTemplateName(string $block): ?string

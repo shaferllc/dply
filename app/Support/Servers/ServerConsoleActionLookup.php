@@ -107,6 +107,11 @@ final class ServerConsoleActionLookup
         return $this->stateFor($server)['inflight_edge_proxy'];
     }
 
+    public function forget(Server $server): void
+    {
+        unset($this->cache[(string) $server->id]);
+    }
+
     public function shouldRefreshServerMeta(Server $server): bool
     {
         $banner = $this->bannerFor($server);

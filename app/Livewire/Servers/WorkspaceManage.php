@@ -89,6 +89,12 @@ class WorkspaceManage extends Component
      */
     public ?array $switch_plan = null;
 
+    /**
+     * Target engine key while the switch modal is open and the preflight plan
+     * is still loading. Null once {@see loadSwitchPlan()} finishes or cancel.
+     */
+    public ?string $switch_preflight_target = null;
+
     /** Opt-in: hand TLS to caddy auto-HTTPS at cutover. Greyed out for apache. */
     public bool $switch_tls_to_caddy = false;
 
@@ -961,9 +967,36 @@ BASH;
             return;
         }
 
-        $this->switch_plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
+        $this->switch_plan = null;
+        $this->switch_preflight_target = $target;
         $this->switch_tls_to_caddy = false;
         $this->dispatch('open-modal', 'webserver-switch-modal');
+    }
+
+    /**
+     * Compute the switch cascade preview after the modal opens. Kept separate
+     * from {@see openSwitchWebserver()} so the confirmation shell appears
+     * immediately while site/profile preflight runs.
+     */
+    public function loadSwitchPlan(): void
+    {
+        $target = $this->switch_preflight_target;
+        if ($target === null || $this->switch_plan !== null) {
+            return;
+        }
+
+        $this->authorize('update', $this->server);
+
+        $plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
+
+        // Operator closed the modal while preflight was running.
+        if ($this->switch_preflight_target !== $target) {
+            return;
+        }
+
+        $this->switch_plan = $plan;
+        $this->switch_tls_to_caddy = false;
+        $this->switch_preflight_target = null;
     }
 
     /**
@@ -1013,6 +1046,7 @@ BASH;
         );
 
         $this->switch_plan = null;
+        $this->switch_preflight_target = null;
         $this->switch_tls_to_caddy = false;
         $this->dispatch('close-modal', 'webserver-switch-modal');
         $this->toastSuccess(__('Webserver switch queued. Progress shows in the banner above.'));
@@ -1063,7 +1097,7 @@ BASH;
             ], static fn ($v) => $v !== null);
         }
 
-        return ConsoleAction::query()->create([
+        $action = ConsoleAction::query()->create([
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'kind' => 'webserver_switch',
@@ -1072,6 +1106,10 @@ BASH;
             'user_id' => request()->user()?->id,
             'output' => $output,
         ]);
+
+        app(ServerConsoleActionLookup::class)->forget($this->server);
+
+        return $action;
     }
 
     /**
@@ -1080,6 +1118,7 @@ BASH;
     public function cancelSwitchWebserver(): void
     {
         $this->switch_plan = null;
+        $this->switch_preflight_target = null;
         $this->switch_tls_to_caddy = false;
         $this->dispatch('close-modal', 'webserver-switch-modal');
     }

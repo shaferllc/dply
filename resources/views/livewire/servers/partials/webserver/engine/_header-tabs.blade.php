@@ -62,6 +62,7 @@
                             'vhosts' => ['label' => __('Vhosts'), 'icon' => 'heroicon-o-server-stack'],
                             'listeners' => ['label' => __('Listeners'), 'icon' => 'heroicon-o-signal'],
                             'extapps' => ['label' => __('ExtApps'), 'icon' => 'heroicon-o-cpu-chip'],
+                            'modules' => ['label' => __('Modules'), 'icon' => 'heroicon-o-puzzle-piece'],
                             'cache' => ['label' => __('Cache'), 'icon' => 'heroicon-o-bolt'],
                         ],
                         'caddy' => [
@@ -77,11 +78,13 @@
                             'upstreams' => ['label' => __('Upstreams'), 'icon' => 'heroicon-o-server'],
                             'certs' => ['label' => __('Certs'), 'icon' => 'heroicon-o-lock-closed'],
                             'modules' => ['label' => __('Modules'), 'icon' => 'heroicon-o-puzzle-piece'],
+                            'cache' => ['label' => __('Cache'), 'icon' => 'heroicon-o-bolt'],
                             'workers' => ['label' => __('Workers'), 'icon' => 'heroicon-o-cpu-chip'],
                         ],
                         'apache' => [
                             'vhosts' => ['label' => __('Vhosts'), 'icon' => 'heroicon-o-server-stack'],
                             'modules' => ['label' => __('Modules'), 'icon' => 'heroicon-o-puzzle-piece'],
+                            'cache' => ['label' => __('Cache'), 'icon' => 'heroicon-o-bolt'],
                             'certs' => ['label' => __('Certs'), 'icon' => 'heroicon-o-lock-closed'],
                             'workers' => ['label' => __('Workers'), 'icon' => 'heroicon-o-cpu-chip'],
                         ],

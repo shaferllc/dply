@@ -82,6 +82,18 @@ test('openlitespeed builder uses all webserver hostnames and redirects', functio
     $this->assertStringContainsString('RewriteRule ^old$ https://example.test/new [R=301,L]', $config);
 });
 
+test('openlitespeed php vhost references server-level lsapi handler', function () {
+    $site = routingSite();
+    $site->update(['type' => SiteType::Php]);
+    $site = $site->fresh(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'server']);
+
+    $config = app(OpenLiteSpeedSiteConfigBuilder::class)->build($site);
+
+    $this->assertStringContainsString('add                     lsapi:lsphp83 php', $config);
+    $this->assertStringNotContainsString('extprocessor', $config);
+    $this->assertStringNotContainsString('extUser', $config);
+});
+
 test('traefik builder uses all webserver hostnames', function () {
     $site = routingSite();
 

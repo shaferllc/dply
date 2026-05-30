@@ -6,6 +6,7 @@
 @php
     $actionInFlight = $actionInFlight ?? false;
     $isComingSoon = ! empty($info['coming_soon']);
+    $switchActionTarget = "openSwitchWebserver('{$key}')";
 @endphp
 
 @if ($inflightSwitch)
@@ -33,29 +34,34 @@
         type="button"
         wire:click="openSwitchWebserver('{{ $key }}')"
         wire:loading.attr="disabled"
-        wire:target="openSwitchWebserver"
+        wire:target="{{ $switchActionTarget }}"
         @disabled($isDeployer || ! $opsReady || $isBlocked || $actionInFlight)
         @class([
-            'mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60',
+            'mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60',
             'bg-brand-forest text-brand-cream shadow-sm shadow-brand-forest/20 hover:bg-brand-forest/90' => ! $isBlocked,
             'cursor-not-allowed bg-brand-sand/40 text-brand-mist' => $isBlocked,
         ])
         title="{{ $isBlocked ? __('Unavailable — see preflight blocker') : '' }}"
     >
-        <span wire:loading.remove wire:target="openSwitchWebserver" class="inline-flex">
+        <span wire:loading.remove wire:target="{{ $switchActionTarget }}" class="inline-flex">
             @if ($isBlocked)
                 <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
             @else
                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
             @endif
         </span>
-        <span wire:loading wire:target="openSwitchWebserver" class="inline-flex">
+        <span wire:loading wire:target="{{ $switchActionTarget }}" class="inline-flex">
             <x-spinner variant="cream" size="sm" />
         </span>
-        @if ($isBlocked)
-            {{ __('Unavailable') }}
-        @else
-            {{ __('Switch to :name', ['name' => $info['label']]) }}
-        @endif
+        <span wire:loading.remove wire:target="{{ $switchActionTarget }}">
+            @if ($isBlocked)
+                {{ __('Unavailable') }}
+            @else
+                {{ __('Switch to :name', ['name' => $info['label']]) }}
+            @endif
+        </span>
+        <span wire:loading wire:target="{{ $switchActionTarget }}">
+            {{ __('Opening…') }}
+        </span>
     </button>
 @endif

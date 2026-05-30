@@ -462,6 +462,9 @@ BASH;
         if (str_contains($name, 'cache') || str_contains($name, 'limit') || str_contains($name, 'upstream')) {
             return 'perf';
         }
+        if (str_contains($name, 'security') || str_contains($name, 'modsecurity') || str_contains($name, 'naxsi')) {
+            return 'security';
+        }
         if (str_contains($name, 'status') || str_contains($name, 'dav') || str_contains($name, 'perl')) {
             return 'observability';
         }

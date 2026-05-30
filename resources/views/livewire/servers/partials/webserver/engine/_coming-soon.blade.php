@@ -5,6 +5,7 @@
     $isEdgeProxyPreview = ! empty($info['is_edge_proxy']);
 
     $engineBlurb = match ($key) {
+        'nginx' => __('Mature HTTP server + reverse proxy. Excellent static-file performance, predictable config, very low memory footprint. Default for most production deployments.'),
         'caddy' => __('Automatic HTTPS out of the box, simple Caddyfile syntax, HTTP/3 by default. Great for opinionated setups where you want sensible defaults over fine-grained tuning.'),
         'apache' => __('Battle-tested with the broadest module catalog and per-directory `.htaccess` support. Higher per-request footprint than nginx but unbeatable compatibility with legacy stacks.'),
         'openlitespeed' => __('LSAPI for the fastest PHP execution, built-in LSCache module with per-vhost cache rules, and a familiar Apache-style config. The standard pick for WordPress-heavy hosting.'),
@@ -14,6 +15,12 @@
     };
 
     $engineHighlights = match ($key) {
+        'nginx' => [
+            ['icon' => 'heroicon-o-bolt', 'title' => __('FastCGI cache'), 'body' => __('RunCloud-style page caching with shared FastCGI/proxy zones.')],
+            ['icon' => 'heroicon-o-server', 'title' => __('Upstreams'), 'body' => __('Load-balanced backend pools in nginx.conf.')],
+            ['icon' => 'heroicon-o-puzzle-piece', 'title' => __('Dynamic modules'), 'body' => __('Install and enable libnginx-mod-* packages from the dashboard.')],
+            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate nginx config with backups.')],
+        ],
         'caddy' => [
             ['icon' => 'heroicon-o-lock-closed', 'title' => __('Automatic HTTPS'), 'body' => __('Certificates provisioned and renewed with zero config.')],
             ['icon' => 'heroicon-o-arrow-path-rounded-square', 'title' => __('Route inspector'), 'body' => __('Live routes, upstreams, and certs from the admin API.')],

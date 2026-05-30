@@ -40,14 +40,23 @@
                         @endif
 
                         @if (! $apache_modules_loaded)
-                            <p class="mt-5 text-sm text-brand-moss">
-                                <span wire:loading wire:target="loadApacheModulesConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Listing modules…') }}
-                                </span>
-                                <span wire:loading.remove wire:target="loadApacheModulesConfig">
-                                    {{ __('Click "Reload from server" to list available modules.') }}
-                                </span>
-                            </p>
+                            <div
+                                wire:loading.block
+                                wire:target="loadApacheModulesConfig,loadActiveEngineSubtabData"
+                                class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                            >
+                                <x-spinner variant="forest" class="mx-auto h-5 w-5" />
+                                <p class="mt-2">{{ __('Listing modules…') }}</p>
+                            </div>
+
+                            <div
+                                wire:loading.remove
+                                wire:target="loadApacheModulesConfig,loadActiveEngineSubtabData"
+                                class="mt-5 w-full rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                            >
+                                <x-heroicon-o-puzzle-piece class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                <p class="mt-2">{{ __('Click "Reload from server" to list available modules.') }}</p>
+                            </div>
                         @else
                             @php
                                 $filtered = $apache_modules_filter === 'all'
@@ -59,9 +68,10 @@
                                     'core' => __('Core'),
                                     'mpm' => __('MPM'),
                                     'tls' => __('TLS'),
-                                    'auth' => __('Auth'),
+                                    'auth' => __('Authentication'),
                                     'proxy' => __('Proxy'),
                                     'perf' => __('Perf'),
+                                    'security' => __('Security'),
                                     'observability' => __('Logs'),
                                     'other' => __('Other'),
                                 ];
@@ -133,7 +143,7 @@
                                                     @else
                                                         <button
                                                             type="button"
-                                                            wire:click="toggleApacheModule('{{ $mod['name'] }}', true)"
+                                                            wire:click="openConfirmActionModal('toggleApacheModule', ['{{ $mod['name'] }}', true], @js(__('Enable module: :name', ['name' => $mod['name']])), @js(__('Run `a2enmod :name`? Apache reloads after the toggle and the change reverts automatically if `apachectl configtest` fails.', ['name' => $mod['name']])), @js(__('Enable')), false)"
                                                             @disabled($isDeployer || $actionInFlight)
                                                             class="inline-flex items-center gap-1 rounded-md border border-brand-forest bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                                         >
@@ -318,3 +328,91 @@
                     </div>
                 </div>
             @endif
+
+            @if ($key === 'apache' && $engine_subtab === 'cache' && $isActive && $engineHasFullControls($key))
+                <div class="{{ $card }} p-6 sm:p-8 mb-6" wire:key="apache-cache-config">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('Apache caching') }}</h3>
+                            <p class="mt-1 text-sm text-brand-moss">
+                                {{ __('RunCloud-style stacks use nginx FastCGI cache at the edge; on pure Apache, dply applies browser Expires headers per site when engine cache is enabled. Enable mod_expires and mod_deflate from the Modules tab.') }}
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" wire:click="loadApacheCacheConfig" wire:loading.attr="disabled" wire:target="loadApacheCacheConfig"
+                                class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
+                                <span wire:loading.remove wire:target="loadApacheCacheConfig"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
+                                <span wire:loading wire:target="loadApacheCacheConfig"><x-spinner class="h-3.5 w-3.5" /></span>
+                                {{ __('Reload') }}
+                            </button>
+                            <button type="button"
+                                wire:click="openConfirmActionModal('purgeApacheEngineCacheConfirmed', [], @js(__('Purge disk cache')), @js(__('Remove mod_cache disk storage under /var/cache/apache2? Browser caches on visitor devices are not affected.')), @js(__('Purge cache')), true)"
+                                wire:loading.attr="disabled"
+                                @disabled($isDeployer || $actionInFlight || ! $opsReady)
+                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                {{ __('Purge disk cache') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    @if ($apache_cache_flash)
+                        <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $apache_cache_flash }}</div>
+                    @endif
+                    @if ($apache_cache_error)
+                        <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                            <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $apache_cache_error }}</pre>
+                        </div>
+                    @endif
+
+                    @if (! $apache_cache_loaded)
+                        <p class="mt-5 text-sm text-brand-moss">
+                            <span wire:loading wire:target="loadApacheCacheConfig,loadActiveEngineSubtabData" class="inline-flex items-center gap-2">
+                                <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading cache settings…') }}
+                            </span>
+                        </p>
+                    @else
+                        <ul class="mt-5 space-y-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm">
+                            <li class="flex items-center justify-between gap-3">
+                                <span class="text-brand-moss">{{ __('mod_expires') }}</span>
+                                <span @class([
+                                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                    'bg-emerald-50 text-emerald-800 ring-emerald-200' => ($apache_cache_status['mod_expires_enabled'] ?? false),
+                                    'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! ($apache_cache_status['mod_expires_enabled'] ?? false),
+                                ])>{{ ($apache_cache_status['mod_expires_enabled'] ?? false) ? __('Enabled') : __('Disabled') }}</span>
+                            </li>
+                            <li class="flex items-center justify-between gap-3">
+                                <span class="text-brand-moss">{{ __('mod_deflate') }}</span>
+                                <span @class([
+                                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                    'bg-emerald-50 text-emerald-800 ring-emerald-200' => ($apache_cache_status['mod_deflate_enabled'] ?? false),
+                                    'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! ($apache_cache_status['mod_deflate_enabled'] ?? false),
+                                ])>{{ ($apache_cache_status['mod_deflate_enabled'] ?? false) ? __('Enabled') : __('Disabled') }}</span>
+                            </li>
+                            <li class="text-xs text-brand-mist">
+                                {{ __('Disk cache path: :path', ['path' => $apache_cache_status['disk_cache_path'] ?? '/var/cache/apache2/mod_cache_disk']) }}
+                            </li>
+                        </ul>
+                        <form wire:submit.prevent="saveApacheCacheConfig" class="mt-6 space-y-4">
+                            <label class="inline-flex items-start gap-2">
+                                <input type="checkbox" value="1" wire:model.live="apache_mod_cache_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
+                                <span class="text-sm text-brand-ink">
+                                    <span class="font-medium">{{ __('Track mod_cache disk caching') }}</span>
+                                    <span class="mt-0.5 block text-xs text-brand-moss">{{ __('Preference flag for future mod_cache automation. Purge uses the disk path above.') }}</span>
+                                </span>
+                            </label>
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 pt-4">
+                                <button type="button" wire:click="setEngineSubtab('modules')" class="text-xs font-semibold text-brand-forest underline decoration-brand-forest/30 underline-offset-2">
+                                    {{ __('Open Modules tab →') }}
+                                </button>
+                                <button type="submit" wire:loading.attr="disabled" wire:target="saveApacheCacheConfig" @disabled($isDeployer || $actionInFlight)
+                                    class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
+                                    {{ __('Save preferences') }}
+                                </button>
+                            </div>
+                        </form>
+                    @endif
+                </div>
+            @endif
+
+            @include('livewire.servers.partials.webserver.engine._apache-custom-vhosts')

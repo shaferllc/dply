@@ -57,6 +57,11 @@ html.dark {
         @apply overflow-hidden rounded-2xl border border-brand-ink/12 bg-white shadow-lg shadow-brand-ink/10;
     }
 
+    /* Systemd inventory — full-width loading row (colspan must span table-fixed columns). */
+    .systemd-inventory-loading-row td[colspan] {
+        @apply w-full max-w-none;
+    }
+
     .dply-card {
         @apply rounded-2xl border border-brand-ink/10 bg-white shadow-sm;
     }

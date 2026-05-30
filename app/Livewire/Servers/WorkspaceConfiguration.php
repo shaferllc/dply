@@ -444,10 +444,10 @@ class WorkspaceConfiguration extends Component
         }
 
         $allowedByEngine = [
-            'nginx' => ['overview', 'logs', 'info', 'hosts', 'upstreams', 'certs', 'modules', 'workers'],
+            'nginx' => ['overview', 'logs', 'info', 'hosts', 'upstreams', 'certs', 'modules', 'cache', 'workers'],
             'caddy' => ['overview', 'logs', 'info', 'routes', 'upstreams', 'certs', 'snippets', 'admin'],
-            'apache' => ['overview', 'logs', 'info', 'vhosts', 'modules', 'certs', 'workers'],
-            'openlitespeed' => ['overview', 'logs', 'info', 'vhosts', 'listeners', 'extapps', 'cache'],
+            'apache' => ['overview', 'logs', 'info', 'vhosts', 'modules', 'cache', 'certs', 'workers'],
+            'openlitespeed' => ['overview', 'logs', 'info', 'vhosts', 'listeners', 'extapps', 'modules', 'cache'],
             'traefik' => ['overview', 'logs', 'info', 'routers', 'services', 'middlewares', 'providers'],
             'haproxy' => ['overview', 'logs', 'info', 'frontends', 'backends', 'ssl', 'runtime'],
         ];

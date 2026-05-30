@@ -1,8 +1,9 @@
             @if (($optimisticEngineSubtabs ?? false) || $engine_subtab === 'overview')
             <div
                 @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'overview'" x-cloak @endif
-                class="{{ $card }} overflow-hidden"
+                class="space-y-4 mb-6"
             >
+            <div class="{{ $card }} overflow-hidden">
                 {{-- Header — engine icon + name + version + status pill.
                      Matches the redesigned Overview-tab panel for consistency. --}}
                 <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
@@ -146,38 +147,44 @@
 
                         <div class="flex flex-wrap items-center gap-3">
                             @if ($inflightSwitch)
-                                <div class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-brand-sand/40 px-4 py-2 text-sm font-semibold text-brand-mist">
+                                <div class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-brand-sand/40 px-4 py-2 text-sm font-semibold text-brand-mist">
                                     <x-spinner variant="forest" size="sm" />
                                     <span>{{ __('Switching in progress…') }}</span>
                                 </div>
                             @else
+                                @php $switchActionTarget = "openSwitchWebserver('{$key}')"; @endphp
                                 <button
                                     type="button"
                                     wire:click="openSwitchWebserver('{{ $key }}')"
                                     wire:loading.attr="disabled"
-                                    wire:target="openSwitchWebserver"
+                                    wire:target="{{ $switchActionTarget }}"
                                     @disabled($isDeployer || ! $opsReady || $isBlocked || $actionInFlight)
                                     @class([
-                                        'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:opacity-60',
+                                        'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60',
                                         'bg-brand-forest text-brand-cream shadow-sm shadow-brand-forest/20 hover:bg-brand-forest/90' => ! $isBlocked,
                                         'cursor-not-allowed bg-brand-sand/40 text-brand-mist' => $isBlocked,
                                     ])
                                 >
-                                    <span wire:loading.remove wire:target="openSwitchWebserver" class="inline-flex">
+                                    <span wire:loading.remove wire:target="{{ $switchActionTarget }}" class="inline-flex">
                                         @if ($isBlocked)
                                             <x-heroicon-o-no-symbol class="h-4 w-4" />
                                         @else
                                             <x-heroicon-o-arrow-path class="h-4 w-4" />
                                         @endif
                                     </span>
-                                    <span wire:loading wire:target="openSwitchWebserver" class="inline-flex">
+                                    <span wire:loading wire:target="{{ $switchActionTarget }}" class="inline-flex">
                                         <x-spinner variant="cream" size="sm" />
                                     </span>
-                                    @if ($isBlocked)
-                                        {{ __('Unavailable') }}
-                                    @else
-                                        {{ __('Switch to :name', ['name' => $info['label']]) }}
-                                    @endif
+                                    <span wire:loading.remove wire:target="{{ $switchActionTarget }}">
+                                        @if ($isBlocked)
+                                            {{ __('Unavailable') }}
+                                        @else
+                                            {{ __('Switch to :name', ['name' => $info['label']]) }}
+                                        @endif
+                                    </span>
+                                    <span wire:loading wire:target="{{ $switchActionTarget }}">
+                                        {{ __('Opening…') }}
+                                    </span>
                                 </button>
                                 <p class="text-[11px] text-brand-mist sm:max-w-xs">
                                     {{ __('Switching rebinds :80 and rewrites every site\'s vhost config for the new engine. dply runs the cutover atomically; existing sites stay up.') }}
@@ -187,6 +194,53 @@
                     </div>
                 @endif
             </div>
+
+            @if (($hasControls ?? false) && in_array($key, ['openlitespeed', 'nginx', 'apache'], true))
+                @php
+                    $engineCapabilities = match ($key) {
+                        'openlitespeed' => [
+                            ['icon' => 'heroicon-o-bolt', 'title' => __('WordPress & LSCache'), 'body' => __('Server-level cache module with per-site rules in the Sites workspace.'), 'subtab' => 'cache'],
+                            ['icon' => 'heroicon-o-cpu-chip', 'title' => __('PHP LSAPI'), 'body' => __('Native lsphp handlers — fastest PHP execution without FPM overhead.'), 'subtab' => 'extapps'],
+                            ['icon' => 'heroicon-o-shield-check', 'title' => __('Security'), 'body' => __('ModSecurity WAF and rate limits via the Modules tab.'), 'subtab' => 'modules'],
+                            ['icon' => 'heroicon-o-server-stack', 'title' => __('Vhosts & listeners'), 'body' => __('Inspect virtual hosts, listeners, and hostname maps.'), 'subtab' => 'vhosts'],
+                        ],
+                        'nginx' => [
+                            ['icon' => 'heroicon-o-bolt', 'title' => __('FastCGI page cache'), 'body' => __('Shared FastCGI/proxy cache zones — RunCloud-style PHP page caching at the edge.'), 'subtab' => 'cache'],
+                            ['icon' => 'heroicon-o-server', 'title' => __('Upstreams & proxy'), 'body' => __('Reverse-proxy backends and load-balanced upstream pools.'), 'subtab' => 'upstreams'],
+                            ['icon' => 'heroicon-o-shield-check', 'title' => __('Security modules'), 'body' => __('WAF, rate limiting, and TLS modules via the Modules tab.'), 'subtab' => 'modules'],
+                            ['icon' => 'heroicon-o-server-stack', 'title' => __('Hosts & certs'), 'body' => __('Custom server blocks, hostname inventory, and certificate expiry.'), 'subtab' => 'hosts'],
+                        ],
+                        'apache' => [
+                            ['icon' => 'heroicon-o-bolt', 'title' => __('Browser & disk cache'), 'body' => __('mod_expires for static assets; optional mod_cache disk storage.'), 'subtab' => 'cache'],
+                            ['icon' => 'heroicon-o-puzzle-piece', 'title' => __('Modules & .htaccess'), 'body' => __('Broad module catalog with per-directory overrides when Apache is the edge.'), 'subtab' => 'modules'],
+                            ['icon' => 'heroicon-o-cpu-chip', 'title' => __('Event MPM workers'), 'body' => __('Tune MPM workers and global keep-alive settings.'), 'subtab' => 'workers'],
+                            ['icon' => 'heroicon-o-server-stack', 'title' => __('Vhosts & certs'), 'body' => __('Custom vhosts, apachectl -S map, and SSL inventory.'), 'subtab' => 'vhosts'],
+                        ],
+                        default => [],
+                    };
+                @endphp
+                @if ($engineCapabilities !== [])
+                <ul class="grid gap-3 sm:grid-cols-2">
+                    @foreach ($engineCapabilities as $capability)
+                        <li>
+                            <button
+                                type="button"
+                                wire:click="setEngineSubtab(@js($capability['subtab']))"
+                                class="flex h-full w-full gap-3 rounded-xl border border-brand-ink/8 bg-white p-3.5 text-left shadow-sm ring-1 ring-brand-ink/[0.03] transition hover:border-brand-sage/40 hover:bg-brand-sand/20 sm:p-4"
+                            >
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sand/35 text-brand-forest ring-1 ring-brand-ink/8">
+                                    <x-dynamic-component :component="$capability['icon']" class="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-semibold text-brand-ink">{{ $capability['title'] }}</span>
+                                    <span class="mt-0.5 block text-[13px] leading-5 text-brand-moss">{{ $capability['body'] }}</span>
+                                </span>
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+                @endif
+            @endif
 
             {{-- =============================================================
                  HEALTH CHARTS — per-engine time-series from the dply metrics
@@ -388,5 +442,5 @@
                     </div>
                 </div>
             @endif
-
+            </div>
             @endif

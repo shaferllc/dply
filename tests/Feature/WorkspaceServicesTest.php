@@ -72,7 +72,7 @@ test('services workspace tabs lazy render their sections', function () {
         ->assertDontSee('activity-tab-test');
 });
 
-test('opening systemd confirm highlights only the target inventory row', function () {
+test('opening systemd confirm does not mark the inventory row busy until confirmed', function () {
     Queue::getFacadeRoot()->except([SyncServerSystemdServicesJob::class]);
 
     [$user, $server] = actingOwnerWithReadyServer();
@@ -100,10 +100,12 @@ test('opening systemd confirm highlights only the target inventory row', functio
     Livewire::actingAs($user)
         ->test(WorkspaceServices::class, ['server' => $server])
         ->call('openSystemdActionConfirm', 'stop', 'fail2ban.service')
-        ->assertSet('systemdActiveRowUnit', 'fail2ban.service')
-        ->assertSet('systemdActiveRowAction', 'stop')
-        ->assertSeeHtml('aria-busy="true"')
-        ->assertSee('Stopping');
+        ->assertSet('showSystemdActionConfirm', true)
+        ->assertSet('systemdActionConfirmKind', 'stop')
+        ->assertSet('systemdActionConfirmUnit', 'fail2ban.service')
+        ->assertSet('systemdActiveRowUnit', null)
+        ->assertSet('systemdActiveRowAction', null)
+        ->assertDontSeeHtml('aria-busy="true"');
 });
 
 test('services workspace shows ops not ready without ssh', function () {

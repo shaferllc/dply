@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers\OpenLiteSpeedHttpdConfigBuilderTest;
 
+use App\Enums\SiteType;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Models\SitePreviewDomain;
 use App\Models\User;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
 use Illuminate\Database\Eloquent\Collection;
@@ -40,6 +42,53 @@ test('cutover listener bound to 80', function () {
 
     expect($out)->toMatch('/address\s+\*:80\b/');
     $this->assertDoesNotMatchRegularExpression('/address\s+\*:8080\b/', $out);
+});
+test('production config adds https listener when site expects tls', function () {
+    $user = makeUserWithOrg();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    SitePreviewDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'preview.example.com',
+        'is_primary' => true,
+    ]);
+
+    $out = app(OpenLiteSpeedHttpdConfigBuilder::class)->build(new Collection([$site->fresh()]), 80);
+
+    $this->assertStringContainsString('listener DefaultSsl {', $out);
+    $this->assertStringContainsString('address                 *:443', $out);
+    $this->assertStringContainsString('keyFile                 /etc/letsencrypt/live/preview.example.com/privkey.pem', $out);
+    $basename = $site->webserverConfigBasename();
+    $this->assertStringContainsString("map                     {$basename} preview.example.com", $out);
+    $this->assertStringContainsString("virtualhost {$basename} {", $out);
+});
+test('staging config on 8080 omits https listener', function () {
+    $user = makeUserWithOrg();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    SitePreviewDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'preview.example.com',
+        'is_primary' => true,
+    ]);
+
+    $out = app(OpenLiteSpeedHttpdConfigBuilder::class)->build(new Collection([$site->fresh()]), 8080);
+
+    $this->assertStringNotContainsString('listener DefaultSsl {', $out);
 });
 test('emits vhtemplate block per site', function () {
     $user = makeUserWithOrg();
@@ -80,20 +129,49 @@ test('emits vhtemplate block per site', function () {
     $basename1 = $site1->webserverConfigBasename();
     $basename2 = $site2->webserverConfigBasename();
 
-    $this->assertStringContainsString("vhTemplate {$basename1} {", $out);
-    $this->assertStringContainsString("vhTemplate {$basename2} {", $out);
-    $this->assertStringContainsString('templateFile            /usr/local/lsws/conf/vhosts/'.$basename1.'/vhconf.conf', $out);
-    $this->assertStringContainsString('templateFile            /usr/local/lsws/conf/vhosts/'.$basename2.'/vhconf.conf', $out);
-    $this->assertStringContainsString('vhDomain                first.example.com', $out);
-    $this->assertStringContainsString('vhDomain                second.example.com', $out);
+    $this->assertStringContainsString("virtualhost {$basename1} {", $out);
+    $this->assertStringContainsString("virtualhost {$basename2} {", $out);
+    $this->assertStringContainsString('configFile              /usr/local/lsws/conf/vhosts/'.$basename1.'/vhconf.conf', $out);
+    $this->assertStringContainsString('configFile              /usr/local/lsws/conf/vhosts/'.$basename2.'/vhconf.conf', $out);
+    $this->assertStringContainsString('map                     '.$basename1.' first.example.com', $out);
+    $this->assertStringContainsString('map                     '.$basename2.' second.example.com', $out);
 
     // vhRoot pinned to repo path so $VH_ROOT in vhconf resolves to a
     // directory dply manages, not the default conf/vhosts/<name>.
     $this->assertStringContainsString('vhRoot                  '.rtrim($site1->effectiveRepositoryPath(), '/'), $out);
+});
+test('emits server-level lsphp extprocessor for php sites', function () {
+    $user = makeUserWithOrg();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+        'type' => SiteType::Php,
+    ]);
+
+    $out = app(OpenLiteSpeedHttpdConfigBuilder::class)->build(new Collection([$site->fresh()]), 80);
+
+    $this->assertStringContainsString('extprocessor lsphp83 {', $out);
+    $this->assertStringContainsString('path                    lsphp83/bin/lsphp', $out);
+    $this->assertStringContainsString('setUIDMode              0', $out);
 });
 test('marks output as dply managed', function () {
     $out = app(OpenLiteSpeedHttpdConfigBuilder::class)->build(new Collection([]), 80);
 
     $this->assertStringContainsString('Managed by Dply', $out);
     $this->assertStringContainsString('do NOT hand-edit', $out);
+});
+test('includes runcloud-style performance defaults', function () {
+    $out = app(OpenLiteSpeedHttpdConfigBuilder::class)->build(new Collection([]), 80);
+
+    $this->assertStringContainsString('module cache {', $out);
+    $this->assertStringContainsString('enableCache', $out);
+    $this->assertStringContainsString('module modgzip {', $out);
+    $this->assertStringContainsString('expires {', $out);
+    $this->assertStringContainsString('enableExpires', $out);
+    $this->assertStringContainsString('enableGzipCompress', $out);
 });

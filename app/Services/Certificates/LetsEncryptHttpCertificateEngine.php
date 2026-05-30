@@ -2,12 +2,16 @@
 
 namespace App\Services\Certificates;
 
+use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\SshConnection;
 
 class LetsEncryptHttpCertificateEngine implements CertificateEngine
 {
+    use PrivilegedRemoteFileWrites;
+
     public function supports(SiteCertificate $certificate): bool
     {
         return $certificate->provider_type === SiteCertificate::PROVIDER_LETSENCRYPT
@@ -65,7 +69,10 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
         };
 
         $ssh = new SshConnection($server);
-        $output = $ssh->exec($cmd.'; printf "\nDPLY_EXIT:%s" "$?"', 600);
+        $output = $ssh->exec(
+            $this->privilegedCommand($server, $cmd.'; printf "\nDPLY_EXIT:%s" "$?"'),
+            600,
+        );
         $exitCode = preg_match('/DPLY_EXIT:(\d+)/', $output, $matches) ? (int) $matches[1] : 1;
         $ok = $exitCode === 0;
 
@@ -99,6 +106,10 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
 
         if (! $ok) {
             throw new \RuntimeException('Certbot exited with code '.$exitCode.'. Check certificate output for details.');
+        }
+
+        if ($site->webserver() === 'openlitespeed') {
+            app(OpenLiteSpeedTlsConfigurator::class)->syncServer($server->fresh());
         }
 
         return $certificate->fresh();

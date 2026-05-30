@@ -5,6 +5,9 @@ namespace App\Services\Sites;
 use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
+use App\Services\Servers\OpenLiteSpeedHttpdConfigPreserver;
+use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use Illuminate\Support\Str;
 
@@ -46,12 +49,24 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
             $emit->step('openlitespeed', 'writing site config: '.$configFile);
         }
 
-        $includeBlock = sprintf(
-            "\nvhTemplate %s {\n  templateFile %s\n  listeners Default\n  vhDomain %s\n}\n",
-            $basename,
-            $configFile,
-            implode(',', $site->webserverHostnames())
-        );
+        $sites = Site::query()
+            ->where('server_id', $server->id)
+            ->with(['domains', 'domainAliases', 'tenantDomains', 'previewDomains', 'server'])
+            ->get();
+        $listenerTls = app(OpenLiteSpeedTlsConfigurator::class)->resolveListenerTlsMaterial($server, $sites);
+        $httpdContents = app(OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, listenPort: 80, listenerTls: $listenerTls);
+        $existingHttpd = $ssh->exec('sudo -n cat '.escapeshellarg($httpdConfig).' 2>/dev/null', 15);
+        if ($existingHttpd !== '' && $ssh->lastExecExitCode() === 0) {
+            $httpdContents = app(OpenLiteSpeedHttpdConfigPreserver::class)->merge($httpdContents, $existingHttpd);
+        }
+        if ($this->writeSystemFileIfChanged($server, $ssh, $httpdConfig, $httpdContents)) {
+            $emit->step('openlitespeed', 'writing httpd_config.conf with listener maps');
+        }
+
+        $deployUser = trim((string) config('server_provision.deploy_ssh_user', 'dply'));
+        if ($deployUser === '') {
+            $deployUser = 'dply';
+        }
 
         $emit->step('openlitespeed', 'restarting lsws');
         $out = $ssh->exec(sprintf(
@@ -59,13 +74,11 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
             $this->privilegedCommand(
                 $server,
                 sprintf(
-                    'mkdir -p %1$s/%2$s %3$s && (grep -Fqx %4$s %5$s || printf "%%s" %6$s >> %5$s) && /usr/local/lsws/bin/lswsctrl restart',
+                    'mkdir -p %1$s/%2$s %3$s /tmp/lshttpd/swap && chown -R %4$s:%4$s /tmp/lshttpd && /usr/local/lsws/bin/lswsctrl restart',
                     escapeshellarg($vhostsPath),
                     escapeshellarg($basename),
                     escapeshellarg(rtrim($site->effectiveRepositoryPath(), '/').'/logs'),
-                    escapeshellarg('templateFile '.$configFile),
-                    escapeshellarg($httpdConfig),
-                    escapeshellarg($includeBlock)
+                    escapeshellarg($deployUser),
                 )
             )
         ), 180);

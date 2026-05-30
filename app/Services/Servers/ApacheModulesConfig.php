@@ -189,8 +189,11 @@ BASH;
         if (str_starts_with($name, 'proxy') || str_starts_with($name, 'lbmethod')) {
             return 'proxy';
         }
-        if (str_starts_with($name, 'cache') || str_contains($name, 'compress') || str_contains($name, 'deflate') || str_contains($name, 'brotli')) {
+        if (str_starts_with($name, 'cache') || str_contains($name, 'compress') || str_contains($name, 'deflate') || str_contains($name, 'brotli') || str_contains($name, 'expires')) {
             return 'perf';
+        }
+        if (str_contains($name, 'security') || str_contains($name, 'evasive') || str_contains($name, 'ratelimit')) {
+            return 'security';
         }
         if (str_starts_with($name, 'log') || str_contains($name, 'status')) {
             return 'observability';

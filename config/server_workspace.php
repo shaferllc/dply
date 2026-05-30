@@ -94,7 +94,7 @@ return [
     | (engine tabs + switch picker) and cannot be switched to until removed.
     | Tests override with config(['server_workspace.webserver_coming_soon' => []]).
     */
-    'webserver_coming_soon' => ['openlitespeed'],
+    'webserver_coming_soon' => [''],
 
     /*
     | Edge proxy engines listed here show "Coming soon" in the overview picker

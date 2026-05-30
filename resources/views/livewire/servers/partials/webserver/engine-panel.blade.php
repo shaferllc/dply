@@ -19,7 +19,7 @@
     // Live-state sub-tab dispatch. Each active engine surfaces its own
     // probe-backed sub-tabs (vhosts / routes / upstreams / certs / etc.).
     $liveStateTabsByEngine = [
-        'openlitespeed' => ['vhosts', 'listeners', 'extapps', 'cache'],
+        'openlitespeed' => ['vhosts', 'listeners', 'extapps', 'modules', 'cache'],
         'caddy' => ['routes', 'upstreams', 'certs', 'admin'],
         'nginx' => ['hosts', 'upstreams', 'certs', 'modules', 'workers'],
         'apache' => ['vhosts', 'modules', 'certs', 'workers'],

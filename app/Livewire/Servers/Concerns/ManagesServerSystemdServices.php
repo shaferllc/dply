@@ -108,14 +108,7 @@ trait ManagesServerSystemdServices
             return;
         }
         $unitString = (string) $unit;
-        if (
-            $unitString !== ''
-            && in_array($kind, ['start', 'restart', 'stop', 'reload', 'enable', 'disable'], true)
-        ) {
-            $this->markSystemdInventoryActiveRow($unitString, $kind);
-        } else {
-            $this->clearSystemdInventoryActiveRow();
-        }
+        $this->clearSystemdInventoryActiveRow();
         $this->systemdActionConfirmKind = $kind;
         $this->systemdActionConfirmUnit = $unitString;
         $this->showSystemdActionConfirm = true;
@@ -411,9 +404,12 @@ trait ManagesServerSystemdServices
     public function systemdInventoryRowWireTargets(string $unit): string
     {
         $encoded = json_encode($unit, JSON_THROW_ON_ERROR);
-        $targets = [];
+        $targets = [
+            "openSystemdStatusModalForService({$encoded})",
+            "openSystemdLogsModalForService({$encoded})",
+            "openSystemdNotifyModalForService({$encoded})",
+        ];
         foreach (['start', 'restart', 'stop', 'reload', 'enable', 'disable'] as $kind) {
-            $targets[] = "openSystemdActionConfirm('{$kind}', {$encoded})";
             $targets[] = "runSystemdServiceAction({$encoded}, '{$kind}')";
         }
 

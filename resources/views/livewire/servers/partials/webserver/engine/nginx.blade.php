@@ -41,14 +41,23 @@
                         @endif
 
                         @if (! $nginx_modules_loaded)
-                            <p class="mt-5 text-sm text-brand-moss">
-                                <span wire:loading wire:target="loadNginxModulesConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Listing modules…') }}
-                                </span>
-                                <span wire:loading.remove wire:target="loadNginxModulesConfig">
-                                    {{ __('Click "Reload from server" to list installable and enabled modules.') }}
-                                </span>
-                            </p>
+                            <div
+                                wire:loading.block
+                                wire:target="loadNginxModulesConfig,loadActiveEngineSubtabData"
+                                class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                            >
+                                <x-spinner variant="forest" class="mx-auto h-5 w-5" />
+                                <p class="mt-2">{{ __('Listing modules…') }}</p>
+                            </div>
+
+                            <div
+                                wire:loading.remove
+                                wire:target="loadNginxModulesConfig,loadActiveEngineSubtabData"
+                                class="mt-5 w-full rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                            >
+                                <x-heroicon-o-puzzle-piece class="mx-auto h-5 w-5 text-brand-mist" aria-hidden="true" />
+                                <p class="mt-2">{{ __('Click "Reload from server" to list installable and enabled modules.') }}</p>
+                            </div>
                         @elseif ($nginx_modules_supports_dynamic)
                             @php
                                 $filtered = $nginx_modules_filter === 'all'
@@ -64,6 +73,7 @@
                                     'content' => __('Content'),
                                     'auth' => __('Authentication'),
                                     'perf' => __('Perf'),
+                                    'security' => __('Security'),
                                     'observability' => __('Observability'),
                                     'other' => __('Other'),
                                 ];
@@ -756,5 +766,77 @@
                             </form>
                         @endif
                     </div>
+                </div>
+            @endif
+
+            @if ($key === 'nginx' && $engine_subtab === 'cache' && $isActive && $engineHasFullControls($key))
+                @php $nginxCacheParams = \App\Services\Servers\NginxEngineCacheConfig::PARAMS; @endphp
+                <div class="{{ $card }} p-6 sm:p-8 mb-6" wire:key="nginx-cache-config">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <h3 class="text-base font-semibold text-brand-ink">{{ __('nginx FastCGI / proxy cache') }}</h3>
+                            <p class="mt-1 text-sm text-brand-moss">
+                                {{ __('Shared cache zones written to :path. Enable per-site engine HTTP cache in Sites → Caching.', ['path' => $nginx_cache_meta['conf_path'] ?? config('sites.nginx_engine_http_cache_conf')]) }}
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" wire:click="loadNginxCacheConfig" wire:loading.attr="disabled" wire:target="loadNginxCacheConfig"
+                                class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
+                                <span wire:loading.remove wire:target="loadNginxCacheConfig"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
+                                <span wire:loading wire:target="loadNginxCacheConfig"><x-spinner class="h-3.5 w-3.5" /></span>
+                                {{ __('Reload') }}
+                            </button>
+                            <button type="button"
+                                wire:click="openConfirmActionModal('purgeNginxEngineCacheConfirmed', [], @js(__('Purge engine cache')), @js(__('Remove all FastCGI and proxy cache files on disk and send PURGE requests to local vhosts?')), @js(__('Purge cache')), true)"
+                                wire:loading.attr="disabled"
+                                @disabled($isDeployer || $actionInFlight || ! $opsReady)
+                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                {{ __('Purge all cache') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    @if ($nginx_cache_flash)
+                        <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-2.5 text-sm text-emerald-900">{{ $nginx_cache_flash }}</div>
+                    @endif
+                    @if ($nginx_cache_error)
+                        <div class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-4 py-2.5 text-sm text-rose-900">
+                            <pre class="whitespace-pre-wrap break-words font-mono text-xs">{{ $nginx_cache_error }}</pre>
+                        </div>
+                    @endif
+
+                    @if (! $nginx_cache_loaded)
+                        <p class="mt-5 text-sm text-brand-moss">
+                            <span wire:loading wire:target="loadNginxCacheConfig,loadActiveEngineSubtabData" class="inline-flex items-center gap-2">
+                                <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading cache settings…') }}
+                            </span>
+                        </p>
+                    @else
+                        <dl class="mt-5 grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-xs sm:grid-cols-2">
+                            <div><dt class="font-semibold text-brand-moss">{{ __('FastCGI zone') }}</dt><dd class="mt-0.5 font-mono text-brand-ink">{{ $nginx_cache_meta['fcgi_zone'] ?? '—' }} → {{ $nginx_cache_meta['fcgi_path'] ?? '—' }}</dd></div>
+                            <div><dt class="font-semibold text-brand-moss">{{ __('Proxy zone') }}</dt><dd class="mt-0.5 font-mono text-brand-ink">{{ $nginx_cache_meta['proxy_zone'] ?? '—' }} → {{ $nginx_cache_meta['proxy_path'] ?? '—' }}</dd></div>
+                        </dl>
+                        <form wire:submit.prevent="saveNginxCacheConfig" class="mt-6 space-y-6">
+                            <div class="grid gap-5 sm:grid-cols-2">
+                                @foreach ($nginxCacheParams as $paramKey => $meta)
+                                    <label class="block">
+                                        <span class="block text-sm font-medium text-brand-ink">{{ __($meta['label']) }}</span>
+                                        <input type="number" min="1" wire:model.lazy="nginx_cache_form.{{ $paramKey }}"
+                                            class="mt-1 block w-full rounded-md border-brand-ink/15 bg-white text-sm font-medium text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
+                                        <span class="mt-1 block text-xs text-brand-moss">{{ __($meta['help']) }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <div class="flex justify-end border-t border-brand-ink/10 pt-4">
+                                <button type="submit" wire:loading.attr="disabled" wire:target="saveNginxCacheConfig" @disabled($isDeployer || $actionInFlight)
+                                    class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
+                                    <span wire:loading.remove wire:target="saveNginxCacheConfig"><x-heroicon-o-check class="h-4 w-4" /></span>
+                                    <span wire:loading wire:target="saveNginxCacheConfig"><x-spinner variant="cream" class="h-4 w-4" /></span>
+                                    {{ __('Save and reload nginx') }}
+                                </button>
+                            </div>
+                        </form>
+                    @endif
                 </div>
             @endif

@@ -132,7 +132,7 @@
                             'nginx/certs' => __('No SSL certificates found — no server block declares ssl_certificate.'),
                             'nginx/modules' => __('No modules reported — run `nginx -V` or enable dynamic modules.'),
                             'nginx/workers' => __('stub_status is unreachable on 127.0.0.1:9091.'),
-                            'apache/vhosts' => __('No virtual hosts reported by `apachectl -S`.'),
+                            'apache/vhosts' => __('No custom vhosts yet — use Add vhost above, or create a site from the Sites workspace.'),
                             'apache/modules' => __('No loaded modules reported by `apachectl -M`.'),
                             'apache/certs' => __('No SSLCertificateFile paths found in enabled sites.'),
                             'apache/workers' => __('mod_status is unreachable on 127.0.0.1:9092.'),
@@ -182,9 +182,9 @@
                     @endphp
                     <div class="px-6 py-6 sm:px-7">
                     <div
-                        wire:loading
+                        wire:loading.block
                         wire:target="{{ $liveStateWireLoadingTargets }}"
-                        class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss"
+                        class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss"
                     >
                         <x-spinner variant="forest" class="mx-auto h-5 w-5" />
                         <p class="mt-2">{{ __('Probing server…') }}</p>
@@ -209,7 +209,7 @@
                             </ul>
                         </div>
                     @elseif ($engine_live_state_loading && empty($rows))
-                        <div class="mt-5 rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss">
+                        <div class="mt-5 w-full rounded-xl border border-brand-ink/10 bg-white px-6 py-10 text-center text-sm text-brand-moss">
                             <x-spinner variant="forest" class="mx-auto h-5 w-5" />
                             <p class="mt-2">{{ __('Probing server…') }}</p>
                         </div>

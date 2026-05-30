@@ -13,3 +13,11 @@ test('the application returns a successful response', function () {
 
     $response->assertStatus(200);
 });
+
+test('404 page renders interactive not-found experience', function () {
+    $this->get('/definitely-not-a-real-dply-route-'.uniqid())
+        ->assertNotFound()
+        ->assertSee('not-found-experience', false)
+        ->assertSee(__('Trace route'), false)
+        ->assertSee(__('Page not found'), false);
+});

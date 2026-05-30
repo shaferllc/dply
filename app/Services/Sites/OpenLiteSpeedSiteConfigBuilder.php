@@ -7,6 +7,7 @@ use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\OpenLiteSpeedTlsPaths;
 use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
@@ -42,7 +43,6 @@ class OpenLiteSpeedSiteConfigBuilder
         }
 
         $root = $site->effectiveDocumentRoot();
-        $phpBinary = '/usr/local/lsws/lsphp'.str_replace('.', '', (string) ($site->phpVersion() ?? '83')).'/bin/lsphp';
 
         if ($site->type === SiteType::Php && $site->octane_port) {
             return $this->buildPhpOctaneProxy($site, $hostnames, $vhostRoot);
@@ -52,6 +52,9 @@ class OpenLiteSpeedSiteConfigBuilder
         $authPrefixContexts = $this->olsBasicAuthPrefixContexts($site);
         $rootAuthLines = $this->olsBasicAuthRootContextLines($site);
         $lscacheBlock = app(SiteCacheDirectivesBuilder::class)->olsLscacheBlock($site);
+        $tlsPaths = $listenPort === null ? OpenLiteSpeedTlsPaths::resolve($site) : null;
+        $tlsBlock = $tlsPaths !== null ? OpenLiteSpeedTlsPaths::vhsslBlock($tlsPaths)."\n" : '';
+        $lsapiHandler = $this->olsLsapiHandlerName($site);
 
         return match ($site->type) {
             SiteType::Php => <<<CONF
@@ -60,9 +63,9 @@ vhDomain                  {$hostnames->implode(',')}
 vhAliases                 www.{$hostnames->first()}
 adminEmails               root@localhost
 enableGzip                1
-index  {
+{$tlsBlock}index  {
   useServer               0
-  indexFiles              index.php, index.html
+  indexFiles              index.html, index.php
 }
 errorlog \$VH_ROOT/logs/error.log {
   useServer               0
@@ -73,27 +76,11 @@ accesslog \$VH_ROOT/logs/access.log {
   logFormat               "%h %l %u %t \"%r\" %>s %b"
 }
 scripthandler  {
-  add                     lsapi:{$this->configName($site)} php
+  add                     lsapi:{$lsapiHandler} php
 }
-extprocessor {$this->configName($site)} {
-  type                    lsapi
-  address                 uds://tmp/lshttpd/{$this->configName($site)}.sock
-  maxConns                10
-  env                     PHP_LSAPI_CHILDREN=10
-  initTimeout             60
-  retryTimeout            0
-  persistConn             1
-  path                    {$phpBinary}
-  backlog                 100
-  instances               1
-  extUser                 nobody
-  extGroup                nogroup
-  runOnStartUp            3
-}
-{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site)}
+{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site, null, $tlsPaths !== null)}
 {$authPrefixContexts}context / {
-  type                    appserver
-  location                {$root}
+  location                \$VH_ROOT/public/
   allowBrowse             1
 {$rootAuthLines}}
 CONF,
@@ -102,11 +89,11 @@ docRoot                   {$root}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-index  {
+{$tlsBlock}index  {
   useServer               0
   indexFiles              index.html
 }
-{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site)}
+{$lscacheBlock}{$authRealms}{$this->rewriteBlock($site, null, $tlsPaths !== null)}
 {$authPrefixContexts}context / {
   location                {$root}
   allowBrowse             1
@@ -125,7 +112,7 @@ docRoot                   {$vhostRoot}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-{$this->rewriteBlock($site, $site->app_port)}
+{$tlsBlock}{$this->rewriteBlock($site, $site->app_port, $tlsPaths !== null)}
 errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
@@ -169,6 +156,8 @@ CONF;
         $authRealms = $this->olsBasicAuthRealmBlocks($site);
         $authPrefixContexts = $this->olsBasicAuthPrefixContexts($site);
         $rootAuthLines = $this->olsBasicAuthRootContextLines($site);
+        $tlsPaths = OpenLiteSpeedTlsPaths::resolve($site);
+        $tlsBlock = $tlsPaths !== null ? OpenLiteSpeedTlsPaths::vhsslBlock($tlsPaths)."\n" : '';
         // OLS Octane proxies every request through the vhost rewrite block. To
         // gate that with basic auth we wrap the proxy in a context / { ... }
         // and let OLS evaluate auth before the rewrite fires. Per-prefix
@@ -183,7 +172,7 @@ docRoot                   {$vhostRoot}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-{$authRealms}{$this->rewriteBlock($site, $oct)}
+{$tlsBlock}{$authRealms}{$this->rewriteBlock($site, $oct, $tlsPaths !== null)}
 {$authPrefixContexts}{$rootContext}errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
@@ -198,6 +187,16 @@ CONF;
     private function configName(Site $site): string
     {
         return str_replace(['.', '-'], '_', $site->webserverConfigBasename());
+    }
+
+    /**
+     * Server-level extProcessor name in httpd_config.conf for this site's PHP version.
+     */
+    private function olsLsapiHandlerName(Site $site): string
+    {
+        $version = str_replace('.', '', (string) ($site->phpVersion() ?? '83'));
+
+        return 'lsphp'.$version;
     }
 
     /**
@@ -325,7 +324,7 @@ CONF;
         return $groups;
     }
 
-    private function rewriteBlock(Site $site, ?int $proxyPort = null): string
+    private function rewriteBlock(Site $site, ?int $proxyPort = null, bool $forceHttpsRedirect = false): string
     {
         $rules = collect();
 
@@ -335,6 +334,11 @@ CONF;
         // The [F,L] flags return 403 and stop processing — placed FIRST so
         // it short-circuits before any redirect or proxy rule below.
         $rules->push('RewriteRule ^/?\.(?!well-known)[^/]+ - [F,L]');
+
+        if ($forceHttpsRedirect) {
+            $rules->push('RewriteCond %{HTTPS} !=on');
+            $rules->push('RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]');
+        }
 
         $olsHeaderNote = false;
         foreach ($site->redirects->sortBy('sort_order') as $redirect) {

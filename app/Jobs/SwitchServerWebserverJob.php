@@ -10,9 +10,13 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
+use App\Models\SiteCertificate;
+use App\Services\Certificates\CertificateRequestService;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
+use App\Services\Servers\OpenLiteSpeedHttpdConfigPreserver;
+use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\Servers\WebserverStatsEndpointTemplates;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\ApacheSiteConfigBuilder;
@@ -167,6 +171,17 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
             // up to the next scheduled probe — see the engine-Overview filter
             // that hides Start when daemon is active, etc.
             SyncServerSystemdServicesJob::dispatch($server->id);
+
+            $this->reconcileSitesAfterSwitch($server, $this->target, $from);
+
+            if ($this->target === 'openlitespeed') {
+                try {
+                    app(OpenLiteSpeedTlsConfigurator::class)->syncServer($server->fresh());
+                    $emitter->info('[tls]       applied OpenLiteSpeed HTTPS listeners for existing certificates');
+                } catch (\Throwable $e) {
+                    $emitter->info('[tls]       HTTPS listener sync skipped — '.$e->getMessage());
+                }
+            }
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
@@ -375,7 +390,9 @@ BASH;
             // for Host-header matching — it's not what Apache reads for the
             // global identity. We source from `hostname -f`, falling back
             // through `hostname` to `localhost` for systems without a FQDN.
-            'apache' => $this->aptInstallIdempotent('apache2').'; '.$this->apacheInstallPostPatches(),
+            'apache' => $this->aptInstallIdempotent('apache2')
+                .'; apt-get install -y --no-install-recommends certbot python3-certbot-apache'
+                .'; '.$this->apacheInstallPostPatches(),
             // Caddy ships in the official cloudsmith / cloudflare-managed apt repo.
             // `command -v` (not dpkg) drives the skip check: a half-installed
             // package can still show `ii` in dpkg while the binary is missing
@@ -426,7 +443,7 @@ BASH;
         $statusName = WebserverStatsEndpointTemplates::APACHE_CONF_NAME;
 
         return <<<BASH
-a2enmod proxy proxy_http proxy_fcgi rewrite headers status >/dev/null
+a2enmod proxy proxy_http proxy_fcgi rewrite headers status ssl >/dev/null
 DPLY_FQDN="\$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo localhost)"
 printf 'ServerName %s\n' "\$DPLY_FQDN" > /etc/apache2/conf-available/dply-servername.conf
 a2enconf dply-servername >/dev/null
@@ -607,6 +624,7 @@ else
   systemctl stop lshttpd 2>/dev/null || true
 fi
 [ -x /usr/local/lsws/bin/lshttpd ] || { echo "[dply] lshttpd binary not found at /usr/local/lsws/bin/lshttpd after install" >&2; exit 127; }
+apt-get install -y --no-install-recommends certbot || true
 {$lsphpPackages}
 BASH;
     }
@@ -667,6 +685,11 @@ BASH;
             $config = $this->buildSiteConfigFor($site, $this->target, listenPort: 8080);
             $path = $this->siteConfigPathFor($site, $this->target);
             $this->writeRemoteFile($server, $ssh, $path, $config);
+
+            if ($this->target === 'openlitespeed') {
+                $repo = rtrim($site->effectiveRepositoryPath(), '/');
+                $ssh->exec($this->privilegedCommand($server, 'mkdir -p '.escapeshellarg($repo.'/logs')), 15);
+            }
 
             // For nginx/apache, ensure sites-enabled is symlinked to sites-available.
             $this->ensureSiteEnabled($server, $ssh, $site, $this->target);
@@ -999,6 +1022,10 @@ BASH;
         $ssh->exec($this->privilegedCommand($server, $backupCmd), 15);
 
         $contents = app(OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $listenPort);
+        $existing = $ssh->exec('sudo -n cat '.escapeshellarg($path).' 2>/dev/null', 15);
+        if ($existing !== '' && $ssh->lastExecExitCode() === 0) {
+            $contents = app(OpenLiteSpeedHttpdConfigPreserver::class)->merge($contents, $existing);
+        }
         $this->writeRemoteFile($server, $ssh, $path, $contents);
     }
 
@@ -1037,6 +1064,74 @@ BASH;
             'traefik' => 'traefik',
             default => null,
         };
+    }
+
+    /**
+     * Align site rows with the new server webserver and re-queue HTTP-01 TLS
+     * installs when leaving Caddy auto-HTTPS or another certbot-backed engine.
+     */
+    protected function reconcileSitesAfterSwitch(Server $server, string $target, string $from): void
+    {
+        $target = strtolower(trim($target));
+        $from = strtolower(trim($from));
+        $activeStatus = Site::activeStatusForWebserver($target);
+
+        $sites = Site::query()
+            ->where('server_id', $server->id)
+            ->with('previewDomains')
+            ->get();
+
+        foreach ($sites as $site) {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            if (isset($meta['provisioning']) && is_array($meta['provisioning'])) {
+                $meta['provisioning']['webserver'] = $target;
+            }
+
+            $site->update([
+                'status' => $activeStatus,
+                'meta' => $meta,
+            ]);
+        }
+
+        if ($target === 'caddy' && $this->tlsToCaddy) {
+            return;
+        }
+
+        if (! in_array($target, ['nginx', 'apache', 'openlitespeed'], true)) {
+            return;
+        }
+
+        if (! in_array($from, ['nginx', 'apache', 'caddy', 'openlitespeed'], true)) {
+            return;
+        }
+
+        $siteIds = $sites->pluck('id');
+
+        $certificates = SiteCertificate::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+            ->where('challenge_type', SiteCertificate::CHALLENGE_HTTP)
+            ->whereIn('status', [
+                SiteCertificate::STATUS_FAILED,
+                SiteCertificate::STATUS_ACTIVE,
+                SiteCertificate::STATUS_PENDING,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+            ])
+            ->get();
+
+        foreach ($certificates as $certificate) {
+            $certificate->update(['status' => SiteCertificate::STATUS_PENDING]);
+            ExecuteSiteCertificateJob::dispatch($certificate->id, $this->userId);
+        }
+
+        $certificateRequestService = app(CertificateRequestService::class);
+        foreach ($sites as $site) {
+            $certificate = $certificateRequestService->queuePrimaryPreviewAutoSsl($site);
+            if ($certificate !== null) {
+                ExecuteSiteCertificateJob::dispatch($certificate->id, $this->userId);
+            }
+        }
     }
 
     /**

@@ -28,7 +28,7 @@
     <x-site-header />
 
     <main class="flex-1 w-full px-4 sm:px-6 py-16 sm:py-20 lg:py-24 flex items-center justify-center">
-        <div class="w-full max-w-2xl mx-auto text-center">
+        <div class="w-full @yield('card-width', 'max-w-2xl') mx-auto text-center">
             <div class="rounded-3xl border border-brand-ink/10 bg-white/90 backdrop-blur-sm shadow-xl shadow-brand-forest/10 overflow-hidden ring-1 ring-brand-ink/5 px-8 py-12 sm:px-12 sm:py-16">
                 @yield('content')
 

@@ -114,6 +114,24 @@ return [
             'failed' => 'Clone failed.',
             'stale' => 'Clone did not finish.',
         ],
+        'php_load_config' => [
+            'running' => 'Loading PHP config from :host …',
+            'completed' => 'PHP config loaded.',
+            'failed' => 'PHP config load failed.',
+            'stale' => 'PHP config load did not finish.',
+        ],
+        'php_save_config' => [
+            'running' => 'Saving PHP config on :host …',
+            'completed' => 'PHP config saved.',
+            'failed' => 'PHP config save failed.',
+            'stale' => 'PHP config save did not finish.',
+        ],
+        'php_refresh_inventory' => [
+            'running' => 'Refreshing PHP inventory on :host …',
+            'completed' => 'PHP inventory refreshed.',
+            'failed' => 'PHP inventory refresh failed.',
+            'stale' => 'PHP inventory refresh did not finish.',
+        ],
     ],
 
     /*

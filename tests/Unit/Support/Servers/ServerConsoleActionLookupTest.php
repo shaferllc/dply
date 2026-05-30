@@ -59,6 +59,28 @@ test('console action lookup batches banner switch and inflight checks', function
     expect($consoleQueries)->toBe(1);
 });
 
+test('console action lookup forget refreshes inflight state after seed', function (): void {
+    $server = Server::factory()->create();
+    $lookup = app(ServerConsoleActionLookup::class);
+
+    expect($lookup->hasInflightWebserverSwitch($server))->toBeFalse();
+
+    ConsoleAction::query()->create([
+        'subject_type' => $server->getMorphClass(),
+        'subject_id' => $server->id,
+        'kind' => 'webserver_switch',
+        'status' => ConsoleAction::STATUS_QUEUED,
+        'label' => 'Switching webserver…',
+        'output' => ['v' => 1, 'lines' => []],
+    ]);
+
+    expect($lookup->hasInflightWebserverSwitch($server))->toBeFalse();
+
+    $lookup->forget($server);
+
+    expect($lookup->hasInflightWebserverSwitch($server))->toBeTrue();
+});
+
 test('console action lookup skips server refresh when banner is idle', function (): void {
     $server = Server::factory()->create();
     $lookup = app(ServerConsoleActionLookup::class);

@@ -4,7 +4,7 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\Site;
-use Illuminate\Support\Facades\Cache;
+use App\Support\Servers\ServerPhpMutationLock;
 
 class ServerPhpManager
 {
@@ -426,7 +426,7 @@ class ServerPhpManager
     /**
      * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
-    public function applyPackageAction(Server $server, string $action, string $version): array
+    public function applyPackageAction(Server $server, string $action, string $version, ?callable $afterLockAcquired = null): array
     {
         $version = $this->normalizeVersionId($version) ?? '';
         $action = trim($action);
@@ -435,13 +435,16 @@ class ServerPhpManager
             throw new \RuntimeException('PHP action and version are required.');
         }
 
-        $lock = Cache::lock($this->packageActionLockKey($server), $this->packageActionLockSeconds($action));
+        $lock = ServerPhpMutationLock::acquire($server, $this->packageActionLockSeconds($action));
+        $acquired = $lock->get();
 
-        if (! $lock->get()) {
+        if (! $acquired) {
             throw new \RuntimeException('Another PHP package action is already running for this server.');
         }
 
         try {
+            $afterLockAcquired?->__invoke($action, $version);
+
             $server = $server->fresh();
             if ($server === null || ! $server->isReady() || empty($server->ssh_private_key) || blank($server->ip_address)) {
                 throw new \RuntimeException('Provisioning and SSH must be ready before managing PHP packages.');
@@ -490,8 +493,13 @@ class ServerPhpManager
                 ];
             }
         } finally {
-            $lock->release();
+            ServerPhpMutationLock::releaseIfOwned($lock, $acquired);
         }
+    }
+
+    public function isMutationInFlight(Server $server): bool
+    {
+        return ServerPhpMutationLock::isHeld($server);
     }
 
     protected function normalizeVersionId(mixed $value): ?string
@@ -882,7 +890,7 @@ BASH;
 
     protected function packageActionLockKey(Server $server): string
     {
-        return 'server-php-package-action:'.$server->id;
+        return ServerPhpMutationLock::key($server);
     }
 
     protected function packageActionLockSeconds(string $action): int

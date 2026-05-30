@@ -18,7 +18,7 @@
     :title="__('PHP')"
     :description="__('Review server-level PHP inventory, defaults, and runtime configuration from one workspace.')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
+    @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if (! $opsReady && ! $sshUnavailable)
@@ -30,15 +30,12 @@
         <p>{{ __('Adding/removing PHP versions runs apt against the upstream Sury/Ondrej PPA. Existing sites pin to a specific version in their FPM pool, so changing the server default doesn\'t move sites — that\'s a per-site setting on the Sites workspace.') }}</p>
     </x-explainer>
 
-    {{-- Console banner — install/uninstall/patch/refresh-inventory + set-default actions
-         all stream into the shared ConsoleAction partial. Subject is the Server (no per-
-         version model); kind family `php_` keeps unrelated runs off this banner. --}}
-    @if ($phpRun)
-        @include('livewire.partials.console-action-banner-static', [
-            'run' => $phpRun,
-            'kindLabels' => [],
-        ])
-    @endif
+    {{-- Console banner — install/uninstall/patch/refresh-inventory, config load/save,
+         and set-default actions stream into the shared ConsoleAction partial. --}}
+    @include('livewire.partials.console-action-banner-static', [
+        'run' => $phpRun,
+        'kindLabels' => (array) config('console_actions.kinds', []),
+    ])
 
     {{-- PHP runtime: hero card with eyebrow + title + summary stat tiles. --}}
     <section class="dply-card overflow-hidden">
@@ -209,22 +206,11 @@
                                 && ! empty($phpConfigEditorErrorLines);
                         @endphp
 
-                        <li
-                            class="relative px-6 py-4 transition sm:px-8"
+                        <x-workspace-table-row
                             wire:key="php-{{ $row['id'] }}"
-                            wire:loading.class.delay="opacity-60 pointer-events-none"
-                            wire:target="{{ $rowTargets }}"
+                            :wire-target="$rowTargets"
+                            class="px-6 py-4 sm:px-8"
                         >
-                            <div
-                                class="pointer-events-none absolute inset-0 hidden items-center justify-center bg-white/40 backdrop-blur-[1px]"
-                                wire:loading.flex.delay
-                                wire:target="{{ $rowTargets }}"
-                            >
-                                <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm ring-1 ring-brand-ink/10">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Working…') }}
-                                </span>
-                            </div>
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
                                 <span class="mt-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
                                     <x-heroicon-o-command-line class="h-4 w-4" />
@@ -426,7 +412,7 @@
                                     </div>
                                 @endcan
                             </div>
-                        </li>
+                        </x-workspace-table-row>
                     @endforeach
                 </ul>
         </section>

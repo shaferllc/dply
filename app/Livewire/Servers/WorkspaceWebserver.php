@@ -12,6 +12,9 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Servers\ApacheCustomVhostsConfig;
+use App\Services\Servers\ApacheEngineCacheConfig;
+use App\Services\Servers\ApacheEngineCachePurger;
 use App\Services\Servers\ApacheGlobalOptionsConfig;
 use App\Services\Servers\ApacheModulesConfig;
 use App\Services\Servers\CaddyCustomRoutesConfig;
@@ -29,12 +32,16 @@ use App\Services\Servers\LiveState\NginxLiveStateProbe;
 use App\Services\Servers\LiveState\OlsLiveStateProbe;
 use App\Services\Servers\LiveState\TraefikLiveStateProbe;
 use App\Services\Servers\NginxCustomHostsConfig;
+use App\Services\Servers\NginxEngineCacheConfig;
+use App\Services\Servers\NginxEngineCachePurger;
 use App\Services\Servers\NginxGlobalOptionsConfig;
 use App\Services\Servers\NginxModulesConfig;
 use App\Services\Servers\NginxUpstreamsConfig;
 use App\Services\Servers\OpenLiteSpeedCacheModuleConfig;
 use App\Services\Servers\OpenLiteSpeedExtAppsConfig;
 use App\Services\Servers\OpenLiteSpeedListenersConfig;
+use App\Services\Servers\OpenLiteSpeedLscachePurger;
+use App\Services\Servers\OpenLiteSpeedModulesConfig;
 use App\Services\Servers\OpenLiteSpeedVhostsConfig;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageSshExecutor;
@@ -244,6 +251,23 @@ class WorkspaceWebserver extends WorkspaceManage
         'certFile' => '',
     ];
 
+    // ---- OLS Modules toggle (Modules sub-tab on the OpenLiteSpeed engine).
+    /**
+     * Per-module: ['name', 'enabled', 'protected', 'on_disk', 'type']
+     *
+     * @var list<array{name: string, enabled: bool, protected: bool, on_disk: bool, type: string}>
+     */
+    public array $ols_modules_list = [];
+
+    public bool $ols_modules_loaded = false;
+
+    public ?string $ols_modules_flash = null;
+
+    public ?string $ols_modules_error = null;
+
+    /** Active type filter on the modules table: 'all' or one of the classify() outputs. */
+    public string $ols_modules_filter = 'all';
+
     // ---- Caddy Global Options form (Admin sub-tab on the Caddy engine).
     /** @var array<string, string> */
     public array $caddy_globals_form = [];
@@ -367,6 +391,30 @@ class WorkspaceWebserver extends WorkspaceManage
 
     /** Active type filter on the modules table: 'all' or one of the classify() outputs. */
     public string $apache_modules_filter = 'all';
+
+    /**
+     * Custom Apache vhosts keyed by slug → VirtualHost fields.
+     *
+     * @var array<string, array{server_name: string, server_aliases: string, document_root: string, php_socket: string}>
+     */
+    public array $apache_custom_vhosts_form = [];
+
+    public bool $apache_custom_vhosts_loaded = false;
+
+    public ?string $apache_custom_vhosts_flash = null;
+
+    public ?string $apache_custom_vhosts_error = null;
+
+    public bool $apache_custom_vhosts_show_add = false;
+
+    /** @var array{slug: string, server_name: string, server_aliases: string, document_root: string, php_socket: string} */
+    public array $apache_custom_vhosts_new = [
+        'slug' => '',
+        'server_name' => '',
+        'server_aliases' => '',
+        'document_root' => '',
+        'php_socket' => '',
+    ];
 
     // ---- HAProxy Global Options form (Runtime sub-tab on the HAProxy edge proxy).
     /** @var array<string, string> */
@@ -571,6 +619,29 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public string $nginx_modules_filter = 'all';
 
+    /** @var array<string, string> */
+    public array $nginx_cache_form = [];
+
+    public bool $nginx_cache_loaded = false;
+
+    public ?string $nginx_cache_flash = null;
+
+    public ?string $nginx_cache_error = null;
+
+    /** @var array<string, mixed> */
+    public array $nginx_cache_meta = [];
+
+    /** @var array<string, mixed> */
+    public array $apache_cache_status = [];
+
+    public bool $apache_cache_loaded = false;
+
+    public bool $apache_mod_cache_enabled = false;
+
+    public ?string $apache_cache_flash = null;
+
+    public ?string $apache_cache_error = null;
+
     /**
      * Custom Caddy routes keyed by slug → site block fields.
      *
@@ -636,6 +707,12 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'cache') {
             $this->loadOlsCacheConfig();
         }
+        if ($this->workspace_tab === 'nginx' && $this->engine_subtab === 'cache') {
+            $this->loadNginxCacheConfig();
+        }
+        if ($this->workspace_tab === 'apache' && $this->engine_subtab === 'cache') {
+            $this->loadApacheCacheConfig();
+        }
 
         // Eager-load the Health tab cards (TLS certs + drift detector) so
         // they paint with data on first render. Services cache for 60s so
@@ -699,7 +776,7 @@ class WorkspaceWebserver extends WorkspaceManage
         $allowed = [
             'overview', 'info', 'logs', 'config',
             // OLS
-            'vhosts', 'listeners', 'extapps', 'cache',
+            'vhosts', 'listeners', 'extapps', 'modules', 'cache',
             // nginx
             'hosts', 'upstreams', 'certs', 'modules', 'workers',
             // caddy (routes/upstreams/certs share with nginx; admin + snippets are unique)
@@ -753,6 +830,9 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->engine_subtab !== 'hosts') {
             $this->nginx_custom_hosts_show_add = false;
         }
+        if ($this->engine_subtab !== 'vhosts') {
+            $this->apache_custom_vhosts_show_add = false;
+        }
         if ($this->engine_subtab !== 'frontends') {
             $this->haproxy_frontends_show_add = false;
         }
@@ -786,6 +866,9 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($tab === 'openlitespeed' && $sub === 'vhosts' && ! $this->ols_vhosts_loaded) {
             $this->loadOlsVhostsConfig();
         }
+        if ($tab === 'openlitespeed' && $sub === 'modules' && ! $this->ols_modules_loaded) {
+            $this->loadOlsModulesConfig();
+        }
         if ($tab === 'caddy' && $sub === 'admin' && ! $this->caddy_globals_loaded) {
             $this->loadCaddyGlobalsConfig();
         }
@@ -807,8 +890,17 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($tab === 'nginx' && $sub === 'modules' && ! $this->nginx_modules_loaded) {
             $this->loadNginxModulesConfig();
         }
+        if ($tab === 'nginx' && $sub === 'cache' && ! $this->nginx_cache_loaded) {
+            $this->loadNginxCacheConfig();
+        }
         if ($tab === 'apache' && $sub === 'modules' && ! $this->apache_modules_loaded) {
             $this->loadApacheModulesConfig();
+        }
+        if ($tab === 'apache' && $sub === 'cache' && ! $this->apache_cache_loaded) {
+            $this->loadApacheCacheConfig();
+        }
+        if ($tab === 'apache' && $sub === 'vhosts' && ! $this->apache_custom_vhosts_loaded) {
+            $this->loadApacheCustomVhostsConfig();
         }
         if ($tab === 'haproxy' && $sub === 'runtime' && ! $this->haproxy_globals_loaded) {
             $this->loadHaproxyGlobalsConfig();
@@ -866,6 +958,88 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_cache_error = __('Failed to read cache config: :msg', ['msg' => $e->getMessage()]);
             $this->ols_cache_loaded = false;
         }
+    }
+
+    public function loadOlsModulesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_modules_error = __('Provisioning and SSH must be ready before listing modules.');
+
+            return;
+        }
+
+        try {
+            $result = app(OpenLiteSpeedModulesConfig::class)->read($this->server);
+            $this->ols_modules_list = $result['modules'];
+            $this->ols_modules_loaded = true;
+            $this->ols_modules_flash = null;
+            $this->ols_modules_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->ols_modules_error = __('Could not read /usr/local/lsws/modules or httpd_config.conf — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->ols_modules_error = __('Failed to read modules: :msg', ['msg' => $e->getMessage()]);
+            $this->ols_modules_loaded = false;
+        }
+    }
+
+    public function toggleOlsModule(string $name, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_modules_error = __('Deployers cannot toggle OpenLiteSpeed modules.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_modules_error = __('Provisioning and SSH must be ready before toggling modules.');
+
+            return;
+        }
+
+        $this->ols_modules_flash = null;
+        $this->ols_modules_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __(':verb OpenLiteSpeed module: :name', ['verb' => $enable ? 'Enable' : 'Disable', 'name' => $name]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(OpenLiteSpeedModulesConfig::class)
+                ->toggle($this->server, $name, $enable, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_modules_flash = __('Module :name :state and OpenLiteSpeed reloaded.', ['name' => $name, 'state' => $enable ? 'enabled' : 'disabled']);
+            $this->loadOlsModulesConfig();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_modules_error = $e->getMessage();
+        }
+    }
+
+    public function setOlsModulesFilter(string $filter): void
+    {
+        $this->ols_modules_filter = in_array($filter, ['all', 'perf', 'security', 'other'], true) ? $filter : 'all';
     }
 
     /**
@@ -929,6 +1103,218 @@ class WorkspaceWebserver extends WorkspaceManage
                 'updated_at' => now(),
             ]);
             $this->ols_cache_error = $e->getMessage();
+        }
+    }
+
+    public function purgeOlsLscacheConfirmed(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_cache_error = __('Deployers cannot purge server cache.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_cache_error = __('Provisioning and SSH must be ready before purging LSCache.');
+
+            return;
+        }
+
+        $this->ols_cache_flash = null;
+        $this->ols_cache_error = null;
+
+        try {
+            app(OpenLiteSpeedLscachePurger::class)->purgeAll($this->server);
+            $this->ols_cache_flash = __('LSCache storage purged on the server.');
+        } catch (\Throwable $e) {
+            $this->ols_cache_error = $e->getMessage();
+        }
+    }
+
+    public function loadNginxCacheConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_cache_error = __('Provisioning and SSH must be ready before reading cache settings.');
+
+            return;
+        }
+
+        try {
+            $result = app(NginxEngineCacheConfig::class)->read($this->server);
+            $this->nginx_cache_form = $result['values'];
+            $this->nginx_cache_meta = [
+                'fcgi_path' => $result['fcgi_path'],
+                'proxy_path' => $result['proxy_path'],
+                'fcgi_zone' => $result['fcgi_zone'],
+                'proxy_zone' => $result['proxy_zone'],
+                'conf_path' => $result['conf_path'],
+            ];
+            $this->nginx_cache_loaded = true;
+            $this->nginx_cache_error = null;
+            $this->nginx_cache_flash = null;
+        } catch (\Throwable $e) {
+            $this->nginx_cache_error = __('Failed to read cache settings: :msg', ['msg' => $e->getMessage()]);
+            $this->nginx_cache_loaded = false;
+        }
+    }
+
+    public function saveNginxCacheConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_cache_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_cache_error = __('Provisioning and SSH must be ready before saving cache settings.');
+
+            return;
+        }
+
+        $this->nginx_cache_flash = null;
+        $this->nginx_cache_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save nginx engine cache config'),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(NginxEngineCacheConfig::class)->save($this->server, $this->nginx_cache_form, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_cache_flash = __('Cache zones saved and nginx reloaded.');
+            $this->loadNginxCacheConfig();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_cache_error = $e->getMessage();
+        }
+    }
+
+    public function purgeNginxEngineCacheConfirmed(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_cache_error = __('Deployers cannot purge server cache.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_cache_error = __('Provisioning and SSH must be ready before purging cache.');
+
+            return;
+        }
+
+        $this->nginx_cache_flash = null;
+        $this->nginx_cache_error = null;
+
+        try {
+            app(NginxEngineCachePurger::class)->purgeAll($this->server);
+            $this->nginx_cache_flash = __('FastCGI and proxy cache storage purged on the server.');
+        } catch (\Throwable $e) {
+            $this->nginx_cache_error = $e->getMessage();
+        }
+    }
+
+    public function loadApacheCacheConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_cache_error = __('Provisioning and SSH must be ready before reading cache settings.');
+
+            return;
+        }
+
+        try {
+            $status = app(ApacheEngineCacheConfig::class)->read($this->server);
+            $this->apache_cache_status = $status;
+            $this->apache_mod_cache_enabled = (bool) ($status['apache_mod_cache_enabled'] ?? false);
+            $this->apache_cache_loaded = true;
+            $this->apache_cache_error = null;
+            $this->apache_cache_flash = null;
+        } catch (\Throwable $e) {
+            $this->apache_cache_error = __('Failed to read cache settings: :msg', ['msg' => $e->getMessage()]);
+            $this->apache_cache_loaded = false;
+        }
+    }
+
+    public function saveApacheCacheConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_cache_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_cache_error = __('Provisioning and SSH must be ready before saving cache settings.');
+
+            return;
+        }
+
+        $this->apache_cache_flash = null;
+        $this->apache_cache_error = null;
+
+        try {
+            app(ApacheEngineCacheConfig::class)->saveModCacheFlag($this->server, $this->apache_mod_cache_enabled);
+            $this->apache_cache_flash = __('Apache cache preferences saved.');
+            $this->loadApacheCacheConfig();
+        } catch (\Throwable $e) {
+            $this->apache_cache_error = $e->getMessage();
+        }
+    }
+
+    public function purgeApacheEngineCacheConfirmed(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_cache_error = __('Deployers cannot purge server cache.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_cache_error = __('Provisioning and SSH must be ready before purging cache.');
+
+            return;
+        }
+
+        $this->apache_cache_flash = null;
+        $this->apache_cache_error = null;
+
+        try {
+            app(ApacheEngineCachePurger::class)->purgeAll($this->server);
+            $this->apache_cache_flash = __('Apache disk cache storage purged on the server.');
+        } catch (\Throwable $e) {
+            $this->apache_cache_error = $e->getMessage();
         }
     }
 
@@ -1980,7 +2366,7 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function setApacheModulesFilter(string $filter): void
     {
-        $this->apache_modules_filter = in_array($filter, ['all', 'mpm', 'tls', 'auth', 'proxy', 'perf', 'observability', 'core', 'other'], true) ? $filter : 'all';
+        $this->apache_modules_filter = in_array($filter, ['all', 'mpm', 'tls', 'auth', 'proxy', 'perf', 'security', 'observability', 'core', 'other'], true) ? $filter : 'all';
     }
 
     public function loadNginxModulesConfig(): void
@@ -2072,7 +2458,7 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function setNginxModulesFilter(string $filter): void
     {
-        $allowed = ['all', 'stream', 'mail', 'tls', 'geo', 'content', 'auth', 'perf', 'observability', 'other'];
+        $allowed = ['all', 'stream', 'mail', 'tls', 'geo', 'content', 'auth', 'perf', 'security', 'observability', 'other'];
         $this->nginx_modules_filter = in_array($filter, $allowed, true) ? $filter : 'all';
     }
 
@@ -3211,7 +3597,7 @@ class WorkspaceWebserver extends WorkspaceManage
             if (! empty($result['unreadable_httpd'])) {
                 $this->ols_vhosts_error = __('Could not read /usr/local/lsws/conf/httpd_config.conf — check sudo permissions for the deploy user.');
             } elseif (empty($result['vhosts'])) {
-                $this->ols_vhosts_flash = __('No vhTemplate blocks found in httpd_config.conf — add a site to populate this list.');
+                $this->ols_vhosts_flash = __('No virtual hosts found in httpd_config.conf — add a site to populate this list.');
             }
         } catch (\Throwable $e) {
             $this->ols_vhosts_error = __('Failed to read vhost config: :msg', ['msg' => $e->getMessage()]);
@@ -3694,7 +4080,7 @@ class WorkspaceWebserver extends WorkspaceManage
     private function isEngineLiveStateSubtab(string $subtab, string $engine): bool
     {
         $map = [
-            'openlitespeed' => ['vhosts', 'listeners', 'extapps', 'cache'],
+            'openlitespeed' => ['vhosts', 'listeners', 'extapps', 'modules', 'cache'],
             'caddy' => ['routes', 'upstreams', 'certs', 'admin'],
             'nginx' => ['hosts', 'upstreams', 'certs', 'modules', 'workers'],
             'apache' => ['vhosts', 'modules', 'certs', 'workers'],
@@ -4182,6 +4568,254 @@ class WorkspaceWebserver extends WorkspaceManage
             ]);
             $this->nginx_custom_hosts_error = $e->getMessage();
         }
+    }
+
+    public function loadApacheCustomVhostsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before reading custom vhosts.');
+
+            return;
+        }
+
+        try {
+            $result = app(ApacheCustomVhostsConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['vhosts'] as $vhost) {
+                $slug = (string) ($vhost['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $form[$slug] = [
+                    'server_name' => (string) ($vhost['server_name'] ?? ''),
+                    'server_aliases' => implode("\n", $vhost['server_aliases'] ?? []),
+                    'document_root' => (string) ($vhost['document_root'] ?? ''),
+                    'php_socket' => (string) ($vhost['php_socket'] ?? ''),
+                ];
+            }
+            $this->apache_custom_vhosts_form = $form;
+            $this->apache_custom_vhosts_loaded = true;
+            $this->apache_custom_vhosts_flash = null;
+            $this->apache_custom_vhosts_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->apache_custom_vhosts_error = __('Could not read custom vhost files — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->apache_custom_vhosts_error = __('Failed to read custom vhosts: :msg', ['msg' => $e->getMessage()]);
+            $this->apache_custom_vhosts_loaded = false;
+        }
+    }
+
+    public function openAddApacheCustomVhostForm(): void
+    {
+        $this->apache_custom_vhosts_show_add = true;
+        $this->apache_custom_vhosts_new = [
+            'slug' => '',
+            'server_name' => '',
+            'server_aliases' => '',
+            'document_root' => '',
+            'php_socket' => '',
+        ];
+        $this->apache_custom_vhosts_error = null;
+        $this->apache_custom_vhosts_flash = null;
+    }
+
+    public function cancelAddApacheCustomVhostForm(): void
+    {
+        $this->apache_custom_vhosts_show_add = false;
+        $this->apache_custom_vhosts_new = [
+            'slug' => '',
+            'server_name' => '',
+            'server_aliases' => '',
+            'document_root' => '',
+            'php_socket' => '',
+        ];
+    }
+
+    public function submitAddApacheCustomVhost(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_custom_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before adding a custom vhost.');
+
+            return;
+        }
+
+        $this->apache_custom_vhosts_flash = null;
+        $this->apache_custom_vhosts_error = null;
+
+        $fields = $this->apacheCustomVhostFieldsFromForm($this->apache_custom_vhosts_new);
+        $slug = (string) ($this->apache_custom_vhosts_new['slug'] ?? '');
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add Apache custom vhost: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(ApacheCustomVhostsConfig::class)->add($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_flash = __('Custom vhost :slug added and Apache reloaded.', ['slug' => $slug]);
+            $this->apache_custom_vhosts_show_add = false;
+            $this->apache_custom_vhosts_new = [
+                'slug' => '',
+                'server_name' => '',
+                'server_aliases' => '',
+                'document_root' => '',
+                'php_socket' => '',
+            ];
+            $this->loadApacheCustomVhostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_error = $e->getMessage();
+        }
+    }
+
+    public function saveApacheCustomVhost(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_custom_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before saving custom vhosts.');
+
+            return;
+        }
+
+        if (! isset($this->apache_custom_vhosts_form[$slug])) {
+            return;
+        }
+
+        $this->apache_custom_vhosts_flash = null;
+        $this->apache_custom_vhosts_error = null;
+
+        $fields = $this->apacheCustomVhostFieldsFromForm($this->apache_custom_vhosts_form[$slug]);
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Apache custom vhost: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(ApacheCustomVhostsConfig::class)->save($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_flash = __('Custom vhost :slug saved and Apache reloaded.', ['slug' => $slug]);
+            $this->loadApacheCustomVhostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_error = $e->getMessage();
+        }
+    }
+
+    public function removeApacheCustomVhost(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_custom_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before removing custom vhosts.');
+
+            return;
+        }
+
+        $this->apache_custom_vhosts_flash = null;
+        $this->apache_custom_vhosts_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove Apache custom vhost: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(ApacheCustomVhostsConfig::class)->remove($this->server, $slug, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_flash = __('Custom vhost :slug removed.', ['slug' => $slug]);
+            $this->loadApacheCustomVhostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * @param  array{server_name?: string, server_aliases?: string, document_root?: string, php_socket?: string}  $form
+     * @return array{server_name: string, server_aliases: list<string>, document_root: string, php_socket: string}
+     */
+    private function apacheCustomVhostFieldsFromForm(array $form): array
+    {
+        return [
+            'server_name' => trim((string) ($form['server_name'] ?? '')),
+            'server_aliases' => array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($form['server_aliases'] ?? '')) ?: []))),
+            'document_root' => trim((string) ($form['document_root'] ?? '')),
+            'php_socket' => trim((string) ($form['php_socket'] ?? '')),
+        ];
     }
 
     /**

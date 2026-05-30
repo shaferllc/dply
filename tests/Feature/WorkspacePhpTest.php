@@ -3,6 +3,7 @@
 namespace Tests\Feature\WorkspacePhpTest;
 
 use App\Livewire\Servers\WorkspacePhp;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -239,8 +240,11 @@ test('php workspace can refresh inventory from livewire', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePhp::class, ['server' => $server])
         ->call('refreshPhpInventory')
-        ->assertDispatched('notify', message: 'PHP inventory refreshed.', type: 'success')
-        ->assertSet('remote_output', "Supported environment: yes\nInstalled versions: 8.3\nDetected CLI default: 8.3");
+        ->assertDispatched('notify', message: 'PHP inventory refreshed.', type: 'success');
+
+    $action = ConsoleAction::query()->where('kind', 'php_refresh_inventory')->first();
+    expect($action)->not->toBeNull()
+        ->and($action->status)->toBe(ConsoleAction::STATUS_COMPLETED);
 });
 
 test('php workspace renders version rows and package actions', function () {
@@ -451,8 +455,11 @@ test('php workspace can save a version config edit from livewire', function () {
         ->call('savePhpConfigEditor')
         ->assertDispatched('notify', message: 'FPM ini saved for PHP 8.3.', type: 'success')
         ->assertSet('phpConfigEditorReloadGuidance', 'Reload PHP-FPM 8.3 after saving to apply these changes.')
-        ->assertSet('phpConfigEditorValidationOutput', 'configuration file syntax is ok')
-        ->assertSet('remote_output', "configuration file syntax is ok\n\nFPM ini saved and PHP-FPM 8.3 reloaded.");
+        ->assertSet('phpConfigEditorValidationOutput', 'configuration file syntax is ok');
+
+    $action = ConsoleAction::query()->where('kind', 'php_save_config')->first();
+    expect($action)->not->toBeNull()
+        ->and($action->status)->toBe(ConsoleAction::STATUS_COMPLETED);
 });
 
 test('php workspace surfaces config validation failures without replacing the live file', function () {
@@ -521,8 +528,11 @@ test('php workspace surfaces config validation failures without replacing the li
         ->call('savePhpConfigEditor')
         ->assertDispatched('notify', message: 'CLI ini validation failed. The live file was not replaced.', type: 'error')
         ->assertSet('phpConfigEditorValidationOutput', 'PHP: syntax error on line 2')
-        ->assertSet('remote_output', 'PHP: syntax error on line 2')
         ->assertSet('phpConfigEditorContent', "memory_limit==512M\n");
+
+    $action = ConsoleAction::query()->where('kind', 'php_save_config')->first();
+    expect($action)->not->toBeNull()
+        ->and($action->status)->toBe(ConsoleAction::STATUS_FAILED);
 });
 
 test('php workspace can run a package action from livewire', function () {
@@ -570,8 +580,11 @@ test('php workspace can run a package action from livewire', function () {
     Livewire::actingAs($user)
         ->test(WorkspacePhp::class, ['server' => $server])
         ->call('runPhpPackageAction', 'install', '8.4')
-        ->assertDispatched('notify', message: 'PHP 8.4 installed.', type: 'success')
-        ->assertSet('remote_output', "Installing packages...\n\nSupported environment: yes\nInstalled versions: 8.4\nDetected CLI default: 8.4");
+        ->assertDispatched('notify', message: 'PHP 8.4 installed.', type: 'success');
+
+    $action = ConsoleAction::query()->where('kind', 'php_install')->first();
+    expect($action)->not->toBeNull()
+        ->and($action->status)->toBe(ConsoleAction::STATUS_COMPLETED);
 });
 
 test('php workspace surfaces package action failures', function () {
@@ -628,7 +641,9 @@ test('php workspace rejects package actions while another server mutation is run
         Livewire::actingAs($user)
             ->test(WorkspacePhp::class, ['server' => $server])
             ->call('runPhpPackageAction', 'install', '8.4')
-            ->assertDispatched('notify', message: 'Another PHP package action is already running for this server.', type: 'error');
+            ->assertDispatched('notify', message: 'Another PHP action is already running for this server. Wait for it to finish.', type: 'error');
+
+        expect(ConsoleAction::query()->where('kind', 'php_install')->count())->toBe(0);
     } finally {
         $lock->release();
     }
@@ -674,6 +689,9 @@ test('php workspace rejects config saves while another server mutation is runnin
         ]);
     $this->app->instance(ServerPhpManager::class, $manager);
 
+    $lock = Cache::lock('server-php-package-action:'.$server->id, 30);
+    expect($lock->get())->toBeTrue();
+
     $editor = Mockery::mock(ServerPhpConfigEditor::class, [app(ConfigRevisionRecorder::class)])->makePartial();
     $editor->shouldReceive('openTarget')
         ->once()
@@ -685,9 +703,7 @@ test('php workspace rejects config saves while another server mutation is runnin
             'content' => "memory_limit=256M\n",
             'reload_guidance' => 'Reload is not required for CLI ini changes, but new CLI processes will use the updated file.',
         ]);
-    $editor->shouldReceive('saveTarget')
-        ->once()
-        ->andThrow(new \RuntimeException('Another PHP server mutation is already running for this server.'));
+    $editor->shouldNotReceive('saveTarget');
     $this->app->instance(ServerPhpConfigEditor::class, $editor);
 
     Livewire::actingAs($user)
@@ -695,5 +711,9 @@ test('php workspace rejects config saves while another server mutation is runnin
         ->call('openPhpConfigEditor', '8.3', 'cli_ini')
         ->set('phpConfigEditorContent', "memory_limit=512M\n")
         ->call('savePhpConfigEditor')
-        ->assertDispatched('notify', message: 'Another PHP server mutation is already running for this server.', type: 'error');
+        ->assertDispatched('notify', message: 'Another PHP action is already running for this server. Wait for it to finish.', type: 'error');
+
+    expect(ConsoleAction::query()->where('kind', 'php_save_config')->count())->toBe(0);
+
+    $lock->release();
 });

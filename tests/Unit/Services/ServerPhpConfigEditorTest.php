@@ -144,7 +144,7 @@ it('rejects config edits while another server level php mutation is running', fu
 
     try {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Another PHP server mutation is already running for this server.');
+        $this->expectExceptionMessage('Another PHP package action is already running for this server.');
 
         $editor->saveTarget($server, '8.3', 'cli_ini', "memory_limit=512M\n");
     } finally {

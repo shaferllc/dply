@@ -113,6 +113,17 @@ class OpenLiteSpeedCacheModuleConfig
     ];
 
     /**
+     * @return array<string, string>
+     */
+    public static function defaultValues(): array
+    {
+        return array_map(
+            fn (array $meta): string => (string) $meta['default'],
+            self::PARAMS,
+        );
+    }
+
+    /**
      * Read the cache module block from the server. Returns a defaults-filled
      * array keyed by the PARAMS keys above. Missing directives use the
      * declared defaults so the UI always renders a populated form.
