@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Support\Servers\FileBrowserEntry;
+use App\Support\Servers\FileBrowserFileRead;
 use App\Support\Servers\FileBrowserListing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -107,4 +108,67 @@ test('jump to normalizes paths', function () {
     Livewire::test(WorkspaceFiles::class, ['server' => $server])
         ->call('jumpTo', '/etc//nginx/')
         ->assertSet('path', '/etc/nginx');
+});
+test('open file shows content in modal without corrupting the page', function () {
+    $user = actingOrgUser('owner');
+    $server = readyServer($user);
+
+    $listing = new FileBrowserListing(
+        path: '/home/dply',
+        entries: [new FileBrowserEntry('.profile', 'file', 220, time(), '-rw-r--r--', 'dply', 'dply')],
+        truncated: false,
+        totalCount: 1,
+        filter: null,
+    );
+
+    $fake = \Mockery::mock(ServerFileBrowserRemoteReader::class);
+    $fake->shouldReceive('list')->andReturn($listing);
+    $fake->shouldReceive('read')
+        ->once()
+        ->andReturn(new FileBrowserFileRead(
+            path: '/home/dply/.profile',
+            size: 220,
+            mtime: time(),
+            sha256: str_repeat('a', 64),
+            mime: 'text/plain',
+            isBinary: false,
+            content: "# ~/.profile\nexport PATH=\$PATH:\$HOME/bin",
+            contentTruncated: false,
+        ));
+    app()->instance(ServerFileBrowserRemoteReader::class, $fake);
+
+    $this->actingAs($user);
+
+    Livewire::test(WorkspaceFiles::class, ['server' => $server])
+        ->call('openFile', '.profile')
+        ->assertSet('showFileModal', true)
+        ->assertSet('viewingPath', '/home/dply/.profile')
+        ->assertSee('# ~/.profile')
+        ->assertDontSee('"showFileModal":false');
+});
+test('file download uses dedicated route instead of livewire action', function () {
+    $user = actingOrgUser('owner');
+    $server = readyServer($user);
+
+    $fake = \Mockery::mock(ServerFileBrowserRemoteReader::class);
+    $fake->shouldReceive('read')->once()->andReturn(new FileBrowserFileRead(
+        path: '/home/dply/.profile',
+        size: 12,
+        mtime: time(),
+        sha256: str_repeat('b', 64),
+        mime: 'text/plain',
+        isBinary: false,
+        content: 'hello world',
+        contentTruncated: false,
+    ));
+    $fake->shouldReceive('streamDownload')->zeroOrMoreTimes();
+    app()->instance(ServerFileBrowserRemoteReader::class, $fake);
+
+    $this->actingAs($user)
+        ->get(route('servers.files.download', [
+            'server' => $server,
+            'path' => '/home/dply/.profile',
+        ]))
+        ->assertOk()
+        ->assertHeader('content-disposition', 'attachment; filename=".profile"');
 });

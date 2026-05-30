@@ -69,7 +69,9 @@
                                 <x-spinner class="h-4 w-4" />
                             </span>
                             {{ $engineLabels[$engine] ?? ucfirst($engine) }}
-                            @if ($engineRow && in_array($engineRow->status, [
+                            @if (($comingSoonEngines[$engine] ?? false) && ! ($capabilities[$engine] ?? false) && ! $engineRow)
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                            @elseif ($engineRow && in_array($engineRow->status, [
                                 \App\Models\ServerDatabaseEngine::STATUS_PENDING,
                                 \App\Models\ServerDatabaseEngine::STATUS_INSTALLING,
                                 \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,

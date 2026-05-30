@@ -217,9 +217,12 @@ return [
         ],
     ],
 
+    ...(require __DIR__.'/contextual-docs-maps.php'),
+
     'fallbacks' => [
         'edge' => 'edge-overview',
-        'sites' => 'sites-and-deploy',
+        'sites' => 'vm-site-overview',
+        'servers' => 'server-overview',
         'organization' => 'org-roles-and-limits',
         'default' => 'edge-overview',
     ],

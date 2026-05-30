@@ -38,5 +38,7 @@ return [
         'mariadb1011' => ['min_ram_mb' => 384, 'min_disk_mb' => 1024],
         'mariadb11' => ['min_ram_mb' => 384, 'min_disk_mb' => 1024],
         'mariadb114' => ['min_ram_mb' => 384, 'min_disk_mb' => 1024],
+        'mongodb' => ['min_ram_mb' => 512, 'min_disk_mb' => 1024],
+        'clickhouse' => ['min_ram_mb' => 1024, 'min_disk_mb' => 2048],
     ],
 ];

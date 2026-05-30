@@ -21,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -713,6 +714,61 @@ test('install database engine rejects unsupported engine', function () {
         ->call('installDatabaseEngine', 'oracle');
 
     Queue::assertNotPushed(InstallDatabaseEngineJob::class);
+});
+
+test('install refuses a coming soon database engine before queueing', function () {
+    Queue::fake();
+    [$user, $server] = actingOwnerWithServer();
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('installDatabaseEngine', 'mariadb');
+
+    Queue::assertNotPushed(InstallDatabaseEngineJob::class);
+    $this->assertDatabaseMissing('server_database_engines', [
+        'server_id' => $server->id,
+        'engine' => 'mariadb',
+    ]);
+});
+
+test('coming soon database engine shows Soon badge on tab strip', function () {
+    [$user, $server] = actingOwnerWithServer();
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('workspace_tab', 'mongodb')
+        ->assertSee(__('Soon'))
+        ->assertSee(__('Coming soon'));
+});
+
+test('install allows gated engine when flag is enabled', function () {
+    config(['features.database.mongodb' => true]);
+    Feature::flushCache();
+
+    Queue::fake();
+    [$user, $server] = actingOwnerWithServer();
+
+    $this->mock(ServerDatabaseHostCapabilities::class, function ($mock): void {
+        $mock->shouldReceive('forServer')->andReturn(['mysql' => false, 'mariadb' => false, 'postgres' => false, 'mongodb' => false, 'clickhouse' => false, 'sqlite' => false]);
+        $mock->shouldReceive('forget')->zeroOrMoreTimes();
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('installDatabaseEngine', 'mongodb')
+        ->assertSet('workspace_tab', 'mongodb');
+
+    Queue::assertPushed(InstallDatabaseEngineJob::class);
 });
 
 test('uninstall database engine dispatches job', function () {

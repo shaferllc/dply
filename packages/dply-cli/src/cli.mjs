@@ -49,6 +49,7 @@ const SERVER_COMMANDS = {
   show: { handler: serverCommands.serverShow, summary: 'Show one server and its BYO sites.' },
   health: { handler: serverCommands.serverHealth, summary: 'Server status + open insight findings.' },
   run: { handler: serverCommands.serverRun, summary: 'Run a command over SSH (--server <id> <command>).' },
+  firewall: { handler: serverCommands.serverFirewall, summary: 'show | apply | apply-bundled | apply-template' },
   'system-users': { handler: serverCommands.serverSystemUsers, summary: 'list | sync | add | update | remove' },
 };
 
@@ -351,6 +352,8 @@ function printTopLevelHelp() {
   info(`  ${'server list'.padEnd(18)} ${c.dim('List VM servers')}`);
   info(`  ${'server show'.padEnd(18)} ${c.dim('One server + BYO sites on it')}`);
   info(`  ${'server health'.padEnd(18)} ${c.dim('Status + insight findings')}`);
+  info(`  ${'server run'.padEnd(18)} ${c.dim('Ad-hoc SSH command (commands.run scope)')}`);
+  info(`  ${'server firewall'.padEnd(18)} ${c.dim('Show/apply UFW rules (network.read/write)')}`);
   info(`  ${'server system-users'.padEnd(18)} ${c.dim('Manage Linux accounts (see `dply server system-users help`)')}`);
   info('');
   info(c.bold('Sites (BYO):'));
@@ -426,7 +429,7 @@ export function allCommandLines() {
     lines.push(`server ${name}`);
   }
 
-  lines.push('server system-users help', 'server run');
+  lines.push('server system-users help', 'server firewall help', 'server run');
 
   for (const name of Object.keys(EDGE_COMMANDS)) {
     lines.push(`edge ${name}`);

@@ -20,7 +20,7 @@ function actingInOrg(User $user, Organization $org): void
     session(['current_organization_id' => $org->id]);
 }
 
-test('site create forbidden when server has no organization', function () {
+test('site create shows blocked state when server has no organization', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -31,10 +31,13 @@ test('site create forbidden when server has no organization', function () {
 
     actingInOrg($user, $org);
 
-    $this->get(route('sites.create', $server))->assertForbidden();
+    $this->get(route('sites.create', $server))
+        ->assertOk()
+        ->assertSee(__('Site creation is blocked'))
+        ->assertSee(__('This server is not linked to an organization.'));
 });
 
-test('deployer cannot open site create form', function () {
+test('deployer sees blocked state on site create form', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'deployer']);
@@ -45,7 +48,10 @@ test('deployer cannot open site create form', function () {
 
     actingInOrg($user, $org);
 
-    $this->get(route('sites.create', $server))->assertForbidden();
+    $this->get(route('sites.create', $server))
+        ->assertOk()
+        ->assertSee(__('Site creation is blocked'))
+        ->assertSee(__('Your role on this organization (deployer) cannot create new sites. Ask an owner or admin.'));
 });
 
 test('site create always allowed now that site caps are retired', function () {

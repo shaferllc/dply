@@ -68,8 +68,33 @@ apt-get install -y apt-transport-https ca-certificates curl gnupg
 curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" > /etc/apt/sources.list.d/clickhouse.list
 apt-get update -y
+printf '%s\n%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d
+chmod +x /usr/sbin/policy-rc.d
 apt-get install -y clickhouse-server clickhouse-client
-systemctl enable --now clickhouse-server
+rm -f /usr/sbin/policy-rc.d
+install -d -o clickhouse -g clickhouse -m 0750 /var/lib/clickhouse /var/log/clickhouse-server 2>/dev/null || true
+chown -R clickhouse:clickhouse /etc/clickhouse-server /var/lib/clickhouse /var/log/clickhouse-server 2>/dev/null || true
+mkdir -p /etc/systemd/system/clickhouse-server.service.d
+printf '[Service]\nTimeoutStartSec=300\n' > /etc/systemd/system/clickhouse-server.service.d/dply.conf
+systemctl daemon-reload
+systemctl enable clickhouse-server
+if ! systemctl start clickhouse-server; then
+  systemctl reset-failed clickhouse-server >/dev/null 2>&1 || true
+  sleep 3
+  systemctl start clickhouse-server || {
+    echo "[dply] ERROR: clickhouse-server failed to start." >&2
+    journalctl -u clickhouse-server --no-pager -n 60 >&2 || true
+    tail -n 50 /var/log/clickhouse-server/clickhouse-server.err.log >&2 2>/dev/null || echo "(no err.log)" >&2
+    exit 1
+  }
+fi
+for i in 1 2 3 4 5 6; do
+  if systemctl is-active --quiet clickhouse-server; then
+    break
+  fi
+  sleep 5
+done
+systemctl is-active --quiet clickhouse-server
 clickhouse-client --version 2>/dev/null | head -n1
 BASH,
             default => throw new \InvalidArgumentException("Unsupported database engine: {$engine}"),

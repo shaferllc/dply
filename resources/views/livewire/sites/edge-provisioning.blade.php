@@ -11,14 +11,17 @@
     @endif
 
     <div class="dply-page-shell pt-6">
-        <x-breadcrumb-trail :items="$siteHeaderBreadcrumbs" />
+        <x-breadcrumb-trail
+            :items="$siteHeaderBreadcrumbs"
+            doc-contextual
+        />
     </div>
 
     <div class="dply-page-shell pt-4">
         <x-page-header
             :title="__('Edge deployment')"
             :description="__('Track the git build and Edge CDN publish until this site goes live.')"
-            doc-route="docs.index"
+            :show-documentation="false"
             toolbar
             compact
             flush

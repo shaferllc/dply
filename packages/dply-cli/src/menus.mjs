@@ -737,6 +737,16 @@ async function buildServersMenu(ctx) {
       action: async () => runServerCommandMenu(ctx),
     });
     items.push({
+      label: 'Firewall — show rules',
+      hint: 'UFW snapshot in dply',
+      action: async () => runWithServer(ctx, ['server', 'firewall', 'show']),
+    });
+    items.push({
+      label: 'Firewall — apply bundled template',
+      hint: 'laravel_web, web_full_stack, …',
+      action: async () => runFirewallBundledMenu(ctx),
+    });
+    items.push({
       label: 'System users — list',
       hint: 'pick a server first',
       action: async () => runWithServer(ctx, ['server', 'system-users', 'list']),
@@ -747,6 +757,7 @@ async function buildServersMenu(ctx) {
       action: async () => runWithServer(ctx, ['server', 'system-users', 'sync']),
     });
     items.push({ label: 'System users help', argv: ['server', 'system-users', 'help'] });
+    items.push({ label: 'Firewall help', argv: ['server', 'firewall', 'help'] });
   }
 
   items.push({ label: 'Server help', argv: ['server', 'help'] });
@@ -790,6 +801,11 @@ async function buildEdgeMenu(ctx) {
       action: async () => runWithEdgeSite(ctx, ['edge', 'deploy']),
     });
     items.push({
+      label: 'Edge status',
+      hint: 'latest deployment · --wait in shell',
+      action: async () => runWithEdgeSite(ctx, ['edge', 'status']),
+    });
+    items.push({
       label: 'Recent deployments',
       action: async () => runWithEdgeSite(ctx, ['edge', 'deployments']),
     });
@@ -810,6 +826,105 @@ async function buildEdgeMenu(ctx) {
     subtitle: rows.length === 0 ? 'No Edge sites visible to this token' : 'Sites, deploys, and delivery',
     items,
   };
+}
+
+/**
+ * @param {{ rl: import('node:readline/promises').Interface, run: (argv: string[]) => Promise<number | void> }} ctx
+ */
+async function runFirewallBundledMenu(ctx) {
+  const serverId = await pickServer(ctx.rl);
+
+  if (!serverId) {
+    return;
+  }
+
+  let keys = [];
+  try {
+    const client = await requireClient({});
+    const payload = (await client.get(`/servers/${encodeURIComponent(serverId)}/firewall`))?.data ?? {};
+    keys = payload.bundled_template_keys ?? [];
+  } catch (err) {
+    if (err?.status === 403) {
+      warn('Firewall unavailable — token may need network.read. Try `dply auth refresh`.');
+
+      return;
+    }
+
+    throw err;
+  }
+
+  if (keys.length === 0) {
+    warn('No bundled firewall templates available.');
+
+    return;
+  }
+
+  info('');
+  info(c.bold('Bundled firewall template'));
+  for (let i = 0; i < keys.length; i += 1) {
+    info(`  ${c.cyan(String(i + 1))}  ${keys[i]}`);
+  }
+
+  let choice;
+  try {
+    choice = (await ctx.rl.question(`${c.bold('Pick template')}› `)).trim();
+  } catch {
+    return;
+  }
+
+  const index = Number.parseInt(choice, 10);
+  const key = Number.isFinite(index) && index >= 1 && index <= keys.length ? keys[index - 1] : choice;
+
+  if (!keys.includes(key)) {
+    warn(`Unknown template "${key}".`);
+
+    return;
+  }
+
+  await ctx.run(['server', 'firewall', 'apply-bundled', key, '--server', serverId]);
+}
+
+/**
+ * @param {{ rl: import('node:readline/promises').Interface, run: (argv: string[]) => Promise<number | void> }} ctx
+ */
+async function runServerCommandMenu(ctx) {
+  const serverId = await pickServer(ctx.rl);
+
+  if (!serverId) {
+    return;
+  }
+
+  info('');
+  info(c.bold('Run command on server'));
+  let command;
+  try {
+    command = (await ctx.rl.question(`${c.bold('Command')}› `)).trim();
+  } catch {
+    return;
+  }
+
+  if (!command) {
+    warn('Command is required.');
+
+    return;
+  }
+
+  await ctx.run(['server', 'run', '--server', serverId, ...tokenizeMenuCommand(command)]);
+}
+
+/**
+ * @param {string} line
+ * @returns {string[]}
+ */
+function tokenizeMenuCommand(line) {
+  const tokens = [];
+  const re = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'|(\S+)/g;
+  let match;
+  while ((match = re.exec(line)) !== null) {
+    tokens.push(match[1] ?? match[2] ?? match[3]);
+  }
+
+  return tokens;
 }
 
 /**

@@ -2430,9 +2430,7 @@ BASH;
         // capabilities probe shape above — flaky SSH shouldn't grey out the whole page.
         $engineUnsupportedReasons = ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
         try {
-            foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
-                $engineUnsupportedReasons[$engine] = $capabilitiesService->engineUnsupportedReason($this->server, $engine);
-            }
+            $engineUnsupportedReasons = $capabilitiesService->unsupportedReasonsByEngine($this->server);
         } catch (\Throwable) {
             // Same posture as the capabilities probe — fall back to "no gating" on probe error.
         }

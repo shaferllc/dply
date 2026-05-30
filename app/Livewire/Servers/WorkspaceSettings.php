@@ -59,7 +59,6 @@ class WorkspaceSettings extends Component
         $this->section = $section;
 
         $this->bootWorkspace($server);
-        $this->server->refresh();
         $this->syncSettingsFormFromServer();
         $this->syncExtendedServerSettingsFromServer();
     }
@@ -181,7 +180,6 @@ class WorkspaceSettings extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
         $this->server->load([
             'sites.domains',
             'serverDatabases',

@@ -93,6 +93,59 @@ test('contextual doc resolver honors doc route props', function () {
         ->and($resolver->resolve(null, 'docs.create-first-server'))->toBe('create-first-server');
 });
 
+test('contextual doc resolver maps vm site sections from config', function () {
+    $site = Site::factory()->make([
+        'meta' => ['runtime_profile' => 'php'],
+    ]);
+
+    $resolver = app(ContextualDocResolver::class);
+
+    expect($resolver->resolveForSiteSection($site, 'deploy'))->toBe('vm-site-deploy')
+        ->and($resolver->resolveForSiteSection($site, 'certificates'))->toBe('vm-site-certificates')
+        ->and($resolver->resolveForSiteSection($site, 'general'))->toBe('vm-site-overview')
+        ->and($resolver->resolveForSiteSection($site, 'laravel-stack'))->toBe('vm-site-laravel');
+});
+
+test('contextual doc resolver maps server workspace section keys', function () {
+    $resolver = app(ContextualDocResolver::class);
+
+    expect($resolver->resolveForServerWorkspace('webserver'))->toBe('server-webserver')
+        ->and($resolver->resolveForServerWorkspace('edge-proxy'))->toBe('server-edge-proxy')
+        ->and($resolver->resolveForServerWorkspace('shared-host'))->toBe('server-shared-host')
+        ->and($resolver->resolveForServerWorkspace('overview'))->toBe('server-overview')
+        ->and($resolver->resolveForServerWorkspace(null))->toBe('server-overview');
+});
+
+test('contextual doc resolver maps dedicated vm site routes from config', function () {
+    $routes = config('contextual-docs.site_route_slugs');
+
+    expect($routes['sites.webserver-config'] ?? null)->toBe('vm-site-webserver-config')
+        ->and($routes['sites.monitor'] ?? null)->toBe('vm-site-monitor');
+});
+
+test('contextual doc resolver resolves vm site monitor route at runtime', function () {
+    [$user, $server, $site] = makeVmSiteForDocs();
+
+    $this->actingAs($user)
+        ->get(route('sites.monitor', ['server' => $server, 'site' => $site]))
+        ->assertOk();
+
+    $resolver = app(ContextualDocResolver::class);
+
+    expect($resolver->resolve())->toBe('vm-site-monitor')
+        ->and($resolver->guideGroup()['key'] ?? null)->toBe('byo-sites');
+});
+
+test('contextual doc resolver resolves vm site repository route at runtime', function () {
+    [$user, $server, $site] = makeVmSiteForDocs();
+
+    $this->actingAs($user)
+        ->get(route('sites.repository', ['server' => $server, 'site' => $site]))
+        ->assertOk();
+
+    expect(app(ContextualDocResolver::class)->resolve())->toBe('vm-site-repository');
+});
+
 test('contextual doc resolver full page url for markdown slug', function () {
     $resolver = app(ContextualDocResolver::class);
 
@@ -139,6 +192,37 @@ function makeEdgeSiteForDocs(): array
         'status' => EdgeDeployment::STATUS_LIVE,
         'storage_prefix' => 'edge/test/prefix',
         'published_at' => now(),
+    ]);
+
+    return [$user, $server, $site];
+}
+
+/**
+ * @return array{0: User, 1: Server, 2: Site}
+ */
+function makeVmSiteForDocs(): array
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+    ]);
+
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'name' => 'vm-app',
+        'status' => Site::STATUS_NGINX_ACTIVE,
+        'meta' => [
+            'runtime_profile' => 'php',
+        ],
     ]);
 
     return [$user, $server, $site];

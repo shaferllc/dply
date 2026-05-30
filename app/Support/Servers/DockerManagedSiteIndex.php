@@ -28,6 +28,8 @@ final class DockerManagedSiteIndex
         $server->loadMissing('sites');
 
         foreach ($server->sites as $site) {
+            $site->setRelation('server', $server);
+
             if (! self::siteUsesDockerStack($site)) {
                 continue;
             }
@@ -92,16 +94,16 @@ final class DockerManagedSiteIndex
 
     private static function siteUsesDockerStack(Site $site): bool
     {
-        if ($site->usesDockerRuntime()) {
-            return true;
-        }
-
         $meta = is_array($site->meta) ? $site->meta : [];
 
-        return is_array($meta['docker_runtime'] ?? null)
+        if (is_array($meta['docker_runtime'] ?? null)
             && (
                 filled($meta['docker_runtime']['compose_yaml'] ?? null)
                 || filled($meta['docker_runtime']['last_deployed_at'] ?? null)
-            );
+            )) {
+            return true;
+        }
+
+        return $site->usesDockerRuntime();
     }
 }

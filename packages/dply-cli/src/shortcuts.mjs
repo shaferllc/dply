@@ -24,7 +24,17 @@ const PROJECT_SUBCOMMANDS = new Set([
 ]);
 
 /** @type {Set<string>} */
-const SERVER_SUBCOMMANDS = new Set(['list', 'system-users', 'help', '--help', '-h']);
+const SERVER_SUBCOMMANDS = new Set([
+  'list',
+  'show',
+  'health',
+  'run',
+  'firewall',
+  'system-users',
+  'help',
+  '--help',
+  '-h',
+]);
 
 /** Single-token shortcuts → argv prefix (rest appended when present). */
 const SINGLE_TOKEN = {

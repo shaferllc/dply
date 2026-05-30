@@ -3,7 +3,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
-            <x-breadcrumb-trail :items="$settingsBreadcrumbs" />
+            <x-breadcrumb-trail
+                :items="$settingsBreadcrumbs"
+                doc-contextual
+                :contextual-doc-slug="$contextualDocSlug"
+            />
 
             <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
@@ -55,8 +59,7 @@
             <x-page-header
                 :title="$sectionHeader['title']"
                 :description="$sectionDescription"
-                doc-contextual
-                :contextual-doc-slug="$contextualDocSlug"
+                :show-documentation="false"
                 toolbar
                 flush
                 class="mt-3"

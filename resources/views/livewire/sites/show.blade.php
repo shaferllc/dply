@@ -10,7 +10,10 @@
         ></div>
     @endif
     <div class="dply-page-shell pt-6">
-        <x-breadcrumb-trail :items="$siteHeaderBreadcrumbs" />
+        <x-breadcrumb-trail
+            :items="$siteHeaderBreadcrumbs"
+            doc-contextual
+        />
     </div>
     <div class="dply-page-shell pt-4">
         <x-page-header
@@ -24,7 +27,7 @@
                 : ($site->usesEdgeRuntime()
                     ? __('Track the git build and Edge CDN publish until this site goes live.')
                     : __('Track provisioning steps and setup until this site is ready to receive traffic.'))"
-            doc-route="docs.index"
+            :show-documentation="false"
             toolbar
             compact
             flush

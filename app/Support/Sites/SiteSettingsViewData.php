@@ -496,7 +496,10 @@ final class SiteSettingsViewData
             ];
 
             if ($section !== 'general') {
-                $items[] = ['label' => $sectionHeader['title'], 'icon' => 'cog-6-tooth'];
+                $items[] = [
+                    'label' => $sectionHeader['title'],
+                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
+                ];
             }
 
             return $items;
@@ -527,7 +530,10 @@ final class SiteSettingsViewData
         ];
 
         if ($section !== 'general') {
-            $items[] = ['label' => $sectionHeader['title'], 'icon' => 'cog-6-tooth'];
+            $items[] = [
+                'label' => $sectionHeader['title'],
+                'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
+            ];
         }
 
         return $items;

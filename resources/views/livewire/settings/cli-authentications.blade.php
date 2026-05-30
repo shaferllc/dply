@@ -60,7 +60,7 @@ dply deploy --follow
 dply site status
 dply site logs --follow</code></pre>
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
-                            {{ __('`dply link` opens a picker (BYO + Edge). Edge linked repos: `dply deploy --wait`.') }}
+                            {{ __('`dply link` opens a picker (BYO + Edge). Edge: `dply edge status --wait` or `dply deploy --wait`. Server SSH: `dply server run --server <id> <command>` needs `commands.run`. Firewall: `dply server firewall show` needs `network.read` — run `dply auth refresh` if scopes are missing.') }}
                         </p>
                     </div>
                     <div>

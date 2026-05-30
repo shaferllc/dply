@@ -25,6 +25,7 @@ use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
+use App\Support\Servers\SharedHostReport;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
@@ -368,6 +369,9 @@ class WorkspaceOverview extends Component
                 : null,
             'costCardSummary' => Feature::active('workspace.server_cost')
                 ? app(ServerCostCard::class)->overviewSummary($this->server)
+                : null,
+            'sharedHostSummary' => Feature::active('workspace.shared_host')
+                ? app(SharedHostReport::class)->overviewSummary($this->server)
                 : null,
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,

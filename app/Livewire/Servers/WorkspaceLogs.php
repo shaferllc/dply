@@ -11,6 +11,7 @@ use App\Services\Servers\ServerSystemLogsReport;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -19,6 +20,12 @@ class WorkspaceLogs extends Component
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesServerSystemLogs;
+
+    /** @var list<string> */
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'related'];
+
+    #[Url(as: 'tab', except: 'viewer')]
+    public string $logsTab = 'viewer';
 
     public bool $logOptionsMenuOpen = false;
 
@@ -41,6 +48,18 @@ class WorkspaceLogs extends Component
     {
         $this->selectLogSource($key);
         $this->logSourceMenuOpen = false;
+    }
+
+    public function setLogsWorkspaceTab(string $tab): void
+    {
+        $this->logsTab = in_array($tab, self::LOGS_TABS, true) ? $tab : 'viewer';
+    }
+
+    /** Pick a source from the catalog tab and jump to the live viewer. */
+    public function selectLogSourceFromCatalog(string $key): void
+    {
+        $this->selectLogSource($key);
+        $this->logsTab = 'viewer';
     }
 
     public function toggleLogOptionsMenu(): void
@@ -87,7 +106,9 @@ class WorkspaceLogs extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->server->loadMissing(['organization', 'sites']);
         $this->bootServerLogs();
+        $this->logsTab = in_array($this->logsTab, self::LOGS_TABS, true) ? $this->logsTab : 'viewer';
     }
 
     #[On('server-workspace-log-snapshot')]
@@ -100,9 +121,8 @@ class WorkspaceLogs extends Component
 
     public function render(ServerSystemLogsReport $logsReport): View
     {
-        $this->server->refresh();
-
         $logSources = $this->availableLogSources();
+        $this->server->loadMissing('organization');
 
         return view('livewire.servers.workspace-logs', [
             'logSources' => $logSources,

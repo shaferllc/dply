@@ -79,3 +79,81 @@ test('store creates vm docker site metadata without pre-allocating internal port
 
     Queue::assertPushed(ProvisionSiteJob::class);
 });
+
+test('docker deep link bypasses choose app bare form when flag is on', function () {
+    config(['dply.choose_app_enabled' => true]);
+
+    [$user, $server] = userWithVmDockerServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['deploy_stack' => 'docker'])
+        ->test(SitesCreate::class, ['server' => $server])
+        ->assertSet('form.deploy_stack', 'docker')
+        ->assertSee(__('Deploy target'))
+        ->assertDontSee(__('Step 1 of 2 · New site'));
+});
+
+test('deployer sees blocked state instead of exception on docker deep link', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'deployer']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => [
+            'manage_docker' => ['present' => true, 'version' => '29.5.2'],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['deploy_stack' => 'docker'])
+        ->test(SitesCreate::class, ['server' => $server])
+        ->assertSet('siteCreateBlockedReason', fn (string $reason): bool => str_contains($reason, 'deployer'))
+        ->assertSee(__('Site creation is blocked'));
+});
+
+test('org mismatch shows switch organization guidance', function () {
+    $user = User::factory()->create();
+    $homeOrg = Organization::factory()->create(['name' => 'Home Org']);
+    $otherOrg = Organization::factory()->create(['name' => 'Other Org']);
+    $homeOrg->users()->attach($user->id, ['role' => 'owner']);
+    $otherOrg->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $homeOrg->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $otherOrg->id,
+        'meta' => [
+            'manage_docker' => ['present' => true, 'version' => '29.5.2'],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['deploy_stack' => 'docker'])
+        ->test(SitesCreate::class, ['server' => $server])
+        ->assertSee(__('Other Org'))
+        ->assertSee(__('Switch organization'));
+});
+
+test('docker deep link shows install banner when engine not probed', function () {
+    config(['dply.choose_app_enabled' => true]);
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['webserver' => 'nginx'],
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['deploy_stack' => 'docker'])
+        ->test(SitesCreate::class, ['server' => $server])
+        ->assertSee(__('Open Docker workspace'))
+        ->assertDontSee(__('Step 1 of 2 · New site'));
+});

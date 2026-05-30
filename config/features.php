@@ -77,6 +77,22 @@ return [
     ],
 
     /*
+    | Database engines offered for install on BYO servers. MySQL, PostgreSQL,
+    | and SQLite are always available; the rest start as "coming soon" until
+    | their install + operate path is validated. When a flag is off the engine
+    | shows a Soon badge + teaser in the Databases workspace and MariaDB
+    | variants are filtered out of the server-create database picker.
+    */
+    'database' => [
+        // exit: ship once MariaDB install + MySQL-family workspace validated on three OSes
+        'mariadb' => env('FEATURE_DATABASE_MARIADB', false),
+        // exit: ship once MongoDB install + document DB workspace validated on three OSes
+        'mongodb' => env('FEATURE_DATABASE_MONGODB', false),
+        // exit: ship once ClickHouse install + OLAP workspace validated on three OSes
+        'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', false),
+    ],
+
+    /*
     | Server-workspace tabs that are NOT in the MVP 14. Each maps to a
     | Livewire component under app/Livewire/Servers/Workspace*.php.
     */
@@ -131,9 +147,9 @@ return [
         'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', true),
 
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
-        'files' => env('FEATURE_WORKSPACE_FILES', false),
+        'files' => env('FEATURE_WORKSPACE_FILES', true),
         // exit: ship alongside files GA; teaser only when files is off
-        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', true),
+        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', false),
         // exit: ship when systemd inventory UI has been validated against three real OSes
         'services' => env('FEATURE_WORKSPACE_SERVICES', true),
         // exit: ship when system-user deletion policy is signed off (data loss risk)
@@ -160,6 +176,10 @@ return [
         'run' => env('FEATURE_WORKSPACE_RUN', false),
         // exit: ship alongside run GA; teaser only when run is off
         'run_preview' => env('FEATURE_WORKSPACE_RUN_PREVIEW', true),
+        // exit: ship once attribution validated on 3 OS stacks + 2+ site fixtures; security review on SSH ps script
+        'shared_host' => env('FEATURE_WORKSPACE_SHARED_HOST', false),
+        // exit: ship alongside shared host GA; teaser only when shared host is off
+        'shared_host_preview' => env('FEATURE_WORKSPACE_SHARED_HOST_PREVIEW', true),
 
         // exit: ship after per-deploy key lifecycle validated on three OSes
         'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),

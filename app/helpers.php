@@ -400,6 +400,25 @@ if (! function_exists('workspace_run_preview_active')) {
     }
 }
 
+if (! function_exists('workspace_shared_host_preview_active')) {
+    /**
+     * True when the Shared Host Radar surface is off but the coming-soon teaser
+     * should surface in nav and the preview workspace page.
+     */
+    function workspace_shared_host_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.shared_host')
+            : Feature::for($organization)->active('workspace.shared_host')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.shared_host_preview')
+            : Feature::for($organization)->active('workspace.shared_host_preview');
+    }
+}
+
 if (! function_exists('multi_surface_active')) {
     /**
      * True when the current org has at least one non-VM product surface

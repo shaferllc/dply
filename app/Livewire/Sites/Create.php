@@ -29,6 +29,7 @@ use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
+use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -148,23 +149,22 @@ class Create extends Component
      */
     public array $containerAvailableRepositories = [];
 
+    /** Non-empty when mount determined the user cannot create a site on this server. */
+    public string $siteCreateBlockedReason = '';
+
     public function mount(
         Server $server,
         ServerPhpManager $phpManager,
         SourceControlRepositoryBrowser $repositoryBrowser,
     ): void {
         $this->authorize('view', $server);
-        $this->authorize('update', $server);
 
-        $org = auth()->user()->currentOrganization();
-        abort_if($org === null, 403);
-        abort_if($server->organization_id === null, 403);
-        if ($server->organization_id !== $org->id) {
-            abort(404);
-        }
-
-        $this->authorize('create', Site::class);
         $this->server = $server;
+        $this->siteCreateBlockedReason = SiteCreateAccess::blockedReason($server);
+
+        if ($this->siteCreateBlockedReason !== '') {
+            return;
+        }
         $this->form->applyDefaultsForType($this->form->type);
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
             $phpData = $phpManager->siteCreationPhpData($server);
@@ -246,6 +246,46 @@ class Create extends Component
         return $this->form->deploy_stack === 'docker'
             && ! $this->isContainerMode()
             && $this->server->dockerEnginePresent();
+    }
+
+    /**
+     * True when the URL requests VM Docker deploy (`?deploy_stack=docker`) on a
+     * regular VM host, even if Docker has not been probed yet.
+     */
+    public function requestsVmDockerDeployStack(): bool
+    {
+        if ($this->isContainerMode()
+            || $this->server->isDockerHost()
+            || $this->server->isKubernetesCluster()) {
+            return false;
+        }
+
+        $deployStack = request()->query('deploy_stack');
+
+        return is_string($deployStack) && $deployStack === 'docker';
+    }
+
+    /**
+     * Choose-app bare create (name + domain only) — skipped for VM Docker
+     * deep links so the full deploy-target wizard stays reachable.
+     */
+    public function usesChooseAppBareCreate(): bool
+    {
+        if ($this->siteCreateBlockedReason !== '') {
+            return false;
+        }
+
+        return config('dply.choose_app_enabled')
+            && $this->server->isVmHost()
+            && ! $this->isContainerMode()
+            && ! $this->usesVmDockerDeployStack()
+            && ! $this->requestsVmDockerDeployStack();
+    }
+
+    public function dockerDeployRequestedButMissing(): bool
+    {
+        return $this->requestsVmDockerDeployStack()
+            && ! $this->server->dockerEnginePresent();
     }
 
     private function initializeContainerMode(SourceControlRepositoryBrowser $repositoryBrowser): void
@@ -1415,6 +1455,8 @@ class Create extends Component
             'phpVersions' => $this->phpVersions,
             'isContainerMode' => $this->isContainerMode(),
             'containerOssPresets' => $this->isContainerMode() ? $this->containerOssPresets() : [],
+            'usesChooseAppBareCreate' => $this->usesChooseAppBareCreate(),
+            'dockerDeployRequestedButMissing' => $this->dockerDeployRequestedButMissing(),
         ]);
     }
 

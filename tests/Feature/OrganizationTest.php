@@ -105,7 +105,10 @@ test('organization show returns 403 for non member', function () {
 
     $response = $this->actingAs($user)->get(route('organizations.show', $org));
 
-    $response->assertForbidden();
+    $response->assertForbidden()
+        ->assertSee('forbidden-experience', false)
+        ->assertSee(__('Run policy audit'), false)
+        ->assertSee(__('Access forbidden'), false);
 });
 
 test('organization switch updates session', function () {

@@ -20,8 +20,8 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Support\HostnameValidator;
+use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
@@ -53,13 +53,15 @@ class WorkspaceSites extends Component
     public array $phpVersions = [];
 
     #[Computed]
+    public function siteCreateAccess(): array
+    {
+        return SiteCreateAccess::assess($this->server);
+    }
+
+    #[Computed]
     public function canAddSite(): bool
     {
-        if (! $this->server->isReady()) {
-            return false;
-        }
-
-        return Gate::forUser(auth()->user())->allows('create', Site::class);
+        return $this->siteCreateAccess['can_create'];
     }
 
     /**
@@ -70,29 +72,7 @@ class WorkspaceSites extends Component
     #[Computed]
     public function addSiteBlockedReason(): string
     {
-        if (! $this->server->isReady()) {
-            return __('This server is still provisioning — site creation unlocks once it reaches the ready state.');
-        }
-
-        $user = auth()->user();
-        $org = $user?->currentOrganization();
-
-        if ($org === null) {
-            return __('No active organization is selected for your account.');
-        }
-
-        if ($org->userIsDeployer($user)) {
-            return __('Your role on this organization (deployer) cannot create new sites. Ask an owner or admin.');
-        }
-
-        if (! $org->canCreateSite()) {
-            return __('You\'ve hit your plan\'s site limit (:used / :max). Delete an existing site or upgrade to add more.', [
-                'used' => $org->sites()->count(),
-                'max' => $org->maxSitesDisplay(),
-            ]);
-        }
-
-        return '';
+        return $this->siteCreateAccess['blocked_reason'];
     }
 
     #[Computed]

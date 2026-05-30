@@ -117,6 +117,7 @@ return [
             'file' => 'EDGE_PREVIEW_COMMENTS.md',
             'title' => 'Edge preview comments',
         ],
+        ...(require __DIR__.'/docs-vm-guides.php'),
     ],
 
     /**
@@ -168,8 +169,9 @@ return [
                 'edge-preview-comments',
             ],
         ],
+        ...(require __DIR__.'/docs-vm-guide-sidebar-groups.php'),
         'sites' => [
-            'label' => 'Sites & servers',
+            'label' => 'Getting started',
             'slugs' => [
                 'create-first-server',
                 'connect-provider',

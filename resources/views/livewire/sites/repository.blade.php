@@ -1,17 +1,10 @@
 <div class="max-w-7xl mx-auto px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[12rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[12rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="font-medium text-brand-ink">{{ __('Repository') }}</li>
-        </ol>
-    </nav>
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Repository'),
+        'currentIcon' => 'folder-open',
+    ])
 
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
         @include('livewire.sites.settings.partials.sidebar')
@@ -20,7 +13,7 @@
             <x-page-header
                 :title="__('Repository')"
                 :description="__('Browse the connected repository, switch branches, and manage the source-control connection. Reads are cached for five minutes — use the per-tab refresh to bypass.')"
-                doc-route="docs.index"
+                :show-documentation="false"
                 flush
                 compact
             />

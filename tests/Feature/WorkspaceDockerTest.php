@@ -8,6 +8,7 @@ use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Servers\WorkspaceDocker;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -55,7 +56,43 @@ test('docker workspace overview renders probe summary', function (): void {
         ->assertSee(__('Docker'))
         ->assertSee('Docker version 27.0.0')
         ->assertSee(__('Running containers'))
-        ->assertSee('2');
+        ->assertSee('2')
+        ->assertSee(__('Create Docker site'));
+});
+
+test('docker workspace disables create docker site link at plan site cap', function (): void {
+    config(['subscription.standard.plans' => [
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1],
+    ]]);
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'ssh_private_key' => 'test-key',
+        'meta' => [
+            'manage_docker' => [
+                'present' => true,
+                'version' => 'Docker version 27.0.0',
+            ],
+        ],
+    ]);
+
+    Site::factory()->create([
+        'organization_id' => $org->id,
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->assertSee(__('Host sites in Docker'))
+        ->assertSee(__('plan\'s site limit'))
+        ->assertDontSee('href="'.route('sites.create', $server).'?deploy_stack=docker"', false);
 });
 
 test('docker workspace http route renders', function (): void {

@@ -4,25 +4,18 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[10rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', [$server, $site]) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[10rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Insights') }}</li>
-        </ol>
-    </nav>
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Insights'),
+        'currentIcon' => 'light-bulb',
+    ])
 
     <div class="mb-8 border-b border-brand-ink/10 pb-6">
         <x-page-header
             :title="__('Insights')"
             :description="__('Monitoring and recommendations for this site.')"
-            doc-route="docs.index"
+            :show-documentation="false"
             flush
             compact
         >

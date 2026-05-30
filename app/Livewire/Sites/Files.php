@@ -13,12 +13,10 @@ use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Support\Servers\FileBrowserListing;
 use App\Support\Servers\FileBrowserPathPolicy;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Site file browser (read + edit text files ≤1 MB + download ≤25 MB).
@@ -310,50 +308,6 @@ class Files extends Component
     {
         $this->showConflictModal = false;
         $this->conflictMessage = null;
-    }
-
-    public function download(string $name): StreamedResponse|Response
-    {
-        try {
-            $target = FileBrowserPathPolicy::join($this->path, $name);
-        } catch (\InvalidArgumentException $e) {
-            abort(400, $e->getMessage());
-        }
-
-        $reader = app(ServerFileBrowserRemoteReader::class);
-        $cap = (int) config('server_file_browser.download_max_bytes', 26_214_400);
-
-        $read = $reader->read($this->server, $target, 0, $this->effectiveLoginUser());
-        if ($read->size > $cap) {
-            abort(413, __('File is larger than the download cap.'));
-        }
-
-        $login = $this->effectiveLoginUser();
-        $logger = app(ServerFileBrowserAuditLogger::class);
-
-        $response = new StreamedResponse(function () use ($reader, $target, $cap, $login): void {
-            $reader->streamDownload($this->server, $target, function (string $chunk): void {
-                echo $chunk;
-                @ob_flush();
-                @flush();
-            }, $cap, $login);
-        });
-
-        $response->headers->set('Content-Type', $read->mime ?: 'application/octet-stream');
-        $response->headers->set('Content-Disposition', 'attachment; filename="'.basename($target).'"');
-
-        $logger->recordDownload(
-            $this->server->organization,
-            Auth::user(),
-            $this->server,
-            $this->site,
-            $target,
-            $read->size,
-            $read->sha256,
-            $login,
-        );
-
-        return $response;
     }
 
     protected function effectiveLoginUser(): string

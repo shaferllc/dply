@@ -19,6 +19,7 @@ use App\Services\SshConnectionFactory;
 use App\Support\Servers\DockerContainerShellSupport;
 use App\Support\Servers\DockerWorkspaceViewData;
 use App\Support\Servers\ServerDockerRemoteInspector;
+use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -693,12 +694,12 @@ class WorkspaceDocker extends Component
             $this->workspace_tab = 'overview';
         }
 
-        $this->server->refresh();
-
         $serviceActions = config('server_manage.service_actions', []);
         $viewData = DockerWorkspaceViewData::for($this->server);
+        $siteCreateAccess = SiteCreateAccess::assess($this->server);
 
         $dockerConsoleRun = ConsoleAction::query()
+            ->with('subject')
             ->where('subject_type', $this->server->getMorphClass())
             ->where('subject_id', $this->server->id)
             ->where('kind', 'manage_action')
@@ -707,6 +708,8 @@ class WorkspaceDocker extends Component
             ->first();
 
         return view('livewire.servers.workspace-docker', [
+            'siteCreateBlockedReason' => $siteCreateAccess['blocked_reason'],
+            'canCreateDockerSite' => $siteCreateAccess['can_create'],
             'server' => $this->server,
             'docker' => $viewData['docker'],
             'docker_present' => $viewData['docker_present'],

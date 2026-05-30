@@ -21,7 +21,7 @@
 >
     <div
         wire:loading.flex
-        wire:target="openFile, openEntry, jumpTo, goUp, toggleViewAsRoot, download"
+        wire:target="openFile, openEntry, jumpTo, goUp, toggleViewAsRoot"
         class="fixed inset-0 z-[60] hidden items-center justify-center bg-brand-ink/40 backdrop-blur-sm"
     >
         <div class="flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-xl ring-1 ring-brand-ink/10">
@@ -100,6 +100,18 @@
                         </thead>
                         <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
                             @forelse ($listing->entries as $entry)
+                                @php
+                                    try {
+                                        $entryDownloadPath = \App\Support\Servers\FileBrowserPathPolicy::join($path, $entry->name);
+                                        $entryDownloadUrl = route('servers.files.download', array_filter([
+                                            'server' => $server,
+                                            'path' => $entryDownloadPath,
+                                            'root' => ($viewAsRoot && $canViewAsRoot) ? '1' : null,
+                                        ]));
+                                    } catch (\InvalidArgumentException) {
+                                        $entryDownloadUrl = null;
+                                    }
+                                @endphp
                                 <tr class="hover:bg-brand-sand/20">
                                     <td class="whitespace-nowrap px-4 py-2 font-mono">
                                         @if ($entry->isDir())
@@ -114,14 +126,21 @@
                                                     <span>{{ $entry->name }}</span>
                                                 </button>
                                             @else
-                                                <button type="button" wire:click="download('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
-                                                    <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
-                                                    <span>{{ $entry->name }}</span>
-                                                </button>
+                                                @if ($entryDownloadUrl)
+                                                    <a href="{{ $entryDownloadUrl }}" class="inline-flex items-center gap-2 text-brand-forest hover:underline">
+                                                        <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
+                                                        <span>{{ $entry->name }}</span>
+                                                    </a>
+                                                @else
+                                                    <span class="inline-flex items-center gap-2 text-brand-forest">
+                                                        <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" />
+                                                        <span>{{ $entry->name }}</span>
+                                                    </span>
+                                                @endif
                                             @endif
                                             <span class="ml-1 text-brand-moss">→ {{ $entry->linkTarget }}</span>
                                         @else
-                                            <button type="button" wire:click="download('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-ink hover:underline">
+                                            <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="inline-flex items-center gap-2 text-brand-ink hover:underline">
                                                 <x-heroicon-o-document class="h-4 w-4 shrink-0 text-brand-mist" />
                                                 <span>{{ $entry->name }}</span>
                                             </button>
@@ -135,14 +154,15 @@
                                         @if ($entry->isFile() || ($entry->isLink() && ! $entry->linkTargetIsDir))
                                             <div class="inline-flex items-center gap-2">
                                                 <button type="button" wire:click="openFile('{{ addslashes($entry->name) }}')" class="font-semibold text-brand-ink hover:underline">{{ __('View') }}</button>
-                                                <button
-                                                    type="button"
-                                                    wire:click="download('{{ addslashes($entry->name) }}')"
-                                                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-sand/40"
-                                                >
-                                                    <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" />
-                                                    {{ __('Download') }}
-                                                </button>
+                                                @if ($entryDownloadUrl)
+                                                    <a
+                                                        href="{{ $entryDownloadUrl }}"
+                                                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-sand/40"
+                                                    >
+                                                        <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" />
+                                                        {{ __('Download') }}
+                                                    </a>
+                                                @endif
                                             </div>
                                         @endif
                                     </td>
@@ -159,7 +179,7 @@
         @endif
 
         @if ($showFileModal)
-            <x-modal name="file-view" :show="true" wire:model="showFileModal" max-width="4xl">
+            <x-modal name="file-view" :show="true" max-width="4xl">
                 <div class="space-y-4 p-6">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">

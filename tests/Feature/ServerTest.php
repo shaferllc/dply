@@ -8,7 +8,6 @@ use App\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\RunSiteDeploymentJob;
-use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
@@ -2071,10 +2070,11 @@ test('server show logs tab renders', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceLogs::class, ['server' => $server])
-        ->assertSee(__('Log viewer'))
-        ->assertSee(__('Available sources'))
-        ->assertSee(__('Security digest'))
-        ->assertSee(__('Deploy windows'))
+        ->assertSet('logsTab', 'viewer')
+        ->assertSee(__('Viewer'))
+        ->assertSee(__('Overview'))
+        ->assertSee(__('Sources'))
+        ->assertSee(__('Related'))
         ->assertSee('Log source')
         ->assertSee('Dply activity')
         ->assertSee(__('Options'))
@@ -2093,7 +2093,14 @@ test('server show logs tab renders', function () {
         ->assertSee(__('Lines visible'))
         ->assertSee(__('Auto-refresh'))
         ->assertSee(__('Reset filter'))
-        ->assertSee(__('Clear display'));
+        ->assertSee(__('Clear display'))
+        ->call('setLogsWorkspaceTab', 'overview')
+        ->assertSee(__('Log viewer'))
+        ->call('setLogsWorkspaceTab', 'sources')
+        ->assertSee(__('Available sources'))
+        ->call('setLogsWorkspaceTab', 'related')
+        ->assertSee(__('Security digest'))
+        ->assertSee(__('Deploy windows'));
 });
 
 test('server logs select log source updates active key', function () {
@@ -2119,6 +2126,26 @@ test('server logs select log source updates active key', function () {
     $component
         ->call('selectLogSource', $keys[1])
         ->assertSet('logKey', $keys[1]);
+});
+test('server logs catalog open switches to viewer tab', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceLogs::class, ['server' => $server])
+        ->call('setLogsWorkspaceTab', 'sources');
+
+    $keys = array_keys($component->instance()->availableLogSources());
+    expect($keys)->not->toBeEmpty();
+
+    $component
+        ->call('selectLogSourceFromCatalog', $keys[0])
+        ->assertSet('logsTab', 'viewer')
+        ->assertSet('logKey', $keys[0]);
 });
 
 test('server logs tail line count persists on server meta', function () {

@@ -53,6 +53,10 @@ $serverWorkspaceSections = [
         'workspace.release_hygiene' => 'Release hygiene',
         'workspace.release_hygiene_preview' => 'Coming soon preview',
     ],
+    'Shared Host Radar' => [
+        'workspace.shared_host' => 'Shared Host Radar',
+        'workspace.shared_host_preview' => 'Coming soon preview',
+    ],
     'Run' => [
         'workspace.run' => 'Run / saved commands',
         'workspace.run_preview' => 'Coming soon preview',
@@ -115,6 +119,15 @@ return [
                     'cache.memcached' => 'Memcached',
                     'cache.keydb' => 'KeyDB',
                     'cache.dragonfly' => 'Dragonfly',
+                ],
+                // Database engines. MySQL / PostgreSQL / SQLite are always
+                // available (no flag). Each leaf off = "coming soon": Soon
+                // badge + teaser in the Databases workspace, hidden from the
+                // server-create database picker (MariaDB variants).
+                'Database engines' => [
+                    'database.mariadb' => 'MariaDB',
+                    'database.mongodb' => 'MongoDB',
+                    'database.clickhouse' => 'ClickHouse',
                 ],
             ], $serverWorkspaceSections),
         ],
@@ -229,6 +242,7 @@ return [
         'workspace.docker' => 'workspace.docker_preview',
         'workspace.backups' => 'workspace.backups_preview',
         'workspace.ssh_access_graph' => 'workspace.ssh_access_graph_preview',
+        'workspace.shared_host' => 'workspace.shared_host_preview',
     ],
 
 ];

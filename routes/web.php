@@ -23,7 +23,9 @@ use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\OrganizationComplianceExportController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
+use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
@@ -151,6 +153,8 @@ use App\Livewire\Servers\WorkspaceSecurityDigest;
 use App\Livewire\Servers\WorkspaceSecurityDigestPreview;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
+use App\Livewire\Servers\WorkspaceSharedHost;
+use App\Livewire\Servers\WorkspaceSharedHostPreview;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshAccessGraph;
 use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
@@ -632,6 +636,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
+    Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to
@@ -722,6 +727,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/security-digest-preview', WorkspaceSecurityDigestPreview::class)->name('servers.security-digest-preview');
     Route::livewire('servers/{server}/insights', WorkspaceInsights::class)->name('servers.insights');
     Route::livewire('servers/{server}/insights-preview', WorkspaceInsightsPreview::class)->name('servers.insights-preview');
+    Route::livewire('servers/{server}/shared-host', WorkspaceSharedHost::class)->name('servers.shared-host');
+    Route::livewire('servers/{server}/shared-host-preview', WorkspaceSharedHostPreview::class)->name('servers.shared-host-preview');
     Route::livewire('servers/{server}/overview', WorkspaceOverview::class)->name('servers.overview');
     Route::livewire('servers/{server}/deploys', ServerDeploys::class)->name('servers.deploys');
     Route::livewire('servers/{server}/monitor', WorkspaceMonitor::class)->name('servers.monitor');
@@ -788,6 +795,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/console-preview', WorkspaceConsolePreview::class)->name('servers.console-preview');
     Route::livewire('servers/{server}/logs', WorkspaceLogs::class)->name('servers.logs');
     Route::livewire('servers/{server}/files', WorkspaceFiles::class)->name('servers.files');
+    Route::get('servers/{server}/files/download', ServerWorkspaceFileDownloadController::class)->name('servers.files.download');
     Route::livewire('servers/{server}/files-preview', WorkspaceFilesPreview::class)->name('servers.files-preview');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');

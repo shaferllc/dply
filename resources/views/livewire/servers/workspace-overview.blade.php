@@ -990,6 +990,54 @@
             @endif
             @endfeature
 
+            @feature('workspace.shared_host')
+            @if ($sharedHostSummary)
+                @php
+                    $sharedHostCritical = ($sharedHostSummary['severity'] ?? '') === 'critical';
+                    $sharedHostWarning = ($sharedHostSummary['severity'] ?? '') === 'warning';
+                @endphp
+                <section @class([
+                    'dply-card overflow-hidden',
+                    'border-rose-200' => $sharedHostCritical,
+                    'border-amber-200' => $sharedHostWarning && ! $sharedHostCritical,
+                ])>
+                    <div @class([
+                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'bg-rose-50/60' => $sharedHostCritical,
+                        'bg-amber-50/60' => $sharedHostWarning && ! $sharedHostCritical,
+                        'bg-brand-sand/20' => ! $sharedHostCritical && ! $sharedHostWarning,
+                    ])>
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex items-start gap-3">
+                                <span @class([
+                                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1',
+                                    'bg-rose-50 text-rose-700 ring-rose-200' => $sharedHostCritical,
+                                    'bg-amber-100 text-amber-700 ring-amber-200' => $sharedHostWarning && ! $sharedHostCritical,
+                                    'bg-brand-sage/15 text-brand-forest ring-brand-sage/25' => ! $sharedHostCritical && ! $sharedHostWarning,
+                                ])>
+                                    <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p @class([
+                                        'text-[11px] font-semibold uppercase tracking-[0.16em]',
+                                        'text-rose-700' => $sharedHostCritical,
+                                        'text-amber-800' => $sharedHostWarning && ! $sharedHostCritical,
+                                        'text-brand-sage' => ! $sharedHostCritical && ! $sharedHostWarning,
+                                    ])>{{ __('Shared Host Radar') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $sharedHostSummary['title'] }}</h3>
+                                    <p class="mt-1 text-sm text-brand-moss">{{ $sharedHostSummary['message'] }}</p>
+                                </div>
+                            </div>
+                            <a href="{{ route('servers.shared-host', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                                {{ __('Open radar') }}
+                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            @endif
+            @endfeature
+
             {{-- Insights (conditional + flag-gated). --}}
             @feature('workspace.insights')
             @if ($openInsightsCount > 0)

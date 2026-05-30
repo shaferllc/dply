@@ -27,6 +27,14 @@ use Illuminate\Support\Facades\Cache;
  */
 class ServerCacheServiceHostCapabilities
 {
+    /**
+     * Per-request memo so multiple {@see engineUnsupportedReason()} calls for the same
+     * server (e.g. keydb + dragonfly in WorkspaceCaches::render()) share one cache read.
+     *
+     * @var array<string, array{id: string, codename: string}|null>
+     */
+    private array $distroInfoMemory = [];
+
     public function __construct(
         protected ServerSshConnectionRunner $runner
     ) {}
@@ -159,6 +167,11 @@ class ServerCacheServiceHostCapabilities
             return null;
         }
 
+        $memoryKey = (string) $server->id;
+        if (array_key_exists($memoryKey, $this->distroInfoMemory)) {
+            return $this->distroInfoMemory[$memoryKey];
+        }
+
         $ttl = max(0, (int) config('server_cache.distro_cache_ttl_seconds', 86_400));
         $key = 'server.'.$server->id.'.cache_service_distro_v1';
 
@@ -190,11 +203,10 @@ class ServerCacheServiceHostCapabilities
             return ['id' => $id, 'codename' => $codename];
         };
 
-        if ($ttl === 0) {
-            return $resolve();
-        }
+        $info = $ttl === 0 ? $resolve() : Cache::remember($key, $ttl, $resolve);
+        $this->distroInfoMemory[$memoryKey] = $info;
 
-        return Cache::remember($key, $ttl, $resolve);
+        return $info;
     }
 
     public function forgetDistro(Server $server): void
@@ -209,14 +221,33 @@ class ServerCacheServiceHostCapabilities
      * install script speak the same vocabulary. Returns null on probe failure so the UI doesn't
      * grey out everything when SSH is flaky — the install script's own check is the final word.
      */
+    /**
+     * @return array<string, string|null>
+     */
+    public function unsupportedReasonsByEngine(Server $server): array
+    {
+        $info = $this->distroInfo($server);
+        $reasons = [];
+
+        foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
+            $reasons[$engine] = $this->unsupportedReasonForEngine($info, $engine);
+        }
+
+        return $reasons;
+    }
+
     public function engineUnsupportedReason(Server $server, string $engine): ?string
+    {
+        return $this->unsupportedReasonForEngine($this->distroInfo($server), $engine);
+    }
+
+    private function unsupportedReasonForEngine(?array $info, string $engine): ?string
     {
         $whitelist = CacheServiceInstallScripts::supportedDistroCodenames($engine);
         if ($whitelist === null) {
             return null;
         }
 
-        $info = $this->distroInfo($server);
         if ($info === null) {
             return null;
         }

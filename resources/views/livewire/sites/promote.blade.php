@@ -3,7 +3,7 @@
         :eyebrow="__('Sites')"
         :title="__('Promote to server')"
         :description="__('Copy this VM site to a standby server on a preview hostname first — smoke-test, then cut over production DNS when ready.')"
-        doc-route="docs.index"
+        doc-contextual
         flush
         compact
     />

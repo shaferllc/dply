@@ -30,6 +30,7 @@ use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\DatabaseEngineAvailability;
 use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\DatabaseWorkspaceEngines;
@@ -333,6 +334,17 @@ class WorkspaceDatabases extends Component
 
         if (! in_array($engine, DatabaseEngineInstallScripts::supportedEngines(), true)) {
             $this->toastError(__('Unsupported database engine.'));
+
+            return;
+        }
+
+        // Coming-soon gate — MariaDB / MongoDB / ClickHouse are gated behind
+        // database.{engine} flags until their install path is GA. Refuse before
+        // queueing so a stale payload can't slip past the disabled UI.
+        if (DatabaseEngineAvailability::isComingSoon($engine)) {
+            $this->toastError(__(':engine isn\'t available yet — it\'s coming soon.', [
+                'engine' => DatabaseEngineInfo::for($engine)['label'] ?? ucfirst($engine),
+            ]));
 
             return;
         }

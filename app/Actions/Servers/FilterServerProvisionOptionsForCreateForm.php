@@ -6,6 +6,7 @@ namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
 use App\Support\Servers\CacheEngineAvailability;
+use App\Support\Servers\DatabaseEngineAvailability;
 use Illuminate\Support\Arr;
 
 /**
@@ -63,10 +64,11 @@ final class FilterServerProvisionOptionsForCreateForm
     }
 
     /**
-     * Drop cache engines that are still "coming soon" (gated behind cache.*
-     * Pennant flags) from the create wizard. Redis is never gated. Also drops
-     * the dedicated Valkey server role when Valkey is coming soon so it can't
-     * be provisioned out from under the gate.
+     * Drop cache + database engines that are still "coming soon" (gated behind
+     * cache.* / database.* Pennant flags) from the create wizard. Redis,
+     * MySQL, PostgreSQL, and SQLite are never gated. Also drops the dedicated
+     * Valkey server role when Valkey is coming soon so it can't be provisioned
+     * out from under the gate.
      *
      * @param  array<string, list<array<string, mixed>>>  $out
      * @return array<string, list<array<string, mixed>>>
@@ -84,6 +86,13 @@ final class FilterServerProvisionOptionsForCreateForm
             $out['server_roles'] = array_values(array_filter(
                 $out['server_roles'],
                 fn (array $row): bool => ! (($row['id'] ?? null) === 'valkey' && CacheEngineAvailability::isComingSoon('valkey')),
+            ));
+        }
+
+        if (isset($out['databases']) && is_array($out['databases'])) {
+            $out['databases'] = array_values(array_filter(
+                $out['databases'],
+                fn (array $row): bool => ! DatabaseEngineAvailability::isProvisionOptionComingSoon((string) ($row['id'] ?? '')),
             ));
         }
 

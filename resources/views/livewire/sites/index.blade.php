@@ -1,11 +1,11 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <x-dashboard-breadcrumb :current="__('Sites')" current-icon="globe-alt" />
+        <x-dashboard-breadcrumb :current="__('Sites')" current-icon="globe-alt" doc-contextual />
 
         <x-page-header
             :title="__('Sites')"
             :description="__('Every hostname routes through a server—pick a site below or add one from its server page.')"
-            doc-route="docs.index"
+            :show-documentation="false"
             flush
             compact
             toolbar

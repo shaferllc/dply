@@ -93,7 +93,30 @@ final class ContextualDocResolver
             return (string) config('contextual-docs.fallbacks.edge', 'edge-overview');
         }
 
-        return (string) config('contextual-docs.fallbacks.sites', 'sites-and-deploy');
+        $sectionSlugs = config('contextual-docs.site_section_slugs', []);
+        $sectionSlug = is_array($sectionSlugs) ? ($sectionSlugs[$section] ?? null) : null;
+        if (is_string($sectionSlug) && $sectionSlug !== '') {
+            return $sectionSlug;
+        }
+
+        return (string) config('contextual-docs.fallbacks.sites', 'vm-site-overview');
+    }
+
+    /**
+     * Resolve contextual docs for a server workspace sidebar section key.
+     */
+    public function resolveForServerWorkspace(?string $activeKey): string
+    {
+        if (! is_string($activeKey) || $activeKey === '') {
+            return (string) config('contextual-docs.fallbacks.servers', 'server-overview');
+        }
+
+        $workspaceSlugs = config('contextual-docs.server_workspace_slugs', []);
+        $slug = is_array($workspaceSlugs) ? ($workspaceSlugs[$activeKey] ?? null) : null;
+
+        return is_string($slug) && $slug !== ''
+            ? $slug
+            : (string) config('contextual-docs.fallbacks.servers', 'server-overview');
     }
 
     /**
@@ -320,6 +343,42 @@ final class ContextualDocResolver
             return $entry;
         }
 
+        $siteRouteSlugs = config('contextual-docs.site_route_slugs', []);
+        $siteRouteSlug = is_array($siteRouteSlugs) ? ($siteRouteSlugs[$currentRoute] ?? null) : null;
+        if (is_string($siteRouteSlug) && $siteRouteSlug !== '') {
+            return [
+                'slug' => $siteRouteSlug,
+                'group' => 'byo-sites',
+            ];
+        }
+
+        foreach (config('server_workspace.nav', []) as $navItem) {
+            if (! is_array($navItem)) {
+                continue;
+            }
+
+            $navKey = $navItem['key'] ?? null;
+            $navRoute = $navItem['route'] ?? null;
+            $previewRoute = $navItem['preview_route'] ?? null;
+
+            if (! is_string($navKey) || $navKey === '') {
+                continue;
+            }
+
+            if ($currentRoute !== $navRoute && $currentRoute !== $previewRoute) {
+                continue;
+            }
+
+            $workspaceSlugs = config('contextual-docs.server_workspace_slugs', []);
+            $slug = is_array($workspaceSlugs) ? ($workspaceSlugs[$navKey] ?? null) : null;
+            if (is_string($slug) && $slug !== '') {
+                return [
+                    'slug' => $slug,
+                    'group' => 'servers',
+                ];
+            }
+        }
+
         return null;
     }
 
@@ -430,7 +489,16 @@ final class ContextualDocResolver
             str_starts_with($route, 'servers.')
             || str_starts_with($route, 'sites.')
         )) {
-            return (string) config('contextual-docs.fallbacks.sites', 'sites-and-deploy');
+            $site = $this->routeSite();
+            if ($site instanceof Site && $site->usesEdgeRuntime()) {
+                return (string) config('contextual-docs.fallbacks.edge', 'edge-overview');
+            }
+
+            if (str_starts_with($route, 'servers.')) {
+                return (string) config('contextual-docs.fallbacks.servers', 'server-overview');
+            }
+
+            return (string) config('contextual-docs.fallbacks.sites', 'vm-site-overview');
         }
 
         return (string) config('contextual-docs.fallbacks.default', 'edge-overview');

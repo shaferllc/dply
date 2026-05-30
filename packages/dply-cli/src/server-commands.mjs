@@ -75,7 +75,7 @@ export async function serverShow(args, flags) {
   }
 
   info('');
-  info(c.dim('Health: `dply server health ' + serverId + '` · system users: `dply server system-users list --server ' + serverId + '`'));
+  info(c.dim('Health: `dply server health ' + serverId + '` · firewall: `dply server firewall show --server ' + serverId + '`'));
 
   return 0;
 }
@@ -208,6 +208,34 @@ export async function serverSystemUsers(args, flags) {
   }
 }
 
+/**
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverFirewall(args, flags) {
+  const sub = args[0] ?? 'show';
+  const rest = args.slice(1);
+
+  switch (sub) {
+    case 'show':
+    case 'list':
+    case 'ls':
+      return firewallShow(rest, flags);
+    case 'apply':
+      return firewallApply(rest, flags);
+    case 'apply-bundled':
+      return firewallApplyBundled(rest, flags);
+    case 'apply-template':
+      return firewallApplyTemplate(rest, flags);
+    case 'help':
+    case '--help':
+    case '-h':
+      return printFirewallHelp();
+    default:
+      throw cliError(`Unknown firewall subcommand: ${sub}. Run \`dply server firewall help\`.`, 2);
+  }
+}
+
 async function systemUsersList(args, flags) {
   const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, args[0]);
@@ -236,6 +264,164 @@ async function systemUsersList(args, flags) {
       row.is_protected ? 'yes' : 'no',
     ]),
   );
+}
+
+async function firewallShow(args, flags) {
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, args[0]);
+  const payload = (await client.get(`/servers/${encodeURIComponent(serverId)}/firewall`))?.data ?? {};
+
+  if (flags.json) {
+    printJson(payload);
+
+    return;
+  }
+
+  const rules = payload.rules ?? [];
+  const templates = payload.templates ?? [];
+  const bundledKeys = payload.bundled_template_keys ?? [];
+
+  info(c.bold('Firewall rules'));
+  if (rules.length === 0) {
+    warn('No rules configured in dply yet.');
+  } else {
+    printTable(
+      ['Name', 'Port', 'Proto', 'Source', 'Action', 'On'],
+      rules.map((row) => [
+        row.name ?? '—',
+        row.port ?? 'any',
+        row.protocol ?? '—',
+        row.source ?? '—',
+        row.action ?? '—',
+        row.enabled ? 'yes' : 'no',
+      ]),
+    );
+  }
+
+  if (templates.length > 0) {
+    info('');
+    info(c.bold('Org templates'));
+    for (const row of templates) {
+      info(`  ${c.cyan(String(row.name))} ${c.dim(String(row.id))}${row.description ? ` · ${row.description}` : ''}`);
+    }
+  }
+
+  if (bundledKeys.length > 0) {
+    info('');
+    info(c.bold('Bundled templates'));
+    info(`  ${bundledKeys.join(', ')}`);
+  }
+
+  info('');
+  info(c.dim('Apply: `dply server firewall apply --server ' + serverId + '` · bundled: `apply-bundled laravel_web`'));
+
+  return 0;
+}
+
+async function firewallApply(args, flags) {
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, args[0]);
+  const ack =
+    flags['ack-ssh-lockout'] === true
+    || flags['acknowledge-ssh-lockout-risk'] === true;
+
+  /** @type {Record<string, unknown>} */
+  const body = {};
+  if (ack) {
+    body.acknowledge_ssh_lockout_risk = true;
+  }
+
+  try {
+    const response = await client.post(`/servers/${encodeURIComponent(serverId)}/firewall/apply`, body);
+
+    if (flags.json) {
+      printJson(response);
+
+      return;
+    }
+
+    if (response.output) {
+      process.stdout.write(String(response.output));
+      if (!String(response.output).endsWith('\n')) {
+        process.stdout.write('\n');
+      }
+    }
+
+    ok(response?.message ?? 'Firewall rules applied.');
+
+    return 0;
+  } catch (err) {
+    if (err?.status === 422 && err?.body?.code === 'ssh_lockout_ack_required') {
+      throw cliError(
+        'SSH lockout risk — review rules, then re-run with --ack-ssh-lockout after confirming SSH access stays open.',
+        2,
+      );
+    }
+
+    throw err;
+  }
+}
+
+async function firewallApplyBundled(args, flags) {
+  const key = args[0];
+  if (!key) {
+    throw cliError('Usage: dply server firewall apply-bundled <key> --server <id>', 2);
+  }
+
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, flags.server ?? args[1]);
+  const response = await client.post(
+    `/servers/${encodeURIComponent(serverId)}/firewall/bundled/${encodeURIComponent(key)}`,
+    {},
+  );
+
+  if (flags.json) {
+    printJson(response);
+
+    return;
+  }
+
+  const created = response?.rules_created;
+  ok(response?.message ?? `Bundled template "${key}" applied.${created != null ? ` (${created} rule(s) added)` : ''}`);
+
+  return 0;
+}
+
+async function firewallApplyTemplate(args, flags) {
+  const templateId = args[0];
+  if (!templateId) {
+    throw cliError('Usage: dply server firewall apply-template <template-id> --server <id>', 2);
+  }
+
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, flags.server ?? args[1]);
+  const response = await client.post(
+    `/servers/${encodeURIComponent(serverId)}/firewall/templates/${encodeURIComponent(templateId)}`,
+    {},
+  );
+
+  if (flags.json) {
+    printJson(response);
+
+    return;
+  }
+
+  const created = response?.rules_created;
+  ok(response?.message ?? `Template applied.${created != null ? ` (${created} rule(s) added)` : ''}`);
+
+  return 0;
+}
+
+function printFirewallHelp() {
+  info(`${c.bold('dply server firewall')} — read and apply UFW rules on a BYO server`);
+  info('');
+  info('  show [--server ID]              List rules, org templates, bundled keys');
+  info('  apply [--server ID]             Push dply rules to the VM (UFW)');
+  info('      [--ack-ssh-lockout]         Confirm SSH lockout risk when required');
+  info('  apply-bundled <key>             Merge a bundled starter ruleset');
+  info('  apply-template <template-id>    Merge an org firewall template');
+
+  return 0;
 }
 
 async function systemUsersSync(args, flags) {

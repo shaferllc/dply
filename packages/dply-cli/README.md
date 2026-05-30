@@ -86,6 +86,32 @@ dply deploy --sync --wait --idempotency-key "$GITHUB_SHA"
 
 Edge linked repos: `dply deploy --wait` blocks until the deployment is live.
 
+### Edge status
+
+```sh
+dply edge status              # linked site, or --site <id>
+dply edge status --wait       # block until latest deploy finishes
+```
+
+### Run a command on a server
+
+Requires the **`commands.run`** scope (included in admin CLI presets; refresh with `dply auth refresh`):
+
+```sh
+dply server run --server <id> php artisan migrate --force
+dply server run --server <id> --command "df -h"
+```
+
+### Firewall (UFW)
+
+Read rules with **`network.read`**; apply with **`network.write`** (org admin CLI preset):
+
+```sh
+dply server firewall show --server <id>
+dply server firewall apply-bundled laravel_web --server <id>
+dply server firewall apply --server <id> --ack-ssh-lockout
+```
+
 ## Commands
 
 See **Profile → CLI** in the web app. Run `dply help`, `dply ls site`, or `dply site help`.

@@ -3,7 +3,7 @@
         :eyebrow="__('Sites')"
         :title="__('Clone site')"
         :description="__('Copy this site to another server or hostname. The job runs in the background; duration depends on repository size.')"
-        doc-route="docs.index"
+        doc-contextual
         flush
         compact
     />

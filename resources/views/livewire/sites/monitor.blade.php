@@ -16,19 +16,12 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-brand-ink">{{ __('Servers') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-brand-ink truncate max-w-[10rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-brand-ink truncate max-w-[10rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="font-medium text-brand-ink">{{ __('Monitor') }}</li>
-        </ol>
-    </nav>
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Monitor'),
+        'currentIcon' => 'chart-bar',
+    ])
 
     @if (session('success'))
         <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{{ session('success') }}</div>
@@ -41,7 +34,7 @@
             <x-page-header
                 :title="__('Monitor')"
                 :description="__('Uptime monitors for this site. Each entry tracks a hostname (and optional path); checks run from dply infrastructure on demand or on a schedule.')"
-                doc-route="docs.index"
+                :show-documentation="false"
                 flush
                 compact
             />

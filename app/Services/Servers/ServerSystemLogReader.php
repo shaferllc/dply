@@ -162,7 +162,8 @@ class ServerSystemLogReader
 
         $limit = max(1, min(5000, $maxLines));
 
-        $siteIds = Site::query()->where('server_id', $server->id)->pluck('id');
+        $server->loadMissing('sites');
+        $siteIds = $server->sites->pluck('id');
 
         $logs = AuditLog::query()
             ->where('organization_id', $server->organization_id)
@@ -184,7 +185,7 @@ class ServerSystemLogReader
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
-            ->with('user')
+            ->with(['user', 'subject'])
             ->get();
 
         if ($logs->isEmpty()) {
@@ -231,7 +232,7 @@ class ServerSystemLogReader
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
-            ->with('user')
+            ->with(['user', 'subject'])
             ->get();
 
         foreach ($audits as $log) {
@@ -583,12 +584,23 @@ class ServerSystemLogReader
         // php_version-drop the canonical column is runtime_version
         // (when runtime='php'). Site::phpVersion() encapsulates the
         // null-when-not-php semantics.
-        $site = Site::query()
-            ->where('server_id', $server->id)
-            ->where('runtime', 'php')
-            ->whereNotNull('runtime_version')
-            ->orderByDesc('updated_at')
-            ->first();
+        $site = null;
+        if ($server->relationLoaded('sites')) {
+            $site = $server->sites
+                ->where('runtime', 'php')
+                ->whereNotNull('runtime_version')
+                ->sortByDesc(fn (Site $row): mixed => $row->updated_at)
+                ->first();
+        }
+
+        if ($site === null) {
+            $site = Site::query()
+                ->where('server_id', $server->id)
+                ->where('runtime', 'php')
+                ->whereNotNull('runtime_version')
+                ->orderByDesc('updated_at')
+                ->first();
+        }
 
         $version = $site?->phpVersion();
         if (is_string($version) && preg_match('/^\d+(\.\d+)?$/', $version)) {

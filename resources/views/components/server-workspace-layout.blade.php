@@ -66,26 +66,17 @@
         if ($activePageItem) {
             $workspaceBreadcrumbs[] = $activePageItem;
         }
-    @endphp
-    <x-breadcrumb-trail :items="$workspaceBreadcrumbs" />
 
-    <x-page-header
-        :title="$contextSite ? $title.' — '.$contextSite->name : $title"
-        :description="$description"
-        :doc-route="$docRoute"
-        :doc-slug="$docSlug"
-        :doc-label="$docLabel"
-        :toolbar="(bool) $pageHeaderToolbar"
-        :compact="(bool) $pageHeaderCompact"
-        flush
+        $contextualDocSlug = app(\App\Support\Docs\ContextualDocResolver::class)
+            ->resolveForServerWorkspace(is_string($active) ? $active : null);
+    @endphp
+    <x-breadcrumb-trail
+        :items="$workspaceBreadcrumbs"
+        doc-contextual
+        :contextual-doc-slug="$contextualDocSlug"
     >
-        @isset($headerLeading)
-            <x-slot name="leading">
-                {{ $headerLeading }}
-            </x-slot>
-        @endisset
         @if ($server->workspace || isset($headerActions))
-            <x-slot name="actions">
+            <x-slot name="trailing">
                 @isset($headerActions)
                     {{ $headerActions }}
                 @endisset
@@ -98,6 +89,21 @@
                 @endif
             </x-slot>
         @endif
+    </x-breadcrumb-trail>
+
+    <x-page-header
+        :title="$contextSite ? $title.' — '.$contextSite->name : $title"
+        :description="$description"
+        :show-documentation="false"
+        :toolbar="(bool) $pageHeaderToolbar"
+        :compact="(bool) $pageHeaderCompact"
+        flush
+    >
+        @isset($headerLeading)
+            <x-slot name="leading">
+                {{ $headerLeading }}
+            </x-slot>
+        @endisset
     </x-page-header>
 
     <div class="mt-6 space-y-8 sm:mt-8">

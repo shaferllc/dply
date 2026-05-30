@@ -35,6 +35,12 @@ final class DatabaseWorkspaceViewData
             ->all();
         $engines = DatabaseWorkspaceEngines::ENGINE_TABS;
 
+        // Engine => coming-soon bool. MySQL / PostgreSQL / SQLite are always
+        // available; MariaDB, MongoDB, and ClickHouse are gated behind
+        // database.{engine} flags. Drives the Soon badge on the tab strip +
+        // the coming-soon teaser in the engine overview panel.
+        $comingSoonEngines = DatabaseEngineAvailability::comingSoonMap($engines);
+
         $engineWorking = $engineRows->contains(fn (ServerDatabaseEngine $row): bool => in_array($row->status, [
             ServerDatabaseEngine::STATUS_PENDING,
             ServerDatabaseEngine::STATUS_INSTALLING,
@@ -47,6 +53,7 @@ final class DatabaseWorkspaceViewData
             'isDeployer',
             'engineLabels',
             'engines',
+            'comingSoonEngines',
             'engineWorking',
             'capabilities',
             'engineRows',

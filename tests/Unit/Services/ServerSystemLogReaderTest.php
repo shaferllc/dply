@@ -10,6 +10,7 @@ use App\Models\SiteDeployment;
 use App\Models\User;
 use App\Services\Servers\ServerSystemLogReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -57,6 +58,38 @@ test('fetch site platform key returns merged activity', function () {
     $this->assertStringContainsString('site.updated', $result['output']);
     $this->assertStringContainsString('deploy', $result['output']);
     $this->assertStringContainsString('manual', $result['output']);
+});
+
+test('dply activity log eager loads audit subjects', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $user->organizations()->attach($org->id);
+    $server = Server::factory()->ready()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    AuditLog::log($org, $user, 'server.updated', $server, null, ['name' => 'Renamed']);
+    AuditLog::log($org, $user, 'site.updated', $site, null, ['name' => 'Renamed']);
+
+    $server->load('sites');
+
+    DB::enableQueryLog();
+    $output = app(ServerSystemLogReader::class)->dplyActivityLog($server, 50);
+    $queries = collect(DB::getQueryLog())
+        ->pluck('query')
+        ->filter(fn (string $sql): bool => str_contains($sql, '"servers"') || str_contains($sql, '"sites"'))
+        ->count();
+    DB::disableQueryLog();
+
+    expect($output)->toContain('server.updated')
+        ->and($output)->toContain('site.updated')
+        ->and($queries)->toBeLessThanOrEqual(2);
 });
 
 test('journal sources are defined', function () {

@@ -68,11 +68,18 @@ trait ManagesServerSystemLogs
     /** When set, the log viewer only lists this site’s platform + access/error sources. */
     public ?Site $scopedSite = null;
 
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $cachedAvailableLogSources = null;
+
     /**
      * @return array<string, array<string, mixed>>
      */
     public function availableLogSources(): array
     {
+        if ($this->cachedAvailableLogSources !== null) {
+            return $this->cachedAvailableLogSources;
+        }
+
         $sources = config('server_system_logs.sources', []);
         $server = $this->server ?? null;
         if ($server === null) {
@@ -88,6 +95,9 @@ trait ManagesServerSystemLogs
 
         if ($this->scopedSite !== null) {
             $site = $this->scopedSite;
+            if ($server !== null && ! $site->relationLoaded('server')) {
+                $site->setRelation('server', $server);
+            }
             $id = (string) $site->getKey();
             $logDirectory = $site->webserverLogDirectory();
             $basename = $site->webserverConfigBasename();
@@ -130,12 +140,15 @@ trait ManagesServerSystemLogs
                 ];
             }
 
+            $this->cachedAvailableLogSources = $sources;
+
             return $sources;
         }
 
         $server->loadMissing('sites');
 
         foreach ($server->sites as $site) {
+            $site->setRelation('server', $server);
             $id = (string) $site->getKey();
             $logDirectory = $site->webserverLogDirectory();
             $basename = $site->webserverConfigBasename();
@@ -152,6 +165,8 @@ trait ManagesServerSystemLogs
                 'group' => 'sites',
             ];
         }
+
+        $this->cachedAvailableLogSources = $sources;
 
         return $sources;
     }
@@ -200,6 +215,7 @@ trait ManagesServerSystemLogs
         }
 
         $this->logKey = $key;
+        $this->cachedAvailableLogSources = null;
         $this->loadSystemLog();
     }
 
@@ -377,7 +393,7 @@ trait ManagesServerSystemLogs
             $this->resetRemoteSshStreamTargets();
             $reader = app(ServerSystemLogReader::class);
             $result = $reader->fetch(
-                $this->server->fresh(),
+                $this->server,
                 $this->logKey,
                 function (string $summary): void {
                     $this->remoteSshStreamSetMeta(__('Remote command'), $summary);
@@ -446,7 +462,6 @@ trait ManagesServerSystemLogs
         }
 
         $this->syncLogViewerPreferencesFromServer();
-        $this->loadSystemLog();
     }
 
     protected function syncLogViewerPreferencesFromServer(): void
@@ -608,8 +623,8 @@ trait ManagesServerSystemLogs
             return;
         }
 
-        $server = $this->server->fresh();
-        if ($server->organization_id && $server->organization?->userIsDeployer($user)) {
+        $this->server->loadMissing('organization');
+        if ($this->server->organization_id && $this->server->organization?->userIsDeployer($user)) {
             return;
         }
 
@@ -628,7 +643,7 @@ trait ManagesServerSystemLogs
         // a 500). Degrade to "no live peer update" instead.
         try {
             broadcast(new ServerWorkspaceLogSnapshotBroadcast(
-                serverId: (string) $server->id,
+                serverId: (string) $this->server->id,
                 logKey: $this->logKey,
                 remoteLogRaw: is_string($raw) ? $raw : null,
                 remoteLogError: $this->remoteLogError,
@@ -640,7 +655,7 @@ trait ManagesServerSystemLogs
             ))->toOthers();
         } catch (\Throwable $e) {
             Log::warning('server_system_logs.broadcast_failed', [
-                'server_id' => (string) $server->id,
+                'server_id' => (string) $this->server->id,
                 'log_key' => $this->logKey,
                 'error' => $e->getMessage(),
             ]);
