@@ -183,7 +183,23 @@ test('switch edge proxy to envoy dispatches add job when another is active', fun
     });
 });
 
-test('add edge proxy rejects catalog preview engines without install job', function () {
+test('add edge proxy dispatches job for openresty when installable', function () {
+    config(['server_workspace.edge_proxy_coming_soon' => []]);
+    Queue::fake();
+    $user = makeUser();
+    $server = makeServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceEdgeProxy::class, ['server' => $server])
+        ->call('addEdgeProxy', 'openresty');
+
+    Queue::assertPushed(AddEdgeProxyJob::class, function (AddEdgeProxyJob $job) use ($server) {
+        return $job->serverId === $server->id && $job->target === 'openresty';
+    });
+});
+
+test('add edge proxy rejects coming soon engines without install job', function () {
+    config(['server_workspace.edge_proxy_coming_soon' => ['openresty']]);
     Queue::fake();
     $user = makeUser();
     $server = makeServer($user);

@@ -2706,9 +2706,9 @@ class Settings extends Show
         $this->site->load('certificates');
     }
 
-    public function retryCertificate(string $certificateId): void
+    public function retryCertificate(string $certificateId, CertificateRepairService $repairService): void
     {
-        $this->repairCertificate($certificateId);
+        $this->repairCertificate($certificateId, $repairService);
     }
 
     public function repairCertificate(string $certificateId, CertificateRepairService $repairService): void
@@ -2718,6 +2718,11 @@ class Settings extends Show
         $certificate = $this->site->certificates()->findOrFail($certificateId);
 
         try {
+            // Seed before dispatch so the certificates-section SSL banner appears
+            // on this re-render; ExecuteSiteCertificateJob::beginConsoleAction()
+            // reuses the row instead of waiting for the worker to create one.
+            $this->seedQueuedConsoleAction('ssl');
+
             $repairService->repair($this->site, $certificate, auth()->id());
         } catch (\InvalidArgumentException $e) {
             $this->toastError($e->getMessage());
@@ -2730,7 +2735,7 @@ class Settings extends Show
             return;
         }
 
-        $this->toastSuccess(__('Certificate repair queued. Dply will re-apply webserver routing and retry Let\'s Encrypt.'));
+        $this->toastSuccess(__('Certificate repair queued. Track progress in the banner at the top of this page.'));
         $this->site->load('certificates');
     }
 

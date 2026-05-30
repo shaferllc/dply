@@ -1,6 +1,7 @@
 @php
     $appUrl = rtrim((string) config('app.url'), '/');
     $serverFlag = '--server '.$server->id;
+    $installUrl = route('cli.install');
 @endphp
 
 <section class="dply-card overflow-hidden">
@@ -27,8 +28,7 @@
     <div class="grid gap-4 px-6 py-5 sm:grid-cols-2 sm:px-7">
         <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Setup') }}</p>
-            <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2.5 text-[11px] leading-relaxed text-brand-cream"><code>npm install -g @dply/cli
-dply login --base-url {{ $appUrl }}</code></pre>
+            <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2.5 text-[11px] leading-relaxed text-brand-cream"><code>curl -fsSL {{ $installUrl }} | bash -s -- --login</code></pre>
         </div>
         <div>
             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Commands for this server') }}</p>
@@ -41,7 +41,7 @@ dply server system-users remove deployer {{ $serverFlag }}</code></pre>
     </div>
     <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-3 sm:px-7">
         <p class="text-[11px] leading-relaxed text-brand-moss">
-            {{ __('Mutations queue over SSH (same as this page). Run `dply server system-users help` for flags. Requires `system_users.*` scopes from device login.') }}
+            {{ __('Package served from this server at /cli/dply-cli.tgz. Mutations queue over SSH — same as this page.') }}
         </p>
     </div>
 </section>

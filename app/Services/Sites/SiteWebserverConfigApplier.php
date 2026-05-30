@@ -33,7 +33,7 @@ class SiteWebserverConfigApplier
         }
 
         $edgeProxy = $site->server->edgeProxy();
-        if (is_string($edgeProxy) && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (is_string($edgeProxy) && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             return app(SiteEdgeBackendProvisioner::class)->provision($site, $emit ?? new ConsoleEmitter);
         }
 
@@ -57,7 +57,7 @@ class SiteWebserverConfigApplier
         }
 
         $edgeProxy = $site->server->edgeProxy();
-        if (is_string($edgeProxy) && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (is_string($edgeProxy) && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             return app(SiteEdgeBackendProvisioner::class)->remove($site);
         }
 

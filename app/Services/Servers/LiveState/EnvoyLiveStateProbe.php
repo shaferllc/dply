@@ -54,6 +54,8 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
                 'listeners' => $this->buildListenerUnits($sections['listeners'] ?? ''),
                 'clusters' => $this->buildClusterUnits($sections['clusters'] ?? ''),
                 'runtime' => $this->buildRuntimeUnits($sections['runtime'] ?? ''),
+                'virtualhosts' => $this->buildVirtualHostUnits($sections['config'] ?? ''),
+                'stats' => $this->buildStatsUnits($sections['stats'] ?? '', $sections['clusters'] ?? ''),
             ],
             engineSpecific: $errors === [] ? [] : ['errors' => $errors],
         );
@@ -82,7 +84,7 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
      */
     private function splitSections(string $output): array
     {
-        $heads = ['listeners', 'clusters', 'runtime'];
+        $heads = ['listeners', 'clusters', 'runtime', 'config', 'stats'];
         $end = '###dply-section:end###';
         $out = [];
         foreach ($heads as $name) {
@@ -115,11 +117,15 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
             if (! is_array($entry)) {
                 continue;
             }
-            $name = (string) ($entry['name'] ?? '');
+            $name = $this->scalarString($entry['name'] ?? '');
             if ($name === '') {
                 continue;
             }
-            $address = $this->formatSocketAddress($entry['local_address'] ?? $entry['address'] ?? null);
+            try {
+                $address = $this->formatSocketAddress($entry['local_address'] ?? $entry['address'] ?? null);
+            } catch (\Throwable) {
+                continue;
+            }
             $rows[] = [
                 'name' => $name,
                 'address' => $address,
@@ -146,7 +152,7 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
             if (! is_array($entry)) {
                 continue;
             }
-            $name = (string) ($entry['name'] ?? '');
+            $name = $this->scalarString($entry['name'] ?? '');
             if ($name === '') {
                 continue;
             }
@@ -155,14 +161,15 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
                 if (! is_array($host)) {
                     continue;
                 }
-                $addr = $this->formatSocketAddress($host['address'] ?? null);
-                $health = (string) data_get($host, 'health_status.healthy', data_get($host, 'health_status', ''));
-                if (is_array($health)) {
-                    $health = (string) ($health['healthy'] ?? 'unknown');
+                try {
+                    $addr = $this->formatSocketAddress($host['address'] ?? null);
+                } catch (\Throwable) {
+                    $addr = '';
                 }
+                $health = $host['health_status'] ?? null;
                 $hosts[] = [
                     'name' => $addr !== '' ? $addr : 'host',
-                    'status' => is_bool($health) ? ($health ? 'UP' : 'DOWN') : strtoupper($health),
+                    'status' => $this->formatHostHealthStatus($health),
                 ];
             }
             $rows[] = [
@@ -175,6 +182,154 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
         }
 
         return $rows;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function buildVirtualHostUnits(string $blob): array
+    {
+        $data = $this->decodeJson($blob);
+        $configs = $data['configs'] ?? [];
+        if (! is_array($configs)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($configs as $config) {
+            if (! is_array($config)) {
+                continue;
+            }
+            foreach ($config['dynamic_route_configs'] ?? [] as $dynamic) {
+                if (! is_array($dynamic)) {
+                    continue;
+                }
+                $routeConfig = data_get($dynamic, 'route_config');
+                if (! is_array($routeConfig)) {
+                    continue;
+                }
+                foreach ($routeConfig['virtual_hosts'] ?? [] as $vh) {
+                    if (! is_array($vh)) {
+                        continue;
+                    }
+                    $name = $this->scalarString($vh['name'] ?? '');
+                    if ($name === '') {
+                        continue;
+                    }
+                    $domains = $this->stringList($vh['domains'] ?? []);
+                    $cluster = '';
+                    foreach ($vh['routes'] ?? [] as $route) {
+                        if (! is_array($route)) {
+                            continue;
+                        }
+                        $cluster = $this->scalarString(data_get($route, 'route.cluster', ''));
+                        if ($cluster !== '') {
+                            break;
+                        }
+                    }
+                    $siteId = null;
+                    if (preg_match('/^vhost_dply-([0-9a-z]+)-/i', $name, $m) === 1) {
+                        $siteId = strtolower($m[1]);
+                    }
+                    $rows[] = [
+                        'name' => $name,
+                        'domains' => $domains,
+                        'cluster' => $cluster,
+                        'site_id' => $siteId,
+                        'dply_managed' => $siteId !== null || $name === 'dply_unmatched',
+                    ];
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function buildStatsUnits(string $prometheusBlob, string $clustersBlob): array
+    {
+        $metrics = $this->parsePrometheusClusterMetrics($prometheusBlob);
+        $clusterNames = [];
+        foreach ($this->buildClusterUnits($clustersBlob) as $cluster) {
+            $name = (string) ($cluster['name'] ?? '');
+            if ($name !== '') {
+                $clusterNames[$name] = true;
+            }
+        }
+        foreach (array_keys($metrics) as $name) {
+            $clusterNames[$name] = true;
+        }
+
+        $rows = [];
+        foreach (array_keys($clusterNames) as $clusterName) {
+            $row = $metrics[$clusterName] ?? ['requests' => 0, 'errors_5xx' => 0, 'connections_active' => 0];
+            $rows[] = [
+                'name' => $clusterName,
+                'requests' => (int) ($row['requests'] ?? 0),
+                'errors_5xx' => (int) ($row['errors_5xx'] ?? 0),
+                'connections_active' => (int) ($row['connections_active'] ?? 0),
+            ];
+        }
+
+        usort($rows, fn (array $a, array $b): int => ($b['requests'] ?? 0) <=> ($a['requests'] ?? 0));
+
+        return $rows;
+    }
+
+    /**
+     * @return array<string, array{requests: int, errors_5xx: int, connections_active: int}>
+     */
+    private function parsePrometheusClusterMetrics(string $blob): array
+    {
+        $out = [];
+        foreach (preg_split('/\r\n|\n/', trim($blob)) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (preg_match('/^([a-zA-Z0-9_:]+)(\{([^}]*)\})?\s+([0-9.eE+-]+)$/', $line, $m) !== 1) {
+                continue;
+            }
+            $metric = $m[1];
+            $labels = $m[3] ?? '';
+            $value = str_contains($m[4], '.') ? (int) round((float) $m[4]) : (int) $m[4];
+            $cluster = '';
+            if ($labels !== '' && preg_match('/cluster_name="([^"]+)"/', $labels, $cm) === 1) {
+                $cluster = $cm[1];
+            }
+            if ($cluster === '') {
+                continue;
+            }
+            $out[$cluster] ??= ['requests' => 0, 'errors_5xx' => 0, 'connections_active' => 0];
+            if (str_contains($metric, 'upstream_rq_total') || str_contains($metric, 'upstream_rq_completed')) {
+                $out[$cluster]['requests'] = max($out[$cluster]['requests'], $value);
+            }
+            if (str_contains($metric, 'upstream_rq_5xx') || (str_contains($metric, 'upstream_rq_xx') && str_contains($labels, 'response_code_class="5"'))) {
+                $out[$cluster]['errors_5xx'] += $value;
+            }
+            if (str_contains($metric, 'upstream_cx_active')) {
+                $out[$cluster]['connections_active'] = max($out[$cluster]['connections_active'], $value);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function stringList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            fn ($v): string => $this->scalarString($v),
+            $values,
+        ), fn (string $s): bool => $s !== '' && $s !== '*'));
     }
 
     /**
@@ -212,16 +367,122 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
 
     private function formatSocketAddress(mixed $address): string
     {
+        if ($address === null || $address === '') {
+            return '';
+        }
+
         if (! is_array($address)) {
-            return is_string($address) ? $address : '';
+            return is_string($address) ? trim($address) : $this->scalarString($address);
         }
+
         if (isset($address['socket_address']) && is_array($address['socket_address'])) {
-            $address = $address['socket_address'];
+            return $this->formatSocketAddress($address['socket_address']);
         }
-        $host = (string) ($address['address'] ?? '*');
-        $port = (int) ($address['port_value'] ?? 0);
+
+        if (isset($address['pipe']) && is_array($address['pipe'])) {
+            $path = $address['pipe']['path'] ?? $address['pipe']['address'] ?? null;
+
+            return is_string($path) && $path !== '' ? $path : '';
+        }
+
+        if (isset($address['address']) && is_array($address['address'])) {
+            return $this->formatSocketAddress($address['address']);
+        }
+
+        $host = $address['address'] ?? '*';
+        if (! is_scalar($host)) {
+            $encoded = json_encode($address, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            return is_string($encoded) ? $encoded : '?';
+        }
+
+        $host = (string) $host;
+        $port = (int) ($address['port_value'] ?? $address['port'] ?? 0);
 
         return $port > 0 ? $host.':'.$port : $host;
+    }
+
+    private function scalarString(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        if (is_array($value)) {
+            if (isset($value['message']) && is_scalar($value['message'])) {
+                return trim((string) $value['message']);
+            }
+
+            $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            return is_string($encoded) ? $encoded : '';
+        }
+
+        return trim((string) $value);
+    }
+
+    private function formatHostHealthStatus(mixed $health): string
+    {
+        if (is_bool($health)) {
+            return $health ? 'UP' : 'DOWN';
+        }
+
+        if (is_array($health)) {
+            if (array_key_exists('healthy', $health)) {
+                return $this->formatHostHealthStatus($health['healthy']);
+            }
+
+            foreach ([
+                'failed_active_health_check',
+                'failed_outlier_check',
+                'failed_active_degraded_check',
+                'excluded_via_immediate_hc_fail',
+                'active_hc_timeout',
+            ] as $failureFlag) {
+                if (($health[$failureFlag] ?? false) === true) {
+                    return 'DOWN';
+                }
+            }
+
+            $eds = strtoupper($this->scalarString($health['eds_health_status'] ?? ''));
+            if ($eds === 'UNHEALTHY') {
+                return 'DOWN';
+            }
+            if ($eds === 'HEALTHY') {
+                return 'UP';
+            }
+
+            // Static clusters without active health checks omit eds_health_status;
+            // no failure flags means Envoy still routes to this host.
+            if ($health !== []) {
+                return 'UP';
+            }
+
+            return 'UNKNOWN';
+        }
+
+        $text = strtolower($this->scalarString($health));
+        if ($text === '') {
+            return 'UNKNOWN';
+        }
+
+        if (in_array($text, ['1', 'true', 'healthy', 'up'], true)) {
+            return 'UP';
+        }
+
+        if (in_array($text, ['0', 'false', 'unhealthy', 'down'], true)) {
+            return 'DOWN';
+        }
+
+        return strtoupper($text);
     }
 
     /**
@@ -232,14 +493,21 @@ class EnvoyLiveStateProbe extends AbstractEngineLiveStateProbe
         if ($hosts === []) {
             return 'UNKNOWN';
         }
-        $up = count(array_filter($hosts, fn (array $h): bool => ($h['status'] ?? '') === 'UP'));
+
+        $statuses = array_map(fn (array $h): string => (string) ($h['status'] ?? 'UNKNOWN'), $hosts);
+        $up = count(array_filter($statuses, fn (string $s): bool => $s === 'UP'));
         if ($up === count($hosts)) {
             return 'UP';
         }
-        if ($up === 0) {
+
+        $down = count(array_filter($statuses, fn (string $s): bool => $s === 'DOWN'));
+        if ($down === count($hosts)) {
             return 'DOWN';
         }
+        if ($down > 0) {
+            return 'DEGRADED';
+        }
 
-        return 'DEGRADED';
+        return 'UNKNOWN';
     }
 }

@@ -35,6 +35,10 @@ class RedirectGuestsToComingSoon
             return $next($request);
         }
 
+        if ($request->is('cli/*')) {
+            return $next($request);
+        }
+
         if ($this->routeIsAllowed($request)) {
             return $next($request);
         }

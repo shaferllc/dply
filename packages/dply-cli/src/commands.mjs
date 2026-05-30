@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import {
+  resolveLoginBaseUrl,
   defaultBaseUrl,
   deleteGlobalConfig,
   readGlobalConfig,
@@ -36,49 +37,48 @@ const CONFIG_CANDIDATES = ['dply.yaml', 'dply.yml', 'dply.json'];
  *   --no-open  Don't try to open the browser, just print the URL
  */
 export async function login(args, flags) {
-  const baseUrl = (flags['base-url'] || flags.b || defaultBaseUrl()).replace(/\/+$/, '');
+  const baseUrl = await resolveLoginBaseUrl(flags);
   const explicitToken = flags.token || flags.t;
+  const enterShell = flags['no-shell'] !== true;
 
   if (explicitToken) {
-    await loginWithToken({ baseUrl, token: explicitToken });
+    await loginWithToken({ baseUrl, token: explicitToken, enterShell });
 
     return;
   }
 
-  await loginWithDeviceFlow({ baseUrl, openBrowser: flags['no-open'] !== true });
+  await loginWithDeviceFlow({ baseUrl, openBrowser: flags['no-open'] !== true, enterShell });
 }
 
-async function loginWithToken({ baseUrl, token }) {
+async function loginWithToken({ baseUrl, token, enterShell = true }) {
   const probe = new ApiClient({ baseUrl, token });
-  let summary = '';
 
   try {
-    const sites = await probe.get('/edge/sites');
-    summary = `${(sites?.data ?? []).length} edge site(s)`;
+    await probe.get('/servers');
   } catch {
     try {
-      const servers = await probe.get('/servers');
-      summary = `${(servers?.data ?? []).length} server(s)`;
+      await probe.get('/edge/sites');
     } catch (err) {
       throw fail(`Token verification failed: ${err.message}`, err.status ?? 1);
     }
   }
 
   await writeGlobalConfig({ token, baseUrl });
-  ok(`Logged in. Token verified against ${c.cyan(baseUrl)}.`);
-  if (summary) {
-    info(`${summary} visible to this token.`);
-  }
+  await finalizeLogin({ baseUrl, enterShell });
 }
 
-async function loginWithDeviceFlow({ baseUrl, openBrowser }) {
+async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true }) {
   // /auth/device/start is unauthenticated — pass an empty bearer.
   const anonymous = new ApiClient({ baseUrl, token: '' });
   let started;
   try {
     started = await anonymous.post('/auth/device/start', {});
   } catch (err) {
-    throw fail(`Could not start device login: ${err.message}`, err.status ?? 1);
+    const hint =
+      baseUrl === defaultBaseUrl()
+        ? ' Check APP_URL / reinstall the CLI from your instance if this host is wrong.'
+        : ' Check the URL is reachable and APP_URL matches your browser host.';
+    throw fail(`Could not start device login at ${baseUrl}: ${err.message}.${hint}`, err.status ?? 1);
   }
 
   const {
@@ -143,7 +143,7 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser }) {
           throw fail('Server marked the code authorized but returned no token.', 1);
         }
         await writeGlobalConfig({ token, baseUrl });
-        ok(`Logged in to ${c.cyan(baseUrl)}.`);
+        await finalizeLogin({ baseUrl, enterShell });
 
         return;
       }
@@ -163,34 +163,106 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser }) {
   }
 }
 
-export async function logout() {
-  await deleteGlobalConfig();
-  ok('Logged out. Token removed from ~/.dply/config.json.');
+/**
+ * @param {{ baseUrl: string, enterShell?: boolean }} opts
+ */
+async function finalizeLogin({ baseUrl, enterShell = true }) {
+  const cfg = await readGlobalConfig();
+  ok(`Logged in to ${c.cyan(baseUrl)}.`);
+
+  if (cfg?.token) {
+    await printLoginSummary(baseUrl, cfg.token);
+  }
+
+  if (enterShell) {
+    const { enterInteractiveShell } = await import('./shell.mjs');
+    await enterInteractiveShell();
+  }
+}
+
+/**
+ * @param {string} baseUrl
+ * @param {string} token
+ */
+async function printLoginSummary(baseUrl, token) {
+  const client = new ApiClient({ baseUrl, token });
+  const hints = [];
+
+  info('');
+
+  try {
+    const servers = (await client.get('/servers'))?.data ?? [];
+    info(`${c.bold(String(servers.length))} server(s) visible`);
+    if (servers.length > 0) {
+      hints.push('server list');
+      hints.push('server system-users list --server <id>');
+    }
+  } catch {
+    // token may not include servers.read
+  }
+
+  try {
+    const sites = (await client.get('/edge/sites'))?.data ?? [];
+    if (sites.length > 0) {
+      info(`${c.bold(String(sites.length))} edge site(s) visible`);
+      hints.push('sites', 'edge deploy');
+    }
+  } catch {
+    // token may not include edge.read
+  }
+
+  if (hints.length > 0) {
+    info('');
+    info(c.dim(`Try: ${hints.slice(0, 3).join(' · ')} · account show`));
+  } else {
+    info('');
+    info(c.dim('Try: account show · account sessions · server list'));
+  }
+}
+
+export async function shell() {
+  const { enterInteractiveShell } = await import('./shell.mjs');
+  await enterInteractiveShell();
+}
+
+export async function menu() {
+  const { enterInteractiveMenu } = await import('./menus.mjs');
+  await enterInteractiveMenu();
 }
 
 export async function whoami() {
   const cfg = await readGlobalConfig();
   if (!cfg?.token) {
-    info(c.dim('Not logged in.'));
+    info(c.dim('Not logged in. Run `dply login`.'));
 
     return 1;
   }
-  printKeyValues([
-    ['Base URL', cfg.baseUrl],
-    ['Token', `${cfg.token.slice(0, 6)}…${cfg.token.slice(-4)}`],
-    ['Saved at', cfg.savedAt ?? '—'],
-  ]);
 
-  const linked = await readSiteLink();
-  if (linked) {
-    info('');
-    info(c.dim('Linked repository:'));
+  try {
+    const { accountShow } = await import('./account-commands.mjs');
+
+    return accountShow({});
+  } catch (err) {
+    if (err?.status !== 403 && err?.status !== 401) {
+      throw err;
+    }
+
+    warn('Could not load account from API — showing local config only.');
     printKeyValues([
-      ['Root', linked.rootDir],
-      ['Site ID', linked.link.siteId],
-      ['Site name', linked.link.siteName ?? '—'],
+      ['Base URL', cfg.baseUrl],
+      ['Token', `${cfg.token.slice(0, 6)}…${cfg.token.slice(-4)}`],
+      ['Saved at', cfg.savedAt ?? '—'],
     ]);
+
+    return 0;
   }
+}
+
+/** @deprecated Use accountLogout via `dply logout` / `dply account logout`. */
+export async function logout() {
+  const { accountLogout } = await import('./account-commands.mjs');
+
+  return accountLogout();
 }
 
 /**

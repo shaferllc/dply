@@ -33,6 +33,9 @@
                         'clusters' => __('Clusters'),
                         'ssl' => __('SSL'),
                         'runtime' => __('Runtime'),
+                        'virtualhosts' => __('Virtual hosts'),
+                        'stats' => __('Stats'),
+                        'static' => __('Static'),
                         default => $engine_subtab,
                     };
                     $subtabDescription = match ($key.'/'.$engine_subtab) {
@@ -68,7 +71,9 @@
                         'haproxy/ssl' => __('Loaded SSL certificate paths from `show ssl cert`.'),
                         'haproxy/runtime' => __('Runtime info from `show info` + memory pool summary from `show pools`.'),
                         'envoy/listeners' => __('HTTP listeners from the admin API — bind addresses and names.'),
+                        'envoy/virtualhosts' => __('Host → cluster routing from the live config dump — one virtual host per site plus the catch-all.'),
                         'envoy/clusters' => __('Upstream clusters with host health from /clusters?format=json.'),
+                        'envoy/stats' => __('Per-cluster request and error counters from /stats/prometheus.'),
                         'envoy/runtime' => __('Process info from /server_info — version, uptime, connections.'),
                         default => '',
                     };
@@ -143,7 +148,9 @@
                         $liveStateProbed = $liveState !== null && $liveCapturedAt !== null;
                         $liveStateStandby = (bool) data_get($liveState?->engineSpecific ?? [], 'standby', false);
                         $liveStateStandbyReason = (string) data_get($liveState?->engineSpecific ?? [], 'standby_reason', '');
-                        $liveStateErrors = array_values(array_filter((array) data_get($liveState?->engineSpecific ?? [], 'errors', [])));
+                        $liveStateErrors = \App\Services\Servers\LiveState\EngineLiveState::probeErrorLines(
+                            data_get($liveState?->engineSpecific ?? [], 'errors', []),
+                        );
                         $liveStateEmptyMessage = match ($key.'/'.$engine_subtab) {
                             'nginx/hosts' => __('No server blocks found in `nginx -T`.'),
                             'nginx/upstreams' => __('No `upstream` blocks found in the flattened nginx config.'),
@@ -165,7 +172,7 @@
                             'traefik/providers' => __('No routers or services are registered yet. Enable providers above, add custom routers, or provision sites — then refresh.'),
                             'traefik/tcprouters', 'traefik/tcpservices', 'traefik/udprouters', 'traefik/udpservices', 'traefik/tls' => __('Nothing returned from the Traefik API for this view.'),
                             'haproxy/frontends', 'haproxy/backends', 'haproxy/ssl', 'haproxy/runtime' => __('Nothing returned from HAProxy stats for this view.'),
-                            'envoy/listeners', 'envoy/clusters', 'envoy/runtime' => __('Nothing returned from the Envoy admin API for this view.'),
+                            'envoy/listeners', 'envoy/virtualhosts', 'envoy/clusters', 'envoy/stats', 'envoy/runtime' => __('Nothing returned from the Envoy admin API for this view.'),
                             default => __('Nothing to show for this view.'),
                         };
                         // For the vhosts table, resolve each row name back to a Site so
@@ -183,6 +190,7 @@
                         }
                         $repairCaddyPhpFpmAction = config('server_manage.service_actions.repair_caddy_php_fpm_upstream');
                         $sitesByVhostName = [];
+                        $sitesByEnvoyVhost = [];
                         if ($engine_subtab === 'vhosts' && ! empty($rows) && $key === 'openlitespeed') {
                             $ids = [];
                             foreach ($rows as $row) {
@@ -195,6 +203,21 @@
                                     ->whereIn('id', array_unique($ids))
                                     ->get(['id', 'slug'])
                                     ->keyBy(fn ($s) => 'dply-'.$s->id.'-'.$s->slug)
+                                    ->all();
+                            }
+                        }
+                        if ($engine_subtab === 'virtualhosts' && ! empty($rows) && $key === 'envoy') {
+                            $ids = [];
+                            foreach ($rows as $row) {
+                                if (! empty($row['site_id'])) {
+                                    $ids[] = (string) $row['site_id'];
+                                }
+                            }
+                            if ($ids !== []) {
+                                $sitesByEnvoyVhost = \App\Models\Site::query()
+                                    ->whereIn('id', array_unique($ids))
+                                    ->get(['id'])
+                                    ->keyBy('id')
                                     ->all();
                             }
                         }
@@ -425,6 +448,18 @@
                                                 <th class="px-4 py-2 font-medium">{{ __('Status') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Hosts') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Healthy (cur/tot)') }}</th>
+                                                @break
+                                            @case('virtualhosts')
+                                                <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Domains') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Cluster') }}</th>
+                                                <th class="px-4 py-2 font-medium text-right">{{ __('Manage') }}</th>
+                                                @break
+                                            @case('stats')
+                                                <th class="px-4 py-2 font-medium">{{ __('Cluster') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Requests') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('5xx') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Active conns') }}</th>
                                                 @break
                                             @case('ssl')
                                                 <th class="px-4 py-2 font-medium">{{ __('Path') }}</th>
@@ -763,6 +798,31 @@
                                                         @if (empty($row['servers']))—@endif
                                                     </td>
                                                     <td class="px-4 py-2 font-mono tabular-nums text-xs text-brand-moss">{{ ($row['sessions_current'] ?? 0).' / '.number_format((int) ($row['sessions_total'] ?? 0)) }}</td>
+                                                    @break
+                                                @case('virtualhosts')
+                                                    @php $envoySite = ! empty($row['site_id']) ? ($sitesByEnvoyVhost[(string) $row['site_id']] ?? null) : null; @endphp
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(', ', $row['domains'] ?? []) ?: '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['cluster'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-right">
+                                                        @if ($envoySite)
+                                                            <a
+                                                                href="{{ route('sites.show', ['server' => $server, 'site' => $envoySite->id]) }}"
+                                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                            >
+                                                                <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
+                                                                {{ __('Open site') }}
+                                                            </a>
+                                                        @else
+                                                            <span class="text-brand-mist text-[11px]">—</span>
+                                                        @endif
+                                                    </td>
+                                                    @break
+                                                @case('stats')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['requests'] ?? 0)) }}</td>
+                                                    <td class="px-4 py-2 tabular-nums text-xs text-rose-700">{{ number_format((int) ($row['errors_5xx'] ?? 0)) }}</td>
+                                                    <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['connections_active'] ?? 0)) }}</td>
                                                     @break
                                                 @case('ssl')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['path'] ?? '—' }}</td>

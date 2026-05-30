@@ -7,7 +7,7 @@ import { c, info, ok, printJson, printTable, warn } from './print.mjs';
  * @param {Record<string, unknown>} flags
  */
 export async function serverList(args, flags) {
-  const client = requireClient(flags);
+  const client = await requireClient(flags);
   const response = await client.get('/servers');
   const rows = response?.data ?? [];
 
@@ -65,7 +65,7 @@ export async function serverSystemUsers(args, flags) {
 }
 
 async function systemUsersList(args, flags) {
-  const client = requireClient(flags);
+  const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, args[0]);
   const response = await client.get(`/servers/${serverId}/system-users`);
   const rows = response?.data ?? [];
@@ -95,7 +95,7 @@ async function systemUsersList(args, flags) {
 }
 
 async function systemUsersSync(args, flags) {
-  const client = requireClient(flags);
+  const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, args[0]);
   const response = await client.post(`/servers/${serverId}/system-users/sync`, {});
   ok(response?.message ?? 'Sync queued.');
@@ -107,7 +107,7 @@ async function systemUsersAdd(args, flags) {
     throw cliError('Usage: dply server system-users add <username> --server <id>', 2);
   }
 
-  const client = requireClient(flags);
+  const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, flags.server ?? args[1]);
 
   const body = {
@@ -127,7 +127,7 @@ async function systemUsersUpdate(args, flags) {
     throw cliError('Usage: dply server system-users update <username> [--shell …] [--sudo] [--no-sudo] [--web-group] [--no-web-group] --server <id>', 2);
   }
 
-  const client = requireClient(flags);
+  const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, flags.server ?? args[1]);
 
   /** @type {Record<string, unknown>} */
@@ -162,7 +162,7 @@ async function systemUsersRemove(args, flags) {
     throw cliError('Usage: dply server system-users remove <username> --server <id>', 2);
   }
 
-  const client = requireClient(flags);
+  const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, flags.server ?? args[1]);
   const response = await client.delete(`/servers/${serverId}/system-users/${encodeURIComponent(username)}`);
   ok(response?.message ?? `Queued removal of ${username}.`);

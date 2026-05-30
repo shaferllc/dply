@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\EnvoyEdgeConfigBuilder;
 use App\Services\Servers\HAProxyEdgeConfigBuilder;
+use App\Services\Servers\OpenRestyEdgeConfigBuilder;
 use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\SshConnection;
 use App\Support\Servers\CaddyRuntimeOwnership;
@@ -42,7 +43,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
     {
         $site->loadMissing('server');
         $edgeProxy = $site->server?->edgeProxy();
-        if (! is_string($edgeProxy) || ! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (! is_string($edgeProxy) || ! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             throw new \RuntimeException('Server has no active edge proxy for backend provisioning.');
         }
 
@@ -53,7 +54,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
     {
         $emit ??= new ConsoleEmitter;
 
-        if (! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             throw new \InvalidArgumentException('Unsupported edge proxy ['.$edgeProxy.'].');
         }
 
@@ -109,7 +110,9 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
                     'mkdir -p /etc/caddy/sites-enabled /var/log/caddy %1$s && touch /etc/caddy/Caddyfile && (grep -Fqx %2$s /etc/caddy/Caddyfile || printf "\n%%s\n" %3$s >> /etc/caddy/Caddyfile) && %4$s && %5$s',
                     $edgeProxy === 'traefik'
                         ? escapeshellarg(rtrim((string) config('sites.traefik_dynamic_config_path'), '/'))
-                        : ($edgeProxy === 'envoy' ? '/etc/envoy' : '/etc/haproxy'),
+                        : ($edgeProxy === 'envoy'
+                            ? '/etc/envoy'
+                            : ($edgeProxy === 'openresty' ? '/etc/openresty' : '/etc/haproxy')),
                     escapeshellarg($importLine),
                     escapeshellarg($importLine),
                     CaddyRuntimeOwnership::shell(),
@@ -150,7 +153,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
         $emit ??= new ConsoleEmitter;
 
         $edgeProxy = $server->edgeProxy();
-        if (! is_string($edgeProxy) || ! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (! is_string($edgeProxy) || ! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             throw new \RuntimeException('Server has no active edge proxy for backend sync.');
         }
 
@@ -243,7 +246,9 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
                     'mkdir -p /etc/caddy/sites-enabled /var/log/caddy %1$s && touch /etc/caddy/Caddyfile && (grep -Fqx %2$s /etc/caddy/Caddyfile || printf "\n%%s\n" %3$s >> /etc/caddy/Caddyfile) && %4$s && %5$s',
                     $edgeProxy === 'traefik'
                         ? escapeshellarg(rtrim((string) config('sites.traefik_dynamic_config_path'), '/'))
-                        : ($edgeProxy === 'envoy' ? '/etc/envoy' : '/etc/haproxy'),
+                        : ($edgeProxy === 'envoy'
+                            ? '/etc/envoy'
+                            : ($edgeProxy === 'openresty' ? '/etc/openresty' : '/etc/haproxy')),
                     escapeshellarg($importLine),
                     escapeshellarg($importLine),
                     CaddyRuntimeOwnership::shell(),
@@ -285,6 +290,10 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
                 .'envoy --mode validate -c /etc/envoy/envoy.yaml && '
                 .'(systemctl restart envoy 2>/dev/null || true) && '
                 .EnvoyAdminScript::waitUntilReady(attempts: 25, sleepSeconds: 1),
+            'openresty' => 'caddy validate --config /etc/caddy/Caddyfile && '
+                .'(systemctl reload caddy 2>/dev/null || systemctl restart caddy) && '
+                .'openresty -t && '
+                .'(systemctl reload openresty 2>/dev/null || systemctl restart openresty 2>/dev/null || true)',
             default => 'true',
         };
     }
@@ -293,7 +302,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
     {
         $site->loadMissing('server');
         $edgeProxy = $site->server?->edgeProxy();
-        if (! is_string($edgeProxy) || ! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (! is_string($edgeProxy) || ! in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             throw new \RuntimeException('Server has no active edge proxy for backend cleanup.');
         }
 
@@ -356,6 +365,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
             'traefik' => $this->writeTraefikStatic($server, $ssh, $listenPort),
             'haproxy' => $this->writeHaproxyConfig($server, $ssh, $sites, $listenPort),
             'envoy' => $this->writeEnvoyConfig($server, $ssh, $sites, $listenPort),
+            'openresty' => $this->writeOpenRestyConfig($server, $ssh, $sites, $listenPort),
         };
     }
 
@@ -386,7 +396,23 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
     private function writeEnvoyConfig(Server $server, SshConnection $ssh, Collection $sites, int $listenPort): void
     {
         $path = '/etc/envoy/envoy.yaml';
-        $contents = app(EnvoyEdgeConfigBuilder::class)->build(
+        $contents = app(EnvoyEdgeConfigBuilder::class)->buildForServer(
+            $server,
+            $sites,
+            $listenPort,
+            fn (Site $s): int => EdgeBackendPortResolver::for($s),
+        );
+        $this->writeSystemFile($ssh, $path, $contents);
+    }
+
+    /**
+     * @param  Collection<int, Site>  $sites
+     */
+    private function writeOpenRestyConfig(Server $server, SshConnection $ssh, Collection $sites, int $listenPort): void
+    {
+        $path = '/etc/openresty/nginx.conf';
+        $contents = app(OpenRestyEdgeConfigBuilder::class)->buildForServer(
+            $server,
             $sites,
             $listenPort,
             fn (Site $s): int => EdgeBackendPortResolver::for($s),

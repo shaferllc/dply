@@ -253,7 +253,7 @@
                             <a
                                 href="{{ route('sites.show', [$server, $s]) }}"
                                 wire:navigate
-                                class="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 pr-6 transition-colors hover:bg-brand-sand/15 sm:pr-7 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-0' : 'px-6 sm:px-7' }}"
+                                class="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 pr-6 transition-colors hover:bg-brand-sand/15 sm:pr-7 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-4 sm:pl-5' : 'px-6 sm:px-7' }}"
                             >
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">

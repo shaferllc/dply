@@ -10,6 +10,7 @@ use App\Models\SiteWebserverConfigProfile;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyEdgeBackendLayout;
 use App\Support\Servers\NginxServiceScript;
 use Illuminate\Support\Str;
 
@@ -71,17 +72,18 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         }
 
         $emit->step('nginx', 'running nginx -t and applying config');
+        $nginxApply = sprintf(
+            'ln -sf %1$s %2$s && %3$s',
+            escapeshellarg($confFile),
+            escapeshellarg($linkFile),
+            NginxServiceScript::testAndReloadOrStartScript(),
+        );
+        if (! $server->hasEdgeProxy()) {
+            $nginxApply = CaddyEdgeBackendLayout::releasePort80Shell()."\n".$nginxApply;
+        }
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_NGINX_EXIT:%%s" "$?"',
-            $this->privilegedCommand(
-                $server,
-                sprintf(
-                    'ln -sf %1$s %2$s && %3$s',
-                    escapeshellarg($confFile),
-                    escapeshellarg($linkFile),
-                    NginxServiceScript::testAndReloadOrStartScript(),
-                )
-            ),
+            $this->privilegedCommand($server, $nginxApply),
         ), 120);
 
         // The nginx -t output is multi-line; emit each non-blank line so the

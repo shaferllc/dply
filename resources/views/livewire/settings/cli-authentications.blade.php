@@ -22,22 +22,30 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Install') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Get the dply CLI') }}</h2>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Requires Node 18+. Run `dply login` — your browser opens here, you approve once, and the terminal is authenticated.') }}
+                            {{ __('Requires Node 18+. Run `dply login` — your browser opens here, you approve once, and the terminal drops into `dply shell`. Press Enter for numbered menus, or type commands directly.') }}
                         </p>
                     </div>
                 </div>
                 <div class="space-y-4 px-6 py-5 sm:px-7">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1. Install globally') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>npm install -g @dply/cli</code></pre>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1. Install') }}</p>
+                        @php $installUrl = route('cli.install'); @endphp
+                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>curl -fsSL {{ $installUrl }} | bash -s -- --login</code></pre>
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('The CLI is hosted by this dply instance — not npm. The script downloads /cli/dply-cli.tgz and installs it globally. Node 18+ required.') }}
+                        </p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('2. Sign in') }}</p>
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('If you used `--login` above, you are already authenticated. Otherwise run:') }}
+                        </p>
                         <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply login --base-url {{ $appUrl }}</code></pre>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('3. Verify') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply whoami
+                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply account show
+dply account sessions
 dply server list</code></pre>
                     </div>
                 </div>

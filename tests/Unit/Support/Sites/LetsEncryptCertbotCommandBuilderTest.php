@@ -30,7 +30,7 @@ test('edge proxy servers use certbot webroot challenge', function (): void {
         ->not->toContain('certbot --nginx');
 });
 
-test('plain nginx servers keep certbot nginx plugin', function (): void {
+test('plain nginx servers use certbot webroot to avoid nginx restarts', function (): void {
     $server = Server::factory()->make([
         'meta' => ['webserver' => 'nginx'],
     ]);
@@ -42,5 +42,8 @@ test('plain nginx servers keep certbot nginx plugin', function (): void {
 
     $cmd = LetsEncryptCertbotCommandBuilder::build($site, ['app.example.com'], 'ops@example.com');
 
-    expect($cmd)->toContain('certbot --nginx')->not->toContain('certonly --webroot');
+    expect($cmd)
+        ->toContain('certbot certonly --webroot')
+        ->toContain('/var/www/demo/public')
+        ->not->toContain('certbot --nginx');
 });

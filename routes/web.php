@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
+use App\Http\Controllers\CliInstallController;
 use App\Http\Controllers\CloudDeployWebhookController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\EdgeLogpushIngestController;
 use App\Http\Controllers\EdgePreviewAccessController;
 use App\Http\Controllers\EdgePreviewCommentsController;
 use App\Http\Controllers\EdgeVitalsIngestController;
+use App\Http\Controllers\EnvoyAdminProxyController;
 use App\Http\Controllers\FunctionLogIngestController;
 use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\GithubEdgeWebhookController;
@@ -334,6 +336,12 @@ Route::livewire('/status/{statusPage}', StatusPublicPage::class)
 Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareController::class, 'show'])
     ->middleware(['throttle:60,1'])
     ->name('database-credential-shares.show');
+
+Route::prefix('cli')->middleware('throttle:60,1')->group(function (): void {
+    Route::get('/install.sh', [CliInstallController::class, 'installScript'])->name('cli.install');
+    Route::get('/dply-cli.tgz', [CliInstallController::class, 'packageTarball'])->name('cli.package');
+    Route::get('/version.json', [CliInstallController::class, 'packageVersion'])->name('cli.version');
+});
 
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
@@ -738,6 +746,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/traefik/assets/{path}', TraefikDashboardProxyController::class)
         ->where('path', '.*')
         ->name('servers.traefik.dashboard.assets');
+    Route::get('servers/{server}/envoy/admin/{path?}', EnvoyAdminProxyController::class)
+        ->where('path', '.*')
+        ->name('servers.envoy.admin');
     Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {

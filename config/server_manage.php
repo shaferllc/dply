@@ -114,6 +114,7 @@ return [
         '/etc/traefik/',
         '/etc/haproxy/',
         '/etc/envoy/',
+        '/etc/openresty/',
         '/etc/mysql/',
         '/etc/mariadb/',
         '/etc/redis/',
@@ -270,6 +271,18 @@ return [
             'access_log' => null,
             'error_log' => null,
             'journal_unit' => 'envoy',
+        ],
+        'openresty' => [
+            'main' => '/etc/openresty/nginx.conf',
+            'globs' => [
+                '/etc/openresty/conf.d/*.conf',
+            ],
+            'validate' => '(sudo -n openresty -t 2>&1 || openresty -t 2>&1)',
+            'reload' => '(sudo -n systemctl reload openresty || systemctl reload openresty) 2>&1',
+            'log_dir' => '/var/log/openresty',
+            'access_log' => '/var/log/openresty/access.log',
+            'error_log' => '/var/log/openresty/error.log',
+            'journal_unit' => 'openresty',
         ],
     ],
 
@@ -972,6 +985,68 @@ BASH
             'script' => '(sudo -n systemctl disable envoy || systemctl disable envoy) 2>&1',
         ],
 
+        'restart_openresty' => [
+            'label' => 'Restart OpenResty',
+            'description' => 'systemctl restart openresty. Brief connection drop while the daemon restarts.',
+            'confirm' => 'Restart OpenResty now? Edge routing may briefly drop connections.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart openresty || systemctl restart openresty) 2>&1
+else
+  (sudo -n service openresty restart || service openresty restart) 2>&1
+fi
+BASH,
+        ],
+        'reload_openresty' => [
+            'label' => 'Reload OpenResty',
+            'description' => 'Graceful reload of /etc/openresty/nginx.conf.',
+            'confirm' => 'Reload OpenResty configuration?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl reload openresty || systemctl reload openresty) 2>&1
+else
+  (sudo -n openresty -s reload || openresty -s reload) 2>&1
+fi
+BASH,
+        ],
+        'openresty_test_config' => [
+            'label' => 'Test OpenResty config',
+            'description' => 'Runs `openresty -t` (parse-only).',
+            'confirm' => 'Run OpenResty configuration syntax test?',
+            'timeout' => 60,
+            'script' => '(sudo -n openresty -t 2>&1 || openresty -t 2>&1)',
+        ],
+        'start_openresty' => [
+            'label' => 'Start OpenResty',
+            'description' => 'systemctl start openresty.',
+            'confirm' => 'Start OpenResty now?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl start openresty || systemctl start openresty) 2>&1',
+        ],
+        'stop_openresty' => [
+            'label' => 'Stop OpenResty',
+            'description' => 'systemctl stop openresty. Sites routed through OpenResty will be unavailable.',
+            'confirm' => 'Stop OpenResty now? Edge routing will be unavailable.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl stop openresty || systemctl stop openresty) 2>&1',
+        ],
+        'enable_openresty' => [
+            'label' => 'Enable OpenResty at boot',
+            'description' => 'systemctl enable openresty.',
+            'confirm' => 'Enable OpenResty to start automatically at boot?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl enable openresty || systemctl enable openresty) 2>&1',
+        ],
+        'disable_openresty' => [
+            'label' => 'Disable OpenResty at boot',
+            'description' => 'systemctl disable openresty. Does not stop the running service.',
+            'confirm' => 'Disable OpenResty from starting at boot? The running service will keep running until stopped.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl disable openresty || systemctl disable openresty) 2>&1',
+        ],
+
         // ---------------------------------------------------------------
         // Per-engine read-only CLI / diagnostic commands. Output lands in
         // the same flash/banner the existing test/reload actions use.
@@ -1173,6 +1248,27 @@ BASH,
             'confirm' => 'Query Envoy runtime info?',
             'timeout' => 10,
             'script' => '(sudo -n curl -sf http://127.0.0.1:9901/server_info 2>&1 || curl -sf http://127.0.0.1:9901/server_info 2>&1 || echo "(admin interface unavailable — is envoy running?)")',
+        ],
+        'openresty_version' => [
+            'label' => 'OpenResty version',
+            'description' => '`openresty -V` — build version + compiled modules.',
+            'confirm' => 'Show OpenResty build version?',
+            'timeout' => 30,
+            'script' => '(sudo -n openresty -V 2>&1 || openresty -V 2>&1)',
+        ],
+        'openresty_show_config' => [
+            'label' => 'Show OpenResty config',
+            'description' => 'Dump /etc/openresty/nginx.conf — full edge config with server and upstream blocks.',
+            'confirm' => 'Show the live OpenResty nginx.conf?',
+            'timeout' => 30,
+            'script' => '(sudo -n cat /etc/openresty/nginx.conf 2>&1 || cat /etc/openresty/nginx.conf 2>&1)',
+        ],
+        'openresty_show_runtime_info' => [
+            'label' => 'OpenResty stub_status',
+            'description' => 'Fetch localhost stub_status counters used by dply live-state probes.',
+            'confirm' => 'Fetch OpenResty stub_status from 127.0.0.1:9149?',
+            'timeout' => 30,
+            'script' => '(sudo -n curl -sf http://127.0.0.1:9149/nginx_status 2>&1 || curl -sf http://127.0.0.1:9149/nginx_status 2>&1 || echo "(stub_status unavailable — is openresty running?)")',
         ],
 
         'apt_upgrade' => [
@@ -2066,6 +2162,9 @@ BASH
             ],
             '/etc/envoy/' => [
                 'engine' => 'envoy',
+            ],
+            '/etc/openresty/' => [
+                'engine' => 'openresty',
             ],
             '/etc/mysql/' => [
                 'validate' => $mysqlConfigValidateScript,

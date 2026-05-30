@@ -12,6 +12,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -2196,7 +2197,7 @@ test('site show displays preview and certificate summary', function () {
         ->assertSee('active');
 });
 
-test('site show displays certificate retry affordance for failed certificate', function () {
+test('site show displays certificate repair affordance for failed certificate', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -2208,6 +2209,7 @@ test('site show displays certificate retry affordance for failed certificate', f
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_NGINX_ACTIVE,
+        'meta' => ['choose_app' => ['skipped' => true]],
     ]);
     SiteCertificate::query()->create([
         'site_id' => $site->id,
@@ -2228,11 +2230,12 @@ test('site show displays certificate retry affordance for failed certificate', f
     $response->assertOk()
         ->assertSee('Existing certificates')
         ->assertSee('failed')
+        ->assertSee('Repair')
         ->assertSee('Last output')
         ->assertSee('DNS validation failed for app.example.com');
 });
 
-test('site show can retry a failed certificate', function () {
+test('site show can repair a failed certificate', function () {
     Queue::getFacadeRoot()->except([ExecuteSiteCertificateJob::class]);
 
     $user = userWithOrganization();
@@ -2246,6 +2249,7 @@ test('site show can retry a failed certificate', function () {
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_NGINX_ACTIVE,
+        'meta' => ['choose_app' => ['skipped' => true]],
     ]);
     $certificate = SiteCertificate::query()->create([
         'site_id' => $site->id,
@@ -2256,6 +2260,12 @@ test('site show can retry a failed certificate', function () {
         'status' => SiteCertificate::STATUS_FAILED,
         'last_output' => 'Initial failure',
     ]);
+
+    $this->mock(SiteWebserverConfigApplier::class, function ($mock) use ($site): void {
+        $mock->shouldReceive('apply')
+            ->once()
+            ->withArgs(fn (Site $passed): bool => $passed->is($site));
+    });
 
     $this->mock(CertificateRequestService::class, function ($mock) use ($certificate): void {
         $mock->shouldReceive('execute')
@@ -2273,13 +2283,72 @@ test('site show can retry a failed certificate', function () {
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
-        ->call('retryCertificate', $certificate->id)
-        ->assertDispatched('notify', message: 'Certificate retry finished.', type: 'success');
+        ->call('repairCertificate', $certificate->id)
+        ->assertDispatched('notify', message: 'Certificate repair queued. Track progress in the banner at the top of this page.', type: 'success');
+
+    expect(ConsoleAction::query()
+        ->where('subject_type', $site->getMorphClass())
+        ->where('subject_id', $site->id)
+        ->where('kind', 'ssl')
+        ->whereNull('dismissed_at')
+        ->exists())->toBeTrue();
 
     $certificate->refresh();
 
     expect($certificate->status)->toBe(SiteCertificate::STATUS_ISSUED);
     expect($certificate->last_output)->toBe('CSR regenerated successfully');
+});
+
+test('repair certificate seeds ssl console action before job dispatch', function () {
+    Queue::fake();
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+        'meta' => ['choose_app' => ['skipped' => true]],
+    ]);
+    $certificate = SiteCertificate::query()->create([
+        'site_id' => $site->id,
+        'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+        'provider_type' => SiteCertificate::PROVIDER_CSR,
+        'challenge_type' => SiteCertificate::CHALLENGE_MANUAL,
+        'domains_json' => ['app.example.com'],
+        'status' => SiteCertificate::STATUS_FAILED,
+        'last_output' => 'Initial failure',
+    ]);
+
+    $this->mock(SiteWebserverConfigApplier::class, function ($mock) use ($site): void {
+        $mock->shouldReceive('apply')
+            ->once()
+            ->withArgs(fn (Site $passed): bool => $passed->is($site));
+    });
+
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'certificates'])
+        ->call('repairCertificate', $certificate->id)
+        ->assertSee(__('Issuing SSL certificate on :host …', ['host' => $site->name]));
+
+    Queue::assertPushed(
+        ExecuteSiteCertificateJob::class,
+        fn (ExecuteSiteCertificateJob $job): bool => $job->certificateId === (string) $certificate->id,
+    );
+
+    $action = ConsoleAction::query()
+        ->where('subject_type', $site->getMorphClass())
+        ->where('subject_id', $site->id)
+        ->where('kind', 'ssl')
+        ->whereNull('dismissed_at')
+        ->first();
+
+    expect($action)->not->toBeNull();
+    expect($action->status)->toBe(ConsoleAction::STATUS_QUEUED);
 });
 
 test('sites index shows provisioning badge and visit link only when ready', function () {

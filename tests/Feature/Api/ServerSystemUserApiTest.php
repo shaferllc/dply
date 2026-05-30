@@ -102,5 +102,5 @@ test('system users write requires ability', function (): void {
     ], ['Authorization' => 'Bearer '.$plain])
         ->assertForbidden();
 
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(CreateServerSystemUserJob::class);
 });

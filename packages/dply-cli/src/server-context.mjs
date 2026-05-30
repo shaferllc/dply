@@ -1,12 +1,12 @@
 import { ApiClient } from './api.mjs';
-import { readGlobalConfig } from './config.mjs';
+import { defaultBaseUrl, readGlobalConfig } from './config.mjs';
 
 /**
  * @param {Record<string, unknown>} [flags]
  */
-export function requireClient(flags = {}) {
-  const cfg = readGlobalConfig();
-  const baseUrl = (flags['base-url'] || flags.b || cfg?.baseUrl || '').replace(/\/+$/, '');
+export async function requireClient(flags = {}) {
+  const cfg = await readGlobalConfig();
+  const baseUrl = (flags['base-url'] || flags.b || cfg?.baseUrl || defaultBaseUrl()).replace(/\/+$/, '');
   const token = cfg?.token;
 
   if (!token) {

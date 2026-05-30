@@ -43,8 +43,11 @@ export function printKeyValues(pairs) {
 /**
  * Print a list of records as a compact table.
  *
+ * Rows may be objects keyed by column name, or positional arrays matching
+ * `columns` left-to-right.
+ *
  * @param {string[]} columns
- * @param {Array<Record<string, unknown>>} rows
+ * @param {Array<Record<string, unknown> | unknown[]>} rows
  */
 export function printTable(columns, rows) {
   if (rows.length === 0) {
@@ -53,11 +56,19 @@ export function printTable(columns, rows) {
     return;
   }
 
-  const widths = columns.map((col) => Math.max(col.length, ...rows.map((r) => String(r[col] ?? '—').length)));
+  const normalized = rows.map((row) => {
+    if (Array.isArray(row)) {
+      return Object.fromEntries(columns.map((col, i) => [col, row[i] ?? '—']));
+    }
+
+    return row;
+  });
+
+  const widths = columns.map((col) => Math.max(col.length, ...normalized.map((r) => String(r[col] ?? '—').length)));
   const header = columns.map((col, i) => c.bold(col.padEnd(widths[i]))).join('  ');
   process.stdout.write(`${header}\n`);
   process.stdout.write(c.dim(columns.map((_, i) => '─'.repeat(widths[i])).join('  ')) + '\n');
-  for (const row of rows) {
+  for (const row of normalized) {
     const line = columns.map((col, i) => String(row[col] ?? '—').padEnd(widths[i])).join('  ');
     process.stdout.write(`${line}\n`);
   }

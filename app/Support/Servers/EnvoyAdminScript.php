@@ -78,6 +78,12 @@ echo '###dply-section:end###'
 echo '###dply-section:runtime###'
 fetch '/server_info'
 echo '###dply-section:end###'
+echo '###dply-section:config###'
+fetch '/config_dump?include_eds=false'
+echo '###dply-section:end###'
+echo '###dply-section:stats###'
+fetch '/stats/prometheus'
+echo '###dply-section:end###'
 BASH,
         );
     }

@@ -101,6 +101,6 @@ return [
     | Edge proxy engines listed here show "Coming soon" in the overview picker
     | and render preview tabs until removed. Active installs keep full controls.
     */
-    'edge_proxy_coming_soon' => ['traefik', 'haproxy', 'openresty'],
+    'edge_proxy_coming_soon' => ['traefik', 'haproxy', 'envoy'],
 
 ];

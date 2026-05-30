@@ -653,4 +653,57 @@ final class BillingAnalytics
 
         return implode(' · ', $parts);
     }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function apiSummary(Organization $organization): array
+    {
+        $state = $this->billingStateComputer->compute($organization);
+
+        return [
+            'organization_id' => (string) $organization->id,
+            'summary' => $this->summary($organization, $state),
+            'plan' => [
+                'key' => $state->planKey,
+                'label' => $state->planLabel,
+                'price_cents' => $state->planPriceCents,
+            ],
+            'monthly_total_cents' => $state->monthlyTotalCents,
+            'managed_subtotal_cents' => $state->managedSubtotalCents(),
+            'is_free' => $state->isFree(),
+            'counts' => [
+                'servers' => $state->serverCount(),
+                'serverless' => $state->serverlessCount,
+                'managed_servers' => $state->managedServerCount,
+                'cloud' => $state->cloudCount,
+                'edge' => $state->edgeCount,
+            ],
+            'subscription' => $this->subscriptionSnapshot($organization),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function apiBreakdown(Organization $organization): array
+    {
+        $state = $this->billingStateComputer->compute($organization);
+
+        return [
+            'monthly_total_cents' => $state->monthlyTotalCents,
+            'categories' => $this->categoryBreakdown($state),
+            'line_items' => $this->lineItems($state),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function apiInvoices(Organization $organization): array
+    {
+        return [
+            'invoices' => $this->invoiceHistory($organization),
+        ];
+    }
 }

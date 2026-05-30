@@ -14,6 +14,8 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\Servers\EnvoyEdgeConfigBuilder;
 use App\Services\Servers\EnvoyStaticConfigOptions;
 use App\Services\Servers\HAProxyEdgeConfigBuilder;
+use App\Services\Servers\OpenRestyEdgeConfigBuilder;
+use App\Services\Servers\OpenRestyStaticConfigOptions;
 use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
@@ -67,7 +69,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public string $serverId,
-        public string $target,   // 'traefik' | 'haproxy' | 'envoy'
+        public string $target,   // 'traefik' | 'haproxy' | 'envoy' | 'openresty'
         public ?string $userId = null,
     ) {}
 
@@ -108,7 +110,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
         if ($server === null) {
             return;
         }
-        if (! in_array($this->target, ['traefik', 'haproxy', 'envoy'], true)) {
+        if (! in_array($this->target, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             return;
         }
 
@@ -238,7 +240,7 @@ BASH;
 
         $ssh->exec($this->privilegedCommand(
             $server,
-            'mkdir -p /etc/caddy/sites-enabled /var/log/caddy /etc/traefik/dynamic /etc/haproxy /etc/envoy && '.CaddyRuntimeOwnership::shell(),
+            'mkdir -p /etc/caddy/sites-enabled /var/log/caddy /etc/traefik/dynamic /etc/haproxy /etc/envoy /etc/openresty && '.CaddyRuntimeOwnership::shell(),
         ), 30);
 
         foreach ($sites as $site) {
@@ -279,6 +281,9 @@ BASH;
         if ($this->target === 'envoy') {
             $this->writeEnvoyEdgeConfig($server, $ssh, $sites, listenPort: 8080);
         }
+        if ($this->target === 'openresty') {
+            $this->writeOpenRestyEdgeConfig($server, $ssh, $sites, listenPort: 8080);
+        }
     }
 
     protected function executeStageValidate(Server $server): void
@@ -286,13 +291,16 @@ BASH;
         $ssh = new SshConnection($server);
         $ssh->exec($this->privilegedCommand(
             $server,
-            CaddyEdgeBackendLayout::stripLegacySiteFragmentsShell().'; dply_strip_legacy_caddy_site_fragments',
+            CaddyEdgeBackendLayout::stripLegacySiteFragmentsShell()
+            .'; '.CaddyEdgeBackendLayout::stripPort80ListenerFragmentsShell()
+            .'; dply_strip_legacy_caddy_site_fragments; dply_strip_port80_caddy_site_fragments',
         ), 30);
 
         $cmd = match ($this->target) {
             'traefik' => 'caddy validate --config /etc/caddy/Caddyfile',
             'haproxy' => 'haproxy -c -f /etc/haproxy/haproxy.cfg && caddy validate --config /etc/caddy/Caddyfile',
             'envoy' => 'envoy --mode validate -c /etc/envoy/envoy.yaml && caddy validate --config /etc/caddy/Caddyfile',
+            'openresty' => 'openresty -t && caddy validate --config /etc/caddy/Caddyfile',
         };
 
         $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
@@ -330,6 +338,7 @@ BASH;
             'traefik' => $this->writeTraefikStaticConfig($server, $ssh, listenPort: 80),
             'haproxy' => $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 80),
             'envoy' => $this->writeEnvoyEdgeConfig($server, $ssh, $sites, listenPort: 80),
+            'openresty' => $this->writeOpenRestyEdgeConfig($server, $ssh, $sites, listenPort: 80),
         };
 
         // Stop the previous webserver (free :80) — except when it's Caddy,
@@ -347,12 +356,26 @@ BASH;
             $this->stopEdgeProxyUnit($ssh, $server, $currentEdge);
         }
 
-        // Ensure Caddy loads backend configs without binding :80 (default apt
-        // Caddyfile serves :80 and blocks Envoy).
+        // Canonical Caddyfile + strip :80 fragments before restart — releasePort80Shell
+        // restarts Caddy and fails when :80 is still held (blocks Envoy bind).
+        $this->writeRemoteFile(
+            $server,
+            $ssh,
+            CaddyEdgeBackendLayout::CADDYFILE_PATH,
+            CaddyEdgeBackendLayout::canonicalCaddyfile(),
+        );
+
+        $ssh->exec($this->privilegedCommand(
+            $server,
+            CaddyEdgeBackendLayout::stripLegacySiteFragmentsShell()
+            .'; '.CaddyEdgeBackendLayout::stripPort80ListenerFragmentsShell()
+            .'; dply_strip_legacy_caddy_site_fragments; dply_strip_port80_caddy_site_fragments',
+        ), 30);
+
         $releaseOut = $ssh->exec($this->privilegedCommand(
             $server,
             CaddyEdgeBackendLayout::releasePort80Shell().' 2>&1',
-        ), 45);
+        ), 60);
         $releaseExit = $ssh->lastExecExitCode();
         if ($releaseExit !== null && $releaseExit !== 0) {
             throw new \RuntimeException(sprintf(
@@ -362,16 +385,12 @@ BASH;
             ));
         }
 
-        $ssh->exec($this->privilegedCommand(
-            $server,
-            '(systemctl is-active --quiet caddy && systemctl reload caddy) || systemctl enable --now caddy',
-        ), 30);
-
         // Start the edge proxy on :80.
         $edgeUnit = match ($this->target) {
             'traefik' => 'traefik',
             'haproxy' => 'haproxy',
             'envoy' => 'envoy',
+            'openresty' => 'openresty',
         };
 
         if ($this->target === 'envoy') {
@@ -444,6 +463,7 @@ BASH;
             'traefik' => $caddy."\n".$this->traefikInstallScript(),
             'haproxy' => $caddy."\n".$this->aptInstallIdempotent('haproxy')."\n".$this->aptInstallIdempotent('socat'),
             'envoy' => $caddy."\n".$this->envoyInstallScript(),
+            'openresty' => $caddy."\n".OpenRestyStaticConfigOptions::installScript(),
         };
     }
 
@@ -546,7 +566,8 @@ BASH;
             escapeshellarg($path),
         )), 15);
 
-        $contents = app(EnvoyEdgeConfigBuilder::class)->build(
+        $contents = app(EnvoyEdgeConfigBuilder::class)->buildForServer(
+            $server,
             $sites,
             $listenPort,
             fn (Site $s): int => $this->backendPort($s),
@@ -555,7 +576,27 @@ BASH;
     }
 
     /**
-     * Stable per-site Caddy backend port. Reuses any value already pinned
+     * @param  Collection<int, Site>  $sites
+     */
+    private function writeOpenRestyEdgeConfig(Server $server, SshConnection $ssh, $sites, int $listenPort): void
+    {
+        $path = '/etc/openresty/nginx.conf';
+        $ssh->exec($this->privilegedCommand($server, sprintf(
+            '[ -f %1$s ] && [ ! -f %1$s.dply-bak ] && cp %1$s %1$s.dply-bak || true',
+            escapeshellarg($path),
+        )), 15);
+
+        $contents = app(OpenRestyEdgeConfigBuilder::class)->buildForServer(
+            $server,
+            $sites,
+            $listenPort,
+            fn (Site $s): int => $this->backendPort($s),
+        );
+        $this->writeRemoteFile($server, $ssh, $path, $contents);
+    }
+
+    /**
+     * Stable per-site Caddy backend port.
      * in site meta by SiteTraefikProvisioner; falls back to a deterministic
      * crc32-derived port in the 20000-40000 range.
      */
@@ -594,6 +635,7 @@ BASH;
             'traefik' => 'traefik',
             'haproxy' => 'haproxy',
             'envoy' => 'envoy',
+            'openresty' => 'openresty',
             default => null,
         };
 

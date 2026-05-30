@@ -145,3 +145,93 @@ test('admin listener on localhost 9901', function () {
     $this->assertStringContainsString('address: 127.0.0.1', $out);
     $this->assertStringContainsString('port_value: 9901', $out);
 });
+
+test('merges custom clusters and operator settings', function () {
+    $out = app(EnvoyEdgeConfigBuilder::class)->build(
+        new Collection([]),
+        80,
+        fn ($s) => 20000,
+        customClusters: [[
+            'name' => 'api_pool',
+            'connect_timeout' => '2s',
+            'lb_policy' => 'LEAST_REQUEST',
+            'endpoints' => ['127.0.0.1:9090'],
+        ]],
+        operatorSettings: ['admin_port' => '9902', 'stat_prefix' => 'edge_ingress'],
+    );
+
+    $this->assertStringContainsString('name: api_pool', $out);
+    $this->assertStringContainsString('port_value: 9090', $out);
+    $this->assertStringContainsString('lb_policy: LEAST_REQUEST', $out);
+    $this->assertStringContainsString('port_value: 9902', $out);
+    $this->assertStringContainsString('stat_prefix: edge_ingress', $out);
+});
+
+test('merges custom virtual hosts before catch-all', function () {
+    $out = app(EnvoyEdgeConfigBuilder::class)->build(
+        new Collection([]),
+        80,
+        fn ($s) => 20000,
+        customVirtualHosts: [[
+            'name' => 'api',
+            'domains' => ['api.example.com'],
+            'cluster' => 'api_pool',
+        ]],
+    );
+
+    $this->assertStringContainsString('name: vhost_custom_api', $out);
+    $this->assertStringContainsString('"api.example.com"', $out);
+    $this->assertStringContainsString('cluster: api_pool', $out);
+
+    $customPos = strpos($out, 'vhost_custom_api');
+    $unmatchedPos = strpos($out, 'dply_unmatched');
+    expect($customPos)->toBeLessThan($unmatchedPos);
+});
+
+test('merges custom listeners in shared and cluster modes', function () {
+    $user = makeUserWithOrg();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'app.example.com',
+        'is_primary' => true,
+    ]);
+
+    $out = app(EnvoyEdgeConfigBuilder::class)->build(
+        new Collection([$site->fresh()]),
+        80,
+        fn () => 25001,
+        customListeners: [
+            [
+                'name' => 'alt_shared',
+                'address' => '0.0.0.0',
+                'port' => 8080,
+                'mode' => 'shared',
+                'default_cluster' => '',
+            ],
+            [
+                'name' => 'metrics',
+                'address' => '127.0.0.1',
+                'port' => 9090,
+                'mode' => 'cluster',
+                'default_cluster' => 'metrics_pool',
+            ],
+        ],
+    );
+
+    $this->assertStringContainsString('name: alt_shared', $out);
+    $this->assertStringContainsString('port_value: 8080', $out);
+    $this->assertStringContainsString('"app.example.com:8080"', $out);
+    $this->assertStringContainsString('name: metrics', $out);
+    $this->assertStringContainsString('address: 127.0.0.1', $out);
+    $this->assertStringContainsString('port_value: 9090', $out);
+    $this->assertStringContainsString('cluster: metrics_pool', $out);
+});

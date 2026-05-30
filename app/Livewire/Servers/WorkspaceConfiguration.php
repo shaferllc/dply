@@ -452,7 +452,7 @@ class WorkspaceConfiguration extends Component
      */
     public static function webserverConfigurationScopes(): array
     {
-        return ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy'];
+        return ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy', 'openresty'];
     }
 
     /**
@@ -490,7 +490,7 @@ class WorkspaceConfiguration extends Component
                 'static', 'dynamic',
             ],
             'haproxy' => ['overview', 'logs', 'info', 'frontends', 'backends', 'ssl', 'runtime'],
-            'envoy' => ['overview', 'logs', 'info', 'listeners', 'clusters', 'runtime'],
+            'envoy' => ['overview', 'logs', 'info', 'listeners', 'virtualhosts', 'clusters', 'stats', 'runtime', 'static'],
         ];
 
         $allowed = $allowedByEngine[$engine] ?? ['overview'];

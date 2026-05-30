@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\AccountApiController;
 use App\Http\Controllers\Api\Auth\DeviceAuthorizationController;
+use App\Http\Controllers\Api\BillingApiController;
 use App\Http\Controllers\Api\Edge\EdgeAccessApiController;
 use App\Http\Controllers\Api\Edge\EdgeAliasApiController;
 use App\Http\Controllers\Api\Edge\EdgeCacheApiController;
@@ -55,6 +57,22 @@ Route::prefix('v1')->group(function (): void {
     $apiAbilities = config('api_token_permissions.http_route_abilities', []);
 
     Route::middleware(['auth.api', 'throttle:api'])->group(function () use ($apiAbilities): void {
+        Route::get('/account', [AccountApiController::class, 'show'])
+            ->middleware('ability:'.$apiAbilities['account.show']);
+        Route::get('/account/organizations', [AccountApiController::class, 'organizations'])
+            ->middleware('ability:'.$apiAbilities['account.organizations']);
+        Route::get('/account/sessions', [AccountApiController::class, 'sessions'])
+            ->middleware('ability:'.$apiAbilities['account.sessions']);
+        Route::delete('/account/sessions/{apiToken}', [AccountApiController::class, 'destroySession'])
+            ->middleware('ability:'.$apiAbilities['account.sessions_destroy']);
+
+        Route::get('/billing', [BillingApiController::class, 'show'])
+            ->middleware('ability:'.$apiAbilities['billing.show']);
+        Route::get('/billing/breakdown', [BillingApiController::class, 'breakdown'])
+            ->middleware('ability:'.$apiAbilities['billing.breakdown']);
+        Route::get('/billing/invoices', [BillingApiController::class, 'invoices'])
+            ->middleware('ability:'.$apiAbilities['billing.invoices']);
+
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
 

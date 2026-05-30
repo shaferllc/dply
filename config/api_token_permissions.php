@@ -36,6 +36,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'deployer_api_allowlist' => [
+        'account.read',
+        'account.write',
         'servers.read',
         'sites.read',
         'sites.deploy',
@@ -69,6 +71,15 @@ return [
         'servers.system_users.store' => 'system_users.write',
         'servers.system_users.update' => 'system_users.write',
         'servers.system_users.destroy' => 'system_users.delete',
+
+        'account.show' => 'account.read',
+        'account.organizations' => 'account.read',
+        'account.sessions' => 'account.read',
+        'account.sessions_destroy' => 'account.write',
+
+        'billing.show' => 'billing.read',
+        'billing.breakdown' => 'billing.read',
+        'billing.invoices' => 'billing.read',
 
         'edge.sites.index' => 'edge.read',
         'edge.sites.show' => 'edge.read',
@@ -140,6 +151,21 @@ return [
                 ['ability' => 'network.read', 'label' => 'Read'],
                 ['ability' => 'network.write', 'label' => 'Write'],
                 ['ability' => 'network.delete', 'label' => 'Delete'],
+            ],
+        ],
+        [
+            'id' => 'billing',
+            'label' => 'Billing',
+            'permissions' => [
+                ['ability' => 'billing.read', 'label' => 'View plan, estimates, and invoices'],
+            ],
+        ],
+        [
+            'id' => 'account',
+            'label' => 'Account & CLI',
+            'permissions' => [
+                ['ability' => 'account.read', 'label' => 'Read profile, orgs, and CLI sessions'],
+                ['ability' => 'account.write', 'label' => 'Revoke CLI sessions'],
             ],
         ],
         [

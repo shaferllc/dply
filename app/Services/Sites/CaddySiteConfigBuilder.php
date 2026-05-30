@@ -41,7 +41,9 @@ class CaddySiteConfigBuilder
         // change the listen port; Caddy needs host:port pairs for the same model.
         $hosts = $listenPort === null
             ? $hostnames->implode(', ')
-            : $hostnames->map(fn (string $host): string => $host.':'.$listenPort)->implode(', ');
+            : $hostnames
+                ->map(fn (string $host): string => 'http://'.$host.':'.$listenPort)
+                ->implode(', ');
         $basename = $site->webserverConfigBasename();
 
         if ($site->isSuspended()) {
@@ -296,7 +298,9 @@ CADDY;
     {
         $hosts = $listenPort === null
             ? $hostnames->implode(', ')
-            : $hostnames->map(fn (string $host): string => $host.':'.$listenPort)->implode(', ');
+            : $hostnames
+                ->map(fn (string $host): string => 'http://'.$host.':'.$listenPort)
+                ->implode(', ');
         $basename = $site->webserverConfigBasename();
         $port = VmDockerSiteConfigSupport::upstreamPort($site);
         $redirectLines = $this->redirectLines($site);

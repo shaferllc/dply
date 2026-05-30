@@ -23,6 +23,7 @@ final class CaddyEdgeBackendLayout
 # dply: Caddy is a per-site backend only — the active edge proxy owns :80.
 {
 	admin off
+	auto_https off
 }
 
 import /etc/caddy/sites-enabled/*.caddy
@@ -43,6 +44,7 @@ dply_install_edge_caddyfile() {
 # dply: Caddy is a per-site backend only — the active edge proxy owns :80.
 {
 	admin off
+	auto_https off
 }
 
 import /etc/caddy/sites-enabled/*.caddy
@@ -74,32 +76,65 @@ BASH;
     }
 
     /**
-     * Remove legacy :80 site fragments and install the edge Caddyfile.
+     * Remove any site fragment that still declares a :80 / plain-HTTP listener
+     * (including misnamed *-tls.caddy left from a prior primary-Caddy install).
+     */
+    public static function stripPort80ListenerFragmentsShell(): string
+    {
+        return <<<'BASH'
+dply_caddy_fragment_binds_port80() {
+  local f="$1"
+  grep -qE '(:80[[:space:]{]|^[[:space:]]*:80[[:space:]]*$)' "$f" 2>/dev/null && return 0
+  grep -qE '\bhttp://' "$f" 2>/dev/null && return 0
+  return 1
+}
+dply_strip_port80_caddy_site_fragments() {
+  for f in /etc/caddy/sites-enabled/*.caddy; do
+    [ -e "$f" ] || continue
+    if dply_caddy_fragment_binds_port80 "$f"; then
+      rm -f "$f"
+    fi
+  done
+}
+BASH;
+    }
+
+    /**
+     * Remove legacy :80 site fragments, install the edge Caddyfile, restart Caddy,
+     * and exit non-zero when Caddy still holds :80 (so Envoy cutover can abort).
      */
     public static function releasePort80Shell(): string
     {
-        return self::installCanonicalCaddyfileShell()."\n".self::stripLegacySiteFragmentsShell()."\n".<<<'BASH'
+        return self::installCanonicalCaddyfileShell()."\n"
+            .self::stripLegacySiteFragmentsShell()."\n"
+            .self::stripPort80ListenerFragmentsShell()."\n"
+            .<<<'BASH'
 dply_caddy_holds_port80() {
   ss -ltnpH 'sport = :80' 2>/dev/null | grep -qE '"caddy"|/caddy'
 }
 dply_release_caddy_port80() {
-  local changed=0
   dply_strip_legacy_caddy_site_fragments
-  changed=1
-  if [ ! -f /etc/caddy/Caddyfile ] || grep -qF ':80 {' /etc/caddy/Caddyfile 2>/dev/null || grep -qF 'http://' /etc/caddy/Caddyfile 2>/dev/null; then
-    dply_install_edge_caddyfile
-    changed=1
-  elif dply_caddy_holds_port80; then
-    echo "[dply] Caddy holds :80 — installing edge-only Caddyfile (no :80 listener) and reloading…" >&2
-    dply_install_edge_caddyfile
-    changed=1
+  dply_strip_port80_caddy_site_fragments
+  dply_install_edge_caddyfile
+  if systemctl is-active --quiet caddy 2>/dev/null; then
+    caddy validate --config /etc/caddy/Caddyfile || exit 11
+    systemctl restart caddy
+  else
+    systemctl enable --now caddy || exit 13
   fi
-  if [ "$changed" -eq 1 ] || dply_caddy_holds_port80; then
-    if systemctl is-active --quiet caddy 2>/dev/null; then
-      caddy validate --config /etc/caddy/Caddyfile
-      systemctl reload caddy
-      sleep 2
+  i=0
+  while [ "$i" -lt 12 ]; do
+    if ! dply_caddy_holds_port80; then
+      return 0
     fi
+    i=$((i + 1))
+    sleep 1
+  done
+  if dply_caddy_holds_port80; then
+    echo "[dply] Caddy still binds :80 after restart — edge mode needs per-site *-backend.caddy only. Check dply-custom routes or a :80 block in /etc/caddy/Caddyfile." >&2
+    ss -ltnpH 'sport = :80' 2>/dev/null | head -5 >&2 || true
+    ls -la /etc/caddy/sites-enabled/ 2>/dev/null | head -20 >&2 || true
+    exit 12
   fi
 }
 dply_release_caddy_port80

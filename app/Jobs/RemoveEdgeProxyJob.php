@@ -189,6 +189,16 @@ class RemoveEdgeProxyJob implements ShouldBeUnique, ShouldQueue
                 ),
             ), 15);
         }
+
+        if ($edgeProxy === 'openresty') {
+            $ssh->exec($this->privilegedCommand(
+                $server,
+                sprintf(
+                    '[ -f %1$s.dply-bak ] && cp %1$s.dply-bak %1$s || true',
+                    escapeshellarg('/etc/openresty/nginx.conf'),
+                ),
+            ), 15);
+        }
     }
 
     /**

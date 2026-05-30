@@ -20,7 +20,13 @@ use App\Services\Servers\ApacheModulesConfig;
 use App\Services\Servers\CaddyCustomRoutesConfig;
 use App\Services\Servers\CaddyGlobalOptionsConfig;
 use App\Services\Servers\CaddyModulesManager;
-use App\Services\Servers\CaddySnippetsConfig;
+use App\Services\Servers\EnvoyCustomClustersConfig;
+use App\Services\Servers\EnvoyCustomListenersConfig;
+use App\Services\Servers\EnvoyCustomVirtualHostsConfig;
+use App\Services\Servers\EnvoyStaticConfigOptions;
+use App\Services\Servers\OpenRestyCustomServersConfig;
+use App\Services\Servers\OpenRestyCustomUpstreamsConfig;
+use App\Services\Servers\OpenRestyStaticConfigOptions;
 use App\Services\Servers\HaproxyBackendsConfig;
 use App\Services\Servers\HaproxyFrontendsConfig;
 use App\Services\Servers\HaproxyGlobalOptionsConfig;
@@ -31,6 +37,7 @@ use App\Services\Servers\LiveState\EnvoyLiveStateProbe;
 use App\Services\Servers\LiveState\HaproxyLiveStateProbe;
 use App\Services\Servers\LiveState\NginxLiveStateProbe;
 use App\Services\Servers\LiveState\OlsLiveStateProbe;
+use App\Services\Servers\LiveState\OpenRestyLiveStateProbe;
 use App\Services\Servers\LiveState\TraefikLiveStateProbe;
 use App\Services\Servers\NginxCustomHostsConfig;
 use App\Services\Servers\NginxEngineCacheConfig;
@@ -64,6 +71,7 @@ use App\Services\Servers\TraefikUdpRoutesConfig;
 use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Servers\WebserverConfigDriftDetector;
 use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\SshConnection;
 use App\Support\Servers\CaddyPhpFpmUpstreamAddress;
 use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Servers\WebserverWorkspaceViewData;
@@ -679,6 +687,121 @@ class WorkspaceWebserver extends WorkspaceManage
     /** @var array{slug: string, servers: string} */
     public array $traefik_http_services_new = ['slug' => '', 'servers' => ''];
 
+    /** @var array<string, string> */
+    public array $envoy_static_form = [];
+
+    public bool $envoy_static_loaded = false;
+
+    public ?string $envoy_static_flash = null;
+
+    public ?string $envoy_static_error = null;
+
+    /** @var array<string, array{endpoints: list<string>, values: array<string, string>}> */
+    public array $envoy_clusters_form = [];
+
+    /** @var array<string, string> */
+    public array $envoy_clusters_endpoints_text = [];
+
+    public bool $envoy_clusters_loaded = false;
+
+    public ?string $envoy_clusters_flash = null;
+
+    public ?string $envoy_clusters_error = null;
+
+    public bool $envoy_clusters_show_add = false;
+
+    /** @var array{name: string, endpoints: string, connect_timeout: string, lb_policy: string} */
+    public array $envoy_clusters_new = [
+        'name' => '',
+        'endpoints' => '',
+        'connect_timeout' => '5s',
+        'lb_policy' => 'ROUND_ROBIN',
+    ];
+
+    /** @var array<string, array{domains: list<string>, cluster: string}> */
+    public array $envoy_virtualhosts_form = [];
+
+    /** @var array<string, string> */
+    public array $envoy_virtualhosts_domains_text = [];
+
+    public bool $envoy_virtualhosts_loaded = false;
+
+    public ?string $envoy_virtualhosts_flash = null;
+
+    public ?string $envoy_virtualhosts_error = null;
+
+    public bool $envoy_virtualhosts_show_add = false;
+
+    /** @var array{name: string, domains: string, cluster: string} */
+    public array $envoy_virtualhosts_new = [
+        'name' => '',
+        'domains' => '',
+        'cluster' => '',
+    ];
+
+    /** @var array<string, array{address: string, port: int|string, mode: string, default_cluster: string}> */
+    public array $envoy_listeners_form = [];
+
+    public bool $envoy_listeners_loaded = false;
+
+    public ?string $envoy_listeners_flash = null;
+
+    public ?string $envoy_listeners_error = null;
+
+    public bool $envoy_listeners_show_add = false;
+
+    /** @var array{name: string, address: string, port: string, mode: string, default_cluster: string} */
+    public array $envoy_listeners_new = [
+        'name' => '',
+        'address' => '0.0.0.0',
+        'port' => '',
+        'mode' => 'shared',
+        'default_cluster' => '',
+    ];
+
+    /** @var array<string, string> */
+    public array $openresty_static_form = [];
+
+    public bool $openresty_static_loaded = false;
+
+    public ?string $openresty_static_flash = null;
+
+    public ?string $openresty_static_error = null;
+
+    /** @var array<string, array{servers: list<string>}> */
+    public array $openresty_upstreams_form = [];
+
+    /** @var array<string, string> */
+    public array $openresty_upstreams_servers_text = [];
+
+    public bool $openresty_upstreams_loaded = false;
+
+    public ?string $openresty_upstreams_flash = null;
+
+    public ?string $openresty_upstreams_error = null;
+
+    public bool $openresty_upstreams_show_add = false;
+
+    /** @var array{name: string, servers: string} */
+    public array $openresty_upstreams_new = ['name' => '', 'servers' => ''];
+
+    /** @var array<string, array{server_names: list<string>, upstream: string}> */
+    public array $openresty_servers_form = [];
+
+    /** @var array<string, string> */
+    public array $openresty_servers_names_text = [];
+
+    public bool $openresty_servers_loaded = false;
+
+    public ?string $openresty_servers_flash = null;
+
+    public ?string $openresty_servers_error = null;
+
+    public bool $openresty_servers_show_add = false;
+
+    /** @var array{name: string, server_names: string, upstream: string} */
+    public array $openresty_servers_new = ['name' => '', 'server_names' => '', 'upstream' => ''];
+
     // ---- nginx Upstreams editor (Upstreams sub-tab on the nginx engine).
     /**
      * Per-upstream: ['servers' => list<string>, 'values' => array<string,string>]
@@ -931,7 +1054,7 @@ class WorkspaceWebserver extends WorkspaceManage
             // haproxy
             'frontends', 'backends', 'ssl', 'runtime',
             // envoy
-            'clusters',
+            'listeners', 'clusters', 'runtime', 'virtualhosts', 'stats', 'static',
         ];
 
         if ($this->engine_subtab === 'tools') {
@@ -1088,6 +1211,33 @@ class WorkspaceWebserver extends WorkspaceManage
         }
         if ($tab === 'traefik' && $sub === 'services' && ! $this->traefik_http_services_loaded) {
             $this->loadTraefikHttpServicesConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'overview') {
+            $this->ensureEngineLiveState();
+        }
+        if ($tab === 'envoy' && $sub === 'static' && ! $this->envoy_static_loaded) {
+            $this->loadEnvoyStaticConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'clusters' && ! $this->envoy_clusters_loaded) {
+            $this->loadEnvoyClustersConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'virtualhosts' && ! $this->envoy_virtualhosts_loaded) {
+            $this->loadEnvoyVirtualHostsConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'listeners' && ! $this->envoy_listeners_loaded) {
+            $this->loadEnvoyListenersConfig();
+        }
+        if ($tab === 'openresty' && $sub === 'overview') {
+            $this->ensureEngineLiveState();
+        }
+        if ($tab === 'openresty' && $sub === 'static' && ! $this->openresty_static_loaded) {
+            $this->loadOpenRestyStaticConfig();
+        }
+        if ($tab === 'openresty' && $sub === 'upstreams' && ! $this->openresty_upstreams_loaded) {
+            $this->loadOpenRestyUpstreamsConfig();
+        }
+        if ($tab === 'openresty' && $sub === 'servers' && ! $this->openresty_servers_loaded) {
+            $this->loadOpenRestyServersConfig();
         }
         if ($sub === 'workers') {
             if ($tab === 'nginx' && ! $this->nginx_globals_loaded) {
@@ -3290,6 +3440,1154 @@ class WorkspaceWebserver extends WorkspaceManage
         }
     }
 
+    public function loadEnvoyStaticConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_static_error = __('Provisioning and SSH must be ready before reading envoy.yaml.');
+
+            return;
+        }
+
+        try {
+            $result = app(EnvoyStaticConfigOptions::class)->read($this->server);
+            $this->envoy_static_form = $result['values'];
+            $this->envoy_static_loaded = true;
+            $this->envoy_static_flash = null;
+            $this->envoy_static_error = $result['unreadable']
+                ? __('Could not read /etc/envoy/envoy.yaml — check sudo permissions for the deploy user.')
+                : null;
+        } catch (\Throwable $e) {
+            $this->envoy_static_error = __('Failed to read Envoy static config: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_static_loaded = false;
+        }
+    }
+
+    public function saveEnvoyStaticConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_static_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_static_error = __('Provisioning and SSH must be ready before saving envoy.yaml.');
+
+            return;
+        }
+
+        $this->envoy_static_flash = null;
+        $this->envoy_static_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Envoy static settings'),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(EnvoyStaticConfigOptions::class)
+                ->save($this->server, $this->envoy_static_form, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->envoy_static_flash = __('Envoy static settings saved and Envoy restarted.');
+            $this->loadEnvoyStaticConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_static_error = $e->getMessage();
+        }
+    }
+
+    public function repairEnvoyAdminApi(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot repair Envoy config.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'envoy') {
+            $this->toastError(__('This server does not have Envoy as its edge proxy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Repair Envoy admin interface'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyStaticConfigOptions::class)
+                ->repairAdminDefaults($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess(__('Envoy admin defaults restored on 127.0.0.1:9901.'));
+            $this->loadEnvoyStaticConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function startEnvoyService(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot start Envoy.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'envoy') {
+            $this->toastError(__('This server does not have Envoy as its edge proxy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Start Envoy'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyStaticConfigOptions::class)
+                ->startEnvoyService($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess(__('Envoy is running. Try the admin link again.'));
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function drainEnvoyListeners(): void
+    {
+        $this->runEnvoyAdminPostAction(
+            __('Drain Envoy listeners'),
+            '/drain_listeners?graceful',
+            __('Envoy listeners are draining — existing connections finish before new ones are accepted.'),
+        );
+    }
+
+    public function healthcheckFailEnvoy(): void
+    {
+        $this->runEnvoyAdminPostAction(
+            __('Fail Envoy health checks'),
+            '/healthcheck/fail',
+            __('Envoy health checks marked failed — upstreams should stop receiving new traffic if wired to health status.'),
+        );
+    }
+
+    private function runEnvoyAdminPostAction(string $title, string $path, string $successMessage): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot run Envoy maintenance actions.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'envoy' || ! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), $title);
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            $ssh = new SshConnection($this->server);
+            $script = sprintf(
+                'curl -4sf --max-time 10 -X POST %s 2>&1 || curl -4sf --max-time 10 %s 2>&1',
+                escapeshellarg('http://127.0.0.1:9901'.$path),
+                escapeshellarg('http://127.0.0.1:9901'.$path),
+            );
+            $output = $ssh->exec($script, 20);
+            if (($ssh->lastExecExitCode() ?? 1) !== 0) {
+                throw new \RuntimeException(trim((string) $output) !== '' ? trim((string) $output) : 'Envoy admin request failed.');
+            }
+            $emitter->info(trim((string) $output));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess($successMessage);
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    private function refreshEnvoyLiveStateAfterServiceAction(): void
+    {
+        if ($this->server->edgeProxy() !== 'envoy') {
+            return;
+        }
+
+        $this->ensureEngineLiveState(forceFresh: true);
+    }
+
+    public function loadEnvoyClustersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_clusters_error = __('Provisioning and SSH must be ready before reading envoy.yaml.');
+
+            return;
+        }
+
+        try {
+            $clusters = app(EnvoyCustomClustersConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($clusters as $cluster) {
+                $name = (string) ($cluster['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = [
+                    'endpoints' => $cluster['endpoints'] ?? [],
+                    'values' => [
+                        'connect_timeout' => (string) ($cluster['connect_timeout'] ?? '5s'),
+                        'lb_policy' => (string) ($cluster['lb_policy'] ?? 'ROUND_ROBIN'),
+                    ],
+                ];
+                $text[$name] = implode("\n", $cluster['endpoints'] ?? []);
+            }
+            $this->envoy_clusters_form = $form;
+            $this->envoy_clusters_endpoints_text = $text;
+            $this->envoy_clusters_loaded = true;
+            $this->envoy_clusters_flash = null;
+            $this->envoy_clusters_error = null;
+        } catch (\Throwable $e) {
+            $this->envoy_clusters_error = __('Failed to read custom clusters: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_clusters_loaded = false;
+        }
+    }
+
+    public function saveEnvoyClustersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_clusters_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_clusters_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+
+        $clusters = [];
+        foreach ($this->envoy_clusters_endpoints_text as $name => $raw) {
+            if (! isset($this->envoy_clusters_form[$name])) {
+                continue;
+            }
+            $endpoints = array_values(array_filter(
+                array_map('trim', preg_split('/\R/', (string) $raw) ?: []),
+                fn (string $line): bool => $line !== '',
+            ));
+            $values = $this->envoy_clusters_form[$name]['values'] ?? [];
+            $clusters[] = [
+                'name' => $name,
+                'endpoints' => $endpoints,
+                'connect_timeout' => (string) ($values['connect_timeout'] ?? '5s'),
+                'lb_policy' => (string) ($values['lb_policy'] ?? 'ROUND_ROBIN'),
+            ];
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Envoy custom clusters'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomClustersConfig::class)
+                ->save($this->server, $clusters, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_flash = __('Custom clusters saved and edge routing regenerated.');
+            $this->loadEnvoyClustersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_error = $e->getMessage();
+        }
+    }
+
+    public function openAddEnvoyClusterForm(): void
+    {
+        $this->envoy_clusters_show_add = true;
+        $this->envoy_clusters_new = [
+            'name' => '',
+            'endpoints' => '',
+            'connect_timeout' => '5s',
+            'lb_policy' => 'ROUND_ROBIN',
+        ];
+        $this->envoy_clusters_error = null;
+        $this->envoy_clusters_flash = null;
+    }
+
+    public function cancelAddEnvoyClusterForm(): void
+    {
+        $this->envoy_clusters_show_add = false;
+    }
+
+    public function submitAddEnvoyCluster(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $name = trim((string) ($this->envoy_clusters_new['name'] ?? ''));
+        $endpoints = array_values(array_filter(
+            array_map('trim', preg_split('/\R/', (string) ($this->envoy_clusters_new['endpoints'] ?? '')) ?: []),
+            fn (string $line): bool => $line !== '',
+        ));
+        $values = [
+            'connect_timeout' => (string) ($this->envoy_clusters_new['connect_timeout'] ?? '5s'),
+            'lb_policy' => (string) ($this->envoy_clusters_new['lb_policy'] ?? 'ROUND_ROBIN'),
+        ];
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy cluster: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomClustersConfig::class)
+                ->addCluster($this->server, $name, $endpoints, $values, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_flash = __('Cluster added.');
+            $this->envoy_clusters_show_add = false;
+            $this->loadEnvoyClustersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_error = $e->getMessage();
+        }
+    }
+
+    public function removeEnvoyCluster(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Envoy cluster: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomClustersConfig::class)
+                ->removeCluster($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_flash = __('Cluster removed.');
+            $this->loadEnvoyClustersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_error = $e->getMessage();
+        }
+    }
+
+    public function loadEnvoyVirtualHostsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_virtualhosts_error = __('Provisioning and SSH must be ready before reading virtual hosts.');
+
+            return;
+        }
+
+        try {
+            $virtualHosts = app(EnvoyCustomVirtualHostsConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($virtualHosts as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = [
+                    'domains' => $row['domains'] ?? [],
+                    'cluster' => (string) ($row['cluster'] ?? ''),
+                ];
+                $text[$name] = implode("\n", $row['domains'] ?? []);
+            }
+            $this->envoy_virtualhosts_form = $form;
+            $this->envoy_virtualhosts_domains_text = $text;
+            $this->envoy_virtualhosts_loaded = true;
+            $this->envoy_virtualhosts_flash = null;
+            $this->envoy_virtualhosts_error = null;
+        } catch (\Throwable $e) {
+            $this->envoy_virtualhosts_error = __('Failed to read custom virtual hosts: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_virtualhosts_loaded = false;
+        }
+    }
+
+    public function saveEnvoyVirtualHostsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_virtualhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_virtualhosts_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+
+        $virtualHosts = [];
+        foreach ($this->envoy_virtualhosts_domains_text as $name => $raw) {
+            if (! isset($this->envoy_virtualhosts_form[$name])) {
+                continue;
+            }
+            $domains = array_values(array_filter(
+                array_map('trim', preg_split('/[\s,]+/', (string) $raw) ?: []),
+                fn (string $d): bool => $d !== '',
+            ));
+            $virtualHosts[] = [
+                'name' => $name,
+                'domains' => $domains,
+                'cluster' => trim((string) ($this->envoy_virtualhosts_form[$name]['cluster'] ?? '')),
+            ];
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Envoy custom virtual hosts'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomVirtualHostsConfig::class)
+                ->save($this->server, $virtualHosts, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_flash = __('Custom virtual hosts saved and edge routing regenerated.');
+            $this->loadEnvoyVirtualHostsConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_error = $e->getMessage();
+        }
+    }
+
+    public function openAddEnvoyVirtualHostForm(): void
+    {
+        $this->envoy_virtualhosts_show_add = true;
+        $this->envoy_virtualhosts_new = [
+            'name' => '',
+            'domains' => '',
+            'cluster' => '',
+        ];
+        $this->envoy_virtualhosts_error = null;
+        $this->envoy_virtualhosts_flash = null;
+    }
+
+    public function cancelAddEnvoyVirtualHostForm(): void
+    {
+        $this->envoy_virtualhosts_show_add = false;
+    }
+
+    public function submitAddEnvoyVirtualHost(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $name = trim((string) ($this->envoy_virtualhosts_new['name'] ?? ''));
+        $domains = array_values(array_filter(
+            array_map('trim', preg_split('/[\s,]+/', (string) ($this->envoy_virtualhosts_new['domains'] ?? '')) ?: []),
+            fn (string $d): bool => $d !== '',
+        ));
+        $cluster = trim((string) ($this->envoy_virtualhosts_new['cluster'] ?? ''));
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy virtual host: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomVirtualHostsConfig::class)
+                ->add($this->server, $name, $domains, $cluster, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_flash = __('Virtual host added.');
+            $this->envoy_virtualhosts_show_add = false;
+            $this->loadEnvoyVirtualHostsConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_error = $e->getMessage();
+        }
+    }
+
+    public function removeEnvoyVirtualHost(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Envoy virtual host: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomVirtualHostsConfig::class)
+                ->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_flash = __('Virtual host removed.');
+            $this->loadEnvoyVirtualHostsConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_error = $e->getMessage();
+        }
+    }
+
+    public function loadEnvoyListenersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_listeners_error = __('Provisioning and SSH must be ready before reading listeners.');
+
+            return;
+        }
+
+        try {
+            $listeners = app(EnvoyCustomListenersConfig::class)->read($this->server);
+            $form = [];
+            foreach ($listeners as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = [
+                    'address' => (string) ($row['address'] ?? '0.0.0.0'),
+                    'port' => (int) ($row['port'] ?? 0),
+                    'mode' => (string) ($row['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED),
+                    'default_cluster' => (string) ($row['default_cluster'] ?? ''),
+                ];
+            }
+            $this->envoy_listeners_form = $form;
+            $this->envoy_listeners_loaded = true;
+            $this->envoy_listeners_flash = null;
+            $this->envoy_listeners_error = null;
+        } catch (\Throwable $e) {
+            $this->envoy_listeners_error = __('Failed to read custom listeners: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_listeners_loaded = false;
+        }
+    }
+
+    public function saveEnvoyListenersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_listeners_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_listeners_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+
+        $listeners = [];
+        foreach ($this->envoy_listeners_form as $name => $values) {
+            $listeners[] = [
+                'name' => $name,
+                'address' => trim((string) ($values['address'] ?? '0.0.0.0')) ?: '0.0.0.0',
+                'port' => (int) ($values['port'] ?? 0),
+                'mode' => trim((string) ($values['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED)),
+                'default_cluster' => trim((string) ($values['default_cluster'] ?? '')),
+            ];
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Envoy custom listeners'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomListenersConfig::class)
+                ->save($this->server, $listeners, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_flash = __('Custom listeners saved and edge routing regenerated.');
+            $this->loadEnvoyListenersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function openAddEnvoyListenerForm(): void
+    {
+        $this->envoy_listeners_show_add = true;
+        $this->envoy_listeners_new = [
+            'name' => '',
+            'address' => '0.0.0.0',
+            'port' => '',
+            'mode' => EnvoyCustomListenersConfig::MODE_SHARED,
+            'default_cluster' => '',
+        ];
+        $this->envoy_listeners_error = null;
+        $this->envoy_listeners_flash = null;
+    }
+
+    public function cancelAddEnvoyListenerForm(): void
+    {
+        $this->envoy_listeners_show_add = false;
+    }
+
+    public function submitAddEnvoyListener(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $fields = [
+            'name' => trim((string) ($this->envoy_listeners_new['name'] ?? '')),
+            'address' => trim((string) ($this->envoy_listeners_new['address'] ?? '0.0.0.0')) ?: '0.0.0.0',
+            'port' => (int) ($this->envoy_listeners_new['port'] ?? 0),
+            'mode' => trim((string) ($this->envoy_listeners_new['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED)),
+            'default_cluster' => trim((string) ($this->envoy_listeners_new['default_cluster'] ?? '')),
+        ];
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy listener: :name', ['name' => $fields['name']]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomListenersConfig::class)
+                ->add($this->server, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_flash = __('Listener added.');
+            $this->envoy_listeners_show_add = false;
+            $this->loadEnvoyListenersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function removeEnvoyListener(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Envoy listener: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomListenersConfig::class)
+                ->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_flash = __('Listener removed.');
+            $this->loadEnvoyListenersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function loadOpenRestyStaticConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->openresty_static_error = __('Provisioning and SSH must be ready before reading OpenResty settings.');
+
+            return;
+        }
+        try {
+            $result = app(OpenRestyStaticConfigOptions::class)->read($this->server);
+            $this->openresty_static_form = $result['values'];
+            $this->openresty_static_loaded = true;
+            $this->openresty_static_flash = null;
+            $this->openresty_static_error = null;
+        } catch (\Throwable $e) {
+            $this->openresty_static_error = __('Failed to read OpenResty settings: :msg', ['msg' => $e->getMessage()]);
+            $this->openresty_static_loaded = false;
+        }
+    }
+
+    public function saveOpenRestyStaticConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty static settings'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyStaticConfigOptions::class)->save($this->server, $this->openresty_static_form, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_static_flash = __('OpenResty static settings saved and edge routing regenerated.');
+            $this->loadOpenRestyStaticConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_static_error = $e->getMessage();
+        }
+    }
+
+    public function loadOpenRestyUpstreamsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->openresty_upstreams_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $rows = app(OpenRestyCustomUpstreamsConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($rows as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = ['servers' => $row['servers'] ?? []];
+                $text[$name] = implode("\n", $row['servers'] ?? []);
+            }
+            $this->openresty_upstreams_form = $form;
+            $this->openresty_upstreams_servers_text = $text;
+            $this->openresty_upstreams_loaded = true;
+            $this->openresty_upstreams_flash = null;
+            $this->openresty_upstreams_error = null;
+        } catch (\Throwable $e) {
+            $this->openresty_upstreams_error = $e->getMessage();
+            $this->openresty_upstreams_loaded = false;
+        }
+    }
+
+    public function saveOpenRestyUpstreamsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $upstreams = [];
+        foreach ($this->openresty_upstreams_servers_text as $name => $raw) {
+            if (! isset($this->openresty_upstreams_form[$name])) {
+                continue;
+            }
+            $servers = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) $raw) ?: []), fn (string $s): bool => $s !== ''));
+            $upstreams[] = ['name' => $name, 'servers' => $servers];
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty custom upstreams'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomUpstreamsConfig::class)->save($this->server, $upstreams, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_upstreams_flash = __('Custom upstreams saved and edge routing regenerated.');
+            $this->loadOpenRestyUpstreamsConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function openAddOpenRestyUpstreamForm(): void
+    {
+        $this->openresty_upstreams_show_add = true;
+        $this->openresty_upstreams_new = ['name' => '', 'servers' => ''];
+        $this->openresty_upstreams_error = null;
+        $this->openresty_upstreams_flash = null;
+    }
+
+    public function cancelAddOpenRestyUpstreamForm(): void
+    {
+        $this->openresty_upstreams_show_add = false;
+    }
+
+    public function submitAddOpenRestyUpstream(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $name = trim((string) ($this->openresty_upstreams_new['name'] ?? ''));
+        $servers = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($this->openresty_upstreams_new['servers'] ?? '')) ?: []), fn (string $s): bool => $s !== ''));
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add OpenResty upstream: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomUpstreamsConfig::class)->add($this->server, $name, $servers, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_upstreams_flash = __('Upstream added.');
+            $this->openresty_upstreams_show_add = false;
+            $this->loadOpenRestyUpstreamsConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function removeOpenRestyUpstream(string $name): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove OpenResty upstream: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomUpstreamsConfig::class)->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_upstreams_flash = __('Upstream removed.');
+            $this->loadOpenRestyUpstreamsConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function loadOpenRestyServersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->openresty_servers_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $rows = app(OpenRestyCustomServersConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($rows as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = ['server_names' => $row['server_names'] ?? [], 'upstream' => (string) ($row['upstream'] ?? '')];
+                $text[$name] = implode("\n", $row['server_names'] ?? []);
+            }
+            $this->openresty_servers_form = $form;
+            $this->openresty_servers_names_text = $text;
+            $this->openresty_servers_loaded = true;
+            $this->openresty_servers_flash = null;
+            $this->openresty_servers_error = null;
+        } catch (\Throwable $e) {
+            $this->openresty_servers_error = $e->getMessage();
+            $this->openresty_servers_loaded = false;
+        }
+    }
+
+    public function saveOpenRestyServersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $servers = [];
+        foreach ($this->openresty_servers_names_text as $name => $raw) {
+            if (! isset($this->openresty_servers_form[$name])) {
+                continue;
+            }
+            $serverNames = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) $raw) ?: []), fn (string $d): bool => $d !== ''));
+            $servers[] = [
+                'name' => $name,
+                'server_names' => $serverNames,
+                'upstream' => trim((string) ($this->openresty_servers_form[$name]['upstream'] ?? '')),
+            ];
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty custom servers'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomServersConfig::class)->save($this->server, $servers, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_servers_flash = __('Custom server blocks saved and edge routing regenerated.');
+            $this->loadOpenRestyServersConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_servers_error = $e->getMessage();
+        }
+    }
+
+    public function openAddOpenRestyServerForm(): void
+    {
+        $this->openresty_servers_show_add = true;
+        $this->openresty_servers_new = ['name' => '', 'server_names' => '', 'upstream' => ''];
+        $this->openresty_servers_error = null;
+        $this->openresty_servers_flash = null;
+    }
+
+    public function cancelAddOpenRestyServerForm(): void
+    {
+        $this->openresty_servers_show_add = false;
+    }
+
+    public function submitAddOpenRestyServer(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $name = trim((string) ($this->openresty_servers_new['name'] ?? ''));
+        $serverNames = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($this->openresty_servers_new['server_names'] ?? '')) ?: []), fn (string $d): bool => $d !== ''));
+        $upstream = trim((string) ($this->openresty_servers_new['upstream'] ?? ''));
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add OpenResty server: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomServersConfig::class)->add($this->server, $name, $serverNames, $upstream, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_servers_flash = __('Server block added.');
+            $this->openresty_servers_show_add = false;
+            $this->loadOpenRestyServersConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_servers_error = $e->getMessage();
+        }
+    }
+
+    public function removeOpenRestyServer(string $name): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove OpenResty server: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomServersConfig::class)->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_servers_flash = __('Server block removed.');
+            $this->loadOpenRestyServersConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_servers_error = $e->getMessage();
+        }
+    }
+
+    private function refreshOpenRestyLiveStateAfterServiceAction(): void
+    {
+        if ($this->server->edgeProxy() !== 'openresty') {
+            return;
+        }
+        $this->ensureEngineLiveState(forceFresh: true);
+    }
+
     private function mergeTraefikStaticEntrypointsIntoMeta(): void
     {
         $server = $this->server->fresh();
@@ -5200,7 +6498,8 @@ class WorkspaceWebserver extends WorkspaceManage
                 'tcprouters', 'tcpservices', 'udprouters', 'udpservices', 'tls', 'providers',
             ],
             'haproxy' => ['frontends', 'backends', 'ssl', 'runtime'],
-            'envoy' => ['listeners', 'clusters', 'runtime'],
+            'envoy' => ['listeners', 'clusters', 'runtime', 'virtualhosts', 'stats'],
+            'openresty' => ['servers', 'upstreams', 'runtime'],
         ];
 
         return in_array($subtab, $map[$engine] ?? [], true);
@@ -5986,6 +7285,7 @@ class WorkspaceWebserver extends WorkspaceManage
             'traefik' => app(TraefikLiveStateProbe::class),
             'haproxy' => app(HaproxyLiveStateProbe::class),
             'envoy' => app(EnvoyLiveStateProbe::class),
+            'openresty' => app(OpenRestyLiveStateProbe::class),
             default => null,
         };
     }
@@ -6358,7 +7658,7 @@ class WorkspaceWebserver extends WorkspaceManage
         // tabs (Overview / Live-state) skip the SSH entirely.
         $configFiles = [];
         if ($this->engine_subtab === 'config'
-            && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy'], true)
+            && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy', 'openresty'], true)
             && $this->serverOpsReady()) {
             $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
             try {
@@ -6396,7 +7696,7 @@ class WorkspaceWebserver extends WorkspaceManage
      */
     protected function engineSupportsConfig(string $engine): bool
     {
-        return in_array($engine, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy'], true);
+        return in_array($engine, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy', 'openresty'], true);
     }
 
     /**

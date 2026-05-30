@@ -7,7 +7,9 @@
                     $traefikState = \App\Services\Servers\LiveState\EngineLiveState::fromArray($traefikLive);
                     $traefikOverview = data_get($traefikState?->engineSpecific ?? [], 'overview');
                     $traefikVersion = data_get($traefikState?->engineSpecific ?? [], 'version');
-                    $traefikLiveStateErrors = array_values(array_filter((array) data_get($traefikState?->engineSpecific ?? [], 'errors', [])));
+                    $traefikLiveStateErrors = \App\Services\Servers\LiveState\EngineLiveState::probeErrorLines(
+                        data_get($traefikState?->engineSpecific ?? [], 'errors', []),
+                    );
                 }
                 $traefikConfigFrom = ! empty($isEdgeProxyPanel) ? 'edge-proxy' : 'webserver';
                 $traefikConfigReturnSub = ($engine_subtab === '' || $engine_subtab === 'config') ? 'overview' : $engine_subtab;

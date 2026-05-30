@@ -111,8 +111,17 @@
                         ],
                         'envoy' => [
                             'listeners' => ['label' => __('Listeners'), 'icon' => 'heroicon-o-signal'],
-                            'clusters' => ['label' => __('Clusters'), 'icon' => 'heroicon-o-server-stack'],
+                            'virtualhosts' => ['label' => __('Virtual hosts'), 'icon' => 'heroicon-o-server-stack'],
+                            'clusters' => ['label' => __('Clusters'), 'icon' => 'heroicon-o-server'],
+                            'stats' => ['label' => __('Stats'), 'icon' => 'heroicon-o-chart-bar'],
                             'runtime' => ['label' => __('Runtime'), 'icon' => 'heroicon-o-cpu-chip'],
+                            'static' => ['label' => __('Static'), 'icon' => 'heroicon-o-cog-6-tooth'],
+                        ],
+                        'openresty' => [
+                            'servers' => ['label' => __('Servers'), 'icon' => 'heroicon-o-server-stack'],
+                            'upstreams' => ['label' => __('Upstreams'), 'icon' => 'heroicon-o-server'],
+                            'runtime' => ['label' => __('Runtime'), 'icon' => 'heroicon-o-cpu-chip'],
+                            'static' => ['label' => __('Static'), 'icon' => 'heroicon-o-cog-6-tooth'],
                         ],
                         default => [],
                     };

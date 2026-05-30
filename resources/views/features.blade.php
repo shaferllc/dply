@@ -685,7 +685,7 @@
                             <x-heroicon-o-command-line class="h-5 w-5 text-brand-sage" aria-hidden="true" />
                             <code class="text-sm">dply</code> CLI
                         </h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Install with <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">npm i -g @dply/cli</code>. <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply login</code> uses OAuth device flow (the GitHub-CLI / Stripe-CLI pattern). Then <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply deploy</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">promote</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">rollback</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">domains</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">usage</code>. Node 18+, no native deps.</p>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Install with <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">curl -fsSL {{ route('cli.install') }} | bash -s -- --login</code>. The CLI is hosted by your dply instance (not npm). <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply login</code> uses OAuth device flow. Then <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply edge deploy</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply server system-users</code>, and more. Node 18+.</p>
                     </li>
                     <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
                         <h3 class="font-semibold text-brand-ink flex items-center gap-2">

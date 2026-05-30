@@ -59,6 +59,7 @@ class SiteReachabilityChecker
 
             try {
                 $response = Http::timeout(5)
+                    ->withoutRedirecting()
                     ->withHeaders(['Host' => $hostname])
                     ->get($url);
 
@@ -144,6 +145,12 @@ class SiteReachabilityChecker
     private function statusMeansReachable(int $status): bool
     {
         if ($status >= 200 && $status < 400) {
+            return true;
+        }
+
+        // A redirect to HTTPS still proves something is listening on :80 — do
+        // not follow the redirect (port 443 may not be configured yet).
+        if (in_array($status, [301, 302, 307, 308], true)) {
             return true;
         }
 

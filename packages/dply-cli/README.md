@@ -5,11 +5,42 @@ BYO server operations, and more from your terminal.
 
 ## Install
 
+The CLI is **hosted by your dply instance** (not npm). Each install downloads
+the package from `/cli/dply-cli.tgz` on the same origin as the web app.
+
 ```sh
-npm install -g @dply/cli
+curl -fsSL https://your-dply.example/cli/install.sh | bash -s -- --login
 ```
 
-Requires Node 18+. Uses built-in `fetch` — no native modules.
+Requires **Node 18+** and **npm** (npm installs the downloaded tarball globally).
+
+When you pipe from your dply server, the script already knows your `APP_URL`.
+`--login` opens the browser for device-flow authentication when install finishes.
+
+```sh
+curl -fsSL https://your-dply.example/cli/install.sh | bash -s -- --help
+curl -fsSL https://your-dply.example/cli/install.sh | bash -s -- --login
+```
+
+Check the hosted version:
+
+```sh
+curl -fsSL https://your-dply.example/cli/version.json
+```
+
+### Self-hosted config
+
+In `.env` on the dply app:
+
+```env
+APP_URL=https://dplyi.test
+# Default — download from this app:
+DPLY_CLI_INSTALL_METHOD=tarball
+DPLY_CLI_NPM_PUBLISHED=false
+```
+
+After you publish `@dply/cli` to npm, set `DPLY_CLI_NPM_PUBLISHED=true` and
+optionally `DPLY_CLI_INSTALL_METHOD=auto` to try npm first.
 
 ## Sign in (seamless device flow)
 
@@ -19,81 +50,25 @@ dply login --base-url https://your-dply.example
 
 1. The CLI prints a short code and opens your browser to the dply instance.
 2. Sign in if needed, confirm the code, pick your organization and scopes, click **Approve**.
-3. The terminal polls automatically and saves the token to `~/.dply/config.json` (mode 0600).
+3. The terminal saves the token and drops you into **`dply shell`** — press **Enter** or run **`menu`** to browse actions without memorizing commands.
 
-Flags:
+Use `dply login --no-shell` in scripts/CI to skip the interactive shell.
 
-| Flag | Purpose |
-| --- | --- |
-| `--base-url URL` | Self-hosted instance (defaults to env `DPLY_API_BASE_URL` or the public cloud) |
-| `--no-open` | Print the URL only — don't launch a browser |
-| `--token PLAINTEXT` | CI / headless: skip the browser and save a token from Settings → API keys |
-
-Revoke CLI sessions anytime from **Profile → CLI** in the web app.
+Revoke CLI sessions from **Profile → CLI** in the web app.
 
 ## Verify
 
 ```sh
 dply whoami
+dply menu            # numbered menus for account, billing, servers, edge
 dply server list
-dply sites          # Edge sites, when your token includes edge scopes
+dply shell          # re-open the interactive shell anytime
 ```
 
 ## Commands
 
-### Top-level
-
-| Command | Purpose |
-| --- | --- |
-| `dply login` | Browser device-flow login |
-| `dply logout` | Remove saved credentials |
-| `dply whoami` | Show active base URL + linked Edge repo |
-| `dply link [site-id]` | Link cwd to an Edge site |
-| `dply sites` | List Edge sites |
-| `dply server …` | BYO server commands (see below) |
-| `dply edge …` | Edge platform commands (see below) |
-
-### Server (BYO)
-
-| Command | Purpose |
-| --- | --- |
-| `dply server list` | List servers in your organization |
-| `dply server system-users list --server ID` | List Linux accounts (dply snapshot) |
-| `dply server system-users sync --server ID` | SSH-sync `/etc/passwd` into dply |
-| `dply server system-users add USER --server ID` | Queue user creation (`--sudo`, `--shell`, `--no-web-group`) |
-| `dply server system-users update USER --server ID` | Queue shell / sudo / web-group changes |
-| `dply server system-users remove USER --server ID` | Queue user removal |
-
-Pass `--server` with a server ULID or a unique server name. Mutations queue over SSH — same as the server workspace UI.
-
-### Edge
-
-| Command | Purpose |
-| --- | --- |
-| `dply edge deploy [--commit X] [--branch Y] [--prod]` | Queue a deploy |
-| `dply edge deployments [--limit N]` | List recent deployments |
-| `dply edge lint [--path dply.yaml]` | Validate repo config |
-| `dply edge open [--dashboard]` | Open live URL or workspace |
-| `dply edge rollback <deployment-id>` | Roll production back |
-| `dply edge promote <preview-site-id>` | Promote preview to production |
-| `dply edge previews list \| create \| rm` | Preview management |
-| `dply edge domains list \| add \| verify \| rm` | Custom domains |
-| `dply edge aliases` | Per-deploy stable URLs |
-| `dply edge purge --tag X` | Purge cache by tag |
-| `dply edge usage [--days N]` | Traffic / billing usage |
-| `dply edge logs --tail [--interval ms] [--window s] [--once]` | Request logs |
-| `dply edge env list \| set \| rm \| push \| pull` | Environment variables |
-
-## Config files
-
-| Path | Purpose |
-| --- | --- |
-| `~/.dply/config.json` | Global token + base URL |
-| `.dply/site.json` | Per-repo Edge site link |
-
-## Scopes
-
-Device login offers scopes based on your org role (Edge, servers, sites, system users, …). Manage active CLI tokens under **Profile → CLI**.
+See the in-app **Profile → CLI** page and the system-users workspace for
+copy-paste examples. Run `dply help` and `dply server system-users help`.
 
 ## Exit codes
 

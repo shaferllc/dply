@@ -185,7 +185,7 @@ class Server extends Model
     /**
      * The L7 edge proxy (if any) sitting in front of this server's webserver.
      * Returns null when the webserver handles :80 directly; otherwise one
-     * of {'traefik', 'haproxy', 'envoy'}.
+     * of {'traefik', 'haproxy', 'envoy', 'openresty'}.
      *
      * When this is non-null, dply runs Caddy as the per-site backend on
      * ephemeral high ports and the edge proxy on :80 — see
@@ -196,7 +196,7 @@ class Server extends Model
         $meta = is_array($this->meta) ? $this->meta : [];
         $proxy = $meta['edge_proxy'] ?? null;
 
-        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy', 'envoy'], true) ? $proxy : null;
+        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true) ? $proxy : null;
     }
 
     public function hasEdgeProxy(): bool

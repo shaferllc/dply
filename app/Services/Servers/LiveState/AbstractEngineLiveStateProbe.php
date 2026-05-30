@@ -43,7 +43,7 @@ abstract class AbstractEngineLiveStateProbe implements EngineLiveStateProbe
      */
     protected function inactiveEdgeProxyLiveState(Server $server): ?EngineLiveState
     {
-        if (! in_array($this->engineKey(), ['traefik', 'haproxy', 'envoy'], true)) {
+        if (! in_array($this->engineKey(), ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             return null;
         }
 

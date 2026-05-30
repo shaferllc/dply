@@ -39,6 +39,7 @@
         'light-bulb' => 'heroicon-o-light-bulb',
         'chart-bar' => 'heroicon-o-chart-bar',
         'command-line' => 'heroicon-o-command-line',
+        'computer-desktop' => 'heroicon-o-computer-desktop',
         'circle-stack' => 'heroicon-o-circle-stack',
         'clock' => 'heroicon-o-clock',
         'clipboard-document-list' => 'heroicon-o-clipboard-document-list',

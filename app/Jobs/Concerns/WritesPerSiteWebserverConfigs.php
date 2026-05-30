@@ -160,6 +160,7 @@ trait WritesPerSiteWebserverConfigs
             'traefik' => 'traefik',
             'haproxy' => 'haproxy',
             'envoy' => 'envoy',
+            'openresty' => 'openresty',
             default => null,
         };
     }

@@ -58,7 +58,7 @@ final class EdgeProxyWorkspaceViewData
     public static function installableEdgeProxies(): array
     {
         return array_values(array_filter(
-            ['traefik', 'haproxy', 'envoy'],
+            ['traefik', 'haproxy', 'envoy', 'openresty'],
             fn (string $key): bool => ! self::isComingSoonEdgeProxy($key),
         ));
     }
@@ -127,6 +127,7 @@ final class EdgeProxyWorkspaceViewData
             'traefik' => [['traefik_test_config', false], ['apply_edge_backend_configs', true], ['reload_traefik', true], ['restart_traefik', true]],
             'haproxy' => [['haproxy_test_config', false], ['apply_edge_backend_configs', true], ['reload_haproxy', false], ['restart_haproxy', true]],
             'envoy' => [['envoy_test_config', false], ['apply_edge_backend_configs', true], ['reload_envoy', true], ['restart_envoy', true]],
+            'openresty' => [['openresty_test_config', false], ['apply_edge_backend_configs', true], ['reload_openresty', true], ['restart_openresty', true]],
             default => [],
         };
 
@@ -146,6 +147,11 @@ final class EdgeProxyWorkspaceViewData
                 'service' => ['label' => __('Service'), 'rows' => [['start_envoy', false], ['reload_envoy', true], ['restart_envoy', true], ['stop_envoy', true]]],
                 'boot' => ['label' => __('Boot'), 'rows' => [['enable_envoy', false], ['disable_envoy', true]]],
             ],
+            'openresty' => [
+                'health' => ['label' => __('Health'), 'rows' => [['openresty_test_config', false], ['apply_edge_backend_configs', true]]],
+                'service' => ['label' => __('Service'), 'rows' => [['start_openresty', false], ['reload_openresty', true], ['restart_openresty', true], ['stop_openresty', true]]],
+                'boot' => ['label' => __('Boot'), 'rows' => [['enable_openresty', false], ['disable_openresty', true]]],
+            ],
             default => [],
         };
 
@@ -153,10 +159,11 @@ final class EdgeProxyWorkspaceViewData
             'traefik' => [['traefik_version', false], ['traefik_show_static_config', false], ['traefik_list_dynamic_configs', false]],
             'haproxy' => [['haproxy_version', false], ['haproxy_show_config', false], ['haproxy_show_runtime_info', false]],
             'envoy' => [['envoy_version', false], ['envoy_show_config', false], ['envoy_show_runtime_info', false]],
+            'openresty' => [['openresty_version', false], ['openresty_show_config', false], ['openresty_show_runtime_info', false]],
             default => [],
         };
 
-        $engineHasFullControls = fn (string $key): bool => in_array($key, ['traefik', 'haproxy', 'envoy'], true);
+        $engineHasFullControls = fn (string $key): bool => in_array($key, ['traefik', 'haproxy', 'envoy', 'openresty'], true);
 
         $iconForAction = fn (string $actionKey): string => match (true) {
             str_contains($actionKey, 'test_config') => 'heroicon-o-shield-check',
@@ -197,7 +204,25 @@ final class EdgeProxyWorkspaceViewData
             default => true,
         };
 
-        $versionFor = fn (string $key): string => '';
+        $versionFor = fn (string $key): string => match ($key) {
+            'envoy' => (function () use ($server): string {
+                $runtime = data_get($server->meta ?? [], 'webserver_live_state.envoy.units.runtime.0.version');
+                if (is_string($runtime) && $runtime !== '' && $runtime !== '?') {
+                    return $runtime;
+                }
+
+                return '';
+            })(),
+            'openresty' => (function () use ($server): string {
+                $runtime = data_get($server->meta ?? [], 'webserver_live_state.openresty.units.runtime.0.version');
+                if (is_string($runtime) && $runtime !== '' && $runtime !== '?') {
+                    return $runtime;
+                }
+
+                return '';
+            })(),
+            default => '',
+        };
 
         $consoleActions = app(ServerConsoleActionLookup::class);
         $consoleState = $consoleActions->stateFor($server, 'edge-proxy');

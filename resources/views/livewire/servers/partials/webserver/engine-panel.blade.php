@@ -28,7 +28,8 @@
             'tcprouters', 'tcpservices', 'udprouters', 'udpservices', 'tls', 'providers',
         ],
         'haproxy' => ['frontends', 'backends', 'ssl', 'runtime'],
-        'envoy' => ['listeners', 'clusters', 'runtime'],
+        'envoy' => ['listeners', 'clusters', 'runtime', 'virtualhosts', 'stats'],
+        'openresty' => ['servers', 'upstreams', 'runtime'],
     ];
     $tabsForThisEngine = $liveStateTabsByEngine[$key] ?? [];
     $isLiveStateView = ($isActive || $isEdgeProxyPanel) && in_array($engine_subtab, $tabsForThisEngine, true);
@@ -69,6 +70,9 @@
             @break
         @case('envoy')
             @include('livewire.servers.partials.webserver.engine.envoy')
+            @break
+        @case('openresty')
+            @include('livewire.servers.partials.webserver.engine.openresty')
             @break
         @case('traefik')
             @include('livewire.servers.partials.webserver.engine.traefik')

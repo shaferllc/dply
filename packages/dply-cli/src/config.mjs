@@ -1,12 +1,79 @@
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const GLOBAL_CONFIG_DIR = join(homedir(), '.dply');
 const GLOBAL_CONFIG_PATH = join(GLOBAL_CONFIG_DIR, 'config.json');
 const LOCAL_LINK_FILE = '.dply/site.json';
+const PUBLIC_CLOUD_URL = 'https://dply.dev';
 
-const DEFAULT_BASE_URL = process.env.DPLY_API_BASE_URL ?? 'https://dply.dev';
+/**
+ * Baked in when the CLI is packaged from a dply instance (/cli/dply-cli.tgz).
+ * Local monorepo installs ship https://dplyi.test; production tarballs use APP_URL.
+ *
+ * @returns {string | null}
+ */
+function bundledInstanceBaseUrl() {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const raw = readFileSync(join(here, 'instance-defaults.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.baseUrl === 'string' && parsed.baseUrl.trim() !== '') {
+      return parsed.baseUrl.replace(/\/+$/, '');
+    }
+  } catch {
+    // Optional file — npm registry installs may omit it.
+  }
+
+  return null;
+}
+
+/**
+ * @returns {string}
+ */
+function fallbackBaseUrl() {
+  return bundledInstanceBaseUrl() ?? PUBLIC_CLOUD_URL;
+}
+
+/**
+ * Production default — sync. Prefer {@link resolveLoginBaseUrl} for login.
+ *
+ * @returns {string}
+ */
+export function defaultBaseUrl() {
+  return (
+    process.env.DPLY_API_BASE_URL ??
+    process.env.DPLY_BASE_URL ??
+    fallbackBaseUrl()
+  ).replace(/\/+$/, '');
+}
+
+/**
+ * Instance URL for `dply login`: flag → env → saved config → bundled → public cloud.
+ *
+ * @param {Record<string, unknown>} [flags]
+ * @returns {Promise<string>}
+ */
+export async function resolveLoginBaseUrl(flags = {}) {
+  const fromFlag = flags['base-url'] || flags.b;
+  if (fromFlag) {
+    return String(fromFlag).replace(/\/+$/, '');
+  }
+
+  const fromEnv = process.env.DPLY_API_BASE_URL || process.env.DPLY_BASE_URL;
+  if (fromEnv) {
+    return fromEnv.replace(/\/+$/, '');
+  }
+
+  const global = await readGlobalConfig();
+  if (global?.baseUrl) {
+    return global.baseUrl.replace(/\/+$/, '');
+  }
+
+  return fallbackBaseUrl();
+}
 
 /**
  * @typedef GlobalConfig
@@ -49,13 +116,6 @@ export async function deleteGlobalConfig() {
   } catch (err) {
     if (err?.code !== 'ENOENT') throw err;
   }
-}
-
-/**
- * @returns {string}
- */
-export function defaultBaseUrl() {
-  return DEFAULT_BASE_URL;
 }
 
 /**
@@ -115,7 +175,7 @@ export async function resolveContext(opts = {}) {
   }
 
   let siteId = opts.siteFlag || process.env.DPLY_EDGE_SITE || null;
-  let baseUrl = global.baseUrl || DEFAULT_BASE_URL;
+  let baseUrl = global.baseUrl || defaultBaseUrl();
 
   const linkResult = await readSiteLink();
   if (linkResult) {

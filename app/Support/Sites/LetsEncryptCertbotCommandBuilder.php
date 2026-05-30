@@ -21,7 +21,7 @@ final class LetsEncryptCertbotCommandBuilder
         $certbot = self::certbotInvocation($site, $domains, $email);
 
         if (! self::usesWebrootPath($site)) {
-            return $certbot;
+            return self::wrapNginxPreflight($site, $certbot);
         }
 
         $webroot = escapeshellarg($site->effectiveDocumentRoot());
@@ -32,13 +32,22 @@ final class LetsEncryptCertbotCommandBuilder
         return "set -e\nmkdir -p {$webroot}/.well-known/acme-challenge\n{$preflight}{$certbot}";
     }
 
+    private static function wrapNginxPreflight(Site $site, string $certbot): string
+    {
+        if ($site->webserver() !== 'nginx' || self::usesWebrootChallenge($site)) {
+            return $certbot;
+        }
+
+        return "set -e\n".self::nginxPort80PreflightScript().$certbot;
+    }
+
     public static function usesWebrootChallenge(Site $site): bool
     {
         $site->loadMissing('server');
         $edgeProxy = $site->server?->edgeProxy();
 
         return is_string($edgeProxy)
-            && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy'], true);
+            && in_array($edgeProxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true);
     }
 
     public static function usesWebrootPath(Site $site): bool
@@ -47,7 +56,7 @@ final class LetsEncryptCertbotCommandBuilder
             return true;
         }
 
-        return in_array($site->webserver(), ['openlitespeed', 'traefik', 'caddy'], true);
+        return in_array($site->webserver(), ['nginx', 'openlitespeed', 'traefik', 'caddy'], true);
     }
 
     /**
@@ -74,7 +83,7 @@ final class LetsEncryptCertbotCommandBuilder
                 $flags,
                 escapeshellarg($email),
             ),
-            'openlitespeed', 'traefik', 'caddy' => sprintf(
+            'nginx', 'openlitespeed', 'traefik', 'caddy' => sprintf(
                 'certbot certonly --webroot -w %s --preferred-challenges http %s --non-interactive --agree-tos -m %s 2>&1',
                 escapeshellarg($site->effectiveDocumentRoot()),
                 $flags,
@@ -86,6 +95,41 @@ final class LetsEncryptCertbotCommandBuilder
                 escapeshellarg($email),
             ),
         };
+    }
+
+    /**
+     * Plain nginx sites use certbot --nginx, which restarts nginx on :80. When
+     * a failed edge-proxy install left Caddy on :80, stop Caddy and ensure
+     * nginx owns the port before invoking certbot.
+     */
+    private static function nginxPort80PreflightScript(): string
+    {
+        return <<<'BASH'
+dply_nginx_owns_port80() {
+  ss -ltnpH 'sport = :80' 2>/dev/null | grep -qE '"nginx"|/nginx'
+}
+dply_caddy_owns_port80() {
+  ss -ltnpH 'sport = :80' 2>/dev/null | grep -qE '"caddy"|/caddy'
+}
+if ! dply_nginx_owns_port80; then
+  if dply_caddy_owns_port80; then
+    echo "[dply] Caddy holds :80 on a plain nginx site — stopping Caddy so certbot can use nginx." >&2
+    systemctl stop caddy 2>/dev/null || true
+  fi
+  if ! systemctl is-active --quiet nginx 2>/dev/null; then
+    systemctl enable --now nginx || exit 21
+  fi
+  if ! dply_nginx_owns_port80; then
+    systemctl restart nginx || exit 22
+  fi
+  if ! dply_nginx_owns_port80; then
+    echo "[dply] nginx is not listening on :80 — another process may own the port." >&2
+    ss -ltnpH 'sport = :80' 2>/dev/null | head -5 >&2 || true
+    exit 23
+  fi
+fi
+
+BASH;
     }
 
     /**
