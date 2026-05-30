@@ -528,7 +528,22 @@
     </div>
 </section>
 
-<x-cli-snippet :commands="[
+<x-cli-snippet
+    class="mt-6"
+    :summary="__('dply CLI (from your laptop)')"
+    :intro="__('Run `dply link --byo :id` once in your repo root, commit `.dply/site.json`, then deploy with bare `dply deploy`. Re-login with `dply auth refresh` if scopes are missing.', ['id' => $site->id])"
+    :commands="[
+        ['label' => __('Link this repo'), 'command' => 'dply link --byo '.$site->id],
+        ['label' => __('Deploy (linked repo)'), 'command' => 'dply deploy --follow'],
+        ['label' => __('Deploy this site'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
+        ['label' => __('Tail deploy logs'), 'command' => 'dply site logs --site '.$site->id.' --follow'],
+        ['label' => __('Site status'), 'command' => 'dply site status --site '.$site->id],
+    ]"
+/>
+
+<x-cli-snippet
+    :summary="__('Artisan (on the server)')"
+    :commands="[
     ['label' => __('Trigger deploy'), 'command' => 'dply:site:deploy '.$site->slug],
     ['label' => __('Abort running deploy'), 'command' => 'dply:site:abort-deploy '.$site->slug],
     ['label' => __('Run a single phase'), 'command' => 'dply:site:run-phase '.$site->slug.' build'],

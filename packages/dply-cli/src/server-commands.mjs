@@ -1,11 +1,7 @@
 import { ApiClient } from './api.mjs';
 import { requireClient, resolveServerId } from './server-context.mjs';
-import { c, info, ok, printJson, printTable, warn } from './print.mjs';
+import { c, info, ok, printJson, printKeyValues, printTable, warn } from './print.mjs';
 
-/**
- * @param {string[]} args
- * @param {Record<string, unknown>} flags
- */
 export async function serverList(args, flags) {
   const client = await requireClient(flags);
   const response = await client.get('/servers');
@@ -19,6 +15,8 @@ export async function serverList(args, flags) {
 
   if (rows.length === 0) {
     warn('No servers visible to this token.');
+    info(c.dim('Add a VM in the dply web app · shortcut: `dply servers`'));
+    info(c.dim('Missing permissions? Try `dply auth refresh` or `dply r`.'));
 
     return;
   }
@@ -33,6 +31,152 @@ export async function serverList(args, flags) {
       row.ip_address ?? '—',
     ]),
   );
+}
+
+/**
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverShow(args, flags) {
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, args[0]);
+  const servers = (await client.get('/servers'))?.data ?? [];
+  const server = servers.find((row) => row.id === serverId);
+
+  if (!server) {
+    throw cliError(`Server ${serverId} not found.`, 1);
+  }
+
+  const sites = (await client.get('/sites'))?.data ?? [];
+  const siteRows = sites.filter((row) => row.server_id === serverId);
+
+  if (flags.json) {
+    printJson({ ...server, sites: siteRows });
+
+    return;
+  }
+
+  info(c.bold(String(server.name ?? 'Server')));
+  printKeyValues([
+    ['ID', server.id ?? '—'],
+    ['Status', server.status ?? '—'],
+    ['Provider', server.provider ?? '—'],
+    ['IP', server.ip_address ?? '—'],
+    ['Created', server.created_at ?? '—'],
+    ['Sites', String(siteRows.length)],
+  ]);
+
+  if (siteRows.length > 0) {
+    info('');
+    info(c.bold('Sites on this server'));
+    for (const site of siteRows) {
+      info(`  ${c.cyan(String(site.name))} ${c.dim(String(site.id))} · ${site.status ?? '—'}`);
+    }
+  }
+
+  info('');
+  info(c.dim('Health: `dply server health ' + serverId + '` · system users: `dply server system-users list --server ' + serverId + '`'));
+
+  return 0;
+}
+
+/**
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverHealth(args, flags) {
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, args[0]);
+  const servers = (await client.get('/servers'))?.data ?? [];
+  const server = servers.find((row) => row.id === serverId);
+
+  if (!server) {
+    throw cliError(`Server ${serverId} not found.`, 1);
+  }
+
+  /** @type {Array<Record<string, unknown>>} */
+  let findings = [];
+  let insightsForbidden = false;
+
+  try {
+    findings = (await client.get(`/servers/${encodeURIComponent(serverId)}/insights`))?.data ?? [];
+  } catch (err) {
+    if (err?.status === 403) {
+      insightsForbidden = true;
+    } else {
+      throw err;
+    }
+  }
+
+  if (flags.json) {
+    printJson({ server, findings, insights_forbidden: insightsForbidden });
+
+    return;
+  }
+
+  info(c.bold(String(server.name ?? 'Server')));
+  printKeyValues([
+    ['Status', server.status ?? '—'],
+    ['IP', server.ip_address ?? '—'],
+  ]);
+
+  info('');
+  info(c.bold('Insights'));
+
+  if (findings.length === 0) {
+    if (insightsForbidden) {
+      warn('Insights unavailable — token may need insights.read. Try `dply auth refresh`.');
+    } else {
+      ok('No open insight findings.');
+    }
+  } else {
+    const critical = findings.filter((row) => row.severity === 'critical').length;
+    const warning = findings.filter((row) => row.severity === 'warning').length;
+    warn(`${findings.length} open finding(s) · ${critical} critical · ${warning} warning`);
+
+    for (const row of findings.slice(0, 5)) {
+      info(`  ${c.cyan(String(row.severity ?? 'info'))}  ${row.title ?? row.insight_key ?? 'Finding'}`);
+    }
+
+    if (findings.length > 5) {
+      info(c.dim(`  … and ${findings.length - 5} more`));
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverRun(args, flags) {
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, undefined);
+  const command = args.join(' ').trim() || String(flags.command || flags.c || '').trim();
+
+  if (!command) {
+    throw cliError('Usage: dply server run --server <id> <command…> · or --command "…"', 2);
+  }
+
+  const response = await client.post(`/servers/${encodeURIComponent(serverId)}/run-command`, { command });
+
+  if (flags.json) {
+    printJson(response);
+
+    return;
+  }
+
+  if (response.output) {
+    process.stdout.write(String(response.output));
+    if (!String(response.output).endsWith('\n')) {
+      process.stdout.write('\n');
+    }
+  }
+
+  ok(response?.message ?? 'Command completed.');
+
+  return 0;
 }
 
 /**

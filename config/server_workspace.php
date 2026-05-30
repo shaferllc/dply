@@ -95,12 +95,12 @@ return [
     | (engine tabs + switch picker) and cannot be switched to until removed.
     | Tests override with config(['server_workspace.webserver_coming_soon' => []]).
     */
-    'webserver_coming_soon' => [''],
+    'webserver_coming_soon' => ['caddy', 'apache', 'openlitespeed'],
 
     /*
     | Edge proxy engines listed here show "Coming soon" in the overview picker
     | and render preview tabs until removed. Active installs keep full controls.
     */
-    'edge_proxy_coming_soon' => ['traefik', 'haproxy', 'envoy'],
+    'edge_proxy_coming_soon' => ['traefik', 'haproxy', 'envoy', 'openresty'],
 
 ];

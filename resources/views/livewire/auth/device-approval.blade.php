@@ -98,6 +98,7 @@
                     __('Billing') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'billing.'))),
                     __('Account & CLI') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'account.'))),
                     __('Edge') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'edge.'))),
+                    __('Projects') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'projects.'))),
                     __('Servers & sites') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'servers.') || str_starts_with($s['ability'], 'sites.'))),
                     __('System users') => array_values(array_filter($availableScopes, fn (array $s): bool => str_starts_with($s['ability'], 'system_users.'))),
                 ];
@@ -179,7 +180,7 @@
                         <fieldset class="min-w-0">
                             <legend class="text-sm font-semibold text-brand-ink">{{ __('Permissions') }}</legend>
                             <p class="mt-1 text-xs leading-relaxed text-brand-moss">
-                                {{ __('Uncheck anything you do not want this CLI session to use. Your org role caps what appears here.') }}
+                                {{ __('Uncheck anything you do not want this CLI session to use. Your org role caps what appears here. Already signed in? Run `dply auth refresh` in the terminal to add scopes without starting over.') }}
                             </p>
 
                             <div class="mt-4 max-h-[min(28rem,55vh)] space-y-5 overflow-y-auto pr-1">

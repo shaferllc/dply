@@ -203,7 +203,7 @@ BASH;
     private function extractTopLevelBlocks(string $config, string $keyword): array
     {
         $blocks = [];
-        $pattern = '/\b'.preg_quote($keyword, '/').'\s*\{/';
+        $pattern = '/\b'.preg_quote($keyword, '/').'\b[^{]*\{/';
         $offset = 0;
         while (preg_match($pattern, $config, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $start = $m[0][1];

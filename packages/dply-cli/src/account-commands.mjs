@@ -1,3 +1,4 @@
+import { handleEmptyProjectList } from './project-prompts.mjs';
 import { deleteGlobalConfig, readGlobalConfig, readSiteLink } from './config.mjs';
 import { requireClient } from './server-context.mjs';
 import { c, info, ok, printJson, printKeyValues, printTable, warn } from './print.mjs';
@@ -19,8 +20,12 @@ export async function accountCommand(args, flags) {
     case 'orgs':
     case 'organizations':
       return accountOrganizations(flags);
+    case 'projects':
+      return accountProjects(flags);
     case 'sessions':
       return accountSessions(flags);
+    case 'refresh':
+      return accountRefresh(flags);
     case 'revoke':
       return accountRevoke(args.slice(1), flags);
     case 'logout':
@@ -62,6 +67,7 @@ export async function accountShow(flags) {
     ['Name', org.name ?? '—'],
     ['Role', org.role ?? '—'],
     ['Org ID', org.id ?? '—'],
+    ['Projects', org.projects_count != null ? String(org.projects_count) : '—'],
   ]);
 
   info('');
@@ -122,6 +128,50 @@ export async function accountOrganizations(flags) {
       row.is_current ? 'yes' : '',
     ]),
   );
+}
+
+/**
+ * @param {Record<string, unknown>} flags
+ */
+export async function accountProjects(flags) {
+  const client = await requireClient(flags);
+  const rows = (await client.get('/account/projects'))?.data ?? [];
+
+  if (flags.json) {
+    printJson(rows);
+
+    return;
+  }
+
+  if (rows.length === 0) {
+    await handleEmptyProjectList({});
+
+    return;
+  }
+
+  printTable(
+    ['ID', 'Name', 'Slug', 'Servers', 'Sites', 'Role'],
+    rows.map((row) => [
+      row.id,
+      row.name,
+      row.slug,
+      row.servers_count ?? '—',
+      row.sites_count ?? '—',
+      row.role ?? '—',
+    ]),
+  );
+
+  info('');
+  info(c.dim('Details: dply project show <id> · dply project help'));
+}
+
+/**
+ * @param {Record<string, unknown>} flags
+ */
+export async function accountRefresh(flags) {
+  const { refreshAuth } = await import('./commands.mjs');
+
+  return refreshAuth([], flags);
 }
 
 /**
@@ -191,11 +241,13 @@ function printAccountHelp() {
   info('');
   info(`  ${'show'.padEnd(14)} ${c.dim('Signed-in user, org, token, and abilities')}`);
   info(`  ${'orgs'.padEnd(14)} ${c.dim('Organizations this user belongs to')}`);
+  info(`  ${'projects'.padEnd(14)} ${c.dim('Projects in the current organization')}`);
   info(`  ${'sessions'.padEnd(14)} ${c.dim('Active dply CLI sessions in this org')}`);
+  info(`  ${'refresh'.padEnd(14)} ${c.dim('Re-approve scopes for more permissions')}`);
   info(`  ${'revoke'.padEnd(14)} ${c.dim('Revoke a CLI session by ID')}`);
   info(`  ${'logout'.padEnd(14)} ${c.dim('Remove the saved token from this machine')}`);
   info('');
-  info(c.dim('Shortcuts: `dply whoami` → account show · `dply logout` → account logout'));
+  info(c.dim('Shortcuts: `dply whoami` → account show · `dply refresh` → account refresh · `dply logout` → account logout'));
 
   return 0;
 }

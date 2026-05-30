@@ -12,6 +12,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\EnvoyStaticConfigOptions;
+use App\Services\Servers\OpenRestyStaticConfigOptions;
 use App\Support\Servers\EdgeProxyWorkspaceViewData;
 use App\Support\Servers\ServerConsoleActionLookup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -420,6 +421,27 @@ test('envoy is installable when not coming soon', function () {
     config(['server_workspace.edge_proxy_coming_soon' => []]);
 
     expect(EdgeProxyWorkspaceViewData::installableEdgeProxies())->toContain('envoy');
+});
+
+test('openresty install script uses ubuntu repo on ubuntu not debian id_like', function () {
+    $script = OpenRestyStaticConfigOptions::installScript();
+    $preconfigure = OpenRestyStaticConfigOptions::preDpkgConfigureScript();
+    $preludeTail = "  > /etc/apt/apt.conf.d/99dply-noninteractive\n";
+    $mergedPrelude = $preludeTail.$preconfigure;
+
+    expect($script)->toContain('case "${ID:-}" in')
+        ->and($script)->toContain('ubuntu)')
+        ->and($script)->toContain('https://openresty.org/package/ubuntu')
+        ->and($script)->not->toContain('grep -qi debian')
+        ->and($script)->toContain('write_openresty_placeholder_config')
+        ->and($script)->toContain('listen 127.0.0.1:18080 default_server')
+        ->and($script)->toContain('/usr/local/openresty/nginx/conf/nginx.conf')
+        ->and($script)->not->toContain('mkdir -p /etc/openresty /var/log/openresty')
+        ->and($script)->toContain('policy-rc.d')
+        ->and($script)->toContain('systemctl disable openresty')
+        ->and($preconfigure)->toContain('openresty preconfigure')
+        ->and($preconfigure)->toContain('write_openresty_placeholder_config')
+        ->and($mergedPrelude)->not->toContain('99dply-noninteractiveopenresty_pkg_configured');
 });
 
 test('envoy install script downloads pinned release binary', function () {

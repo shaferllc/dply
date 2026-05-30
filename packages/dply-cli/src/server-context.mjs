@@ -33,7 +33,7 @@ export async function requireClient(flags = {}) {
  */
 export async function resolveServerId(client, flags, positional) {
   const fromFlag = flags.server || flags.s;
-  const candidate = String(fromFlag || positional || '').trim();
+  const candidate = String(fromFlag || positional || process.env.DPLY_SERVER || '').trim();
 
   if (!candidate) {
     const err = new Error('Pass --server <id-or-name> (or set DPLY_SERVER).');

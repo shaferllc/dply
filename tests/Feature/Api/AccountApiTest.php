@@ -42,7 +42,8 @@ test('account show returns user org and token metadata', function (): void {
         ->assertJsonPath('data.organization.name', 'Acme Ops')
         ->assertJsonPath('data.organization.role', 'owner')
         ->assertJsonPath('data.token.is_cli', true)
-        ->assertJsonPath('data.token.is_current', true);
+        ->assertJsonPath('data.token.is_current', true)
+        ->assertJsonStructure(['data' => ['organization' => ['projects_count']]]);
 });
 
 test('account organizations lists memberships', function (): void {

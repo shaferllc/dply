@@ -54,21 +54,41 @@ dply login --base-url https://your-dply.example
 
 Use `dply login --no-shell` in scripts/CI to skip the interactive shell.
 
-Revoke CLI sessions from **Profile → CLI** in the web app.
+Revoke CLI sessions from **Profile → CLI** in the web app. Run `dply auth refresh` (or `dply refresh`) to re-approve scopes when you need more permissions.
 
 ## Verify
 
 ```sh
 dply whoami
-dply menu            # numbered menus for account, billing, servers, edge
+dply menu            # numbered menus — type names or numbers
 dply server list
-dply shell          # re-open the interactive shell anytime
+dply site list       # BYO VM sites
+dply shell           # re-open the interactive shell anytime
 ```
+
+## Deploy a BYO site (hero workflow)
+
+From your app repo:
+
+```sh
+dply link              # interactive picker (BYO + Edge)
+dply deploy --follow   # queue deploy + stream logs when linked to BYO
+dply site status       # last deployment summary
+```
+
+CI / GitHub Actions:
+
+```sh
+# Install + auth (see Profile → CLI for full workflow YAML)
+dply login --token "$DPLY_TOKEN" --no-shell
+dply deploy --sync --wait --idempotency-key "$GITHUB_SHA"
+```
+
+Edge linked repos: `dply deploy --wait` blocks until the deployment is live.
 
 ## Commands
 
-See the in-app **Profile → CLI** page and the system-users workspace for
-copy-paste examples. Run `dply help` and `dply server system-users help`.
+See **Profile → CLI** in the web app. Run `dply help`, `dply ls site`, or `dply site help`.
 
 ## Exit codes
 

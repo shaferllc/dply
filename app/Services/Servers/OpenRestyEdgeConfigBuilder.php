@@ -108,7 +108,7 @@ class OpenRestyEdgeConfigBuilder
 # Managed by Dply — do NOT hand-edit. Regenerated on every edge routing rebuild.
 worker_processes {$workerProcesses};
 error_log /var/log/openresty/error.log warn;
-pid /var/run/openresty.pid;
+pid /usr/local/openresty/nginx/logs/nginx.pid;
 
 events {
     worker_connections {$workerConnections};

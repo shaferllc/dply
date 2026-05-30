@@ -41,12 +41,48 @@
                             {{ __('If you used `--login` above, you are already authenticated. Otherwise run:') }}
                         </p>
                         <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply login --base-url {{ $appUrl }}</code></pre>
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Need more scopes later? Run `dply auth refresh` (or `dply refresh`) — same browser approval, new token on that machine.') }}
+                        </p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('3. Verify') }}</p>
                         <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply account show
-dply account sessions
-dply server list</code></pre>
+dply menu
+dply server list
+dply site list</code></pre>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('4. Deploy a BYO site from your repo') }}</p>
+                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>cd /path/to/your/app
+dply link
+dply deploy --follow
+dply site status
+dply site logs --follow</code></pre>
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('`dply link` opens a picker (BYO + Edge). Edge linked repos: `dply deploy --wait`.') }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('5. GitHub Actions (BYO deploy)') }}</p>
+                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: curl -fsSL {{ $installUrl }} | bash -s -- --no-shell
+      - run: dply login --token "${{@{{ secrets.DPLY_TOKEN }}}}" --no-shell
+      - run: dply deploy --sync --wait --idempotency-key "${{@{{ github.sha }}}}"</code></pre>
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Create an org API token with sites.deploy. Link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.') }}
+                        </p>
                     </div>
                 </div>
             </section>

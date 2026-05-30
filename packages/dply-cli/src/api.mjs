@@ -71,6 +71,10 @@ export class ApiClient {
   patch(path, body, init = {}) {
     return this.request(path, { ...init, method: 'PATCH', body });
   }
+
+  put(path, body, init = {}) {
+    return this.request(path, { ...init, method: 'PUT', body });
+  }
 }
 
 function apiError(message, status, body) {

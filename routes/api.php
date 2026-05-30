@@ -17,8 +17,8 @@ use App\Http\Controllers\Api\EdgeEnvController;
 use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
-use App\Http\Controllers\Api\OperatorReadmeController;
 use App\Http\Controllers\Api\OperatorSummaryController;
+use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\ServerController;
 use App\Http\Controllers\Api\ServerFirewallController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
@@ -61,6 +61,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('ability:'.$apiAbilities['account.show']);
         Route::get('/account/organizations', [AccountApiController::class, 'organizations'])
             ->middleware('ability:'.$apiAbilities['account.organizations']);
+        Route::get('/account/projects', [AccountApiController::class, 'projects'])
+            ->middleware('ability:'.$apiAbilities['account.projects']);
         Route::get('/account/sessions', [AccountApiController::class, 'sessions'])
             ->middleware('ability:'.$apiAbilities['account.sessions']);
         Route::delete('/account/sessions/{apiToken}', [AccountApiController::class, 'destroySession'])
@@ -72,6 +74,57 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('ability:'.$apiAbilities['billing.breakdown']);
         Route::get('/billing/invoices', [BillingApiController::class, 'invoices'])
             ->middleware('ability:'.$apiAbilities['billing.invoices']);
+
+        Route::get('/projects', [ProjectApiController::class, 'index'])
+            ->middleware('ability:'.$apiAbilities['projects.index']);
+        Route::post('/projects', [ProjectApiController::class, 'store'])
+            ->middleware('ability:'.$apiAbilities['projects.store']);
+        Route::get('/projects/{project}', [ProjectApiController::class, 'show'])
+            ->middleware('ability:'.$apiAbilities['projects.show']);
+        Route::patch('/projects/{project}', [ProjectApiController::class, 'update'])
+            ->middleware('ability:'.$apiAbilities['projects.update']);
+        Route::delete('/projects/{project}', [ProjectApiController::class, 'destroy'])
+            ->middleware('ability:'.$apiAbilities['projects.destroy']);
+        Route::get('/projects/{project}/health', [ProjectApiController::class, 'health'])
+            ->middleware('ability:'.$apiAbilities['projects.health']);
+        Route::get('/projects/{project}/members', [ProjectApiController::class, 'members'])
+            ->middleware('ability:'.$apiAbilities['projects.members_index']);
+        Route::post('/projects/{project}/members', [ProjectApiController::class, 'storeMember'])
+            ->middleware('ability:'.$apiAbilities['projects.members_store']);
+        Route::delete('/projects/{project}/members/{member}', [ProjectApiController::class, 'destroyMember'])
+            ->middleware('ability:'.$apiAbilities['projects.members_destroy']);
+        Route::post('/projects/{project}/servers/{server}/attach', [ProjectApiController::class, 'attachServer'])
+            ->middleware('ability:'.$apiAbilities['projects.servers_attach']);
+        Route::delete('/projects/{project}/servers/{server}/detach', [ProjectApiController::class, 'detachServer'])
+            ->middleware('ability:'.$apiAbilities['projects.servers_detach']);
+        Route::post('/projects/{project}/sites/{site}/attach', [ProjectApiController::class, 'attachSite'])
+            ->middleware('ability:'.$apiAbilities['projects.sites_attach']);
+        Route::delete('/projects/{project}/sites/{site}/detach', [ProjectApiController::class, 'detachSite'])
+            ->middleware('ability:'.$apiAbilities['projects.sites_detach']);
+        Route::get('/projects/{project}/deploys', [ProjectApiController::class, 'deploys'])
+            ->middleware('ability:'.$apiAbilities['projects.deploys_index']);
+        Route::post('/projects/{project}/deploy', [ProjectApiController::class, 'deploy'])
+            ->middleware('ability:'.$apiAbilities['projects.deploy']);
+        Route::get('/projects/{project}/deploys/{deployRun}', [ProjectApiController::class, 'showDeploy'])
+            ->middleware('ability:'.$apiAbilities['projects.deploys_show']);
+        Route::get('/projects/{project}/environments', [ProjectApiController::class, 'environments'])
+            ->middleware('ability:'.$apiAbilities['projects.environments_index']);
+        Route::post('/projects/{project}/environments', [ProjectApiController::class, 'storeEnvironment'])
+            ->middleware('ability:'.$apiAbilities['projects.environments_store']);
+        Route::delete('/projects/{project}/environments/{environment}', [ProjectApiController::class, 'destroyEnvironment'])
+            ->middleware('ability:'.$apiAbilities['projects.environments_destroy']);
+        Route::get('/projects/{project}/variables', [ProjectApiController::class, 'variables'])
+            ->middleware('ability:'.$apiAbilities['projects.variables_index']);
+        Route::put('/projects/{project}/variables', [ProjectApiController::class, 'upsertVariable'])
+            ->middleware('ability:'.$apiAbilities['projects.variables_upsert']);
+        Route::delete('/projects/{project}/variables/{variable}', [ProjectApiController::class, 'destroyVariable'])
+            ->middleware('ability:'.$apiAbilities['projects.variables_destroy']);
+        Route::get('/projects/{project}/runbooks', [ProjectApiController::class, 'runbooks'])
+            ->middleware('ability:'.$apiAbilities['projects.runbooks_index']);
+        Route::post('/projects/{project}/runbooks', [ProjectApiController::class, 'storeRunbook'])
+            ->middleware('ability:'.$apiAbilities['projects.runbooks_store']);
+        Route::delete('/projects/{project}/runbooks/{runbook}', [ProjectApiController::class, 'destroyRunbook'])
+            ->middleware('ability:'.$apiAbilities['projects.runbooks_destroy']);
 
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);

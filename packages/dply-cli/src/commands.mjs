@@ -13,6 +13,12 @@ import {
   writeSiteLink,
 } from './config.mjs';
 import { c, info, ok, printJson, printKeyValues, printTable, warn } from './print.mjs';
+import {
+  deployFollowIntervalMs,
+  deployFollowRequested,
+  followEdgeDeployment,
+  TERMINAL_EDGE_DEPLOY_STATUSES,
+} from './deploy-follow.mjs';
 
 const execFileAsync = promisify(execFile);
 const CONFIG_CANDIDATES = ['dply.yaml', 'dply.yml', 'dply.json'];
@@ -47,7 +53,77 @@ export async function login(args, flags) {
     return;
   }
 
-  await loginWithDeviceFlow({ baseUrl, openBrowser: flags['no-open'] !== true, enterShell });
+  await loginWithDeviceFlow({ baseUrl, openBrowser: flags['no-open'] !== true, enterShell, mode: 'login' });
+}
+
+/**
+ * Re-run device-flow approval to mint a new CLI token with updated scopes.
+ * Keeps the same base URL unless --base-url is passed. Revokes the previous
+ * CLI session when the new token has account.write (use --keep-old to skip).
+ *
+ * @param {string[]} _args
+ * @param {Record<string, unknown>} flags
+ */
+export async function refreshAuth(_args, flags) {
+  const cfg = await readGlobalConfig();
+  if (!cfg?.token) {
+    throw fail('Not logged in. Run `dply login` first.', 2);
+  }
+
+  const baseUrl = await resolveLoginBaseUrl(flags);
+  const keepOld = flags['keep-old'] === true;
+
+  /** @type {string[]} */
+  let oldAbilities = [];
+  let oldSessionId = null;
+
+  try {
+    const client = new ApiClient({ baseUrl, token: cfg.token });
+    const account = (await client.get('/account'))?.data ?? {};
+    oldAbilities = account.token?.abilities ?? [];
+    oldSessionId = account.token?.id ?? null;
+  } catch {
+    warn('Could not read the current session — continuing with refresh.');
+  }
+
+  info('');
+  info(c.bold('Refresh CLI permissions'));
+  info(c.dim('Approve scopes in your browser. This replaces the token saved on this machine.'));
+  if (oldAbilities.length > 0) {
+    info('');
+    info(c.dim(`Current scopes (${oldAbilities.length}): ${oldAbilities.join(', ')}`));
+  }
+
+  await loginWithDeviceFlow({
+    baseUrl,
+    openBrowser: flags['no-open'] !== true,
+    enterShell: false,
+    mode: 'refresh',
+  });
+
+  const newCfg = await readGlobalConfig();
+  if (!newCfg?.token) {
+    return;
+  }
+
+  /** @type {string[]} */
+  let newAbilities = [];
+  try {
+    const client = new ApiClient({ baseUrl, token: newCfg.token });
+    newAbilities = (await client.get('/account'))?.data?.token?.abilities ?? [];
+  } catch {
+    // non-fatal
+  }
+
+  printAbilityDiff(oldAbilities, newAbilities);
+
+  if (!keepOld && oldSessionId) {
+    await revokeSupersededSession({ baseUrl, newToken: newCfg.token, oldSessionId });
+  } else if (keepOld && oldSessionId) {
+    info(c.dim('Previous CLI session kept (--keep-old). Revoke stale sessions from Profile → CLI.'));
+  }
+
+  ok('CLI permissions refreshed.');
 }
 
 async function loginWithToken({ baseUrl, token, enterShell = true }) {
@@ -67,7 +143,10 @@ async function loginWithToken({ baseUrl, token, enterShell = true }) {
   await finalizeLogin({ baseUrl, enterShell });
 }
 
-async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true }) {
+/**
+ * @param {{ baseUrl: string, openBrowser?: boolean, enterShell?: boolean, mode?: 'login' | 'refresh' }} opts
+ */
+async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true, mode = 'login' }) {
   // /auth/device/start is unauthenticated — pass an empty bearer.
   const anonymous = new ApiClient({ baseUrl, token: '' });
   let started;
@@ -98,7 +177,11 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true }) 
   const expiresAt = Date.now() + Math.max(60, Number.parseInt(expires_in ?? '900', 10)) * 1000;
 
   info('');
-  info(`${c.bold('Open this URL to approve the CLI:')}`);
+  if (mode === 'refresh') {
+    info(`${c.bold('Open this URL to approve updated CLI scopes:')}`);
+  } else {
+    info(`${c.bold('Open this URL to approve the CLI:')}`);
+  }
   info(`  ${c.cyan(verification_uri_complete || verification_uri)}`);
   info('');
   info(`${c.bold('Confirm the code shown matches:')}`);
@@ -119,7 +202,9 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true }) 
   // the row instead of waiting for the 15-minute TTL.
   const onSigint = () => {
     info('');
-    warn('Login cancelled. Re-run `dply login` to start over.');
+    warn(mode === 'refresh'
+      ? 'Refresh cancelled. Re-run `dply auth refresh` to try again.'
+      : 'Login cancelled. Re-run `dply login` to start over.');
     process.exit(2);
   };
   process.on('SIGINT', onSigint);
@@ -143,23 +228,87 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true }) 
           throw fail('Server marked the code authorized but returned no token.', 1);
         }
         await writeGlobalConfig({ token, baseUrl });
+        if (mode === 'refresh') {
+          ok(`New CLI token saved for ${c.cyan(baseUrl)}.`);
+
+          return;
+        }
         await finalizeLogin({ baseUrl, enterShell });
 
         return;
       }
       if (status === 'denied') {
-        throw fail('Login denied in the browser. Re-run `dply login` to try again.', 2);
+        throw fail(
+          mode === 'refresh'
+            ? 'Refresh denied in the browser. Re-run `dply auth refresh` to try again.'
+            : 'Login denied in the browser. Re-run `dply login` to try again.',
+          2,
+        );
       }
       if (status === 'expired') {
-        throw fail('Login code expired. Re-run `dply login` to start over.', 2);
+        throw fail(
+          mode === 'refresh'
+            ? 'Refresh code expired. Re-run `dply auth refresh` to start over.'
+            : 'Login code expired. Re-run `dply login` to start over.',
+          2,
+        );
       }
 
       await sleep(pollIntervalMs);
     }
 
-    throw fail('Login timed out before approval. Re-run `dply login` to start over.', 2);
+    throw fail(
+      mode === 'refresh'
+        ? 'Refresh timed out before approval. Re-run `dply auth refresh` to start over.'
+        : 'Login timed out before approval. Re-run `dply login` to start over.',
+      2,
+    );
   } finally {
     process.off('SIGINT', onSigint);
+  }
+}
+
+/**
+ * @param {string[]} before
+ * @param {string[]} after
+ */
+function printAbilityDiff(before, after) {
+  const added = after.filter((ability) => !before.includes(ability));
+  const removed = before.filter((ability) => !after.includes(ability));
+
+  if (added.length === 0 && removed.length === 0) {
+    info('');
+    info(c.dim('Scopes unchanged — pick additional permissions on the approval page next time.'));
+
+    return;
+  }
+
+  info('');
+  if (added.length > 0) {
+    ok(`Added (${added.length}): ${added.join(', ')}`);
+  }
+  if (removed.length > 0) {
+    warn(`Removed (${removed.length}): ${removed.join(', ')}`);
+  }
+}
+
+/**
+ * @param {{ baseUrl: string, newToken: string, oldSessionId: string }} opts
+ */
+async function revokeSupersededSession({ baseUrl, newToken, oldSessionId }) {
+  const client = new ApiClient({ baseUrl, token: newToken });
+
+  try {
+    const response = await client.delete(`/account/sessions/${encodeURIComponent(oldSessionId)}`);
+    if (response?.revoked_current) {
+      info(c.dim('Previous session was already replaced.'));
+
+      return;
+    }
+    info(c.dim('Previous CLI session revoked.'));
+  } catch (err) {
+    warn(`Could not revoke the previous CLI session: ${err.message}`);
+    info(c.dim('Remove stale sessions from Profile → CLI if needed.'));
   }
 }
 
@@ -266,37 +415,108 @@ export async function logout() {
 }
 
 /**
- * `dply link <site-id>` — write .dply/site.json so future commands
- * default to that site. Without an explicit id, prints the list of
- * available sites so the user can pick one.
+ * `dply link [--byo|--edge] <site-id>` — write .dply/site.json so future
+ * commands (including bare `dply deploy`) default to that site.
  */
-export async function link(args) {
+export async function link(args, flags) {
   const ctx = await resolveContext();
   const api = new ApiClient(ctx);
+  const productFlag = flags.byo === true ? 'byo' : flags.edge === true ? 'edge' : null;
 
   if (args.length === 0) {
-    const sites = (await api.get('/edge/sites'))?.data ?? [];
-    info(c.dim('Pass one of these site IDs to `dply link`:'));
-    printTable(['id', 'name', 'hostname', 'status'], sites.map((s) => ({
-      id: s.id,
-      name: s.name,
-      hostname: s.hostname,
-      status: s.status,
-    })));
+    const { interactiveLinkSite } = await import('./link-interactive.mjs');
+    const handled = await interactiveLinkSite(api, ctx, productFlag);
+
+    if (handled) {
+      return 0;
+    }
+
+    const [byoSites, edgeSites] = await Promise.all([
+      productFlag === 'edge' ? Promise.resolve([]) : api.get('/sites').then((r) => r?.data ?? []).catch(() => []),
+      productFlag === 'byo' ? Promise.resolve([]) : api.get('/edge/sites').then((r) => r?.data ?? []).catch(() => []),
+    ]);
+
+    info(c.bold('BYO VM sites'));
+    if (byoSites.length === 0) {
+      info(c.dim('  (none visible)'));
+    } else {
+      printTable(['id', 'name', 'server', 'status'], byoSites.map((s) => ({
+        id: s.id,
+        name: s.name,
+        server: s.server_name ?? s.server_id,
+        status: s.status,
+      })));
+    }
+
+    info('');
+    info(c.bold('Edge sites'));
+    if (edgeSites.length === 0) {
+      info(c.dim('  (none visible)'));
+    } else {
+      printTable(['id', 'name', 'hostname', 'status'], edgeSites.map((s) => ({
+        id: s.id,
+        name: s.name,
+        hostname: s.hostname,
+        status: s.status,
+      })));
+    }
+
+    info('');
+    info(c.dim('Link: `dply link --byo <id>` · `dply link --edge <id>` · then bare `dply deploy --follow`'));
 
     return 0;
   }
 
   const siteId = args[0];
+  let product = productFlag;
+
+  if (!product) {
+    product = await detectSiteProduct(api, siteId);
+  }
+
+  const { writeLinkRecord } = await import('./link-interactive.mjs');
+
+  if (product === 'byo') {
+    const rows = (await api.get('/sites'))?.data ?? [];
+    const site = rows.find((row) => row.id === siteId);
+
+    if (!site) {
+      throw fail(`BYO site ${siteId} not found. Run \`dply link\` to list sites.`, 2);
+    }
+
+    await writeLinkRecord(ctx, 'byo', site);
+
+    return 0;
+  }
+
   const response = await api.get(`/edge/sites/${encodeURIComponent(siteId)}`);
-  const site = response.data;
-  const path = await writeSiteLink({
-    siteId: site.id,
-    siteName: site.name,
-    baseUrl: ctx.baseUrl,
-    organizationId: site.organization_id,
-  });
-  ok(`Linked ${c.cyan(site.name)} (${site.id}) → ${c.dim(path)}`);
+  await writeLinkRecord(ctx, 'edge', response.data);
+
+  return 0;
+}
+
+/**
+ * @param {ApiClient} api
+ * @param {string} siteId
+ * @returns {Promise<'byo' | 'edge'>}
+ */
+async function detectSiteProduct(api, siteId) {
+  const byoRows = (await api.get('/sites'))?.data ?? [];
+  if (byoRows.some((row) => row.id === siteId)) {
+    return 'byo';
+  }
+
+  try {
+    await api.get(`/edge/sites/${encodeURIComponent(siteId)}`);
+
+    return 'edge';
+  } catch (err) {
+    if (err?.status === 404) {
+      throw fail(`Site ${siteId} not found. Run \`dply link\` to list BYO and Edge sites.`, 2);
+    }
+
+    throw err;
+  }
 }
 
 export async function sites() {
@@ -335,6 +555,12 @@ export async function deploy(args, flags) {
     ['Storage prefix', d.storage_prefix ?? '—'],
   ]);
 
+  if (deployFollowRequested(flags)) {
+    await followEdgeDeployment(api, ctx.siteId, String(d.id), {
+      intervalMs: deployFollowIntervalMs(flags),
+    });
+  }
+
   if (flags.prod) {
     const site = (await api.get(`/edge/sites/${encodeURIComponent(ctx.siteId)}`))?.data;
     const liveUrl = site?.live_url;
@@ -364,6 +590,67 @@ export async function deployments(args, flags) {
       aliases: (d.aliases ?? []).length,
     })),
   );
+}
+
+export async function edgeStatus(args, flags) {
+  const ctx = await requireSiteContext(flags);
+  const api = new ApiClient(ctx);
+  const site = (await api.get(`/edge/sites/${encodeURIComponent(ctx.siteId)}`))?.data ?? {};
+  const latest = (await api.get(
+    `/edge/sites/${encodeURIComponent(ctx.siteId)}/deployments?limit=1`,
+  ))?.data?.[0];
+
+  if (flags.json) {
+    printJson({ site, latest_deployment: latest ?? null });
+
+    return;
+  }
+
+  info(c.bold(String(site.name ?? 'Edge site')));
+  printKeyValues([
+    ['ID', site.id ?? ctx.siteId],
+    ['Hostname', site.hostname ?? '—'],
+    ['Status', site.status ?? '—'],
+    ['Live URL', site.live_url ?? '—'],
+    ['Runtime', site.runtime_mode ?? '—'],
+  ]);
+
+  info('');
+  info(c.bold('Latest deployment'));
+
+  if (!latest) {
+    warn('No deployments yet.');
+
+    return;
+  }
+
+  printKeyValues([
+    ['ID', latest.id ?? '—'],
+    ['Status', latest.status ?? '—'],
+    ['Commit', latest.git_commit ? String(latest.git_commit).slice(0, 7) : '—'],
+    ['Branch', latest.git_branch ?? '—'],
+    ['Published', latest.published_at ?? '—'],
+  ]);
+
+  if (latest.failure_reason) {
+    info('');
+    warn(String(latest.failure_reason));
+  }
+
+  if (
+    deployFollowRequested(flags)
+    && latest.id
+    && latest.status
+    && !TERMINAL_EDGE_DEPLOY_STATUSES.has(latest.status)
+  ) {
+    await followEdgeDeployment(api, ctx.siteId, String(latest.id), {
+      intervalMs: deployFollowIntervalMs(flags),
+    });
+  } else if (latest.status && !TERMINAL_EDGE_DEPLOY_STATUSES.has(latest.status)) {
+    info(c.dim('In progress — `dply edge status --wait` · or `dply deploy --wait`'));
+  }
+
+  return 0;
 }
 
 export async function rollback(args, flags) {

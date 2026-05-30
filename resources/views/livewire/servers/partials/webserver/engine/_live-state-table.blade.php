@@ -35,6 +35,7 @@
                         'runtime' => __('Runtime'),
                         'virtualhosts' => __('Virtual hosts'),
                         'stats' => __('Stats'),
+                        'servers' => __('Servers'),
                         'static' => __('Static'),
                         default => $engine_subtab,
                     };
@@ -75,6 +76,9 @@
                         'envoy/clusters' => __('Upstream clusters with host health from /clusters?format=json.'),
                         'envoy/stats' => __('Per-cluster request and error counters from /stats/prometheus.'),
                         'envoy/runtime' => __('Process info from /server_info — version, uptime, connections.'),
+                        'openresty/servers' => __('Server blocks from `openresty -T` — server_name, listen, and proxy_pass upstream.'),
+                        'openresty/upstreams' => __('Upstream pools from the flattened config — member servers per pool.'),
+                        'openresty/runtime' => __('Build version and stub_status connection counters from localhost.'),
                         default => '',
                     };
                 @endphp
@@ -173,6 +177,7 @@
                             'traefik/tcprouters', 'traefik/tcpservices', 'traefik/udprouters', 'traefik/udpservices', 'traefik/tls' => __('Nothing returned from the Traefik API for this view.'),
                             'haproxy/frontends', 'haproxy/backends', 'haproxy/ssl', 'haproxy/runtime' => __('Nothing returned from HAProxy stats for this view.'),
                             'envoy/listeners', 'envoy/virtualhosts', 'envoy/clusters', 'envoy/stats', 'envoy/runtime' => __('Nothing returned from the Envoy admin API for this view.'),
+                            'openresty/servers', 'openresty/upstreams', 'openresty/runtime' => __('Nothing returned from the OpenResty probe for this view.'),
                             default => __('Nothing to show for this view.'),
                         };
                         // For the vhosts table, resolve each row name back to a Site so
@@ -455,6 +460,12 @@
                                                 <th class="px-4 py-2 font-medium">{{ __('Cluster') }}</th>
                                                 <th class="px-4 py-2 font-medium text-right">{{ __('Manage') }}</th>
                                                 @break
+                                            @case('servers')
+                                                <th class="px-4 py-2 font-medium">{{ __('Name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('server_name') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Listen') }}</th>
+                                                <th class="px-4 py-2 font-medium">{{ __('Upstream') }}</th>
+                                                @break
                                             @case('stats')
                                                 <th class="px-4 py-2 font-medium">{{ __('Cluster') }}</th>
                                                 <th class="px-4 py-2 font-medium">{{ __('Requests') }}</th>
@@ -545,9 +556,9 @@
                                                     <td class="px-4 py-2 text-xs text-brand-moss">{{ implode(' → ', $row['handlers'] ?? []) ?: '—' }}</td>
                                                     @break
                                                 @case('upstreams')
-                                                    @if ($key === 'nginx')
+                                                    @if ($key === 'nginx' || $key === 'openresty')
                                                         <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
-                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ implode(', ', $row['servers'] ?? []) ?: '—' }}</td>
+                                                        <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ is_array($row['servers'] ?? null) ? implode(', ', $row['servers']) : '—' }}</td>
                                                     @else
                                                         @php
                                                             $upstreamAddress = (string) ($row['address'] ?? '');
@@ -818,6 +829,12 @@
                                                         @endif
                                                     </td>
                                                     @break
+                                                @case('servers')
+                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 text-xs text-brand-moss">{{ $row['server_names'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['listen'] ?? '—' }}</td>
+                                                    <td class="px-4 py-2 font-mono text-[11px] text-brand-moss">{{ $row['upstream'] ?? '—' }}</td>
+                                                    @break
                                                 @case('stats')
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['name'] ?? '—' }}</td>
                                                     <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['requests'] ?? 0)) }}</td>
@@ -828,10 +845,17 @@
                                                     <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['path'] ?? '—' }}</td>
                                                     @break
                                                 @case('runtime')
-                                                    <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['version'] ?? '—' }}</td>
-                                                    <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['uptime_sec'] ?? 0)) }}s</td>
-                                                    <td class="px-4 py-2 font-mono tabular-nums text-xs">{{ ($row['current_conns'] ?? 0).' / '.number_format((int) ($row['cum_conns'] ?? 0)) }}</td>
-                                                    <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['cum_req'] ?? 0)) }}</td>
+                                                    @if ($key === 'openresty')
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['version'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 tabular-nums text-xs">{{ $row['active_connections'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 tabular-nums text-xs">{{ ($row['reading'] ?? '—').' / '.($row['writing'] ?? '—').' / '.($row['waiting'] ?? '—') }}</td>
+                                                        <td class="px-4 py-2 text-xs text-brand-mist">—</td>
+                                                    @else
+                                                        <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $row['version'] ?? '—' }}</td>
+                                                        <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['uptime_sec'] ?? 0)) }}s</td>
+                                                        <td class="px-4 py-2 font-mono tabular-nums text-xs">{{ ($row['current_conns'] ?? 0).' / '.number_format((int) ($row['cum_conns'] ?? 0)) }}</td>
+                                                        <td class="px-4 py-2 tabular-nums text-xs">{{ number_format((int) ($row['cum_req'] ?? 0)) }}</td>
+                                                    @endif
                                                     @break
                                             @endswitch
                                         </tr>

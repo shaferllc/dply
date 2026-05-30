@@ -3,6 +3,8 @@ import { stdin as input, stdout as output } from 'node:process';
 import { readGlobalConfig } from './config.mjs';
 import { completeCommandLine } from './cli.mjs';
 import { runMenuSession } from './menus.mjs';
+import { expandArgv } from './shortcuts.mjs';
+import { runSmartShellCommand } from './smart-shell.mjs';
 import { c, info, ok, warn } from './print.mjs';
 
 /**
@@ -28,7 +30,7 @@ export async function enterInteractiveShell() {
     while (true) {
       let line;
       try {
-        line = (await rl.question(`${c.bold('dply')}› `)).trim();
+        line = normalizeShellLine((await rl.question(`${c.bold('dply')}› `)).trim());
       } catch {
         break;
       }
@@ -73,25 +75,23 @@ export async function enterInteractiveShell() {
           await run(['server', 'help']);
         } else if (topic === 'edge') {
           await run(['edge', '--help']);
+        } else if (topic === 'project' || topic === 'projects') {
+          await run(['project', 'help']);
+        } else if (topic === 'shortcuts') {
+          await run(['ls', 'shortcuts']);
         } else {
-          warn(`No help topic "${topic}". Try: help account · help billing · help server · help edge`);
+          warn(`No help topic "${topic}". Try: help account · help projects · help shortcuts`);
         }
 
         continue;
       }
 
-      const tokens = tokenizeLine(line);
+      const tokens = expandArgv(tokenizeLine(line));
       if (tokens.length === 0) {
         continue;
       }
 
-      try {
-        await run(tokens);
-      } catch (err) {
-        const message = err?.message ?? String(err);
-        warn(message);
-        printCommandHint(tokens[0]);
-      }
+      await runSmartShellCommand(rl, run, tokens);
     }
   } finally {
     rl.close();
@@ -103,12 +103,14 @@ export async function printShellGuide() {
 
   info('');
   info(`${c.bold('dply')} ${c.dim('interactive CLI')}`);
-  info(c.dim('  Enter / menu   browse actions without memorizing commands'));
+  info(c.dim('  Enter / menu   browse actions — type numbers or commands in menus'));
   info(c.dim('  Tab            complete commands'));
   info(c.dim('  ls             command index'));
   info(c.dim('  help           detailed help · help account/server/edge'));
   info(c.dim('  guide          show this screen again'));
   info(c.dim('  exit           leave interactive mode'));
+  info(c.dim('  Paste `dply …` commands — the leading `dply` is ignored here'));
+  info(c.dim('  Shortcuts: projects · servers · me · r · ls shortcuts'));
   info('');
 
   if (!cfg?.token) {
@@ -122,10 +124,16 @@ export async function printShellGuide() {
     ok(`Signed in · ${cfg.baseUrl}`);
     info('');
     info(c.bold('Browse or type'));
-    info(`  ${c.cyan('menu')}             ${c.dim('Account · Billing · Servers · Edge')}`);
-    info(`  ${c.cyan('account show')}     ${c.dim('profile, org, token, abilities')}`);
-    info(`  ${c.cyan('server list')}      ${c.dim('VM servers in this org')}`);
-    info(`  ${c.cyan('sites')}            ${c.dim('Edge sites')}`);
+    info(`  ${c.cyan('menu')} / ${c.cyan('Enter')}   ${c.dim('numbered menus — no memorization')}`);
+    info(c.bold('Shortcuts'));
+    info(`  ${c.cyan('deploy')}             ${c.dim('deploy linked repo (BYO or Edge)')}`);
+    info(`  ${c.cyan('site')} / ${c.cyan('site list')}   ${c.dim('BYO VM sites')}`);
+    info(`  ${c.cyan('create')} / ${c.cyan('new')}     ${c.dim('create a project (prompts for name)')}`);
+    info(`  ${c.cyan('projects')} / ${c.cyan('p')}     ${c.dim('list projects (create if none)')}`);
+    info(`  ${c.cyan('servers')} / ${c.cyan('sv')}    ${c.dim('list VM servers')}`);
+    info(`  ${c.cyan('me')} / ${c.cyan('who')}        ${c.dim('account profile')}`);
+    info(`  ${c.cyan('r')}                 ${c.dim('refresh CLI permissions')}`);
+    info(`  ${c.cyan('sites')}              ${c.dim('Edge sites')}`);
     info('');
     info(c.dim('Type the start of a command and press Tab to complete.'));
   }
@@ -134,26 +142,23 @@ export async function printShellGuide() {
 }
 
 /**
- * @param {string | undefined} command
+ * Inside the interactive shell the prompt is already `dply›`, so pasted
+ * full invocations like `dply auth refresh` should work without retyping.
+ *
+ * @param {string} line
+ * @returns {string}
  */
-function printCommandHint(command) {
-  if (!command) {
-    return;
+export function normalizeShellLine(line) {
+  const trimmed = line.trim();
+  if (trimmed === '' || trimmed.toLowerCase() === 'dply') {
+    return '';
   }
 
-  const hints = {
-    login: 'login',
-    menu: 'menu · or press Enter in the shell',
-    server: 'server list · server system-users help',
-    account: 'account show · account orgs · account sessions',
-    billing: 'billing show · billing breakdown · billing invoices',
-    edge: 'edge deploy · edge deployments · edge --help',
-  };
-
-  const hint = hints[command];
-  if (hint) {
-    info(c.dim(`Try: ${hint} · or run ls`));
+  if (/^dply\s+/i.test(trimmed)) {
+    return trimmed.replace(/^dply\s+/i, '').trim();
   }
+
+  return trimmed;
 }
 
 /**

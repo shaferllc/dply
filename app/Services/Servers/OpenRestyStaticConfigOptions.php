@@ -70,26 +70,131 @@ class OpenRestyStaticConfigOptions
         'admin' => 'Observability',
     ];
 
-    public static function installScript(): string
+    /**
+     * Shared bash helpers for OpenResty apt install (policy-rc.d, placeholder
+     * config that avoids binding :80, package-state checks).
+     */
+    public static function installShellHelpers(): string
     {
         return <<<'BASH'
+
+openresty_pkg_configured() {
+  dpkg-query -W -f='${Status}' openresty 2>/dev/null | grep -q '^install ok installed$'
+}
+install_openresty_policy_rc_d() {
+  printf '%s\n%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d
+  chmod +x /usr/sbin/policy-rc.d
+}
+remove_openresty_policy_rc_d() {
+  rm -f /usr/sbin/policy-rc.d
+}
+write_openresty_placeholder_config() {
+  mkdir -p /var/log/openresty /usr/local/openresty/nginx/logs
+  cat > /tmp/dply-openresty-nginx.conf <<'DPLY_NGINX'
+# dply placeholder — replaced during edge-proxy provision/cutover
+worker_processes auto;
+error_log /var/log/openresty/error.log;
+pid /usr/local/openresty/nginx/logs/nginx.pid;
+events { worker_connections 1024; }
+http {
+  server {
+    listen 127.0.0.1:18080 default_server;
+    return 503;
+  }
+}
+DPLY_NGINX
+  TARGET=""
+  if [ -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
+    TARGET="/usr/local/openresty/nginx/conf/nginx.conf"
+  elif [ -L /etc/openresty ] && [ -f /etc/openresty/nginx.conf ]; then
+    TARGET="/etc/openresty/nginx.conf"
+  elif [ -d /etc/openresty ] && [ ! -L /etc/openresty ] && [ -f /etc/openresty/nginx.conf ]; then
+    TARGET="/etc/openresty/nginx.conf"
+  elif [ -d /usr/local/openresty/nginx/conf ]; then
+    TARGET="/usr/local/openresty/nginx/conf/nginx.conf"
+  fi
+  if [ -n "$TARGET" ]; then
+    install -D -m 0644 /tmp/dply-openresty-nginx.conf "$TARGET"
+    echo "[dply] openresty placeholder config installed at ${TARGET}."
+  fi
+  rm -f /tmp/dply-openresty-nginx.conf
+}
+ensure_openresty_stopped() {
+  systemctl stop openresty 2>/dev/null || true
+  systemctl disable openresty 2>/dev/null || true
+}
+BASH;
+    }
+
+    /**
+     * Run before any dpkg configure during edge-proxy install so half-installed
+     * openresty packages do not try to bind :80 (already used by Caddy/nginx).
+     */
+    public static function preDpkgConfigureScript(): string
+    {
+        return self::installShellHelpers().<<<'BASH'
+
+write_openresty_placeholder_config
+install_openresty_policy_rc_d
+echo "[dply] openresty preconfigure — placeholder nginx.conf + policy-rc.d before dpkg configure."
+dpkg --force-confdef --force-confold --configure -a 2>&1 || true
+ensure_openresty_stopped
+BASH;
+    }
+
+    public static function installScript(): string
+    {
+        return self::installShellHelpers().<<<'BASH'
+
 set -euo pipefail
-if command -v openresty >/dev/null 2>&1 && [ -f /etc/openresty/nginx.conf ]; then
-  echo "[dply] openresty already installed; skipping."
+write_openresty_placeholder_config
+install_openresty_policy_rc_d
+if openresty_pkg_configured && command -v openresty >/dev/null 2>&1; then
+  echo "[dply] openresty already installed; skipping package install."
+  ensure_openresty_stopped
 else
   apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release
   curl -fsSL https://openresty.org/package/pubkey.gpg | gpg --batch --yes --dearmor -o /usr/share/keyrings/openresty.gpg
+  # shellcheck source=/dev/null
+  . /etc/os-release 2>/dev/null || true
   CODENAME=$(lsb_release -sc 2>/dev/null || echo bookworm)
-  if grep -qi debian /etc/os-release 2>/dev/null; then
-    echo "deb [signed-by=/usr/share/keyrings/openresty.gpg] http://openresty.org/package/debian ${CODENAME} openresty" > /etc/apt/sources.list.d/openresty.list
-  else
-    echo "deb [signed-by=/usr/share/keyrings/openresty.gpg] http://openresty.org/package/ubuntu ${CODENAME} main" > /etc/apt/sources.list.d/openresty.list
-  fi
+  ARCH=$(dpkg --print-architecture 2>/dev/null || echo amd64)
+  case "${ID:-}" in
+    ubuntu)
+      if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+        REPO="https://openresty.org/package/arm64/ubuntu"
+      else
+        REPO="https://openresty.org/package/ubuntu"
+      fi
+      echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/openresty.gpg] ${REPO} ${CODENAME} main" > /etc/apt/sources.list.d/openresty.list
+      ;;
+    debian)
+      echo "deb [signed-by=/usr/share/keyrings/openresty.gpg] https://openresty.org/package/debian ${CODENAME} openresty" > /etc/apt/sources.list.d/openresty.list
+      ;;
+    *)
+      echo "[dply] unsupported Linux ID for OpenResty packages: ${ID:-unknown}" >&2
+      exit 127
+      ;;
+  esac
+  echo "[dply] policy-rc.d shim active — openresty will not auto-start on :80 during package install."
   apt-get update -y
-  apt-get install -y --no-install-recommends openresty
-  systemctl stop openresty 2>/dev/null || true
+  write_openresty_placeholder_config
+  if ! openresty_pkg_configured; then
+    apt-get install -y --no-install-recommends openresty
+  fi
+  write_openresty_placeholder_config
+  if ! openresty_pkg_configured; then
+    dpkg --force-confdef --force-confold --configure openresty
+  fi
+  if ! openresty_pkg_configured; then
+    remove_openresty_policy_rc_d
+    echo "[dply] openresty package failed to configure" >&2
+    exit 127
+  fi
+  ensure_openresty_stopped
 fi
-mkdir -p /etc/openresty /var/log/openresty
+remove_openresty_policy_rc_d
+mkdir -p /var/log/openresty /usr/local/openresty/nginx/logs
 command -v openresty >/dev/null 2>&1 || { echo "[dply] openresty binary not on PATH after install" >&2; exit 127; }
 BASH;
     }

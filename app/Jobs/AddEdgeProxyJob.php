@@ -177,26 +177,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
     {
         $ssh = new SshConnection($server);
         $script = $this->installerScriptFor($this->target);
-        $prelude = <<<'BASH'
-i=0
-while command -v fuser >/dev/null 2>&1 && (fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1); do
-  i=$((i+1))
-  if [ "$i" -gt 60 ]; then
-    echo "[dply] dpkg lock held by another process for >5 minutes; aborting." >&2
-    exit 100
-  fi
-  HOLDERS=$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | tr -d ' ')
-  echo "[dply] waiting for dpkg lock to free (held by PID(s): ${HOLDERS:-?}) — attempt $i/60…"
-  sleep 5
-done
-mkdir -p /etc/apt/apt.conf.d
-cat > /etc/apt/apt.conf.d/99dply-noninteractive <<'APTCONF'
-Dpkg::Options { "--force-confdef"; "--force-confold"; };
-APT::Get::Assume-Yes "true";
-DPkg::Lock::Timeout "300";
-APTCONF
-dpkg --force-confdef --force-confold --configure -a 2>&1 || true
-BASH;
+        $prelude = $this->installPreludeScript();
         $cmd = $this->privilegedCommand($server, 'export DEBIAN_FRONTEND=noninteractive; '.$prelude.'; '.$script.' 2>&1');
 
         $pending = '';
@@ -240,7 +221,7 @@ BASH;
 
         $ssh->exec($this->privilegedCommand(
             $server,
-            'mkdir -p /etc/caddy/sites-enabled /var/log/caddy /etc/traefik/dynamic /etc/haproxy /etc/envoy /etc/openresty && '.CaddyRuntimeOwnership::shell(),
+            'mkdir -p /etc/caddy/sites-enabled /var/log/caddy /var/log/openresty /etc/traefik/dynamic /etc/haproxy /etc/envoy && '.CaddyRuntimeOwnership::shell(),
         ), 30);
 
         foreach ($sites as $site) {
@@ -300,7 +281,7 @@ BASH;
             'traefik' => 'caddy validate --config /etc/caddy/Caddyfile',
             'haproxy' => 'haproxy -c -f /etc/haproxy/haproxy.cfg && caddy validate --config /etc/caddy/Caddyfile',
             'envoy' => 'envoy --mode validate -c /etc/envoy/envoy.yaml && caddy validate --config /etc/caddy/Caddyfile',
-            'openresty' => 'openresty -t && caddy validate --config /etc/caddy/Caddyfile',
+            'openresty' => 'mkdir -p /var/log/openresty && openresty -t && caddy validate --config /etc/caddy/Caddyfile',
         };
 
         $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
@@ -467,6 +448,40 @@ BASH;
         };
     }
 
+    /**
+     * Apt lock wait + dpkg configure prelude. OpenResty gets a placeholder
+     * nginx.conf and policy-rc.d shim so postinst does not bind :80.
+     */
+    private function installPreludeScript(): string
+    {
+        $common = <<<'BASH'
+i=0
+while command -v fuser >/dev/null 2>&1 && (fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1); do
+  i=$((i+1))
+  if [ "$i" -gt 60 ]; then
+    echo "[dply] dpkg lock held by another process for >5 minutes; aborting." >&2
+    exit 100
+  fi
+  HOLDERS=$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | tr -d ' ')
+  echo "[dply] waiting for dpkg lock to free (held by PID(s): ${HOLDERS:-?}) — attempt $i/60…"
+  sleep 5
+done
+mkdir -p /etc/apt/apt.conf.d
+printf '%s\n' \
+  'Dpkg::Options { "--force-confdef"; "--force-confold"; };' \
+  'APT::Get::Assume-Yes "true";' \
+  'DPkg::Lock::Timeout "300";' \
+  > /etc/apt/apt.conf.d/99dply-noninteractive
+
+BASH;
+
+        if ($this->target === 'openresty') {
+            return $common.OpenRestyStaticConfigOptions::preDpkgConfigureScript();
+        }
+
+        return $common.'dpkg --force-confdef --force-confold --configure -a 2>&1 || true'."\n";
+    }
+
     private function caddyInstallScript(): string
     {
         // Verbatim copy of the script in SwitchServerWebserverJob. They
@@ -581,6 +596,7 @@ BASH;
     private function writeOpenRestyEdgeConfig(Server $server, SshConnection $ssh, $sites, int $listenPort): void
     {
         $path = '/etc/openresty/nginx.conf';
+        $ssh->exec($this->privilegedCommand($server, 'mkdir -p /var/log/openresty'), 15);
         $ssh->exec($this->privilegedCommand($server, sprintf(
             '[ -f %1$s ] && [ ! -f %1$s.dply-bak ] && cp %1$s %1$s.dply-bak || true',
             escapeshellarg($path),

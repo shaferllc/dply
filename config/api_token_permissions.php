@@ -24,9 +24,9 @@ return [
         // column was dropped — the underlying API endpoint no longer
         // exists. Existing tokens that hold the ability remain valid
         // tokens, the ability just no-ops.
-        'read' => ['servers.read', 'sites.read', 'insights.read'],
-        'deploy' => ['servers.read', 'sites.read', 'sites.deploy'],
-        'ops' => ['servers.read', 'sites.read', 'sites.deploy', 'commands.run'],
+        'read' => ['servers.read', 'sites.read', 'insights.read', 'projects.read'],
+        'deploy' => ['servers.read', 'sites.read', 'sites.deploy', 'projects.read', 'projects.deploy'],
+        'ops' => ['servers.read', 'sites.read', 'sites.deploy', 'commands.run', 'projects.read', 'projects.deploy'],
         'full' => ['*'],
     ],
 
@@ -43,6 +43,8 @@ return [
         'sites.deploy',
         'system_users.read',
         'system_users.write',
+        'projects.read',
+        'projects.deploy',
     ],
 
     /*
@@ -74,12 +76,39 @@ return [
 
         'account.show' => 'account.read',
         'account.organizations' => 'account.read',
+        'account.projects' => 'projects.read',
         'account.sessions' => 'account.read',
         'account.sessions_destroy' => 'account.write',
 
         'billing.show' => 'billing.read',
         'billing.breakdown' => 'billing.read',
         'billing.invoices' => 'billing.read',
+
+        'projects.index' => 'projects.read',
+        'projects.show' => 'projects.read',
+        'projects.health' => 'projects.read',
+        'projects.members_index' => 'projects.read',
+        'projects.deploys_index' => 'projects.read',
+        'projects.deploys_show' => 'projects.read',
+        'projects.environments_index' => 'projects.read',
+        'projects.variables_index' => 'projects.read',
+        'projects.runbooks_index' => 'projects.read',
+        'projects.store' => 'projects.write',
+        'projects.update' => 'projects.write',
+        'projects.members_store' => 'projects.write',
+        'projects.members_destroy' => 'projects.write',
+        'projects.servers_attach' => 'projects.write',
+        'projects.servers_detach' => 'projects.write',
+        'projects.sites_attach' => 'projects.write',
+        'projects.sites_detach' => 'projects.write',
+        'projects.environments_store' => 'projects.write',
+        'projects.environments_destroy' => 'projects.write',
+        'projects.variables_upsert' => 'projects.write',
+        'projects.variables_destroy' => 'projects.write',
+        'projects.runbooks_store' => 'projects.write',
+        'projects.runbooks_destroy' => 'projects.write',
+        'projects.destroy' => 'projects.delete',
+        'projects.deploy' => 'projects.deploy',
 
         'edge.sites.index' => 'edge.read',
         'edge.sites.show' => 'edge.read',
@@ -259,6 +288,16 @@ return [
                 ['ability' => 'edge.read', 'label' => 'Read'],
                 ['ability' => 'edge.deploy', 'label' => 'Deploy / rollback / promote'],
                 ['ability' => 'edge.write', 'label' => 'Manage domains and cache'],
+            ],
+        ],
+        [
+            'id' => 'projects',
+            'label' => 'Projects',
+            'permissions' => [
+                ['ability' => 'projects.read', 'label' => 'Read projects, health, and deploy history'],
+                ['ability' => 'projects.write', 'label' => 'Create and update projects, members, and resources'],
+                ['ability' => 'projects.deploy', 'label' => 'Queue project-wide deploys'],
+                ['ability' => 'projects.delete', 'label' => 'Delete projects'],
             ],
         ],
         [

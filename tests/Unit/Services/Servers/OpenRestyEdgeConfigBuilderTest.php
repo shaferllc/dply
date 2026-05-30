@@ -28,7 +28,7 @@ function makeUserWithOrg(): User
 test('listener binds to provided port', function () {
     $out = app(OpenRestyEdgeConfigBuilder::class)->build(new Collection([]), 8080, fn ($s) => 20000);
 
-    expect($out)->toMatch('/listen 8080;/');
+    expect($out)->toMatch('/listen 8080 default_server;/');
 });
 
 test('emits upstream server block and catch-all', function () {

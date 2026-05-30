@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,10 +27,37 @@ class AccountApiController extends Controller
         return response()->json([
             'data' => [
                 'user' => $this->userPayload($user),
-                'organization' => $this->organizationPayload($organization, $user, true),
+                'organization' => $this->organizationPayload($organization, $user, true, true),
                 'token' => $this->tokenPayload($token, true),
             ],
         ]);
+    }
+
+    public function projects(Request $request): JsonResponse
+    {
+        /** @var Organization $organization */
+        $organization = $request->attributes->get('api_organization');
+        /** @var User $user */
+        $user = $request->user();
+
+        $query = $organization->workspaces()
+            ->withCount(['servers', 'sites'])
+            ->orderBy('name');
+
+        if (! $organization->hasAdminAccess($user)) {
+            $query->whereHas('members', fn ($members) => $members->where('user_id', $user->id));
+        }
+
+        $rows = $query->get()->map(fn (Workspace $workspace): array => [
+            'id' => (string) $workspace->id,
+            'name' => (string) $workspace->name,
+            'slug' => (string) $workspace->slug,
+            'servers_count' => (int) $workspace->servers_count,
+            'sites_count' => (int) $workspace->sites_count,
+            'role' => $workspace->memberRole($user),
+        ])->values()->all();
+
+        return response()->json(['data' => $rows]);
     }
 
     public function organizations(Request $request): JsonResponse
@@ -123,16 +151,26 @@ class AccountApiController extends Controller
     }
 
     /**
-     * @return array{id: string, name: string, role: string|null, is_current?: bool}
+     * @return array{id: string, name: string, role: string|null, is_current?: bool, projects_count?: int}
      */
-    protected function organizationPayload(Organization $organization, User $user, bool $isCurrent = false): array
+    protected function organizationPayload(Organization $organization, User $user, bool $isCurrent = false, bool $includeProjectsCount = false): array
     {
-        return [
+        $payload = [
             'id' => (string) $organization->id,
             'name' => (string) $organization->name,
             'role' => $this->organizationRole($organization, $user),
             'is_current' => $isCurrent,
         ];
+
+        if ($includeProjectsCount) {
+            $query = $organization->workspaces();
+            if (! $organization->hasAdminAccess($user)) {
+                $query->whereHas('members', fn ($members) => $members->where('user_id', $user->id));
+            }
+            $payload['projects_count'] = $query->count();
+        }
+
+        return $payload;
     }
 
     /**
