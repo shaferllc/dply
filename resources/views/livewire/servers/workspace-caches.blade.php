@@ -1,7 +1,18 @@
+@php
+    // Dedicated cache-role boxes (server_role redis/valkey) badge the workspace
+    // with the engine name itself; co-located caches on app servers keep the
+    // generic "Caches" title since they may run several engines side-by-side.
+    $cachesRole = (string) ($server->meta['server_role'] ?? '');
+    $cachesTitle = match ($cachesRole) {
+        'redis' => __('Redis'),
+        'valkey' => __('Valkey'),
+        default => __('Caches'),
+    };
+@endphp
 <x-server-workspace-layout
     :server="$server"
     active="caches"
-    :title="__('Caches')"
+    :title="$cachesTitle"
     :description="__('Install and manage cache services on this server — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines side-by-side are supported.')"
 >
     @include('livewire.servers.partials.workspace-flashes')

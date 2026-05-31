@@ -138,10 +138,28 @@ if (! function_exists('server_workspace_nav_for_server')) {
         $hostKind = (string) ($server->meta['host_kind'] ?? 'vm');
         $needsSupervisorSetup = $server->supervisor_package_status !== Server::SUPERVISOR_PACKAGE_INSTALLED;
 
+        // Per-role allow-list: dedicated Redis/Valkey/etc. boxes get a focused
+        // sidebar instead of the full app-server nav. Roles not listed in
+        // server_workspace.role_nav_keys fall through unchanged.
+        // $roleKeyPositions doubles as the membership test AND the within-group
+        // sort order — items are emitted in the order their key appears in the
+        // role's `keys` list, so the role config alone controls visual order.
+        $serverRole = (string) ($server->meta['server_role'] ?? '');
+        $roleConfig = (array) (config('server_workspace.role_nav_keys.'.$serverRole, []) ?: []);
+        $roleKeyPositions = is_array($roleConfig['keys'] ?? null)
+            ? array_flip(array_values(array_filter($roleConfig['keys'], 'is_string')))
+            : null;
+        $roleOverrides = is_array($roleConfig['overrides'] ?? null) ? $roleConfig['overrides'] : [];
+
         $filtered = [];
 
         foreach ($items as $item) {
             if (! is_array($item)) {
+                continue;
+            }
+
+            $key = $item['key'] ?? null;
+            if ($roleKeyPositions !== null && (! is_string($key) || ! isset($roleKeyPositions[$key]))) {
                 continue;
             }
 
@@ -186,6 +204,17 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 $item['needs_setup'] = true;
             }
 
+            // Apply per-role label / group overrides (e.g. Caches → "Redis"
+            // and promoted into the overview group for a redis-role server).
+            if (is_string($key) && isset($roleOverrides[$key]) && is_array($roleOverrides[$key])) {
+                if (isset($roleOverrides[$key]['label']) && is_string($roleOverrides[$key]['label'])) {
+                    $item['label'] = $roleOverrides[$key]['label'];
+                }
+                if (isset($roleOverrides[$key]['group']) && is_string($roleOverrides[$key]['group'])) {
+                    $item['group'] = $roleOverrides[$key]['group'];
+                }
+            }
+
             $minSites = (int) ($item['requires_min_sites'] ?? 0);
             if ($minSites > 1) {
                 $count = $siteCounts[$serverId] ?? $server->sites()->count();
@@ -196,6 +225,20 @@ if (! function_exists('server_workspace_nav_for_server')) {
             }
 
             $filtered[] = $item;
+        }
+
+        // When role gating is active, sort by the role config's keys order so
+        // a Redis-mode sidebar reads "Overview, Redis, Console, Health…" even
+        // though the base nav has caches at position 17 (after monitor items).
+        // Default-role servers fall through unchanged because $roleKeyPositions
+        // is null.
+        if ($roleKeyPositions !== null && $filtered !== []) {
+            usort($filtered, static function (array $a, array $b) use ($roleKeyPositions): int {
+                $posA = $roleKeyPositions[$a['key'] ?? ''] ?? PHP_INT_MAX;
+                $posB = $roleKeyPositions[$b['key'] ?? ''] ?? PHP_INT_MAX;
+
+                return $posA <=> $posB;
+            });
         }
 
         return $navCache[$cacheKey] = $filtered;

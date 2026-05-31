@@ -787,7 +787,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.services')->group(function (): void {
         Route::livewire('servers/{server}/services', WorkspaceServices::class)->name('servers.services');
     });
-    Route::livewire('servers/{server}/php', WorkspacePhp::class)->middleware('server.service.installed')->name('servers.php');
+    Route::livewire('servers/{server}/php', WorkspacePhp::class)->name('servers.php');
     Route::livewire('servers/{server}/webserver', WorkspaceWebserver::class)->name('servers.webserver');
     Route::livewire('servers/{server}/edge-proxy', WorkspaceEdgeProxy::class)->name('servers.edge-proxy');
     Route::get('servers/{server}/webserver/caddy/admin-api/{path?}', CaddyAdminApiProxyController::class)
@@ -806,7 +806,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->where('path', '.*')
         ->name('servers.envoy.admin');
     Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
-    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->middleware('server.service.installed')->name('servers.databases');
+    Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');
     });
@@ -816,7 +816,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/docker', WorkspaceDocker::class)->name('servers.docker');
     Route::livewire('servers/{server}/docker-preview', WorkspaceDockerPreview::class)->name('servers.docker-preview');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
-    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
+    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');
     Route::get('servers/{server}/queue-workers', function (Server $server) {
         return redirect()->route('servers.daemons', array_merge(['server' => $server], request()->query()));
     })->name('servers.queue-workers');
@@ -826,7 +826,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // The component renders the full workspace when workspace.backups is on,
     // or the coming-soon teaser when it is off but workspace.backups_preview
     // is on (else 404). The service.installed gate still applies.
-    Route::livewire('servers/{server}/backups', WorkspaceBackups::class)->middleware('server.service.installed')->name('servers.backups');
+    Route::livewire('servers/{server}/backups', WorkspaceBackups::class)->name('servers.backups');
     Route::livewire('servers/{server}/backups-preview', WorkspaceBackupsPreview::class)->name('servers.backups-preview');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');

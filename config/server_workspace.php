@@ -82,6 +82,49 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Per-role sidebar override
+    |--------------------------------------------------------------------------
+    | When a server's `server_role` (stored on meta.server_role at create time)
+    | appears here, the sidebar is filtered to the listed `keys` and rows may
+    | have their `label` / `group` overridden — used to give role-specialised
+    | servers (a dedicated Redis/Valkey cache box, not an app server with a
+    | co-located cache) a focused nav instead of the full 30+ item generic
+    | sidebar built for `application` servers.
+    |
+    | The route middleware {@see EnsureServerServiceInstalled} mirrors this so
+    | deep links to hidden routes 404 — consistent with how tag-gated rows are
+    | guarded today.
+    |
+    | Roles absent from this map (notably `application`, the default) get the
+    | full sidebar above unchanged.
+    */
+    'role_nav_keys' => [
+        // Order of `keys` defines the within-group rendering order on these
+        // servers — the helper sorts filtered items by their position here so
+        // a role can elevate (e.g.) Redis next to Overview without touching
+        // the base nav array. `overrides[key].group` re-homes a row into a
+        // different group than its base config entry; `overrides[key].label`
+        // swaps the displayed label.
+        'redis' => [
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'firewall', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'overrides' => [
+                'caches' => ['label' => 'Redis', 'group' => 'overview'],
+                'logs' => ['group' => 'monitor'],
+                'cron' => ['group' => 'admin'],
+            ],
+        ],
+        'valkey' => [
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'firewall', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'overrides' => [
+                'caches' => ['label' => 'Valkey', 'group' => 'overview'],
+                'logs' => ['group' => 'monitor'],
+                'cron' => ['group' => 'admin'],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Sidebar group labels
     |--------------------------------------------------------------------------
     | Display labels for the group keys above. Only groups actually present in

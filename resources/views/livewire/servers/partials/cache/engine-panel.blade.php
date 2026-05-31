@@ -499,11 +499,23 @@
                         </x-explainer>
                     </div>
 
+                    {{-- Connection details: host, port, AUTH password (with
+                         show/copy), and a ready-to-paste CLI command. Renders
+                         BEFORE the language-specific snippet so the values
+                         operators need are visible without scrolling. --}}
+                    @include('livewire.servers.partials.cache.connection-details', [
+                        'row' => $row,
+                        'server' => $server,
+                        'card' => $card,
+                        'engineLabels' => $engineLabels,
+                    ])
+
                     {{-- Connection snippet for this engine. --}}
                     @include('livewire.servers.partials.cache-connection-snippet', [
                         'cacheService' => $row,
                         'card' => $card,
                         'engineLabels' => $engineLabels,
+                        'server' => $server,
                     ])
                     @endif {{-- /overview subtab --}}
 
@@ -556,6 +568,46 @@
                                     {{ __('No AUTH password is set. Anything that can reach the loopback port can issue commands. Set one below to require authentication.') }}
                                 @endif
                             </p>
+
+                            {{-- Current password reveal. The Overview tab carries this too via
+                                 the connection details card; mirroring it here lets operators
+                                 who land directly on Configure recover the value without
+                                 round-tripping the Overview subtab. --}}
+                            @if (filled($row->auth_password))
+                                <div class="mt-5 max-w-xl" x-data="{
+                                    shown: false,
+                                    copyCurrent() {
+                                        navigator.clipboard?.writeText(@js((string) $row->auth_password));
+                                        this.$dispatch('toast', { message: @js(__('Password copied')) });
+                                    },
+                                }">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Current password') }}</p>
+                                    <div class="mt-1 flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-zinc-50 px-3 py-2">
+                                        <code class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">
+                                            <span x-show="! shown">{{ str_repeat('•', min(strlen((string) $row->auth_password), 24)) }}</span>
+                                            <span x-show="shown" x-cloak>{{ $row->auth_password }}</span>
+                                        </code>
+                                        <button
+                                            type="button"
+                                            x-on:click="shown = !shown"
+                                            class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink"
+                                            :title="shown ? @js(__('Hide')) : @js(__('Show'))"
+                                        >
+                                            <x-heroicon-o-eye class="h-4 w-4" x-show="! shown" />
+                                            <x-heroicon-o-eye-slash class="h-4 w-4" x-show="shown" x-cloak />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            x-on:click="copyCurrent()"
+                                            class="shrink-0 rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink"
+                                            title="{{ __('Copy') }}"
+                                        >
+                                            <x-heroicon-o-clipboard class="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+
                             <form wire:submit="setAuthPassword" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div class="sm:col-span-2">
                                     <div class="flex items-end justify-between gap-2">

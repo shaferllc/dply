@@ -13,6 +13,12 @@
     // so they're "setup complete" the moment they're STATUS_READY — even when
     // setup_status is null.
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+
+    // Dedicated cache boxes (server_role redis/valkey) hide the generic
+    // Sites/Databases/Latest-deploy/Background tiles and the Sites preview —
+    // they render 0s on these servers and pull the operator toward set-up
+    // flows that don't apply. The Caches workspace is the surface they want.
+    $isCacheRoleHost = in_array((string) ($server->meta['server_role'] ?? ''), ['redis', 'valkey'], true);
     $setupIncomplete = $server->isVmHost() && (
         $server->status !== \App\Models\Server::STATUS_READY
         || $server->setup_status !== \App\Models\Server::SETUP_STATUS_DONE
@@ -568,6 +574,7 @@
                     ])
                     : __('No deploys yet');
             @endphp
+            @if (! $isCacheRoleHost)
             <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
@@ -652,9 +659,10 @@
                     </a>
                 </div>
             </section>
+            @endif
 
             {{-- Sites preview. --}}
-            @if ($sitesPreview->isNotEmpty())
+            @if (! $isCacheRoleHost && $sitesPreview->isNotEmpty())
                 <section class="dply-card overflow-hidden">
                     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <div class="flex items-start gap-3">

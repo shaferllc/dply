@@ -267,11 +267,23 @@ class WorkspaceOverview extends Component
             [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES],
             true,
         );
+        $serverRole = (string) ($this->server->meta['server_role'] ?? '');
+        $isCacheRoleHost = in_array($serverRole, ['redis', 'valkey'], true);
         $monitorInstalled = $latestMetricSnapshot !== null
             && is_array($latestMetricSnapshot->payload ?? null)
             && isset($latestMetricSnapshot->payload['cpu_pct']);
         $hasBackupSchedule = ($backgroundSummary['active_schedules'] ?? 0)
             + ($backgroundSummary['paused_schedules'] ?? 0) > 0;
+        // An "installed" cache engine is one that's past the install pipeline
+        // (running or stopped). Pending/installing/uninstalling/failed rows
+        // are mid-flight and don't satisfy the onboarding step yet.
+        $cacheEngineInstalled = \App\Models\ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('status', [
+                \App\Models\ServerCacheService::STATUS_RUNNING,
+                \App\Models\ServerCacheService::STATUS_STOPPED,
+            ])
+            ->exists();
 
         $onboardingSteps = [];
         if (! $isContainerHostForChecklist) {
@@ -284,18 +296,33 @@ class WorkspaceOverview extends Component
                 'cta_route' => route('servers.ssh-keys', $this->server),
             ];
         }
-        $onboardingSteps[] = [
-            'key' => 'first_site',
-            'label' => $isContainerHostForChecklist
-                ? __('Add your first container app')
-                : __('Add your first site'),
-            'help' => $isContainerHostForChecklist
-                ? __('Point dply at a Git repo and deploy a container.')
-                : __('Connect a Git repo, configure the web root, and deploy.'),
-            'done' => $sites->count() > 0,
-            'cta_label' => __('Add'),
-            'cta_route' => route('sites.create', $this->server),
-        ];
+        if ($isCacheRoleHost) {
+            // Cache-role servers (server_role redis/valkey) don't host sites —
+            // the "first useful thing" is installing the cache engine via the
+            // Caches workspace, not connecting a Git repo.
+            $engineLabel = $serverRole === 'valkey' ? __('Valkey') : __('Redis');
+            $onboardingSteps[] = [
+                'key' => 'first_cache_engine',
+                'label' => __('Install :engine', ['engine' => $engineLabel]),
+                'help' => __('Provision the cache engine apt + systemd on this host.'),
+                'done' => $cacheEngineInstalled,
+                'cta_label' => __('Open Caches'),
+                'cta_route' => route('servers.caches', $this->server),
+            ];
+        } else {
+            $onboardingSteps[] = [
+                'key' => 'first_site',
+                'label' => $isContainerHostForChecklist
+                    ? __('Add your first container app')
+                    : __('Add your first site'),
+                'help' => $isContainerHostForChecklist
+                    ? __('Point dply at a Git repo and deploy a container.')
+                    : __('Connect a Git repo, configure the web root, and deploy.'),
+                'done' => $sites->count() > 0,
+                'cta_label' => __('Add'),
+                'cta_route' => route('sites.create', $this->server),
+            ];
+        }
         if (! $isContainerHostForChecklist) {
             $onboardingSteps[] = [
                 'key' => 'monitor',
@@ -305,14 +332,20 @@ class WorkspaceOverview extends Component
                 'cta_label' => __('Install'),
                 'cta_route' => route('servers.monitor', $this->server),
             ];
-            $onboardingSteps[] = [
-                'key' => 'backups',
-                'label' => __('Schedule backups'),
-                'help' => __('Automatic database + site-files backups on a cron you choose.'),
-                'done' => $hasBackupSchedule,
-                'cta_label' => __('Open Backups'),
-                'cta_route' => route('servers.backups', $this->server),
-            ];
+            // Backups workspace is gated by mysql/postgres install tags AND
+            // hidden from the Redis sidebar via role_nav_keys — skip the step
+            // entirely on cache-role hosts so the checklist doesn't dangle on
+            // a CTA route that 404s.
+            if (! $isCacheRoleHost) {
+                $onboardingSteps[] = [
+                    'key' => 'backups',
+                    'label' => __('Schedule backups'),
+                    'help' => __('Automatic database + site-files backups on a cron you choose.'),
+                    'done' => $hasBackupSchedule,
+                    'cta_label' => __('Open Backups'),
+                    'cta_route' => route('servers.backups', $this->server),
+                ];
+            }
         }
         if ($notificationSummary['manage_url']) {
             $onboardingSteps[] = [

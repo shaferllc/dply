@@ -20,15 +20,31 @@
     @endif
 
     @php
+        // Read the active item label from the *role-aware* nav so role overrides
+        // (e.g. `caches` labelled "Redis" on a redis-role server) surface in the
+        // breadcrumb too. Falls back to the base nav for active keys the role
+        // filter would hide — defence in case of a stale deep link bookmark.
         $activePageItem = null;
         if (filled($active) && $active !== 'overview') {
-            foreach (config('server_workspace.nav', []) as $navItem) {
+            $roleAwareNav = server_workspace_nav_for_server($server);
+            foreach ($roleAwareNav as $navItem) {
                 if (is_array($navItem) && ($navItem['key'] ?? null) === $active) {
                     $activePageItem = [
                         'label' => __($navItem['label'] ?? ucfirst((string) $active)),
                         'icon' => $navItem['icon'] ?? null,
                     ];
                     break;
+                }
+            }
+            if ($activePageItem === null) {
+                foreach (config('server_workspace.nav', []) as $navItem) {
+                    if (is_array($navItem) && ($navItem['key'] ?? null) === $active) {
+                        $activePageItem = [
+                            'label' => __($navItem['label'] ?? ucfirst((string) $active)),
+                            'icon' => $navItem['icon'] ?? null,
+                        ];
+                        break;
+                    }
                 }
             }
         }

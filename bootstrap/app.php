@@ -295,6 +295,12 @@ return Application::configure(basePath: dirname(__DIR__))
             EnforceMaintenanceMode::class,
             CaptureReferralCode::class,
             RedirectGuestsToComingSoon::class,
+            // Workspace deep-link guard: 404s requests for workspace routes the
+            // bound server can't reach (tag-gated rows that lack the required
+            // installed-service tag; role-gated rows hidden by role_nav_keys).
+            // Short-circuits for non-server routes via an `instanceof` check,
+            // so the cost is one route-binding lookup per web request.
+            EnsureServerServiceInstalled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
