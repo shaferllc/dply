@@ -17,6 +17,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\ServerProviderGate;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -50,6 +51,19 @@ test('list server provider cards includes vultr when enabled', function () {
     $ids = array_column(ListServerProviderCards::run($org), 'id');
 
     expect($ids)->toContain('vultr');
+});
+
+test('vultr is omitted when pennant flag is off', function () {
+    Feature::define('provider.vultr', fn (): bool => false);
+    Feature::flushCache();
+
+    $user = vultrTestUser();
+    $org = $user->currentOrganization();
+
+    $ids = array_column(ListServerProviderCards::run($org), 'id');
+
+    expect($ids)->not->toContain('vultr');
+    expect(ServerProviderGate::enabled('vultr'))->toBeFalse();
 });
 
 test('credentials nav includes vultr when enabled', function () {

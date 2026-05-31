@@ -95,3 +95,57 @@ test('destroy instance deletes server by id', function () {
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && $request->url() === 'https://api.vultr.com/v2/instances/vps-555');
 });
+
+test('domain exists checks vultr dns domains', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/domains/example.com' => Http::response([
+            'domain' => ['domain' => 'example.com'],
+        ], 200),
+        'https://api.vultr.com/v2/domains/missing.test' => Http::response([], 404),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    expect((new VultrService($credential))->domainExists('example.com'))->toBeTrue();
+    expect((new VultrService($credential))->domainExists('missing.test'))->toBeFalse();
+});
+
+test('upsert domain record creates record when missing', function () {
+    Http::fake(function ($request) {
+        $url = $request->url();
+        $method = $request->method();
+
+        if (str_contains($url, '/domains/example.com/records') && $method === 'GET') {
+            return Http::response(['records' => [], 'meta' => ['links' => ['next' => '']]], 200);
+        }
+
+        if ($url === 'https://api.vultr.com/v2/domains/example.com/records' && $method === 'POST') {
+            return Http::response([
+                'record' => ['id' => 'rec-55', 'type' => 'A', 'name' => 'preview', 'data' => '203.0.113.1'],
+            ], 201);
+        }
+
+        return Http::response([], 404);
+    });
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    $record = (new VultrService($credential))->upsertDomainRecord('example.com', 'A', 'preview', '203.0.113.1');
+
+    expect($record['id'] ?? null)->toBe('rec-55');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://api.vultr.com/v2/domains/example.com/records'
+        && ($request->data()['data'] ?? null) === '203.0.113.1');
+});
+
+test('normalize record name maps apex hostnames to empty string', function () {
+    expect(VultrService::normalizeRecordName('example.com', 'example.com'))->toBe('');
+    expect(VultrService::normalizeRecordName('preview', 'example.com'))->toBe('preview');
+});

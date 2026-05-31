@@ -8,6 +8,7 @@ use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\Route53Service;
+use App\Services\VultrService;
 
 final class SiteDnsProviderFactory
 {
@@ -17,10 +18,11 @@ final class SiteDnsProviderFactory
             'digitalocean' => new DigitalOceanDnsProvider(new DigitalOceanService($credential)),
             'hetzner' => new HetznerDnsProvider(new HetznerService($credential)),
             'linode', 'akamai' => new LinodeDnsProvider(new LinodeService($credential)),
+            'vultr' => new VultrDnsProvider(new VultrService($credential)),
             'cloudflare' => new CloudflareDnsProvider(new CloudflareDnsService($credential)),
             'aws' => new Route53DnsProvider(new Route53Service($credential)),
             default => throw new \RuntimeException(
-                __('DNS automation is not available for this provider yet. Choose DigitalOcean, Hetzner, Linode, Cloudflare, or AWS (Route53).')
+                __('DNS automation is not available for this provider yet. Choose DigitalOcean, Hetzner, Linode, Vultr, Cloudflare, or AWS (Route53).')
             ),
         };
     }

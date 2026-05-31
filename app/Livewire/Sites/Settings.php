@@ -53,6 +53,7 @@ use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
+use App\Services\VultrService;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\SiteSettingsSidebar;
@@ -1573,7 +1574,7 @@ class Settings extends Show
             $appDoToken = trim((string) config('services.digitalocean.token'));
 
             if ($credForApi === null && $appDoToken === '') {
-                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
+                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, Vultr, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
 
                 return;
             }
@@ -1598,6 +1599,13 @@ class Settings extends Show
                         $linode = new LinodeService($credForApi);
                         if (! $linode->domainExists($zone)) {
                             $this->addError('settings_dns_zone', __('That domain was not found in this Linode account. Add it under Linode → Domains first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'vultr') {
+                        $vultr = new VultrService($credForApi);
+                        if (! $vultr->domainExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That domain was not found in this Vultr account. Add it under Vultr → DNS first.'));
 
                             return;
                         }

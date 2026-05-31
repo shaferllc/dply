@@ -263,15 +263,28 @@
     @case('vultr')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Vultr uses personal API keys — there is no OAuth sign-in for third-party apps. Sign in to the customer portal, create a key with compute and DNS access, then paste it below.') }}</p>
+                    <a
+                        href="https://my.vultr.com/settings/#settingsapi"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#007BFC] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0062C9] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Vultr Customer Portal') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your API key') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="vultr_name" :value="__('Label (optional)')" />
-                        <x-text-input id="vultr_name" wire:model="vultr_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="vultr_name" wire:model="vultr_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production account') }}" />
                     </div>
                     <div>
-                        <x-input-label for="vultr_api_token" :value="__('API token')" />
+                        <x-input-label for="vultr_api_token" :value="__('API key')" />
                         <x-text-input id="vultr_api_token" wire:model="vultr_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://my.vultr.com/settings/#settingsapi" target="_blank" rel="noopener" class="'.$link.'">Vultr → Account → API</a>']) !!}</p>
+                        <p class="{{ $hint }}">{!! __('Create a key at :link. Enable access to Instances and DNS — the same key powers compute and DNS.', ['link' => '<a href="https://my.vultr.com/settings/#settingsapi" target="_blank" rel="noopener" class="'.$link.'">Vultr → Account → API</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('vultr_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeVultr" wire:loading.attr="disabled" wire:target="storeVultr">

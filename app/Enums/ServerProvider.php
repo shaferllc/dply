@@ -88,6 +88,7 @@ enum ServerProvider: string
             self::Hetzner,
             self::Linode,
             self::Akamai,
+            self::Vultr,
             self::Cloudflare,
             self::Aws,
             self::Gandi,

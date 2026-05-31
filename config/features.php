@@ -60,8 +60,8 @@ return [
         'aws' => env('FEATURE_PROVIDER_AWS', false),
         // exit: keep on; full BYO compute + Linode DNS Manager — flag for per-org pause / emergency cutoff
         'linode' => env('FEATURE_PROVIDER_LINODE', true),
-        // exit: ship to all orgs once we've had 5+ successful Vultr provisions in prod
-        'vultr' => env('FEATURE_PROVIDER_VULTR', false),
+        // exit: full BYO compute + Vultr DNS — per-org rollout via Pennant
+        'vultr' => env('FEATURE_PROVIDER_VULTR', true),
         // exit: ship once Fly.io machine provisioning is end-to-end green
         'fly_io' => env('FEATURE_PROVIDER_FLY_IO', false),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
