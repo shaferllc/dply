@@ -1,27 +1,3 @@
-let passkeysLoader = null;
-
-function dplyPasskeyButtonsPresent() {
-    return Boolean(
-        document.getElementById('dply-passkey-login-btn')
-            || document.getElementById('dply-passkey-register-btn'),
-    );
-}
-
-/**
- * WebAuthn client — login + security settings only.
- */
-export function dplyEnsurePasskeys() {
-    if (!dplyPasskeyButtonsPresent()) {
-        return Promise.resolve();
-    }
-
-    if (!passkeysLoader) {
-        passkeysLoader = import('./dply-passkeys.js');
-    }
-
-    return passkeysLoader;
-}
-
 let docsProseLoader = null;
 
 /**
@@ -35,10 +11,6 @@ export function dplyEnsureDocsProseStyles() {
     return docsProseLoader;
 }
 
-function dplyMaybeLoadPasskeys() {
-    dplyEnsurePasskeys().catch(() => {});
-}
-
 function dplyMaybeLoadDocsProseStyles() {
     if (
         document.querySelector('.docs-markdown-prose, .docs-sidebar-prose')
@@ -49,12 +21,10 @@ function dplyMaybeLoadDocsProseStyles() {
 
 export function registerDplyLazyAssetListeners() {
     document.addEventListener('DOMContentLoaded', () => {
-        dplyMaybeLoadPasskeys();
         dplyMaybeLoadDocsProseStyles();
     });
 
     document.addEventListener('livewire:navigated', () => {
-        dplyMaybeLoadPasskeys();
         dplyMaybeLoadDocsProseStyles();
     });
 

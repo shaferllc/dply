@@ -39,6 +39,8 @@
     ][$postureTone];
 @endphp
 
+@vite(['resources/js/dply-passkeys-lazy.js'])
+
 <div
     x-data="{
         passwordSaved: false,

@@ -27,6 +27,8 @@ class SiteDeployStep extends Model
 
     public const TYPE_ARTISAN_MIGRATE = 'artisan_migrate';
 
+    public const TYPE_ARTISAN_MIGRATE_PRETEND = 'artisan_migrate_pretend';
+
     public const TYPE_ARTISAN_CONFIG_CACHE = 'artisan_config_cache';
 
     public const TYPE_ARTISAN_ROUTE_CACHE = 'artisan_route_cache';
@@ -58,6 +60,7 @@ class SiteDeployStep extends Model
     /** @return list<string> */
     public const RELEASE_STEP_TYPES = [
         self::TYPE_ARTISAN_MIGRATE,
+        self::TYPE_ARTISAN_MIGRATE_PRETEND,
         self::TYPE_ARTISAN_OPTIMIZE,
         self::TYPE_ARTISAN_STORAGE_LINK,
         self::TYPE_ARTISAN_QUEUE_RESTART,
@@ -192,6 +195,7 @@ class SiteDeployStep extends Model
             self::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
             self::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',
             self::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force',
+            self::TYPE_ARTISAN_MIGRATE_PRETEND => 'php artisan migrate --pretend --no-interaction',
             self::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
             self::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
             self::TYPE_ARTISAN_VIEW_CACHE => 'php artisan view:cache',
@@ -225,6 +229,7 @@ class SiteDeployStep extends Model
             self::TYPE_PNPM_INSTALL => __('pnpm install'),
             self::TYPE_BUN_INSTALL => __('bun install'),
             self::TYPE_ARTISAN_MIGRATE => __('Migrate'),
+            self::TYPE_ARTISAN_MIGRATE_PRETEND => __('Migrate (pretend)'),
             self::TYPE_ARTISAN_CONFIG_CACHE => __('Config cache'),
             self::TYPE_ARTISAN_ROUTE_CACHE => __('Route cache'),
             self::TYPE_ARTISAN_VIEW_CACHE => __('View cache'),
@@ -260,6 +265,7 @@ class SiteDeployStep extends Model
             self::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
             self::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',
             self::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force',
+            self::TYPE_ARTISAN_MIGRATE_PRETEND => 'php artisan migrate --pretend --no-interaction',
             self::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
             self::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
             self::TYPE_ARTISAN_VIEW_CACHE => 'php artisan view:cache',

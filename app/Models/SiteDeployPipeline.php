@@ -18,6 +18,7 @@ class SiteDeployPipeline extends Model
         'name',
         'slug',
         'description',
+        'deploy_branches',
         'clone_script',
         'activate_script',
         'is_default',
@@ -32,6 +33,7 @@ class SiteDeployPipeline extends Model
         return [
             'is_default' => 'boolean',
             'sort_order' => 'integer',
+            'deploy_branches' => 'array',
         ];
     }
 

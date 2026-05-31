@@ -6,6 +6,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
+use App\Support\Sites\DeployPipelineBranchResolver;
 
 class SiteGitDeployer
 {
@@ -34,6 +35,7 @@ class SiteGitDeployer
 
         $path = rtrim($site->effectiveRepositoryPath(), '/');
         $branch = $site->git_branch ?: 'main';
+        app(DeployPipelineBranchResolver::class)->applyForDeploy($site, $branch);
         $ssh = $this->sshFactory->forServer($server);
 
         $keyPath = '/root/.ssh/dply_site_'.$site->id.'_deploy';

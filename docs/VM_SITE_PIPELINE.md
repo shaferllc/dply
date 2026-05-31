@@ -58,3 +58,19 @@ Hooks are part of the same timeline as build steps (not a separate page):
 Drag **Shell**, **Webhook**, or **Notification** from the **Add hooks** palette onto a dashed zone in the timeline — the zone sets **when** it runs (before/after clone, before/after activate, or onto a build/release step for “after step”). A configure form opens for every type (shell script, webhook URL, or notification channel). Click a palette pill to add a hook manually and pick the timing yourself.
 
 Only hooks on the **active deploy pipeline** run on deployment.
+
+## Branch → pipeline mapping
+
+Each pipeline can list **Git branches** (comma-separated names or wildcards such as `release/*`). On deploy, Dply picks the **first matching pipeline** (by sort order) for the site’s current `git_branch`. If nothing matches, the pipeline marked **Deploy** in the UI runs.
+
+Branch mapping does not change which pipeline you are editing in the workspace—it only affects which recipe runs when that branch deploys.
+
+## Laravel safety bundle
+
+On Laravel sites, **Pipeline → Safety presets → Laravel safety bundle** adds:
+
+- **Maintenance down** hook (before activate) and **Maintenance up** (after activate)
+- **Migrate (pretend)** release step
+- **Pre-migrate DB snapshot** custom step (`mysqldump` / `pg_dump` when available)
+
+It does **not** add a real **Migrate** step—you add that when you are ready to apply schema changes. **Pipeline review** warns when migrate runs without pretend, backup, or maintenance pairing.

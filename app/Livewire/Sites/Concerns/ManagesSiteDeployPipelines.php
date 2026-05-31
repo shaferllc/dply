@@ -7,6 +7,7 @@ namespace App\Livewire\Sites\Concerns;
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Support\Sites\DeployPipelineSafetyPresets;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -33,6 +34,8 @@ trait ManagesSiteDeployPipelines
 
     public ?string $pending_delete_pipeline_id = null;
 
+    public string $editing_pipeline_branches = '';
+
     public function setEditingPipeline(string $pipelineId): void
     {
         $this->authorize('view', $this->site);
@@ -41,6 +44,7 @@ trait ManagesSiteDeployPipelines
             return;
         }
         $this->editingPipelineId = (string) $pipeline->id;
+        $this->syncEditingPipelineBranches();
         $this->syncPipelineAnchorScriptsFromEditingPipeline();
         $this->closePipelineStepForm();
         $this->closePipelineAnchorForm();
@@ -49,6 +53,7 @@ trait ManagesSiteDeployPipelines
 
     public function updatedEditingPipelineId(): void
     {
+        $this->syncEditingPipelineBranches();
         $this->syncPipelineAnchorScriptsFromEditingPipeline();
         $this->closePipelineStepForm();
         $this->closePipelineAnchorForm();
@@ -79,6 +84,7 @@ trait ManagesSiteDeployPipelines
         $duplicateFrom = $this->duplicate_current_on_create ? $this->editingDeployPipeline()->id : null;
         $pipeline = $manager->createPipeline($this->site, $this->new_pipeline_name, $duplicateFrom);
         $this->editingPipelineId = (string) $pipeline->id;
+        $this->syncEditingPipelineBranches();
         $this->duplicate_current_on_create = false;
         $this->closeCreatePipelineForm();
         $this->toastSuccess(__('Pipeline created.'));
@@ -174,6 +180,64 @@ trait ManagesSiteDeployPipelines
         }
         $this->closeApplyTemplateModal();
         $this->toastSuccess(__('Pipeline updated from template.'));
+    }
+
+    public function saveEditingPipelineBranches(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'editing_pipeline_branches' => 'nullable|string|max:500',
+        ]);
+
+        $pipeline = $this->editingDeployPipeline();
+        $pipeline->update([
+            'deploy_branches' => $this->parseDeployBranchesInput($this->editing_pipeline_branches),
+        ]);
+        $this->site->load('deployPipelines');
+        $this->toastSuccess(__('Git branch mapping saved.'));
+    }
+
+    public function applyLaravelSafetyPresetBundle(): void
+    {
+        $this->authorize('update', $this->site);
+
+        try {
+            $result = app(DeployPipelineSafetyPresets::class)->apply(
+                DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1,
+                $this->editingDeployPipeline(),
+                $this->site,
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->toastSuccess(__(
+            'Safety bundle applied (:hooks hook(s), :steps step(s) added).',
+            ['hooks' => $result['hooks_added'], 'steps' => $result['steps_added']],
+        ));
+    }
+
+    protected function syncEditingPipelineBranches(): void
+    {
+        $branches = $this->editingDeployPipeline()->deploy_branches ?? [];
+        $this->editing_pipeline_branches = is_array($branches) && $branches !== []
+            ? implode(', ', $branches)
+            : '';
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function parseDeployBranchesInput(string $input): array
+    {
+        return collect(explode(',', $input))
+            ->map(fn (string $branch) => trim($branch))
+            ->filter(fn (string $branch) => $branch !== '')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

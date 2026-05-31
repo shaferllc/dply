@@ -99,6 +99,7 @@ return [
         ['type' => SiteDeployStep::TYPE_CUSTOM, 'label' => 'bundle install', 'icon' => 'heroicon-o-cube', 'phase' => 'build', 'custom_command' => 'bundle install --deployment --without development:test', 'requires' => 'rails'],
         ['type' => SiteDeployStep::TYPE_CUSTOM, 'label' => 'assets:precompile', 'icon' => 'heroicon-o-photo', 'phase' => 'build', 'custom_command' => 'bundle exec rails assets:precompile', 'requires' => 'rails'],
         // Release — Laravel
+        ['type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND, 'label' => 'Migrate (pretend)', 'icon' => 'heroicon-o-eye', 'phase' => 'release', 'requires' => 'laravel'],
         ['type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE, 'label' => 'Migrate', 'icon' => 'heroicon-o-arrow-path', 'phase' => 'release', 'requires' => 'laravel'],
         ['type' => SiteDeployStep::TYPE_ARTISAN_DB_SEED, 'label' => 'DB seed', 'icon' => 'heroicon-o-circle-stack', 'phase' => 'release', 'requires' => 'laravel'],
         ['type' => SiteDeployStep::TYPE_ARTISAN_OPTIMIZE, 'label' => 'Optimize', 'icon' => 'heroicon-o-bolt', 'phase' => 'release', 'requires' => 'laravel'],

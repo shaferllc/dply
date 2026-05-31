@@ -1,4 +1,6 @@
 <div>
+    @vite(['resources/js/dply-passkeys-lazy.js'])
+
     <x-livewire-validation-errors />
     <x-auth-session-status class="mb-4 rounded-lg border border-emerald-200/80 bg-emerald-50/90 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/40" :status="session('status')" />
     @if (session('error'))

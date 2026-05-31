@@ -17,6 +17,7 @@ use App\Support\Docs\ContextualDocResolver;
 use App\Support\Sites\DeployPipelineAdvisor;
 use App\Support\Sites\DeployPipelineIssueFixResolver;
 use App\Support\Sites\DeployPipelinePalette;
+use App\Support\Sites\DeployPipelineSafetyPresets;
 use App\Support\Sites\DeployPipelineTimeline;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
@@ -40,6 +41,7 @@ class WorkspacePipeline extends Show
         parent::mount($server, $site);
 
         app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+        $this->syncEditingPipelineBranches();
         $this->syncPipelineAnchorScriptsFromEditingPipeline();
 
         $tab = request()->query('tab');
@@ -202,6 +204,11 @@ class WorkspacePipeline extends Show
                 'pipelineAdvisorErrors' => collect($pipelineAdvisor['errors']),
                 'pipelineAdvisorWarnings' => collect($pipelineAdvisor['warnings']),
                 'pipelineActionableChecks' => $pipelineActionableChecks,
+                'pipelineSafetyBundles' => DeployPipelineSafetyPresets::bundles(),
+                'pipelineSafetyBundleVisible' => DeployPipelineSafetyPresets::visibleForSite(
+                    $this->site,
+                    DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1,
+                ),
             ],
         ));
     }

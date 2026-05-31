@@ -25,6 +25,7 @@ final class SiteDeployPipelineCommands
             SiteDeployStep::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
             SiteDeployStep::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',
             SiteDeployStep::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force --no-interaction',
+            SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND => 'php artisan migrate --pretend --no-interaction',
             SiteDeployStep::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
             SiteDeployStep::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
             SiteDeployStep::TYPE_ARTISAN_VIEW_CACHE => 'php artisan view:cache',

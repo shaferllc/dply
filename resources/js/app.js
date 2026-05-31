@@ -1,13 +1,11 @@
 import './bootstrap';
 
 import {
-    dplyEnsurePasskeys,
     dplyEnsureDocsProseStyles,
     registerDplyLazyAssetListeners,
 } from './lazy-load.js';
 import { registerDplyThemeListeners } from './theme.js';
 
-window.dplyEnsurePasskeys = dplyEnsurePasskeys;
 window.dplyEnsureDocsProseStyles = dplyEnsureDocsProseStyles;
 
 registerDplyLazyAssetListeners();

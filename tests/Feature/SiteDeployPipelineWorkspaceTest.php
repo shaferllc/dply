@@ -468,3 +468,63 @@ test('pipeline workspace can add shell hook on timeline', function () {
         'script' => 'echo pipeline-hook',
     ]);
 });
+
+test('pipeline workspace saves deploy branch mapping', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('editingPipelineId', (string) $pipeline->id)
+        ->set('editing_pipeline_branches', 'main, develop, release/*')
+        ->call('saveEditingPipelineBranches')
+        ->assertHasNoErrors();
+
+    expect($pipeline->fresh()->deploy_branches)->toBe(['main', 'develop', 'release/*']);
+});
+
+test('pipeline workspace applies laravel safety bundle', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('editingPipelineId', (string) $pipeline->id)
+        ->call('applyLaravelSafetyPresetBundle')
+        ->assertHasNoErrors()
+        ->assertSee('Laravel safety bundle');
+
+    $pipeline->refresh()->load(['hooks', 'steps']);
+
+    expect($pipeline->hooks)->toHaveCount(2)
+        ->and($pipeline->steps->where('step_type', SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND)->count())->toBe(1);
+});

@@ -61,6 +61,23 @@ test('pipeline advisor flags empty custom step command', function () {
         ->and($result['errors'])->not->toBeEmpty();
 });
 
+test('pipeline advisor flags migrate without pretend on laravel sites', function () {
+    $site = laravelSiteForPipelineAdvisor();
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE,
+        'phase' => SiteDeployStep::PHASE_RELEASE,
+        'timeout_seconds' => 900,
+    ]);
+
+    $result = app(DeployPipelineAdvisor::class)->analyze($site, $pipeline->fresh(['steps', 'hooks']));
+
+    expect(collect($result['checks'])->pluck('key'))->toContain('migrate_without_pretend');
+});
+
 test('pipeline advisor flags maintenance down after activate', function () {
     $site = laravelSiteForPipelineAdvisor();
     $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);

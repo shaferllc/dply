@@ -123,6 +123,27 @@
                 </button>
             </div>
 
+            <form wire:submit="saveEditingPipelineBranches" class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+                <label for="editing_pipeline_branches" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Git branches') }}</label>
+                <p class="mb-2 text-sm text-brand-moss">
+                    {{ __('Comma-separated branch names or patterns (e.g. main, develop, release/*). When the site deploys that branch, this pipeline is used—even if another pipeline is marked Deploy in the UI.') }}
+                </p>
+                <div class="flex flex-wrap items-end gap-3">
+                    <input
+                        type="text"
+                        id="editing_pipeline_branches"
+                        wire:model="editing_pipeline_branches"
+                        class="min-w-[14rem] flex-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm"
+                        placeholder="{{ __('main, develop, staging/*') }}"
+                    />
+                    <x-secondary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditingPipelineBranches">
+                        <span wire:loading.remove wire:target="saveEditingPipelineBranches">{{ __('Save branches') }}</span>
+                        <span wire:loading wire:target="saveEditingPipelineBranches">{{ __('Saving…') }}</span>
+                    </x-secondary-button>
+                </div>
+                <x-input-error :messages="$errors->get('editing_pipeline_branches')" class="mt-1" />
+            </form>
+
             <div class="flex flex-wrap items-center gap-2">
                 @unless ($isActiveDeployPipeline)
                     <button
@@ -161,6 +182,29 @@
                 </form>
             @endif
         </div>
+
+        @if ($pipelineSafetyBundleVisible ?? false)
+            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Safety presets') }}</p>
+                @php $safetyBundle = ($pipelineSafetyBundles ?? [])[\App\Support\Sites\DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1] ?? null; @endphp
+                @if ($safetyBundle)
+                    <p class="mt-1 text-sm text-brand-moss">{{ $safetyBundle['description'] }}</p>
+                    <button
+                        type="button"
+                        wire:click="applyLaravelSafetyPresetBundle"
+                        wire:loading.attr="disabled"
+                        wire:target="applyLaravelSafetyPresetBundle"
+                        class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                    >
+                        <x-heroicon-m-shield-check class="h-3.5 w-3.5" wire:loading.remove wire:target="applyLaravelSafetyPresetBundle" />
+                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="applyLaravelSafetyPresetBundle" />
+                        <span wire:loading.remove wire:target="applyLaravelSafetyPresetBundle">{{ $safetyBundle['label'] }}</span>
+                        <span wire:loading wire:target="applyLaravelSafetyPresetBundle">{{ __('Applying…') }}</span>
+                    </button>
+                    <p class="mt-2 text-xs text-brand-moss">{{ __('Adds maintenance down/up hooks, migrate pretend, and a pre-migrate DB snapshot step. Add Migrate when you are ready to apply schema changes.') }}</p>
+                @endif
+            </div>
+        @endif
 
         @if (($deployPipelineTemplates ?? []) !== [])
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">

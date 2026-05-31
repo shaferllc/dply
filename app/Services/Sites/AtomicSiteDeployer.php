@@ -7,6 +7,7 @@ use App\Models\SiteDeployHook;
 use App\Models\SiteRelease;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
+use App\Support\Sites\DeployPipelineBranchResolver;
 
 class AtomicSiteDeployer
 {
@@ -31,6 +32,7 @@ class AtomicSiteDeployer
 
         $base = rtrim($site->effectiveRepositoryPath(), '/');
         $branch = $site->git_branch ?: 'main';
+        app(DeployPipelineBranchResolver::class)->applyForDeploy($site, $branch);
         $ssh = $this->sshFactory->forServer($server);
         $log = '';
 

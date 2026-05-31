@@ -108,6 +108,7 @@ final class DeployPipelineAdvisor
         $this->checkScaffoldingSteps($pipeline->steps, $warnings, $checks);
         $this->checkEmptyPipeline($site, $pipeline->steps, $warnings, $checks);
         $this->checkHooks($pipeline->hooks, $pipeline->steps, $errors, $warnings, $checks);
+        $this->checkLaravelReleaseSafety($site, $releaseSteps, $pipeline->hooks, $warnings, $checks);
 
         if ($site->deploy_strategy !== 'atomic') {
             $hasReleaseMigrate = $releaseSteps->contains(
@@ -402,6 +403,87 @@ final class DeployPipelineAdvisor
                 $warnings[] = $message;
                 $checks[] = $this->check('maintenance_up_early_'.$hook->id, 'warning', $message);
             }
+        }
+    }
+
+    /**
+     * @param  Collection<int, SiteDeployStep>  $releaseSteps
+     * @param  Collection<int, SiteDeployHook>  $hooks
+     * @param  list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string}>  $checks
+     */
+    private function checkLaravelReleaseSafety(
+        Site $site,
+        Collection $releaseSteps,
+        Collection $hooks,
+        array &$warnings,
+        array &$checks,
+    ): void {
+        if (! $site->isLaravelFrameworkDetected()) {
+            return;
+        }
+
+        $indexed = $releaseSteps->values();
+        $position = fn (string $type) => $indexed->search(fn (SiteDeployStep $s) => $s->step_type === $type);
+
+        $migratePos = $position(SiteDeployStep::TYPE_ARTISAN_MIGRATE);
+        $pretendPos = $position(SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND);
+        $hasBackup = $releaseSteps->contains(
+            fn (SiteDeployStep $s) => $s->step_type === SiteDeployStep::TYPE_CUSTOM
+                && str_contains((string) $s->custom_command, 'dply-pre-migrate'),
+        );
+
+        if ($migratePos !== false && $pretendPos === false) {
+            $message = __('Release runs Migrate without a prior “Migrate (pretend)” step—add pretend or the Laravel safety bundle to preview SQL first.');
+            $warnings[] = $message;
+            $checks[] = $this->check('migrate_without_pretend', 'warning', $message);
+        }
+
+        if ($migratePos !== false && $pretendPos !== false && $pretendPos > $migratePos) {
+            $message = __('“Migrate (pretend)” is after “Migrate”—pretend should run first to preview pending changes.');
+            $warnings[] = $message;
+            $checks[] = $this->check('pretend_after_migrate', 'warning', $message);
+        }
+
+        if ($migratePos !== false && ! $hasBackup) {
+            $message = __('Release includes Migrate without a pre-migrate DB snapshot step—use the Laravel safety bundle or Server → Databases → Backups.');
+            $warnings[] = $message;
+            $checks[] = $this->check('migrate_without_backup', 'warning', $message);
+        }
+
+        if ($migratePos !== false && $hasBackup && $pretendPos !== false) {
+            $backupPos = $indexed->search(
+                fn (SiteDeployStep $s) => $s->step_type === SiteDeployStep::TYPE_CUSTOM
+                    && str_contains((string) $s->custom_command, 'dply-pre-migrate'),
+            );
+            if ($backupPos !== false && $backupPos > $pretendPos) {
+                $message = __('Pre-migrate backup runs after “Migrate (pretend)”—snapshot the database before dry-run and real migrate.');
+                $warnings[] = $message;
+                $checks[] = $this->check('backup_after_pretend', 'warning', $message);
+            }
+        }
+
+        $hasMaintenanceDown = $hooks->contains(
+            fn (SiteDeployHook $h) => $h->hook_kind === SiteDeployHook::KIND_SHELL
+                && $h->anchor === SiteDeployHook::ANCHOR_BEFORE_ACTIVATE
+                && str_contains(strtolower((string) $h->script), 'artisan down'),
+        );
+        $hasMaintenanceUp = $hooks->contains(
+            fn (SiteDeployHook $h) => $h->hook_kind === SiteDeployHook::KIND_SHELL
+                && $h->anchor === SiteDeployHook::ANCHOR_AFTER_ACTIVATE
+                && str_contains(strtolower((string) $h->script), 'artisan up'),
+        );
+
+        if ($migratePos !== false && ! $hasMaintenanceDown) {
+            $message = __('Migrate in Release without a maintenance-down hook before activate—visitors may hit the app during schema changes.');
+            $warnings[] = $message;
+            $checks[] = $this->check('migrate_without_maintenance_down', 'warning', $message);
+        }
+
+        if ($hasMaintenanceDown && ! $hasMaintenanceUp) {
+            $message = __('Maintenance down is configured without a matching “up” hook after activate.');
+            $warnings[] = $message;
+            $checks[] = $this->check('maintenance_down_without_up', 'warning', $message);
         }
     }
 
