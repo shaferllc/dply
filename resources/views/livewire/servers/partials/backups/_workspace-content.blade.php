@@ -1,7 +1,7 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    @if ($contextSite)
+    @if ($contextSite && ! ($siteDedicatedContext ?? false))
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -24,6 +24,11 @@
                 </div>
             </div>
         </section>
+    @elseif ($contextSite && ($siteDedicatedContext ?? false))
+        <p class="text-sm text-brand-moss">
+            {{ __('Database backups are managed at the server level.') }}
+            <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Open server backups') }}</a>
+        </p>
     @endif
 
     <x-explainer>

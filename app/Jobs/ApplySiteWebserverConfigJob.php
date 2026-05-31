@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
+use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBasicAuthUser;
 use App\Services\Sites\SiteWebserverConfigApplier;
 use Illuminate\Bus\Queueable;
@@ -24,6 +25,7 @@ class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public string $siteId,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {}
 
     public function uniqueId(): string
@@ -54,6 +56,7 @@ class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
         }
 
         $applyStartedAt = now();
+        $this->bindConsoleRunId($this->seededConsoleRunId);
         $emit = $this->beginConsoleAction();
 
         try {
@@ -68,6 +71,12 @@ class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
             // row stamped during the apply (which didn't make it into the htpasswd
             // we wrote) survives until the next apply rewrites the file.
             SiteBasicAuthUser::query()
+                ->where('site_id', $site->id)
+                ->whereNotNull('pending_removal_at')
+                ->where('pending_removal_at', '<=', $applyStartedAt)
+                ->delete();
+
+            SiteAccessGatePassword::query()
                 ->where('site_id', $site->id)
                 ->whereNotNull('pending_removal_at')
                 ->where('pending_removal_at', '<=', $applyStartedAt)

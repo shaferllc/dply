@@ -5,6 +5,7 @@ namespace Tests\Feature\ServerWorkspaceNavTest;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerProvisionRun;
+use App\Models\Site;
 use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
@@ -44,7 +45,7 @@ test('nav hides php and databases when stack excludes them', function () {
     // Daemons stays visible even without supervisor installed — the page itself
     // offers the Install Supervisor CTA, so the nav entry can't be gated on it.
     expect($keys)->toContain('daemons');
-    expect($keys)->toContain('queue-workers');
+    expect($keys)->not->toContain('queue-workers');
 
     // Always-on / non-gated tabs stay.
     expect($keys)->toContain('firewall');
@@ -66,9 +67,8 @@ test('nav shows php and databases when stack installs them', function () {
     expect($keys)->toContain('php');
     expect($keys)->toContain('databases');
 
-    // Daemons and Queue workers ride on the SSH host, not on Supervisor being installed.
+    // Daemons (incl. queue workers) ride on the SSH host, not on Supervisor being installed.
     expect($keys)->toContain('daemons');
-    expect($keys)->toContain('queue-workers');
 });
 
 test('nav flags daemons needs setup when supervisor missing', function () {
@@ -84,7 +84,6 @@ test('nav flags daemons needs setup when supervisor missing', function () {
     $items = collect(server_workspace_nav_for_server($server))->keyBy('key');
 
     expect((bool) ($items['daemons']['needs_setup'] ?? false))->toBeTrue();
-    expect((bool) ($items['queue-workers']['needs_setup'] ?? false))->toBeTrue();
 });
 
 test('nav drops needs setup flag when supervisor installed', function () {
@@ -101,7 +100,6 @@ test('nav drops needs setup flag when supervisor installed', function () {
 
     expect($items)->toHaveKey('daemons');
     expect((bool) ($items['daemons']['needs_setup'] ?? false))->toBeFalse();
-    expect((bool) ($items['queue-workers']['needs_setup'] ?? false))->toBeFalse();
 });
 
 test('nav batches workspace feature flag lookups', function () {
@@ -123,6 +121,33 @@ test('nav batches workspace feature flag lookups', function () {
 
     expect(count(server_workspace_nav_feature_names()))->toBeGreaterThan(10);
     expect($featureQueries)->toBeLessThanOrEqual(2);
+});
+
+test('nav batches site count lookups for requires_min_sites gate', function () {
+    Feature::define('workspace.shared_host', fn (): bool => true);
+    Feature::define('workspace.shared_host_preview', fn (): bool => false);
+
+    $server = serverWithoutProvisionArtifact();
+    Site::factory()->count(2)->create([
+        'server_id' => $server->id,
+        'user_id' => $server->user_id,
+        'organization_id' => $server->organization_id,
+    ]);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    server_workspace_nav_for_server($server);
+    server_workspace_nav_for_server($server);
+
+    $siteCountQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains(strtolower($query['query']), 'count(*)')
+            && str_contains(strtolower($query['query']), '"sites"'))
+        ->count();
+
+    DB::disableQueryLog();
+
+    expect($siteCountQueries)->toBe(1);
 });
 
 test('route gate returns 404 for php when php is not installed', function () {

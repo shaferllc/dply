@@ -12,7 +12,6 @@ use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RemoveSiteRepositoryJob;
-use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -20,18 +19,18 @@ use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Livewire\Concerns\MountsSiteWorkspace;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
+use App\Livewire\Sites\Concerns\ManagesSiteDeployHooks;
+use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
-use App\Models\SiteDeployHook;
-use App\Models\SiteDeployment;
-use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteRedirect;
-use App\Models\SiteRelease;
 use App\Services\Certificates\CertificateRepairService;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
@@ -48,11 +47,9 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
-use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\Sites\SiteProvisioningRestarter;
-use App\Services\Sites\SiteReleaseRollback;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
@@ -75,8 +72,12 @@ class Show extends Component
     use DispatchesToastNotifications;
     use ManagesEdgeRedeploy;
     use ManagesServerlessRuntime;
+    use ManagesSiteDeployExecution;
+    use ManagesSiteDeployHooks;
+    use ManagesSiteDeploySteps;
     use MountsSiteWorkspace;
     use RefreshesLinkedSourceControlAccounts;
+    use WatchesConsoleActionOutcomes;
 
     public Server $server;
 
@@ -295,20 +296,6 @@ class Show extends Component
     public array $editing_redirect_header_rows = [['name' => '', 'value' => '']];
 
     public string $editing_redirect_comment = '';
-
-    public string $new_hook_phase = 'after_clone';
-
-    public string $new_hook_script = '';
-
-    public int $new_hook_order = 0;
-
-    public int $new_hook_timeout_seconds = 900;
-
-    public string $new_deploy_step_type = SiteDeployStep::TYPE_COMPOSER_INSTALL;
-
-    public string $new_deploy_step_command = '';
-
-    public int $new_deploy_step_timeout = 900;
 
     public string $webhook_allowed_ips_text = '';
 
@@ -584,13 +571,24 @@ class Show extends Component
         // (before the worker picks the job up), and so we can stamp the per-action
         // label. The job's beginConsoleAction() reuses this row instead of
         // creating a new one.
-        $this->seedQueuedConsoleAction('webserver_config', $bannerLabel);
+        $run = $this->seedQueuedConsoleAction('webserver_config', $bannerLabel);
 
         // Queued: errors surface via the apply banner (status=failed) on the next
         // poll, not as inline toasts. Inline-running this used to time out HTTP requests
         // because SSH/nginx work was happening synchronously on the web worker.
-        ApplySiteWebserverConfigJob::dispatch($this->site->id);
-        $this->toastSuccess($successMessage.' '.__('Webserver config queued.'));
+        ApplySiteWebserverConfigJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            $successMessage,
+            __('Webserver config could not be applied on the server.'),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -814,30 +812,6 @@ class Show extends Component
         $this->redirect(route('sites.create', $this->server), navigate: true);
     }
 
-    public function deployNow(): void
-    {
-        $this->authorize('update', $this->site);
-        try {
-            RunSiteDeploymentJob::dispatchSync($this->site, SiteDeployment::TRIGGER_MANUAL);
-            $this->site->refresh();
-            $this->toastSuccess(config('insights.queue_after_deploy', true)
-                ? __('Deployment finished. Server and site insight runs have been queued.')
-                : __('Deployment finished.'));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
-    }
-
-    public function queueDeploy(SiteDeploySyncCoordinator $coordinator): void
-    {
-        $this->authorize('update', $this->site);
-        $coordinator->dispatchManualForGroup($this->site->fresh());
-        $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
-        $this->toastSuccess(config('insights.queue_after_deploy', true)
-            ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')
-            : $base);
-    }
-
     public function runRuntimeAction(string $action, SiteRuntimeActionExecutor $executor): void
     {
         $this->authorize('update', $this->site);
@@ -862,19 +836,6 @@ class Show extends Component
             $this->site->refresh();
             $this->toastError($e->getMessage());
         }
-    }
-
-    public function getDeployLockInfoProperty(): ?array
-    {
-        return Cache::get('site-deploy-active:'.$this->site->id);
-    }
-
-    public function releaseDeployLock(): void
-    {
-        $this->authorize('update', $this->site);
-        Cache::lock('site-deploy:'.$this->site->id)->forceRelease();
-        Cache::forget('site-deploy-active:'.$this->site->id);
-        $this->toastSuccess('Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.');
     }
 
     /**
@@ -1364,14 +1325,17 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_push');
+        $run = $this->seedQueuedConsoleAction('env_push');
 
         PushSiteEnvJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess(__('Push queued — track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment file pushed to server.'), __('Environment push did not finish.'));
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -1411,11 +1375,13 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_sync');
+        $run = $this->seedQueuedConsoleAction('env_sync');
         SyncEnvFromServerJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
+        $this->watchConsoleAction($run, __('Environment synced from server.'), __('Environment sync did not finish.'));
     }
 
     /**
@@ -1434,14 +1400,17 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_sync');
+        $run = $this->seedQueuedConsoleAction('env_sync');
 
         SyncEnvFromServerJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess(__('Env sync queued — track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment synced from server.'), __('Environment sync did not finish.'));
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -1465,10 +1434,20 @@ class Show extends Component
         $this->site->forceFill(['env_file_path' => $newPath])->save();
         $this->env_file_path_override = $newPath;
 
-        $this->seedQueuedConsoleAction('env_push');
-        PushSiteEnvJob::dispatch($this->site->id, (string) (auth()->id() ?? ''));
+        $run = $this->seedQueuedConsoleAction('env_push');
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
 
-        $this->toastSuccess(__('Relocating .env to :path — see banner for progress.', ['path' => $newPath]));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Relocated .env to :path.', ['path' => $newPath]),
+            __('Relocating .env to :path did not finish.', ['path' => $newPath]),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -1911,14 +1890,20 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_push');
+        $run = $this->seedQueuedConsoleAction('env_push');
 
         PushSiteEnvJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess($savedMessage.' '.__('Pushing to server — see banner.'));
+        $this->watchConsoleAction(
+            $run,
+            $savedMessage.' '.__('Pushed to server.'),
+            __('Push to server did not finish.'),
+        );
+        $this->toastSuccess($savedMessage.' '.__('Pushing to server — the console banner will confirm when it finishes.'));
     }
 
     public function toggleRevealEnvVar(string $key): void
@@ -2217,135 +2202,6 @@ class Show extends Component
         $this->authorize('update', $this->site);
         SiteRedirect::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
         $this->finalizeRoutingMutation('Redirect removed.');
-    }
-
-    public function addDeployHook(): void
-    {
-        $this->authorize('update', $this->site);
-        $this->validate([
-            'new_hook_phase' => 'required|in:before_clone,after_clone,after_activate',
-            'new_hook_script' => 'required|string|max:16000',
-            'new_hook_order' => 'integer|min:0|max:999',
-            'new_hook_timeout_seconds' => 'required|integer|min:30|max:3600',
-        ]);
-        SiteDeployHook::query()->create([
-            'site_id' => $this->site->id,
-            'phase' => $this->new_hook_phase,
-            'script' => $this->new_hook_script,
-            'sort_order' => $this->new_hook_order,
-            'timeout_seconds' => $this->new_hook_timeout_seconds,
-        ]);
-        $this->new_hook_script = '';
-        $this->new_hook_order = 0;
-        $this->new_hook_timeout_seconds = 900;
-        $this->toastSuccess('Deploy hook added.');
-    }
-
-    public function deleteDeployHook(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        SiteDeployHook::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->toastSuccess('Hook removed.');
-    }
-
-    public function addDeployPipelineStep(): void
-    {
-        $this->authorize('update', $this->site);
-        $types = array_keys(SiteDeployStep::typeLabels());
-        $this->validate([
-            'new_deploy_step_type' => 'required|string|in:'.implode(',', $types),
-            'new_deploy_step_command' => 'nullable|string|max:4000',
-            'new_deploy_step_timeout' => 'required|integer|min:30|max:3600',
-        ]);
-        $needsCustom = in_array($this->new_deploy_step_type, [
-            SiteDeployStep::TYPE_NPM_RUN,
-            SiteDeployStep::TYPE_CUSTOM,
-        ], true);
-        if ($needsCustom && trim($this->new_deploy_step_command) === '') {
-            $this->addError('new_deploy_step_command', 'This step type needs a value in the command field.');
-
-            return;
-        }
-        SiteDeployStep::query()->create([
-            'site_id' => $this->site->id,
-            'sort_order' => (int) ($this->site->deploySteps()->max('sort_order') ?? 0) + 1,
-            'step_type' => $this->new_deploy_step_type,
-            'custom_command' => trim($this->new_deploy_step_command) !== '' ? trim($this->new_deploy_step_command) : null,
-            'timeout_seconds' => $this->new_deploy_step_timeout,
-        ]);
-        $this->new_deploy_step_command = '';
-        $this->new_deploy_step_timeout = 900;
-        $this->toastSuccess('Deploy pipeline step added. Runs after git, before the post-deploy command.');
-    }
-
-    public function deleteDeployPipelineStep(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        SiteDeployStep::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->toastSuccess('Pipeline step removed.');
-    }
-
-    public function moveDeployStepUp(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order', 'asc')->pluck('id')->all();
-        $pos = array_search($id, $ids, true);
-        if ($pos === false || $pos === 0) {
-            return;
-        }
-        [$ids[$pos - 1], $ids[$pos]] = [$ids[$pos], $ids[$pos - 1]];
-        foreach ($ids as $i => $stepId) {
-            SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
-        }
-        $this->toastSuccess('Pipeline order updated.');
-    }
-
-    public function moveDeployStepDown(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order', 'asc')->pluck('id')->all();
-        $pos = array_search($id, $ids, true);
-        if ($pos === false || $pos >= count($ids) - 1) {
-            return;
-        }
-        [$ids[$pos + 1], $ids[$pos]] = [$ids[$pos], $ids[$pos + 1]];
-        foreach ($ids as $i => $stepId) {
-            SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
-        }
-        $this->toastSuccess('Pipeline order updated.');
-    }
-
-    public function confirmRollbackRelease(int|string $releaseId): void
-    {
-        $this->authorize('update', $this->site);
-
-        $this->openConfirmActionModal(
-            'rollbackRelease',
-            [(string) $releaseId],
-            __('Rollback release'),
-            __('Point current symlink at this release?'),
-            __('Rollback'),
-            true,
-        );
-    }
-
-    public function rollbackRelease(int|string $releaseId, SiteReleaseRollback $rollback): void
-    {
-        $this->authorize('update', $this->site);
-        if (! $this->server->hostCapabilities()->supportsReleaseRollback()) {
-            $this->toastError(__('This host runtime does not support release rollback via server symlinks.'));
-
-            return;
-        }
-
-        try {
-            $release = SiteRelease::query()->where('site_id', $this->site->id)->findOrFail($releaseId);
-            $rollback->rollbackTo($this->site, $release);
-            $this->site->refresh();
-            $this->toastSuccess('Rolled back active release symlink. Re-install Nginx if document root changed.');
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
     }
 
     public function addDomain(): void
@@ -2830,6 +2686,8 @@ class Show extends Component
 
     public function render(): View
     {
+        $this->resolveWatchedConsoleAction();
+
         $ready = $this->site->isReadyForWorkspace();
         $activeTab = $this->resolveDashboardTab();
 

@@ -1,52 +1,4 @@
 @php
-    use App\Services\Servers\SchedulerHealthEvaluator;
-
-    $card = 'dply-card overflow-hidden';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-    $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
-
-    /**
-     * Health-state → visual chip mapping. Centralised here so the per-card
-     * loop and the summary strip stay visually consistent.
-     */
-    $chipForHealth = static function (?string $health): array {
-        return match ($health) {
-            SchedulerHealthEvaluator::STATE_HEALTHY => [
-                'label' => __('Healthy'),
-                'classes' => 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200',
-                'dot' => 'bg-emerald-500',
-            ],
-            SchedulerHealthEvaluator::STATE_WAITING => [
-                'label' => __('Waiting for first tick'),
-                'classes' => 'bg-sky-50 text-sky-800 ring-1 ring-sky-200',
-                'dot' => 'bg-sky-500',
-            ],
-            SchedulerHealthEvaluator::STATE_AMBER => [
-                'label' => __('Behind schedule'),
-                'classes' => 'bg-amber-50 text-amber-900 ring-1 ring-amber-200',
-                'dot' => 'bg-amber-500',
-            ],
-            SchedulerHealthEvaluator::STATE_RED => [
-                'label' => __('Not ticking'),
-                'classes' => 'bg-red-50 text-red-800 ring-1 ring-red-200',
-                'dot' => 'bg-red-500',
-            ],
-            SchedulerHealthEvaluator::STATE_PAUSED => [
-                'label' => __('Paused'),
-                'classes' => 'bg-brand-sand/50 text-brand-mist ring-1 ring-brand-ink/10',
-                'dot' => 'bg-brand-mist',
-            ],
-            default => [
-                'label' => __('Unknown'),
-                'classes' => 'bg-brand-sand/50 text-brand-mist ring-1 ring-brand-ink/10',
-                'dot' => 'bg-brand-mist',
-            ],
-        };
-    };
-@endphp
-
-@php
     // Site-context schedule (reached from a site's sidebar with ?site=)
     // renders inside the site workspace wrapper to match the other site
     // sub-pages. The server-level Schedule keeps the server shell.
@@ -83,7 +35,7 @@
                 <x-page-header
                     :eyebrow="__('Background')"
                     :title="__('Schedule')"
-                    :description="__('Framework schedulers for this site. Tracks tick health and nudges you when one stops firing.')"
+                    :description="__('Framework schedulers for this site (schedule:run tick health, cadence, run-now).')"
                     :show-documentation="false"
                     flush
                     compact
@@ -92,6 +44,8 @@
                 @include('livewire.servers.partials.schedule._workspace-content')
             </main>
         </div>
+
+        @include('livewire.servers.partials.schedule._workspace-modals')
     </div>
 @else
     <x-server-workspace-layout
@@ -101,5 +55,9 @@
         :description="__('Framework schedulers running on this server. Tracks tick health for each scheduler; nudges you when one stops firing.')"
     >
         @include('livewire.servers.partials.schedule._workspace-content')
+
+        <x-slot name="modals">
+            @include('livewire.servers.partials.schedule._workspace-modals')
+        </x-slot>
     </x-server-workspace-layout>
 @endif

@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerHealthCockpit;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -24,15 +25,24 @@ class WorkspaceHealth extends Component
 
     protected string $requiredFeature = 'workspace.health';
 
+    /** @var list<string> */
+    public const HEALTH_TABS = ['overview', 'capacity', 'releases', 'reliability'];
+
+    #[Url(as: 'tab', except: 'overview')]
+    public string $healthTab = 'overview';
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
     }
 
+    public function setHealthWorkspaceTab(string $tab): void
+    {
+        $this->healthTab = in_array($tab, self::HEALTH_TABS, true) ? $tab : 'overview';
+    }
+
     public function render(ServerHealthCockpit $cockpit): View
     {
-        $this->server->refresh();
-
         $report = $cockpit->forServer($this->server);
 
         return view('livewire.servers.workspace-health', [

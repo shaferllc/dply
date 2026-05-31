@@ -1,7 +1,6 @@
 @php
     $cronUrl = route('sites.cron', ['server' => $server, 'site' => $site]);
     $daemonsUrl = route('sites.daemons', ['server' => $server, 'site' => $site]);
-    $queueWorkersUrl = route('sites.queue-workers', ['server' => $server, 'site' => $site]);
     $sidekiqPresetUrl = $daemonsUrl.'?preset=sidekiq';
     $solidQueuePresetUrl = $daemonsUrl.'?preset=solid-queue';
     $actionCablePresetUrl = $daemonsUrl.'?preset=action-cable';
@@ -69,7 +68,7 @@
             <div class="rounded-xl border border-brand-ink/10 bg-white p-5">
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('All workers for this site') }}</h3>
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('See and manage every queue / background worker scoped to this site.') }}</p>
-                <a href="{{ $queueWorkersUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Open Queue workers') }} →</a>
+                <a href="{{ $daemonsUrl }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-brand-ink underline">{{ __('Open Daemons') }} →</a>
             </div>
         </div>
         </div>

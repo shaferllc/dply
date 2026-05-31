@@ -128,25 +128,46 @@ class ConsoleAction extends Model
         return $this->dismissed_at !== null;
     }
 
+    public function isQueuedStalled(): bool
+    {
+        if ($this->status !== self::STATUS_QUEUED || $this->created_at === null) {
+            return false;
+        }
+
+        $threshold = (int) config('console_actions.queued_stalled_after_seconds', 45);
+
+        return $this->created_at->lt(now()->subSeconds($threshold));
+    }
+
     public function isStale(): bool
     {
-        $threshold = (int) config('console_actions.stale_after_seconds', 600);
-
-        // A row stuck in `running` past the threshold is stale (worker died
-        // mid-job). A row stuck in `queued` past the threshold is also stale —
-        // it means the dispatch happened but the worker never picked the job
-        // up (queue paused, redis flushed, etc.), so the banner would otherwise
-        // hang forever with "no output yet" copy.
         if ($this->status === self::STATUS_RUNNING && $this->started_at !== null) {
+            $threshold = (int) config('console_actions.stale_after_seconds', 600);
+
             return $this->started_at->lt(now()->subSeconds($threshold));
         }
 
         if ($this->status === self::STATUS_QUEUED) {
-            return $this->created_at !== null
-                && $this->created_at->lt(now()->subSeconds($threshold));
+            return $this->isQueuedStalled();
         }
 
         return false;
+    }
+
+    public static function queueWorkerStalledMessage(): string
+    {
+        $connection = (string) config('queue.default', 'sync');
+        $seconds = (int) config('console_actions.queued_stalled_after_seconds', 45);
+
+        if ($connection === 'sync') {
+            return __('No worker progress after :seconds seconds. Check that queue jobs are running.', [
+                'seconds' => $seconds,
+            ]);
+        }
+
+        return __('No queue worker picked up this task after :seconds seconds.', [
+            'seconds' => $seconds,
+        ]);
     }
 
     /**

@@ -30,12 +30,12 @@
             </span>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Inbound + outbound traffic') : __('Domains, aliases & redirects') }}</h2>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Inbound + outbound traffic') : __('Domains, DNS, aliases & redirects') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     @if ($site->usesDockerRuntime())
                         {{ __('Manage published hostnames, custom domains, redirects, and preview endpoints from one networking workspace.') }}
                     @else
-                        {{ __('Manage customer domains, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
+                        {{ __('Manage customer domains, DNS automation, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
                     @endif
                 </p>
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -58,7 +58,7 @@
             :icon="$routingTabIcons[$tab] ?? 'heroicon-o-share'"
             href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => $tab]) }}"
             wire:navigate
-        >{{ \Illuminate\Support\Str::headline($tab) }}</x-server-workspace-tab>
+        >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
 
@@ -244,6 +244,9 @@
         ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
         ['label' => __('Find by hostname'), 'command' => 'dply:fleet:domain-find example.com'],
     ]" />
+
+@elseif ($routingTab === 'dns')
+    @include('livewire.sites.settings.partials.routing._tab-dns')
 
 @elseif ($routingTab === 'aliases')
     @php $aliasCount = $site->domainAliases->count(); @endphp

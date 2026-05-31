@@ -1,0 +1,239 @@
+/**
+ * Drag-and-drop for site deploy pipeline steps + hooks (Sortable.js).
+ * Use this.$wire (not a reactive Alpine property) to avoid Vue __v_raw proxy errors.
+ */
+import Sortable from 'sortablejs';
+
+document.addEventListener('alpine:init', () => {
+    window.Alpine.data('deployPipelineWorkspace', () => ({
+        buildSortable: null,
+        releaseSortable: null,
+        buildPaletteSortable: null,
+        releasePaletteSortable: null,
+        hookPaletteSortable: null,
+        hookZoneSortables: [],
+        morphHook: null,
+
+        init() {
+            this.boot();
+
+            if (typeof window.Livewire?.hook === 'function') {
+                const componentId = this.$wire?.$id;
+                this.morphHook = ({ component }) => {
+                    if (componentId && component.id === componentId) {
+                        requestAnimationFrame(() => this.boot());
+                    }
+                };
+                window.Livewire.hook('morph.updated', this.morphHook);
+            }
+        },
+
+        boot() {
+            this.teardown();
+
+            this.buildSortable = this.createStepZone(this.$refs.buildSortZone, 'build');
+            this.releaseSortable = this.createStepZone(this.$refs.releaseSortZone, 'release');
+            this.buildPaletteSortable = this.createStepPalette(this.$refs.buildPalette);
+            this.releasePaletteSortable = this.createStepPalette(this.$refs.releasePalette);
+            this.hookPaletteSortable = this.createHookPalette(this.$refs.hookPalette);
+
+            this.$el.querySelectorAll('[data-hook-drop-zone]').forEach((zone) => {
+                const anchor = zone.dataset.hookDropZone;
+                if (! anchor) {
+                    return;
+                }
+                const sortable = this.createHookZone(zone, anchor);
+                if (sortable) {
+                    this.hookZoneSortables.push(sortable);
+                }
+            });
+        },
+
+        acceptsPaletteItem(toEl, dragEl) {
+            if (! toEl || ! dragEl?.dataset) {
+                return false;
+            }
+
+            if (dragEl.dataset.paletteHookKind) {
+                return Boolean(toEl.dataset?.hookDropZone);
+            }
+
+            if (dragEl.dataset.paletteType) {
+                return toEl.dataset?.pipelineDropZone === dragEl.dataset.palettePhase;
+            }
+
+            return false;
+        },
+
+        createStepZone(zone, phase) {
+            if (! zone) {
+                return null;
+            }
+
+            return Sortable.create(zone, {
+                group: {
+                    name: `pipeline-flow-${phase}`,
+                    pull: true,
+                    put: (to, _from, dragEl) => this.acceptsPaletteItem(to.el, dragEl),
+                },
+                animation: 150,
+                draggable: '[data-pipeline-step-id]',
+                filter: '[data-pipeline-no-drag], [data-timeline-fixed], [data-hook-drop-zone]',
+                preventOnFilter: true,
+                ghostClass: 'dply-pipeline-sortable-ghost',
+                chosenClass: 'dply-pipeline-sortable-chosen',
+                onAdd: (evt) => this.handlePaletteAdd(evt, zone, phase),
+                onEnd: (evt) => {
+                    if (evt.item?.dataset?.paletteType || evt.item?.dataset?.paletteHookKind) {
+                        return;
+                    }
+                    if (evt.from === evt.to && evt.oldIndex !== evt.newIndex) {
+                        this.persistStepOrder(phase);
+                    }
+                },
+            });
+        },
+
+        createHookZone(zone, anchor) {
+            return Sortable.create(zone, {
+                group: {
+                    name: 'pipeline-hooks',
+                    pull: false,
+                    put: (to, _from, dragEl) => this.acceptsPaletteItem(to.el, dragEl),
+                },
+                animation: 150,
+                draggable: '[data-hook-reorder-id]',
+                filter: '[data-pipeline-no-drag], [data-timeline-fixed]',
+                preventOnFilter: true,
+                ghostClass: 'dply-pipeline-sortable-ghost',
+                chosenClass: 'dply-pipeline-sortable-chosen',
+                onAdd: (evt) => this.handleHookPaletteAdd(evt, anchor),
+            });
+        },
+
+        createStepPalette(palette) {
+            if (! palette) {
+                return null;
+            }
+
+            const phase = palette.querySelector('[data-palette-phase]')?.dataset?.palettePhase ?? 'build';
+
+            return Sortable.create(palette, {
+                group: {
+                    name: `pipeline-flow-${phase}`,
+                    pull: 'clone',
+                    put: false,
+                },
+                sort: false,
+                animation: 120,
+                draggable: '[data-palette-type]',
+                handle: '[data-palette-drag-handle]',
+                filter: '[data-pipeline-no-drag]',
+                preventOnFilter: true,
+                forceFallback: true,
+                fallbackTolerance: 3,
+            });
+        },
+
+        createHookPalette(palette) {
+            if (! palette) {
+                return null;
+            }
+
+            return Sortable.create(palette, {
+                group: {
+                    name: 'pipeline-hooks',
+                    pull: 'clone',
+                    put: false,
+                },
+                sort: false,
+                animation: 120,
+                draggable: '[data-palette-hook-kind]',
+                handle: '[data-palette-drag-handle]',
+                filter: '[data-pipeline-no-drag]',
+                preventOnFilter: true,
+                forceFallback: true,
+                fallbackTolerance: 3,
+            });
+        },
+
+        handlePaletteAdd(evt, zone, phase) {
+            const type = evt.item?.dataset?.paletteType;
+            const itemPhase = evt.item?.dataset?.palettePhase;
+            if (! type || itemPhase !== phase) {
+                evt.item?.remove();
+
+                return;
+            }
+            const insertIndex = this.stepInsertIndex(zone, evt.newIndex);
+            evt.item.remove();
+            this.$wire.addDeployPipelineStepFromPalette(
+                type,
+                Number(insertIndex),
+                phase,
+            );
+        },
+
+        handleHookPaletteAdd(evt, anchor) {
+            const kind = evt.item?.dataset?.paletteHookKind;
+            if (! kind) {
+                evt.item?.remove();
+
+                return;
+            }
+            const dropZone = evt.to;
+            const stepId = dropZone?.dataset?.hookAnchorStepId || null;
+            evt.item.remove();
+            this.$wire.addDeployPipelineHookFromPalette(kind, anchor, stepId);
+        },
+
+        stepInsertIndex(zone, newIndex) {
+            const children = [...zone.children];
+            let index = 0;
+            for (let i = 0; i < newIndex && i < children.length; i++) {
+                if (children[i].dataset?.pipelineStepId) {
+                    index++;
+                }
+            }
+
+            return index;
+        },
+
+        persistStepOrder(phase) {
+            const zone = phase === 'release' ? this.$refs.releaseSortZone : this.$refs.buildSortZone;
+            if (! zone || ! this.$wire) {
+                return;
+            }
+            const ids = [...zone.querySelectorAll('[data-pipeline-step-id]')]
+                .map((el) => el.dataset.pipelineStepId)
+                .filter(Boolean);
+            if (! ids.length) {
+                return;
+            }
+            if (phase === 'release') {
+                this.$wire.reorderDeployPipelineReleaseSteps(ids);
+            } else {
+                this.$wire.reorderDeployPipelineBuildSteps(ids);
+            }
+        },
+
+        teardown() {
+            this.buildSortable?.destroy();
+            this.releaseSortable?.destroy();
+            this.buildPaletteSortable?.destroy();
+            this.releasePaletteSortable?.destroy();
+            this.hookPaletteSortable?.destroy();
+            this.hookZoneSortables.forEach((s) => s.destroy());
+            this.buildSortable = null;
+            this.releaseSortable = null;
+            this.buildPaletteSortable = null;
+            this.releasePaletteSortable = null;
+            this.hookPaletteSortable = null;
+            this.hookZoneSortables = [];
+        },
+
+        destroy() {
+            this.teardown();
+        },
+    }));
+});

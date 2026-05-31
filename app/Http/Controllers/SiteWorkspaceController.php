@@ -30,6 +30,37 @@ class SiteWorkspaceController
 
         $section = ($section === null || $section === '') ? 'general' : $section;
 
+        if (
+            $section === 'deploy'
+            && $server->isVmHost()
+            && ! $site->usesFunctionsRuntime()
+            && ! $site->usesEdgeRuntime()
+        ) {
+            return redirect()->route('sites.deployments.index', [
+                'server' => $server,
+                'site' => $site,
+                ...request()->query(),
+            ]);
+        }
+
+        if ($section === 'pipeline') {
+            return redirect()->route('sites.pipeline', [
+                'server' => $server,
+                'site' => $site,
+                ...request()->query(),
+            ]);
+        }
+
+        if ($section === 'dns') {
+            return redirect()->route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'routing',
+                'tab' => 'dns',
+                ...request()->query(),
+            ]);
+        }
+
         $component = $site->usesEdgeRuntime() ? EdgeSettings::class : Settings::class;
 
         $params = [

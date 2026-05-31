@@ -1,6 +1,8 @@
 @php
     $card = 'dply-card overflow-hidden';
     $supportsBA = $site->supportsBasicAuthProvisioning();
+    $supportsFormGate = $site->webserverSupportsFormPasswordGate();
+    $accessMethod = $access_gate_method !== '' ? $access_gate_method : $site->resolvedAccessGateMethod();
     $supportsPathPrefixes = $supportsBA && $site->basicAuthSupportsPathPrefixes();
     // Caddy is the only engine that can't enforce non-bcrypt hashes (apr1, sha).
     // Other engines read htpasswd directly via files, which support all formats.
@@ -26,14 +28,13 @@
 @endphp
 
 <section class="space-y-6">
-    {{-- Apply banner is rendered at the settings.blade.php top level so it's visible on
-         every section, not just basic-auth. --}}
+    {{-- Webserver apply / sync progress streams to the console banner at the top of
+         this page (auto-scrolled into view when you add, remove, or rotate a credential). --}}
 
     <x-explainer tone="info">
-        <p>{{ __('HTTP basic auth puts a username/password gate in front of all or part of this site. Dply hashes credentials in the database and writes htpasswd files on the server inside your repo\'s .dply/basic-auth directory; the webserver config references those files.') }}</p>
-        <p>{{ __('Path scope: use / to protect the whole site, or a prefix like /wp-admin to gate just one section. Octane and Node sites only support / in this release.') }}</p>
-        <p>{{ __('Dply only stores password hashes — the plaintext is shown once in this UI. Use Rotate password if you need a fresh credential without losing the entry.') }}</p>
-        <p>{{ __('Sync from server scans the repository for stray .htpasswd files (Dply-written or otherwise) and imports their entries so you can remove them through this UI. Discovered rows are tagged so you can tell them apart from credentials you added here.') }}</p>
+        <p>{{ __('Choose one staging lock method for this site. HTTP basic auth uses the browser popup and supports multiple users; the password gate shows a styled login form with a cookie (like Edge preview protection).') }}</p>
+        <p>{{ __('Path scope for HTTP basic auth: use / to protect the whole site, or a prefix like /wp-admin. The password gate applies site-wide only in this release.') }}</p>
+        <p>{{ __('Dply only stores password hashes — plaintext is shown once in this UI. Switching methods removes the other method on the next webserver apply.') }}</p>
     </x-explainer>
 
     @if (! $supportsBA)
@@ -52,6 +53,206 @@
             </div>
         </section>
     @else
+        <div class="{{ $card }}">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Method') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How visitors authenticate') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Only one method can be active. Changes apply through the webserver config job shown in the banner above.') }}</p>
+            </div>
+            <div class="grid gap-3 p-6 sm:grid-cols-3 sm:px-7">
+                <button
+                    type="button"
+                    wire:click="selectAccessGateMethod('off')"
+                    @class([
+                        'rounded-xl border px-4 py-4 text-left transition',
+                        'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-forest/30' => $accessMethod === 'off',
+                        'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'off',
+                    ])
+                >
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Off') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('No access gate — visitors reach the app directly.') }}</p>
+                </button>
+                <button
+                    type="button"
+                    wire:click="selectAccessGateMethod('basic_auth')"
+                    @class([
+                        'rounded-xl border px-4 py-4 text-left transition',
+                        'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-forest/30' => $accessMethod === 'basic_auth',
+                        'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'basic_auth',
+                    ])
+                >
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('HTTP basic auth') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Browser popup, multiple users, optional path prefixes.') }}</p>
+                </button>
+                <button
+                    type="button"
+                    wire:click="selectAccessGateMethod('form_password')"
+                    @disabled(! $supportsFormGate)
+                    @class([
+                        'rounded-xl border px-4 py-4 text-left transition',
+                        'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-forest/30' => $accessMethod === 'form_password',
+                        'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'form_password',
+                        'cursor-not-allowed opacity-60' => ! $supportsFormGate,
+                    ])
+                >
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Password gate') }}</p>
+                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                        @if ($supportsFormGate)
+                            {{ __('Styled login page + cookie — no browser basic-auth dialog.') }}
+                        @else
+                            {{ __('Coming soon for OpenLiteSpeed.') }}
+                        @endif
+                    </p>
+                </button>
+            </div>
+        </div>
+
+        @if ($accessMethod === 'form_password' && $supportsFormGate)
+            @php
+                $gatePasswords = $site->accessGatePasswords;
+                $activeGatePasswords = $gatePasswords->reject(fn ($row) => $row->isPendingRemoval());
+                $gatePasswordCount = $activeGatePasswords->count();
+            @endphp
+            <div class="{{ $card }}">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Password gate') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Named gate passwords') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('Add one or more labeled passwords so you can see who logged in. After a successful login, a secure cookie lasts 24 hours.') }}
+                            </p>
+                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                                <span class="inline-flex items-center gap-1">
+                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
+                                    {{ trans_choice('{0} no passwords|{1} :count password|[2,*] :count passwords', $gatePasswordCount, ['count' => $gatePasswordCount]) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex shrink-0 flex-wrap gap-2">
+                        <button
+                            type="button"
+                            x-data=""
+                            x-on:click.prevent="$dispatch('open-modal', 'add-form-gate-modal')"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-sage"
+                        >
+                            <x-heroicon-m-plus class="h-3.5 w-3.5" />
+                            {{ __('Add password') }}
+                        </button>
+                        @if ($gatePasswordCount > 0)
+                            <button
+                                type="button"
+                                wire:click="disableFormGatePassword"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            >
+                                {{ __('Remove gate') }}
+                            </button>
+                        @endif
+                    </div>
+                </div>
+
+                @if ($gatePasswords->isNotEmpty())
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($gatePasswords as $gatePassword)
+                            <li @class(['px-6 py-4 sm:px-7', 'opacity-60' => $gatePassword->isPendingRemoval()])>
+                                <div class="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $gatePassword->label }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">
+                                            @if ($gatePassword->isPendingRemoval())
+                                                {{ __('Removing on next webserver apply') }}
+                                            @else
+                                                {{ __('Active gate password') }}
+                                            @endif
+                                        </p>
+                                    </div>
+                                    @if (! $gatePassword->isPendingRemoval())
+                                        <button
+                                            type="button"
+                                            wire:click="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                                            title="{{ __('Remove credential') }}"
+                                            aria-label="{{ __('Remove') }}"
+                                        >
+                                            <x-heroicon-o-trash class="h-4 w-4" />
+                                        </button>
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <div class="px-6 py-8 sm:px-7">
+                        <p class="text-sm text-brand-moss">{{ __('No gate passwords yet. Add one to enable the login form — until then the site will not require the gate on apply.') }}</p>
+                    </div>
+                @endif
+            </div>
+
+            <div class="{{ $card }}" wire:init="loadFormGateLoginLog">
+                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login log') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent gate logins') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Successful logins are recorded on the server with the credential label, IP, and time.') }}</p>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                    @if (! $form_gate_login_log_loaded)
+                        <p class="text-sm text-brand-moss">{{ __('Loading login log…') }}</p>
+                    @elseif ($form_gate_login_log === [])
+                        <p class="text-sm text-brand-moss">{{ __('No logins recorded yet.') }}</p>
+                    @else
+                        <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
+                            @foreach ($form_gate_login_log as $entry)
+                                <li class="px-4 py-3 text-sm">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="font-semibold text-brand-ink">{{ $entry['label'] }}</span>
+                                        <time class="text-xs text-brand-mist">{{ $entry['at'] }}</time>
+                                    </div>
+                                    <p class="mt-1 text-xs text-brand-moss">
+                                        @if (! empty($entry['ip']))
+                                            {{ $entry['ip'] }}
+                                        @endif
+                                        @if (! empty($entry['hostname']))
+                                            @if (! empty($entry['ip'])) · @endif
+                                            {{ $entry['hostname'] }}
+                                        @endif
+                                    </p>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+            </div>
+
+            <x-modal name="add-form-gate-modal" maxWidth="md">
+                <form wire:submit="addFormGatePassword" class="space-y-4 p-6">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Add gate password') }}</h2>
+                    <p class="text-sm text-brand-moss">{{ __('Use a label like a person or team name so logins are attributable.') }}</p>
+                    <div>
+                        <x-input-label for="new_form_gate_label" :value="__('Label')" />
+                        <x-text-input id="new_form_gate_label" wire:model="new_form_gate_label" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Sarah, Agency preview') }}" />
+                        <x-input-error :messages="$errors->get('new_form_gate_label')" class="mt-1" />
+                    </div>
+                    <div>
+                        <x-input-label for="form_gate_password" :value="__('Password')" />
+                        <div class="mt-1 flex gap-2">
+                            <x-text-input id="form_gate_password" wire:model="form_gate_password" type="text" class="block w-full font-mono text-sm" autocomplete="new-password" />
+                            <button type="button" wire:click="generateFormGatePassword" class="shrink-0 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                {{ __('Generate') }}
+                            </button>
+                        </div>
+                        <x-input-error :messages="$errors->get('form_gate_password')" class="mt-1" />
+                    </div>
+                    <div class="flex justify-end gap-2">
+                        <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'add-form-gate-modal')">{{ __('Cancel') }}</x-secondary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addFormGatePassword">{{ __('Save password') }}</x-primary-button>
+                    </div>
+                </form>
+            </x-modal>
+        @elseif ($accessMethod === 'basic_auth')
         {{-- Slim header card: icon, title, count + freshness, and the primary CTAs.
              Inspired by the SSH keys workspace — keeps the page from being dominated by a
              big inline form when the operator just wants to add or rotate one credential. --}}
@@ -507,6 +708,7 @@
         </div>
 
         @include('livewire.sites.settings.partials.basic-auth-password-reveal-modal')
+        @endif
     @endif
 
     <x-cli-snippet tone="stub" />

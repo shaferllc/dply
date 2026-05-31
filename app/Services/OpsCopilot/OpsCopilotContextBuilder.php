@@ -139,6 +139,11 @@ final class OpsCopilotContextBuilder
         ];
     }
 
+    public function siteHasRecentFailure(Site $site): bool
+    {
+        return $this->latestFailureForSite($site) !== null;
+    }
+
     /**
      * @return array<string, mixed>|null
      */

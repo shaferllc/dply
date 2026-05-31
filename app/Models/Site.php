@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -526,6 +527,30 @@ class Site extends Model
         return $this->hasMany(SiteBasicAuthUser::class)->orderBy('sort_order')->orderBy('username');
     }
 
+    public function accessGate(): HasOne
+    {
+        return $this->hasOne(SiteAccessGate::class);
+    }
+
+    public function accessGatePasswords(): HasMany
+    {
+        return $this->hasMany(SiteAccessGatePassword::class)->orderBy('sort_order')->orderBy('label');
+    }
+
+    /**
+     * Password gate credentials that should be written to config.json and enforced.
+     *
+     * @return Collection<int, SiteAccessGatePassword>
+     */
+    public function enforceableAccessGatePasswords(): Collection
+    {
+        $this->loadMissing('accessGatePasswords');
+
+        return $this->accessGatePasswords->reject(
+            fn (SiteAccessGatePassword $row): bool => $row->isPendingRemoval(),
+        )->values();
+    }
+
     /**
      * Subset of {@see basicAuthUsers()} that the webserver should actually
      * enforce: managed (Dply wrote the htpasswd) AND not pending-removal
@@ -572,10 +597,17 @@ class Site extends Model
      */
     public function latestDeployment(): ?SiteDeployment
     {
-        // The deployments() relation pre-orders by id desc; reorder()
-        // resets so started_at desc is the only sort and ULIDs created
-        // out-of-order (test fixtures, backdated rows) sort correctly.
-        return $this->deployments()->reorder('started_at', 'desc')->first();
+        return once(function (): ?SiteDeployment {
+            if ($this->relationLoaded('deployments')) {
+                return $this->deployments
+                    ->sortByDesc(fn (SiteDeployment $deployment): int => $deployment->started_at?->getTimestamp() ?? 0)
+                    ->first();
+            }
+
+            // deployments() pre-orders by id desc; reorder() so started_at
+            // is the only sort (ULIDs / backdated rows may disagree with id).
+            return $this->deployments()->reorder('started_at', 'desc')->first();
+        });
     }
 
     public function webhookDeliveryLogs(): HasMany
@@ -605,12 +637,37 @@ class Site extends Model
 
     public function deployHooks(): HasMany
     {
-        return $this->hasMany(SiteDeployHook::class)->orderBy('sort_order');
+        $relation = $this->hasMany(SiteDeployHook::class)->orderBy('sort_order');
+
+        if ($this->active_deploy_pipeline_id) {
+            $relation->where('pipeline_id', $this->active_deploy_pipeline_id);
+        }
+
+        return $relation;
     }
 
+    public function deployPipelines(): HasMany
+    {
+        return $this->hasMany(SiteDeployPipeline::class)->orderBy('sort_order')->orderBy('name');
+    }
+
+    public function activeDeployPipeline(): BelongsTo
+    {
+        return $this->belongsTo(SiteDeployPipeline::class, 'active_deploy_pipeline_id');
+    }
+
+    /**
+     * Ordered steps for the pipeline used on deploy (active pipeline).
+     */
     public function deploySteps(): HasMany
     {
-        return $this->hasMany(SiteDeployStep::class)->orderBy('sort_order');
+        $relation = $this->hasMany(SiteDeployStep::class)->orderBy('sort_order');
+
+        if ($this->active_deploy_pipeline_id) {
+            $relation->where('pipeline_id', $this->active_deploy_pipeline_id);
+        }
+
+        return $relation;
     }
 
     public function fileBackups(): HasMany
@@ -1359,6 +1416,26 @@ class Site extends Model
     public function usesKubernetesRuntime(): bool
     {
         return $this->runtimeProfile() === 'kubernetes_web';
+    }
+
+    /**
+     * Whether this site can use the site-scoped systemd Services workspace
+     * (dply-site-{id}[-{name}].service). PHP/static and container/serverless
+     * workloads use FPM, nginx, or Supervisor (Daemons) instead.
+     */
+    public static function supportsSystemdServices(Site $site, Server $server): bool
+    {
+        if (! $server->hostCapabilities()->supportsSsh()) {
+            return false;
+        }
+
+        if ($site->usesFunctionsRuntime()
+            || $site->usesDockerRuntime()
+            || $site->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        return ! in_array((string) ($site->runtime ?? ''), ['php', 'static'], true);
     }
 
     public function usesContainerRuntime(): bool
@@ -2417,6 +2494,114 @@ class Site extends Model
             'traefik',
             'openlitespeed',
         ], true);
+    }
+
+    public function supportsAccessGateProvisioning(): bool
+    {
+        return $this->supportsBasicAuthProvisioning();
+    }
+
+    /**
+     * Form password gate is not wired for OpenLiteSpeed in v1.
+     */
+    public function webserverSupportsFormPasswordGate(): bool
+    {
+        if (! $this->supportsAccessGateProvisioning()) {
+            return false;
+        }
+
+        return $this->webserver() !== 'openlitespeed';
+    }
+
+    public function resolvedAccessGateMethod(): string
+    {
+        $this->loadMissing(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+
+        $gate = $this->accessGate;
+        if ($gate !== null && $gate->isFormPasswordActive()) {
+            return SiteAccessGate::METHOD_FORM_PASSWORD;
+        }
+
+        if ($gate !== null && $gate->method === SiteAccessGate::METHOD_OFF) {
+            return SiteAccessGate::METHOD_OFF;
+        }
+
+        if ($this->enforceableBasicAuthUsers()->isNotEmpty()) {
+            return SiteAccessGate::METHOD_BASIC_AUTH;
+        }
+
+        if ($gate !== null && $gate->method === SiteAccessGate::METHOD_BASIC_AUTH) {
+            return SiteAccessGate::METHOD_BASIC_AUTH;
+        }
+
+        return SiteAccessGate::METHOD_OFF;
+    }
+
+    public function usesFormPasswordGate(): bool
+    {
+        return $this->resolvedAccessGateMethod() === SiteAccessGate::METHOD_FORM_PASSWORD
+            && $this->webserverSupportsFormPasswordGate();
+    }
+
+    public function usesBasicAuthGate(): bool
+    {
+        if ($this->usesFormPasswordGate()) {
+            return false;
+        }
+
+        return $this->enforceableBasicAuthUsers()->isNotEmpty()
+            || $this->resolvedAccessGateMethod() === SiteAccessGate::METHOD_BASIC_AUTH;
+    }
+
+    public function accessGateStorageDirectoryOnHost(): string
+    {
+        return rtrim($this->effectiveRepositoryPath(), '/').'/.dply/access-gate';
+    }
+
+    public function accessGateScriptPathOnHost(): string
+    {
+        return $this->accessGateStorageDirectoryOnHost().'/index.php';
+    }
+
+    public function accessGateConfigPathOnHost(): string
+    {
+        return $this->accessGateStorageDirectoryOnHost().'/config.json';
+    }
+
+    public function accessGateLoginLogPathOnHost(): string
+    {
+        return $this->accessGateStorageDirectoryOnHost().'/logins.jsonl';
+    }
+
+    /**
+     * Unix account executing the on-host gate script via PHP-FPM. Stock pools use
+     * www-data; explicit {@see $php_fpm_user} overrides when a site has its own pool.
+     */
+    public function accessGatePhpRuntimeUser(Server $server): string
+    {
+        $explicit = trim((string) ($this->php_fpm_user ?? ''));
+
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        return 'www-data';
+    }
+
+    /**
+     * Hash stored for basic-auth credentials. Caddy (primary or edge backend) needs
+     * bcrypt inline; file-based engines (nginx, Apache, Traefik, OLS) use apr1 in
+     * htpasswd files.
+     */
+    public function hashBasicAuthPassword(string $plaintext): string
+    {
+        $this->loadMissing('server');
+
+        if ($this->webserver() === 'caddy' || $this->server?->hasEdgeProxy()) {
+            return Hash::make($plaintext);
+        }
+
+        return SiteBasicAuthUser::apr1Hash($plaintext);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Servers\PreflightSchedulerOnSiteTest;
 
+use App\Models\ServerSchedulerHeartbeat;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\PreflightSchedulerOnSite;
 
@@ -59,6 +60,19 @@ OUT;
 
     expect($svc->structuralFailures($results))->toBeEmpty('advisory warnings must not surface as structural blockers');
     expect($svc->advisoryWarnings($results))->toHaveCount(2);
+});
+test('structural failure blocks laravel checks only for laravel kind', function () {
+    $output = <<<'OUT'
+DPLY_PREFLIGHT: site_release_present pass found
+DPLY_PREFLIGHT: php_binary fail php binary not found on PATH
+DPLY_PREFLIGHT: cron_user_access pass ok
+OUT;
+
+    $svc = new PreflightSchedulerOnSite($this->app->make(ExecuteRemoteTaskOnServer::class));
+    $results = $svc->parseResult($output);
+
+    expect($svc->structuralFailures($results, ServerSchedulerHeartbeat::KIND_LARAVEL))->toHaveCount(1);
+    expect($svc->structuralFailures($results, ServerSchedulerHeartbeat::KIND_GENERIC))->toBeEmpty();
 });
 test('garbage lines are ignored', function () {
     $output = <<<'OUT'

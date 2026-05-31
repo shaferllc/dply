@@ -13,11 +13,11 @@ Each daemon shows:
 
 ## Supervisor setup
 
-If Supervisor is not installed, sidebar dots on **Daemons** and **Site → Queue workers** prompt install from **Manage**.
+If Supervisor is not installed, sidebar dots on **Daemons** prompt install from **Manage**.
 
 ## Server vs site daemons
 
-Configure site-specific workers under **Site → Daemons** or **Queue workers**. This section is for host-level programs (custom agents, org-wide consumers).
+Configure site-specific workers under **Site → Daemons** (queue workers, Horizon, Sidekiq, schedulers, and custom binaries). Server **Daemons** covers host-level programs too.
 
 ## Actions
 
@@ -26,5 +26,5 @@ Start, stop, and restart queue remote Supervisor commands with streaming output.
 ## Related sections
 
 - **Site → Daemons** — per-app Supervisor groups
-- **Site → Queue workers** — Laravel/Redis queue templates
+- **Site → Daemons** — Laravel/Redis queue templates and per-program logs
 - **Services** — systemd units outside Supervisor

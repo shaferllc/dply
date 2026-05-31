@@ -17,13 +17,15 @@ test('passes hook timeout to remote shell', function () {
     SiteDeployHook::query()->create([
         'site_id' => $site->id,
         'phase' => SiteDeployHook::PHASE_BEFORE_CLONE,
+        'hook_kind' => SiteDeployHook::KIND_SHELL,
+        'anchor' => SiteDeployHook::ANCHOR_BEFORE_CLONE,
         'script' => 'echo hi',
         'sort_order' => 0,
         'timeout_seconds' => 222,
     ]);
 
     $shell = new FakeRemoteShell;
-    $runner = new DeployHookRunner;
+    $runner = app(DeployHookRunner::class);
     $runner->runPhase($shell, $site->fresh(), SiteDeployHook::PHASE_BEFORE_CLONE, '/tmp');
 
     expect($shell->execCalls)->not->toBeEmpty();

@@ -434,3 +434,34 @@ html.dark {
         --tw-ring-offset-color: rgb(24 24 27);
     }
 }
+
+/* Deploy pipeline Sortable.js — single class tokens (Sortable cannot use spaced Tailwind strings) */
+.dply-pipeline-sortable-ghost {
+    opacity: 0.4;
+}
+
+.dply-pipeline-sortable-chosen {
+    box-shadow: 0 0 0 2px rgb(104 132 121 / 0.5);
+    border-radius: 9999px;
+}
+
+/* Unsaved-changes bar: shown via wire:dirty.class or Alpine when modal forms are dirty */
+.dply-unsaved-bar-visible {
+    display: block !important;
+}
+
+.dply-palette-drag-handle {
+    touch-action: none;
+}
+
+.dply-palette-drag-handle:hover {
+    background-color: rgb(251 191 36 / 0.35);
+}
+
+[data-palette-type] .dply-palette-drag-handle:hover {
+    background-color: rgb(224 242 254 / 0.9);
+}
+
+[data-palette-phase='release'] .dply-palette-drag-handle:hover {
+    background-color: rgb(209 250 229 / 0.9);
+}

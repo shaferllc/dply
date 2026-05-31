@@ -81,10 +81,10 @@ final class SiteSettingsSidebar
                 ['id' => 'general', 'label' => __('General'), 'icon' => 'heroicon-o-rectangle-stack', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
                 ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking'],
-                ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-signal', 'group' => 'networking'],
                 ['id' => 'certificates', 'label' => __('Certificates'), 'icon' => 'heroicon-o-shield-check', 'group' => 'networking'],
-                ['id' => 'deploy', 'label' => __('Deploy'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
+                ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'],
+                ['id' => 'pipeline', 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal', 'group' => 'deploy', 'route' => 'sites.pipeline'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
                 ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user', 'group' => 'runtime'],
                 ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
@@ -104,26 +104,8 @@ final class SiteSettingsSidebar
             $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'platform'));
         }
 
-        // Runtime sub-tabs (runtime-php / runtime-ruby / runtime-static) are
-        // VM-only — they expose engine knobs that, for container/serverless
-        // workspaces, live in the artifact (Dockerfile / function manifest).
-        $withRuntimeChild = $isContainerWorkspace
-            ? $base
-            : collect($base)
-                ->flatMap(function (array $item) use ($site): array {
-                    if ($item['id'] !== 'runtime') {
-                        return [$item];
-                    }
-
-                    $child = self::runtimeChildFor($site);
-
-                    return $child === null ? [$item] : [$item, $child];
-                })
-                ->values()
-                ->all();
-
         $withWebserver = $showWebserverConfigEditor
-            ? collect($withRuntimeChild)
+            ? collect($base)
                 ->flatMap(function (array $item): array {
                     if ($item['id'] !== 'routing') {
                         return [$item];
@@ -144,6 +126,8 @@ final class SiteSettingsSidebar
                             'icon' => 'heroicon-o-bolt-slash',
                             'group' => 'networking',
                             'route' => 'sites.caching',
+                            'feature' => 'workspace.site_caching',
+                            'preview_feature' => 'workspace.site_caching_preview',
                         ],
                         [
                             'id' => 'cdn',
@@ -151,12 +135,14 @@ final class SiteSettingsSidebar
                             'icon' => 'heroicon-o-globe-alt',
                             'group' => 'networking',
                             'route' => 'sites.cdn',
+                            'feature' => 'workspace.site_cdn',
+                            'preview_feature' => 'workspace.site_cdn_preview',
                         ],
                     ];
                 })
                 ->values()
                 ->all()
-            : $withRuntimeChild;
+            : $base;
 
         $withBackground = $showBackgroundGroup
             ? self::insertBackgroundGroup($withWebserver)
@@ -170,10 +156,11 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
-                // Hide items whose target page is behind a disabled feature flag
-                // (e.g. Schedule → feature:workspace.schedule) so the sidebar
-                // never links to a route that would 404 for this organization.
-                ->filter(fn (array $item): bool => empty($item['feature']) || Feature::active($item['feature']))
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services' || Site::supportsSystemdServices($site, $server))
+                // Hide gated items when neither the full feature nor its coming-soon
+                // preview is active (e.g. Schedule, Backups).
+                ->filter(fn (array $item): bool => self::sidebarItemVisible($item))
+                ->map(fn (array $item): array => self::markPreviewOnly($item))
                 ->values()
                 ->all(),
             $server,
@@ -190,14 +177,13 @@ final class SiteSettingsSidebar
     private static function insertBackgroundGroup(array $items): array
     {
         // The Schedule and Backups items navigate to the server-level pages — they're
-        // provided here as a convenience entry point. The cron / daemons / queue-workers
-        // items above use site-scoped routes (same component, site context bound).
+        // provided here as a convenience entry point. Cron / daemons use site-scoped routes.
         $background = [
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
             ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'servers.schedule', 'route_params' => 'server_with_site', 'feature' => 'workspace.schedule'],
             ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
-            ['id' => 'queue-workers', 'label' => __('Queue workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.queue-workers'],
-            ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'servers.backups', 'route_params' => 'server_with_site'],
+            ['id' => 'services', 'label' => __('Services'), 'icon' => 'heroicon-o-cpu-chip', 'group' => 'background', 'route' => 'sites.services'],
+            ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'sites.backups', 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ];
 
         $insertIndex = null;
@@ -290,7 +276,6 @@ final class SiteSettingsSidebar
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
             ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
-            ['id' => 'queue-workers', 'label' => __('Queue workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.queue-workers'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
         ];
 
@@ -298,7 +283,45 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * Attach `needs_setup => true` to the Daemons / Queue workers items when Supervisor
+     * @param  array<string, mixed>  $item
+     */
+    private static function sidebarItemVisible(array $item): bool
+    {
+        $feature = $item['feature'] ?? null;
+        if (! is_string($feature) || $feature === '') {
+            return true;
+        }
+
+        $previewFeature = $item['preview_feature'] ?? null;
+        $featureActive = Feature::active($feature);
+        $previewActive = is_string($previewFeature) && $previewFeature !== ''
+            && Feature::active($previewFeature)
+            && ! $featureActive;
+
+        return $featureActive || $previewActive;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private static function markPreviewOnly(array $item): array
+    {
+        $feature = $item['feature'] ?? null;
+        if (! is_string($feature) || $feature === '' || Feature::active($feature)) {
+            return $item;
+        }
+
+        $previewFeature = $item['preview_feature'] ?? null;
+        if (is_string($previewFeature) && $previewFeature !== '' && Feature::active($previewFeature)) {
+            $item['preview_only'] = true;
+        }
+
+        return $item;
+    }
+
+    /**
+     * Attach `needs_setup => true` to the Daemons item when Supervisor
      * isn't installed on the host. Mirrors the same flag emitted by
      * {@see server_workspace_nav_for_server()} so the sidebar partial can render a
      * "needs install" dot without re-querying the server.
@@ -313,7 +336,7 @@ final class SiteSettingsSidebar
         }
 
         return array_map(static function (array $item): array {
-            if (in_array($item['id'] ?? null, ['daemons', 'queue-workers'], true)) {
+            if (($item['id'] ?? null) === 'daemons') {
                 $item['needs_setup'] = true;
             }
 
@@ -322,17 +345,29 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @return array{id: string, label: string, icon: string, group: string, parent: string}|null
+     * In-page runtime tabs for the combined Runtime workspace (Overview + language).
+     *
+     * @return array<string, string> tab key => label
      */
-    private static function runtimeChildFor(Site $site): ?array
+    public static function runtimeTabsFor(Site $site): array
     {
-        $runtime = (string) ($site->runtime ?? '');
+        $tabs = ['overview' => __('Overview')];
 
-        return match ($runtime) {
-            'php' => ['id' => 'runtime-php', 'label' => __('PHP'), 'icon' => 'heroicon-o-cog', 'group' => 'runtime', 'parent' => 'runtime'],
-            'ruby' => ['id' => 'runtime-ruby', 'label' => __('Ruby'), 'icon' => 'heroicon-o-cog', 'group' => 'runtime', 'parent' => 'runtime'],
-            'static' => ['id' => 'runtime-static', 'label' => __('Static'), 'icon' => 'heroicon-o-cog', 'group' => 'runtime', 'parent' => 'runtime'],
+        $languageTab = match ((string) ($site->runtime ?? '')) {
+            'php' => 'php',
+            'ruby' => 'ruby',
+            'static' => 'static',
             default => null,
         };
+
+        if ($languageTab !== null) {
+            $tabs[$languageTab] = match ($languageTab) {
+                'php' => __('PHP'),
+                'ruby' => __('Ruby'),
+                'static' => __('Static'),
+            };
+        }
+
+        return $tabs;
     }
 }

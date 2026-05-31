@@ -2,28 +2,46 @@
 
 /*
 |--------------------------------------------------------------------------
-| Feature Flags
+| Feature flags (Pennant) — org-scoped product rollout
 |--------------------------------------------------------------------------
 |
-| Default values for every Pennant feature flag. The hybrid resolver in
-| FeatureServiceProvider returns a per-scope DB override if one exists,
-| otherwise falls back to the value here.
+| Mental model: this file answers ONE question — "Should this organization
+| get this product capability?" It is NOT a catalog of every on/off switch
+| in the app. Use the layer that matches the question:
 |
-| Naming: dot-namespaced singular domain + snake_case leaf. The auto-
-| registrar in FeatureServiceProvider walks this array and registers
-| every leaf as "{namespace}.{leaf}" via Feature::define().
+|   Layer                         | Question                           | Where
+|   ------------------------------|------------------------------------|------------------------------
+|   features.php (here) + Pennant | Org gets this product/tab/engine?  | FEATURE_* env; admin org override on `features` table; scope = current org (`global.*` = platform kill switches, read config not DB)
+|   server_providers.php          | Is provider integration in build?  | DPLY_SERVER_PROVIDER_* (catalog; Hetzner/custom have no provider.* flag)
+|   ServerProviderGate            | Org can add creds / create server?   | catalog AND provider.* when mapped in PENNANT_FLAGS
+|   server_workspace.php          | Global engine UI not ready yet?      | webserver_coming_soon / edge_proxy_coming_soon (not Pennant)
+|   server_workspace.php nav      | Show sidebar row for this server?    | requires_any_tags, except_host_kinds, requires_min_sites (not Pennant)
+|   subscription / billing        | Org within plan limits?            | Organization::canCreateSite(), SubscriptionPlanResolver
+|   dply.php, edge.php, …         | Ops / runtime behavior?              | DPLY_* env (not product rollout)
+|
+| Pennant resolution: FeatureServiceProvider registers every leaf below as
+| "{namespace}.{leaf}". Config/env is the global default; explicit per-org
+| DB rows override. No null-scope "platform default" rows — change globals
+| via env or this file + config:clear (tests: config([...]) + flush cache).
+|
+| Namespaces in this file:
+|   surface.*   — whole product routes (Cloud, Edge, Fleet, …)
+|   workspace.* — server-workspace pages + *_preview teasers
+|   provider.*  — gradual VM provider rollout (plus server_providers catalog)
+|   cache.* / database.* — per-engine install rollout (CacheEngineAvailability, DatabaseEngineAvailability)
+|   global.*    — platform kill switches (vm_enabled, edge_delivery_enabled, …)
+|   launch.*    — cross-product wizards
+|
+| Core BYO workspace (Overview, Sites, Metrics, Logs, Firewall, Cron, …) has
+| no workspace.* flag — only roadmap/advanced tabs and previews are gated here.
 |
 | Adding a flag:
 |   1. Add an entry below with an exit-criteria comment.
-|   2. Reference it via @feature(), route middleware, Livewire mount(),
-|      or Feature::active() — same string as the config key.
+|   2. Wire @feature(), route middleware, Livewire RequiresFeature, or
+|      Feature::active() — same string as "{namespace}.{leaf}".
+|   3. If admin-toggleable: config/admin_feature_flags.php (+ preview pair if teaser).
 |
-| Retiring a flag:
-|   Open a "chore: retire feature flag X" PR that removes:
-|     - the config entry below
-|     - the Feature::define (auto, just by deletion)
-|     - every @feature / middleware / mount() / Feature::active call site
-|     - any WithFeatures trait entries in tests
+| Retiring a flag: remove entry, all call sites, and WithFeatures/usesFeatures tests.
 |
 */
 
@@ -183,6 +201,14 @@ return [
 
         // exit: ship after per-deploy key lifecycle validated on three OSes
         'ephemeral_credentials' => env('FEATURE_WORKSPACE_EPHEMERAL_CREDENTIALS', true),
+        // exit: ship once Cloudflare CDN attach + purge + metrics validated on three VM stacks
+        'site_cdn' => env('FEATURE_WORKSPACE_SITE_CDN', false),
+        // exit: ship alongside site CDN GA; teaser only when site CDN is off
+        'site_cdn_preview' => env('FEATURE_WORKSPACE_SITE_CDN_PREVIEW', true),
+        // exit: ship once per-site nginx/varnish/lscache apply loop validated on three stacks
+        'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', false),
+        // exit: ship alongside site caching GA; teaser only when site caching is off
+        'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', true),
     ],
 
     /*
@@ -242,7 +268,7 @@ return [
         // exit: ship when LLM + heuristic triage validated across BYO + Edge failures
         'ops_copilot' => env('FEATURE_GLOBAL_OPS_COPILOT', true),
         // exit: ship when platform LLM synthesis validated + rate limits tuned
-        'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', false),
+        'ai_llm' => env('FEATURE_GLOBAL_AI_LLM', true),
         // exit: emergency hard stop for BYO VM create/deploy/webhooks; never retire
         'vm_enabled' => env('FEATURE_GLOBAL_VM_ENABLED', true),
         // exit: emergency pause for Edge build/deploy pipeline; never retire

@@ -75,6 +75,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->syncAccessGateFiles($site, $ssh, $emit);
 
         if ($this->writeSystemFileIfChanged($server, $ssh, $backendConfig, $this->caddyBuilder->build($site, $backendPort))) {
             $emit->step('edge', 'writing caddy backend config: '.$backendConfig);
@@ -202,6 +203,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
             }
             $this->ensureSuspendedPage($site, $ssh, $emit);
             $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+            $this->syncAccessGateFiles($site, $ssh, $emit);
 
             $this->writeSystemFileIfChanged($server, $ssh, $backendConfig, $this->caddyBuilder->build($site, $backendPort));
 

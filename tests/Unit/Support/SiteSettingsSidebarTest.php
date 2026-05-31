@@ -115,18 +115,17 @@ test('cron and daemons link to dedicated routes', function () {
 
     expect($items['cron']['route'] ?? null)->toBe('sites.cron');
     expect($items['daemons']['route'] ?? null)->toBe('sites.daemons');
-    expect($items['queue-workers']['route'] ?? null)->toBe('sites.queue-workers');
+    expect($items)->not->toHaveKey('queue-workers');
 });
-test('background includes schedule and backups pointing to server routes', function () {
+test('background includes schedule on server route and backups on site route', function () {
     $server = makeVmServer();
     $site = makeSite($server);
 
     $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
 
     expect($items['schedule']['route'] ?? null)->toBe('servers.schedule');
-    expect($items['schedule']['route_params'] ?? null)->toBe('server_only');
-    expect($items['backups']['route'] ?? null)->toBe('servers.backups');
-    expect($items['backups']['route_params'] ?? null)->toBe('server_only');
+    expect($items['schedule']['route_params'] ?? null)->toBe('server_with_site');
+    expect($items['backups']['route'] ?? null)->toBe('sites.backups');
 });
 test('rails stack item is hidden when rails not detected', function () {
     $server = makeVmServer();
@@ -199,17 +198,48 @@ test('docker workspace drops host only sections', function () {
     expect($ids)->toContain('repository');
     expect($ids)->toContain('runtime');
 });
-test('container workspace has no runtime subtab', function () {
-    // Runtime sub-tabs (runtime-php / runtime-ruby / runtime-static) are
-    // VM-only — for container/serverless, engine knobs live on Runtime
-    // itself (Engine + Limits clusters) and runtime-version is set there.
-    $server = makeContainerServer();
+test('vm php site has single runtime sidebar item not language child', function () {
+    $server = makeVmServer();
+    $site = makeSite($server, 'php');
 
-    foreach (['php', 'ruby', 'static'] as $runtime) {
-        $site = makeSite($server, $runtime);
-        $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
-        expect($ids)->not->toContain('runtime-'.$runtime);
-    }
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('runtime');
+    expect($ids)->not->toContain('runtime-php');
+});
+test('vm site keeps dns under routing instead of a separate sidebar item', function () {
+    $server = makeVmServer();
+    $site = makeSite($server);
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('routing');
+    expect($ids)->not->toContain('dns');
+});
+test('runtime tabs include overview and language for vm php site', function () {
+    $server = makeVmServer();
+    $site = makeSite($server, 'php');
+
+    expect(SiteSettingsSidebar::runtimeTabsFor($site))->toBe([
+        'overview' => 'Overview',
+        'php' => 'PHP',
+    ]);
+});
+test('node site has services in background sidebar', function () {
+    $server = makeVmServer();
+    $site = makeSite($server, 'node');
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->toContain('services');
+});
+test('php site hides services from sidebar', function () {
+    $server = makeVmServer();
+    $site = makeSite($server, 'php');
+
+    $ids = collect(SiteSettingsSidebar::items($site, $server))->pluck('id')->all();
+
+    expect($ids)->not->toContain('services');
 });
 test('container workspace group order', function () {
     $server = makeContainerServer();

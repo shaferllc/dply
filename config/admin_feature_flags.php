@@ -137,6 +137,10 @@ return [
             'groups' => [
                 'Site capabilities' => [
                     'workspace.site_promote' => 'Site promote',
+                    'workspace.site_cdn' => 'Site CDN / Edge',
+                    'workspace.site_cdn_preview' => 'Coming soon preview',
+                    'workspace.site_caching' => 'Site caching',
+                    'workspace.site_caching_preview' => 'Coming soon preview',
                 ],
             ],
         ],
@@ -244,6 +248,8 @@ return [
         'workspace.backups' => 'workspace.backups_preview',
         'workspace.ssh_access_graph' => 'workspace.ssh_access_graph_preview',
         'workspace.shared_host' => 'workspace.shared_host_preview',
+        'workspace.site_cdn' => 'workspace.site_cdn_preview',
+        'workspace.site_caching' => 'workspace.site_caching_preview',
     ],
 
 ];

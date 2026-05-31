@@ -6,7 +6,7 @@ The **Laravel** section appears when dply detects a **Laravel** app in the repos
 
 - **`php artisan migrate`** — run pending migrations on deploy or on demand
 - **`config:cache` / `route:cache`** — optimize commands
-- **Queue** links to **Queue workers**
+- **Queue** links to **Daemons**
 - **Scheduler** link to **Cron jobs** with recommended `schedule:run` entry
 
 ## APP_KEY

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ServerHealthCockpitPageTest;
 
+use App\Livewire\Servers\WorkspaceHealth;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -53,6 +55,25 @@ test('server health page renders cockpit', function (): void {
     $this->actingAs($user)
         ->get(route('servers.health', $server))
         ->assertOk()
+        ->assertSee(__('Overall'))
+        ->assertSee(__('Capacity snapshot'));
+});
+
+test('health workspace tabs switch via query string and livewire', function (): void {
+    [$user, $server] = healthUserWithServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'capacity'])
+        ->test(WorkspaceHealth::class, ['server' => $server])
+        ->assertSet('healthTab', 'capacity')
         ->assertSee(__('Guest metrics snapshot'))
-        ->assertSee(__('Overall'));
+        ->call('setHealthWorkspaceTab', 'releases')
+        ->assertSet('healthTab', 'releases')
+        ->assertSee(__('Atomic releases'))
+        ->call('setHealthWorkspaceTab', 'reliability')
+        ->assertSet('healthTab', 'reliability')
+        ->assertSee(__('Failed deploys'))
+        ->call('setHealthWorkspaceTab', 'overview')
+        ->assertSet('healthTab', 'overview')
+        ->assertSee(__('Capacity snapshot'));
 });

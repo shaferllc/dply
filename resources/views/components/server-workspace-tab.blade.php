@@ -11,7 +11,7 @@
 
 @php
     $sharedClasses = [
-        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+        'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-none transition',
         'bg-brand-ink text-brand-cream shadow-sm' => $active && $variant !== 'danger' && $subtabKey === null,
         'bg-red-700 text-white shadow-sm' => $active && $variant === 'danger' && $subtabKey === null,
         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! $active && $variant !== 'danger' && $subtabKey === null,
@@ -51,7 +51,7 @@
         @if ($subtabKey === null)
             {{ $attributes->class($sharedClasses) }}
         @else
-            {{ $attributesWithoutWireClick->class('inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition') }}
+            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
                 ? (@js($variant === 'danger') ? @js($optimisticDangerActiveClass) : @js($optimisticActiveClass))
                 : @js($optimisticInactiveClass)"
@@ -67,7 +67,7 @@
                 </span>
             @endif
         @endif
-        <span>{{ $slot }}</span>
+        {{ $slot }}
     </a>
 @else
     <button
@@ -87,7 +87,7 @@
         @if ($subtabKey === null)
             {{ $attributes->class($sharedClasses) }}
         @else
-            {{ $attributesWithoutWireClick->class('inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition') }}
+            {{ $attributesWithoutWireClick->class('inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold leading-none transition') }}
             x-bind:class="subtab === @js($subtabKey)
                 ? (@js($variant === 'danger') ? @js($optimisticDangerActiveClass) : @js($optimisticActiveClass))
                 : @js($optimisticInactiveClass)"
@@ -103,6 +103,6 @@
                 </span>
             @endif
         @endif
-        <span>{{ $slot }}</span>
+        {{ $slot }}
     </button>
 @endif

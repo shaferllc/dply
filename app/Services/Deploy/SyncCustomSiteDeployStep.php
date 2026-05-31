@@ -26,7 +26,9 @@ class SyncCustomSiteDeployStep
         $script = $site->deployScript;
         $content = $script ? trim((string) $script->content) : '';
 
-        $site->deploySteps()
+        $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+        $pipeline->steps()
             ->where('phase', SiteDeployStep::PHASE_RELEASE)
             ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
             ->where('sort_order', 0)
@@ -36,7 +38,8 @@ class SyncCustomSiteDeployStep
             return null;
         }
 
-        return $site->deploySteps()->create([
+        return $pipeline->steps()->create([
+            'site_id' => $site->id,
             'sort_order' => 0,
             'step_type' => SiteDeployStep::TYPE_CUSTOM,
             'phase' => SiteDeployStep::PHASE_RELEASE,

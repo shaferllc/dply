@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\ProvisionSiteJob;
 use App\Enums\SiteType;
+use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RunComposerScaffoldJob;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
-use App\Models\SiteDeployStep;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -237,7 +237,7 @@ class ChooseApp extends Component
         // a pipeline_job; recipe-driven installers (Statamic / Symfony / Craft
         // / Drupal) run the generic Composer pipeline.
         $recipe = is_array($tile['recipe'] ?? null) ? $tile['recipe'] : null;
-        $jobClass = $tile['pipeline_job'] ?? ($recipe !== null ? \App\Jobs\RunComposerScaffoldJob::class : null);
+        $jobClass = $tile['pipeline_job'] ?? ($recipe !== null ? RunComposerScaffoldJob::class : null);
         if (! is_string($jobClass) || ! class_exists($jobClass)) {
             $this->addError('selected', __('This installer is not available on this dply install yet.'));
 
@@ -372,18 +372,11 @@ class ChooseApp extends Component
     private function seedDeployStepsAndProvision(array $tile, string $runtime, SiteProvisioner $siteProvisioner): void
     {
         $framework = (string) ($tile['framework'] ?? '');
-        $defaults = app(RuntimeAwareDeployStepDefaults::class)
-            ->defaultsFor($runtime, $framework !== '' ? $framework : null);
-        foreach ($defaults as $step) {
-            SiteDeployStep::create([
-                'site_id' => $this->site->id,
-                'sort_order' => $step['sort_order'],
-                'step_type' => $step['step_type'],
-                'phase' => $step['phase'],
-                'custom_command' => $step['custom_command'] ?? null,
-                'timeout_seconds' => $step['timeout_seconds'],
-            ]);
-        }
+        app(SiteDeployPipelineManager::class)->seedRuntimeDefaults(
+            $this->site,
+            $runtime,
+            $framework !== '' ? $framework : null,
+        );
 
         $this->site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($this->site);

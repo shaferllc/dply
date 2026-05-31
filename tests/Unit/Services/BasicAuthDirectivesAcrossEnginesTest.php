@@ -4,6 +4,8 @@ namespace Tests\Unit\Services\BasicAuthDirectivesAcrossEnginesTest;
 
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Models\SiteAccessGate;
+use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteDomain;
 use App\Services\Sites\ApacheSiteConfigBuilder;
@@ -12,6 +14,7 @@ use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -37,6 +40,39 @@ function siteWithBasicAuth(string $username = 'preview', string $path = '/', ?st
     ]);
 
     return $site->refresh()->load('domains', 'redirects', 'basicAuthUsers');
+}
+
+function siteWithFormPasswordGate(string $username = 'preview'): Site
+{
+    $site = Site::factory()->create([
+        'slug' => 'form-gate-test',
+        'type' => SiteType::Static,
+        'document_root' => '/var/www/form-gate/public',
+        'repository_path' => '/var/www/form-gate',
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'form-gate.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+    SiteAccessGate::query()->create([
+        'site_id' => $site->id,
+        'method' => SiteAccessGate::METHOD_FORM_PASSWORD,
+        'cookie_secret' => Str::random(48),
+    ]);
+    SiteAccessGatePassword::factory()->create([
+        'site_id' => $site->id,
+        'label' => 'Preview',
+    ]);
+    SiteBasicAuthUser::factory()->create([
+        'site_id' => $site->id,
+        'username' => $username,
+        'password_hash' => Hash::make('secret'),
+        'path' => '/',
+    ]);
+
+    return $site->refresh()->load('domains', 'redirects', 'basicAuthUsers', 'accessGate', 'accessGatePasswords');
 }
 
 test('apache emits authtype basic for root', function () {
@@ -137,4 +173,55 @@ test('openlitespeed emits realm and root context auth', function () {
     $this->assertStringContainsString('location              '.$site->basicAuthHtpasswdPathForNormalizedPath('/'), $ols);
     $this->assertStringContainsString('authName                Restricted', $ols);
     $this->assertStringContainsString('required                valid-user', $ols);
+});
+
+test('form password gate skips basic auth directives across engines', function () {
+    $site = siteWithFormPasswordGate();
+
+    $apache = app(ApacheSiteConfigBuilder::class)->build($site);
+    $this->assertStringNotContainsString('AuthType Basic', $apache);
+    $this->assertStringContainsString('__dply_vm_access=', $apache);
+
+    $caddy = app(CaddySiteConfigBuilder::class)->build($site);
+    $this->assertStringNotContainsString('basic_auth {', $caddy);
+    $this->assertStringContainsString('forward_auth /__dply/access/verify', $caddy);
+
+    $ols = app(OpenLiteSpeedSiteConfigBuilder::class)->build($site);
+    $this->assertStringNotContainsString('authName                Restricted', $ols);
+});
+
+test('traefik emits forward auth middleware for form password gate', function () {
+    $site = Site::factory()->create([
+        'slug' => 'auth-traefik-form',
+        'type' => SiteType::Php,
+        'app_port' => 9000,
+        'document_root' => '/var/www/auth-traefik-form/public',
+        'repository_path' => '/var/www/auth-traefik-form',
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'traefik-form.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+    $salt = bin2hex(random_bytes(16));
+    SiteAccessGate::query()->create([
+        'site_id' => $site->id,
+        'method' => SiteAccessGate::METHOD_FORM_PASSWORD,
+        'cookie_secret' => Str::random(48),
+    ]);
+    SiteAccessGatePassword::query()->create([
+        'site_id' => $site->id,
+        'label' => 'Preview',
+        'password_salt' => $salt,
+        'password_verifier' => hash('sha256', $salt.'secret'),
+        'sort_order' => 0,
+    ]);
+
+    $site->refresh()->load('domains', 'redirects', 'accessGate', 'accessGatePasswords');
+    $yaml = app(TraefikSiteConfigBuilder::class)->build($site, 9000);
+
+    $this->assertStringContainsString('forwardAuth:', $yaml);
+    $this->assertStringContainsString('/__dply/access/verify', $yaml);
+    $this->assertStringNotContainsString('basicAuth:', $yaml);
 });

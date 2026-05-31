@@ -38,12 +38,6 @@
     $runtimeDisplay = $runtimeLabel !== ''
         ? trim($runtimeLabel.' '.$runtimeVersion)
         : __('Not set');
-    $runtimeSubTab = match ($runtimeKey) {
-        'php' => 'runtime-php',
-        'ruby' => 'runtime-ruby',
-        'static' => 'runtime-static',
-        default => null,
-    };
 @endphp
 
 {{-- 1. Runtime card --}}
@@ -56,14 +50,9 @@
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $runtimeDisplay !== __('Not set') ? $runtimeDisplay : __('Language & version') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('What this site runs and how. Language and version live here; per-language tuning lives in the runtime sub-tab below.') }}</p>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('What this site runs and how. Language and version live here; per-language tuning is on the PHP, Ruby, or Static tab when applicable.') }}</p>
             </div>
         </div>
-        @if ($runtimeSubTab !== null)
-            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => $runtimeSubTab]) }}" wire:navigate class="shrink-0 text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">
-                {{ __('Open :runtime settings', ['runtime' => ucfirst($runtimeKey)]) }} →
-            </a>
-        @endif
     </div>
 
     <div class="space-y-6 px-6 py-6 sm:px-7">
@@ -183,102 +172,39 @@
     </div>
 </section>
 
-{{-- 3. Site processes — hidden for static sites, which have no SiteProcess rows
-     (Site::created skips the auto-web-row for SiteType::Static). Showing the panel
-     for static sites would expose a worker/scheduler form that has no meaningful
-     systemd unit to back it. --}}
+{{-- Background processes callout --}}
 @if ($site->type !== \App\Enums\SiteType::Static)
 <section class="mt-6 dply-card overflow-hidden">
-    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Processes') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site processes') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The web row drives the NGINX upstream. Workers and schedulers run as separate systemd units (dply-site-:id-:name.service).', ['id' => $site->id, 'name' => '<name>']) }}</p>
+    <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workers & schedulers') }}</h2>
+            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                @if (in_array((string) ($site->runtime ?? ''), ['php'], true) || $site->isLaravelFrameworkDetected())
+                    {{ __('Queue workers and Horizon run under Daemons (Supervisor). Scheduled tasks use Cron or the Laravel tab.') }}
+                @elseif ($site->isRailsFrameworkDetected())
+                    {{ __('Sidekiq and Solid Queue run under Daemons (Supervisor). Optional systemd workers are on the Services page.') }}
+                @else
+                    {{ __('App servers: set start command and port above. Workers can use systemd (Services) or Supervisor (Daemons).') }}
+                @endif
+            </p>
+            <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
+                <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Daemons') }} →</a>
+                <a href="{{ route('sites.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Cron jobs') }} →</a>
+                @if (\App\Models\Site::supportsSystemdServices($site, $server))
+                    <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Services (systemd)') }} →</a>
+                @endif
+                @if ($site->isLaravelFrameworkDetected())
+                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'laravel-stack']) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Laravel') }} →</a>
+                @endif
+                @if ($site->isRailsFrameworkDetected())
+                    <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'rails-stack']) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Rails') }} →</a>
+                @endif
             </div>
         </div>
-        @if ($site->processes->isNotEmpty())
-            <p class="shrink-0 text-xs text-brand-moss">{{ trans_choice('{1} 1 process|[2,*] :count processes', $site->processes->count(), ['count' => $site->processes->count()]) }}</p>
-        @endif
-    </div>
-
-    <div class="space-y-4 px-6 py-6 sm:px-7">
-
-    @if ($site->processes->isNotEmpty())
-        <ul class="space-y-2">
-            @foreach ($site->processes as $process)
-                <li class="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-brand-ink/10 bg-white p-3">
-                    <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $process->type }}</span>
-                            <span class="text-sm font-semibold text-brand-ink">{{ $process->name }}</span>
-                            @if (! $process->is_active)
-                                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900">{{ __('inactive') }}</span>
-                            @endif
-                            @if ((int) $process->scale > 1)
-                                <span class="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-900">{{ __('scale :n', ['n' => $process->scale]) }}</span>
-                            @endif
-                        </div>
-                        <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $process->command ?? __('(unset — runtime-default applies)') }}</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-3 text-xs">
-                        @if ($process->type !== 'web')
-                            <label class="flex items-center gap-1 text-brand-moss">
-                                {{ __('scale') }}
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="16"
-                                    value="{{ (int) $process->scale }}"
-                                    wire:change="setSiteProcessScale('{{ $process->id }}', $event.target.valueAsNumber)"
-                                    class="w-14 rounded border-brand-ink/15 px-2 py-1 text-xs"
-                                />
-                            </label>
-                            <button type="button" wire:click="restartSiteProcess('{{ $process->id }}')" wire:loading.attr="disabled" wire:target="restartSiteProcess" class="font-medium text-sky-700 hover:text-sky-800 disabled:opacity-50">
-                                {{ __('Restart') }}
-                            </button>
-                            <button type="button" wire:click="toggleSiteProcessActive('{{ $process->id }}')" class="font-medium {{ $process->is_active ? 'text-amber-700 hover:text-amber-800' : 'text-emerald-700 hover:text-emerald-800' }}">
-                                {{ $process->is_active ? __('Deactivate') : __('Activate') }}
-                            </button>
-                            <button type="button" wire:click="removeSiteProcess('{{ $process->id }}')" wire:confirm="{{ __('Remove the :name process? Its systemd unit will be torn down on the next deploy.', ['name' => $process->name]) }}" class="font-medium text-rose-700 hover:text-rose-800">{{ __('Remove') }}</button>
-                        @endif
-                    </div>
-                </li>
-            @endforeach
-        </ul>
-    @else
-        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-4 text-sm text-brand-moss">
-            <p>{{ __('No processes recorded yet. Add a worker or scheduler below, or trigger a deploy so the web process is registered.') }}</p>
-        </div>
-    @endif
-
-    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/10 p-4">
-        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add a process') }}</p>
-        <div class="mt-3 grid gap-2 sm:grid-cols-[110px,200px,1fr,auto] sm:items-end">
-            <div>
-                <label for="new_site_process_type" class="block text-[11px] font-medium text-brand-moss">{{ __('Type') }}</label>
-                <select id="new_site_process_type" wire:model="new_site_process_type" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
-                    <option value="worker">{{ __('worker') }}</option>
-                    <option value="scheduler">{{ __('scheduler') }}</option>
-                    <option value="custom">{{ __('custom') }}</option>
-                </select>
-            </div>
-            <div>
-                <label for="new_site_process_name" class="block text-[11px] font-medium text-brand-moss">{{ __('Name') }}</label>
-                <input type="text" id="new_site_process_name" wire:model="new_site_process_name" placeholder="sidekiq" class="mt-1 block w-full rounded-lg border-brand-ink/15 font-mono text-sm shadow-sm" />
-                <x-input-error :messages="$errors->get('new_site_process_name')" class="mt-1" />
-            </div>
-            <div>
-                <label for="new_site_process_command" class="block text-[11px] font-medium text-brand-moss">{{ __('Command') }}</label>
-                <input type="text" id="new_site_process_command" wire:model="new_site_process_command" placeholder="bundle exec sidekiq -C config/sidekiq.yml" class="mt-1 block w-full rounded-lg border-brand-ink/15 font-mono text-sm shadow-sm" />
-                <x-input-error :messages="$errors->get('new_site_process_command')" class="mt-1" />
-            </div>
-            <x-primary-button type="button" wire:click="addSiteProcess">{{ __('Add') }}</x-primary-button>
-        </div>
-    </div>
     </div>
 </section>
 @endif

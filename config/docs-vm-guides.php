@@ -177,6 +177,10 @@ return [
         'file' => 'VM_SITE_DAEMONS.md',
         'title' => 'Site daemons',
     ],
+    'vm-site-services' => [
+        'file' => 'VM_SITE_SERVICES.md',
+        'title' => 'Site services (systemd)',
+    ],
     'vm-site-danger' => [
         'file' => 'VM_SITE_DANGER.md',
         'title' => 'Delete site',
@@ -212,10 +216,6 @@ return [
     'vm-site-overview' => [
         'file' => 'VM_SITE_OVERVIEW.md',
         'title' => 'VM site overview',
-    ],
-    'vm-site-queue-workers' => [
-        'file' => 'VM_SITE_QUEUE_WORKERS.md',
-        'title' => 'Site queue workers',
     ],
     'vm-site-rails' => [
         'file' => 'VM_SITE_RAILS.md',

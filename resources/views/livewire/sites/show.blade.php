@@ -159,6 +159,8 @@
                 @else
                     @include('livewire.sites.partials.show.dashboard-header')
 
+                    <x-ops-copilot-callout :site="$site" compact class="mt-6" />
+
                     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="dashboard_tab">
 
                     @if ($activeTab === 'overview')

@@ -3,8 +3,10 @@
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Ai\LlmSynthesizer;
+use App\Services\OpsCopilot\OpsCopilotContextBuilder;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Pennant\Feature;
@@ -93,6 +95,34 @@ if (! function_exists('server_workspace_nav_for_server')) {
      */
     function server_workspace_nav_for_server(Server $server): array
     {
+        static $siteCounts = [];
+        static $navCache = [];
+
+        $serverId = (string) $server->getKey();
+        $hostKind = (string) ($server->meta['host_kind'] ?? 'vm');
+        $supervisorStatus = (string) ($server->supervisor_package_status ?? '');
+
+        $needsSiteCount = false;
+        foreach ((array) config('server_workspace.nav', []) as $navItem) {
+            if (is_array($navItem) && (int) ($navItem['requires_min_sites'] ?? 0) > 1) {
+                $needsSiteCount = true;
+                break;
+            }
+        }
+
+        $siteCountKey = '';
+        if ($needsSiteCount) {
+            if (! array_key_exists($serverId, $siteCounts)) {
+                $siteCounts[$serverId] = $server->sites()->count();
+            }
+            $siteCountKey = (string) $siteCounts[$serverId];
+        }
+
+        $cacheKey = $serverId.'|'.$hostKind.'|'.$supervisorStatus.'|'.$siteCountKey;
+        if (isset($navCache[$cacheKey])) {
+            return $navCache[$cacheKey];
+        }
+
         $items = config('server_workspace.nav', []);
         if (! is_array($items)) {
             return [];
@@ -152,19 +182,23 @@ if (! function_exists('server_workspace_nav_for_server')) {
             if ($previewActive) {
                 $item['preview_only'] = true;
             }
-            if (($item['key'] ?? null) === 'daemons' && $needsSupervisorSetup) {
+            if ($needsSupervisorSetup && ($item['key'] ?? null) === 'daemons') {
                 $item['needs_setup'] = true;
             }
 
             $minSites = (int) ($item['requires_min_sites'] ?? 0);
-            if ($minSites > 1 && $server->sites()->count() < $minSites) {
-                continue;
+            if ($minSites > 1) {
+                $count = $siteCounts[$serverId] ?? $server->sites()->count();
+                $siteCounts[$serverId] = $count;
+                if ($count < $minSites) {
+                    continue;
+                }
             }
 
             $filtered[] = $item;
         }
 
-        return $filtered;
+        return $navCache[$cacheKey] = $filtered;
     }
 }
 
@@ -289,6 +323,44 @@ if (! function_exists('workspace_backups_preview_active')) {
         return $organization === null
             ? Feature::active('workspace.backups_preview')
             : Feature::for($organization)->active('workspace.backups_preview');
+    }
+}
+
+if (! function_exists('workspace_site_cdn_preview_active')) {
+    /**
+     * True when the site CDN workspace is off but the coming-soon teaser should
+     * surface in nav and the preview page.
+     */
+    function workspace_site_cdn_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.site_cdn')
+            : Feature::for($organization)->active('workspace.site_cdn')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.site_cdn_preview')
+            : Feature::for($organization)->active('workspace.site_cdn_preview');
+    }
+}
+
+if (! function_exists('workspace_site_caching_preview_active')) {
+    /**
+     * True when the site caching workspace is off but the coming-soon teaser should
+     * surface in nav and the preview page.
+     */
+    function workspace_site_caching_preview_active(?Organization $organization = null): bool
+    {
+        if ($organization === null
+            ? Feature::active('workspace.site_caching')
+            : Feature::for($organization)->active('workspace.site_caching')) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.site_caching_preview')
+            : Feature::for($organization)->active('workspace.site_caching_preview');
     }
 }
 
@@ -533,6 +605,16 @@ if (! function_exists('ops_copilot_active')) {
         return $organization === null
             ? Feature::active('global.ops_copilot')
             : Feature::for($organization)->active('global.ops_copilot');
+    }
+}
+
+if (! function_exists('ops_copilot_site_has_failure')) {
+    /**
+     * True when the site has a recent failed BYO or Edge deploy Copilot can triage.
+     */
+    function ops_copilot_site_has_failure(Site $site): bool
+    {
+        return app(OpsCopilotContextBuilder::class)->siteHasRecentFailure($site);
     }
 }
 

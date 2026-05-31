@@ -38,6 +38,10 @@
                 </button>
             </header>
 
+            @if ($deployment->status === 'failed')
+                <x-ops-copilot-callout :site="$site" :show="true" class="mt-6" />
+            @endif
+
             @php
                 $durationMs = $deployment->phaseTotalDurationMs();
                 if ($durationMs <= 0 && $deployment->started_at && $deployment->finished_at) {

@@ -9,6 +9,7 @@ use App\Models\SiteBasicAuthUser;
 use App\Services\Servers\ServerPhpManager;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
+use App\Support\Sites\SiteAccessGateConfigSupport;
 use App\Support\Sites\VmDockerSiteConfigSupport;
 use Illuminate\Support\Collection;
 
@@ -20,7 +21,7 @@ class CaddySiteConfigBuilder
             return '';
         }
 
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'accessGate']);
 
         $hostnames = collect($site->webserverHostnames())
             ->filter()
@@ -62,6 +63,7 @@ class CaddySiteConfigBuilder
         );
         $redirectLines = $this->redirectLines($site);
         $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
         $dotfileDeny = $this->caddyDotfileDenyBlock();
 
         if ($site->type === SiteType::Php && $site->octane_port) {
@@ -70,7 +72,7 @@ class CaddySiteConfigBuilder
 
             return <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverb}{$basicAuth}{$dotfileDeny}    encode zstd gzip
+{$redirectLines}{$reverb}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -84,7 +86,7 @@ CADDY;
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverbPhp}{$basicAuth}{$dotfileDeny}    root * {$root}
+{$redirectLines}{$reverbPhp}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -95,7 +97,7 @@ CADDY;
 CADDY,
             SiteType::Static => <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$dotfileDeny}    root * {$root}
+{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -105,7 +107,7 @@ CADDY,
 CADDY,
             SiteType::Node => <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$dotfileDeny}    encode zstd gzip
+{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -145,6 +147,10 @@ CADDY;
      */
     protected function caddyBasicAuthBlocks(Site $site): string
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return '';
+        }
+
         $users = $site->enforceableBasicAuthUsers();
         if ($users->isEmpty()) {
             return '';
@@ -305,6 +311,7 @@ CADDY;
         $port = VmDockerSiteConfigSupport::upstreamPort($site);
         $redirectLines = $this->redirectLines($site);
         $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
         $dotfileDeny = $this->caddyDotfileDenyBlock();
 
         if ($site->isSuspended()) {
@@ -313,7 +320,7 @@ CADDY;
 
         return <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$dotfileDeny}    encode zstd gzip
+{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -359,6 +366,9 @@ CADDY;
             ->map(fn (string $host): string => 'https://'.$host)
             ->implode(', ');
         $basename = $site->webserverConfigBasename();
+        $site->loadMissing('basicAuthUsers');
+        $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
 
         return <<<CADDY
 {$httpsHosts} {
@@ -366,7 +376,7 @@ CADDY;
     log {
         output file /var/log/caddy/{$basename}-tls-access.log
     }
-    reverse_proxy 127.0.0.1:{$backendPort}
+{$basicAuth}{$formGate}    reverse_proxy 127.0.0.1:{$backendPort}
 }
 CADDY;
     }

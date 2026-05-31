@@ -131,6 +131,11 @@
                             <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
                         @endif
                         <span class="flex-1 truncate">{{ $item['label'] }}</span>
+                        @if (! empty($item['preview_only']))
+                            <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
+                                {{ __('Soon') }}
+                            </span>
+                        @endif
                         @if (! empty($item['needs_setup']))
                             <span
                                 class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"

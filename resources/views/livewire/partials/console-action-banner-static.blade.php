@@ -39,6 +39,7 @@
             $subject = $run->subject;
             $host = (string) ($subject->name ?? 'host');
             $stale = $run->isStale();
+            $queuedStalled = $run->isQueuedStalled();
             $effectiveStatus = $stale ? 'failed' : $run->status;
 
             // Prefer the per-dispatch label (set by the caller, e.g. "Removing
@@ -50,18 +51,22 @@
             if (! empty($run->label)) {
                 $message = match ($effectiveStatus) {
                     'completed' => preg_replace('/\s*…$/u', '', (string) $run->label).' — done.',
-                    'failed' => $stale
-                        ? preg_replace('/\s*…$/u', '', (string) $run->label).' — did not finish.'
-                        : preg_replace('/\s*…$/u', '', (string) $run->label).' — failed.',
+                    'failed' => $queuedStalled
+                        ? preg_replace('/\s*…$/u', '', (string) $run->label).' — queue worker did not pick this up.'
+                        : ($stale
+                            ? preg_replace('/\s*…$/u', '', (string) $run->label).' — did not finish.'
+                            : preg_replace('/\s*…$/u', '', (string) $run->label).' — failed.'),
                     default => (string) $run->label,
                 };
             } else {
                 $message = match ($effectiveStatus) {
                     'queued', 'running' => $kind['running'] ?? __('Working …'),
                     'completed' => $kind['completed'] ?? __('Done.'),
-                    'failed' => $stale
-                        ? ($kind['stale'] ?? __('Did not finish.'))
-                        : ($kind['failed'] ?? __('Failed.')),
+                    'failed' => $queuedStalled
+                        ? \App\Models\ConsoleAction::queueWorkerStalledMessage()
+                        : ($stale
+                            ? ($kind['stale'] ?? __('Did not finish.'))
+                            : ($kind['failed'] ?? __('Failed.'))),
                     default => $kind['running'] ?? __('Working …'),
                 };
             }
@@ -160,6 +165,10 @@
                                     {{ __('Show details') }}
                                 </button>
                             @endif
+                        @elseif ($queuedStalled)
+                            <p class="mt-0.5 text-xs opacity-70">{{ \App\Models\ConsoleAction::queueWorkerStalledMessage() }}</p>
+                        @elseif ($run->status === 'queued')
+                            <p class="mt-0.5 text-xs opacity-70">{{ __('Queued — waiting for worker. Expand output below for live SSH steps.') }}</p>
                         @elseif ($run->started_at)
                             <p class="mt-0.5 text-xs opacity-70">{{ __('Started :time', ['time' => $run->started_at->diffForHumans()]) }}</p>
                         @endif

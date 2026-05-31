@@ -421,4 +421,90 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             $this->writeSystemFile($ssh, $filePath, $newContents);
         }
     }
+
+    /**
+     * Deploy or remove the on-host form-password gate bundle under
+     * {@see Site::accessGateStorageDirectoryOnHost()}.
+     */
+    protected function syncAccessGateFiles(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        $payload = app(SiteAccessGateService::class)->configPayload($site);
+        $base = $site->accessGateStorageDirectoryOnHost();
+        $scriptPath = $site->accessGateScriptPathOnHost();
+        $configPath = $site->accessGateConfigPathOnHost();
+        $server = $site->server;
+
+        if ($payload === null) {
+            if ($server !== null) {
+                $out = $ssh->exec(sprintf(
+                    'test -d %1$s && rm -rf %1$s && echo dropped 2>/dev/null || true',
+                    escapeshellarg($base),
+                ), 30);
+                if (str_contains((string) $out, 'dropped')) {
+                    $emit?->step($this->emitterSource(), 'removed form-password gate directory');
+                }
+            } else {
+                $ssh->exec(sprintf('test -d %1$s && rm -rf %1$s || true', escapeshellarg($base)), 30);
+            }
+
+            return;
+        }
+
+        $scriptSource = (string) file_get_contents(resource_path('site-scripts/vm-access-gate.php'));
+        $configJson = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+
+        $logPath = $site->accessGateLoginLogPathOnHost();
+
+        if ($server !== null) {
+            $ssh->exec($this->privilegedCommand($server, 'mkdir -p '.escapeshellarg($base)), 30);
+            if ($this->writeSystemFileIfChanged($server, $ssh, $scriptPath, $scriptSource)) {
+                $emit?->step($this->emitterSource(), 'updating form-password gate script');
+            }
+            if ($this->writeSystemFileIfChanged($server, $ssh, $configPath, $configJson."\n")) {
+                $emit?->step($this->emitterSource(), 'updating form-password gate config');
+            }
+            $this->ensureAccessGateLoginLogWritable($site, $server, $ssh, $base, $logPath, $emit);
+        } else {
+            $ssh->exec('mkdir -p '.escapeshellarg($base), 30);
+            $this->writeSystemFile($ssh, $scriptPath, $scriptSource);
+            $this->writeSystemFile($ssh, $configPath, $configJson."\n");
+            @touch($logPath);
+            @chmod($base, 0775);
+            @chmod($logPath, 0664);
+        }
+    }
+
+    /**
+     * PHP-FPM executes the gate script; it must be able to append logins.jsonl even
+     * though Dply writes index.php/config.json as root-owned system files.
+     */
+    protected function ensureAccessGateLoginLogWritable(
+        Site $site,
+        Server $server,
+        SshConnection $ssh,
+        string $base,
+        string $logPath,
+        ?ConsoleEmitter $emit = null,
+    ): void {
+        $runtimeUser = $site->accessGatePhpRuntimeUser($server);
+        $cmd = sprintf(
+            'touch %1$s && chown %3$s:%3$s %2$s %1$s && chmod 775 %2$s && chmod 664 %1$s',
+            escapeshellarg($logPath),
+            escapeshellarg($base),
+            escapeshellarg($runtimeUser),
+        );
+
+        $out = $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_ACCESS_GATE_LOG_PERM_EXIT:%%s" "$?"',
+            $this->privilegedCommand($server, $cmd)
+        ), 30);
+
+        if (! preg_match('/DPLY_ACCESS_GATE_LOG_PERM_EXIT:0\s*$/', $out)) {
+            throw new \RuntimeException(
+                'Unable to prepare form-password gate login log permissions on '.$logPath.'. Output: '.Str::limit($out, 1000)
+            );
+        }
+
+        $emit?->step($this->emitterSource(), 'ensuring form-password gate login log is writable');
+    }
 }

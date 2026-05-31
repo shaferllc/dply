@@ -9,6 +9,7 @@ use App\Models\ServerCronJob;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRedirect;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Edge\Config\EdgeRepoConfig;
 use App\Services\SshConnection;
 use Illuminate\Support\Facades\Log;
@@ -242,11 +243,16 @@ final class ByoRepoConfigSync
             ->where('script', 'like', ByoRepoConfigLoader::MANAGED_HOOK_PREFIX.'%')
             ->delete();
 
+        $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
         $count = 0;
         foreach ($hooks as $hook) {
+            $phase = $hook['phase'];
             SiteDeployHook::query()->create([
                 'site_id' => $site->id,
-                'phase' => $hook['phase'],
+                'pipeline_id' => $pipeline->id,
+                'phase' => $phase,
+                'hook_kind' => SiteDeployHook::KIND_SHELL,
+                'anchor' => $phase,
                 'script' => $hook['script'],
                 'sort_order' => $hook['sort_order'],
                 'timeout_seconds' => $hook['timeout'],

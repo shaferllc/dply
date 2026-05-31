@@ -17,9 +17,16 @@ use App\Models\SiteDomain;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Feature::define('workspace.site_cdn', fn (): bool => true);
+    Feature::define('workspace.site_cdn_preview', fn (): bool => false);
+    Feature::flushCache();
+});
 
 /**
  * @return array{0: User, 1: Server, 2: Site, 3: ProviderCredential}

@@ -481,7 +481,7 @@ final class SiteShowViewData
         bool $supportsReleaseRollback,
         mixed $previewDomain,
     ): array {
-        $latestDeployment = $site->deployments->first();
+        $latestDeployment = $site->latestDeployment();
         $primaryHostname = optional($site->primaryDomain())->hostname;
         $aliasHostnames = $site->relationLoaded('domainAliases')
             ? $site->domainAliases->pluck('hostname')->filter()->values()
@@ -577,6 +577,17 @@ final class SiteShowViewData
                 'status' => strtolower((string) ($runtimeLog['status'] ?? '')),
             ];
         });
+    }
+
+    /**
+     * @return Collection<int, array{title: string, meta: string|null, transcript: string}>
+     */
+    /**
+     * @return Collection<int, array{title: string, meta: string|null, transcript: string}>
+     */
+    public static function deploymentConsolesFor(Collection $deployments): Collection
+    {
+        return self::deploymentConsoles($deployments);
     }
 
     /**

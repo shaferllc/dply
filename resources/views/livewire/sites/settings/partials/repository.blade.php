@@ -301,7 +301,7 @@
                 </div>
             </div>
             <a
-                href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}"
+                href="{{ route('sites.pipeline', [$server, $site]) }}"
                 wire:navigate
                 class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
             >

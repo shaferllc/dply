@@ -45,11 +45,26 @@
             </x-page-header>
 
             <main class="min-w-0 space-y-6 mt-8">
+                @if ($watchedConsoleRunId)
+                    <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
+                @endif
+
                 @if ($sectionConsoleActionKinds !== [])
-                    @include('livewire.partials.console-action-banner-static', [
-                        'run' => $sectionConsoleActionRun,
-                        'kindLabels' => (array) config('console_actions.kinds', []),
-                    ])
+                    <div
+                        id="site-console-action-banner"
+                        x-data="{}"
+                        x-on:dply-console-action-focus.window="$nextTick(() => {
+                            const el = document.getElementById('site-console-action-banner');
+                            if (el) {
+                                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        })"
+                    >
+                        @include('livewire.partials.console-action-banner-static', [
+                            'run' => $sectionConsoleActionRun,
+                            'kindLabels' => (array) config('console_actions.kinds', []),
+                        ])
+                    </div>
                 @endif
 
                 <div role="tabpanel" id="site-settings-panel" aria-labelledby="site-settings-sidebar" class="space-y-6">
@@ -75,24 +90,30 @@
                         @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
-                    @elseif ($section === 'dns')
-                        @include('livewire.sites.settings.partials.dns')
                     @elseif ($section === 'certificates')
                         @include('livewire.sites.settings.partials.certificates')
-                    @elseif (in_array($section, ['deploy', 'repository'], true))
-                        @include('livewire.sites.settings.partials.deploy-recipe')
+                    @elseif ($section === 'repository')
+                        @include('livewire.sites.settings.partials.repository')
+                    @elseif ($section === 'deploy')
+                        @if ($functionsHost)
+                            @include('livewire.sites.settings.partials.deploy-recipe')
+                        @else
+                            @php
+                                $deployRedirect = route('sites.deployments.index', [$server, $site]);
+                            @endphp
+                            <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/30 p-6 text-sm text-brand-moss">
+                                {{ __('Deploy settings moved to Deployments, Repository, and Pipeline.') }}
+                                <a href="{{ $deployRedirect }}" wire:navigate class="ml-1 font-semibold text-brand-forest hover:underline">{{ __('Open Deployments') }}</a>
+                                <span class="text-brand-mist" aria-hidden="true"> · </span>
+                                <a href="{{ route('sites.pipeline', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Open Pipeline') }}</a>
+                            </div>
+                        @endif
                     @elseif ($section === 'runtime')
                         @if ($site->usesFunctionsRuntime())
                             @include('livewire.sites.settings.partials.runtime-serverless')
                         @else
-                            @include('livewire.sites.settings.partials.runtime')
+                            @include('livewire.sites.settings.partials.runtime-workspace')
                         @endif
-                    @elseif ($section === 'runtime-php')
-                        @include('livewire.sites.settings.partials.runtime.php')
-                    @elseif ($section === 'runtime-ruby')
-                        @include('livewire.sites.settings.partials.runtime.ruby')
-                    @elseif ($section === 'runtime-static')
-                        @include('livewire.sites.settings.partials.runtime.static')
                     @elseif ($section === 'system-user')
                         @include('livewire.sites.settings.partials.system-user')
                     @elseif ($section === 'laravel-stack')

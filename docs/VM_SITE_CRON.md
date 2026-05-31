@@ -19,7 +19,7 @@ Test a job immediately; output streams like server cron runs.
 
 ## Supervisor dot
 
-If Supervisor is missing, **Daemons** and **Queue workers** show setup hints — cron still works via system crontab.
+If Supervisor is missing, **Daemons** shows setup hints — cron still works via system crontab.
 
 ## Related sections
 

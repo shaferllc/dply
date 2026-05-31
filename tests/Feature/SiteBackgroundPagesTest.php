@@ -225,6 +225,28 @@ test('sidebar deployments item routes to history list', function () {
     $response = $this->actingAs($user)->get(route('sites.deployments.index', [$server, $site]));
     $response->assertOk()->assertSee('Deployments');
 });
+
+test('vm sidebar deploy group routes to deployments repository and pipeline', function () {
+    $user = actingOrgOwner();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
+
+    $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
+
+    expect($items['deploy']['route'] ?? null)->toBe('sites.deployments.index')
+        ->and($items['pipeline']['route'] ?? null)->toBe('sites.pipeline')
+        ->and($items->has('repository'))->toBeTrue()
+        ->and($items['repository']['route'] ?? null)->toBeNull();
+});
 test('clicking a history row opens the tick detail modal with the full body', function () {
     // The history table truncates the body to 120 chars; the detail modal
     // shows the whole captured preview. The marker sits past char 120 on

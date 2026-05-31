@@ -712,6 +712,18 @@
                                         <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('No deploys yet') }}</p>
                                     @endif
                                 </div>
+                                @feature('surface.fleet')
+                                    @if ($deployStatus === 'failed' && ops_copilot_active())
+                                        <a
+                                            href="{{ route('fleet.copilot', ['site' => $previewSite->id]) }}"
+                                            wire:navigate
+                                            class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-800 hover:bg-violet-100"
+                                        >
+                                            <x-heroicon-o-sparkles class="h-3 w-3" aria-hidden="true" />
+                                            {{ __('Copilot') }}
+                                        </a>
+                                    @endif
+                                @endfeature
                             </li>
                         @endforeach
                     </ul>

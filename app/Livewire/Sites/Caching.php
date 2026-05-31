@@ -6,10 +6,13 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -25,6 +28,12 @@ use Livewire\Component;
 class Caching extends Component
 {
     use DispatchesToastNotifications;
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.site_caching';
+
+    /** When true, render the coming-soon teaser instead of the full panel. */
+    public bool $comingSoonPreview = false;
 
     public Server $server;
 
@@ -72,7 +81,32 @@ class Caching extends Component
         $this->server = $server;
         $this->site = $site;
 
+        $organization = auth()->user()->currentOrganization();
+
+        if (! Feature::for($organization)->active('workspace.site_caching')) {
+            if (workspace_site_caching_preview_active($organization)) {
+                $this->comingSoonPreview = true;
+
+                return;
+            }
+
+            abort(404);
+        }
+
         $this->hydrateFromSite();
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $organization = auth()->user()->currentOrganization();
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::for($organization)->active($flag)) {
+            abort(404);
+        }
     }
 
     private function hydrateFromSite(): void
@@ -188,6 +222,24 @@ class Caching extends Component
 
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.sites.caching-preview', array_merge(
+                SiteSettingsViewData::for(
+                    $this->server,
+                    $this->site,
+                    'caching',
+                    null,
+                    [],
+                    auth()->user(),
+                ),
+                [
+                    'section' => 'caching',
+                    'routingTab' => 'domains',
+                    'laravel_tab' => 'commands',
+                ],
+            ));
+        }
+
         return view('livewire.sites.caching', [
             'available' => $this->availableMethods,
         ]);

@@ -51,6 +51,21 @@ function functionSite(?string $repoUrl = 'git@github.com:acme/api.git', string $
     return [$user, $server, $site];
 }
 
+test('repository page without connected repo hides browse tabs and shows connection form', function () {
+    [$user, $server, $site] = functionSite('');
+    Http::fake();
+
+    Livewire::actingAs($user)
+        ->test(Repository::class, ['server' => $server, 'site' => $site])
+        ->assertOk()
+        ->assertSee('No repository connected')
+        ->assertSee('Repository URL')
+        ->assertSee('Save connection')
+        ->assertDontSee('repository-tab-overview')
+        ->assertDontSee('repository-tab-files')
+        ->assertDontSee('Add a Git repository URL first.');
+});
+
 test('repository page renders with default overview tab', function () {
     [$user, $server, $site] = functionSite();
     Http::fake();

@@ -190,6 +190,7 @@
                             $navHref = server_workspace_nav_item_url($server, $item);
                             $needsSetup = (bool) ($item['needs_setup'] ?? false);
                             $previewOnly = (bool) ($item['preview_only'] ?? false);
+                            $soonBadge = (bool) ($item['soon_badge'] ?? false);
                         @endphp
                         <a
                             href="{{ $navHref }}"
@@ -281,7 +282,7 @@
                                     <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch
                             <span class="flex-1 truncate">{{ $label }}</span>
-                            @if ($previewOnly)
+                            @if ($previewOnly || $soonBadge)
                                 <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
                                     {{ __('Soon') }}
                                 </span>

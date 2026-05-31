@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ServerPatchAdvisorPageTest;
 
+use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -82,4 +84,23 @@ test('non vm host returns 404', function (): void {
     $this->actingAs($user)
         ->get(route('servers.patches', $server->fresh()))
         ->assertNotFound();
+});
+
+test('patches workspace tabs switch via query string and livewire', function (): void {
+    [$user, $server] = patchAdvisorUserWithServer();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'packages'])
+        ->test(WorkspacePatchAdvisor::class, ['server' => $server])
+        ->assertSet('patchesTab', 'packages')
+        ->assertSee(__('Packages & OS detection'))
+        ->call('setPatchesWorkspaceTab', 'actions')
+        ->assertSet('patchesTab', 'actions')
+        ->assertSee(__('Apt actions'))
+        ->call('setPatchesWorkspaceTab', 'settings')
+        ->assertSet('patchesTab', 'settings')
+        ->assertSee(__('Unattended-upgrades'))
+        ->call('setPatchesWorkspaceTab', 'overview')
+        ->assertSet('patchesTab', 'overview')
+        ->assertSee(__('Patch snapshot'));
 });

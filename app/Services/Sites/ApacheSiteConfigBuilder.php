@@ -7,6 +7,7 @@ use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\SiteAccessGateConfigSupport;
 use Illuminate\Support\Collection;
 
 class ApacheSiteConfigBuilder
@@ -23,7 +24,7 @@ class ApacheSiteConfigBuilder
             return '';
         }
 
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'accessGate']);
 
         $hostnames = collect($site->webserverHostnames());
         if ($hostnames->isEmpty()) {
@@ -52,6 +53,7 @@ class ApacheSiteConfigBuilder
             $port = (int) $site->octane_port;
             $reverb = $this->reverbProxyDirectives($site);
             $octBa = $this->apacheRootLocationBasicAuth($site);
+            $formGate = SiteAccessGateConfigSupport::apacheBlocks($site);
 
             return $this->applyListenPort(<<<APACHE
 # Managed by Dply — {$basename} (Laravel Octane)
@@ -62,7 +64,7 @@ class ApacheSiteConfigBuilder
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto "http"
-{$redirectLines}{$reverb}{$octBa}    ProxyPass / http://127.0.0.1:{$port}/
+{$redirectLines}{$formGate['rewrite']}{$reverb}{$octBa}{$formGate['locations']}    ProxyPass / http://127.0.0.1:{$port}/
     ProxyPassReverse / http://127.0.0.1:{$port}/
 </VirtualHost>
 APACHE, $listenPort);
@@ -73,6 +75,7 @@ APACHE, $listenPort);
         $phpBa = $this->apacheDirectoryAndPrefixLocations($site, $root);
         $staticBa = $this->apacheDirectoryAndPrefixLocations($site, $root);
         $nodeBa = $this->apacheRootLocationBasicAuth($site);
+        $formGateNode = SiteAccessGateConfigSupport::apacheBlocks($site);
         $dotfileDeny = $this->apacheDotfileDenyBlock();
 
         $config = match ($site->type) {
@@ -84,7 +87,7 @@ APACHE, $listenPort);
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-{$dotfileDeny}{$engineApache}{$redirectLines}{$reverbPhp}    <Directory {$root}>
+{$dotfileDeny}{$engineApache}{$redirectLines}{$phpBa['rewrite']}{$reverbPhp}    <Directory {$root}>
         AllowOverride All
 {$phpBa['directory']}
         Options FollowSymLinks
@@ -105,7 +108,7 @@ APACHE,
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
 
-{$dotfileDeny}{$redirectLines}    <Directory {$root}>
+{$dotfileDeny}{$redirectLines}{$staticBa['rewrite']}    <Directory {$root}>
         AllowOverride All
 {$staticBa['directory']}
         Options FollowSymLinks
@@ -122,7 +125,7 @@ APACHE,
 {$aliasLines}    ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
     ProxyPreserveHost On
-{$dotfileDeny}{$redirectLines}{$nodeBa}    ProxyPass / http://127.0.0.1:{$site->app_port}/
+{$dotfileDeny}{$redirectLines}{$nodeBa}{$formGateNode['rewrite']}{$formGateNode['locations']}    ProxyPass / http://127.0.0.1:{$site->app_port}/
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
@@ -168,16 +171,21 @@ APACHE;
     }
 
     /**
-     * @return array{directory: string, locations: string}
+     * @return array{directory: string, locations: string, rewrite: string}
      */
     protected function apacheDirectoryAndPrefixLocations(Site $site, string $documentRoot): array
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return SiteAccessGateConfigSupport::apacheBlocks($site);
+        }
+
         $site->loadMissing('basicAuthUsers');
         $users = $site->enforceableBasicAuthUsers();
         if ($users->isEmpty()) {
             return [
                 'directory' => '        Require all granted'."\n",
                 'locations' => '',
+                'rewrite' => '',
             ];
         }
 
@@ -217,11 +225,15 @@ AUTH;
 APACHE;
         }
 
-        return ['directory' => $directory, 'locations' => $locations];
+        return ['directory' => $directory, 'locations' => $locations, 'rewrite' => ''];
     }
 
     protected function apacheRootLocationBasicAuth(Site $site): string
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return '';
+        }
+
         $site->loadMissing('basicAuthUsers');
         if (! $site->enforceableBasicAuthUsers()->contains(fn (SiteBasicAuthUser $u): bool => $u->normalizedPath() === '/')) {
             return '';

@@ -12,13 +12,13 @@ Use VM sites for **PHP**, **Rails**, **WordPress**, **static**, and **Docker-on-
 
 **Networking** — **Routing**, **DNS**, **Certificates**, **Web server config**, **Caching**, **CDN / Edge**
 
-**Deploy** — **Deploy** (hooks, webhooks), **Repository** (Git, branch)
+**Deploy** — **Deployments** (run + history), **Repository** (Git, branch, webhooks), **Pipeline** (steps, hooks, rollout)
 
 **Runtime** — **Runtime**, **System user**, **Laravel / Rails / WordPress** (when detected), **Environment**
 
 **Observability** — **Logs**, **Notifications**, **Monitor**
 
-**Background** — **Cron jobs**, **Schedule**, **Daemons**, **Queue workers**, **Backups** (links to server)
+**Background** — **Cron jobs**, **Schedule**, **Daemons** (queue workers + other Supervisor programs), **Backups** (links to server)
 
 **Access** — **Authentication** (HTTP basic auth)
 
@@ -40,7 +40,9 @@ Each section has a matching guide in **Documentation → Site workspace guides**
 | I want to… | Go to |
 |------------|--------|
 | Change primary domain | **Routing → Domains** |
-| Zero-downtime deploys | **Settings** or **Deploy** |
+| Deploy now / view history | **Deployments** |
+| Zero-downtime, hooks, pipeline steps | **Pipeline** |
+| Git URL, branch, deploy key | **Repository** |
 | Edit nginx vhost | **Web server config** |
 | Add env vars | **Environment** |
 | Lock staging | **Authentication** |

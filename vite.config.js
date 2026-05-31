@@ -34,7 +34,11 @@ export default defineConfig(({ mode }) => {
         plugins: [
             tailwindcss(),
             laravel({
-                input: ['resources/css/app.css', 'resources/js/app.js'],
+                input: [
+                    'resources/css/app.css',
+                    'resources/js/app.js',
+                    'resources/js/deploy-pipeline-dnd.js',
+                ],
                 refresh: false,
             }),
         ],

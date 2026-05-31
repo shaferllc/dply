@@ -8,6 +8,7 @@ use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
+use App\Services\Sites\DeployHookRunner;
 use App\Services\SshConnection;
 use Closure;
 use Illuminate\Support\Carbon;
@@ -38,6 +39,10 @@ use Illuminate\Support\Carbon;
  */
 class DeployPhaseRunner
 {
+    public function __construct(
+        private readonly DeployHookRunner $hookRunner,
+    ) {}
+
     /**
      * Walk the build phase steps in declaration order. Stops at the
      * first failure and returns results for every step attempted.
@@ -165,6 +170,10 @@ class DeployPhaseRunner
             $result['step_id'] = (string) $step->id;
             $result['step_type'] = $step->step_type;
             $result['command'] = $cmd;
+            $hookLog = $this->hookRunner->runAfterStep($shell, $site, (string) $step->id, $cwd);
+            if ($hookLog !== '') {
+                $result['output'] = ($result['output'] ?? '').$hookLog;
+            }
             $results[] = $result;
 
             if (! $result['ok']) {

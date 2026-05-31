@@ -228,7 +228,7 @@ class WorkspaceCron extends Component
         $sshUser = trim((string) $this->server->ssh_user);
         $laravelHomeUser = ($sshUser === '' || $sshUser === 'root') ? 'deploy' : $sshUser;
 
-        return [
+        $presets = [
             'laravel_schedule' => [
                 'label' => __('Laravel — `schedule:run`'),
                 'cron_expression' => '* * * * *',
@@ -263,6 +263,13 @@ class WorkspaceCron extends Component
                 'user' => 'root',
             ],
         ];
+
+        $site = $this->schedulerHelperTargetSite();
+        if ($site === null || ! $site->isLaravelFrameworkDetected()) {
+            unset($presets['laravel_schedule']);
+        }
+
+        return $presets;
     }
 
     public function updatedNewCronExpression(): void

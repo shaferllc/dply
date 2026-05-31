@@ -222,6 +222,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Queued-stall threshold
+    |--------------------------------------------------------------------------
+    | If status is still `queued` this many seconds after created_at, the UI
+    | treats the run as failed (queue worker likely not running). Shorter than
+    | `stale_after_seconds` so operators are not left waiting ten minutes.
+    */
+    'queued_stalled_after_seconds' => (int) env('DPLY_CONSOLE_ACTION_QUEUED_STALLED', 45),
+
+    /*
+    |--------------------------------------------------------------------------
     | Stale-running threshold
     |--------------------------------------------------------------------------
     | If status is still 'running' this many seconds after started_at, the

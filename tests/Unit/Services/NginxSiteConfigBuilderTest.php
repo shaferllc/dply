@@ -4,7 +4,10 @@ namespace Tests\Unit\Services\NginxSiteConfigBuilderTest;
 
 use App\Enums\SiteType;
 use App\Models\Site;
+use App\Models\SiteAccessGate;
+use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBasicAuthUser;
+use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
@@ -12,6 +15,7 @@ use App\Models\SiteTenantDomain;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -141,6 +145,49 @@ test('basic auth adds acme bypass and htpasswd for static site', function () {
 
     $this->assertStringContainsString('location ^~ /.well-known/acme-challenge/', $nginx);
     $this->assertStringContainsString('auth_basic_user_file '.$site->basicAuthHtpasswdPathForNormalizedPath('/').';', $nginx);
+});
+
+test('form password gate emits auth_request and skips htpasswd directives', function () {
+    $site = Site::factory()->create([
+        'slug' => 'form-gate-static',
+        'type' => SiteType::Static,
+        'document_root' => '/var/www/form-gate-static/public',
+        'repository_path' => '/var/www/form-gate-static',
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'form-gate-static.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+    $salt = bin2hex(random_bytes(16));
+    SiteAccessGate::query()->create([
+        'site_id' => $site->id,
+        'method' => SiteAccessGate::METHOD_FORM_PASSWORD,
+        'cookie_secret' => Str::random(48),
+    ]);
+    SiteAccessGatePassword::query()->create([
+        'site_id' => $site->id,
+        'label' => 'Preview',
+        'password_salt' => $salt,
+        'password_verifier' => hash('sha256', $salt.'secret'),
+        'sort_order' => 0,
+    ]);
+    SiteBasicAuthUser::factory()->create([
+        'site_id' => $site->id,
+        'username' => 'preview',
+        'password_hash' => Hash::make('secret'),
+        'path' => '/',
+    ]);
+
+    $site->refresh()->load('domains', 'redirects', 'basicAuthUsers', 'accessGate', 'accessGatePasswords');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    $this->assertStringContainsString('auth_request /__dply/access/verify', $nginx);
+    $this->assertStringContainsString('location = /__dply/access/verify', $nginx);
+    $this->assertStringContainsString('include fastcgi.conf', $nginx);
+    $this->assertStringNotContainsString('snippets/fastcgi-php.conf', $nginx);
+    $this->assertStringNotContainsString('auth_basic_user_file', $nginx);
 });
 
 test('octane block proxies with upgrade headers', function () {
@@ -280,4 +327,42 @@ test('listen port mode rewrites listens and strips tls', function () {
     // No TLS plumbing should remain at the test port.
     $this->assertStringNotContainsString('listen 443', $testPort);
     $this->assertStringNotContainsString('ssl_certificate', $testPort);
+});
+
+test('active certificate appends https server block with basic auth', function () {
+    $site = Site::factory()->create([
+        'slug' => 'auth-tls',
+        'type' => SiteType::Php,
+        'document_root' => '/var/www/auth-tls/public',
+        'repository_path' => '/var/www/auth-tls',
+        'ssl_status' => Site::SSL_ACTIVE,
+    ]);
+    SitePreviewDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'auth-tls.on-dply.com',
+        'is_primary' => true,
+    ]);
+    SiteCertificate::query()->create([
+        'site_id' => $site->id,
+        'scope_type' => SiteCertificate::SCOPE_PREVIEW,
+        'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+        'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+        'status' => SiteCertificate::STATUS_ACTIVE,
+        'last_installed_at' => now(),
+        'domains_json' => ['auth-tls.on-dply.com'],
+    ]);
+    SiteBasicAuthUser::factory()->create([
+        'site_id' => $site->id,
+        'username' => 'ops',
+        'password_hash' => SiteBasicAuthUser::apr1Hash('secret'),
+        'path' => '/',
+    ]);
+
+    $site->refresh()->load('domains', 'redirects', 'basicAuthUsers', 'previewDomains');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    expect(substr_count($nginx, 'listen 80;'))->toBe(1)
+        ->and(substr_count($nginx, 'listen 443 ssl;'))->toBe(1)
+        ->and($nginx)->toContain('ssl_certificate /etc/letsencrypt/live/auth-tls.on-dply.com/fullchain.pem;')
+        ->and($nginx)->toContain('auth_basic_user_file '.$site->basicAuthHtpasswdPathForNormalizedPath('/').';');
 });

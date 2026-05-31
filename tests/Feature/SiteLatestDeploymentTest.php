@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -47,6 +48,37 @@ test('latest deployment returns null when none recorded', function () {
     $site = makeSite();
 
     expect($site->latestDeployment())->toBeNull();
+});
+
+test('latest deployment uses eager loaded deployments without a second query', function () {
+    $site = makeSite();
+    SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'idempotency_key' => 'eager-old',
+        'trigger' => 'manual',
+        'status' => SiteDeployment::STATUS_SUCCESS,
+        'started_at' => now()->subHour(),
+    ]);
+    $latest = SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'idempotency_key' => 'eager-new',
+        'trigger' => 'webhook',
+        'status' => SiteDeployment::STATUS_SUCCESS,
+        'started_at' => now()->subMinute(),
+    ]);
+
+    $site->load('deployments');
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $found = $site->latestDeployment();
+
+    expect(DB::getQueryLog())->toBeEmpty();
+    expect($found)->not->toBeNull();
+    expect($found->id)->toBe($latest->id);
 });
 function makeSite(): Site
 {

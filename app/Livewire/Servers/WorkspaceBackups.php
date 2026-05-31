@@ -26,6 +26,7 @@ use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
@@ -34,9 +35,9 @@ use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Server-scoped backups workspace: surfaces existing {@see ServerDatabaseBackup}
- * and {@see SiteFileBackup} runs for everything attached to the server, plus
- * recurring schedule CRUD via {@see ServerBackupSchedule}.
+ * Backups workspace at {@see servers.backups} (server-wide) and {@see sites.backups}
+ * (site-scoped). Surfaces {@see ServerDatabaseBackup} and {@see SiteFileBackup}
+ * runs plus recurring schedule CRUD via {@see ServerBackupSchedule}.
  *
  * Schedules materialize as {@see ServerCronJob} entries that invoke
  * `dply:run-backup-schedule {schedule}` so the cron line stays stable across
@@ -93,8 +94,11 @@ class WorkspaceBackups extends Component
     /** @var array<string, mixed> */
     public array $destinationForm = [];
 
-    /** When set (?site=…), all queries on this page narrow to backups/sites for that site only. */
+    /** When set (site route or ?site=), all queries narrow to that site. */
     public ?string $context_site_id = null;
+
+    /** True when mounted from {@see sites.backups} (native site workspace, not a server filter). */
+    public bool $siteDedicatedContext = false;
 
     /** overview | schedules | history */
     public string $backups_workspace_tab = 'overview';
@@ -116,8 +120,19 @@ class WorkspaceBackups extends Component
         }
     }
 
-    public function mount(Server $server): void
+    public function mount(Server $server, ?Site $site = null): void
     {
+        if ($site !== null) {
+            abort_unless($site->server_id === $server->id, 404);
+            abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
+            Gate::authorize('view', $site);
+
+            $this->siteDedicatedContext = true;
+            $this->context_site_id = $site->id;
+            $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+            $this->new_target_id = $site->id;
+        }
+
         if (! Feature::active('workspace.backups')) {
             if (workspace_backups_preview_active()) {
                 $this->comingSoonPreview = true;
@@ -133,8 +148,11 @@ class WorkspaceBackups extends Component
         $this->destinationForm = $this->emptyDestinationForm();
         $this->hydrateDatabaseBackupSettings();
 
-        // Site sidebar's "Backups" entry navigates here with ?site={id}; honoring it pre-filters
-        // the page so operators don't see noise from other sites on the same server.
+        if ($this->context_site_id !== null) {
+            return;
+        }
+
+        // Server workspace can deep-link with ?site= to pre-filter without leaving server nav.
         $siteId = request()->query('site');
         if (is_string($siteId) && $siteId !== '') {
             $exists = Site::query()
@@ -764,7 +782,14 @@ class WorkspaceBackups extends Component
     public function render(): View
     {
         if ($this->comingSoonPreview) {
-            return view('livewire.servers.workspace-backups-preview');
+            $contextSite = $this->context_site_id !== null
+                ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+                : null;
+
+            return view('livewire.servers.workspace-backups-preview', [
+                'contextSite' => $contextSite,
+                'siteDedicatedContext' => $this->siteDedicatedContext,
+            ]);
         }
 
         $this->server->refresh();
@@ -913,6 +938,7 @@ class WorkspaceBackups extends Component
         return view('livewire.servers.workspace-backups', [
             'opsReady' => $this->serverOpsReady(),
             'contextSite' => $contextSite,
+            'siteDedicatedContext' => $this->siteDedicatedContext,
             'databases' => $databases,
             'sites' => $sites,
             'databaseBackups' => $databaseBackups,

@@ -99,9 +99,9 @@
             </div>
         </div>
         <div class="flex shrink-0 flex-wrap items-center gap-2">
-            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+            <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                 <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" />
-                {{ __('Deploy') }}
+                {{ __('Deployments') }}
             </a>
             <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                 <x-heroicon-o-cube-transparent class="h-3.5 w-3.5" />
@@ -198,6 +198,12 @@
         @if (($preflightActionableChecks ?? collect())->isNotEmpty())
             <div class="mt-5">
                 <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
+            </div>
+        @endif
+
+        @if ($this->latestDeployment !== null && (string) $this->latestDeployment->status === 'failed')
+            <div class="mt-5">
+                <x-ops-copilot-callout :site="$site" compact :show="true" />
             </div>
         @endif
 

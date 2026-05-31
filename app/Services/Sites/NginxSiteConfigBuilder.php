@@ -8,6 +8,8 @@ use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteWebserverConfigProfile;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\OpenLiteSpeedTlsPaths;
+use App\Support\Sites\SiteAccessGateConfigSupport;
 use App\Support\Sites\VmDockerSiteConfigSupport;
 
 class NginxSiteConfigBuilder
@@ -27,7 +29,7 @@ class NginxSiteConfigBuilder
             return '';
         }
 
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'accessGate']);
         $hostnames = collect($site->webserverHostnames());
         if ($hostnames->isEmpty()) {
             throw new \InvalidArgumentException('Add at least one domain before installing Nginx.');
@@ -125,7 +127,11 @@ class NginxSiteConfigBuilder
             return '';
         }
 
-        return $listenPort === null ? $config : $this->rewriteForListenPort($config, $listenPort);
+        if ($listenPort !== null) {
+            return $this->rewriteForListenPort($config, $listenPort);
+        }
+
+        return $this->appendTlsServerBlocks($site, $config);
     }
 
     /**
@@ -235,6 +241,7 @@ NGINX;
             $reverb = $this->reverbProxyLocationBlock($site);
             $octaneProxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
             $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
+            $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
 
             return <<<NGINX
 # Managed by Dply — {$basename} (Laravel Octane)
@@ -246,8 +253,8 @@ server {
     index index.php index.html;
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$poolNote}{$redirectBlock}{$reverb}{$octaneBa['preamble']}    location / {
-{$octaneBa['location_slash_auth']}        try_files \$uri @octane;
+{$layerPrefix}{$poolNote}{$redirectBlock}{$reverb}{$octaneBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}    location / {
+{$octaneBa['location_slash_auth']}{$formGate['location_slash_auth']}        try_files \$uri @octane;
     }
 
     location @octane {
@@ -273,6 +280,7 @@ NGINX;
             ? app(SiteCacheDirectivesBuilder::class)->nginxFastcgiDirectives($site)
             : '';
         $phpBa = $this->nginxBasicAuthPhpFragments($site, $root, $phpSock, $fcgiEngine);
+        $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -287,8 +295,8 @@ server {
 {$layerPrefix}
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-{$poolNote}{$redirectBlock}{$reverbPlain}{$phpBa['preamble']}{$phpBa['prefix_locations']}    location / {
-{$phpBa['location_slash_auth']}        try_files \$uri \$uri/ /index.php?\$query_string;
+{$poolNote}{$redirectBlock}{$reverbPlain}{$phpBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$phpBa['prefix_locations']}    location / {
+{$phpBa['location_slash_auth']}{$formGate['location_slash_auth']}        try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
     location ~ \.php\$ {
@@ -316,6 +324,7 @@ NGINX;
     ): string {
         $openFile = app(SiteCacheDirectivesBuilder::class)->nginxOpenFileCacheBlock($site);
         $staticBa = $this->nginxBasicAuthStaticFragments($site, $root);
+        $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -327,9 +336,9 @@ server {
     index index.html;
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$openFile}{$redirectBlock}{$staticBa['preamble']}{$staticBa['prefix_locations']}
+{$layerPrefix}{$openFile}{$redirectBlock}{$staticBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$staticBa['prefix_locations']}
     location / {
-{$staticBa['location_slash_auth']}        try_files \$uri \$uri/ =404;
+{$staticBa['location_slash_auth']}{$formGate['location_slash_auth']}        try_files \$uri \$uri/ =404;
     }
 
     location ~ /\.(?!well-known).* {
@@ -352,6 +361,7 @@ NGINX;
         $proxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
         $webRoot = rtrim($site->effectiveDocumentRootForNginx(), '/');
         $nodeBa = $this->nginxBasicAuthNodeFragments($site, $webRoot);
+        $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $webRoot);
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -361,9 +371,9 @@ server {
     server_name {$serverNames};
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$nodeBa['prefix_locations']}
+{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$nodeBa['prefix_locations']}
     location / {
-{$nodeBa['location_slash_auth']}        proxy_http_version 1.1;
+{$nodeBa['location_slash_auth']}{$formGate['location_slash_auth']}        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -482,6 +492,10 @@ NGINX;
 
     protected function nginxBasicAuthEnabled(Site $site): bool
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return false;
+        }
+
         return $site->enforceableBasicAuthUsers()->isNotEmpty();
     }
 
@@ -670,6 +684,44 @@ server {
 }
 NGINX;
 
-        return $listenPort === null ? $config : $this->rewriteForListenPort($config, $listenPort);
+        if ($listenPort !== null) {
+            return $this->rewriteForListenPort($config, $listenPort);
+        }
+
+        return $this->appendTlsServerBlocks($site, $config);
+    }
+
+    /**
+     * Duplicate the managed :80 server block for :443 when Let's Encrypt material
+     * is installed so HTTPS requests hit the same auth and routing as HTTP.
+     */
+    protected function appendTlsServerBlocks(Site $site, string $config): string
+    {
+        if (! OpenLiteSpeedTlsPaths::siteExpectsTls($site) || ! OpenLiteSpeedTlsPaths::siteEdgeTlsFrontReady($site)) {
+            return $config;
+        }
+
+        $paths = OpenLiteSpeedTlsPaths::resolve($site);
+        if ($paths === null) {
+            return $config;
+        }
+
+        $sslDirectives = "    ssl_certificate {$paths['certFile']};\n"
+            ."    ssl_certificate_key {$paths['keyFile']};\n"
+            ."    ssl_protocols TLSv1.2 TLSv1.3;\n";
+
+        $tlsBlock = preg_replace(
+            '/(\s*)listen 80;\s*\n\s*listen \[::\]:80;/',
+            "$1listen 443 ssl;\n$1listen [::]:443 ssl;\n{$sslDirectives}",
+            $config,
+            1,
+            $count
+        );
+
+        if ($count === 0 || $tlsBlock === null) {
+            return $config;
+        }
+
+        return $config."\n\n".$tlsBlock;
     }
 }

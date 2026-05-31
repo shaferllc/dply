@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerPatchAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -30,6 +31,12 @@ class WorkspacePatchAdvisor extends Component
     use RunsServerInventoryProbe;
 
     protected string $requiredFeature = 'workspace.patch_advisor';
+
+    /** @var list<string> */
+    public const PATCHES_TABS = ['overview', 'packages', 'actions', 'settings'];
+
+    #[Url(as: 'tab', except: 'overview')]
+    public string $patchesTab = 'overview';
 
     public string $manage_auto_updates_interval = 'off';
 
@@ -112,6 +119,11 @@ class WorkspacePatchAdvisor extends Component
         $this->toastSuccess(__('Patch preferences saved.'));
     }
 
+    public function setPatchesWorkspaceTab(string $tab): void
+    {
+        $this->patchesTab = in_array($tab, self::PATCHES_TABS, true) ? $tab : 'overview';
+    }
+
     protected function forceExtendedInventoryProbe(): bool
     {
         return true;
@@ -119,8 +131,6 @@ class WorkspacePatchAdvisor extends Component
 
     public function render(ServerPatchAdvisor $advisor): View
     {
-        $this->server->refresh();
-
         $consoleRun = ConsoleAction::query()
             ->where('subject_type', $this->server->getMorphClass())
             ->where('subject_id', $this->server->id)

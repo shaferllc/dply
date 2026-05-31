@@ -50,6 +50,7 @@ const SERVER_COMMANDS = {
   health: { handler: serverCommands.serverHealth, summary: 'Server status + open insight findings.' },
   run: { handler: serverCommands.serverRun, summary: 'Run a command over SSH (--server <id> <command>).' },
   firewall: { handler: serverCommands.serverFirewall, summary: 'show | apply | apply-bundled | apply-template' },
+  'shared-host': { handler: serverCommands.serverSharedHost, summary: 'explain — fairness advisor briefing' },
   'system-users': { handler: serverCommands.serverSystemUsers, summary: 'list | sync | add | update | remove' },
 };
 

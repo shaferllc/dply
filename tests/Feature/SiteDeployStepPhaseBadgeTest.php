@@ -39,10 +39,10 @@ test('dashboard shows phase badges on each deploy step', function () {
         'timeout_seconds' => 300,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [
+    $response = $this->actingAs($user)->get(route('sites.pipeline', [
         'server' => $server,
         'site' => $site,
-        'section' => 'deploy',
+        'tab' => 'steps',
     ]));
 
     $response->assertOk();

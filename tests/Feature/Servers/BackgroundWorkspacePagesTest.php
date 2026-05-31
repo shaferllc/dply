@@ -10,7 +10,6 @@ use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceOverview;
-use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceSchedule;
 use App\Models\AuditLog;
 use App\Models\Organization;
@@ -23,6 +22,7 @@ use App\Models\ServerProvisionRun;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
+use App\Models\SupervisorProgramAuditLog;
 use App\Models\User;
 use App\Notifications\BackupFailureNotification;
 use App\Services\Servers\PreflightSchedulerOnSite;
@@ -32,6 +32,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Concerns\WithFeatures;
 
@@ -58,7 +59,7 @@ function readyServer(User $user): Server
         'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
     ]);
 }
-test('queue workers page lists only queue program types', function () {
+test('daemons page lists queue and custom program types', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
 
@@ -84,11 +85,11 @@ test('queue workers page lists only queue program types', function () {
     ]);
 
     $component = Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server]);
+        ->test(WorkspaceDaemons::class, ['server' => $server]);
 
     $component->assertOk();
-    $programs = $component->viewData('programs');
-    expect($programs->pluck('id')->all())->toBe([$queue->id], 'Only the queue-type program should appear, not the custom one.');
+    $programs = $component->viewData('filteredSupervisorPrograms');
+    expect($programs->pluck('id')->all())->toEqualCanonicalizing([$queue->id, $custom->id]);
 });
 test('schedule page renders detected unmonitored card for scheduler shaped cron', function () {
     // Rewritten for the milestone-2A scheduler control plane: the page no
@@ -237,7 +238,7 @@ test('backups route renders via http', function () {
         ->set('backups_workspace_tab', 'history')
         ->assertSee('Recent database backups', false);
 });
-test('site queue workers route renders via http', function () {
+test('legacy site queue workers route redirects to site daemons', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $site = Site::factory()->create([
@@ -248,9 +249,7 @@ test('site queue workers route renders via http', function () {
 
     $this->actingAs($user)
         ->get(route('sites.queue-workers', ['server' => $server, 'site' => $site]))
-        ->assertOk()
-        ->assertSee('Queue workers', false)
-        ->assertSee($site->name, false);
+        ->assertRedirect(route('sites.daemons', ['server' => $server, 'site' => $site]));
 });
 /** Helper: install a stack_summary artifact so ServerInstalledServices stops failing-open. */
 function setExpectedServices(Server $server, array $services): void
@@ -280,7 +279,7 @@ test('backups route 404s when no database tag present', function () {
         ->get(route('servers.backups', $server))
         ->assertNotFound();
 });
-test('site queue workers route shows install banner when supervisor missing', function () {
+test('site daemons route shows install banner when supervisor missing', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
@@ -291,10 +290,10 @@ test('site queue workers route shows install banner when supervisor missing', fu
     ]);
 
     $this->actingAs($user)
-        ->get(route('sites.queue-workers', ['server' => $server, 'site' => $site]))
+        ->get(route('sites.daemons', ['server' => $server, 'site' => $site]))
         ->assertOk()
         ->assertSee('Supervisor is not installed', false)
-        ->assertSee('Go to Daemons to install', false);
+        ->assertSee('Install Supervisor', false);
 });
 test('backups route denied for user outside organization', function () {
     $owner = actingOrgUser();
@@ -550,12 +549,16 @@ test('enable scheduler for site creates laravel wrapper cron entry', function ()
         'server_id' => $server->id,
         'user_id' => $user->id,
         'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
     ]);
 
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'laravel')
         ->set('enable_cron_expression', '* * * * *')
         ->call('enableSchedulerForSite');
 
@@ -580,12 +583,16 @@ test('enable scheduler for site creates rails wrapper cron entry', function () {
         'server_id' => $server->id,
         'user_id' => $user->id,
         'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'rails', 'language' => 'ruby'],
+            ],
+        ],
     ]);
 
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'rails')
         ->set('enable_cron_expression', '0 * * * *')
         ->call('enableSchedulerForSite');
 
@@ -744,7 +751,7 @@ test('schedule meta includes recent runs for target', function () {
     $recent = $meta[$schedule->id]['recent_runs'];
     expect($recent)->toHaveCount(5, 'History should be capped at 5 entries.');
 });
-test('queue workers stop action calls stop program group', function () {
+test('daemons stop action calls stop program group', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
@@ -765,20 +772,15 @@ test('queue workers stop action calls stop program group', function () {
     app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server])
-        ->call('stopWorker', $program->id);
+        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->call('stopOneProgram', $program->id);
 
-    // SupervisorProgram::create above triggers the observer, which writes
-    // a `server.daemons.program_created` row at the same second as the
-    // worker action below — so filter by action rather than ordering by
-    // created_at (which ties at second-precision timestamps).
-    $audit = AuditLog::query()
-        ->where('organization_id', $server->organization_id)
-        ->where('action', 'queue_worker.stop')
-        ->first();
-    expect($audit)->not->toBeNull('Expected a queue_worker.stop audit row.');
+    expect(SupervisorProgramAuditLog::query()
+        ->where('server_id', $server->id)
+        ->where('action', 'stop_one')
+        ->exists())->toBeTrue();
 });
-test('queue workers start action calls start program group', function () {
+test('daemons start action calls start program group', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
@@ -799,16 +801,15 @@ test('queue workers start action calls start program group', function () {
     app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server])
-        ->call('startWorker', $program->id);
+        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->call('startOneProgram', $program->id);
 
-    $audit = AuditLog::query()
-        ->where('organization_id', $server->organization_id)
-        ->where('action', 'queue_worker.start')
-        ->first();
-    expect($audit)->not->toBeNull('Expected a queue_worker.start audit row.');
+    expect(SupervisorProgramAuditLog::query()
+        ->where('server_id', $server->id)
+        ->where('action', 'start_one')
+        ->exists())->toBeTrue();
 });
-test('queue workers stats count active inactive and total processes', function () {
+test('daemons stats count active inactive and total processes', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
@@ -827,8 +828,8 @@ test('queue workers stats count active inactive and total processes', function (
     ]);
 
     $component = Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server]);
-    $stats = $component->viewData('stats');
+        ->test(WorkspaceDaemons::class, ['server' => $server]);
+    $stats = $component->viewData('daemonsStats');
 
     expect($stats['active'])->toBe(2);
     expect($stats['inactive'])->toBe(1);
@@ -1106,9 +1107,19 @@ test('solid queue preset fills daemons form', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'rails', 'language' => 'ruby'],
+            ],
+        ],
+    ]);
 
     Livewire::actingAs($user)
-        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $site])
         ->call('applySupervisorPreset', 'solid-queue')
         ->assertSet('new_sv_slug', 'solid-queue')
         ->assertSet('new_sv_command', 'bin/jobs');
@@ -1117,9 +1128,19 @@ test('action cable preset fills daemons form', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'rails', 'language' => 'ruby'],
+            ],
+        ],
+    ]);
 
     Livewire::actingAs($user)
-        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $site])
         ->call('applySupervisorPreset', 'action-cable')
         ->assertSet('new_sv_slug', 'action-cable')
         ->assertSet('new_sv_command', 'bundle exec puma -p 28080 cable/config.ru');
@@ -1310,9 +1331,10 @@ test('overview background tile summarizes workers and schedules', function () {
     expect($summary['paused_schedules'])->toBe(1);
     expect($summary['failed_backups_7d'])->toBe(1, '30-day-old failure must be excluded from 7d window.');
 });
-test('site queue workers stop dispatches and audits with site id', function () {
+test('site daemons stop dispatches for site scoped program', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
+    $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
     $site = Site::factory()->create([
         'server_id' => $server->id,
         'user_id' => $user->id,
@@ -1335,18 +1357,15 @@ test('site queue workers stop dispatches and audits with site id', function () {
     app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $site])
-        ->call('stopWorker', $program->id);
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $site])
+        ->call('stopOneProgram', $program->id);
 
-    // Filter by action to avoid tying with the observer's `program_created` row.
-    $audit = AuditLog::query()
-        ->where('organization_id', $server->organization_id)
-        ->where('action', 'queue_worker.stop')
-        ->first();
-    expect($audit)->not->toBeNull('Expected a queue_worker.stop audit row.');
-    expect($audit?->new_values['site_id'] ?? null)->toBe($site->id);
+    expect(SupervisorProgramAuditLog::query()
+        ->where('supervisor_program_id', $program->id)
+        ->where('action', 'stop_one')
+        ->exists())->toBeTrue();
 });
-test('site queue workers stats count only this site programs', function () {
+test('site daemons stats count only this site programs', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $siteA = Site::factory()->create([
@@ -1380,14 +1399,14 @@ test('site queue workers stats count only this site programs', function () {
     ]);
 
     $component = Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
-    $stats = $component->viewData('stats');
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $siteA]);
+    $stats = $component->viewData('daemonsStats');
 
     expect($stats['active'])->toBe(1);
     expect($stats['inactive'])->toBe(1);
     expect($stats['total_processes'])->toBe(3);
 });
-test('site queue workers page scopes to site', function () {
+test('site daemons page scopes programs to site by default', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $siteA = Site::factory()->create([
@@ -1425,9 +1444,193 @@ test('site queue workers page scopes to site', function () {
     ]);
 
     $component = Livewire::actingAs($user)
-        ->test(WorkspaceQueueWorkers::class, ['server' => $server, 'site' => $siteA]);
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $siteA]);
     $component->assertOk();
 
-    $programs = $component->viewData('programs');
+    $programs = $component->viewData('filteredSupervisorPrograms');
     expect($programs->pluck('id')->all())->toBe([$aProgram->id], 'Site A page must only show site A programs.');
+});
+test('site daemons can import programs from another site on the same server', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $sourceSite = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'repository_path' => '/var/www/source-app',
+    ]);
+    $targetSite = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'repository_path' => '/var/www/target-app',
+    ]);
+
+    SupervisorProgram::create([
+        'server_id' => $server->id,
+        'site_id' => $sourceSite->id,
+        'slug' => 'laravel-queue',
+        'program_type' => 'queue',
+        'command' => 'php /var/www/source-app/current/artisan queue:work',
+        'directory' => '/var/www/source-app/current',
+        'user' => 'dply',
+        'numprocs' => 2,
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $targetSite])
+        ->set('import_from_site_id', $sourceSite->id)
+        ->call('importProgramFromSite', SupervisorProgram::query()->where('site_id', $sourceSite->id)->value('id'))
+        ->assertHasNoErrors();
+
+    $imported = SupervisorProgram::query()
+        ->where('server_id', $server->id)
+        ->where('site_id', $targetSite->id)
+        ->first();
+
+    expect($imported)->not->toBeNull();
+    expect($imported->slug)->toBe('laravel-queue-'.Str::slug($targetSite->slug));
+    expect($imported->directory)->toBe('/var/www/target-app/current');
+    expect($imported->command)->toBe('php /var/www/target-app/current/artisan queue:work');
+    expect($imported->numprocs)->toBe(2);
+});
+test('site daemons preset list is filtered by detected framework', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $laravelSite = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
+    ]);
+    $railsSite = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'rails', 'language' => 'ruby'],
+            ],
+        ],
+    ]);
+
+    $laravelPresets = Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $laravelSite])
+        ->instance()
+        ->supervisorPresetOptionsForForm();
+    $laravelValues = array_column($laravelPresets, 'value');
+    expect($laravelValues)->toContain('laravel-queue');
+    expect($laravelValues)->not->toContain('sidekiq');
+
+    $railsPresets = Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $railsSite])
+        ->instance()
+        ->supervisorPresetOptionsForForm();
+    $railsValues = array_column($railsPresets, 'value');
+    expect($railsValues)->toContain('sidekiq');
+    expect($railsValues)->not->toContain('laravel-queue');
+});
+test('site daemons saves solid queue preset with site id', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'rails', 'language' => 'ruby'],
+            ],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $site])
+        ->call('applySupervisorPreset', 'solid-queue')
+        ->call('saveSupervisorProgram');
+
+    $program = SupervisorProgram::query()
+        ->where('server_id', $server->id)
+        ->where('slug', 'solid-queue')
+        ->first();
+
+    expect($program)->not->toBeNull();
+    expect($program->program_type)->toBe('solid-queue');
+    expect($program->site_id)->toBe($site->id);
+});
+test('daemons page edit and delete program', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+    $provisioner = \Mockery::mock(SupervisorProvisioner::class);
+    $provisioner->shouldReceive('deleteConfigFile')->once();
+    app()->instance(SupervisorProvisioner::class, $provisioner);
+
+    $program = SupervisorProgram::create([
+        'server_id' => $server->id,
+        'slug' => 'edit-me',
+        'program_type' => 'horizon',
+        'command' => 'php artisan horizon',
+        'directory' => '/srv/app/current',
+        'user' => 'dply',
+        'numprocs' => 2,
+        'is_active' => true,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->call('beginEditProgram', $program->id)
+        ->set('new_sv_numprocs', 4)
+        ->call('saveSupervisorProgram');
+
+    expect($program->fresh()->numprocs)->toBe(4);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->call('openConfirmActionModal', 'deleteSupervisorProgram', [$program->id], 'Delete', 'Delete?', 'Delete', true)
+        ->call('confirmActionModal');
+
+    expect(SupervisorProgram::find($program->id))->toBeNull();
+});
+test('daemons page tails stdout log for individual program', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+
+    $program = SupervisorProgram::create([
+        'server_id' => $server->id,
+        'slug' => 'laravel-queue',
+        'program_type' => 'queue',
+        'command' => 'php artisan queue:work',
+        'directory' => '/srv/app/current',
+        'user' => 'dply',
+        'numprocs' => 1,
+        'is_active' => true,
+    ]);
+
+    $provisioner = \Mockery::mock(SupervisorProvisioner::class);
+    $provisioner->shouldReceive('tailProgramStdoutLog')->once()->andReturn("processed job\n");
+    app()->instance(SupervisorProvisioner::class, $provisioner);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server])
+        ->call('openProgramLogs', $program->id)
+        ->assertSet('log_tail_program_id', $program->id)
+        ->assertSet('log_tail_slug', 'laravel-queue')
+        ->assertSet('log_tail_body', "processed job\n");
+});
+test('legacy server queue workers route redirects to daemons', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+
+    $this->actingAs($user)
+        ->get(route('servers.queue-workers', $server))
+        ->assertRedirect(route('servers.daemons', $server));
 });

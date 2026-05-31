@@ -514,6 +514,83 @@ function printSystemUsersHelp() {
 }
 
 /**
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+export async function serverSharedHost(args, flags) {
+  const sub = args[0];
+
+  if (sub === 'help' || sub === '--help' || sub === '-h' || !sub) {
+    return printSharedHostHelp();
+  }
+
+  if (sub === 'explain') {
+    return sharedHostExplain(args.slice(1), flags);
+  }
+
+  throw cliError(`Unknown shared-host subcommand: ${sub}. Run \`dply server shared-host help\`.`, 2);
+}
+
+async function sharedHostExplain(args, flags) {
+  const client = await requireClient(flags);
+  const serverId = await resolveServerId(client, flags, args[0]);
+  const response = await client.get(`/servers/${serverId}/shared-host/explain`);
+  const data = response?.data;
+
+  if (flags.json) {
+    printJson(data);
+
+    return;
+  }
+
+  if (!data) {
+    warn('No shared host briefing returned.');
+
+    return;
+  }
+
+  info(c.bold(String(data.summary ?? 'Shared host briefing')));
+  info('');
+  info(c.dim(`Overall: ${data.overall ?? '—'} · sites: ${data.site_count ?? '—'} · contention: ${data.contention_count ?? 0}`));
+
+  if (data.ai_narrative) {
+    info('');
+    info(c.bold('AI summary'));
+    info(String(data.ai_narrative));
+  } elseif (data.briefing && data.briefing !== data.summary) {
+    info('');
+    info(String(data.briefing));
+  }
+
+  const recommendations = data.recommendations ?? [];
+  if (recommendations.length > 0) {
+    info('');
+    info(c.bold('Recommendations'));
+    for (const row of recommendations) {
+      info(`  ${c.cyan(String(row.title ?? 'Tip'))}`);
+      if (row.summary) {
+        info(`    ${c.dim(String(row.summary))}`);
+      }
+    }
+  }
+
+  if (data.radar_url) {
+    info('');
+    info(c.dim(`Radar: ${data.radar_url}`));
+  }
+
+  return 0;
+}
+
+function printSharedHostHelp() {
+  info(`${c.bold('dply server shared-host')} — multi-site fairness on a BYO server`);
+  info('');
+  info('  explain [--server ID]             Print fairness advisor briefing');
+
+  return 0;
+}
+
+/**
  * @param {string} message
  * @param {number} [code]
  */

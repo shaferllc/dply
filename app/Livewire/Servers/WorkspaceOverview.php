@@ -26,6 +26,7 @@ use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\SharedHostReport;
+use App\Support\Servers\SupervisorQueueProgramTypes;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
@@ -201,7 +202,7 @@ class WorkspaceOverview extends Component
         $backgroundSummary = [
             'active_workers' => SupervisorProgram::query()
                 ->where('server_id', $this->server->id)
-                ->whereIn('program_type', WorkspaceQueueWorkers::QUEUE_TYPES)
+                ->whereIn('program_type', SupervisorQueueProgramTypes::TYPES)
                 ->where('is_active', true)
                 ->count(),
             'active_schedules' => ServerBackupSchedule::query()

@@ -62,6 +62,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $this->ensureSuspendedPage($site, $ssh, $emit);
         $this->ensureNginxEngineHttpCacheInfrastructure($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->syncAccessGateFiles($site, $ssh, $emit);
         $this->writeNginxLayerSnippetFiles($site, $profile, $ssh, $emit);
 
         // Vhost write only emits when content actually changed; an apply that

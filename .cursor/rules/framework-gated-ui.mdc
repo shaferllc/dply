@@ -1,0 +1,42 @@
+---
+description: Show framework-specific UI only when Site runtime detection matches
+alwaysApply: true
+---
+
+# Framework-gated UI
+
+- **Any framework-specific UI, preset, helper, nav item, or default command** must only appear when Dply detects that framework on the **relevant site**.
+- **Detection:** `Site::isLaravelFrameworkDetected()`, `isRailsFrameworkDetected()`, `isWordPressDetected()`, etc. (from `resolvedRuntimeAppDetection()`).
+- **Resolve the target site first** — `context_site_id`, form `*_site_id`, or an explicit picker. Never show Laravel copy on a Rails site (or vice versa).
+- **When not detected:** offer a **generic** path (custom command, raw Supervisor command, generic scheduler kind). Do not show framework pickers or artisan/whenever defaults “just in case.”
+- **When no site is selected yet:** hide framework-specific affordances until a site is chosen, or show only stack-agnostic options (e.g. Node.js, custom command).
+- **Follow existing patterns:** `SiteSettingsSidebar` (laravel-stack / rails-stack), `WorkspaceCron` Laravel scheduler helper, site Settings `@if ($site->isLaravelFrameworkDetected())`.
+
+## Examples
+
+### Avoid
+
+```blade
+<select wire:model="enable_framework">
+    <option value="laravel">Laravel</option>
+    <option value="rails">Rails</option>
+</select>
+```
+
+Always showing Laravel/Rails presets on every site’s Daemons form regardless of detection.
+
+### Prefer
+
+```blade
+@if ($enableTargetSite?->isLaravelFrameworkDetected())
+    <p>{{ __('Laravel schedule:run') }}</p>
+@elseif ($enableTargetSite?->isRailsFrameworkDetected())
+    <p>{{ __('Rails whenever') }}</p>
+@elseif ($enableTargetSite)
+    <textarea wire:model="enable_custom_command" …></textarea>
+@else
+    <p>{{ __('Pick a site first.') }}</p>
+@endif
+```
+
+Filter supervisor preset lists in PHP via `allowedSupervisorPresetKeys()` using the resolved form site’s detection.

@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Support\SiteSettingsSidebar;
+use App\Services\Deploy\DeploymentContractBuilder;
+use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Support\Sites\SiteSettingsViewData;
+use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
@@ -24,7 +29,9 @@ use Livewire\WithPagination;
  */
 class DeploymentsList extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesSiteDeployExecution;
     use WithPagination;
 
     public Server $server;
@@ -112,20 +119,44 @@ class DeploymentsList extends Component
             ->all();
 
         $runtimeMode = $this->site->runtimeTargetMode();
+        $isVmDeployHub = $runtimeMode === 'vm'
+            && ! $this->site->usesFunctionsRuntime()
+            && ! $this->site->usesEdgeRuntime();
 
-        return view('livewire.sites.deployments-list', [
-            'deployments' => $deployments,
-            'triggers' => $triggers,
-            'statuses' => self::ALLOWED_STATUSES,
-            // Sidebar context — keeps the workspace nav visible so operators
-            // can pivot from history back to Repository / Commits / Logs etc.
-            // without losing the site context.
-            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
-            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
-            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
-            'routingTab' => 'domains',
-            'laravel_tab' => 'commands',
-            'section' => 'deploy',
-        ])->layout('layouts.app');
+        $deploymentConsoles = collect();
+        $atomicReleases = false;
+
+        if ($isVmDeployHub) {
+            $this->site->load([
+                'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
+                'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
+            ]);
+            $atomicReleases = $this->site->deploy_strategy === 'atomic';
+            if ($this->site->relationLoaded('deployments')) {
+                $deploymentConsoles = SiteShowViewData::deploymentConsolesFor($this->site->deployments);
+            }
+        }
+
+        return view('livewire.sites.deployments-list', array_merge(
+            SiteSettingsViewData::for(
+                $this->server,
+                $this->site,
+                'deploy',
+                app(DeploymentContractBuilder::class)->build($this->site),
+                app(DeploymentPreflightValidator::class)->validate($this->site),
+                auth()->user(),
+            ),
+            [
+                'deployments' => $deployments,
+                'triggers' => $triggers,
+                'statuses' => self::ALLOWED_STATUSES,
+                'isVmDeployHub' => $isVmDeployHub,
+                'deploymentConsoles' => $deploymentConsoles,
+                'atomicReleases' => $atomicReleases,
+                'section' => 'deploy',
+                'routingTab' => 'domains',
+                'laravel_tab' => 'commands',
+            ],
+        ))->layout('layouts.app');
     }
 }

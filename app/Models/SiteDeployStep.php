@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class SiteDeployStep extends Model
 {
@@ -74,6 +75,7 @@ class SiteDeployStep extends Model
 
     protected $fillable = [
         'site_id',
+        'pipeline_id',
         'sort_order',
         'step_type',
         'phase',
@@ -84,6 +86,11 @@ class SiteDeployStep extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function pipeline(): BelongsTo
+    {
+        return $this->belongsTo(SiteDeployPipeline::class, 'pipeline_id');
     }
 
     /**
@@ -166,6 +173,35 @@ class SiteDeployStep extends Model
                 : null,
             default => null,
         };
+    }
+
+    /** Short label for pipeline pill UI (execution order strip). */
+    public function pillLabel(): string
+    {
+        return match ($this->step_type) {
+            self::TYPE_COMPOSER_INSTALL => __('Composer install'),
+            self::TYPE_NPM_CI => __('npm ci'),
+            self::TYPE_NPM_INSTALL => __('npm install'),
+            self::TYPE_NPM_RUN => trim((string) $this->custom_command) !== ''
+                ? __('npm run :script', ['script' => trim((string) $this->custom_command)])
+                : __('npm run'),
+            self::TYPE_ARTISAN_MIGRATE => __('Migrate'),
+            self::TYPE_ARTISAN_CONFIG_CACHE => __('Config cache'),
+            self::TYPE_ARTISAN_ROUTE_CACHE => __('Route cache'),
+            self::TYPE_ARTISAN_VIEW_CACHE => __('View cache'),
+            self::TYPE_ARTISAN_OPTIMIZE => __('Optimize'),
+            self::TYPE_ARTISAN_OCTANE_INSTALL => __('Octane install'),
+            self::TYPE_ARTISAN_REVERB_INSTALL => __('Reverb install'),
+            self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''
+                ? Str::limit(trim((string) $this->custom_command), 36)
+                : __('Custom command'),
+            default => $this->step_type,
+        };
+    }
+
+    public static function needsCustomCommand(string $stepType): bool
+    {
+        return in_array($stepType, [self::TYPE_NPM_RUN, self::TYPE_CUSTOM], true);
     }
 
     public static function typeLabels(): array

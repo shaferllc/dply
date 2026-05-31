@@ -489,7 +489,7 @@ final class ServerHealthCockpit
                 (int) $releases['sites_over_keep'],
                 ['count' => (int) $releases['sites_over_keep']],
             ),
-            'href' => route('servers.health', $server),
+            'href' => route('servers.health', [$server, 'tab' => 'releases']),
             'link_label' => __('Review releases'),
         ]];
     }

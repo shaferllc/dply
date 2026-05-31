@@ -47,7 +47,7 @@
                 <p class="mt-3 text-sm">
                     @feature('workspace.patch_advisor')
                         <a
-                            href="{{ route('servers.patches', $server).'#patch-unattended-upgrades' }}"
+                            href="{{ route('servers.patches', [$server, 'tab' => 'settings']) }}"
                             wire:navigate
                             class="font-medium text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:text-brand-ink"
                         >{{ __('Configure automatic security updates (Patches)') }}</a>

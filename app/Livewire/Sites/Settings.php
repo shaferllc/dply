@@ -5,11 +5,9 @@ namespace App\Livewire\Sites;
 use App\Enums\SiteType;
 use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
-use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
-use App\Jobs\TearDownSiteSystemdUnitJob;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\ManagesSiteBindings;
@@ -20,13 +18,14 @@ use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteAccessGate;
+use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDeployment;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
-use App\Models\SiteProcess;
 use App\Models\SiteTenantDomain;
 use App\Models\Snapshot;
 use App\Models\Workspace;
@@ -45,15 +44,16 @@ use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
+use App\Services\Sites\SiteAccessGateLoginLogReader;
+use App\Services\Sites\SiteAccessGateService;
 use App\Services\Sites\SiteDeploySyncGroupManager;
 use App\Services\Sites\SiteScopedCommandWrapper;
-use App\Services\Sites\SiteSystemdProvisioner;
-use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -61,6 +61,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 
 class Settings extends Show
 {
@@ -74,7 +75,7 @@ class Settings extends Show
         return $this->site;
     }
 
-    private const ROUTING_TABS = ['domains', 'aliases', 'redirects', 'preview', 'tenants'];
+    private const ROUTING_TABS = ['domains', 'dns', 'aliases', 'redirects', 'preview', 'tenants'];
 
     private const LEGACY_ROUTING_SECTIONS = [
         'domains' => 'domains',
@@ -82,6 +83,12 @@ class Settings extends Show
         'redirects' => 'redirects',
         'preview' => 'preview',
         'tenants' => 'tenants',
+    ];
+
+    private const LEGACY_RUNTIME_SECTIONS = [
+        'runtime-php' => 'php',
+        'runtime-ruby' => 'ruby',
+        'runtime-static' => 'static',
     ];
 
     /** @var list<string> */
@@ -94,6 +101,8 @@ class Settings extends Show
     public string $section = 'general';
 
     public string $routingTab = 'domains';
+
+    public string $runtimeTab = 'overview';
 
     public string $settings_primary_domain = '';
 
@@ -134,6 +143,17 @@ class Settings extends Show
     public string $bulk_basic_auth_input = '';
 
     public string $bulk_basic_auth_path = '/';
+
+    public string $access_gate_method = '';
+
+    public string $form_gate_password = '';
+
+    public string $new_form_gate_label = '';
+
+    /** @var list<array{at: string, label: string, credential_id: string, hostname: string, ip: string|null, user_agent: string|null}> */
+    public array $form_gate_login_log = [];
+
+    public bool $form_gate_login_log_loaded = false;
 
     public string $new_tenant_hostname = '';
 
@@ -318,18 +338,6 @@ class Settings extends Show
 
     public string $sync_group_leader_site_id = '';
 
-    /**
-     * New SiteProcess form. The user fills these in and clicks "Add" to
-     * materialize a row. Type is one of SiteProcess::TYPE_WORKER /
-     * TYPE_SCHEDULER / TYPE_CUSTOM — the auto-created `web` row is
-     * managed by the Site::created hook, not this form.
-     */
-    public string $new_site_process_type = 'worker';
-
-    public string $new_site_process_name = '';
-
-    public string $new_site_process_command = '';
-
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
         if ($site->server_id !== $server->id) {
@@ -375,6 +383,30 @@ class Settings extends Show
             return;
         }
 
+        if ($section === 'dns') {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'routing',
+                'tab' => 'dns',
+                ...collect(request()->query())->except('section')->all(),
+            ]), navigate: true);
+
+            return;
+        }
+
+        if (array_key_exists($section, self::LEGACY_RUNTIME_SECTIONS)) {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'runtime',
+                'tab' => self::LEGACY_RUNTIME_SECTIONS[$section],
+                ...collect(request()->query())->except('section')->all(),
+            ]), navigate: true);
+
+            return;
+        }
+
         if ($section === 'webhooks') {
             $this->redirect(route('sites.show', [
                 'server' => $server,
@@ -406,6 +438,7 @@ class Settings extends Show
 
         $this->section = $section;
         $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
+        $this->runtimeTab = $this->resolveRuntimeTabForSite($site, request()->query('tab'));
 
         $laravelTabQuery = request()->query('laravel_tab');
         if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup', 'schedule', 'migrations', 'pail'], true)) {
@@ -417,7 +450,11 @@ class Settings extends Show
         // redundant refresh here.
         $this->syncGeneralSettingsForm(skipRefresh: true);
         $this->syncPreviewSettingsForm();
-        if ($this->section === 'dns') {
+        if ($this->section === 'basic-auth') {
+            $this->site->loadMissing(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+            $this->access_gate_method = $this->site->resolvedAccessGateMethod();
+        }
+        if ($this->section === 'routing' && $this->routingTab === 'dns') {
             $this->syncDnsSettingsForm();
         }
 
@@ -750,7 +787,7 @@ class Settings extends Show
 
     public function updatedSection(string $value): void
     {
-        if ($value === 'dns') {
+        if ($value === 'routing' && $this->routingTab === 'dns') {
             $this->syncDnsSettingsForm();
         }
         if ($value === 'runtime' || $value === 'laravel-stack' || $value === 'system-user') {
@@ -1435,6 +1472,15 @@ class Settings extends Show
             : self::ROUTING_TABS[0];
     }
 
+    private function resolveRuntimeTabForSite(Site $site, mixed $tab): string
+    {
+        $allowed = array_keys(SiteSettingsSidebar::runtimeTabsFor($site));
+
+        return is_string($tab) && in_array($tab, $allowed, true)
+            ? $tab
+            : 'overview';
+    }
+
     private function syncGeneralSettingsForm(bool $skipRefresh = false): void
     {
         // Skip the refresh when the caller has just refreshed (mount path —
@@ -1857,6 +1903,9 @@ class Settings extends Show
             return;
         }
 
+        app(SiteAccessGateService::class)->ensureBasicAuthMethod($this->site);
+        $this->access_gate_method = SiteAccessGate::METHOD_BASIC_AUTH;
+
         $pathRules = ['required', 'string', 'max:512'];
         if (! $this->site->basicAuthSupportsPathPrefixes()) {
             $pathRules[] = Rule::in(['/', '']);
@@ -1867,7 +1916,10 @@ class Settings extends Show
                 'required',
                 'string',
                 'max:128',
-                Rule::unique('site_basic_auth_users', 'username')->where('site_id', $this->site->id),
+                Rule::unique('site_basic_auth_users', 'username')
+                    ->where(fn ($query) => $query
+                        ->where('site_id', $this->site->id)
+                        ->whereNull('pending_removal_at')),
             ],
             'new_basic_auth_password' => ['required', 'string', 'min:8', 'max:255'],
             'new_basic_auth_path' => $pathRules,
@@ -1886,20 +1938,38 @@ class Settings extends Show
             return;
         }
 
-        SiteBasicAuthUser::query()->create([
-            'site_id' => $this->site->id,
-            'username' => trim($validated['new_basic_auth_username']),
-            'password_hash' => Hash::make($validated['new_basic_auth_password']),
-            'path' => $path,
-            'sort_order' => (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0) + 1,
-        ]);
+        $username = trim($validated['new_basic_auth_username']);
+        $passwordHash = $this->site->hashBasicAuthPassword($validated['new_basic_auth_password']);
+
+        $pendingRow = $this->site->basicAuthUsers()
+            ->where('username', $username)
+            ->whereNotNull('pending_removal_at')
+            ->first();
+
+        if ($pendingRow !== null) {
+            $pendingRow->forceFill([
+                'password_hash' => $passwordHash,
+                'path' => $path,
+                'pending_removal_at' => null,
+            ])->save();
+            $savedMessage = __('Basic authentication user restored.');
+        } else {
+            SiteBasicAuthUser::query()->create([
+                'site_id' => $this->site->id,
+                'username' => $username,
+                'password_hash' => $passwordHash,
+                'path' => $path,
+                'sort_order' => (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0) + 1,
+            ]);
+            $savedMessage = __('Basic authentication user saved.');
+        }
 
         $this->new_basic_auth_username = '';
         $this->new_basic_auth_password = '';
         $this->new_basic_auth_path = '/';
         $this->site->load('basicAuthUsers');
         $this->dispatch('close-modal', 'add-basic-auth-modal');
-        $this->finalizeRoutingMutation(__('Basic authentication user saved.'), __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
+        $this->finalizeRoutingMutation($savedMessage, __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
     }
 
     /**
@@ -1958,6 +2028,258 @@ class Settings extends Show
         $this->new_basic_auth_password = Str::password(20);
     }
 
+    public function generateFormGatePassword(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->form_gate_password = Str::password(20);
+    }
+
+    public function selectAccessGateMethod(string $method): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsAccessGateProvisioning()) {
+            return;
+        }
+
+        if (! in_array($method, [
+            SiteAccessGate::METHOD_OFF,
+            SiteAccessGate::METHOD_BASIC_AUTH,
+            SiteAccessGate::METHOD_FORM_PASSWORD,
+        ], true)) {
+            return;
+        }
+
+        if ($method === SiteAccessGate::METHOD_FORM_PASSWORD && ! $this->site->webserverSupportsFormPasswordGate()) {
+            $this->toastError(__('Password gate is not available for OpenLiteSpeed in this release.'));
+
+            return;
+        }
+
+        $live = $this->site->resolvedAccessGateMethod();
+        if ($method === $live && $method !== SiteAccessGate::METHOD_FORM_PASSWORD) {
+            $this->access_gate_method = $method;
+
+            return;
+        }
+
+        if ($method === SiteAccessGate::METHOD_FORM_PASSWORD && $live !== SiteAccessGate::METHOD_FORM_PASSWORD) {
+            if ($live === SiteAccessGate::METHOD_BASIC_AUTH && $this->site->enforceableBasicAuthUsers()->isNotEmpty()) {
+                $this->openConfirmActionModal(
+                    'prepareFormPasswordGate',
+                    [],
+                    __('Switch to password gate?'),
+                    __('HTTP basic auth credentials will be removed on the next webserver apply. Enter a new shared password below, then save.'),
+                    __('Switch method'),
+                    true,
+                );
+
+                return;
+            }
+
+            $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+
+            return;
+        }
+
+        if ($live === SiteAccessGate::METHOD_FORM_PASSWORD && $method !== SiteAccessGate::METHOD_FORM_PASSWORD) {
+            $this->openConfirmActionModal(
+                'applyAccessGateMethod',
+                [$method],
+                __('Switch access method?'),
+                __('The password gate will be removed on the next webserver apply.'),
+                __('Switch method'),
+                $method === SiteAccessGate::METHOD_OFF,
+            );
+
+            return;
+        }
+
+        if ($live === SiteAccessGate::METHOD_BASIC_AUTH && $this->site->enforceableBasicAuthUsers()->isNotEmpty() && $method === SiteAccessGate::METHOD_OFF) {
+            $this->openConfirmActionModal(
+                'applyAccessGateMethod',
+                [$method],
+                __('Turn off access protection?'),
+                __('All basic auth credentials will be removed on the next webserver apply.'),
+                __('Turn off protection'),
+                true,
+            );
+
+            return;
+        }
+
+        $this->applyAccessGateMethod($method);
+    }
+
+    public function prepareFormPasswordGate(): void
+    {
+        $this->authorize('update', $this->site);
+        app(SiteAccessGateService::class)->markAllBasicAuthUsersForRemoval($this->site);
+        $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+        $this->site->load('basicAuthUsers');
+    }
+
+    public function applyAccessGateMethod(string $method): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsAccessGateProvisioning()) {
+            return;
+        }
+
+        $service = app(SiteAccessGateService::class);
+
+        if ($method === SiteAccessGate::METHOD_OFF) {
+            $service->markAllBasicAuthUsersForRemoval($this->site);
+            $service->disable($this->site);
+            $this->access_gate_method = SiteAccessGate::METHOD_OFF;
+            $this->site->load(['accessGate', 'basicAuthUsers']);
+            $this->finalizeRoutingMutation(__('Access protection turned off.'));
+
+            return;
+        }
+
+        if ($method === SiteAccessGate::METHOD_BASIC_AUTH) {
+            $wasForm = $this->site->usesFormPasswordGate();
+            app(SiteAccessGateService::class)->markAllFormGatePasswordsForRemoval($this->site);
+            $gate = SiteAccessGate::query()->firstOrNew(['site_id' => $this->site->id]);
+            if (! $gate->exists) {
+                $gate->cookie_secret = Str::random(48);
+            }
+            $gate->method = SiteAccessGate::METHOD_BASIC_AUTH;
+            $gate->password_salt = null;
+            $gate->password_verifier = null;
+            $gate->save();
+            $this->access_gate_method = SiteAccessGate::METHOD_BASIC_AUTH;
+            $this->site->load(['accessGate', 'basicAuthUsers']);
+
+            if ($wasForm) {
+                $this->finalizeRoutingMutation(__('Switched to HTTP basic auth.'));
+            }
+
+            return;
+        }
+
+        $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+    }
+
+    public function saveFormGatePassword(): void
+    {
+        $this->addFormGatePassword();
+    }
+
+    public function addFormGatePassword(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsAccessGateProvisioning()) {
+            $this->toastError(__('Access protection is not available for this site runtime.'));
+
+            return;
+        }
+
+        if (! $this->site->webserverSupportsFormPasswordGate()) {
+            $this->toastError(__('Password gate is not available for OpenLiteSpeed in this release.'));
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'new_form_gate_label' => ['required', 'string', 'max:64'],
+            'form_gate_password' => ['required', 'string', 'min:8', 'max:255'],
+        ], [], [
+            'new_form_gate_label' => __('label'),
+            'form_gate_password' => __('password'),
+        ]);
+
+        app(SiteAccessGateService::class)->addFormGatePassword(
+            $this->site,
+            $validated['new_form_gate_label'],
+            $validated['form_gate_password'],
+        );
+
+        $this->new_form_gate_label = '';
+        $this->form_gate_password = '';
+        $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+        $this->form_gate_login_log_loaded = false;
+        $this->dispatch('close-modal', 'add-form-gate-modal');
+        $this->site->load(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+        $this->finalizeRoutingMutation(
+            __('Password gate credential saved.'),
+            __('Applying password gate on :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
+    }
+
+    public function loadFormGateLoginLog(): void
+    {
+        $this->authorize('view', $this->site);
+
+        if (! $this->site->usesFormPasswordGate()) {
+            $this->form_gate_login_log = [];
+            $this->form_gate_login_log_loaded = true;
+
+            return;
+        }
+
+        $this->form_gate_login_log = app(SiteAccessGateLoginLogReader::class)->recent($this->site);
+        $this->form_gate_login_log_loaded = true;
+    }
+
+    public function confirmRemoveFormGatePassword(string $passwordId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $row = SiteAccessGatePassword::query()
+            ->where('site_id', $this->site->id)
+            ->where('id', $passwordId)
+            ->first();
+
+        if ($row === null || $row->isPendingRemoval()) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'removeFormGatePassword',
+            [$passwordId],
+            __('Remove password gate credential?'),
+            __(':label will stop working after the next webserver apply.', ['label' => $row->label]),
+            __('Remove credential'),
+            true,
+        );
+    }
+
+    public function removeFormGatePassword(string $passwordId): void
+    {
+        $this->authorize('update', $this->site);
+
+        app(SiteAccessGateService::class)->markFormGatePasswordForRemoval($this->site, $passwordId);
+        $this->site->load(['accessGate', 'accessGatePasswords']);
+
+        if ($this->site->enforceableAccessGatePasswords()->isEmpty()) {
+            $gate = $this->site->accessGate;
+            if ($gate !== null) {
+                $gate->method = SiteAccessGate::METHOD_FORM_PASSWORD;
+                $gate->save();
+            }
+        }
+
+        $this->finalizeRoutingMutation(__('Password gate credential marked for removal.'));
+    }
+
+    public function disableFormGatePassword(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'applyAccessGateMethod',
+            [SiteAccessGate::METHOD_OFF],
+            __('Remove password gate?'),
+            __('Visitors will reach the site without the login form after the next webserver apply.'),
+            __('Remove gate'),
+            true,
+        );
+    }
+
     /**
      * Dispatches a backgrounded job that walks the server, finds every .htpasswd
      * inside the site repo, and imports the user entries Dply doesn't already
@@ -1980,14 +2302,21 @@ class Settings extends Show
         // once the worker calls beginConsoleAction(), which is async — the
         // banner reads from the DB on parent render and would stay empty until
         // the user navigated or another action triggered a re-render.
-        $this->seedQueuedConsoleAction('basic_auth_sync');
+        $run = $this->seedQueuedConsoleAction('basic_auth_sync');
 
         SyncBasicAuthFromServerJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess(__('Sync queued — track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Basic-auth sync finished.'),
+            __('Basic-auth sync did not finish.'),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     // seedQueuedConsoleAction lives on Show.php and is inherited — see
@@ -2028,7 +2357,7 @@ class Settings extends Show
             return;
         }
 
-        $user->password_hash = Hash::make($customPassword);
+        $user->password_hash = $this->site->hashBasicAuthPassword($customPassword);
         $user->save();
 
         $this->site->load('basicAuthUsers');
@@ -2067,7 +2396,7 @@ class Settings extends Show
             return;
         }
 
-        $existing = $this->site->basicAuthUsers()->pluck('username')->all();
+        $existing = $this->site->basicAuthUsers()->notPendingRemoval()->pluck('username')->all();
         $seen = [];
         $created = 0;
         $skipped = 0;
@@ -2096,7 +2425,7 @@ class Settings extends Show
 
                 continue;
             }
-            if (in_array($username, $existing, true) || in_array($username, $seen, true)) {
+            if (in_array($username, $seen, true)) {
                 $skipped++;
 
                 continue;
@@ -2110,7 +2439,30 @@ class Settings extends Show
 
                 continue;
             }
-            $hash = $alreadyHashed ? $secret : Hash::make($secret);
+            $hash = $alreadyHashed ? $secret : $this->site->hashBasicAuthPassword($secret);
+
+            $pendingRow = $this->site->basicAuthUsers()
+                ->where('username', $username)
+                ->whereNotNull('pending_removal_at')
+                ->first();
+
+            if ($pendingRow !== null) {
+                $pendingRow->forceFill([
+                    'password_hash' => $hash,
+                    'path' => $path,
+                    'pending_removal_at' => null,
+                ])->save();
+                $seen[] = $username;
+                $created++;
+
+                continue;
+            }
+
+            if (in_array($username, $existing, true)) {
+                $skipped++;
+
+                continue;
+            }
 
             SiteBasicAuthUser::query()->create([
                 'site_id' => $this->site->id,
@@ -2120,6 +2472,7 @@ class Settings extends Show
                 'sort_order' => ++$sortBase,
             ]);
             $seen[] = $username;
+            $existing[] = $username;
             $created++;
         }
 
@@ -2721,9 +3074,9 @@ class Settings extends Show
             // Seed before dispatch so the certificates-section SSL banner appears
             // on this re-render; ExecuteSiteCertificateJob::beginConsoleAction()
             // reuses the row instead of waiting for the worker to create one.
-            $this->seedQueuedConsoleAction('ssl');
+            $run = $this->seedQueuedConsoleAction('ssl');
 
-            $repairService->repair($this->site, $certificate, auth()->id());
+            $repairService->repair($this->site, $certificate, auth()->id(), (string) $run->id);
         } catch (\InvalidArgumentException $e) {
             $this->toastError($e->getMessage());
 
@@ -2735,7 +3088,13 @@ class Settings extends Show
             return;
         }
 
-        $this->toastSuccess(__('Certificate repair queued. Track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Certificate repair finished.'),
+            __('Certificate repair did not finish.'),
+        );
+        $this->toastConsoleActionQueued();
         $this->site->load('certificates');
     }
 
@@ -2895,197 +3254,6 @@ class Settings extends Show
     }
 
     /**
-     * Add a SiteProcess (worker / scheduler / custom) to the site.
-     *
-     * The auto-created `web` row is owned by the Site::created hook —
-     * users edit its command via the start_command field, not this
-     * form. The form only accepts non-web types so a duplicate web
-     * SiteProcess can't appear (the relation already enforces unique
-     * `(site_id, name)`, but we belt-and-suspenders here for clarity).
-     */
-    public function addSiteProcess(): void
-    {
-        $this->authorize('update', $this->site);
-
-        $allowedTypes = [SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER, SiteProcess::TYPE_CUSTOM];
-        $validated = $this->validate([
-            'new_site_process_type' => ['required', 'string', 'in:'.implode(',', $allowedTypes)],
-            'new_site_process_name' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9_-]+$/'],
-            'new_site_process_command' => ['required', 'string', 'max:2000'],
-        ], attributes: [
-            'new_site_process_type' => __('process type'),
-            'new_site_process_name' => __('process name'),
-            'new_site_process_command' => __('process command'),
-        ]);
-
-        $name = trim($validated['new_site_process_name']);
-        if ($name === 'web') {
-            $this->addError(
-                'new_site_process_name',
-                __('The name "web" is reserved for the upstream process.'),
-            );
-
-            return;
-        }
-
-        if ($this->site->processes()->where('name', $name)->exists()) {
-            $this->addError(
-                'new_site_process_name',
-                __('A process named ":name" already exists for this site.', ['name' => $name]),
-            );
-
-            return;
-        }
-
-        $this->site->processes()->create([
-            'type' => $validated['new_site_process_type'],
-            'name' => $name,
-            'command' => trim($validated['new_site_process_command']),
-            'scale' => 1,
-            'is_active' => true,
-        ]);
-
-        // Re-provision systemd units so the new process gets its own unit
-        // file installed without waiting for the next deploy. The job
-        // skips PHP/static sites internally so this is safe to call
-        // unconditionally for non-PHP runtimes.
-        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
-        }
-
-        $this->new_site_process_name = '';
-        $this->new_site_process_command = '';
-        $this->new_site_process_type = SiteProcess::TYPE_WORKER;
-
-        $this->toastSuccess(__('Process :name added.', ['name' => $name]));
-    }
-
-    /**
-     * Remove a non-web SiteProcess. The web row is the upstream the
-     * NGINX vhost depends on — deleting it would break routing — so
-     * the method refuses to touch it.
-     *
-     * Side effect: dispatches TearDownSiteSystemdUnitJob to disable +
-     * remove the matching systemd unit file on the server. Computed
-     * from the live process before deletion (the unit name is derived
-     * from the process name), then queued so the SSH round-trip
-     * doesn't block the form response.
-     */
-    public function removeSiteProcess(string $id): void
-    {
-        $this->authorize('update', $this->site);
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-
-        if ($process->type === SiteProcess::TYPE_WEB) {
-            $this->toastError(__('The web process is managed by dply and cannot be removed from this UI.'));
-
-            return;
-        }
-
-        $name = $process->name;
-        $unitName = app(SiteSystemdUnitBuilder::class)
-            ->processUnitName($this->site, $process);
-        $process->delete();
-
-        // For non-PHP/static sites, dispatch the per-unit teardown so
-        // the systemd unit file goes away alongside the row. PHP and
-        // static runtimes never had a unit installed in the first
-        // place, so dispatching for them is a guaranteed no-op (the
-        // job's runtime guard would skip).
-        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            TearDownSiteSystemdUnitJob::dispatch($this->site->id, $unitName);
-        }
-
-        $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
-    }
-
-    /**
-     * Flip a SiteProcess between active and inactive.
-     *
-     * Active is the default; flipping to inactive prevents the deploy
-     * pipeline from registering / starting the unit (the systemd unit
-     * file is still removed/refreshed when the process is added or
-     * removed, but skipped from `systemctl enable --now` when the row
-     * is inactive). Useful for temporarily silencing a worker without
-     * deleting + recreating the row.
-     *
-     * Refuses to deactivate the auto-created `web` row — that would
-     * disable the upstream NGINX proxies to and 502 the site. The user
-     * can deactivate workers / schedulers / custom processes only.
-     */
-    public function toggleSiteProcessActive(string $id): void
-    {
-        $this->authorize('update', $this->site);
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-
-        $next = ! (bool) $process->is_active;
-        if ($process->type === SiteProcess::TYPE_WEB && ! $next) {
-            $this->toastError(__('The web process must stay active.'));
-
-            return;
-        }
-
-        $process->update(['is_active' => $next]);
-
-        $this->toastSuccess($next
-            ? __('Process :name reactivated.', ['name' => $process->name])
-            : __('Process :name deactivated.', ['name' => $process->name]),
-        );
-    }
-
-    /**
-     * Update a SiteProcess's scale (number of replicas).
-     *
-     * Per the strategy memo: "scale (default 1, implemented via systemd
-     *
-     * @.service templates)". The data-layer update lands here; the
-     * actual systemd template + multi-instance enable happens on the
-     * next deploy / re-converge — re-running ProvisionSiteSystemdUnitsJob
-     * picks up the new scale value when it builds the unit content.
-     *
-     * Bounds: 1 (minimum, "process exists") to 16 (a reasonable cap
-     * for single-server scale; horizontal scale beyond that wants more
-     * servers, not more replicas on one).
-     */
-    public function setSiteProcessScale(string $id, int $scale): void
-    {
-        $this->authorize('update', $this->site);
-
-        if ($scale < 1 || $scale > 16) {
-            $this->toastError(__('Scale must be between 1 and 16.'));
-
-            return;
-        }
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-
-        $process->update(['scale' => $scale]);
-
-        // Re-provision the unit so the next deploy emits the right
-        // number of @{N}.service instances. Skipped for PHP/static —
-        // those don't have systemd units to reflect scale into.
-        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
-        }
-
-        $this->toastSuccess(__('Scale set to :n for :name.', [
-            'n' => $scale,
-            'name' => $process->name,
-        ]));
-    }
-
-    /**
      * Recent SiteDeployment rows that carry structured phase_results
      * (i.e. went through the new DeployPhaseRunner). Used by the
      * settings.blade.php "Recent deployments" panel so the view stays
@@ -3102,61 +3270,20 @@ class Settings extends Show
     }
 
     /**
-     * Most recent SiteDeployment for the dashboard's "Last deploy"
-     * badge. Computed in PHP because Blade's @php(...) inline form
-     * trips on the method-chain length of `$site->latestDeployment()`.
+     * Most recent SiteDeployment for the general tab "Last deploy" badge.
+     *
+     * @property-read SiteDeployment|null $latestDeployment
      */
-    public function getLatestDeploymentProperty()
+    #[Computed]
+    public function latestDeployment(): ?SiteDeployment
     {
         return $this->site->latestDeployment();
     }
 
-    /**
-     * Restart a single non-web SiteProcess via systemctl.
-     *
-     * Mirror of the dply:site:restart-process CLI — both routes call
-     * SiteSystemdProvisioner::restartUnit so UI and CLI behavior
-     * stay aligned. Refuses to touch the web row (NGINX upstream —
-     * the deploy pipeline's restart phase owns that). Refuses for
-     * PHP/static sites that have no systemd units.
-     */
-    public function restartSiteProcess(string $id): void
-    {
-        $this->authorize('update', $this->site);
-
-        $runtime = $this->site->runtimeKey();
-        if (in_array($runtime, ['php', 'static', null], true)) {
-            $this->toastError(__('PHP and static sites have no systemd units to restart.'));
-
-            return;
-        }
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-        if ($process->type === SiteProcess::TYPE_WEB) {
-            $this->toastError(__('The web process is owned by the deploy pipeline; trigger the restart phase instead.'));
-
-            return;
-        }
-
-        $unitName = app(SiteSystemdUnitBuilder::class)
-            ->processUnitName($this->site, $process);
-
-        try {
-            app(SiteSystemdProvisioner::class)->restartUnit($this->site, $unitName);
-        } catch (\Throwable $e) {
-            $this->toastError(__('Restart failed: :msg', ['msg' => $e->getMessage()]));
-
-            return;
-        }
-
-        $this->toastSuccess(__('Restarted :name.', ['name' => $process->name]));
-    }
-
     public function render(): View
     {
+        $this->resolveWatchedConsoleAction();
+
         if (! $this->site->isReadyForWorkspace()) {
             return parent::render();
         }
@@ -3201,7 +3328,7 @@ class Settings extends Show
                 ->get(['id', 'name']);
         }
 
-        if (in_array($section, ['dns', 'certificates'], true)) {
+        if ($section === 'certificates' || ($section === 'routing' && $this->routingTab === 'dns')) {
             $viewData['providerCredentials'] = ProviderCredential::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
@@ -3209,11 +3336,15 @@ class Settings extends Show
                 ->get(['id', 'name', 'provider']);
         }
 
-        if ($section === 'runtime-php' && $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+        if (
+            $section === 'runtime'
+            && $this->runtimeTab === 'php'
+            && $this->server->hostCapabilities()->supportsMachinePhpManagement()
+        ) {
             $viewData['sitePhpData'] = app(ServerPhpManager::class)->sitePhpData($this->server, $this->site);
         }
 
-        if (in_array($section, ['deploy', 'repository'], true)) {
+        if (in_array($section, ['deploy', 'repository', 'pipeline'], true)) {
             $viewData['repositorySyncGroup'] = app(SiteDeploySyncGroupManager::class)->findGroupForSite($this->site)?->load(['sites.server', 'leader']);
             $viewData['organizationSites'] = Site::query()
                 ->where('organization_id', $this->site->organization_id)
@@ -3245,14 +3376,15 @@ class Settings extends Show
         $sectionRelations = match ($section) {
             'general' => ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
             'settings' => ['workspace', 'workspace.variables'],
-            'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains'],
-            'dns' => ['dnsProviderCredential', 'domains', 'previewDomains'],
+            'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains', 'dnsProviderCredential'],
             'certificates' => ['previewDomains'],
-            'deploy', 'repository' => ['deployHooks', 'deploySteps', 'deployments'],
+            'repository' => ['deployments'],
+            'pipeline' => ['deployHooks', 'deploySteps'],
+            'deploy' => ['deployHooks', 'deploySteps', 'deployments'],
             'environment' => ['workspace', 'workspace.variables'],
             'logs' => ['deployments', 'webhookDeliveryLogs'],
             'notifications' => ['notificationSubscriptions'],
-            'basic-auth' => ['basicAuthUsers'],
+            'basic-auth' => ['basicAuthUsers', 'accessGate', 'accessGatePasswords'],
             'laravel-stack', 'rails-stack' => ['workspace', 'workspace.variables'],
             default => [],
         };
@@ -3266,10 +3398,8 @@ class Settings extends Show
             'general',
             'deploy',
             'repository',
+            'pipeline',
             'runtime',
-            'runtime-php',
-            'runtime-ruby',
-            'runtime-static',
             'environment',
             'laravel-stack',
             'rails-stack',

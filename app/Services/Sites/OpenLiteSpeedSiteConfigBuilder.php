@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
+use App\Support\Sites\SiteAccessGateConfigSupport;
 use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
@@ -287,6 +288,10 @@ CONF;
      */
     private function olsBasicAuthPathGroups(Site $site): array
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return [];
+        }
+
         $users = $site->enforceableBasicAuthUsers();
         if ($users->isEmpty()) {
             return [];

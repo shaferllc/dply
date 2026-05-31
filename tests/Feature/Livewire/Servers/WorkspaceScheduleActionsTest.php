@@ -179,6 +179,20 @@ test('run now refuses when paused', function () {
 
     Bus::assertDispatched(RunSchedulerNowJob::class);
 });
+
+test('schedule workspace tabs switch via query param and setter', function () {
+    [$user, $server] = array_slice(setupWithScheduler(), 0, 2);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'schedulers'])
+        ->test(WorkspaceSchedule::class, ['server' => $server])
+        ->assertSet('schedule_workspace_tab', 'schedulers')
+        ->call('setScheduleWorkspaceTab', 'enable')
+        ->assertSet('schedule_workspace_tab', 'enable')
+        ->call('setScheduleWorkspaceTab', 'bogus')
+        ->assertSet('schedule_workspace_tab', 'overview');
+});
+
 afterEach(function () {
     Mockery::close();
 });

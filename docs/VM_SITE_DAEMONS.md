@@ -1,6 +1,6 @@
 # Site daemons
 
-The **Daemons** section manages **Supervisor programs** scoped to this site — long-running processes that are not queue workers.
+The **Daemons** section manages **Supervisor programs** scoped to this site — queue workers, websocket servers, and other long-running processes supervised by `supervisord`.
 
 ## Programs
 
@@ -21,6 +21,7 @@ If the host lacks Supervisor, install from **Server → Manage** or follow the s
 
 ## Related sections
 
-- **Queue workers** — Laravel/redis templates
+- **Services** — systemd units for Node/Rails/Python workers (not PHP/Laravel queues)
+- **Queue workers** — Laravel/Redis templates (Horizon, `queue:work`)
 - **Server → Daemons** — host-wide programs
 - **Runtime** — PHP/Ruby context for commands

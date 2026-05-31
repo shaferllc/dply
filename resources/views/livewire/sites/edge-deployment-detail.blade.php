@@ -61,6 +61,10 @@
                 </div>
             </header>
 
+            @if ($deployment->status === \App\Models\EdgeDeployment::STATUS_FAILED)
+                <x-ops-copilot-callout :site="$site" :show="true" class="mt-6" />
+            @endif
+
             <x-server-workspace-tablist :aria-label="__('Deployment sections')" class="mt-6">
                 @foreach ([
                     'overview' => __('Overview'),

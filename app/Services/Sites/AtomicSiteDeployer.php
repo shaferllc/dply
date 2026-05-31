@@ -13,6 +13,7 @@ class AtomicSiteDeployer
     public function __construct(
         protected DeployHookRunner $hookRunner,
         protected SiteDeployPipelineRunner $pipelineRunner,
+        protected PipelineAnchorScriptRunner $anchorRunner,
         protected SshConnectionFactory $sshFactory
     ) {}
 
@@ -50,8 +51,6 @@ class AtomicSiteDeployer
 
         $baseEsc = escapeshellarg($base);
         $newEsc = escapeshellarg($newRelease);
-        $repoEsc = escapeshellarg($repo);
-        $branchEsc = escapeshellarg($branch);
 
         $log .= $ssh->exec("mkdir -p {$baseEsc}/releases", 60);
 
@@ -63,34 +62,33 @@ class AtomicSiteDeployer
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $base);
         $this->hookRunner->assertHooksSucceeded($log, 'before_clone');
 
-        $log .= "\n--- git clone (atomic) ---\n";
-        $log .= $ssh->exec(
-            $gitSsh.sprintf('git clone --depth 1 --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $newEsc),
-            600
-        );
-
-        $hasGit = trim($ssh->exec(sprintf('test -d %s/.git && echo ok', $newEsc), 30));
-        if ($hasGit !== 'ok') {
-            throw new \RuntimeException('Git clone failed. See deployment log.');
-        }
+        $log .= $this->anchorRunner->runClone($ssh, $site, $newRelease, $gitSsh, $repo, $branch, true, false);
+        $this->hookRunner->assertHooksSucceeded($log, 'clone');
+        $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
         $this->hookRunner->assertHooksSucceeded($log, 'after_clone');
 
         app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
 
-        $log .= $this->pipelineRunner->run($ssh, $site, $newRelease);
+        $log .= $this->pipelineRunner->runBuild($ssh, $site, $newRelease);
+
+        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $newRelease);
+        $this->hookRunner->assertHooksSucceeded($log, 'before_activate');
+
+        $log .= $this->anchorRunner->runActivate($ssh, $site, $newRelease, $gitSsh, $repo, $branch);
+        $this->hookRunner->assertHooksSucceeded($log, 'activate');
+
+        $currentPath = $base.'/current';
+        $log .= $this->pipelineRunner->runRelease($ssh, $site, $currentPath);
 
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {
             $log .= "\n--- post deploy ---\n";
-            $log .= $ssh->exec(sprintf('cd %s && %s', $newEsc, $post), 900);
+            $log .= $ssh->exec(sprintf('cd %s && %s', escapeshellarg($currentPath), $post), 900);
         }
 
-        $log .= "\n--- activate release ---\n";
-        $log .= $ssh->exec(sprintf('ln -sfn %s %s/current', $newEsc, $baseEsc), 60);
-
-        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $base.'/current');
+        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $currentPath);
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);

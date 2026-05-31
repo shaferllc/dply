@@ -21,18 +21,8 @@ final class DaemonWorkspaceViewData
         $card = 'dply-card overflow-hidden';
         $opsReady = $server->isReady() && $server->ssh_private_key;
 
-        /** @var list<array{value: string, label: string}> */
-        $supervisorPresets = [
-            ['value' => 'laravel-queue', 'label' => __('Laravel queue worker (queue:work)')],
-            ['value' => 'laravel-horizon', 'label' => __('Laravel Horizon')],
-            ['value' => 'reverb', 'label' => __('Laravel Reverb (websockets)')],
-            ['value' => 'laravel-schedule', 'label' => __('Laravel scheduler (schedule:work)')],
-            ['value' => 'laravel-octane', 'label' => __('Laravel Octane')],
-            ['value' => 'nodejs', 'label' => __('Node.js process')],
-            ['value' => 'sidekiq', 'label' => __('Sidekiq (Ruby)')],
-            ['value' => 'solid-queue', 'label' => __('Solid Queue (Rails 8)')],
-            ['value' => 'action-cable', 'label' => __('Action Cable (Rails websockets)')],
-        ];
+        $supervisorPresets = $component->supervisorPresetOptionsForForm();
+        $supervisorFormSiteIsLaravel = $component->supervisorFormSiteIsLaravel();
 
         $programStatusBadgeClass = fn (string $state): string => match ($state) {
             'running' => 'bg-emerald-100 text-emerald-900 ring-emerald-200',
@@ -54,6 +44,7 @@ final class DaemonWorkspaceViewData
             'card',
             'opsReady',
             'supervisorPresets',
+            'supervisorFormSiteIsLaravel',
             'programStatusBadgeClass',
             'advancedFormOpen',
         );

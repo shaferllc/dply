@@ -185,7 +185,7 @@ final class ServerPatchAdvisor
                 'severity' => 'critical',
                 'title' => trans_choice(':count security update pending|:count security updates pending', $securityCount, ['count' => $securityCount]),
                 'message' => __('Review the package list below and run apt actions when ready.'),
-                'href' => route('servers.patches', $server).'#patch-apt-actions',
+                'href' => route('servers.patches', [$server, 'tab' => 'actions']),
                 'link_label' => __('Apt actions'),
             ];
         } elseif ($total > 0) {
@@ -193,7 +193,7 @@ final class ServerPatchAdvisor
                 'severity' => 'warning',
                 'title' => trans_choice(':count package update pending|:count package updates pending', $total, ['count' => $total]),
                 'message' => __('Non-security upgrades are available.'),
-                'href' => route('servers.patches', $server).'#patch-apt-actions',
+                'href' => route('servers.patches', [$server, 'tab' => 'actions']),
                 'link_label' => __('Apt actions'),
             ];
         }

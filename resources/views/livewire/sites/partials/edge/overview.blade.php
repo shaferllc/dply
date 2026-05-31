@@ -1,5 +1,7 @@
 @include('livewire.sites.partials.edge.delivery-banner')
 
+<x-ops-copilot-callout :site="$site" compact class="mb-6" />
+
 @include('livewire.sites.partials.edge.hero')
 
 <div class="grid gap-6 lg:grid-cols-2">

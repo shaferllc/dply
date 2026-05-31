@@ -41,6 +41,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public string $siteId,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {}
 
     public function uniqueId(): string
@@ -70,6 +71,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $this->bindConsoleRunId($this->seededConsoleRunId);
         $emit = $this->beginConsoleAction();
 
         try {

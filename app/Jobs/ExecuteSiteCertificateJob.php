@@ -25,6 +25,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
     public function __construct(
         public string $certificateId,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {}
 
     protected function consoleSubject(): Model
@@ -55,6 +56,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             return;
         }
 
+        $this->bindConsoleRunId($this->seededConsoleRunId);
         $emit = $this->beginConsoleAction();
 
         try {

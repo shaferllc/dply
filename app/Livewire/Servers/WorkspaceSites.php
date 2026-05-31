@@ -11,9 +11,8 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerBulkSiteActions;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -353,17 +352,7 @@ class WorkspaceSites extends Component
             ],
         ]);
 
-        $defaults = app(RuntimeAwareDeployStepDefaults::class)->defaultsFor($site->runtime, null);
-        foreach ($defaults as $step) {
-            SiteDeployStep::create([
-                'site_id' => $site->id,
-                'sort_order' => $step['sort_order'],
-                'step_type' => $step['step_type'],
-                'phase' => $step['phase'],
-                'custom_command' => $step['custom_command'] ?? null,
-                'timeout_seconds' => $step['timeout_seconds'],
-            ]);
-        }
+        app(SiteDeployPipelineManager::class)->seedRuntimeDefaults($site, $site->runtime, null);
 
         SiteDomain::query()->create([
             'site_id' => $site->id,

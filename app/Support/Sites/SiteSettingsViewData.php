@@ -62,6 +62,11 @@ final class SiteSettingsViewData
             '{DEPLOY_ENV}' => __('Selected environment group used for key/value vars.'),
             '{PHP_VERSION}' => __('Site PHP version when the runtime is PHP-backed.'),
             '{RAILS_ENV}' => __('Rails env from site settings (Settings → Runtime / Deploy); substituted in hook scripts before run.'),
+            '{RELEASE_DIR}' => __('Release directory for this deploy (new release folder or live checkout path).'),
+            '{BASE_DIR}' => __('Site root on the server (parent of releases/ and current for atomic deploys).'),
+            '{REPO_URL}' => __('Configured Git repository URL.'),
+            '{GIT_SSH_PREFIX}' => __('Export prefix for deploy-key SSH when a key is configured; empty otherwise.'),
+            '{CURRENT_LINK}' => __('Path to the current symlink (atomic) or same as release dir (simple).'),
         ];
         $deployHookPhaseLabels = [
             SiteDeployHook::PHASE_BEFORE_CLONE => __('Before clone'),
@@ -76,10 +81,21 @@ final class SiteSettingsViewData
         $settingsSidebarItems = SiteSettingsSidebar::items($site, $server);
         $routingTabIcons = [
             'domains' => 'heroicon-o-globe-alt',
+            'dns' => 'heroicon-o-signal',
             'aliases' => 'heroicon-o-link',
             'redirects' => 'heroicon-o-arrow-uturn-right',
             'preview' => 'heroicon-o-sparkles',
             'tenants' => 'heroicon-o-building-office-2',
+        ];
+        $routingTabLabels = [
+            'dns' => __('DNS'),
+        ];
+        $runtimeTabs = SiteSettingsSidebar::runtimeTabsFor($site);
+        $runtimeTabIcons = [
+            'overview' => 'heroicon-o-cube-transparent',
+            'php' => 'heroicon-o-command-line',
+            'ruby' => 'heroicon-o-command-line',
+            'static' => 'heroicon-o-document',
         ];
         $previewDomain = $site->primaryPreviewDomain();
         $activeCertificate = $site->certificates->firstWhere('status', SiteCertificate::STATUS_ACTIVE);
@@ -216,6 +232,9 @@ final class SiteSettingsViewData
                 'isContainerWorkspace',
                 'settingsSidebarItems',
                 'routingTabIcons',
+                'routingTabLabels',
+                'runtimeTabs',
+                'runtimeTabIcons',
                 'previewDomain',
                 'activeCertificate',
                 'pendingCertificate',

@@ -11,6 +11,7 @@ use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\PreflightSchedulerOnSite;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
@@ -46,6 +47,20 @@ function setupServerWithSite(): array
 
     return [$user, $server, $site];
 }
+
+function siteWithDetectedFramework(Site $site, string $framework, string $language = 'php'): Site
+{
+    $meta = is_array($site->meta) ? $site->meta : [];
+    $meta['vm_runtime'] = [
+        'detected' => [
+            'framework' => $framework,
+            'language' => $language,
+        ],
+    ];
+    $site->update(['meta' => $meta]);
+
+    return $site->fresh();
+}
 /**
  * Stub the preflight runner so tests don't try to SSH. Returns the
  * provided result array on every call to run().
@@ -57,10 +72,10 @@ function stubPreflight(array $results): PreflightSchedulerOnSite
     $stub = Mockery::mock(PreflightSchedulerOnSite::class);
     $stub->shouldReceive('run')->andReturn($results);
     $stub->shouldReceive('structuralFailures')->andReturnUsing(
-        fn (array $r) => array_values(array_filter(
+        fn (array $r, string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL) => array_values(array_filter(
             $r,
             fn (array $check): bool => $check['status'] === 'fail'
-                && in_array($check['key'], PreflightSchedulerOnSite::STRUCTURAL_CHECKS, true),
+                && in_array($check['key'], (new PreflightSchedulerOnSite(app(ExecuteRemoteTaskOnServer::class)))->structuralChecksForKind($kind), true),
         )),
     );
     $stub->shouldReceive('advisoryWarnings')->andReturnUsing(
@@ -75,6 +90,7 @@ function stubPreflight(array $results): PreflightSchedulerOnSite
 }
 test('enable with all preflight passes creates wrapper cron and heartbeat', function () {
     [$user, $server, $site] = setupServerWithSite();
+    $site = siteWithDetectedFramework($site, 'laravel');
     stubPreflight([
         ['key' => 'site_release_present', 'status' => 'pass', 'message' => 'ok'],
         ['key' => 'php_binary', 'status' => 'pass', 'message' => 'ok'],
@@ -88,7 +104,6 @@ test('enable with all preflight passes creates wrapper cron and heartbeat', func
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'laravel')
         ->set('enable_cron_expression', '* * * * *')
         ->call('enableSchedulerForSite')
         ->assertHasNoErrors();
@@ -117,6 +132,7 @@ test('enable with all preflight passes creates wrapper cron and heartbeat', func
 });
 test('enable blocks on structural preflight failure', function () {
     [$user, $server, $site] = setupServerWithSite();
+    $site = siteWithDetectedFramework($site, 'laravel');
     stubPreflight([
         ['key' => 'site_release_present', 'status' => 'pass', 'message' => 'ok'],
         ['key' => 'php_binary', 'status' => 'fail', 'message' => 'no php binary'],
@@ -130,7 +146,6 @@ test('enable blocks on structural preflight failure', function () {
     $component = Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'laravel')
         ->set('enable_cron_expression', '* * * * *')
         ->call('enableSchedulerForSite');
 
@@ -145,6 +160,7 @@ test('enable blocks on structural preflight failure', function () {
 });
 test('enable allows advisory warnings through', function () {
     [$user, $server, $site] = setupServerWithSite();
+    $site = siteWithDetectedFramework($site, 'laravel');
     stubPreflight([
         ['key' => 'site_release_present', 'status' => 'pass', 'message' => 'ok'],
         ['key' => 'php_binary', 'status' => 'pass', 'message' => 'ok'],
@@ -158,7 +174,6 @@ test('enable allows advisory warnings through', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'laravel')
         ->set('enable_cron_expression', '* * * * *')
         ->call('enableSchedulerForSite')
         ->assertHasNoErrors();
@@ -176,7 +191,6 @@ test('enable blocks when preflight ssh fails', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'laravel')
         ->set('enable_cron_expression', '* * * * *')
         ->call('enableSchedulerForSite');
 
@@ -194,11 +208,55 @@ test('enable rejects invalid cron expression before ssh', function () {
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
         ->set('enable_site_id', $site->id)
-        ->set('enable_framework', 'laravel')
         ->set('enable_cron_expression', 'utter nonsense')
         ->call('enableSchedulerForSite');
 
     expect(ServerCronJob::query()->where('server_id', $server->id)->count())->toBe(0);
+});
+test('enable with custom command on undetected framework site uses generic kind', function () {
+    [$user, $server, $site] = setupServerWithSite();
+    stubPreflight([
+        ['key' => 'site_release_present', 'status' => 'pass', 'message' => 'ok'],
+        ['key' => 'cron_user_access', 'status' => 'pass', 'message' => 'ok'],
+        ['key' => 'no_duplicate_scheduler', 'status' => 'pass', 'message' => 'ok'],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSchedule::class, ['server' => $server])
+        ->set('enable_site_id', $site->id)
+        ->set('enable_custom_command', 'cd /var/www/app/current && ./run-scheduler')
+        ->set('enable_cron_expression', '*/5 * * * *')
+        ->call('enableSchedulerForSite')
+        ->assertHasNoErrors();
+
+    $cron = ServerCronJob::query()->where('server_id', $server->id)->where('site_id', $site->id)->firstOrFail();
+    $this->assertStringContainsString("'generic'", $cron->command);
+    $this->assertStringContainsString('./run-scheduler', $cron->command);
+
+    expect(ServerSchedulerHeartbeat::query()->where('site_id', $site->id)->value('scheduler_kind'))->toBe('generic');
+});
+test('enable tab shows custom command field when framework is not laravel or rails', function () {
+    [$user, $server, $site] = setupServerWithSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceSchedule::class, ['server' => $server])
+        ->set('enable_site_id', $site->id)
+        ->set('schedule_workspace_tab', 'enable');
+
+    expect($component->viewData('showCustomSchedulerEnable'))->toBeTrue();
+    expect($component->viewData('showLaravelSchedulerEnable'))->toBeFalse();
+});
+test('enable tab shows laravel scheduler when site is laravel', function () {
+    [$user, $server, $site] = setupServerWithSite();
+    $site = siteWithDetectedFramework($site, 'laravel');
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceSchedule::class, ['server' => $server])
+        ->set('enable_site_id', $site->id)
+        ->set('schedule_workspace_tab', 'enable');
+
+    expect($component->viewData('showLaravelSchedulerEnable'))->toBeTrue();
+    expect($component->viewData('showCustomSchedulerEnable'))->toBeFalse();
 });
 afterEach(function () {
     Mockery::close();

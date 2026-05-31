@@ -9,6 +9,7 @@ use App\Jobs\ApplySiteCdnJob;
 use App\Jobs\PurgeSiteCdnJob;
 use App\Jobs\SyncSiteCdnMetricsJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
@@ -16,8 +17,10 @@ use App\Models\SiteAuditEvent;
 use App\Services\Cloudflare\CloudflareCdnService;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
+use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -32,6 +35,12 @@ use Livewire\Component;
 class Cdn extends Component
 {
     use DispatchesToastNotifications;
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.site_cdn';
+
+    /** When true, render the coming-soon teaser instead of the full panel. */
+    public bool $comingSoonPreview = false;
 
     public Server $server;
 
@@ -76,7 +85,32 @@ class Cdn extends Component
         $this->server = $server;
         $this->site = $site;
 
+        $organization = auth()->user()->currentOrganization();
+
+        if (! Feature::for($organization)->active('workspace.site_cdn')) {
+            if (workspace_site_cdn_preview_active($organization)) {
+                $this->comingSoonPreview = true;
+
+                return;
+            }
+
+            abort(404);
+        }
+
         $this->hydrateFromSite();
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $organization = auth()->user()->currentOrganization();
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::for($organization)->active($flag)) {
+            abort(404);
+        }
     }
 
     private function hydrateFromSite(): void
@@ -275,6 +309,24 @@ class Cdn extends Component
 
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.sites.cdn-preview', array_merge(
+                SiteSettingsViewData::for(
+                    $this->server,
+                    $this->site,
+                    'cdn',
+                    null,
+                    [],
+                    auth()->user(),
+                ),
+                [
+                    'section' => 'cdn',
+                    'routingTab' => 'domains',
+                    'laravel_tab' => 'commands',
+                ],
+            ));
+        }
+
         return view('livewire.sites.cdn');
     }
 }

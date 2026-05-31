@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
+use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use Illuminate\Support\Facades\Log;
 
@@ -32,12 +33,18 @@ class PreflightSchedulerOnSite
 
     public const STATUS_FAIL = 'fail';
 
-    /** Check keys → severity. `fail` blocks Enable; `warn` allows it. */
+    /** Laravel Enable — all structural checks. */
     public const STRUCTURAL_CHECKS = [
         'site_release_present',
         'php_binary',
         'artisan_file',
         'laravel_boots',
+        'cron_user_access',
+    ];
+
+    /** Rails / generic Enable — release + crontab access only. */
+    public const STRUCTURAL_CHECKS_MINIMAL = [
+        'site_release_present',
         'cron_user_access',
     ];
 
@@ -51,14 +58,26 @@ class PreflightSchedulerOnSite
     ) {}
 
     /**
-     * Build the bash bundle that runs every check and stamps results.
-     *
-     * Returns a single bash heredoc the SSH layer can ship. Per-check
-     * commands are short and silent — the only relevant output is the
-     * stamped lines. Anything else (stdout / stderr) is captured but
-     * irrelevant to the parser.
+     * @return list<string>
      */
-    public function buildScript(Site $site): string
+    public function structuralChecksForKind(string $kind): array
+    {
+        return $kind === ServerSchedulerHeartbeat::KIND_LARAVEL
+            ? self::STRUCTURAL_CHECKS
+            : self::STRUCTURAL_CHECKS_MINIMAL;
+    }
+
+    /**
+     * Build the bash bundle that runs every check and stamps results.
+     */
+    public function buildScript(Site $site, string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL): string
+    {
+        return $kind === ServerSchedulerHeartbeat::KIND_LARAVEL
+            ? $this->buildLaravelScript($site)
+            : $this->buildMinimalScript($site);
+    }
+
+    protected function buildLaravelScript(Site $site): string
     {
         $repoPath = rtrim($site->effectiveRepositoryPath(), '/');
         $currentDir = $repoPath.'/current';
@@ -67,10 +86,6 @@ class PreflightSchedulerOnSite
         $repo = escapeshellarg($currentDir);
         $user = escapeshellarg($deployUser);
 
-        // PHP binary detection — `which php` is the universal probe; we
-        // accept any `php` on PATH. Operators with multiple PHP versions can
-        // get more specific via the site's php_fpm_user, but for preflight
-        // any callable `php` is enough.
         return <<<BASH
 set +e
 emit() { printf 'DPLY_PREFLIGHT: %s %s %s\\n' "\$1" "\$2" "\$3"; }
@@ -101,7 +116,6 @@ SCHEDULE_OUT=\$(cd {$repo} 2>/dev/null && php artisan schedule:list 2>&1)
 SCHEDULE_EXIT=\$?
 if [ \$SCHEDULE_EXIT -eq 0 ]; then
     emit laravel_boots pass "schedule:list ran successfully"
-    # 5. task count (advisory) — count non-empty non-header lines as a proxy.
     TASK_COUNT=\$(printf '%s\\n' "\$SCHEDULE_OUT" | grep -cE '^\\s+\\* ' 2>/dev/null || true)
     if [ "\$TASK_COUNT" -gt 0 ] 2>/dev/null; then
         emit scheduler_has_tasks pass "found \$TASK_COUNT scheduled task(s)"
@@ -112,12 +126,10 @@ else
     emit laravel_boots fail "schedule:list exited \$SCHEDULE_EXIT — app may be broken (check .env, deps, migrations)"
 fi
 
-# 6. cron access for the deploy user
+# 5. cron access for the deploy user
 if sudo -nu {$user} crontab -l >/dev/null 2>&1; then
     emit cron_user_access pass "user {$deployUser} can read crontab"
 else
-    # crontab -l exits 1 when the user has no crontab — that's fine; we only
-    # care if access is genuinely denied. Try writing a dry probe.
     if sudo -nu {$user} sh -c 'echo "" | crontab - && crontab -l' >/dev/null 2>&1; then
         emit cron_user_access pass "user {$deployUser} can write crontab"
     else
@@ -125,7 +137,7 @@ else
     fi
 fi
 
-# 7. no duplicate scheduler under another user (advisory)
+# 6. no duplicate scheduler under another user (advisory)
 DUP=\$(sudo -n bash -c 'for u in \$(awk -F: "{print \$1}" /etc/passwd); do crontab -lu "\$u" 2>/dev/null | grep -E "schedule:run|schedule:work" | grep -v "dply-scheduler-tick" && echo "--dup-user-\$u--"; done' 2>/dev/null | head -c 2048)
 if [ -z "\$DUP" ]; then
     emit no_duplicate_scheduler pass "no other scheduler-shaped cron lines found"
@@ -135,9 +147,48 @@ fi
 BASH;
     }
 
+    protected function buildMinimalScript(Site $site): string
+    {
+        $repoPath = rtrim($site->effectiveRepositoryPath(), '/');
+        $currentDir = $repoPath.'/current';
+        $deployUser = $site->effectiveSystemUser($site->server) ?: 'dply';
+
+        $repo = escapeshellarg($currentDir);
+        $user = escapeshellarg($deployUser);
+
+        return <<<BASH
+set +e
+emit() { printf 'DPLY_PREFLIGHT: %s %s %s\\n' "\$1" "\$2" "\$3"; }
+
+# 1. site release present
+if [ -d {$repo} ]; then
+    emit site_release_present pass "current release found at {$currentDir}"
+else
+    emit site_release_present fail "no current release at {$currentDir} — deploy the site first"
+fi
+
+# 2. cron access for the deploy user
+if sudo -nu {$user} crontab -l >/dev/null 2>&1; then
+    emit cron_user_access pass "user {$deployUser} can read crontab"
+else
+    if sudo -nu {$user} sh -c 'echo "" | crontab - && crontab -l' >/dev/null 2>&1; then
+        emit cron_user_access pass "user {$deployUser} can write crontab"
+    else
+        emit cron_user_access fail "user {$deployUser} cannot access crontab — check sudo policy"
+    fi
+fi
+
+# 3. no duplicate scheduler under another user (advisory)
+DUP=\$(sudo -n bash -c 'for u in \$(awk -F: "{print \$1}" /etc/passwd); do crontab -lu "\$u" 2>/dev/null | grep -E "schedule:run|schedule:work|whenever|sidekiq" | grep -v "dply-scheduler-tick" && echo "--dup-user-\$u--"; done' 2>/dev/null | head -c 2048)
+if [ -z "\$DUP" ]; then
+    emit no_duplicate_scheduler pass "no other scheduler-shaped cron lines found"
+else
+    emit no_duplicate_scheduler warn "another scheduler-like cron line was found — adding ours would create a duplicate"
+fi
+BASH;
+    }
+
     /**
-     * Parse the bundle output into structured results.
-     *
      * @return list<array{key: string, status: string, message: string}>
      */
     public function parseResult(string $output): array
@@ -165,16 +216,16 @@ BASH;
     }
 
     /**
-     * Inspect parsed results for structural failures (block Enable).
-     *
      * @param  list<array{key: string, status: string, message: string}>  $results
      * @return list<array{key: string, status: string, message: string}>
      */
-    public function structuralFailures(array $results): array
+    public function structuralFailures(array $results, string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL): array
     {
+        $checks = $this->structuralChecksForKind($kind);
+
         return array_values(array_filter(
             $results,
-            fn (array $r): bool => $r['status'] === self::STATUS_FAIL && in_array($r['key'], self::STRUCTURAL_CHECKS, true),
+            fn (array $r): bool => $r['status'] === self::STATUS_FAIL && in_array($r['key'], $checks, true),
         ));
     }
 
@@ -191,16 +242,15 @@ BASH;
     }
 
     /**
-     * Run the bundle over SSH and return parsed results. Defensive on SSH
-     * failure — returns an empty result, lets the caller decide whether to
-     * block (typically: yes — we couldn't verify, refuse the Enable).
-     *
      * @return list<array{key: string, status: string, message: string}>
      */
-    public function run(Server $server, Site $site): array
-    {
+    public function run(
+        Server $server,
+        Site $site,
+        string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL,
+    ): array {
         try {
-            $script = $this->buildScript($site);
+            $script = $this->buildScript($site, $kind);
             $out = $this->remote->runInlineBash($server, 'scheduler-preflight', $script, 30, false);
 
             return $this->parseResult((string) $out->getBuffer());
@@ -208,6 +258,7 @@ BASH;
             Log::warning('scheduler.preflight.ssh_failed', [
                 'server_id' => $server->id,
                 'site_id' => $site->id,
+                'scheduler_kind' => $kind,
                 'error' => $e->getMessage(),
             ]);
 

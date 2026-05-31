@@ -12,6 +12,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
+use App\Livewire\Sites\WorkspacePipeline;
 use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -31,6 +32,7 @@ use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DockerDeployEngine;
 use App\Services\Deploy\KubernetesKubectlExecutor;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteWebserverConfigApplier;
@@ -116,10 +118,9 @@ test('site settings deploy section shows docker runtime artifacts', function () 
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
+    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'overview'], false));
 
     $response->assertOk()
-        ->assertSee('Deploy')
         ->assertSee('Runtime target')
         ->assertSee('docker compose up -d --build')
         ->assertSee('FROM php:8.3-apache');
@@ -152,10 +153,9 @@ test('site settings deploy section shows kubernetes runtime artifacts', function
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
+    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'overview'], false));
 
     $response->assertOk()
-        ->assertSee('Deploy')
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('kind: Deployment');
@@ -1276,6 +1276,30 @@ test('site environment section renders keys for serverless sites', function () {
         ->assertDontSee('wire:click="pushEnvToServer"', false);
 });
 
+test('site settings legacy dns section redirects to routing dns tab', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['choose_app' => ['skipped' => true]],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('sites.settings', [$server, $site, 'section' => 'dns'], false))
+        ->assertRedirect(route('sites.show', [
+            $server,
+            $site,
+            'section' => 'routing',
+            'tab' => 'dns',
+        ], false));
+});
+
 test('site settings legacy routing section redirects to routing tab', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
@@ -1299,7 +1323,26 @@ test('site settings legacy routing section redirects to routing tab', function (
     ], false));
 });
 
-test('site settings deploy section shows no downtime scripts hooks variables and log links', function () {
+test('legacy deploy url redirects to deployments index', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false))
+        ->assertRedirect(route('sites.deployments.index', ['server' => $server, 'site' => $site], false));
+});
+
+test('vm site pipeline workspace shows rollout hooks and reference', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -1317,8 +1360,10 @@ test('site settings deploy section shows no downtime scripts hooks variables and
         'post_deploy_command' => 'php artisan optimize',
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
     SiteDeployStep::query()->create([
         'site_id' => $site->id,
+        'pipeline_id' => $pipeline->id,
         'sort_order' => 1,
         'step_type' => SiteDeployStep::TYPE_NPM_CI,
         'timeout_seconds' => 900,
@@ -1331,24 +1376,62 @@ test('site settings deploy section shows no downtime scripts hooks variables and
         'timeout_seconds' => 900,
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy'], false));
+    $response = $this->actingAs($user)->get(route('sites.pipeline', ['server' => $server, 'site' => $site], false));
 
     $response->assertOk()
-        ->assertSee('Deploy')
+        ->assertSee('Pipeline')
+        ->assertSee('Pipeline steps')
+        ->assertSee('Rollout');
+
+    $this->actingAs($user)
+        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'rollout'], false))
+        ->assertOk()
         ->assertSee('Zero downtime deployment')
-        ->assertSee('After deploy verification')
-        ->assertSee('Pre-deploy script')
-        ->assertSee('Main deploy script')
-        ->assertSee('Post-deploy script')
-        ->assertSee('Deploy hooks')
+        ->assertSee('After deploy verification');
+
+    $this->actingAs($user)
+        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
+        ->assertOk()
+        ->assertSee('Pipeline', false)
+        ->assertSee('Clone')
+        ->assertSee('Activate');
+
+    $this->actingAs($user)
+        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
+        ->assertOk()
+        ->assertSee('Add hooks');
+
+    $this->actingAs($user)
+        ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'reference'], false))
+        ->assertOk()
         ->assertSee('Deploy script variables')
         ->assertSee('{SITE_DOMAIN}')
-        ->assertSee('{BRANCH}')
-        ->assertSee(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs'], false), escape: false)
-        ->assertSee(route('servers.logs', $server, false), escape: false);
+        ->assertSee('{BRANCH}');
 });
 
-test('site settings deploy section can save repository and strategy settings', function () {
+test('site settings repository section is distinct from pipeline', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'git_repository_url' => 'git@github.com:org/repo.git',
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'repository'], false))
+        ->assertOk()
+        ->assertSee('Quick deploy')
+        ->assertDontSee('Deploy script variables');
+});
+
+test('vm site pipeline can save rollout settings', function () {
     Bus::fake();
 
     $user = userWithOrganization();
@@ -1378,13 +1461,7 @@ test('site settings deploy section can save repository and strategy settings', f
     ]);
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
-        ->set('git_repository_url', 'git@github.com:acme/example.git')
-        ->set('git_branch', 'release')
-        ->set('post_deploy_command', 'php artisan optimize')
-        ->call('saveGit')
-        ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Git settings saved.', type: 'success')
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->set('zero_downtime_enabled', true)
         ->call('saveZeroDowntimeDeployment')
         ->assertHasNoErrors()
@@ -1397,31 +1474,19 @@ test('site settings deploy section can save repository and strategy settings', f
         ->set('nginx_extra_raw', 'location /health { return 200; }')
         ->call('saveDeploymentSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.', type: 'success')
-        ->set('php_fpm_user', 'deploy')
-        ->call('saveSystemUserSettings')
-        ->assertHasNoErrors()
-        ->assertDispatched('notify', message: __('System user settings saved.'), type: 'success');
+        ->assertDispatched('notify', message: 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.', type: 'success');
 
     Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
     $site->refresh();
 
-    expect($site->git_repository_url)->toBe('git@github.com:acme/example.git');
-    expect($site->git_branch)->toBe('release');
-    expect($site->post_deploy_command)->toBe('php artisan optimize');
     expect($site->deploy_strategy)->toBe('atomic');
     expect($site->releases_to_keep)->toBe(8);
     expect($site->deployment_environment)->toBe('staging');
     expect($site->octane_port)->toBe(8080);
-    expect($site->php_fpm_user)->toBe('deploy');
     expect($site->laravel_scheduler)->toBeTrue();
     expect($site->restart_supervisor_programs_after_deploy)->toBeTrue();
     expect($site->nginx_extra_raw)->toBe('location /health { return 200; }');
-    $meta = is_array($site->meta) ? $site->meta : [];
-    expect($meta['deploy_health_expect_status'] ?? null)->toBe(200);
-    expect($meta['deploy_health_attempts'] ?? null)->toBe(5);
-    expect((bool) ($meta['deploy_health_enabled'] ?? false))->toBeFalse();
 });
 
 test('site settings general section uses certificate summary for ssl status', function () {
@@ -1674,11 +1739,11 @@ test('site show displays docker runtime target summary', function () {
         ],
     ]);
 
-    // Compose / Dockerfile artifacts live on Deploy; live discovery on Runtime.
-    $this->actingAs($user)->get(route('sites.show', [
+    // Compose / Dockerfile artifacts live on Pipeline; live discovery on Runtime.
+    $this->actingAs($user)->get(route('sites.pipeline', [
         'server' => $server,
         'site' => $site,
-        'section' => 'deploy',
+        'tab' => 'overview',
     ], false))
         ->assertOk()
         ->assertSee('Runtime target')
@@ -1725,10 +1790,10 @@ test('site show displays kubernetes runtime target summary', function () {
         ],
     ]);
 
-    $response = $this->actingAs($user)->get(route('sites.show', [
+    $response = $this->actingAs($user)->get(route('sites.pipeline', [
         'server' => $server,
         'site' => $site,
-        'section' => 'deploy',
+        'tab' => 'overview',
     ], false));
 
     $response->assertOk()
@@ -3289,6 +3354,7 @@ test('site dns settings page renders and saves credential', function () {
         'user_id' => $user->id,
         'organization_id' => $org->id,
         'status' => Site::STATUS_NGINX_ACTIVE,
+        'meta' => ['choose_app' => ['skipped' => true]],
     ]);
     $credential = ProviderCredential::factory()->create([
         'user_id' => $user->id,
@@ -3299,11 +3365,17 @@ test('site dns settings page renders and saves credential', function () {
 
     $this->actingAs($user)
         ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'dns'], false))
-        ->assertOk()
-        ->assertSee('DNS automation', escape: false);
+        ->assertRedirect(route('sites.show', [
+            'server' => $server,
+            'site' => $site,
+            'section' => 'routing',
+            'tab' => 'dns',
+        ], false));
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+        ->withQueryParams(['tab' => 'dns'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
+        ->assertSee('DNS provider', escape: false)
         ->set('settings_dns_zone', '')
         ->set('settings_dns_provider_credential_id', $credential->id)
         ->call('saveDnsSettings')
@@ -3334,7 +3406,8 @@ test('site dns settings rejects credential from another organization', function 
     ]);
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+        ->withQueryParams(['tab' => 'dns'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->set('settings_dns_zone', '')
         ->set('settings_dns_provider_credential_id', $foreignCredential->id)
         ->call('saveDnsSettings')
@@ -3370,7 +3443,8 @@ test('site dns settings saves zone when domain exists in digitalocean', function
     ]);
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+        ->withQueryParams(['tab' => 'dns'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->set('settings_dns_zone', 'example.com')
         ->set('settings_dns_provider_credential_id', $credential->id)
         ->call('saveDnsSettings')
@@ -3403,7 +3477,8 @@ test('site dns settings rejects zone not in digitalocean account', function () {
     ]);
 
     Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'dns'])
+        ->withQueryParams(['tab' => 'dns'])
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
         ->set('settings_dns_zone', 'missing.example')
         ->call('saveDnsSettings')
         ->assertHasErrors(['settings_dns_zone']);

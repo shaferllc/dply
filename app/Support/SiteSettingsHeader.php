@@ -36,13 +36,8 @@ final class SiteSettingsHeader
             ],
             'routing' => [
                 'title' => __('Routing'),
-                'description' => __('Domains, aliases, redirects, preview hosts, and tenant routing for this :resource.', ['resource' => $resourceNoun]),
+                'description' => __('Domains, DNS automation, aliases, redirects, preview hosts, and tenant routing for this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-share',
-            ],
-            'dns' => [
-                'title' => __('DNS'),
-                'description' => __('DNS providers and the records Dply manages for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-signal',
             ],
             'certificates' => [
                 'title' => __('Certificates'),
@@ -50,9 +45,14 @@ final class SiteSettingsHeader
                 'icon' => 'heroicon-o-shield-check',
             ],
             'deploy' => [
-                'title' => __('Deploy'),
-                'description' => __('Repository source, no-downtime rollout strategy, deploy scripts, hooks, and release/log access for this :resource.', ['resource' => $resourceNoun]),
+                'title' => __('Deployments'),
+                'description' => __('Deploy history, triggers, and release rollback for this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-code-bracket-square',
+            ],
+            'pipeline' => [
+                'title' => __('Pipeline'),
+                'description' => __('Build steps, deploy hooks, zero-downtime rollout, and post-activate checks for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-adjustments-horizontal',
             ],
             'repository' => [
                 'title' => __('Repository'),
@@ -63,23 +63,8 @@ final class SiteSettingsHeader
                 'title' => __('Runtime'),
                 'description' => $site->usesFunctionsRuntime()
                     ? __('How this function executes — runtime, entrypoint, and the memory, timeout, and concurrency limits applied to the action.')
-                    : __('What this :resource runs and how — language, processes, detection, and container lifecycle.', ['resource' => $resourceNoun]),
+                    : __('What this :resource runs and how — language, processes, detection, and per-language tuning (PHP, Ruby, or Static) on the tabs below.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-cube-transparent',
-            ],
-            'runtime-php' => [
-                'title' => __('PHP runtime'),
-                'description' => __('PHP version, memory and execution limits, FPM pool user, scheduler, and Octane settings for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-cog',
-            ],
-            'runtime-ruby' => [
-                'title' => __('Ruby runtime'),
-                'description' => __('Ruby/Rails-specific runtime settings for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-cog',
-            ],
-            'runtime-static' => [
-                'title' => __('Static runtime'),
-                'description' => __('Published path and static-site specific runtime settings for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-cog',
             ],
             'system-user' => [
                 'title' => __('System user'),

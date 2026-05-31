@@ -1,22 +1,51 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
-        'server' => $server,
-        'site' => $site,
-        'currentLabel' => __('Deployments'),
-        'currentIcon' => 'code-bracket-square',
-    ])
-
-    <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
-                :title="__('Deployments')"
-                :description="__('Every deployment recorded for this site, newest first. Click a row to drill into per-step output.')"
-                :show-documentation="false"
-                flush
-                compact
+        <div class="min-w-0 lg:col-span-9">
+            <x-breadcrumb-trail
+                :items="$settingsBreadcrumbs"
+                doc-contextual
+                :contextual-doc-slug="$contextualDocSlug ?? null"
             />
+
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
+            </div>
+
+            @if ($headerRoleLabel !== null)
+                <div class="mt-3 flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
+                          title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
+                        @if ($headerIsDeployer)
+                            <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
+                        @elseif ($headerCanUpdateSite)
+                            <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
+                        @else
+                            <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
+                        @endif
+                        {{ $headerRoleLabel }}
+                    </span>
+                </div>
+            @endif
+
+            <x-page-header
+                :title="$sectionHeader['title']"
+                :description="$sectionDescription"
+                :show-documentation="false"
+                toolbar
+                flush
+                class="mt-3"
+            >
+                <x-slot name="leading">
+                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                        @svg($sectionHeader['icon'], 'h-7 w-7 text-brand-ink')
+                    </span>
+                </x-slot>
+            </x-page-header>
+
+            <main class="min-w-0 space-y-6 mt-8">
+            <x-ops-copilot-callout :site="$site" />
 
             @if ($site->server?->isDigitalOceanFunctionsHost())
                 {{-- The live deploy journey is the redeploy surface: it shows
@@ -33,6 +62,8 @@
                     :site="$site"
                     wire:key="deploy-hooks-{{ $site->id }}"
                 />
+            @elseif ($isVmDeployHub ?? false)
+                @include('livewire.sites.partials.deployments._vm-hub')
             @else
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/30 px-4 py-3">
                     <p class="text-sm text-brand-moss">{{ __('Trigger a fresh deploy of the current repository state.') }}</p>
@@ -174,6 +205,11 @@
     @endif
 
             <x-cli-snippet class="mt-6" :command="'dply:site:deploy-history '.$site->slug" />
-        </main>
+            </main>
+        </div>
     </div>
+
+    @if ($isVmDeployHub ?? false)
+        @include('livewire.partials.confirm-action-modal')
+    @endif
 </div>

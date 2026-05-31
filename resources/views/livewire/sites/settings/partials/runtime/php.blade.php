@@ -20,10 +20,7 @@
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Not a PHP site') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This site does not run PHP, so there are no PHP runtime settings to tune. Open the Runtime hub to manage processes and detection, or pick another runtime sub-tab.') }}</p>
-                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']) }}" wire:navigate class="mt-3 inline-flex items-center text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">
-                    {{ __('Back to Runtime') }} →
-                </a>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This site does not run PHP, so there are no PHP runtime settings to tune. Switch to the Overview tab for processes and detection.') }}</p>
             </div>
         </div>
     </section>

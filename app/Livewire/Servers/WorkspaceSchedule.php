@@ -13,10 +13,12 @@ use App\Models\Site;
 use App\Services\Servers\CronExpressionValidator;
 use App\Services\Servers\PreflightSchedulerOnSite;
 use App\Services\Servers\SchedulerCardsBuilder;
+use App\Services\Servers\SchedulerHealthEvaluator;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -42,16 +44,28 @@ class WorkspaceSchedule extends Component
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
+    /** @var list<string> */
+    public const SCHEDULE_TABS = ['overview', 'schedulers', 'enable'];
+
+    /** @var 'overview'|'schedulers'|'enable' */
+    #[Url(as: 'tab', except: 'overview', history: true)]
+    public string $schedule_workspace_tab = 'overview';
+
     /** Form state for "Enable scheduler for site". */
     public string $enable_site_id = '';
 
     public string $enable_cron_expression = '* * * * *';
 
-    /** @var 'laravel'|'rails' Framework hint that picks the right scheduler command. */
-    public string $enable_framework = 'laravel';
+    /** @var 'laravel'|'rails'|'' Framework hint when detection picks a preset command. */
+    public string $enable_framework = '';
+
+    public string $enable_custom_command = '';
 
     /** When set (?site=…), filters the lists to that site's cron entries / daemons. */
     public ?string $context_site_id = null;
+
+    /** @var 'site'|'all' Only when {@see} is set. */
+    public string $schedulers_list_scope = 'all';
 
     /**
      * Edit-cadence inline state — keyed by `heartbeat_id` so multiple cards
@@ -72,6 +86,10 @@ class WorkspaceSchedule extends Component
      */
     public array $run_now_in_flight = [];
 
+    public bool $showDisableMonitoringModal = false;
+
+    public ?string $disableMonitoringHeartbeatId = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -85,8 +103,100 @@ class WorkspaceSchedule extends Component
             if ($exists) {
                 $this->context_site_id = $siteId;
                 $this->enable_site_id = $siteId;
+                $this->schedulers_list_scope = 'site';
             }
         }
+
+        if (! in_array($this->schedule_workspace_tab, self::SCHEDULE_TABS, true)) {
+            $this->schedule_workspace_tab = 'overview';
+        }
+
+        $this->syncEnableFormToSiteFramework();
+    }
+
+    public function updatedEnableSiteId(): void
+    {
+        $this->syncEnableFormToSiteFramework();
+    }
+
+    protected function syncEnableFormToSiteFramework(): void
+    {
+        $site = $this->resolveEnableTargetSite();
+        if ($site === null) {
+            return;
+        }
+
+        if ($site->isLaravelFrameworkDetected()) {
+            $this->enable_framework = 'laravel';
+            $this->enable_custom_command = '';
+
+            return;
+        }
+
+        if ($site->isRailsFrameworkDetected()) {
+            $this->enable_framework = 'rails';
+            $this->enable_custom_command = '';
+
+            return;
+        }
+
+        $this->enable_framework = '';
+        if (trim($this->enable_custom_command) === '') {
+            $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+            $this->enable_custom_command = 'cd '.$directory.' && ';
+        }
+    }
+
+    protected function resolveEnableTargetSite(): ?Site
+    {
+        $siteId = $this->context_site_id ?: ($this->enable_site_id !== '' ? $this->enable_site_id : null);
+        if ($siteId === null) {
+            return null;
+        }
+
+        return Site::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($siteId)
+            ->first();
+    }
+
+    protected function resolveEnableSchedulerKind(Site $site): string
+    {
+        if ($site->isLaravelFrameworkDetected()) {
+            return ServerSchedulerHeartbeat::KIND_LARAVEL;
+        }
+
+        if ($site->isRailsFrameworkDetected()) {
+            return ServerSchedulerHeartbeat::KIND_RAILS;
+        }
+
+        return ServerSchedulerHeartbeat::KIND_GENERIC;
+    }
+
+    protected function resolveBareSchedulerCommand(Site $site, string $kind): ?string
+    {
+        $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
+
+        return match ($kind) {
+            ServerSchedulerHeartbeat::KIND_LARAVEL => 'cd '.$directory.' && php artisan schedule:run',
+            ServerSchedulerHeartbeat::KIND_RAILS => 'cd '.$directory.' && bundle exec whenever --update-crontab',
+            ServerSchedulerHeartbeat::KIND_GENERIC => ($command = trim($this->enable_custom_command)) !== '' ? $command : null,
+            default => null,
+        };
+    }
+
+    protected function schedulerKindLabel(string $kind): string
+    {
+        return match ($kind) {
+            ServerSchedulerHeartbeat::KIND_LARAVEL => 'Laravel',
+            ServerSchedulerHeartbeat::KIND_RAILS => 'Rails',
+            default => 'Custom',
+        };
+    }
+
+    public function setScheduleWorkspaceTab(string $tab): void
+    {
+        $this->schedule_workspace_tab = in_array($tab, self::SCHEDULE_TABS, true) ? $tab : 'overview';
     }
 
     /**
@@ -120,13 +230,15 @@ class WorkspaceSchedule extends Component
             return;
         }
 
-        // Q18: preflight all seven checks in one SSH round-trip. Block on
-        // structural failures; warn-and-allow on advisory ones.
-        $results = $preflight->run($this->server, $site);
+        // Q18: preflight in one SSH round-trip. Block on structural failures;
+        // warn-and-allow on advisory ones. Checks vary by scheduler kind.
+        $kind = $this->resolveEnableSchedulerKind($site);
+        $results = $preflight->run($this->server, $site, $kind);
         $this->preflight_results = $results;
 
-        $failures = $preflight->structuralFailures($results);
+        $failures = $preflight->structuralFailures($results, $kind);
         if ($results === [] || $failures !== []) {
+            $this->schedule_workspace_tab = 'enable';
             $this->toastError($results === []
                 ? __('Preflight could not run over SSH — the structured results below tell you why.')
                 : __('Preflight blocked Enable — fix the structural issues below before retrying.'));
@@ -134,26 +246,16 @@ class WorkspaceSchedule extends Component
             return;
         }
 
-        // Wrap the framework scheduler command in dply-scheduler-tick so the
-        // heartbeat + per-task pipe starts working immediately. The bare
-        // command is preserved as the wrapper's `-- <cmd>` tail; an operator
-        // who later removes the wrapper (e.g. via Disable Monitoring) ends up
-        // with exactly the original bare line.
-        $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
-        $bareCommand = match ($this->enable_framework) {
-            'laravel' => 'cd '.$directory.' && php artisan schedule:run',
-            'rails' => 'cd '.$directory.' && bundle exec whenever --update-crontab',
-            default => null,
-        };
+        $bareCommand = $this->resolveBareSchedulerCommand($site, $kind);
         if ($bareCommand === null) {
-            $this->toastError(__('Unknown framework.'));
+            $this->schedule_workspace_tab = 'enable';
+            $this->toastError($kind === ServerSchedulerHeartbeat::KIND_GENERIC
+                ? __('Enter a scheduler command.')
+                : __('Could not build scheduler command for this site.'));
 
             return;
         }
 
-        $kind = $this->enable_framework === 'rails'
-            ? ServerSchedulerHeartbeat::KIND_RAILS
-            : ServerSchedulerHeartbeat::KIND_LARAVEL;
         $wrappedCommand = sprintf(
             '/usr/local/bin/dply-scheduler-tick %s %s -- %s',
             escapeshellarg($site->id),
@@ -168,7 +270,7 @@ class WorkspaceSchedule extends Component
             'command' => $wrappedCommand,
             'user' => $site->effectiveSystemUser($this->server),
             'enabled' => true,
-            'description' => ucfirst($this->enable_framework).' scheduler — '.$site->name.' (wrapper-managed)',
+            'description' => $this->schedulerKindLabel($kind).' scheduler — '.$site->name.' (wrapper-managed)',
         ]);
 
         // Pre-create the heartbeat row in waiting-for-first-tick state (Q4 (e))
@@ -202,8 +304,9 @@ class WorkspaceSchedule extends Component
             ],
         );
 
-        $this->reset(['enable_site_id', 'enable_framework']);
+        $this->reset(['enable_site_id', 'enable_framework', 'enable_custom_command']);
         $this->enable_cron_expression = '* * * * *';
+        $this->schedule_workspace_tab = 'schedulers';
         $this->toastSuccess(__('Scheduler enabled for :site. Waiting for the first tick — the chip will go green within ~60-90 seconds.', ['site' => $site->name]));
     }
 
@@ -339,6 +442,30 @@ class WorkspaceSchedule extends Component
      * doesn't exist yet — wrapper-invoking cron lines are only created by 2C).
      * Per Q20 (c), this is symmetric with Enable creating one.
      */
+    public function openDisableMonitoringModal(string $heartbeatId): void
+    {
+        $this->authorize('update', $this->server);
+        $this->disableMonitoringHeartbeatId = $heartbeatId;
+        $this->showDisableMonitoringModal = true;
+    }
+
+    public function closeDisableMonitoringModal(): void
+    {
+        $this->showDisableMonitoringModal = false;
+        $this->disableMonitoringHeartbeatId = null;
+    }
+
+    public function confirmDisableMonitoring(): void
+    {
+        if ($this->disableMonitoringHeartbeatId === null) {
+            return;
+        }
+
+        $heartbeatId = $this->disableMonitoringHeartbeatId;
+        $this->closeDisableMonitoringModal();
+        $this->disableMonitoring($heartbeatId);
+    }
+
     public function disableMonitoring(string $heartbeatId): void
     {
         $this->authorize('update', $this->server);
@@ -474,16 +601,18 @@ class WorkspaceSchedule extends Component
         // handful of rows on a single server); runs on every render.
         $built = $cardsBuilder->build($this->server);
 
-        // Apply the ?site= filter at render time so the summary strip still
-        // reflects the whole server even when the operator is drilled into
-        // one site. Drives the "Filtered to site:" banner on the page.
-        $cards = $built['cards'];
-        if ($this->context_site_id !== null) {
+        $allCards = $built['cards'];
+        $cards = $allCards;
+        if ($this->context_site_id !== null && $this->schedulers_list_scope === 'site') {
             $cards = array_values(array_filter(
                 $cards,
                 fn (array $card): bool => $card['site']->id === $this->context_site_id,
             ));
         }
+
+        $scheduleStats = ($this->context_site_id !== null && $this->schedulers_list_scope === 'site')
+            ? $this->scheduleStatsFromCards($cards)
+            : $this->scheduleStatsFromSummary($built['stats']);
 
         $sites = Site::query()
             ->where('server_id', $this->server->id)
@@ -494,15 +623,81 @@ class WorkspaceSchedule extends Component
             ? $sites->firstWhere('id', $this->context_site_id)
             : null;
 
+        $enableTargetSite = $this->resolveEnableTargetSite() ?? $contextSite;
+
         return view('livewire.servers.workspace-schedule', [
             'opsReady' => $this->serverOpsReady(),
             'contextSite' => $contextSite,
+            'contextSiteModel' => $contextSite,
+            'enableTargetSite' => $enableTargetSite,
+            'showLaravelSchedulerEnable' => $enableTargetSite?->isLaravelFrameworkDetected() ?? false,
+            'showRailsSchedulerEnable' => $enableTargetSite?->isRailsFrameworkDetected() ?? false,
+            'showCustomSchedulerEnable' => $enableTargetSite !== null
+                && ! ($enableTargetSite->isLaravelFrameworkDetected() || $enableTargetSite->isRailsFrameworkDetected()),
             'cards' => $cards,
+            'allCards' => $allCards,
             'stats' => $built['stats'],
+            'scheduleStats' => $scheduleStats,
             'sites' => $sites,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
         ]);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $cards
+     * @return array{total: int, healthy: int, attention: int, paused: int}
+     */
+    private function scheduleStatsFromCards(array $cards): array
+    {
+        $healthy = 0;
+        $attention = 0;
+        $paused = 0;
+        $total = 0;
+
+        foreach ($cards as $card) {
+            $state = (string) ($card['state'] ?? '');
+            if ($state === 'no_scheduler') {
+                $attention++;
+
+                continue;
+            }
+
+            $total++;
+
+            if ($state === 'paused') {
+                $paused++;
+
+                continue;
+            }
+
+            $health = $card['health'] ?? null;
+            if ($health === SchedulerHealthEvaluator::STATE_HEALTHY) {
+                $healthy++;
+            } elseif (in_array($health, [
+                SchedulerHealthEvaluator::STATE_WAITING,
+                SchedulerHealthEvaluator::STATE_AMBER,
+                SchedulerHealthEvaluator::STATE_RED,
+            ], true) || $state === 'detected_unmonitored') {
+                $attention++;
+            }
+        }
+
+        return compact('total', 'healthy', 'attention', 'paused');
+    }
+
+    /**
+     * @param  array{healthy: int, waiting: int, amber: int, red: int, paused: int, unmonitored: int, tracked_total: int, no_scheduler_sites: int}  $stats
+     * @return array{total: int, healthy: int, attention: int, paused: int}
+     */
+    private function scheduleStatsFromSummary(array $stats): array
+    {
+        return [
+            'total' => $stats['tracked_total'] + $stats['paused'] + $stats['unmonitored'],
+            'healthy' => $stats['healthy'],
+            'attention' => $stats['waiting'] + $stats['amber'] + $stats['red'] + $stats['unmonitored'] + $stats['no_scheduler_sites'],
+            'paused' => $stats['paused'],
+        ];
     }
 }

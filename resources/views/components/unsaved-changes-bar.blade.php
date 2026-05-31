@@ -7,6 +7,11 @@
     'saveDisabled' => false,
     'saveLabel' => null,
     'discardLabel' => null,
+    /**
+     * Livewire bool property (e.g. pipeline_form_edits_pending) for modal / conditional forms.
+     * Uses Alpine x-bind alongside wire:dirty so the bar is not hidden when only the modal is dirty.
+     */
+    'formPendingWire' => null,
 ])
 
 @php
@@ -15,20 +20,27 @@
 @endphp
 
 {{--
-    Outer node: keep `hidden` + wire:dirty.remove.class until dirty (avoids FOUC). Do not use flex/display
-    utilities here—they fight Livewire dirty CSS. Prefer leaf paths in `targets` so JSON.stringify compares
-    primitives; whole nested objects vs Alpine proxies often read “dirty” on first paint.
+    Default `hidden` + wire:dirty.class keeps the bar off until a targeted field changes.
+    `formPendingWire` adds dply-unsaved-bar-visible when open modal forms differ from their snapshot
+    (wire:dirty alone would re-hide the bar because rollout fields are still clean).
+
+    z-[110] sits above app modals (z-[100]) so the bar stays visible while editing in a modal.
 --}}
 <div
     {{ $attributes->class([
+        'dply-unsaved-bar',
         'hidden',
-        'pointer-events-auto fixed left-1/2 z-40 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-brand-mist/80 bg-white shadow-lg shadow-brand-forest/10',
+        'pointer-events-auto fixed left-1/2 z-[110] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-brand-mist/80 bg-white shadow-lg shadow-brand-forest/10',
         'bottom-24 sm:bottom-28',
     ]) }}
     @if (filled($targets))
         wire:target="{{ $targets }}"
+        wire:dirty.class="dply-unsaved-bar-visible"
     @endif
-    wire:dirty.remove.class="hidden"
+    @if (filled($formPendingWire))
+        x-data
+        x-bind:class="{ 'dply-unsaved-bar-visible': $wire.{{ $formPendingWire }} }"
+    @endif
     role="region"
     aria-label="{{ __('Unsaved changes') }}"
 >

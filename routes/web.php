@@ -143,7 +143,6 @@ use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
-use App\Livewire\Servers\WorkspaceQueueWorkers;
 use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Livewire\Servers\WorkspaceReleaseHygienePreview;
 use App\Livewire\Servers\WorkspaceRun;
@@ -194,6 +193,8 @@ use App\Livewire\Sites\SitePromote as SitesPromote;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\Workers;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
+use App\Livewire\Sites\WorkspacePipeline;
+use App\Livewire\Sites\WorkspaceSystemd;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
@@ -600,6 +601,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');
     });
     Route::livewire('servers/{server}/sites/{site}/env-diff', SitesEnvDiff::class)->name('sites.env-diff');
+    Route::get('servers/{server}/sites/{site}/deploy', function (Server $server, Site $site) {
+        return redirect()->route('sites.deployments.index', ['server' => $server, 'site' => $site] + request()->query());
+    });
+    Route::livewire('servers/{server}/sites/{site}/pipeline', WorkspacePipeline::class)->name('sites.pipeline');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/edge/deployments/{deployment}', EdgeDeploymentDetail::class)->name('sites.edge.deployments.show');
@@ -616,7 +621,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
-    Route::livewire('servers/{server}/sites/{site}/queue-workers', WorkspaceQueueWorkers::class)->name('sites.queue-workers');
+    Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
+    Route::get('servers/{server}/sites/{site}/queue-workers', function (Server $server, Site $site) {
+        return redirect()->route('sites.daemons', ['server' => $server, 'site' => $site] + request()->query());
+    })->name('sites.queue-workers');
+    Route::livewire('servers/{server}/sites/{site}/backups', WorkspaceBackups::class)->name('sites.backups');
     // BACKGROUND group for container/serverless workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
@@ -632,7 +641,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // tree, branches, and the connection config (account / repo /
     // deploy key / webhook). VM sites keep the legacy section partial
     // at `?section=repository`.
-    Route::livewire('servers/{server}/sites/{site}/repository', Repository::class)->name('sites.repository');
+    Route::livewire('servers/{server}/sites/{site}/source', Repository::class)->name('sites.repository');
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
@@ -649,9 +658,23 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
 
         if ($targetSection === 'webhooks') {
             $targetSection = 'notifications';
+        } elseif ($targetSection === 'deploy') {
+            return redirect()->route('sites.deployments.index', ['server' => $server, 'site' => $site] + $query);
+        } elseif ($targetSection === 'pipeline') {
+            return redirect()->route('sites.pipeline', ['server' => $server, 'site' => $site] + $query);
+        } elseif ($targetSection === 'dns') {
+            $query['tab'] = 'dns';
+            $targetSection = 'routing';
         } elseif (in_array($targetSection, ['domains', 'aliases', 'redirects', 'preview', 'tenants'], true)) {
             $query['tab'] = $targetSection;
             $targetSection = 'routing';
+        } elseif (in_array($targetSection, ['runtime-php', 'runtime-ruby', 'runtime-static'], true)) {
+            $query['tab'] = match ($targetSection) {
+                'runtime-php' => 'php',
+                'runtime-ruby' => 'ruby',
+                'runtime-static' => 'static',
+            };
+            $targetSection = 'runtime';
         }
 
         return redirect()->route('sites.show', [
@@ -768,6 +791,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/docker-preview', WorkspaceDockerPreview::class)->name('servers.docker-preview');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->middleware('server.service.installed')->name('servers.daemons');
+    Route::get('servers/{server}/queue-workers', function (Server $server) {
+        return redirect()->route('servers.daemons', array_merge(['server' => $server], request()->query()));
+    })->name('servers.queue-workers');
     Route::middleware('feature:workspace.schedule')->group(function (): void {
         Route::livewire('servers/{server}/schedule', WorkspaceSchedule::class)->name('servers.schedule');
     });

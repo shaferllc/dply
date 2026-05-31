@@ -45,6 +45,7 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->syncAccessGateFiles($site, $ssh, $emit);
         if ($this->writeSystemFileIfChanged($server, $ssh, $configFile, $this->builder->build($site))) {
             $emit->step('openlitespeed', 'writing site config: '.$configFile);
         }

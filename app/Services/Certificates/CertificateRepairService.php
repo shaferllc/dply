@@ -18,7 +18,7 @@ final class CertificateRepairService
         private readonly SiteWebserverConfigApplier $webserverConfigApplier,
     ) {}
 
-    public function repair(Site $site, SiteCertificate $certificate, ?string $userId = null): SiteCertificate
+    public function repair(Site $site, SiteCertificate $certificate, ?string $userId = null, ?string $consoleRunId = null): SiteCertificate
     {
         if (! in_array($certificate->status, [
             SiteCertificate::STATUS_FAILED,
@@ -38,7 +38,7 @@ final class CertificateRepairService
             'last_output' => null,
         ])->save();
 
-        ExecuteSiteCertificateJob::dispatch((string) $certificate->id, $userId);
+        ExecuteSiteCertificateJob::dispatch((string) $certificate->id, $userId, $consoleRunId);
 
         if ($site->ssl_status === Site::SSL_FAILED || $site->ssl_status === Site::SSL_NONE) {
             $site->update(['ssl_status' => Site::SSL_PENDING]);

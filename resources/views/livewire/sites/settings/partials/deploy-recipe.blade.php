@@ -189,9 +189,10 @@
                                         @endif
                                     </span>
                                     <span class="flex gap-3 text-xs">
-                                        <button type="button" wire:click="moveDeployStepUp({{ $step->id }})" class="text-brand-moss hover:underline">{{ __('Up') }}</button>
-                                        <button type="button" wire:click="moveDeployStepDown({{ $step->id }})" class="text-brand-moss hover:underline">{{ __('Down') }}</button>
-                                        <button type="button" wire:click="deleteDeployPipelineStep({{ $step->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
+                                        <button type="button" wire:click="openEditPipelineStep('{{ $step->id }}')" class="text-brand-forest hover:underline">{{ __('Edit') }}</button>
+                                        <button type="button" wire:click="moveDeployStepUp('{{ $step->id }}')" class="text-brand-moss hover:underline">{{ __('Up') }}</button>
+                                        <button type="button" wire:click="moveDeployStepDown('{{ $step->id }}')" class="text-brand-moss hover:underline">{{ __('Down') }}</button>
+                                        <button type="button" wire:click="deleteDeployPipelineStep('{{ $step->id }}')" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
                                     </span>
                                 </div>
                             </li>
@@ -220,29 +221,15 @@
         </div>
 
         @if (! $functionsHost)
-            <details class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
-                <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a pipeline step') }}</summary>
-                <form wire:submit="addDeployPipelineStep" class="mt-4 flex flex-wrap items-end gap-3">
-                    <div>
-                        <label for="new_deploy_step_type" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Step') }}</label>
-                        <select id="new_deploy_step_type" wire:model="new_deploy_step_type" class="min-w-[220px] rounded-md border-brand-ink/15 shadow-sm text-sm">
-                            @foreach (\App\Models\SiteDeployStep::typeLabels() as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="min-w-[220px] flex-1">
-                        <label for="new_deploy_step_command" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('npm script / custom command') }}</label>
-                        <input type="text" id="new_deploy_step_command" wire:model="new_deploy_step_command" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-sm" placeholder="build or full shell for custom" />
-                        <x-input-error :messages="$errors->get('new_deploy_step_command')" class="mt-1" />
-                    </div>
-                    <div>
-                        <label for="new_deploy_step_timeout" class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                        <input type="number" id="new_deploy_step_timeout" wire:model="new_deploy_step_timeout" min="30" max="3600" class="w-24 rounded-md border-brand-ink/15 shadow-sm text-sm" />
-                    </div>
-                    <x-primary-button type="submit">{{ __('Add step') }}</x-primary-button>
-                </form>
-            </details>
+            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Add or edit a pipeline step') }}</p>
+                <p class="mt-1 text-sm text-brand-moss">{{ __('Opens a modal to configure type, phase, timeout, and command.') }}</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <x-secondary-button type="button" wire:click="openAddPipelineStepForm">{{ __('Add step') }}</x-secondary-button>
+                    <x-secondary-button type="button" wire:click="openAddPipelineStepForm('custom', 'build')">{{ __('Custom command') }}</x-secondary-button>
+                </div>
+            </div>
+            @include('livewire.sites.partials.pipeline._pipeline-modals')
         @endif
         </div>
     </section>
@@ -280,74 +267,44 @@
     @endif
 
     <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
-                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hooks') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('before_clone runs in the deploy base directory. after_clone runs in the new release. after_activate runs after the current symlink updates on atomic deploys.') }}</p>
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-700 ring-amber-200">
+                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hooks') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline hooks') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                        {{ __('Shell scripts, HTTP webhooks, and notification channels live on the Pipeline timeline — before clone, after any build step, or after activate.') }}
+                    </p>
+                </div>
             </div>
+            <a
+                href="{{ route('sites.pipeline', [$server, $site, 'tab' => 'steps']) }}"
+                wire:navigate
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-forest"
+            >
+                <x-heroicon-m-wrench-screwdriver class="h-4 w-4" />
+                {{ __('Edit on Pipeline') }}
+            </a>
         </div>
-        <div class="space-y-4 p-6 sm:p-8">
-
-        <div class="grid gap-4 xl:grid-cols-3">
-            @foreach ($deployHookPhaseLabels as $phase => $phaseLabel)
-                <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
-                    <p class="text-sm font-semibold text-brand-ink">{{ $phaseLabel }}</p>
-                    <p class="mt-1 text-xs font-medium uppercase tracking-wide text-brand-moss">{{ $phase }}</p>
-                    @php
-                        $phaseHooks = $site->deployHooks->where('phase', $phase)->sortBy('sort_order');
-                    @endphp
-                    @if ($phaseHooks->isNotEmpty())
-                        <ul class="mt-3 space-y-3 text-sm">
-                            @foreach ($phaseHooks as $hook)
-                                <li class="rounded-xl border border-brand-ink/10 bg-white p-3">
-                                    <div class="mb-2 flex justify-between gap-3">
-                                        <span class="font-medium text-brand-ink">#{{ $hook->sort_order }} <span class="font-normal text-brand-moss">· {{ (int) ($hook->timeout_seconds ?? config('dply.default_deploy_hook_timeout_seconds', 900)) }}s</span></span>
-                                        <button type="button" wire:click="deleteDeployHook({{ $hook->id }})" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
-                                    </div>
-                                    <pre class="overflow-x-auto rounded-xl bg-brand-ink p-3 text-xs text-green-400">{{ \Illuminate\Support\Str::limit($hook->script, 500) }}</pre>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <p class="mt-3 text-sm text-brand-moss">{{ __('No hooks in this stage yet.') }}</p>
-                    @endif
-                </div>
-            @endforeach
-        </div>
-
-        <details class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4">
-            <summary class="cursor-pointer list-none text-sm font-semibold text-brand-ink">{{ __('Add a hook') }}</summary>
-            <form wire:submit="addDeployHook" class="mt-4 space-y-3">
-                <select wire:model="new_hook_phase" class="rounded-md border-brand-ink/15 text-sm">
-                    <option value="before_clone">before_clone</option>
-                    <option value="after_clone">after_clone</option>
-                    <option value="after_activate">after_activate</option>
-                </select>
-                <div class="flex flex-wrap items-end gap-3">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Sort order') }}</label>
-                        <x-text-input type="number" wire:model="new_hook_order" class="w-24 text-sm" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-brand-moss">{{ __('Timeout (s)') }}</label>
-                        <input type="number" wire:model="new_hook_timeout_seconds" min="30" max="3600" class="w-24 rounded-md border-brand-ink/15 shadow-sm text-sm" />
-                    </div>
-                </div>
-                <textarea wire:model="new_hook_script" rows="4" class="w-full rounded-md border-brand-ink/15 font-mono text-xs" placeholder="#!/usr/bin/env bash"></textarea>
-                <x-primary-button type="submit">{{ __('Add hook') }}</x-primary-button>
-            </form>
-        </details>
+        <div class="p-6 sm:p-8">
+            @php $hookCount = $site->deployHooks->count(); @endphp
+            <p class="text-sm text-brand-moss">
+                @if ($hookCount > 0)
+                    {{ trans_choice(':count hook on the active deploy pipeline|:count hooks on the active deploy pipeline', $hookCount, ['count' => $hookCount]) }}
+                @else
+                    {{ __('No hooks on the active pipeline yet.') }}
+                @endif
+            </p>
         </div>
     </section>
 
     {{-- Zero downtime + post-activate health check + the broader rollout
          form (releases, env, scheduler, supervisor, extra Nginx) sit
-         after Pipeline + Hooks so the page reads chronologically:
-         Source → Build → Pipeline → Hooks → Activate → Rollout. --}}
+         after Pipeline so the page reads chronologically:
+         Source → Build → Pipeline → Activate → Rollout. --}}
     @if (! $functionsHost)
         <form wire:submit="saveZeroDowntimeDeployment" class="dply-card overflow-hidden">
             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\OperatorSummaryController;
 use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\ServerController;
 use App\Http\Controllers\Api\ServerFirewallController;
+use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
 use Illuminate\Support\Facades\Route;
@@ -128,6 +129,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
+        Route::get('/servers/{server}/shared-host/explain', [ServerSharedHostController::class, 'explain'])
+            ->middleware('ability:'.$apiAbilities['servers.index']);
 
         Route::get('/servers/{server}/system-users', [ServerSystemUserApiController::class, 'index'])
             ->middleware('ability:'.$apiAbilities['servers.system_users.index']);

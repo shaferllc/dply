@@ -15,14 +15,13 @@ use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Services\Deploy\LocalRepositoryInspector;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
@@ -1222,18 +1221,11 @@ class Create extends Component
         // pipeline editor. Skips when no defaults apply (custom / null
         // runtime / unknown runtime).
         $effectiveFramework = (string) ($this->detectedPlan['framework'] ?? '');
-        $defaults = app(RuntimeAwareDeployStepDefaults::class)
-            ->defaultsFor($site->runtime, $effectiveFramework !== '' ? $effectiveFramework : null);
-        foreach ($defaults as $step) {
-            SiteDeployStep::create([
-                'site_id' => $site->id,
-                'sort_order' => $step['sort_order'],
-                'step_type' => $step['step_type'],
-                'phase' => $step['phase'],
-                'custom_command' => $step['custom_command'] ?? null,
-                'timeout_seconds' => $step['timeout_seconds'],
-            ]);
-        }
+        app(SiteDeployPipelineManager::class)->seedRuntimeDefaults(
+            $site,
+            $site->runtime,
+            $effectiveFramework !== '' ? $effectiveFramework : null,
+        );
 
         SiteDomain::query()->create([
             'site_id' => $site->id,

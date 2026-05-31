@@ -268,6 +268,10 @@ class Repository extends Component
             'providerKind' => (string) ($this->site->repositoryMeta()['git_provider_kind'] ?? ''),
         ];
 
+        if ($payload['currentRepositoryUrl'] === '') {
+            return view('livewire.sites.repository', $payload + $this->renderConnectionPayload($browser, $user));
+        }
+
         return view('livewire.sites.repository', match ($this->tab) {
             'files' => $payload + $this->renderFilesPayload($reader, $user, $branchInUse),
             'branches' => $payload + $this->renderBranchesPayload($reader, $user),

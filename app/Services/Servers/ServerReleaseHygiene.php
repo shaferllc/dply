@@ -350,7 +350,7 @@ final class ServerReleaseHygiene
                 'severity' => 'critical',
                 'title' => __('Root disk critically full'),
                 'message' => __('Disk is at :pct% — prune releases and rotate logs before deploys fail.', ['pct' => number_format($pct, 0)]),
-                'href' => route('servers.health', $server),
+                'href' => route('servers.health', [$server, 'tab' => 'capacity']),
                 'link_label' => __('Open health'),
             ]];
         }

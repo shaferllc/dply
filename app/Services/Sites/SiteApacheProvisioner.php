@@ -43,6 +43,7 @@ class SiteApacheProvisioner extends AbstractSiteWebserverProvisioner implements 
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->syncAccessGateFiles($site, $ssh, $emit);
         if ($this->writeSystemFileIfChanged($server, $ssh, $confFile, $config)) {
             $emit->step('apache', 'writing site config file: '.$confFile);
         }
