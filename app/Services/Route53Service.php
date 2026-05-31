@@ -35,13 +35,65 @@ class Route53Service
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
         $zoneId = $this->findHostedZoneId($zone);
-        $fqdn = rtrim($name, '.').'.'.rtrim($zone, '.').'.';
+        $fqdn = $this->fqdnForRecord($name, $zone);
 
         $this->client->changeResourceRecordSets([
             'HostedZoneId' => $zoneId,
             'ChangeBatch' => [
                 'Changes' => [[
                     'Action' => 'UPSERT',
+                    'ResourceRecordSet' => [
+                        'Name' => $fqdn,
+                        'Type' => strtoupper($type),
+                        'TTL' => 60,
+                        'ResourceRecords' => [
+                            ['Value' => $value],
+                        ],
+                    ],
+                ]],
+            ],
+        ]);
+
+        return [
+            'id' => implode('|', [$zoneId, $fqdn, strtoupper($type), $value]),
+            'name' => self::normalizeRecordName($name, $zone),
+            'value' => $value,
+            'type' => strtoupper($type),
+        ];
+    }
+
+    public function hostedZoneExists(string $zone): bool
+    {
+        try {
+            $this->findHostedZoneId($zone);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public function deleteRecord(string $recordId): void
+    {
+        if ($recordId === '' || ! str_contains($recordId, '|')) {
+            return;
+        }
+
+        $parts = explode('|', $recordId, 4);
+        if (count($parts) !== 4) {
+            return;
+        }
+
+        [$zoneId, $fqdn, $type, $value] = $parts;
+        if ($zoneId === '' || $fqdn === '' || $type === '' || $value === '') {
+            return;
+        }
+
+        $this->client->changeResourceRecordSets([
+            'HostedZoneId' => $zoneId,
+            'ChangeBatch' => [
+                'Changes' => [[
+                    'Action' => 'DELETE',
                     'ResourceRecordSet' => [
                         'Name' => $fqdn,
                         'Type' => $type,
@@ -53,13 +105,34 @@ class Route53Service
                 ]],
             ],
         ]);
+    }
 
-        return [
-            'id' => $zoneId.':'.$fqdn.':'.$type,
-            'name' => $name,
-            'value' => $value,
-            'type' => $type,
-        ];
+    public static function normalizeRecordName(string $recordName, string $zoneName): string
+    {
+        $recordName = strtolower(trim($recordName));
+        $zoneName = strtolower(trim($zoneName));
+
+        if ($recordName === '' || $recordName === '@' || ($zoneName !== '' && $recordName === $zoneName)) {
+            return '';
+        }
+
+        if ($zoneName !== '' && str_ends_with($recordName, '.'.$zoneName)) {
+            $recordName = substr($recordName, 0, -1 * (strlen($zoneName) + 1));
+        }
+
+        return $recordName;
+    }
+
+    private function fqdnForRecord(string $name, string $zone): string
+    {
+        $relative = self::normalizeRecordName($name, $zone);
+        $zone = rtrim(strtolower(trim($zone)), '.');
+
+        if ($relative === '') {
+            return $zone.'.';
+        }
+
+        return $relative.'.'.$zone.'.';
     }
 
     private function findHostedZoneId(string $zone): string

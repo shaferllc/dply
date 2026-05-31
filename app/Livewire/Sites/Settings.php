@@ -42,6 +42,7 @@ use App\Services\LinodeService;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\RemoteCli\Artisan;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\Route53Service;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
@@ -55,7 +56,6 @@ use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
-use App\Services\VultrService;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\SiteSettingsSidebar;
@@ -1576,7 +1576,7 @@ class Settings extends Show
             $appDoToken = trim((string) config('services.digitalocean.token'));
 
             if ($credForApi === null && $appDoToken === '') {
-                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, Vultr, Google Cloud, Azure, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
+                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, Vultr, AWS, Google Cloud, Azure, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
 
                 return;
             }
@@ -1608,6 +1608,13 @@ class Settings extends Show
                         $vultr = new VultrService($credForApi);
                         if (! $vultr->domainExists($zone)) {
                             $this->addError('settings_dns_zone', __('That domain was not found in this Vultr account. Add it under Vultr → DNS first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'aws') {
+                        $route53 = new Route53Service($credForApi);
+                        if (! $route53->hostedZoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That hosted zone was not found in this AWS account. Create it in Route 53 first.'));
 
                             return;
                         }

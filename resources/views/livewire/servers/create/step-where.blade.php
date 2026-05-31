@@ -92,14 +92,14 @@
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Full stack VM, Docker-only host, or register a managed Kubernetes cluster.') }}</p>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Traditional VM, Docker-only host, or register a managed Kubernetes cluster.') }}</p>
                         </div>
                         <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                     </div>
                     <div class="p-6 sm:p-7">
                         <div class="grid gap-3 sm:grid-cols-3">
                             @foreach ([
-                                ['kind' => 'vm', 'icon' => 'server', 'label' => __('Full stack VM'), 'desc' => __('Nginx, PHP, your database — the traditional VPS-style setup.')],
+                                ['kind' => 'vm', 'icon' => 'server', 'label' => __('Traditional VM'), 'desc' => __('A traditional VPS — install whatever software and stack you need.')],
                                 ['kind' => 'docker', 'icon' => 'cube-transparent', 'label' => __('Docker host'), 'desc' => __('Skip the stack install. Dply provisions Docker and orchestrates containers.')],
                                 ['kind' => 'kubernetes', 'icon' => 'server-stack', 'label' => __('Managed Kubernetes'), 'desc' => __('Register an existing DOKS or EKS cluster — dply deploys into it.')],
                             ] as $opt)
@@ -331,14 +331,14 @@
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Standard VM/VPS gets the full dply stack; Docker host is just Docker + your containers.') }}</p>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Traditional VM/VPS over SSH, or a Docker host for container workloads.') }}</p>
                         </div>
                         <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
                     </div>
                     <div class="p-6 sm:p-7">
                         <div class="grid gap-3 sm:grid-cols-2">
                             @foreach ([
-                                ['kind' => 'vm', 'icon' => 'server', 'label' => __('Standard VM / VPS'), 'desc' => __('Dply installs Nginx, PHP, your database — full stack setup.')],
+                                ['kind' => 'vm', 'icon' => 'server', 'label' => __('Traditional VM / VPS'), 'desc' => __('Your server — install whatever software and stack you need.')],
                                 ['kind' => 'docker', 'icon' => 'cube-transparent', 'label' => __('Docker host'), 'desc' => __('Skip stack install. Dply just connects over SSH and orchestrates containers.')],
                             ] as $opt)
                                 @php $selected = $form->custom_host_kind === $opt['kind']; @endphp

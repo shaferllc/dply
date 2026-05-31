@@ -673,10 +673,23 @@
     @case('aws')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Create an IAM user with EC2 and Route 53 permissions, then paste the access key ID and secret. The same credential powers EC2 server provisioning and Route 53 DNS automation.') }}</p>
+                    <a
+                        href="https://console.aws.amazon.com/iam/home#/users"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#232F3E] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1a232e] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open AWS IAM console') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your access keys') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="aws_name" :value="__('Label (optional)')" />
-                        <x-text-input id="aws_name" wire:model="aws_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="aws_name" wire:model="aws_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production account') }}" />
                     </div>
                     <div>
                         <x-input-label for="aws_access_key_id" :value="__('Access key ID')" />
@@ -686,9 +699,16 @@
                     <div>
                         <x-input-label for="aws_secret_access_key" :value="__('Secret access key')" />
                         <x-text-input id="aws_secret_access_key" wire:model="aws_secret_access_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Use least-privilege IAM policies for EC2 and Route 53. Create keys under :link.', ['link' => '<a href="https://console.aws.amazon.com/iam/home#/users" target="_blank" rel="noopener" class="'.$link.'">AWS IAM</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('aws_secret_access_key')" class="mt-2" />
                     </div>
-                    <x-primary-button type="button" wire:click="storeAws" wire:loading.attr="disabled" wire:target="storeAws">{{ __('Save') }}</x-primary-button>
+                    <x-primary-button type="button" wire:click="storeAws" wire:loading.attr="disabled" wire:target="storeAws">
+                        <span wire:loading.remove wire:target="storeAws">{{ __('Connect AWS') }}</span>
+                        <span wire:loading wire:target="storeAws" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>

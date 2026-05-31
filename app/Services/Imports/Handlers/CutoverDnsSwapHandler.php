@@ -18,6 +18,7 @@ use App\Services\HetznerService;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\WaitForTargetServerException;
 use App\Services\LinodeService;
+use App\Services\Route53Service;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Services\VultrService;
 use Illuminate\Support\Facades\Log;
@@ -133,10 +134,11 @@ class CutoverDnsSwapHandler implements StepHandler
             'hetzner' => (new HetznerService($credential))->zoneExists($zone),
             'linode', 'akamai' => (new LinodeService($credential))->domainExists($zone),
             'vultr' => (new VultrService($credential))->domainExists($zone),
+            'aws' => (new Route53Service($credential))->hostedZoneExists($zone),
             'gcp' => (new GcpDnsService($credential))->zoneExists($zone),
             'azure' => (new AzureDnsService($credential))->zoneExists($zone),
             'cloudflare' => (new CloudflareDnsService($credential))->zoneExists($zone),
-            default => false, // gandi/namecheap/vercel_dns/route53 — not yet wired
+            default => false,
         };
     }
 
@@ -174,7 +176,7 @@ class CutoverDnsSwapHandler implements StepHandler
 
         return match ($credential->provider) {
             'digitalocean' => $this->swapViaDigitalOcean($credential, $domain, $zone, $relative, $newIp),
-            'hetzner', 'linode', 'akamai', 'vultr', 'gcp', 'azure' => $this->swapViaDnsProvider($credential, $zone, $relative, $newIp),
+            'hetzner', 'linode', 'akamai', 'vultr', 'aws', 'gcp', 'azure' => $this->swapViaDnsProvider($credential, $zone, $relative, $newIp),
             'cloudflare' => $this->swapViaCloudflare($credential, $domain, $zone, $relative, $newIp),
             default => [
                 'strategy' => 'instructions',

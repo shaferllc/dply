@@ -205,7 +205,7 @@
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-brand-mist">
                                 <x-heroicon-o-hashtag class="h-4 w-4" aria-hidden="true" />
                             </span>
-                            <x-text-input id="form_name" wire:model="form.name" type="text" class="block w-full pl-9 font-mono text-base" required autocomplete="off" />
+                            <x-text-input id="form_name" wire:model.live="form.name" type="text" class="block w-full pl-9 font-mono text-base" required autocomplete="off" />
                         </div>
                         <button
                             type="button"

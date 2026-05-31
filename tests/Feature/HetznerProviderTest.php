@@ -145,6 +145,7 @@ test('resolve hetzner catalog returns locations and server types', function () {
                     'name' => 'cx22',
                     'memory' => 4,
                     'cores' => 2,
+                    'disk' => 80,
                     'prices' => [
                         [
                             'price_monthly' => ['gross' => '5.49'],
@@ -172,6 +173,8 @@ test('resolve hetzner catalog returns locations and server types', function () {
     expect($catalog['regions'][0]['value'])->toBe('fsn1');
     expect($catalog['sizes'])->toHaveCount(1);
     expect($catalog['sizes'][0]['value'])->toBe('cx22');
+    expect($catalog['sizes'][0]['disk_gb'])->toBe(80);
+    expect($catalog['sizes'][0]['label'])->toContain('80GB');
     expect($catalog['region_label'])->toBe('Location');
 });
 

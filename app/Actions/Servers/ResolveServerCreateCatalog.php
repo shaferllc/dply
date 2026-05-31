@@ -347,17 +347,24 @@ final class ResolveServerCreateCatalog
                 if ($v === '') {
                     continue;
                 }
+                $memGb = (int) ($st['memory'] ?? 0);
+                $cores = (int) ($st['cores'] ?? 0);
+                $diskGb = (int) ($st['disk'] ?? 0);
                 $monthly = $this->extractFloat($st, ['prices.0.price_monthly.gross', 'prices.0.price_monthly.net']);
                 $hourly = $this->extractFloat($st, ['prices.0.price_hourly.gross', 'prices.0.price_hourly.net']);
+                $spec = $memGb.'GB / '.$cores.' '.__('vCPU');
+                if ($diskGb > 0) {
+                    $spec .= ' / '.$diskGb.'GB '.__('disk');
+                }
                 $sizes[] = [
                     'value' => $v,
-                    'label' => $v.' — '.((int) ($st['memory'] ?? 0)).'GB / '.((int) ($st['cores'] ?? 0)).' vCPU'.$this->formatPriceSuffix($monthly, $hourly),
+                    'label' => $v.' — '.$spec.$this->formatPriceSuffix($monthly, $hourly),
                     'price_monthly' => $monthly,
                     'price_hourly' => $hourly,
                     'pricing_source' => ($monthly !== null || $hourly !== null) ? 'provider_catalog' : null,
-                    'memory_mb' => ((int) ($st['memory'] ?? 0)) > 0 ? ((int) ($st['memory'] ?? 0)) * 1024 : null,
-                    'vcpus' => ((int) ($st['cores'] ?? 0)) > 0 ? (int) ($st['cores'] ?? 0) : null,
-                    'disk_gb' => null,
+                    'memory_mb' => $memGb > 0 ? $memGb * 1024 : null,
+                    'vcpus' => $cores > 0 ? $cores : null,
+                    'disk_gb' => $diskGb > 0 ? $diskGb : null,
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);

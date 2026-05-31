@@ -17,6 +17,8 @@ class Route53DnsProvider implements DnsProvider
 
     public function deleteRecord(string $zone, string $recordId): void
     {
-        // Route53 deletions are not wired yet because record payload reconstruction is still missing.
+        unset($zone);
+
+        $this->service->deleteRecord($recordId);
     }
 }
