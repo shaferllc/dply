@@ -6,8 +6,11 @@ namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
 use App\Actions\Servers\Support\ServerProviderTypeMap;
+use App\Enums\ServerProvider;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
+use App\Models\Server;
+use App\Models\Site;
 use App\Support\ServerProviderGate;
 
 /**
@@ -18,7 +21,7 @@ final class ListServerProviderCards
     use AsObject;
 
     /**
-     * @return list<array{id: string, label: string, linked: bool}>
+     * @return list<array{id: string, label: string, linked: bool, server_count: int, site_count: int}>
      */
     public function handle(?Organization $org): array
     {
@@ -26,20 +29,79 @@ final class ListServerProviderCards
             ? ProviderCredential::query()->where('organization_id', $org->id)->get()->groupBy('provider')
             : collect();
 
+        $serverCounts = $this->serverCountsByProvider($org);
+        $siteCounts = $this->siteCountsByProvider($org);
+
         $cards = [];
         foreach ($this->definitions() as $def) {
             if (! ServerProviderGate::enabled($def['id'])) {
                 continue;
             }
             $pkey = ServerProviderTypeMap::toCredentialProvider($def['id']);
+            $countKey = $pkey ?? $def['id'];
             $cards[] = [
                 'id' => $def['id'],
                 'label' => $def['label'],
                 'linked' => $def['id'] === 'custom' || ($pkey !== null && $grouped->has($pkey)),
+                'server_count' => (int) ($serverCounts[$countKey] ?? 0),
+                'site_count' => (int) ($siteCounts[$countKey] ?? 0),
             ];
         }
 
         return $cards;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function serverCountsByProvider(?Organization $org): array
+    {
+        if (! $org) {
+            return [];
+        }
+
+        return Server::query()
+            ->where('organization_id', $org->id)
+            ->whereNotNull('provider')
+            ->groupBy('provider')
+            ->selectRaw('provider, COUNT(*) as aggregate')
+            ->pluck('aggregate', 'provider')
+            ->mapWithKeys(fn (int|string $count, mixed $provider): array => [
+                $this->normalizeProviderKey($provider) => (int) $count,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function siteCountsByProvider(?Organization $org): array
+    {
+        if (! $org) {
+            return [];
+        }
+
+        return Site::query()
+            ->where('sites.organization_id', $org->id)
+            ->whereNotNull('sites.server_id')
+            ->join('servers', 'sites.server_id', '=', 'servers.id')
+            ->whereNotNull('servers.provider')
+            ->groupBy('servers.provider')
+            ->selectRaw('servers.provider, COUNT(sites.id) as aggregate')
+            ->pluck('aggregate', 'provider')
+            ->mapWithKeys(fn (int|string $count, mixed $provider): array => [
+                $this->normalizeProviderKey($provider) => (int) $count,
+            ])
+            ->all();
+    }
+
+    private function normalizeProviderKey(mixed $provider): string
+    {
+        if ($provider instanceof ServerProvider) {
+            return $provider->value;
+        }
+
+        return (string) $provider;
     }
 
     /**

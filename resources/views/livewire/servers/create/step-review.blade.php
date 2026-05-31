@@ -265,6 +265,25 @@
                                     <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
                                 </span>
                             @endif
+                            @if (in_array($form->server_role, ['redis', 'valkey'], true) && ($form->cache_remote_access || $form->cache_require_password))
+                                @if ($form->cache_remote_access && $form->cache_allowed_from !== '')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache access') }}</span>
+                                        <span class="font-medium font-mono text-brand-ink">{{ $form->cache_allowed_from }}</span>
+                                    </span>
+                                @elseif ($form->cache_remote_access)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache access') }}</span>
+                                        <span class="font-medium text-brand-ink">{{ __('Remote (CIDR pending)') }}</span>
+                                    </span>
+                                @endif
+                                @if ($form->cache_require_password)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache auth') }}</span>
+                                        <span class="font-medium text-brand-ink">{{ __('Password required') }}</span>
+                                    </span>
+                                @endif
+                            @endif
                             @foreach ($languageRuntimes as $name => $version)
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
                                     <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $name }}</span>
@@ -438,11 +457,11 @@
         </footer>
       </div>
 
-      {{-- Sidebar: cost preview + helper context, sticky on lg.
+      {{-- Sidebar: cost preview + helper context.
            The preflight checks panel stays in the main column where
            it has room; the cost preview lifts up here so the operator
            sees pricing at a glance while scanning the summary. --}}
-      <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+      <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
         @if ($isKubernetes)
             <div data-testid="k8s-billing-disclosure" class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                 <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">

@@ -11,9 +11,37 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
+test('seeds cache auth password and firewall rule from meta', function () {
+    $password = 'SeedCache-Password12';
+    $server = makeServer([
+        'meta' => [
+            'cache_service' => 'redis',
+            'cache_server' => [
+                'remote_access' => true,
+                'allowed_from' => '10.10.0.0/16',
+                'require_password' => true,
+                'password_encrypted' => Crypt::encryptString($password),
+            ],
+        ],
+    ]);
+
+    app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    $row = ServerCacheService::query()->where('server_id', $server->id)->first();
+    expect($row)->not->toBeNull();
+    expect($row->auth_password)->toBe($password);
+
+    $this->assertDatabaseHas('server_firewall_rules', [
+        'server_id' => $server->id,
+        'port' => 6379,
+        'source' => '10.10.0.0/16',
+        'action' => 'allow',
+    ]);
+});
 test('seeds cache and database rows from meta', function () {
     $server = makeServer([
         'meta' => [

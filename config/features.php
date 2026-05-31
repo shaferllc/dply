@@ -93,7 +93,7 @@ return [
     */
     'cache' => [
         // exit: ship once Valkey install + engine-switch validated on Ubuntu 22.04/24.04 + Debian 12
-        'valkey' => env('FEATURE_CACHE_VALKEY', false),
+        'valkey' => env('FEATURE_CACHE_VALKEY', true),
         // exit: ship once Memcached install + connection snippet validated on three OSes
         'memcached' => env('FEATURE_CACHE_MEMCACHED', false),
         // exit: ship once KeyDB upstream distro coverage is validated end-to-end

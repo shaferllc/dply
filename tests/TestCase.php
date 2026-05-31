@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Actions\Servers\GetProviderCredentialsForServerType;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +59,8 @@ abstract class TestCase extends BaseTestCase
         } catch (\Throwable) {
             // Best-effort cleanup only.
         }
+
+        GetProviderCredentialsForServerType::flushMemo();
 
         parent::tearDown();
     }

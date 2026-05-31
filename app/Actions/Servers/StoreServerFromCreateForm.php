@@ -130,6 +130,10 @@ final class StoreServerFromCreateForm
                 'python' => $form->python_version,
                 'go' => $form->go_version,
             ],
+            cacheRemoteAccess: $form->cache_remote_access,
+            cacheAllowedFrom: $form->cache_allowed_from,
+            cacheRequirePassword: $form->cache_require_password,
+            cachePassword: $form->cache_password !== '' ? $form->cache_password : null,
         );
 
         // Provider-mode Docker hosts: tag the meta so Server::hostKind() returns

@@ -826,6 +826,51 @@ test('servers create step where shows provider account + region + size pickers',
         ->assertSee('Region & size');
 });
 
+test('servers create step where shows role-aware size guidance for redis', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+        'https://api.digitalocean.com/v2/regions' => Http::response([
+            'regions' => [['slug' => 'nyc3', 'name' => 'New York 3', 'available' => true]],
+        ], 200),
+        'https://api.digitalocean.com/v2/sizes' => Http::response([
+            'sizes' => [
+                ['slug' => 's-1vcpu-1gb', 'memory' => 1024, 'vcpus' => 1, 'disk' => 25, 'price_monthly' => 6, 'available' => true],
+                ['slug' => 's-2vcpu-4gb', 'memory' => 4096, 'vcpus' => 2, 'disk' => 80, 'price_monthly' => 24, 'available' => true],
+            ],
+        ], 200),
+    ]);
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Primary DO',
+        'credentials' => ['api_token' => 'token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'region' => 'nyc3',
+        'size' => 's-1vcpu-1gb',
+        'name' => 'redis-host',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSee('What is this server for?')
+        ->call('chooseServerRole', 'redis')
+        ->assertSet('form.server_role', 'redis')
+        ->assertSet('form.install_profile', 'redis_server')
+        ->assertSee('Sizing recommendations are tuned for Cache / key-value server.')
+        ->assertSee('Too small for Cache / key-value server');
+});
+
 test('servers create generates a name and can regenerate it', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();

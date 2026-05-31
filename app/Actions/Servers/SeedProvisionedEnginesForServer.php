@@ -8,7 +8,12 @@ use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseEngine;
+use App\Models\ServerFirewallRule;
 use App\Services\Servers\ServerProvisionCommandBuilder;
+use App\Support\Servers\CacheServiceNetworkExposure;
+use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,7 +47,7 @@ class SeedProvisionedEnginesForServer
         $meta = $server->meta ?? [];
 
         return DB::transaction(function () use ($server, $meta): array {
-            $cacheCreated = $this->seedCacheService($server, (string) ($meta['cache_service'] ?? ''));
+            $cacheCreated = $this->seedCacheService($server, (string) ($meta['cache_service'] ?? ''), $meta);
             $dbCreated = $this->seedDatabaseEngine($server, (string) ($meta['database'] ?? ''));
 
             return [
@@ -52,7 +57,7 @@ class SeedProvisionedEnginesForServer
         });
     }
 
-    private function seedCacheService(Server $server, string $engine): bool
+    private function seedCacheService(Server $server, string $engine, array $meta): bool
     {
         $engine = trim($engine);
         if ($engine === '' || $engine === 'none' || ! in_array($engine, ServerCacheService::ENGINES, true)) {
@@ -68,15 +73,83 @@ class SeedProvisionedEnginesForServer
             return false;
         }
 
-        ServerCacheService::query()->create([
+        $cacheServerMeta = is_array($meta['cache_server'] ?? null) ? $meta['cache_server'] : [];
+        $authPassword = $this->resolveCacheAuthPassword($cacheServerMeta);
+
+        $row = ServerCacheService::query()->create([
             'server_id' => $server->id,
             'engine' => $engine,
             'name' => ServerCacheService::DEFAULT_INSTANCE_NAME,
             'status' => ServerCacheService::STATUS_RUNNING,
             'port' => ServerCacheService::defaultPortFor($engine),
+            'auth_password' => $authPassword,
         ]);
 
+        $this->seedCacheFirewallRuleFromMeta($server, $row, $cacheServerMeta);
+
         return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $cacheServerMeta
+     */
+    private function resolveCacheAuthPassword(array $cacheServerMeta): ?string
+    {
+        if (! ($cacheServerMeta['require_password'] ?? false)) {
+            return null;
+        }
+
+        $encrypted = $cacheServerMeta['password_encrypted'] ?? null;
+        if (! is_string($encrypted) || $encrypted === '') {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($encrypted);
+        } catch (DecryptException) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $cacheServerMeta
+     */
+    private function seedCacheFirewallRuleFromMeta(Server $server, ServerCacheService $row, array $cacheServerMeta): void
+    {
+        if (! ($cacheServerMeta['remote_access'] ?? false)) {
+            return;
+        }
+
+        if (! DedicatedCacheServerProvisionConfig::engineSupportsRemoteAccess($row->engine)) {
+            return;
+        }
+
+        $source = trim((string) ($cacheServerMeta['allowed_from'] ?? ''));
+        if (! DedicatedCacheServerProvisionConfig::isAllowedSourceCidr($source)) {
+            return;
+        }
+
+        $tag = CacheServiceNetworkExposure::firewallRuleTag($row);
+        $exists = ServerFirewallRule::query()
+            ->where('server_id', $server->id)
+            ->whereJsonContains('tags', $tag)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id,
+            'name' => sprintf('Cache · %s (%s)', ucfirst($row->engine), $row->name),
+            'port' => (int) $row->port,
+            'protocol' => 'tcp',
+            'source' => $source,
+            'action' => 'allow',
+            'enabled' => true,
+            'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
+            'tags' => ['dply-cache', $tag],
+        ]);
     }
 
     private function seedDatabaseEngine(Server $server, string $engine): bool

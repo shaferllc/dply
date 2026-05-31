@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -119,6 +120,92 @@ test('step what view renders featured preset tiles', function () {
         ->assertSee('Rails app')
         ->assertSee('Next.js / Node API')
         ->assertSee('Django / FastAPI');
+});
+
+test('step what hides app templates for dedicated redis server purpose', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    ServerCreateDraft::query()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'step' => 3,
+        'payload' => [
+            'mode' => 'provider',
+            'type' => 'hetzner',
+            'name' => 'redis-host',
+            'server_role' => 'redis',
+            'install_profile' => 'redis_server',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'none',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(StepWhat::class)
+        ->assertSee('What we\'ll install')
+        ->assertSee('Cache engine')
+        ->assertSee('Cache / key-value server')
+        ->assertSee('Redis')
+        ->assertSee('Network access')
+        ->assertSee('Localhost only')
+        ->assertSee('Other servers on my network')
+        ->assertSee('Provision preview')
+        ->assertSee('Valkey')
+        ->assertSee('Soon')
+        ->assertDontSee('Pick a stack template')
+        ->assertDontSee('Polyglot host');
+});
+
+test('dedicated cache wizard supports engine and network access pickers', function () {
+    config(['features.cache.valkey' => true]);
+    Feature::flushCache();
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    ServerCreateDraft::query()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'step' => 3,
+        'payload' => [
+            'mode' => 'provider',
+            'type' => 'hetzner',
+            'name' => 'cache-host',
+            'server_role' => 'redis',
+            'install_profile' => 'redis_server',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'none',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(StepWhat::class)
+        ->call('chooseDedicatedCacheEngine', 'valkey')
+        ->assertSet('form.cache_service', 'valkey')
+        ->call('chooseCacheNetworkAccess', 'remote')
+        ->assertSet('form.cache_remote_access', true)
+        ->call('chooseCacheAuthMode', 'password')
+        ->assertSet('form.cache_require_password', true)
+        ->assertNotSet('form.cache_password', '');
+});
+
+test('changing an override keeps the overrides panel open', function () {
+    $user = seedUserWithDraft();
+
+    Livewire::actingAs($user)
+        ->test(StepWhat::class)
+        ->set('overridesPanelOpen', true)
+        ->set('form.install_profile', 'queue_worker')
+        ->assertSet('overridesPanelOpen', true);
 });
 function seedUserWithDraft(): User
 {

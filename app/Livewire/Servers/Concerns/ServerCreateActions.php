@@ -16,8 +16,11 @@ use App\Livewire\Forms\ServerCreateForm;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\ServerCacheService;
 use App\Services\SshConnectionFactory;
 use App\Support\ServerProviderGate;
+use App\Support\Servers\CacheEngineAvailability;
+use App\Support\Servers\DedicatedCacheServerProvisionConfig;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -225,7 +228,7 @@ trait ServerCreateActions
     }
 
     /**
-     * @return list<array{id: string, label: string, linked: bool}>
+     * @return list<array{id: string, label: string, linked: bool, server_count: int, site_count: int}>
      */
     protected function listServerProviderCards(): array
     {
@@ -248,7 +251,7 @@ trait ServerCreateActions
 
     /**
      * @param  list<array{id: string, label: string, linked: bool}>  $cards
-     * @return list<array{id: string, label: string, linked: bool}>
+     * @return list<array{id: string, label: string, linked: bool, server_count: int, site_count: int}>
      */
     protected function provisionProviderCardsFromList(array $cards): array
     {
@@ -272,7 +275,7 @@ trait ServerCreateActions
         return 'digitalocean';
     }
 
-    protected function syncProvisionPreferenceFields(): void
+    protected function syncProvisionPreferenceFields(?Collection $credentials = null): void
     {
         if (in_array($this->form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
             return;
@@ -280,7 +283,7 @@ trait ServerCreateActions
 
         $org = auth()->user()?->currentOrganization();
         $hasLinkedCredential = $org
-            ? GetProviderCredentialsForServerType::run($org, $this->form->type)->isNotEmpty()
+            ? ($credentials ?? GetProviderCredentialsForServerType::run($org, $this->form->type))->isNotEmpty()
             : false;
 
         $opts = FilterServerProvisionOptionsForCreateForm::run(
@@ -341,7 +344,7 @@ trait ServerCreateActions
         $this->form->provider_credential_id = (string) $credential->id;
         $this->active_provider = $type;
         $this->applyInstallProfile();
-        $this->syncProvisionPreferenceFields();
+        $this->syncProvisionPreferenceFields($credentials);
 
         $catalog = $this->resolveServerCreateCatalog($org, '');
 
@@ -624,6 +627,12 @@ trait ServerCreateActions
 
     protected function ensureInstallProfileMatchesCurrentSelections(): void
     {
+        if ($this->isDedicatedCacheServerPurposeRole()) {
+            $this->normalizeDedicatedCacheServerForm();
+
+            return;
+        }
+
         $matching = collect(config('server_provision_options.install_profiles', []))->first(function (array $profile): bool {
             return ($profile['server_role'] ?? null) === $this->form->server_role
                 && ($profile['cache_service'] ?? null) === $this->form->cache_service
@@ -635,6 +644,272 @@ trait ServerCreateActions
         $this->form->install_profile = is_array($matching)
             ? (string) $matching['id']
             : '';
+    }
+
+    protected function installProfileIdForServerRole(string $serverRole): ?string
+    {
+        return match ($serverRole) {
+            'redis', 'valkey' => 'redis_server',
+            'database' => 'database_node',
+            'worker' => 'queue_worker',
+            'plain' => 'static_app_host',
+            'application' => 'laravel_app',
+            default => null,
+        };
+    }
+
+    protected function isDedicatedCacheServerPurposeRole(?string $role = null): bool
+    {
+        return in_array($role ?? $this->form->server_role, ['redis', 'valkey'], true);
+    }
+
+    protected function normalizeDedicatedCacheServerForm(): void
+    {
+        if (! $this->isDedicatedCacheServerPurposeRole()) {
+            return;
+        }
+
+        if ($this->form->server_role === 'valkey' && ($this->form->cache_service === 'none' || $this->form->cache_service === '')) {
+            $this->form->cache_service = 'valkey';
+        }
+
+        $this->form->server_role = 'redis';
+
+        if ($this->form->cache_service === 'none' || $this->form->cache_service === '') {
+            $this->form->cache_service = 'redis';
+        }
+
+        if (! DedicatedCacheServerProvisionConfig::engineSupportsRemoteAccess($this->form->cache_service)) {
+            $this->form->cache_remote_access = false;
+            $this->form->cache_allowed_from = '';
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($this->form->cache_service)) {
+            $this->form->cache_require_password = false;
+            $this->form->cache_password = '';
+        }
+
+        $this->form->install_profile = 'redis_server';
+    }
+
+    /**
+     * All cache engines for the dedicated-host tile grid — includes Pennant-gated
+     * engines as coming-soon rows so operators see Valkey/KeyDB/etc. even when
+     * {@see FilterServerProvisionOptionsForCreateForm} strips them from pickers.
+     *
+     * @return list<array{id: string, label: string, coming_soon?: bool}>
+     */
+    protected function dedicatedCacheEngineOptions(array $provisionOptions): array
+    {
+        $options = collect($provisionOptions['cache_services'] ?? [])
+            ->filter(fn (array $row): bool => ($row['id'] ?? '') !== 'none')
+            ->values();
+
+        $presentIds = $options->pluck('id')->all();
+
+        foreach (CacheEngineAvailability::GATED_ENGINES as $engine) {
+            if (in_array($engine, $presentIds, true)) {
+                continue;
+            }
+
+            if (! CacheEngineAvailability::isComingSoon($engine)) {
+                continue;
+            }
+
+            if (! $this->dedicatedCacheEngineAllowedForProvider($engine)) {
+                continue;
+            }
+
+            $configRow = collect(config('server_provision_options.cache_services', []))
+                ->firstWhere('id', $engine);
+
+            if (! is_array($configRow)) {
+                continue;
+            }
+
+            $options->push([
+                'id' => $engine,
+                'label' => (string) ($configRow['label'] ?? $engine),
+                'coming_soon' => true,
+            ]);
+        }
+
+        return $options->all();
+    }
+
+    protected function dedicatedCacheEngineAllowedForProvider(string $engine): bool
+    {
+        $row = collect(config('server_provision_options.cache_services', []))
+            ->firstWhere('id', $engine);
+
+        if (! is_array($row)) {
+            return false;
+        }
+
+        $exclude = $row['exclude_providers'] ?? null;
+        if (is_array($exclude) && in_array($this->form->type, $exclude, true)) {
+            return false;
+        }
+
+        $providers = $row['providers'] ?? null;
+        if (is_array($providers) && $providers !== [] && ! in_array($this->form->type, $providers, true)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Server purposes chosen on Step 2 that ship a fixed stack — no Laravel/Rails
+     * template grid on Step 3.
+     */
+    protected function isDedicatedServerPurposeRole(?string $role = null): bool
+    {
+        return in_array($role ?? $this->form->server_role, [
+            'redis',
+            'valkey',
+            'database',
+            'load_balancer',
+            'worker',
+            'plain',
+            'docker',
+        ], true);
+    }
+
+    protected function syncInstallProfileForServerRole(): void
+    {
+        if (in_array($this->form->type, ['digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
+            return;
+        }
+
+        $profileId = $this->installProfileIdForServerRole($this->form->server_role);
+        if ($profileId !== null) {
+            $profile = collect(config('server_provision_options.install_profiles', []))
+                ->firstWhere('id', $profileId);
+            if (is_array($profile)) {
+                $this->form->install_profile = $profileId;
+                foreach (['server_role', 'cache_service', 'webserver', 'php_version', 'database', 'setup_script_key'] as $field) {
+                    if (array_key_exists($field, $profile) && is_string($profile[$field])) {
+                        $this->form->{$field} = $profile[$field];
+                    }
+                }
+                $this->normalizeDedicatedCacheServerForm();
+                $this->syncProvisionPreferenceFields();
+
+                return;
+            }
+        }
+
+        $this->syncProvisionPreferenceFields();
+        $this->ensureInstallProfileMatchesCurrentSelections();
+    }
+
+    protected function notifySizeRoleGuidance(): void
+    {
+        if ($this->form->mode !== 'provider' || $this->form->size === '') {
+            return;
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $catalog = $this->resolveServerCreateCatalog($org);
+        $mismatch = $this->sizeRoleMismatchForForm($catalog);
+        if ($mismatch === null) {
+            return;
+        }
+
+        $message = $mismatch['detail'];
+        if ($mismatch['suggested_size'] !== '') {
+            $message .= ' '.(__('Consider :plan instead.', ['plan' => $mismatch['suggested_label']]));
+        }
+
+        $this->dispatch(
+            'toast',
+            message: $message,
+            type: $mismatch['state'] === 'too_small' ? 'warning' : 'info',
+        );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $sizes
+     * @param  array<string, array{state?: string, label?: string, detail?: string}>  $recommendations
+     */
+    protected function firstGoodStartingPointSizeValue(array $sizes, array $recommendations): string
+    {
+        foreach ($sizes as $size) {
+            $value = (string) ($size['value'] ?? '');
+            if ($value !== '' && ($recommendations[$value]['state'] ?? null) === 'good_starting_point') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $catalog
+     * @return array{state: string, label: string, detail: string, suggested_size: string, suggested_label: string}|null
+     */
+    protected function sizeRoleMismatchForForm(array $catalog): ?array
+    {
+        if ($this->form->mode !== 'provider' || $this->form->size === '') {
+            return null;
+        }
+
+        $sizes = is_array($catalog['sizes'] ?? null) ? $catalog['sizes'] : [];
+        $recommendations = RecommendServerCreateSizes::run($this->form->server_role, $sizes);
+        $current = $recommendations[$this->form->size] ?? null;
+        $state = $current['state'] ?? null;
+
+        if (! in_array($state, ['too_small', 'overkill'], true)) {
+            return null;
+        }
+
+        $suggested = $this->firstGoodStartingPointSizeValue($sizes, $recommendations);
+        $suggestedLabel = $suggested;
+        foreach ($sizes as $size) {
+            if ((string) ($size['value'] ?? '') === $suggested) {
+                $suggestedLabel = (string) ($size['label'] ?? $suggested);
+                break;
+            }
+        }
+
+        return [
+            'state' => (string) $state,
+            'label' => (string) ($current['label'] ?? ''),
+            'detail' => (string) ($current['detail'] ?? ''),
+            'suggested_size' => $suggested,
+            'suggested_label' => $suggestedLabel,
+        ];
+    }
+
+    protected function roleSizingTip(?string $serverRole): string
+    {
+        return match ($serverRole) {
+            'redis', 'valkey' => __('Redis and Valkey are memory-bound — favor RAM over vCPU when in doubt.'),
+            'database' => __('Database nodes need RAM for working sets and disk for data growth.'),
+            'application' => __('Web servers run web, PHP, cache, and database together — leave RAM headroom.'),
+            'worker' => __('Worker hosts need steady CPU and memory for queue throughput.'),
+            'load_balancer' => __('Load balancers route traffic — smaller plans are usually enough.'),
+            'plain' => __('Plain hosts are minimal — pick the smallest plan that fits your manual stack.'),
+            'docker' => __('Docker hosts need memory for images and running containers.'),
+            default => __('Pick a server purpose above to tune size recommendations.'),
+        };
+    }
+
+    protected function serverRoleLabel(string $serverRole): string
+    {
+        $role = collect(config('server_provision_options.server_roles', []))
+            ->firstWhere('id', $serverRole);
+
+        if (is_array($role) && filled($role['label'] ?? null)) {
+            return (string) $role['label'];
+        }
+
+        return str($serverRole)->replace('_', ' ')->title()->toString();
     }
 
     protected function resetCustomConnectionTestState(): void

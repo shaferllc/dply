@@ -17,6 +17,7 @@ use App\Livewire\Servers\Create\StepType;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\User;
 use App\Support\ServerProviderGate;
 use App\Support\Servers\FakeCloudProvision;
@@ -53,6 +54,29 @@ test('list server provider cards includes hetzner when enabled', function () {
     $ids = array_column(ListServerProviderCards::run($org), 'id');
 
     expect($ids)->toContain('hetzner');
+});
+
+test('list server provider cards includes server and site counts per provider', function () {
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    $hetznerServer = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'provider' => ServerProvider::Hetzner,
+    ]);
+
+    Site::factory()->count(2)->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'server_id' => $hetznerServer->id,
+    ]);
+
+    $hetznerCard = collect(ListServerProviderCards::run($org))->firstWhere('id', 'hetzner');
+
+    expect($hetznerCard)->not->toBeNull()
+        ->and($hetznerCard['server_count'])->toBe(1)
+        ->and($hetznerCard['site_count'])->toBe(2);
 });
 
 test('hetzner is omitted when pennant flag is off', function () {

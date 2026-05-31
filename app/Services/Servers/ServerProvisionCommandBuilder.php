@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\UserSshKey;
+use App\Support\Servers\DedicatedCacheServerProvisionConfig;
 
 /**
  * Builds a bash script (list of lines) from servers.meta stack fields set at create time.
@@ -93,8 +94,8 @@ final class ServerProvisionCommandBuilder
             'docker' => $this->roleDocker($web, $php, $database, $cache, $layout),
             'worker' => $this->roleWorker($php, $database, $layout),
             'database' => $this->roleDatabase($database, $layout),
-            'redis' => $this->roleRedis(),
-            'valkey' => $this->roleValkey(),
+            'redis' => $this->roleCacheHost($cache),
+            'valkey' => $this->roleCacheHost('valkey'),
             'load_balancer' => $this->roleLoadBalancer($layout),
             'plain' => $this->rolePlain($layout),
             default => [],
@@ -742,28 +743,28 @@ final class ServerProvisionCommandBuilder
     }
 
     /** @return list<string> */
+    private function roleCacheHost(string $cache): array
+    {
+        $engine = $cache === '' || $cache === 'none' ? 'redis' : $cache;
+        $config = DedicatedCacheServerProvisionConfig::fromServer($this->server, $engine);
+
+        return array_merge(
+            $this->ufwSsh(),
+            $this->installAppCache($engine, $config),
+            $config->ufwAllowLines(),
+        );
+    }
+
+    /** @return list<string> */
     private function roleRedis(): array
     {
-        $lines = $this->ufwSsh();
-        $lines = array_merge($lines, $this->ensurePackagesInstalled(
-            ['redis-server'],
-            '[dply] redis-server already installed; skipping package install.'
-        ));
-        $lines[] = $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n");
-        $lines[] = 'systemctl enable --now redis-server';
-
-        return $lines;
+        return $this->roleCacheHost('redis');
     }
 
     /** @return list<string> */
     private function roleValkey(): array
     {
-        $lines = $this->ufwSsh();
-        $lines[] = 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi';
-        $lines[] = $this->writeFileWithRollback('/etc/valkey/valkey.conf', "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n");
-        $lines[] = 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true';
-
-        return $lines;
+        return $this->roleCacheHost('valkey');
     }
 
     /** @return list<string> */
@@ -898,14 +899,19 @@ final class ServerProvisionCommandBuilder
     /**
      * @return list<string>
      */
-    private function installAppCache(string $cache): array
+    private function installAppCache(string $cache, ?DedicatedCacheServerProvisionConfig $config = null): array
     {
+        $redisConf = $config?->configFileContent('redis') ?? "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
+        $valkeyConf = $config?->configFileContent('valkey') ?? "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
+        $keydbConf = $config?->configFileContent('keydb') ?? "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n";
+        $memcachedConf = $config?->configFileContent('memcached') ?? "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n";
+
         return match ($cache) {
             'none' => [],
             'valkey' => $this->withStep('Installing Valkey', [
                 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
                 'if command -v redis-cli >/dev/null 2>&1; then echo "[dply] redis-cli already available."; else apt-get install -y --no-install-recommends redis-tools || true; fi',
-                $this->writeFileWithRollback('/etc/valkey/valkey.conf', "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
+                $this->writeFileWithRollback('/etc/valkey/valkey.conf', $valkeyConf),
                 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
             ]),
             'memcached' => $this->withStep('Installing Memcached', [
@@ -913,39 +919,28 @@ final class ServerProvisionCommandBuilder
                     ['memcached', 'libmemcached-tools'],
                     '[dply] memcached already installed; skipping package install.'
                 ),
-                $this->writeFileWithRollback('/etc/memcached.conf', "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n"),
+                $this->writeFileWithRollback('/etc/memcached.conf', $memcachedConf),
                 'systemctl enable --now memcached',
             ]),
-            'keydb' => $this->installKeyDb(),
+            'keydb' => $this->withStep('Installing KeyDB', [
+                'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
+                    .'apt-get install -y --no-install-recommends software-properties-common ca-certificates && '
+                    .'add-apt-repository -y ppa:eq-alpha/keydb 2>/dev/null || true; '
+                    .'apt-get update -y && '
+                    .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
+                $this->writeFileWithRollback('/etc/keydb/keydb.conf', $keydbConf),
+                'systemctl enable --now keydb-server 2>/dev/null || systemctl enable --now keydb 2>/dev/null || true',
+            ]),
             'dragonfly' => $this->installDragonfly(),
             default => $this->withStep('Installing Redis', [
                 ...$this->ensurePackagesInstalled(
                     ['redis-server', 'redis-tools'],
                     '[dply] redis-server already installed; skipping package install.'
                 ),
-                $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
+                $this->writeFileWithRollback('/etc/redis/redis.conf', $redisConf),
                 'systemctl enable --now redis-server',
             ]),
         };
-    }
-
-    /**
-     * Install KeyDB from the project's launchpad PPA. Drop-in Redis replacement;
-     * provides redis-cli compatibility and a `keydb-server` systemd unit.
-     *
-     * @return list<string>
-     */
-    private function installKeyDb(): array
-    {
-        return $this->withStep('Installing KeyDB', [
-            'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
-                .'apt-get install -y --no-install-recommends software-properties-common ca-certificates && '
-                .'add-apt-repository -y ppa:eq-alpha/keydb 2>/dev/null || true; '
-                .'apt-get update -y && '
-                .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
-            $this->writeFileWithRollback('/etc/keydb/keydb.conf', "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n"),
-            'systemctl enable --now keydb-server 2>/dev/null || systemctl enable --now keydb 2>/dev/null || true',
-        ]);
     }
 
     /**

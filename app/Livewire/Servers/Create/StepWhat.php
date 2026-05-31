@@ -11,12 +11,16 @@ use App\Livewire\Servers\Concerns\ServerCreateActions;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerBlueprint;
+use App\Models\ServerCacheService;
 use App\Models\ServerCreateDraft;
 use App\Services\AwsEksService;
 use App\Services\Servers\Blueprint\ServerBlueprintApplier;
 use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use App\Services\Servers\ServerCreatePresetCatalog;
+use App\Support\Servers\CacheEngineAvailability;
+use App\Support\Servers\DedicatedCacheServerProvisionConfig;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -46,6 +50,8 @@ class StepWhat extends Component
      */
     public string $selectedBlueprintId = '';
 
+    public bool $overridesPanelOpen = false;
+
     public function mount(): mixed
     {
         $this->authorize('create', Server::class);
@@ -73,6 +79,10 @@ class StepWhat extends Component
         $this->ensureDefaultEksRegion();
         $this->autoSelectSingletonKubernetesCluster();
         $this->ensureDefaultNewClusterName();
+
+        if (! $skipsStack) {
+            $this->syncInstallProfileForServerRole();
+        }
 
         return null;
     }
@@ -219,26 +229,137 @@ class StepWhat extends Component
             }
             $this->validate($rules, attributes: $attrs);
         } else {
-            $this->validate([
+            $rules = [
                 'form.install_profile' => ['required', 'string'],
                 'form.server_role' => ['required', 'string'],
                 'form.webserver' => ['required', 'string'],
                 'form.php_version' => ['required', 'string'],
                 'form.database' => ['required', 'string'],
                 'form.cache_service' => ['required', 'string'],
-            ], attributes: [
+            ];
+
+            if ($this->isDedicatedCacheServerPurposeRole()) {
+                if ($this->form->cache_remote_access) {
+                    $rules['form.cache_allowed_from'] = [
+                        'required',
+                        'string',
+                        'max:64',
+                        function (string $attribute, mixed $value, \Closure $fail): void {
+                            if (! DedicatedCacheServerProvisionConfig::isAllowedSourceCidr((string) $value)) {
+                                $fail(__('Pick a specific CIDR (e.g. 10.0.0.0/8 for VPC peers). Exposing a cache to the public internet is not allowed here.'));
+                            }
+                        },
+                    ];
+                }
+
+                if (
+                    $this->form->cache_require_password
+                    && ServerCacheService::engineSupportsAuth($this->form->cache_service)
+                ) {
+                    $rules['form.cache_password'] = ['required', 'string', 'min:12', 'max:256', 'regex:/^[\x21-\x7E]+$/'];
+                }
+            }
+
+            $this->validate($rules, attributes: [
                 'form.install_profile' => __('install profile'),
                 'form.server_role' => __('server role'),
                 'form.webserver' => __('web server'),
                 'form.php_version' => __('PHP version'),
                 'form.database' => __('database'),
                 'form.cache_service' => __('cache service'),
+                'form.cache_allowed_from' => __('allowed source'),
+                'form.cache_password' => __('cache password'),
             ]);
         }
 
         $this->saveDraftFromForm($this->form, advanceTo: 4);
 
         return $this->redirect(route(self::routeNameForStep(4)), navigate: true);
+    }
+
+    public function generateDedicatedCachePassword(): void
+    {
+        if (! $this->isDedicatedCacheServerPurposeRole()) {
+            return;
+        }
+
+        $this->form->cache_require_password = true;
+        $this->form->cache_password = Str::password(32, symbols: false);
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function chooseDedicatedCacheEngine(string $engine): void
+    {
+        if (! $this->isDedicatedCacheServerPurposeRole()) {
+            return;
+        }
+
+        if (CacheEngineAvailability::isComingSoon($engine)) {
+            return;
+        }
+
+        $this->form->cache_service = $engine;
+        $this->normalizeDedicatedCacheServerForm();
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function chooseCacheNetworkAccess(string $mode): void
+    {
+        if (! $this->isDedicatedCacheServerPurposeRole()) {
+            return;
+        }
+
+        $remote = $mode === 'remote';
+        if ($remote && ! DedicatedCacheServerProvisionConfig::engineSupportsRemoteAccess($this->form->cache_service)) {
+            return;
+        }
+
+        $this->form->cache_remote_access = $remote;
+        if (! $remote) {
+            $this->form->cache_allowed_from = '';
+        }
+
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function chooseCacheAuthMode(string $mode): void
+    {
+        if (! $this->isDedicatedCacheServerPurposeRole()) {
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($this->form->cache_service)) {
+            return;
+        }
+
+        $requirePassword = $mode === 'password';
+        $this->form->cache_require_password = $requirePassword;
+
+        if ($requirePassword && $this->form->cache_password === '') {
+            $this->form->cache_password = Str::password(32, symbols: false);
+        }
+
+        if (! $requirePassword) {
+            $this->form->cache_password = '';
+        }
+
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function updatedFormCacheRequirePassword(bool $value): void
+    {
+        if (! $value || $this->form->cache_password !== '') {
+            return;
+        }
+
+        $this->form->cache_password = Str::password(32, symbols: false);
+    }
+
+    public function updatedFormCacheRemoteAccess(bool $value): void
+    {
+        if (! $value) {
+            $this->form->cache_allowed_from = '';
+        }
     }
 
     protected function stepNumber(): int
@@ -328,6 +449,54 @@ class StepWhat extends Component
         $this->saveDraftFromForm($this->form);
     }
 
+    public function updatedFormInstallProfile(): void
+    {
+        $this->overridesPanelOpen = true;
+        $this->applyInstallProfile();
+    }
+
+    public function updatedFormServerRole(): void
+    {
+        $this->overridesPanelOpen = true;
+        $this->syncInstallProfileForServerRole();
+        $this->notifySizeRoleGuidance();
+    }
+
+    public function updated($name): void
+    {
+        foreach ([
+            'form.webserver',
+            'form.php_version',
+            'form.database',
+            'form.cache_service',
+            'form.ruby_version',
+            'form.node_version',
+            'form.python_version',
+            'form.go_version',
+        ] as $field) {
+            if ($name === $field) {
+                $this->overridesPanelOpen = true;
+
+                if ($field === 'form.cache_service' && $this->isDedicatedCacheServerPurposeRole()) {
+                    $this->normalizeDedicatedCacheServerForm();
+                }
+
+                break;
+            }
+        }
+    }
+
+    public function applySuggestedPlanSize(string $size): void
+    {
+        if ($size === '') {
+            return;
+        }
+
+        $this->form->size = $size;
+        $this->saveDraftFromForm($this->form);
+        $this->dispatch('toast', message: __('Plan updated to match your server purpose.'), type: 'success');
+    }
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -369,6 +538,13 @@ class StepWhat extends Component
                 'label' => $r,
             ], AwsEksService::SUPPORTED_REGIONS),
             'canContinue' => $this->canContinueToReview($isKubernetes),
+            'continueBlockerMessage' => $this->continueBlockerMessage($isKubernetes),
+            'sizeRoleMismatch' => $isKubernetes ? null : $this->sizeRoleMismatchForForm($catalog),
+            'stepWhereRoute' => route(self::routeNameForStep(2)),
+            'isDedicatedServerPurpose' => ! $isKubernetes && $this->isDedicatedServerPurposeRole(),
+            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+                ->firstWhere('id', $this->form->server_role),
+            'dedicatedCacheEngineOptions' => $this->dedicatedCacheEngineOptions($context['provisionOptions']),
         ]);
     }
 
@@ -413,7 +589,63 @@ class StepWhat extends Component
             && $this->form->webserver !== ''
             && $this->form->php_version !== ''
             && $this->form->database !== ''
-            && $this->form->cache_service !== '';
+            && $this->form->cache_service !== ''
+            && (! $this->isDedicatedCacheServerPurposeRole() || $this->form->cache_service !== 'none')
+            && $this->dedicatedCacheAccessFieldsValid();
+    }
+
+    private function dedicatedCacheAccessFieldsValid(): bool
+    {
+        if (! $this->isDedicatedCacheServerPurposeRole()) {
+            return true;
+        }
+
+        if ($this->form->cache_remote_access) {
+            if (! DedicatedCacheServerProvisionConfig::isAllowedSourceCidr($this->form->cache_allowed_from)) {
+                return false;
+            }
+        }
+
+        if (
+            $this->form->cache_require_password
+            && ServerCacheService::engineSupportsAuth($this->form->cache_service)
+            && strlen($this->form->cache_password) < 12
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function continueBlockerMessage(bool $isKubernetes): ?string
+    {
+        if ($this->canContinueToReview($isKubernetes)) {
+            return null;
+        }
+
+        if ($isKubernetes) {
+            return __('Pick or create a cluster (and confirm the namespace) before continuing.');
+        }
+
+        if ($this->isDedicatedCacheServerPurposeRole()) {
+            if ($this->form->cache_remote_access && ! DedicatedCacheServerProvisionConfig::isAllowedSourceCidr($this->form->cache_allowed_from)) {
+                return __('Enter a private network CIDR (e.g. 10.0.0.0/8) for cross-server access, or switch back to Localhost only.');
+            }
+
+            if (
+                $this->form->cache_require_password
+                && ServerCacheService::engineSupportsAuth($this->form->cache_service)
+                && strlen($this->form->cache_password) < 12
+            ) {
+                return __('Set a cache password (at least 12 characters) or choose No password.');
+            }
+        }
+
+        if ($this->isDedicatedServerPurposeRole()) {
+            return __('Confirm the stack choices above before continuing.');
+        }
+
+        return __('Pick a stack template (or fill in the required fields) before continuing.');
     }
 
     /**

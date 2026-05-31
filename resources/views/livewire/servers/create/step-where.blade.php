@@ -207,6 +207,18 @@
                                             @endif
                                         </span>
                                     </button>
+                                    @if ($card['linked'])
+                                        <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-brand-ink/8 pt-3 text-[11px] text-brand-moss">
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                                {{ trans_choice(':count server|:count servers', $card['server_count'], ['count' => $card['server_count']]) }}
+                                            </span>
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                                {{ trans_choice(':count site|:count sites', $card['site_count'], ['count' => $card['site_count']]) }}
+                                            </span>
+                                        </div>
+                                    @endif
                                     @unless ($card['linked'])
                                         <x-add-provider-credential-link
                                             :provider="$card['id']"
@@ -283,6 +295,14 @@
                     </div>
                 </section>
 
+                {{-- Server purpose (sizes recommendations key off server_role). --}}
+                @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
+                    @include('livewire.servers.create._server-purpose-picker', [
+                        'provisionOptions' => $provisionOptions,
+                        'form' => $form,
+                    ])
+                @endif
+
                 {{-- Region + size (VM / Docker hosts only). --}}
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
                     <section class="dply-card overflow-hidden">
@@ -294,11 +314,18 @@
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Placement') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Region & size') }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick where the VM lives and how big it should be.') }}</p>
+                                @if ($selectedServerRole)
+                                    <p class="mt-2 text-xs font-medium text-brand-forest">
+                                        {{ __('Sizing recommendations are tuned for :role.', ['role' => $selectedServerRole['label'] ?? $form->server_role]) }}
+                                    </p>
+                                @endif
                             </div>
                         </div>
-                        <div class="grid gap-6 p-6 sm:grid-cols-2 sm:p-7">
+                        <div class="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 sm:items-start sm:p-7">
                             @include('livewire.servers.create._provider-region-picker')
-                            @include('livewire.servers.create._provider-size-picker')
+                            @include('livewire.servers.create._provider-size-picker', [
+                                'selectedServerRole' => $selectedServerRole,
+                            ])
                         </div>
                     </section>
                 @endif
@@ -508,12 +535,14 @@
         </div>
 
         {{-- Sidebar: live recommendations + preflight teaser --}}
-        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
             @if ($form->mode === 'provider')
                 @include('livewire.servers.create._sidebar-provider', [
                     'preflight' => $preflight,
                     'catalog' => $catalog,
                     'form' => $form,
+                    'selectedServerRole' => $selectedServerRole,
+                    'roleSizingTip' => $roleSizingTip,
                 ])
             @else
                 @include('livewire.servers.create._sidebar-custom', [

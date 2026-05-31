@@ -242,10 +242,15 @@ final class BuildServerCreatePreflight
         $sizeValue = $form->size;
         if ($sizeValue !== '' && isset($sizeRecommendations[$sizeValue])) {
             $recommendation = $sizeRecommendations[$sizeValue];
+            $role = collect(config('server_provision_options.server_roles', []))
+                ->firstWhere('id', $form->server_role);
+            $roleLabel = is_array($role) && filled($role['label'] ?? null)
+                ? (string) $role['label']
+                : str($form->server_role)->replace('_', ' ')->title()->toString();
             $checks[] = $this->check(
                 'size_recommendation',
                 $recommendation['state'] === 'too_small' ? 'warning' : 'info',
-                __('Sizing guidance'),
+                __('Sizing for :role', ['role' => $roleLabel]),
                 $recommendation['detail'],
                 false,
                 'size',

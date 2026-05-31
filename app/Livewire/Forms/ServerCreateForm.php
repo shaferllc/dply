@@ -46,6 +46,15 @@ class ServerCreateForm extends Form
 
     public string $cache_service = 'redis';
 
+    /** Dedicated cache host: allow connections from another server (VPC CIDR). */
+    public bool $cache_remote_access = false;
+
+    public string $cache_allowed_from = '';
+
+    public bool $cache_require_password = false;
+
+    public string $cache_password = '';
+
     public string $webserver = 'nginx';
 
     public string $php_version = '8.3';

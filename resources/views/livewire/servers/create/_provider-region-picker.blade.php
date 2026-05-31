@@ -24,8 +24,8 @@
     ])->filter(fn (array $marker) => $regionOptions->contains(fn (array $region) => ($region['value'] ?? null) === $marker['value']))->values();
 @endphp
 
-<div>
-    <x-input-label for="form_region" :value="$catalog['region_label'] ?? __('Region')" />
+<div class="flex min-w-0 flex-col">
+    <x-input-label for="form_region" :value="$catalog['region_label'] ?? __('Region')" class="min-h-5" />
     <div
         x-data="{
             open: false,
@@ -68,7 +68,7 @@
         class="relative mt-1"
     >
         @if ($regionOptions->isEmpty())
-            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
+            <div class="flex min-h-[5.25rem] items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
                 {{ __('Select an account first to load regions.') }}
             </div>
         @else
@@ -80,18 +80,20 @@
                 x-on:keydown.escape.window="close()"
                 x-bind:aria-expanded="open.toString()"
                 aria-haspopup="listbox"
-                class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                class="flex min-h-[5.25rem] w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             >
-                <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0">
+                <div class="flex w-full items-center justify-between gap-4">
+                    <div class="min-w-0 flex-1">
                         <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Selected region') }}</div>
                         @if ($selectedRegionOption)
                             <div class="mt-1 truncate text-sm font-semibold text-slate-900">{{ $selectedRegionOption['label'] }}</div>
+                            <div class="mt-1 truncate text-xs text-slate-600">{{ strtoupper((string) ($selectedRegionOption['value'] ?? '')) }}</div>
                         @else
                             <div class="mt-1 text-sm text-slate-500">{{ __('Select region') }}</div>
+                            <div class="mt-1 text-xs text-transparent" aria-hidden="true">&nbsp;</div>
                         @endif
                     </div>
-                    <div class="shrink-0 pt-1 text-slate-400" x-bind:class="{ 'rotate-180': open }">
+                    <div class="shrink-0 text-slate-400" x-bind:class="{ 'rotate-180': open }">
                         <x-heroicon-m-chevron-down class="h-5 w-5 transition-transform" aria-hidden="true" />
                     </div>
                 </div>

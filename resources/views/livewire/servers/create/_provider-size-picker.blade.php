@@ -59,11 +59,18 @@
 
     $sizeCards = collect($catalog['sizes'] ?? [])->map($parsePlanOption)->values();
     $selectedSizeCard = $sizeCards->firstWhere('value', $form->size);
-    $recommendedSizeCard = $sizeCards->first();
+    $recommendedSizeRow = collect($catalog['sizes'] ?? [])
+        ->first(fn (array $size): bool => ($size['recommendation']['state'] ?? null) === 'good_starting_point');
+    $recommendedSizeValue = is_array($recommendedSizeRow) ? (string) ($recommendedSizeRow['value'] ?? '') : '';
+    $recommendedSizeCard = $recommendedSizeValue !== ''
+        ? $sizeCards->firstWhere('value', $recommendedSizeValue)
+        : null;
+    $selectedServerRole = $selectedServerRole ?? collect(config('server_provision_options.server_roles', []))
+        ->firstWhere('id', $form->server_role);
 @endphp
 
-<div>
-    <x-input-label for="form_size" :value="$catalog['size_label'] ?? __('Plan / size')" />
+<div class="flex min-w-0 flex-col">
+    <x-input-label for="form_size" :value="$catalog['size_label'] ?? __('Plan / size')" class="min-h-5" />
     <div
         x-data="{
             open: false,
@@ -103,7 +110,7 @@
         class="relative mt-1"
     >
         @if ($sizeCards->isEmpty())
-            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
+            <div class="flex min-h-[5.25rem] items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
                 {{ __('Select a region first to load available plans.') }}
             </div>
         @else
@@ -115,10 +122,10 @@
                 x-on:keydown.escape.window="close()"
                 x-bind:aria-expanded="open.toString()"
                 aria-haspopup="listbox"
-                class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                class="flex min-h-[5.25rem] w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             >
-                <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0">
+                <div class="flex w-full items-center justify-between gap-4">
+                    <div class="min-w-0 flex-1">
                         <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                             <span>{{ __('Selected plan') }}</span>
                             @if ($selectedSizeCard && $recommendedSizeCard && $selectedSizeCard['value'] === $recommendedSizeCard['value'])
@@ -127,7 +134,7 @@
                         </div>
                         @if ($selectedSizeCard)
                             <div class="mt-1 truncate text-sm font-semibold text-slate-900">{{ $selectedSizeCard['name'] }}</div>
-                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+                            <div class="mt-1 flex min-h-[1.125rem] flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
                                 <span>{{ $selectedSizeCard['ram'] }}</span><span>·</span>
                                 <span>{{ $selectedSizeCard['cpu'] }}</span><span>·</span>
                                 <span>{{ $selectedSizeCard['disk'] }}</span>
@@ -135,9 +142,10 @@
                             </div>
                         @else
                             <div class="mt-1 text-sm text-slate-500">{{ __('Select a plan') }}</div>
+                            <div class="mt-1 text-xs text-transparent" aria-hidden="true">&nbsp;</div>
                         @endif
                     </div>
-                    <div class="shrink-0 pt-1 text-slate-400" x-bind:class="{ 'rotate-180': open }">
+                    <div class="shrink-0 text-slate-400" x-bind:class="{ 'rotate-180': open }">
                         <x-heroicon-m-chevron-down class="h-5 w-5 transition-transform" aria-hidden="true" />
                     </div>
                 </div>
@@ -172,12 +180,19 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <div class="truncate text-sm font-semibold text-slate-900">{{ $sizeCard['name'] }}</div>
-                                            @if (($rawSize['recommendation']['state'] ?? null) === 'good_starting_point')
-                                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700 ring-1 ring-emerald-200">{{ __('Good starting point') }}</span>
-                                            @elseif (($rawSize['recommendation']['state'] ?? null) === 'too_small')
-                                                <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 ring-1 ring-amber-200">{{ __('Too small') }}</span>
-                                            @elseif (($rawSize['recommendation']['state'] ?? null) === 'overkill')
-                                                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-700 ring-1 ring-slate-200">{{ __('Overkill') }}</span>
+                                            @if (! empty($rawSize['recommendation']['label']))
+                                                @php
+                                                    $recState = $rawSize['recommendation']['state'] ?? null;
+                                                    $recBadgeClass = match ($recState) {
+                                                        'good_starting_point' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                                        'too_small' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                                                        'overkill' => 'bg-slate-100 text-slate-700 ring-slate-200',
+                                                        default => 'bg-slate-100 text-slate-600 ring-slate-200',
+                                                    };
+                                                @endphp
+                                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ring-1 {{ $recBadgeClass }}">
+                                                    {{ $rawSize['recommendation']['label'] }}
+                                                </span>
                                             @endif
                                         </div>
                                         <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-600">
@@ -185,6 +200,9 @@
                                             <span><span class="font-medium text-slate-700">{{ __('CPU') }}:</span> {{ $sizeCard['cpu'] }}</span>
                                             <span><span class="font-medium text-slate-700">{{ __('Disk') }}:</span> {{ $sizeCard['disk'] }}</span>
                                         </div>
+                                        @if (! empty($rawSize['recommendation']['detail']))
+                                            <p class="mt-1.5 text-xs leading-relaxed text-slate-500">{{ $rawSize['recommendation']['detail'] }}</p>
+                                        @endif
                                         @if ($sizeCard['value'] !== $sizeCard['name'])
                                             <div class="mt-1 truncate text-[11px] text-slate-400">{{ $sizeCard['value'] }}</div>
                                         @endif

@@ -8,6 +8,7 @@ use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use phpseclib3\Crypt\RSA;
 
 uses(RefreshDatabase::class);
@@ -330,6 +331,58 @@ test('build can force reinstall via config', function () {
     $this->assertStringNotContainsString('already installed; skipping package install.', $joined);
     $this->assertStringNotContainsString('already installed; skipping repository setup.', $joined);
     $this->assertStringNotContainsString('already installed; skipping installer.', $joined);
+});
+
+test('build dedicated cache host installs selected engine', function () {
+    config(['server_provision.install_supervisor_on_provision' => false]);
+
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'redis',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'none',
+            'cache_service' => 'valkey',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    expect($joined)->toContain('valkey-server');
+});
+
+test('build dedicated cache host applies remote access and password from meta', function () {
+    config(['server_provision.install_supervisor_on_provision' => false]);
+
+    $password = 'ProvisionCache-Password1';
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'redis',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'none',
+            'cache_service' => 'redis',
+            'cache_server' => [
+                'remote_access' => true,
+                'allowed_from' => '172.16.0.0/12',
+                'require_password' => true,
+                'password_encrypted' => Crypt::encryptString($password),
+            ],
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    expect($joined)->toContain("ufw allow from '172.16.0.0/12' to any port 6379 proto tcp");
+
+    preg_match_all("/dply_write_file '([^']+)' '([^']+)'/", $joined, $writes, PREG_SET_ORDER);
+    $redisWrite = collect($writes)->first(fn (array $row): bool => base64_decode($row[1], true) === '/etc/redis/redis.conf');
+    expect($redisWrite)->not->toBeNull();
+    $content = base64_decode($redisWrite[2], true);
+    expect($content)->toContain('bind 0.0.0.0 -::1');
+    expect($content)->toContain('requirepass '.$password);
 });
 test('build uses operational public key for deploy user bootstrap when present', function () {
     $keyPath = base_path('app/TaskRunner/Tests/fixtures/private_key.pem');

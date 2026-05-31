@@ -57,7 +57,11 @@ final class ServerSystemdInventoryRecorder
                 continue;
             }
             $label = preg_replace('/\.service$/i', '', $u) ?? $u;
-            $rows[] = [
+            // Key by unit so a unit listed more than once in the inventory output
+            // collapses to a single row (last occurrence wins). The
+            // server_systemd_service_states table has a unique (server_id, unit)
+            // constraint, so emitting duplicates here would blow up the insert.
+            $rows[$u] = [
                 'unit' => $u,
                 'label' => is_string($label) ? $label : $u,
                 'active' => $act,
@@ -70,6 +74,7 @@ final class ServerSystemdInventoryRecorder
                 'can_manage' => isset($allowed[$u]),
             ];
         }
+        $rows = array_values($rows);
         usort($rows, fn (array $a, array $b) => strcmp($a['label'], $b['label']));
 
         return $rows;

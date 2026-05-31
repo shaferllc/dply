@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Create;
 
+use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\GetProviderCredentialsForServerType;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Forms\ServerCreateForm;
@@ -13,6 +14,7 @@ use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -77,14 +79,21 @@ class StepWhere extends Component
             return;
         }
 
+        $catalog = $this->resolveServerCreateCatalog($org);
+        $credentials = $catalog['credentials'] instanceof Collection
+            ? $catalog['credentials']
+            : collect();
+
         if ($this->form->provider_credential_id === '') {
-            $credentials = GetProviderCredentialsForServerType::run($org, $this->form->type);
             if ($credentials->count() === 1) {
                 $this->form->provider_credential_id = (string) $credentials->first()->id;
                 // Picking a credential changes the catalog source — refresh the memo.
                 $this->memoServerCreateCatalog = null;
                 $this->memoServerCreateCatalogKey = null;
-                $this->syncProvisionPreferenceFields();
+                $this->syncProvisionPreferenceFields($credentials);
+                $catalog = $this->resolveServerCreateCatalog($org);
+            } else {
+                return;
             }
         }
 
@@ -92,7 +101,6 @@ class StepWhere extends Component
             return;
         }
 
-        $catalog = $this->resolveServerCreateCatalog($org);
         $regions = $catalog['regions'] ?? [];
 
         // Region: if empty, prefer West Coast US (per project default) and fall through
@@ -196,6 +204,42 @@ class StepWhere extends Component
             $this->memoServerCreateCatalogKey = null;
             $this->autoSelectSingleOptions();
         }
+    }
+
+    public function chooseServerRole(string $role): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $catalog = $this->resolveServerCreateCatalog($org);
+
+        $hasLinkedCredential = $this->form->provider_credential_id !== ''
+            && ($catalog['credentials'] instanceof Collection)
+            && $catalog['credentials']->contains('id', $this->form->provider_credential_id);
+
+        $allowed = collect(
+            FilterServerProvisionOptionsForCreateForm::run(
+                $this->form->type,
+                $hasLinkedCredential,
+                $role,
+            )['server_roles'] ?? []
+        )->pluck('id')->all();
+
+        if ($allowed !== [] && ! in_array($role, $allowed, true)) {
+            return;
+        }
+
+        $this->form->server_role = $role;
+        $this->syncInstallProfileForServerRole();
+        $this->notifySizeRoleGuidance();
+    }
+
+    public function updatedFormServerRole(): void
+    {
+        $this->syncInstallProfileForServerRole();
+        $this->notifySizeRoleGuidance();
     }
 
     public function chooseProvider(string $provider): void
@@ -350,10 +394,14 @@ class StepWhere extends Component
             'reachedStep' => $this->currentDraft()?->step ?? 2,
             'catalog' => $context['catalog'],
             'preflight' => $context['preflight'],
+            'provisionOptions' => $context['provisionOptions'],
             'hasAnyProviderCredentials' => $context['hasAnyProviderCredentials'],
             'hasLinkedCredential' => $context['hasLinkedCredential'],
             'providerCards' => $this->resolveProviderCards(),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
+            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+                ->firstWhere('id', $this->form->server_role),
+            'roleSizingTip' => $this->roleSizingTip($this->form->server_role),
         ]);
     }
 }
