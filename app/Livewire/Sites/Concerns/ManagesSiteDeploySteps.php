@@ -72,14 +72,14 @@ trait ManagesSiteDeploySteps
         return 'pipeline-step-form';
     }
 
-    public function openAddPipelineStepForm(?string $stepType = null, ?string $phase = null): void
+    public function openAddPipelineStepForm(?string $stepType = null, ?string $phase = null, ?string $defaultCommand = null): void
     {
         $this->authorize('update', $this->site);
         $this->closePipelineAnchorForm();
         $this->closeAddPipelineHookForm();
         $this->editing_deploy_step_id = null;
         $this->new_deploy_step_type = $stepType ?? SiteDeployStep::TYPE_COMPOSER_INSTALL;
-        $this->new_deploy_step_command = '';
+        $this->new_deploy_step_command = $defaultCommand ?? '';
         $this->new_deploy_step_timeout = 900;
         $this->new_deploy_step_phase = $phase ?? SiteDeployStep::defaultPhaseFor($this->new_deploy_step_type);
         $this->show_pipeline_step_form = true;
@@ -306,6 +306,7 @@ trait ManagesSiteDeploySteps
         string $stepType,
         ?int $insertIndex = null,
         string $phase = SiteDeployStep::PHASE_BUILD,
+        ?string $customCommand = null,
     ): void {
         $this->authorize('update', $this->site);
         $types = array_keys(SiteDeployStep::typeLabels());
@@ -317,7 +318,10 @@ trait ManagesSiteDeploySteps
             $phase = SiteDeployStep::defaultPhaseFor($stepType);
         }
 
-        if (SiteDeployStep::needsCustomCommand($stepType)) {
+        $command = trim((string) $customCommand);
+        $command = $command !== '' ? $command : null;
+
+        if (SiteDeployStep::needsCustomCommand($stepType) && $command === null) {
             $this->openAddPipelineStepForm($stepType, $phase);
 
             return;
@@ -325,10 +329,10 @@ trait ManagesSiteDeploySteps
 
         $pipeline = $this->editingDeployPipeline();
 
-        if ($this->shouldConfirmDuplicatePipelineStep($pipeline, $stepType, null)) {
+        if ($this->shouldConfirmDuplicatePipelineStep($pipeline, $stepType, $command)) {
             $this->openDuplicatePipelineStepModal(
                 stepType: $stepType,
-                customCommand: null,
+                customCommand: $command,
                 timeout: 900,
                 insertIndex: $insertIndex,
                 phase: $phase,
@@ -338,7 +342,7 @@ trait ManagesSiteDeploySteps
             return;
         }
 
-        $this->persistPipelineStep($pipeline, $stepType, null, 900, $insertIndex, $phase);
+        $this->persistPipelineStep($pipeline, $stepType, $command, 900, $insertIndex, $phase);
         $this->toastSuccess(__('Step added to pipeline.'));
     }
 

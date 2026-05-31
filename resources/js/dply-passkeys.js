@@ -99,12 +99,11 @@ function bindPasskeyRegister() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initPasskeys() {
     bindPasskeyLogin();
     bindPasskeyRegister();
-});
+}
 
-document.addEventListener('livewire:navigated', () => {
-    bindPasskeyLogin();
-    bindPasskeyRegister();
-});
+initPasskeys();
+
+document.addEventListener('livewire:navigated', initPasskeys);

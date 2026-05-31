@@ -13,6 +13,8 @@ document.addEventListener('alpine:init', () => {
         hookPaletteSortable: null,
         hookZoneSortables: [],
         morphHook: null,
+        dropBusy: false,
+        dropBusyLabel: 'Updating pipeline…',
 
         init() {
             this.boot();
@@ -157,9 +159,16 @@ document.addEventListener('alpine:init', () => {
             });
         },
 
-        handlePaletteAdd(evt, zone, phase) {
+        async handlePaletteAdd(evt, zone, phase) {
+            if (this.dropBusy) {
+                evt.item?.remove();
+
+                return;
+            }
+
             const type = evt.item?.dataset?.paletteType;
             const itemPhase = evt.item?.dataset?.palettePhase;
+            const paletteCommand = evt.item?.dataset?.paletteCommand?.trim() || null;
             if (! type || itemPhase !== phase) {
                 evt.item?.remove();
 
@@ -167,14 +176,31 @@ document.addEventListener('alpine:init', () => {
             }
             const insertIndex = this.stepInsertIndex(zone, evt.newIndex);
             evt.item.remove();
-            this.$wire.addDeployPipelineStepFromPalette(
-                type,
-                Number(insertIndex),
-                phase,
-            );
+
+            if (! this.$wire) {
+                return;
+            }
+
+            this.setDropBusy(true, 'Adding step…');
+            try {
+                await this.$wire.addDeployPipelineStepFromPalette(
+                    type,
+                    Number(insertIndex),
+                    phase,
+                    paletteCommand,
+                );
+            } finally {
+                this.setDropBusy(false);
+            }
         },
 
-        handleHookPaletteAdd(evt, anchor) {
+        async handleHookPaletteAdd(evt, anchor) {
+            if (this.dropBusy) {
+                evt.item?.remove();
+
+                return;
+            }
+
             const kind = evt.item?.dataset?.paletteHookKind;
             if (! kind) {
                 evt.item?.remove();
@@ -184,7 +210,35 @@ document.addEventListener('alpine:init', () => {
             const dropZone = evt.to;
             const stepId = dropZone?.dataset?.hookAnchorStepId || null;
             evt.item.remove();
-            this.$wire.addDeployPipelineHookFromPalette(kind, anchor, stepId);
+
+            if (! this.$wire) {
+                return;
+            }
+
+            this.setDropBusy(true, 'Adding hook…');
+            try {
+                await this.$wire.addDeployPipelineHookFromPalette(kind, anchor, stepId);
+            } finally {
+                this.setDropBusy(false);
+            }
+        },
+
+        setDropBusy(busy, label = 'Updating pipeline…') {
+            this.dropBusy = busy;
+            this.dropBusyLabel = label;
+            const sortables = [
+                this.buildSortable,
+                this.releaseSortable,
+                this.buildPaletteSortable,
+                this.releasePaletteSortable,
+                this.hookPaletteSortable,
+                ...this.hookZoneSortables,
+            ];
+            sortables.forEach((sortable) => {
+                if (sortable) {
+                    sortable.option('disabled', busy);
+                }
+            });
         },
 
         stepInsertIndex(zone, newIndex) {
@@ -199,7 +253,7 @@ document.addEventListener('alpine:init', () => {
             return index;
         },
 
-        persistStepOrder(phase) {
+        async persistStepOrder(phase) {
             const zone = phase === 'release' ? this.$refs.releaseSortZone : this.$refs.buildSortZone;
             if (! zone || ! this.$wire) {
                 return;
@@ -210,10 +264,16 @@ document.addEventListener('alpine:init', () => {
             if (! ids.length) {
                 return;
             }
-            if (phase === 'release') {
-                this.$wire.reorderDeployPipelineReleaseSteps(ids);
-            } else {
-                this.$wire.reorderDeployPipelineBuildSteps(ids);
+
+            this.setDropBusy(true, 'Updating order…');
+            try {
+                if (phase === 'release') {
+                    await this.$wire.reorderDeployPipelineReleaseSteps(ids);
+                } else {
+                    await this.$wire.reorderDeployPipelineBuildSteps(ids);
+                }
+            } finally {
+                this.setDropBusy(false);
             }
         },
 

@@ -30,5 +30,5 @@
         'empty' => count($block['hooks']) === 0 ? __('Hook') : null,
         'compact' => true,
     ])
-    @include('livewire.sites.partials.pipeline._timeline-chevron')
+    @include('livewire.sites.partials.pipeline._timeline-flow-connector')
 </div>

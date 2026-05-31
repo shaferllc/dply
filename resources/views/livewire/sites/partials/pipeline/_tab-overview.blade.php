@@ -26,6 +26,18 @@
             </dd>
         </div>
     </dl>
+    @if (($pipelineActionableChecks ?? collect())->isNotEmpty())
+        <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
+            <x-site-preflight-issues-panel
+                :checks="$pipelineActionableChecks"
+                compact
+                section-id="pipeline-advisor-overview"
+                :title="__('Pipeline review')"
+                :description="__('Open the Pipeline tab to adjust steps and hooks flagged below.')"
+            />
+        </div>
+    @endif
+
     <div class="flex flex-wrap gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
         <button type="button" wire:click="setPipelineTab('steps')" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Edit build steps') }}</button>
         <button type="button" wire:click="setPipelineTab('steps')" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Edit hooks') }}</button>

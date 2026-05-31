@@ -25,7 +25,7 @@
     @foreach ($items as $item)
         @if (($item['type'] ?? '') === 'hook')
             @include('livewire.sites.partials.pipeline._timeline-hook-pill', ['hook' => $item['hook']])
-            @include('livewire.sites.partials.pipeline._timeline-chevron')
+            @include('livewire.sites.partials.pipeline._timeline-flow-connector')
         @endif
     @endforeach
     @if (count($items) === 0 && $empty)

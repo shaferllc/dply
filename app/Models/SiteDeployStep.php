@@ -19,6 +19,12 @@ class SiteDeployStep extends Model
 
     public const TYPE_NPM_RUN = 'npm_run';
 
+    public const TYPE_YARN_INSTALL = 'yarn_install';
+
+    public const TYPE_PNPM_INSTALL = 'pnpm_install';
+
+    public const TYPE_BUN_INSTALL = 'bun_install';
+
     public const TYPE_ARTISAN_MIGRATE = 'artisan_migrate';
 
     public const TYPE_ARTISAN_CONFIG_CACHE = 'artisan_config_cache';
@@ -35,7 +41,30 @@ class SiteDeployStep extends Model
     /** One-shot Laravel Reverb scaffolding (`php artisan reverb:install`). */
     public const TYPE_ARTISAN_REVERB_INSTALL = 'artisan_reverb_install';
 
+    public const TYPE_ARTISAN_STORAGE_LINK = 'artisan_storage_link';
+
+    public const TYPE_ARTISAN_EVENT_CACHE = 'artisan_event_cache';
+
+    public const TYPE_ARTISAN_QUEUE_RESTART = 'artisan_queue_restart';
+
+    public const TYPE_ARTISAN_HORIZON_TERMINATE = 'artisan_horizon_terminate';
+
+    public const TYPE_ARTISAN_DB_SEED = 'artisan_db_seed';
+
+    public const TYPE_ARTISAN_CACHE_CLEAR = 'artisan_cache_clear';
+
     public const TYPE_CUSTOM = 'custom';
+
+    /** @return list<string> */
+    public const RELEASE_STEP_TYPES = [
+        self::TYPE_ARTISAN_MIGRATE,
+        self::TYPE_ARTISAN_OPTIMIZE,
+        self::TYPE_ARTISAN_STORAGE_LINK,
+        self::TYPE_ARTISAN_QUEUE_RESTART,
+        self::TYPE_ARTISAN_HORIZON_TERMINATE,
+        self::TYPE_ARTISAN_DB_SEED,
+        self::TYPE_ARTISAN_CACHE_CLEAR,
+    ];
 
     /**
      * Deploy pipeline phases (build → swap → release → restart).
@@ -100,11 +129,9 @@ class SiteDeployStep extends Model
      */
     public static function defaultPhaseFor(string $stepType): string
     {
-        return match ($stepType) {
-            self::TYPE_ARTISAN_MIGRATE,
-            self::TYPE_ARTISAN_OPTIMIZE => self::PHASE_RELEASE,
-            default => self::PHASE_BUILD,
-        };
+        return in_array($stepType, self::RELEASE_STEP_TYPES, true)
+            ? self::PHASE_RELEASE
+            : self::PHASE_BUILD;
     }
 
     /** @return list<string> */
@@ -161,6 +188,9 @@ class SiteDeployStep extends Model
             self::TYPE_NPM_RUN => trim((string) $this->custom_command) !== ''
                 ? 'npm run '.trim((string) $this->custom_command)
                 : null,
+            self::TYPE_YARN_INSTALL => 'yarn install --frozen-lockfile',
+            self::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
+            self::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',
             self::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force',
             self::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
             self::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
@@ -168,6 +198,12 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_OPTIMIZE => 'php artisan optimize',
             self::TYPE_ARTISAN_OCTANE_INSTALL => 'php artisan octane:install --no-interaction',
             self::TYPE_ARTISAN_REVERB_INSTALL => 'php artisan reverb:install --no-interaction',
+            self::TYPE_ARTISAN_STORAGE_LINK => 'php artisan storage:link',
+            self::TYPE_ARTISAN_EVENT_CACHE => 'php artisan event:cache',
+            self::TYPE_ARTISAN_QUEUE_RESTART => 'php artisan queue:restart',
+            self::TYPE_ARTISAN_HORIZON_TERMINATE => 'php artisan horizon:terminate',
+            self::TYPE_ARTISAN_DB_SEED => 'php artisan db:seed --force',
+            self::TYPE_ARTISAN_CACHE_CLEAR => 'php artisan cache:clear',
             self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''
                 ? trim((string) $this->custom_command)
                 : null,
@@ -185,6 +221,9 @@ class SiteDeployStep extends Model
             self::TYPE_NPM_RUN => trim((string) $this->custom_command) !== ''
                 ? __('npm run :script', ['script' => trim((string) $this->custom_command)])
                 : __('npm run'),
+            self::TYPE_YARN_INSTALL => __('yarn install'),
+            self::TYPE_PNPM_INSTALL => __('pnpm install'),
+            self::TYPE_BUN_INSTALL => __('bun install'),
             self::TYPE_ARTISAN_MIGRATE => __('Migrate'),
             self::TYPE_ARTISAN_CONFIG_CACHE => __('Config cache'),
             self::TYPE_ARTISAN_ROUTE_CACHE => __('Route cache'),
@@ -192,6 +231,12 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_OPTIMIZE => __('Optimize'),
             self::TYPE_ARTISAN_OCTANE_INSTALL => __('Octane install'),
             self::TYPE_ARTISAN_REVERB_INSTALL => __('Reverb install'),
+            self::TYPE_ARTISAN_STORAGE_LINK => __('Storage link'),
+            self::TYPE_ARTISAN_EVENT_CACHE => __('Event cache'),
+            self::TYPE_ARTISAN_QUEUE_RESTART => __('Queue restart'),
+            self::TYPE_ARTISAN_HORIZON_TERMINATE => __('Horizon terminate'),
+            self::TYPE_ARTISAN_DB_SEED => __('DB seed'),
+            self::TYPE_ARTISAN_CACHE_CLEAR => __('Cache clear'),
             self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''
                 ? Str::limit(trim((string) $this->custom_command), 36)
                 : __('Custom command'),
@@ -211,6 +256,9 @@ class SiteDeployStep extends Model
             self::TYPE_NPM_CI => 'npm ci',
             self::TYPE_NPM_INSTALL => 'npm install',
             self::TYPE_NPM_RUN => 'npm run … (script in field below)',
+            self::TYPE_YARN_INSTALL => 'yarn install --frozen-lockfile',
+            self::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
+            self::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',
             self::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force',
             self::TYPE_ARTISAN_CONFIG_CACHE => 'php artisan config:cache',
             self::TYPE_ARTISAN_ROUTE_CACHE => 'php artisan route:cache',
@@ -218,6 +266,12 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_OPTIMIZE => 'php artisan optimize',
             self::TYPE_ARTISAN_OCTANE_INSTALL => 'php artisan octane:install --no-interaction',
             self::TYPE_ARTISAN_REVERB_INSTALL => 'php artisan reverb:install --no-interaction',
+            self::TYPE_ARTISAN_STORAGE_LINK => 'php artisan storage:link',
+            self::TYPE_ARTISAN_EVENT_CACHE => 'php artisan event:cache',
+            self::TYPE_ARTISAN_QUEUE_RESTART => 'php artisan queue:restart',
+            self::TYPE_ARTISAN_HORIZON_TERMINATE => 'php artisan horizon:terminate',
+            self::TYPE_ARTISAN_DB_SEED => 'php artisan db:seed --force',
+            self::TYPE_ARTISAN_CACHE_CLEAR => 'php artisan cache:clear',
             self::TYPE_CUSTOM => 'Custom shell command',
         ];
     }

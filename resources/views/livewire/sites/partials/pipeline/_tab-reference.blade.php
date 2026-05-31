@@ -1,4 +1,6 @@
 <div class="space-y-6">
+    @include('livewire.sites.partials.pipeline._step-catalog')
+
     <details class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
         <summary class="cursor-pointer list-none">
             <h3 class="inline text-base font-semibold text-brand-ink">{{ __('Deploy script variables') }}</h3>

@@ -1,6 +1,9 @@
 @props([
     'checks',
     'compact' => false,
+    'title' => null,
+    'description' => null,
+    'sectionId' => 'site-preflight-issues',
 ])
 
 @php
@@ -9,7 +12,7 @@
 
 @if ($issues->isNotEmpty())
     <section
-        id="site-preflight-issues"
+        id="{{ $sectionId }}"
         @class([
             'scroll-mt-24 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/90 to-white',
             'px-4 py-4 sm:px-5 sm:py-5' => $compact,
@@ -18,9 +21,9 @@
     >
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">{{ __('Preflight issues') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">{{ $title ?? __('Preflight issues') }}</p>
                 <p class="mt-1 text-sm leading-relaxed text-amber-950/90">
-                    {{ __('Review each item below and jump to the matching workspace section to fix it.') }}
+                    {{ $description ?? __('Review each item below and jump to the matching workspace section to fix it.') }}
                 </p>
             </div>
             <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">

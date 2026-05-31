@@ -56,7 +56,7 @@
 @endphp
 
 @if (! $functionsHost && $editingPipeline)
-    @vite(['resources/js/deploy-pipeline-dnd.js'])
+    @vite(['resources/css/deploy-pipeline.css', 'resources/js/deploy-pipeline-dnd.js'])
 
     <section
         class="dply-card overflow-hidden"
@@ -71,11 +71,23 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Build') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Drag build steps onto the build or release areas. Drag Shell, Webhook, or Notification onto any dashed hook slot in the timeline.') }}
+                    {{ __('The pipeline runs top to bottom in four phases. Drag steps into Build or Release; drag hooks onto dashed slots in any phase.') }}
                 </p>
                 </div>
             </div>
         </div>
+
+        @if (($pipelineActionableChecks ?? collect())->isNotEmpty())
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
+                <x-site-preflight-issues-panel
+                    :checks="$pipelineActionableChecks"
+                    compact
+                    section-id="pipeline-advisor-issues"
+                    :title="__('Pipeline review')"
+                    :description="__('These checks catch common ordering and phase mistakes before the next deploy.')"
+                />
+            </div>
+        @endif
 
         <div class="space-y-6 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
             <div class="flex flex-wrap items-center gap-2">
@@ -171,35 +183,58 @@
         @endif
 
         <div class="space-y-6 p-6 sm:p-8">
+            <div class="relative">
             <div
-                class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-5 sm:px-6"
+                class="dply-pipeline-timeline space-y-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:p-5"
                 role="list"
                 aria-label="{{ __('Deploy pipeline order') }}"
+                wire:loading.class.delay="opacity-50 pointer-events-none"
+                wire:target="addDeployPipelineStepFromPalette,reorderDeployPipelineBuildSteps,reorderDeployPipelineReleaseSteps,addDeployPipelineHookFromPalette,confirmAddDuplicatePipelineStep"
             >
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="hidden flex-wrap items-center gap-2 pb-1 sm:flex" aria-hidden="true">
+                    <span class="rounded-full bg-stone-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-800">1 {{ __('Clone') }}</span>
+                    <x-heroicon-m-chevron-right class="h-3.5 w-3.5 text-brand-mist" />
+                    <span class="rounded-full bg-sky-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-900">2 {{ __('Build') }}</span>
+                    <x-heroicon-m-chevron-right class="h-3.5 w-3.5 text-brand-mist" />
+                    <span class="rounded-full bg-brand-sage/30 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-forest">3 {{ __('Activate') }}</span>
+                    <x-heroicon-m-chevron-right class="h-3.5 w-3.5 text-brand-mist" />
+                    <span class="rounded-full bg-emerald-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-900">4 {{ __('Release') }}</span>
+                </div>
+
+                <x-pipeline-timeline-section
+                    :step="1"
+                    :title="__('Clone & fetch')"
+                    :description="__('Git checkout into a new release folder. Optional hooks run on the server before or right after clone.')"
+                    tone="prepare"
+                >
                     @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
                         'anchor' => 'before_clone',
                         'items' => $hooksBeforeClone,
-                        'empty' => __('Drop hook here'),
+                        'empty' => __('Hook'),
                     ])
-                    @include('livewire.sites.partials.pipeline._timeline-chevron')
-
                     @if ($showCloneAnchor)
+                        @include('livewire.sites.partials.pipeline._timeline-flow-connector')
                         @include('livewire.sites.partials.pipeline._timeline-item', ['item' => ['type' => 'anchor', 'key' => 'clone']])
+                        @include('livewire.sites.partials.pipeline._timeline-flow-connector')
                     @endif
-
                     @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
                         'anchor' => 'after_clone',
                         'items' => $hooksAfterClone,
-                        'empty' => __('Drop hook here'),
+                        'empty' => __('Hook'),
                     ])
-                    @include('livewire.sites.partials.pipeline._timeline-chevron')
+                </x-pipeline-timeline-section>
 
+                <x-pipeline-timeline-section
+                    :step="2"
+                    :title="__('Build')"
+                    :description="__('Install dependencies and compile assets in the new release — before the site goes live.')"
+                    tone="build"
+                >
                     <div
                         x-ref="buildSortZone"
                         @class([
-                            'inline-flex min-h-[2.75rem] min-w-[6rem] flex-wrap items-center gap-2 rounded-xl px-1 py-1 transition-colors',
-                            'border border-dashed border-sky-300/50 bg-sky-50/40' => count($timelineSplit['buildBlocks']) === 0,
+                            'inline-flex min-h-[2.75rem] min-w-0 flex-1 flex-wrap items-center gap-2 rounded-xl px-1 py-1 transition-colors',
+                            'border border-dashed border-sky-300/60 bg-sky-50/50' => count($timelineSplit['buildBlocks']) === 0,
                             'border border-transparent' => count($timelineSplit['buildBlocks']) > 0,
                         ])
                         data-pipeline-drop-zone="build"
@@ -207,26 +242,39 @@
                         @forelse ($timelineSplit['buildBlocks'] as $block)
                             @include('livewire.sites.partials.pipeline._timeline-step-block', ['block' => $block])
                         @empty
-                            <span class="px-2 text-xs text-brand-moss">{{ __('Drop build steps here') }}</span>
+                            <span class="px-2 text-xs text-brand-moss">{{ __('Drop build steps from the palette below') }}</span>
                         @endforelse
                     </div>
+                </x-pipeline-timeline-section>
 
+                <x-pipeline-timeline-section
+                    :step="3"
+                    :title="__('Activate')"
+                    :description="__('Flip traffic to the new release (symlink for zero-downtime). Hooks can run just before the swap.')"
+                    tone="activate"
+                >
                     @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
                         'anchor' => 'before_activate',
                         'items' => $hooksBeforeActivate,
-                        'empty' => __('Drop hook here'),
+                        'empty' => __('Hook'),
                     ])
-                    @include('livewire.sites.partials.pipeline._timeline-chevron')
-
                     @if ($showActivateAnchor)
+                        @include('livewire.sites.partials.pipeline._timeline-flow-connector')
                         @include('livewire.sites.partials.pipeline._timeline-item', ['item' => ['type' => 'anchor', 'key' => 'activate']])
                     @endif
+                </x-pipeline-timeline-section>
 
+                <x-pipeline-timeline-section
+                    :step="4"
+                    :title="__('Release')"
+                    :description="__('Commands on the live path after activate — migrations, cache warmers, etc.')"
+                    tone="release"
+                >
                     <div
                         x-ref="releaseSortZone"
                         @class([
-                            'inline-flex min-h-[2.75rem] min-w-[6rem] flex-wrap items-center gap-2 rounded-xl px-1 py-1 transition-colors',
-                            'border border-dashed border-emerald-300/50 bg-emerald-50/40' => count($timelineSplit['releaseBlocks']) === 0,
+                            'inline-flex min-h-[2.75rem] min-w-0 flex-1 flex-wrap items-center gap-2 rounded-xl px-1 py-1 transition-colors',
+                            'border border-dashed border-emerald-300/60 bg-emerald-50/50' => count($timelineSplit['releaseBlocks']) === 0,
                             'border border-transparent' => count($timelineSplit['releaseBlocks']) > 0,
                         ])
                         data-pipeline-drop-zone="release"
@@ -234,20 +282,24 @@
                         @forelse ($timelineSplit['releaseBlocks'] as $block)
                             @include('livewire.sites.partials.pipeline._timeline-step-block', ['block' => $block])
                         @empty
-                            <span class="px-2 text-xs text-brand-moss">{{ __('Drop release steps here (e.g. migrate)') }}</span>
+                            <span class="px-2 text-xs text-brand-moss">{{ __('Drop release steps from the palette below') }}</span>
                         @endforelse
                     </div>
-
+                    @include('livewire.sites.partials.pipeline._timeline-flow-connector')
                     @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
                         'anchor' => 'after_activate',
                         'items' => $hooksAfterActivate,
-                        'empty' => __('Drop hook here'),
+                        'empty' => __('Hook'),
                     ])
-                </div>
+                </x-pipeline-timeline-section>
 
                 @if ($stepCount === 0 && $hookCount === 0)
-                    <p class="mt-4 text-sm text-brand-moss">{{ __('Add build steps and hooks from the palettes below.') }}</p>
+                    <p class="rounded-xl border border-dashed border-brand-ink/15 bg-white/60 px-4 py-3 text-sm text-brand-moss">
+                        {{ __('Add build steps and hooks from the palettes below.') }}
+                    </p>
                 @endif
+            </div>
+            @include('livewire.sites.partials.pipeline._pipeline-timeline-busy-overlay')
             </div>
 
             <div class="grid gap-6 lg:grid-cols-2">
@@ -269,81 +321,78 @@
                             <x-heroicon-m-code-bracket class="h-3.5 w-3.5" />
                             {{ __('Custom command') }}
                         </button>
+                        <button
+                            type="button"
+                            wire:click="setPipelineTab('reference')"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        >
+                            <x-heroicon-o-book-open class="h-3.5 w-3.5" />
+                            {{ __('Browse all steps') }}
+                        </button>
                     </div>
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Build palette') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Dependency installs and asset builds — runs in phase 2 above.') }}</p>
                         <div x-ref="buildPalette" class="mt-3 flex flex-wrap gap-2">
-                            @foreach ($buildPalette as $entry)
-                                <div
-                                    data-palette-type="{{ $entry['type'] }}"
-                                    data-palette-phase="build"
-                                    class="inline-flex max-w-full select-none items-stretch rounded-full border border-sky-300/70 bg-white shadow-sm ring-1 ring-sky-200/40"
-                                    title="{{ __('Drag by the handle before activate, or click the label to append') }}"
-                                >
-                                    <span
-                                        data-palette-drag-handle
-                                        class="dply-palette-drag-handle inline-flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-l-full border-r border-sky-200/80 bg-sky-50 text-sky-800/70 active:cursor-grabbing"
-                                        aria-hidden="true"
-                                    >
-                                        <x-heroicon-m-bars-3 class="h-4 w-4" />
-                                    </span>
-                                    <button
-                                        type="button"
-                                        wire:click="addDeployPipelineStepFromPalette('{{ $entry['type'] }}', null, 'build')"
-                                        data-pipeline-no-drag
-                                        class="inline-flex min-h-9 items-center gap-1.5 rounded-r-full px-3 py-2 text-xs font-semibold text-sky-900 hover:bg-sky-50"
-                                    >
-                                        <x-dynamic-component :component="$entry['icon'] ?? 'heroicon-o-plus'" class="h-4 w-4 shrink-0" />
-                                        {{ __($entry['label']) }}
-                                    </button>
-                                    @include('livewire.sites.partials.pipeline._timeline-chevron')
-                                </div>
-                            @endforeach
+                            @forelse ($buildPalette as $entry)
+                                @include('livewire.sites.partials.pipeline._step-palette-item', ['entry' => $entry])
+                            @empty
+                                <p class="text-xs text-brand-moss">{{ __('No build presets for this runtime — use Custom command.') }}</p>
+                            @endforelse
                         </div>
                     </div>
                     <div>
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Release palette') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Runs after activate on the live release path.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Migrations, cache, and workers on the live path — phase 4 above.') }}</p>
                         <div x-ref="releasePalette" class="mt-3 flex flex-wrap gap-2">
-                            @foreach ($releasePalette as $entry)
-                                <div
-                                    data-palette-type="{{ $entry['type'] }}"
-                                    data-palette-phase="release"
-                                    class="inline-flex max-w-full select-none items-stretch rounded-full border border-emerald-300/70 bg-white shadow-sm ring-1 ring-emerald-200/40"
-                                    title="{{ __('Drag by the handle after activate, or click the label to append') }}"
-                                >
-                                    <span
-                                        data-palette-drag-handle
-                                        class="dply-palette-drag-handle inline-flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-l-full border-r border-emerald-200/80 bg-emerald-50 text-emerald-800/70 active:cursor-grabbing"
-                                        aria-hidden="true"
-                                    >
-                                        <x-heroicon-m-bars-3 class="h-4 w-4" />
-                                    </span>
-                                    <button
-                                        type="button"
-                                        wire:click="addDeployPipelineStepFromPalette('{{ $entry['type'] }}', null, 'release')"
-                                        data-pipeline-no-drag
-                                        class="inline-flex min-h-9 items-center gap-1.5 rounded-r-full px-3 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-50"
-                                    >
-                                        <x-dynamic-component :component="$entry['icon'] ?? 'heroicon-o-plus'" class="h-4 w-4 shrink-0" />
-                                        {{ __($entry['label']) }}
-                                    </button>
-                                    @include('livewire.sites.partials.pipeline._timeline-chevron')
-                                </div>
-                            @endforeach
+                            @forelse ($releasePalette as $entry)
+                                @include('livewire.sites.partials.pipeline._step-palette-item', ['entry' => $entry])
+                            @empty
+                                <p class="text-xs text-brand-moss">{{ __('No release presets for this runtime — use Custom (release).') }}</p>
+                            @endforelse
                         </div>
                     </div>
                 </div>
-                <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Add hooks') }}</p>
-                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Drag onto any dashed hook slot in the timeline — placement sets when it runs. Finish setup in the dialog that opens.') }}</p>
-                    <div x-ref="hookPalette" class="mt-3 flex flex-wrap gap-3">
-                        @foreach (config('site_deploy_pipeline.hook_palette', []) as $entry)
-                            @include('livewire.sites.partials.pipeline._hook-palette-item', ['entry' => $entry])
-                        @endforeach
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hook types') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Drag onto any dashed hook slot in the timeline.') }}</p>
+                        <div x-ref="hookPalette" class="mt-3 flex flex-wrap gap-2">
+                            @foreach (config('site_deploy_pipeline.hook_palette', []) as $entry)
+                                @include('livewire.sites.partials.pipeline._hook-palette-item', ['entry' => $entry])
+                            @endforeach
+                        </div>
                     </div>
+                    @if (($pipelineHookPresets ?? []) !== [])
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Common hook shortcuts') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Opens the configure dialog with script and timing prefilled.') }}</p>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                @foreach ($pipelineHookPresets as $preset)
+                                    <button
+                                        type="button"
+                                        wire:click="addDeployPipelineHookFromPreset(@js($preset))"
+                                        class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1.5 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100/80"
+                                    >
+                                        <x-dynamic-component :component="$preset['icon'] ?? 'heroicon-o-bolt'" class="h-3.5 w-3.5 shrink-0" />
+                                        {{ __($preset['label']) }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
+
+            <details class="rounded-2xl border border-brand-ink/10 bg-white">
+                <summary class="cursor-pointer list-none px-4 py-4 sm:px-5">
+                    <span class="text-sm font-semibold text-brand-ink">{{ __('All available steps & hooks') }}</span>
+                    <span class="ml-2 text-xs text-brand-moss">{{ __('full catalog — including types hidden from the palettes above') }}</span>
+                </summary>
+                <div class="border-t border-brand-ink/10 px-2 pb-4 sm:px-3">
+                    @include('livewire.sites.partials.pipeline._step-catalog')
+                </div>
+            </details>
 
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4 sm:p-5">
                 <p class="text-sm font-semibold text-brand-ink">{{ __('Post-deploy command') }}</p>

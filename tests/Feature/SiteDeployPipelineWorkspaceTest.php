@@ -10,6 +10,7 @@ use App\Models\SiteDeployHook;
 use App\Models\SiteDeployStep;
 use App\Models\User;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Support\Sites\DeployPipelineAdvisor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -90,7 +91,8 @@ test('pipeline workspace supports creating pipeline and applying template', func
         ->assertOk()
         ->assertSee('Pipelines')
         ->assertSee('Dply templates')
-        ->assertSee('Add hooks');
+        ->assertSee('Hook types')
+        ->assertSee('Browse all steps');
 
     Livewire::actingAs($user)
         ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
@@ -370,6 +372,67 @@ test('pipeline workspace can edit deploy hook', function () {
         ->assertSet('show_add_pipeline_hook_form', false);
 
     expect($hook->fresh()->script)->toBe('echo after');
+});
+
+test('pipeline reference tab shows full step catalog', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'runtime' => 'node',
+    ]);
+
+    app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'reference')
+        ->assertSee('Step catalog')
+        ->assertSee('All pipeline steps')
+        ->assertSee('Built-in step types')
+        ->assertSee('Migrate');
+});
+
+test('pipeline workspace shows advisor when configuration is risky', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE,
+        'phase' => SiteDeployStep::PHASE_BUILD,
+        'timeout_seconds' => 900,
+    ]);
+
+    expect(app(DeployPipelineAdvisor::class)->analyze($site, $pipeline->fresh(['steps', 'hooks']))['warnings'])->not->toBeEmpty();
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->assertSee('Pipeline review')
+        ->assertSee('Migrate');
 });
 
 test('pipeline workspace can add shell hook on timeline', function () {

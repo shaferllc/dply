@@ -24,7 +24,7 @@
             <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
         </button>
     </div>
-    @include('livewire.sites.partials.pipeline._timeline-chevron')
+    @include('livewire.sites.partials.pipeline._timeline-flow-connector')
 @elseif ($item['type'] === 'hook')
     @include('livewire.sites.partials.pipeline._timeline-hook-pill', ['hook' => $item['hook']])
 @endif

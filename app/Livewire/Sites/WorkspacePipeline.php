@@ -14,6 +14,9 @@ use App\Services\Deploy\DeployPipelineTemplateCatalog;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Sites\PipelineAnchorScriptRunner;
 use App\Support\Docs\ContextualDocResolver;
+use App\Support\Sites\DeployPipelineAdvisor;
+use App\Support\Sites\DeployPipelineIssueFixResolver;
+use App\Support\Sites\DeployPipelinePalette;
 use App\Support\Sites\DeployPipelineTimeline;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
@@ -155,6 +158,13 @@ class WorkspacePipeline extends Show
 
         $deploymentContract = app(DeploymentContractBuilder::class)->build($this->site);
         $deploymentPreflight = app(DeploymentPreflightValidator::class)->validate($this->site);
+        $pipelineAdvisor = app(DeployPipelineAdvisor::class)->analyze($this->site, $editingPipeline);
+        $pipelineAdvisorChecks = collect($pipelineAdvisor['checks']);
+        $pipelineActionableChecks = DeployPipelineIssueFixResolver::actionableChecks(
+            $this->site,
+            $this->server,
+            $pipelineAdvisorChecks,
+        );
 
         return view('livewire.sites.workspace-pipeline', array_merge(
             SiteSettingsViewData::for(
@@ -171,7 +181,11 @@ class WorkspacePipeline extends Show
                 'laravel_tab' => 'commands',
                 'pipelineTabs' => config('site_deploy_pipeline.tabs', []),
                 'pipelineTabIcons' => config('site_deploy_pipeline.tab_icons', []),
-                'pipelinePalette' => config('site_deploy_pipeline.palette', []),
+                'pipelinePalette' => DeployPipelinePalette::stepsFor($this->site),
+                'pipelineHookPresets' => DeployPipelinePalette::hookPresetsFor($this->site),
+                'pipelineStepCatalog' => DeployPipelinePalette::stepCatalogFor($this->site),
+                'pipelineStepTypeReference' => DeployPipelinePalette::stepTypeReference(),
+                'pipelineHookCatalog' => DeployPipelinePalette::hookCatalogFor($this->site),
                 'deployPipelineTemplates' => app(DeployPipelineTemplateCatalog::class)->templatesForSite($this->site),
                 'editingDeployPipeline' => $editingPipeline,
                 'editingDeploySteps' => $editingPipeline->steps,
@@ -184,6 +198,10 @@ class WorkspacePipeline extends Show
                 'pipelineUnsavedTargets' => implode(',', $this->pipelineUnsavedTargetFields()),
                 'pipelineAnchorDefaultCloneHint' => app(PipelineAnchorScriptRunner::class)->defaultCloneScriptHint($this->site),
                 'pipelineAnchorDefaultActivateHint' => app(PipelineAnchorScriptRunner::class)->defaultActivateScriptHint($this->site),
+                'pipelineAdvisor' => $pipelineAdvisor,
+                'pipelineAdvisorErrors' => collect($pipelineAdvisor['errors']),
+                'pipelineAdvisorWarnings' => collect($pipelineAdvisor['warnings']),
+                'pipelineActionableChecks' => $pipelineActionableChecks,
             ],
         ));
     }

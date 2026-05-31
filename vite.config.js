@@ -36,7 +36,9 @@ export default defineConfig(({ mode }) => {
             laravel({
                 input: [
                     'resources/css/app.css',
+                    'resources/css/deploy-pipeline.css',
                     'resources/js/app.js',
+                    'resources/js/file-browser-editor-lazy.js',
                     'resources/js/deploy-pipeline-dnd.js',
                 ],
                 refresh: false,

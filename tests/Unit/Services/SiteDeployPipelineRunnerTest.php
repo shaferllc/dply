@@ -38,4 +38,6 @@ test('resolves artisan install steps', function (string $type, string $expected)
 
 test('artisan optimize includes no interaction flag', function () {
     expect(SiteDeployPipelineCommands::fragmentFor(SiteDeployStep::TYPE_ARTISAN_OPTIMIZE, ''))->toBe('php artisan optimize --no-interaction');
+    expect(SiteDeployPipelineCommands::fragmentFor(SiteDeployStep::TYPE_YARN_INSTALL, ''))->toBe('yarn install --frozen-lockfile');
+    expect(SiteDeployPipelineCommands::fragmentFor(SiteDeployStep::TYPE_ARTISAN_QUEUE_RESTART, ''))->toBe('php artisan queue:restart');
 });

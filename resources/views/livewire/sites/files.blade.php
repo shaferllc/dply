@@ -21,6 +21,8 @@
     }
 @endphp
 
+@vite(['resources/js/file-browser-editor-lazy.js'])
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div
         wire:loading.flex
@@ -240,10 +242,15 @@
                 <div
                     x-data="{
                         editor: null,
-                        init() {
-                            this.editor = window.dplyFileBrowserMountEditor(this.$refs.editorMount, {
+                        async init() {
+                            const mountEditor = window.dplyEnsureFileBrowserEditor
+                                ? await window.dplyEnsureFileBrowserEditor()
+                                : null;
+                            if (! mountEditor) return;
+                            this.editor = mountEditor(this.$refs.editorMount, {
                                 content: this.$wire.editingContent ?? '',
                                 mime: this.$wire.editingMime ?? '',
+                                path: this.$wire.editingPath ?? '',
                                 onChange: (val) => { this.$wire.set('editingContent', val, true); },
                             });
                         },

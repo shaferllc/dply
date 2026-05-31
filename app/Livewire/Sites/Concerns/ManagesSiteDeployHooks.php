@@ -49,6 +49,21 @@ trait ManagesSiteDeployHooks
         return 'pipeline-hook-form';
     }
 
+    /**
+     * @param  array{kind: string, label?: string, anchor?: string, script?: string}  $preset
+     */
+    public function addDeployPipelineHookFromPreset(array $preset): void
+    {
+        $kind = $preset['kind'] ?? SiteDeployHook::KIND_SHELL;
+        $anchor = $preset['anchor'] ?? SiteDeployHook::ANCHOR_AFTER_ACTIVATE;
+        $script = trim((string) ($preset['script'] ?? ''));
+
+        $this->openAddPipelineHookForm($kind, $anchor, lockAnchor: isset($preset['anchor']));
+        if ($kind === SiteDeployHook::KIND_SHELL && $script !== '') {
+            $this->new_hook_script = $script;
+        }
+    }
+
     public function addDeployPipelineHookFromPalette(
         string $kind,
         string $anchor,
