@@ -84,7 +84,7 @@ final class ResolveServerCreateCatalog
         return match ($type) {
             'digitalocean' => $this->catalogDigitalOcean($credentials, $credential, $selectedRegion),
             'digitalocean_kubernetes' => $this->catalogDigitalOceanKubernetes($credentials, $credential),
-            'hetzner' => $this->catalogHetzner($credentials, $credential),
+            'hetzner' => $this->catalogHetzner($credentials, $credential, $selectedRegion),
             'linode' => $this->catalogLinode($credentials, $credential),
             'vultr' => $this->catalogVultr($credentials, $credential, $selectedRegion),
             'akamai' => $this->catalogAkamai($credentials, $credential),
@@ -326,10 +326,11 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    private function catalogHetzner(Collection $credentials, ProviderCredential $credential): array
+    private function catalogHetzner(Collection $credentials, ProviderCredential $credential, string $selectedRegion = ''): array
     {
         $regions = [];
         $sizes = [];
+        $selectedRegion = trim($selectedRegion);
         try {
             $svc = new HetznerService($credential);
             foreach ($svc->getLocations() as $loc) {
@@ -347,11 +348,37 @@ final class ResolveServerCreateCatalog
                 if ($v === '') {
                     continue;
                 }
+
+                // Hetzner publishes per-server-type location availability
+                // inline on /server_types via the `prices` array. Use that
+                // as the availability matrix so the picker never offers a
+                // (location, server_type) combo the create API will reject
+                // with "unsupported location for server type" — e.g. CX
+                // series in US locations like hil/ash, which only carry
+                // the CPX/CCX lines.
+                $availableLocations = [];
+                foreach ((array) ($st['prices'] ?? []) as $price) {
+                    if (! is_array($price)) {
+                        continue;
+                    }
+                    $loc = (string) ($price['location'] ?? '');
+                    if ($loc !== '') {
+                        $availableLocations[$loc] = true;
+                    }
+                }
+                $availableLocations = array_keys($availableLocations);
+
+                if ($selectedRegion !== '' && $availableLocations !== [] && ! in_array($selectedRegion, $availableLocations, true)) {
+                    continue;
+                }
+
                 $memGb = (int) ($st['memory'] ?? 0);
                 $cores = (int) ($st['cores'] ?? 0);
                 $diskGb = (int) ($st['disk'] ?? 0);
-                $monthly = $this->extractFloat($st, ['prices.0.price_monthly.gross', 'prices.0.price_monthly.net']);
-                $hourly = $this->extractFloat($st, ['prices.0.price_hourly.gross', 'prices.0.price_hourly.net']);
+                $monthly = $this->priceForLocation($st, $selectedRegion, 'price_monthly')
+                    ?? $this->extractFloat($st, ['prices.0.price_monthly.gross', 'prices.0.price_monthly.net']);
+                $hourly = $this->priceForLocation($st, $selectedRegion, 'price_hourly')
+                    ?? $this->extractFloat($st, ['prices.0.price_hourly.gross', 'prices.0.price_hourly.net']);
                 $spec = $memGb.'GB / '.$cores.' '.__('vCPU');
                 if ($diskGb > 0) {
                     $spec .= ' / '.$diskGb.'GB '.__('disk');
@@ -365,6 +392,7 @@ final class ResolveServerCreateCatalog
                     'memory_mb' => $memGb > 0 ? $memGb * 1024 : null,
                     'vcpus' => $cores > 0 ? $cores : null,
                     'disk_gb' => $diskGb > 0 ? $diskGb : null,
+                    'available_in_regions' => $availableLocations,
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
@@ -379,6 +407,39 @@ final class ResolveServerCreateCatalog
             'region_label' => __('Location'),
             'size_label' => __('Server type'),
         ];
+    }
+
+    /**
+     * Pull a per-location price from a Hetzner server_type payload. Falls
+     * back to null when the requested location is missing — callers then
+     * use prices.0.* as the catalog-default price.
+     */
+    private function priceForLocation(array $serverType, string $location, string $key): ?float
+    {
+        if ($location === '') {
+            return null;
+        }
+
+        foreach ((array) ($serverType['prices'] ?? []) as $price) {
+            if (! is_array($price)) {
+                continue;
+            }
+            if ((string) ($price['location'] ?? '') !== $location) {
+                continue;
+            }
+            $entry = $price[$key] ?? null;
+            if (! is_array($entry)) {
+                continue;
+            }
+            foreach (['gross', 'net'] as $field) {
+                $raw = $entry[$field] ?? null;
+                if (is_numeric($raw)) {
+                    return (float) $raw;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

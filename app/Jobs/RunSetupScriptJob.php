@@ -10,6 +10,7 @@ use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
+use App\Models\ServerCredentialShare;
 use App\Models\ServerProvisionRun;
 use App\Models\UserSshKey;
 use App\Modules\TaskRunner\AnonymousTask;
@@ -18,6 +19,7 @@ use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
+use App\Notifications\RedisServerProvisionedNotification;
 use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Notifications\ServerProvisionFailedNotification;
 use App\Observers\TaskRunnerTaskObserver;
@@ -94,6 +96,25 @@ class RunSetupScriptJob implements ShouldQueue
                 && filled($creator->email)
             ) {
                 $creator->notify(new ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
+            }
+
+            // Dedicated redis servers get a tailored "your cache is live" email
+            // with a reveal-once link to the AUTH password (never emailed
+            // directly). Always sent for redis hosts — this is the feature the
+            // operator opted into when picking the redis profile. Idempotent
+            // via a meta flag so retries don't re-issue links.
+            $redisServer = $server->fresh() ?? $server;
+            if ($creator
+                && filled($creator->email)
+                && $redisServer->isRedisServer()
+                && blank(data_get($redisServer->meta, 'redis_provisioned_email_sent_at'))
+            ) {
+                $share = ServerCredentialShare::issue($redisServer, $creator);
+                $creator->notify(new RedisServerProvisionedNotification($redisServer, $share->token));
+
+                $redisMeta = $redisServer->meta ?? [];
+                $redisMeta['redis_provisioned_email_sent_at'] = now()->toIso8601String();
+                $redisServer->update(['meta' => $redisMeta]);
             }
 
             // Kick off insights immediately so the workspace lands with a

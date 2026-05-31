@@ -27,8 +27,10 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Notifications\RedisServerProvisioningStartedNotification;
 use App\Services\AwsEksService;
 use App\Services\DigitalOceanService;
+use App\Services\HetznerService;
 use App\Support\ServerProviderGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -89,7 +91,7 @@ final class StoreServerFromCreateForm
             )->validate();
         }
 
-        return match ($form->type) {
+        $server = match ($form->type) {
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
             'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
             'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
@@ -110,6 +112,36 @@ final class StoreServerFromCreateForm
             'custom' => $this->storeCustom($user, $org, $form),
             default => throw ValidationException::withMessages(['form.type' => __('Invalid server type.')]),
         };
+
+        $this->notifyRedisProvisioningStarted($server, $user);
+
+        return $server;
+    }
+
+    /**
+     * Heads-up email the moment a dedicated redis server begins provisioning.
+     * Single chokepoint for every provider; the "ready" email with the reveal
+     * link fires later from RunSetupScriptJob. Idempotent via a meta flag.
+     */
+    private function notifyRedisProvisioningStarted(Server $server, User $user): void
+    {
+        if (! $server->isRedisServer()) {
+            return;
+        }
+
+        if (! filled($user->email)) {
+            return;
+        }
+
+        if (filled(data_get($server->meta, 'redis_starting_email_sent_at'))) {
+            return;
+        }
+
+        $user->notify(new RedisServerProvisioningStartedNotification($server));
+
+        $meta = $server->meta ?? [];
+        $meta['redis_starting_email_sent_at'] = now()->toIso8601String();
+        $server->update(['meta' => $meta]);
     }
 
     /**
@@ -540,6 +572,8 @@ final class StoreServerFromCreateForm
         $credential = ProviderCredential::where('organization_id', $org->id)
             ->where('provider', 'hetzner')
             ->findOrFail($form->provider_credential_id);
+
+        $this->validateHetznerRegionSizeCombo($credential, $form->region, $form->size);
 
         [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
 
@@ -1182,5 +1216,57 @@ final class StoreServerFromCreateForm
         $status = $key ? Server::SETUP_STATUS_PENDING : null;
 
         return [$key, $status];
+    }
+
+    /**
+     * Reject incompatible Hetzner (location, server_type) combos before
+     * the row is persisted. The catalog filter on the wizard prevents
+     * this on the happy path, but a stale form, API hiccup, or direct
+     * URL submission can still land here — surfacing a validation error
+     * is much friendlier than letting the cloud-side provision job log a
+     * generic "unsupported location for server type" half a minute later.
+     */
+    private function validateHetznerRegionSizeCombo(ProviderCredential $credential, string $region, string $size): void
+    {
+        $region = trim($region);
+        $size = trim($size);
+        if ($region === '' || $size === '') {
+            return;
+        }
+
+        try {
+            $svc = new HetznerService($credential);
+            $serverTypes = $svc->getServerTypes();
+        } catch (Throwable) {
+            // Catalog probe failed — fall through and let the provision job
+            // surface the API error. We don't want to block submission on a
+            // transient Hetzner outage.
+            return;
+        }
+
+        foreach ($serverTypes as $st) {
+            if (! is_array($st) || (string) ($st['name'] ?? '') !== $size) {
+                continue;
+            }
+
+            $locations = [];
+            foreach ((array) ($st['prices'] ?? []) as $price) {
+                if (is_array($price) && (string) ($price['location'] ?? '') !== '') {
+                    $locations[] = (string) $price['location'];
+                }
+            }
+
+            if ($locations === [] || in_array($region, $locations, true)) {
+                return;
+            }
+
+            throw ValidationException::withMessages([
+                'size' => __('The server type :size is not available in :region. Available in: :locations.', [
+                    'size' => $size,
+                    'region' => $region,
+                    'locations' => implode(', ', $locations),
+                ]),
+            ]);
+        }
     }
 }

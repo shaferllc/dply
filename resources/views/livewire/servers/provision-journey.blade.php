@@ -323,6 +323,38 @@
                                 {{ __('Resume install') }}
                             </button>
                         @endif
+                        @if ($canRetryCloudProvision)
+                            <button
+                                type="button"
+                                wire:click="editAndRetry"
+                                wire:loading.attr="disabled"
+                                wire:target="editAndRetry,retryCloudProvision"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-pencil-square class="h-4 w-4" wire:loading.remove wire:target="editAndRetry" />
+                                <svg wire:loading wire:target="editAndRetry" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                <span wire:loading.remove wire:target="editAndRetry">{{ __('Edit configuration') }}</span>
+                                <span wire:loading wire:target="editAndRetry">{{ __('Restoring wizard…') }}</span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="retryCloudProvision"
+                                wire:loading.attr="disabled"
+                                wire:target="retryCloudProvision,editAndRetry"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="retryCloudProvision" />
+                                <svg wire:loading wire:target="retryCloudProvision" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                <span wire:loading.remove wire:target="retryCloudProvision">{{ __('Retry as-is') }}</span>
+                                <span wire:loading wire:target="retryCloudProvision">{{ __('Queueing…') }}</span>
+                            </button>
+                        @endif
                         @if ($server->status === \App\Models\Server::STATUS_READY && ! in_array($server->setup_status, [\App\Models\Server::SETUP_STATUS_PENDING, \App\Models\Server::SETUP_STATUS_RUNNING], true))
                             <a
                                 href="{{ route('servers.overview', $server) }}"
@@ -500,6 +532,44 @@
                                                     </ul>
                                                 </details>
                                             @endif
+                                        </div>
+                                    @endif
+
+                                    @if ($canRetryCloudProvision)
+                                        <div class="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-white/70 px-4 py-3">
+                                            <button
+                                                type="button"
+                                                wire:click="editAndRetry"
+                                                wire:loading.attr="disabled"
+                                                wire:target="editAndRetry,retryCloudProvision"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-wait disabled:opacity-60"
+                                            >
+                                                <x-heroicon-o-pencil-square class="h-4 w-4" wire:loading.remove wire:target="editAndRetry" />
+                                                <svg wire:loading wire:target="editAndRetry" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                </svg>
+                                                <span wire:loading.remove wire:target="editAndRetry">{{ __('Edit configuration') }}</span>
+                                                <span wire:loading wire:target="editAndRetry">{{ __('Restoring wizard…') }}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="retryCloudProvision"
+                                                wire:loading.attr="disabled"
+                                                wire:target="retryCloudProvision,editAndRetry"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
+                                            >
+                                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="retryCloudProvision" />
+                                                <svg wire:loading wire:target="retryCloudProvision" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                </svg>
+                                                <span wire:loading.remove wire:target="retryCloudProvision">{{ __('Retry as-is') }}</span>
+                                                <span wire:loading wire:target="retryCloudProvision">{{ __('Queueing…') }}</span>
+                                            </button>
+                                            <p class="basis-full text-xs leading-5 text-red-900/80">
+                                                {{ __('No provider resource was created. Edit configuration takes you back to the wizard with your picks pre-filled so you can change the bad region/size, then re-submit. Retry as-is queues the same config again.') }}
+                                            </p>
                                         </div>
                                     @endif
 

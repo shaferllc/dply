@@ -134,6 +134,19 @@ class Server extends Model
         return $this->belongsTo(Team::class);
     }
 
+    /**
+     * A dedicated cache host provisioned via the "redis_server" profile — as
+     * opposed to an app server that merely runs redis as a co-located cache.
+     * Gates the redis-specific provisioning emails.
+     */
+    public function isRedisServer(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return ($meta['server_role'] ?? null) === 'redis'
+            && ($meta['install_profile'] ?? null) === 'redis_server';
+    }
+
     public function providerCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class);

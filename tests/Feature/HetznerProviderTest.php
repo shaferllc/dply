@@ -205,6 +205,23 @@ test('resolve hetzner catalog returns locations and server types', function () {
 test('store server from create form dispatches hetzner provision job', function () {
     Queue::fake();
 
+    // The submit-side combo validator probes /server_types as
+    // defence-in-depth against stale forms. Mock it so the test path
+    // covers the happy combo (fsn1 + cx22) without a real network hop.
+    Http::fake([
+        'https://api.hetzner.cloud/v1/server_types' => Http::response([
+            'server_types' => [
+                [
+                    'name' => 'cx22',
+                    'prices' => [
+                        ['location' => 'fsn1', 'price_monthly' => ['gross' => '5.49']],
+                        ['location' => 'nbg1', 'price_monthly' => ['gross' => '5.49']],
+                    ],
+                ],
+            ],
+        ], 200),
+    ]);
+
     $user = hetznerTestUser();
     $org = $user->currentOrganization();
 

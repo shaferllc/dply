@@ -22,6 +22,7 @@ use App\Http\Controllers\GithubCloudWebhookController;
 use App\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
 use App\Http\Controllers\OrganizationComplianceExportController;
+use App\Http\Controllers\ServerCredentialShareController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
@@ -294,7 +295,21 @@ foreach ((array) config('services.digitalocean.testing_domains', []) as $functio
 }
 
 Route::get('/', function () {
-    return view('welcome');
+    // Allow visitors to preview an alternate, animated homepage and remember
+    // their choice. `?v=1` (classic) or `?v=2` (animated); persisted via cookie.
+    $requested = request()->query('v');
+    $valid = in_array($requested, ['1', '2'], true);
+    $version = $valid
+        ? $requested
+        : (request()->cookie('home_version') === '2' ? '2' : '1');
+
+    $response = response()->view($version === '2' ? 'welcome-v2' : 'welcome');
+
+    if ($valid) {
+        $response->cookie('home_version', $version, 60 * 24 * 365);
+    }
+
+    return $response;
 });
 
 Route::get('/pricing', function () {
@@ -347,6 +362,10 @@ Route::livewire('/status/{statusPage}', StatusPublicPage::class)
 Route::get('/share/database-credentials/{token}', [DatabaseCredentialShareController::class, 'show'])
     ->middleware(['throttle:60,1'])
     ->name('database-credential-shares.show');
+
+Route::get('/share/server-credentials/{token}', [ServerCredentialShareController::class, 'show'])
+    ->middleware(['throttle:60,1'])
+    ->name('server-credential-shares.show');
 
 Route::prefix('cli')->middleware('throttle:60,1')->group(function (): void {
     Route::get('/install.sh', [CliInstallController::class, 'installScript'])->name('cli.install');
