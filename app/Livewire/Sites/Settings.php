@@ -35,6 +35,8 @@ use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\DigitalOceanService;
+use App\Services\HetznerService;
+use App\Services\LinodeService;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\RemoteCli\Artisan;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
@@ -1571,7 +1573,7 @@ class Settings extends Show
             $appDoToken = trim((string) config('services.digitalocean.token'));
 
             if ($credForApi === null && $appDoToken === '') {
-                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
+                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
 
                 return;
             }
@@ -1582,6 +1584,20 @@ class Settings extends Show
                         $service = new DigitalOceanService($credForApi);
                         if (! $service->domainExistsInAccount($zone)) {
                             $this->addError('settings_dns_zone', __('That domain was not found in this DigitalOcean account. Add it under DigitalOcean Networking → Domains first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'hetzner') {
+                        $hetzner = new HetznerService($credForApi);
+                        if (! $hetzner->zoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That zone was not found in this Hetzner Cloud project. Add it under Hetzner Console → DNS first.'));
+
+                            return;
+                        }
+                    } elseif (in_array($credForApi->provider, ['linode', 'akamai'], true)) {
+                        $linode = new LinodeService($credForApi);
+                        if (! $linode->domainExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That domain was not found in this Linode account. Add it under Linode → Domains first.'));
 
                             return;
                         }

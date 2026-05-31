@@ -20,6 +20,7 @@ final class ServerProviderGate
      */
     private const PENNANT_FLAGS = [
         'digitalocean' => 'provider.digitalocean',
+        'hetzner' => 'provider.hetzner',
         'aws' => 'provider.aws',
         'aws_app_runner' => 'provider.aws_app_runner',
         'aws_kubernetes' => 'provider.aws_eks',

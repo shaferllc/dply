@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Livewire\Admin\Roadmap;
 
 use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
+use App\Livewire\Admin\Roadmap\Concerns\ManagesRoadmapReleases;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\AuditLog;
 use App\Models\Organization;
 use App\Models\RoadmapItem;
+use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use App\Models\User;
+use App\Services\Roadmap\RoadmapSuggestionNotifier;
+use App\Support\Roadmap\RoadmapQuarter;
+use App\Support\Roadmap\RoadmapReleaseTrain;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -25,6 +30,7 @@ class Index extends Component
     use AuthorizesPlatformAdmin;
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesRoadmapReleases;
     use WithPagination;
 
     #[Url(as: 'tab', except: 'items')]
@@ -50,6 +56,12 @@ class Index extends Component
 
     public string $itemArea = '';
 
+    public string $itemTargetQuarter = '';
+
+    public string $itemTargetReleaseId = '';
+
+    public string $itemShippedReleaseId = '';
+
     public bool $itemIsPublished = false;
 
     public ?string $promotingSuggestionId = null;
@@ -65,7 +77,7 @@ class Index extends Component
 
     public function setTab(string $tab): void
     {
-        if (! in_array($tab, ['items', 'suggestions'], true)) {
+        if (! in_array($tab, ['items', 'releases', 'suggestions'], true)) {
             return;
         }
 
@@ -100,6 +112,9 @@ class Index extends Component
         $this->itemDescription = $item->description ?? '';
         $this->itemStatus = $item->status;
         $this->itemArea = $item->area ?? '';
+        $this->itemTargetQuarter = $item->target_quarter ?? '';
+        $this->itemTargetReleaseId = $item->target_release_id ?? '';
+        $this->itemShippedReleaseId = $item->shipped_release_id ?? '';
         $this->itemIsPublished = $item->is_published;
         $this->promotingSuggestionId = null;
         $this->showItemModal = true;
@@ -134,6 +149,18 @@ class Index extends Component
             $this->itemArea = '';
         }
 
+        if (! filled($this->itemTargetQuarter)) {
+            $this->itemTargetQuarter = '';
+        }
+
+        if (! filled($this->itemTargetReleaseId)) {
+            $this->itemTargetReleaseId = '';
+        }
+
+        if (! filled($this->itemShippedReleaseId)) {
+            $this->itemShippedReleaseId = '';
+        }
+
         $validated = $this->validate([
             'itemTitle' => ['required', 'string', 'max:200'],
             'itemSummary' => ['nullable', 'string', 'max:500'],
@@ -144,10 +171,29 @@ class Index extends Component
                     $fail(__('The selected area is invalid.'));
                 }
             }],
+            'itemTargetQuarter' => ['nullable', 'string', 'max:16', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (filled($value) && ! RoadmapQuarter::isValidKey((string) $value)) {
+                    $fail(__('The selected target quarter is invalid.'));
+                }
+            }],
+            'itemTargetReleaseId' => ['nullable', 'string', 'exists:roadmap_releases,id'],
+            'itemShippedReleaseId' => ['nullable', 'string', 'exists:roadmap_releases,id'],
             'itemIsPublished' => ['boolean'],
         ]);
 
         $area = filled($validated['itemArea'] ?? null) ? $validated['itemArea'] : null;
+        $targetQuarter = filled($validated['itemTargetQuarter'] ?? null) ? $validated['itemTargetQuarter'] : null;
+        $targetReleaseId = filled($validated['itemTargetReleaseId'] ?? null) ? $validated['itemTargetReleaseId'] : null;
+        $shippedReleaseId = filled($validated['itemShippedReleaseId'] ?? null) ? $validated['itemShippedReleaseId'] : null;
+
+        if ($validated['itemStatus'] === RoadmapItem::STATUS_SHIPPED && $shippedReleaseId === null && $targetReleaseId !== null) {
+            $shippedReleaseId = $targetReleaseId;
+        }
+
+        if ($validated['itemStatus'] !== RoadmapItem::STATUS_SHIPPED) {
+            $shippedReleaseId = null;
+        }
+
         $shippedAt = $validated['itemStatus'] === RoadmapItem::STATUS_SHIPPED
             ? now()->toDateString()
             : null;
@@ -168,12 +214,15 @@ class Index extends Component
                 'description' => filled($validated['itemDescription'] ?? null) ? trim((string) $validated['itemDescription']) : null,
                 'status' => $validated['itemStatus'],
                 'area' => $area,
+                'target_quarter' => $targetQuarter,
+                'target_release_id' => $targetReleaseId,
+                'shipped_release_id' => $shippedReleaseId,
                 'is_published' => (bool) $validated['itemIsPublished'],
                 'shipped_at' => $shippedAt,
             ]);
 
             $this->logRoadmapAudit('roadmap.item.updated', $item, $oldValues, $item->fresh()?->only([
-                'title', 'summary', 'description', 'status', 'area', 'is_published', 'shipped_at',
+                'title', 'summary', 'description', 'status', 'area', 'target_quarter', 'target_release_id', 'shipped_release_id', 'is_published', 'shipped_at',
             ]));
             $this->toastSuccess(__('Roadmap item updated.'));
         } else {
@@ -187,15 +236,22 @@ class Index extends Component
                 'description' => filled($validated['itemDescription'] ?? null) ? trim((string) $validated['itemDescription']) : null,
                 'status' => $validated['itemStatus'],
                 'area' => $area,
+                'target_quarter' => $targetQuarter,
+                'target_release_id' => $targetReleaseId,
+                'shipped_release_id' => $shippedReleaseId,
                 'sort_order' => $sortOrder,
                 'is_published' => (bool) $validated['itemIsPublished'],
                 'shipped_at' => $shippedAt,
             ]);
 
             $this->logRoadmapAudit('roadmap.item.created', $item, null, $item->only([
-                'title', 'summary', 'description', 'status', 'area', 'is_published', 'shipped_at',
+                'title', 'summary', 'description', 'status', 'area', 'target_quarter', 'target_release_id', 'shipped_release_id', 'is_published', 'shipped_at',
             ]));
             $this->toastSuccess(__('Roadmap item created.'));
+
+            if ($this->promotingSuggestionId !== null) {
+                $this->linkSuggestionToItem($this->promotingSuggestionId, $item);
+            }
         }
 
         $this->closeItemModal();
@@ -257,6 +313,85 @@ class Index extends Component
         $other->update(['sort_order' => $currentOrder]);
     }
 
+    /**
+     * @param  list<string>  $orderedIds
+     */
+    public function reorderItems(string $status, array $orderedIds): void
+    {
+        $columns = [];
+        foreach (RoadmapItem::statusKeys() as $statusKey) {
+            $columns[$statusKey] = RoadmapItem::query()
+                ->where('status', $statusKey)
+                ->ordered()
+                ->pluck('id')
+                ->all();
+        }
+
+        $columns[$status] = array_values(array_unique(array_filter(
+            $orderedIds,
+            fn (mixed $id): bool => is_string($id) && $id !== '',
+        )));
+
+        $this->syncRoadmapColumns($columns);
+    }
+
+    /**
+     * @param  array<string, list<string>>  $columns
+     */
+    public function syncRoadmapColumns(array $columns): void
+    {
+        Gate::authorize('viewPlatformAdmin');
+
+        $validStatuses = RoadmapItem::statusKeys();
+
+        foreach (array_keys($columns) as $status) {
+            if (! in_array($status, $validStatuses, true)) {
+                return;
+            }
+        }
+
+        foreach ($validStatuses as $status) {
+            if (! array_key_exists($status, $columns)) {
+                $columns[$status] = [];
+            }
+        }
+
+        foreach ($columns as $status => $orderedIds) {
+            $orderedIds = array_values(array_unique(array_filter(
+                $orderedIds,
+                fn (mixed $id): bool => is_string($id) && $id !== '',
+            )));
+
+            foreach ($orderedIds as $index => $id) {
+                $item = RoadmapItem::query()->find($id);
+                if ($item === null) {
+                    continue;
+                }
+
+                $updates = ['sort_order' => $index];
+
+                if ($item->status !== $status) {
+                    $updates['status'] = $status;
+
+                    if ($status === RoadmapItem::STATUS_SHIPPED) {
+                        if ($item->shipped_at === null) {
+                            $updates['shipped_at'] = now()->toDateString();
+                        }
+
+                        if ($item->shipped_release_id === null && $item->target_release_id !== null) {
+                            $updates['shipped_release_id'] = $item->target_release_id;
+                        }
+                    } else {
+                        $updates['shipped_at'] = null;
+                        $updates['shipped_release_id'] = null;
+                    }
+                }
+
+                $item->update($updates);
+            }
+        }
+    }
+
     public function openSuggestion(string $suggestionId): void
     {
         $suggestion = RoadmapSuggestion::query()->findOrFail($suggestionId);
@@ -311,11 +446,17 @@ class Index extends Component
     {
         $this->authorizePlatformAdmin();
 
-        $items = RoadmapItem::query()->ordered()->get()->groupBy('status');
+        $items = RoadmapItem::query()
+            ->with(['sourceSuggestions', 'targetRelease', 'shippedRelease'])
+            ->ordered()
+            ->get()
+            ->groupBy('status');
+        $releases = RoadmapRelease::query()->ordered()->withCount(['targetItems', 'shippedItems'])->get();
         $newSuggestionCount = RoadmapSuggestion::query()->where('status', RoadmapSuggestion::STATUS_NEW)->count();
 
         $suggestions = $this->tab === 'suggestions'
             ? RoadmapSuggestion::query()
+                ->with('promotedRoadmapItem')
                 ->search($this->suggestionSearch)
                 ->status($this->suggestionStatusFilter)
                 ->latest('created_at')
@@ -323,13 +464,17 @@ class Index extends Component
             : null;
 
         $viewingSuggestion = $this->viewingSuggestionId
-            ? RoadmapSuggestion::query()->find($this->viewingSuggestionId)
+            ? RoadmapSuggestion::query()->with('promotedRoadmapItem')->find($this->viewingSuggestionId)
             : null;
 
         return view('livewire.admin.roadmap.index', [
             'itemsByStatus' => $items,
             'statusLabels' => config('roadmap.statuses', []),
             'areaLabels' => config('roadmap.areas', []),
+            'quarterOptions' => RoadmapQuarter::options(),
+            'releaseOptions' => $releases,
+            'releaseSlugOptions' => RoadmapReleaseTrain::upcomingOptions(18),
+            'releases' => $releases,
             'suggestions' => $suggestions,
             'suggestionStatusLabels' => config('roadmap.suggestion_statuses', []),
             'newSuggestionCount' => $newSuggestionCount,
@@ -350,6 +495,13 @@ class Index extends Component
             'status' => $suggestion->status,
         ]);
 
+        $notifier = app(RoadmapSuggestionNotifier::class);
+        if ($status === RoadmapSuggestion::STATUS_REVIEWED) {
+            $notifier->notifyReviewed($suggestion);
+        } elseif ($status === RoadmapSuggestion::STATUS_DECLINED) {
+            $notifier->notifyDeclined($suggestion);
+        }
+
         if ($this->viewingSuggestionId === $suggestionId) {
             $this->closeSuggestion();
         }
@@ -361,7 +513,7 @@ class Index extends Component
      * @param  array<string, mixed>|null  $oldValues
      * @param  array<string, mixed>|null  $newValues
      */
-    private function logRoadmapAudit(string $action, RoadmapItem|RoadmapSuggestion $subject, ?array $oldValues, ?array $newValues): void
+    private function logRoadmapAudit(string $action, RoadmapItem|RoadmapSuggestion|RoadmapRelease $subject, ?array $oldValues, ?array $newValues): void
     {
         $user = auth()->user();
         if (! $user instanceof User) {
@@ -383,6 +535,31 @@ class Index extends Component
         );
     }
 
+    private function linkSuggestionToItem(string $suggestionId, RoadmapItem $item): void
+    {
+        $suggestion = RoadmapSuggestion::query()->find($suggestionId);
+        if (! $suggestion instanceof RoadmapSuggestion) {
+            return;
+        }
+
+        $oldValues = [
+            'status' => $suggestion->status,
+            'promoted_roadmap_item_id' => $suggestion->promoted_roadmap_item_id,
+        ];
+
+        $suggestion->update([
+            'promoted_roadmap_item_id' => $item->id,
+            'status' => RoadmapSuggestion::STATUS_REVIEWED,
+        ]);
+
+        $this->logRoadmapAudit('roadmap.suggestion.promoted', $suggestion, $oldValues, [
+            'status' => $suggestion->status,
+            'promoted_roadmap_item_id' => $item->id,
+        ]);
+
+        app(RoadmapSuggestionNotifier::class)->notifyPromoted($suggestion->fresh() ?? $suggestion, $item);
+    }
+
     private function resetItemForm(): void
     {
         $this->editingItemId = null;
@@ -391,6 +568,9 @@ class Index extends Component
         $this->itemDescription = '';
         $this->itemStatus = RoadmapItem::STATUS_PLANNED;
         $this->itemArea = '';
+        $this->itemTargetQuarter = '';
+        $this->itemTargetReleaseId = '';
+        $this->itemShippedReleaseId = '';
         $this->itemIsPublished = false;
         $this->promotingSuggestionId = null;
         $this->resetValidation();

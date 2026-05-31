@@ -85,3 +85,68 @@ test('destroy instance deletes linode by id', function () {
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && $request->url() === 'https://api.linode.com/v4/linode/instances/555');
 });
+
+test('domain exists checks linode dns domains', function () {
+    Http::fake([
+        'https://api.linode.com/v4/domains*' => Http::response([
+            'data' => [
+                ['id' => 10, 'domain' => 'example.com'],
+            ],
+            'pages' => 1,
+        ], 200),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'linode',
+        'credentials' => ['api_token' => 'lin_test'],
+    ]);
+
+    expect((new LinodeService($credential))->domainExists('example.com'))->toBeTrue();
+    expect((new LinodeService($credential))->domainExists('missing.test'))->toBeFalse();
+});
+
+test('upsert domain record creates record when missing', function () {
+    Http::fake(function ($request) {
+        $url = $request->url();
+        $method = $request->method();
+
+        if (str_contains($url, '/domains/10/records') && $method === 'GET') {
+            return Http::response(['data' => [], 'pages' => 1], 200);
+        }
+
+        if ($url === 'https://api.linode.com/v4/domains/10/records' && $method === 'POST') {
+            return Http::response([
+                'data' => ['id' => 55, 'type' => 'A', 'name' => 'preview', 'target' => '203.0.113.1'],
+            ], 200);
+        }
+
+        if (str_contains($url, '/domains') && $method === 'GET') {
+            return Http::response([
+                'data' => [
+                    ['id' => 10, 'domain' => 'example.com'],
+                ],
+                'pages' => 1,
+            ], 200);
+        }
+
+        return Http::response([], 404);
+    });
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'linode',
+        'credentials' => ['api_token' => 'lin_test'],
+    ]);
+
+    $record = (new LinodeService($credential))->upsertDomainRecord('example.com', 'A', 'preview', '203.0.113.1');
+
+    expect($record['id'] ?? null)->toBe(55);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://api.linode.com/v4/domains/10/records'
+        && ($request->data()['target'] ?? null) === '203.0.113.1');
+});
+
+test('normalize record name maps apex hostnames to empty string', function () {
+    expect(LinodeService::normalizeRecordName('example.com', 'example.com'))->toBe('');
+    expect(LinodeService::normalizeRecordName('preview', 'example.com'))->toBe('preview');
+});

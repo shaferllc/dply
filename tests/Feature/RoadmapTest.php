@@ -94,3 +94,25 @@ test('roadmap area filter limits visible items', function () {
         ->assertSee('Edge CDN polish')
         ->assertDontSee('Server patching UI');
 });
+
+test('public roadmap shows recently shipped strip and target quarter', function () {
+    RoadmapItem::factory()->shipped()->create([
+        'title' => 'Fleet overview shipped',
+        'summary' => 'Cross-server health at a glance',
+        'is_published' => true,
+        'shipped_at' => now()->subDays(2),
+    ]);
+
+    RoadmapItem::factory()->create([
+        'title' => 'Planned with quarter',
+        'target_quarter' => '2026-Q4',
+        'is_published' => true,
+    ]);
+
+    $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
+        ->get(route('roadmap'))
+        ->assertOk()
+        ->assertSee(__('Recently shipped'))
+        ->assertSee('Fleet overview shipped')
+        ->assertSee('Q4 2026');
+});

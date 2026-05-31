@@ -18,11 +18,13 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\ServerProviderGate;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Component;
 use Livewire\Livewire;
 
@@ -30,6 +32,8 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     config(['server_providers.enabled.hetzner' => true]);
+    Feature::define('provider.hetzner', fn (): bool => true);
+    Feature::flushCache();
 });
 
 function hetznerTestUser(): User
@@ -49,6 +53,19 @@ test('list server provider cards includes hetzner when enabled', function () {
     $ids = array_column(ListServerProviderCards::run($org), 'id');
 
     expect($ids)->toContain('hetzner');
+});
+
+test('hetzner is omitted when pennant flag is off', function () {
+    Feature::define('provider.hetzner', fn (): bool => false);
+    Feature::flushCache();
+
+    $user = hetznerTestUser();
+    $org = $user->currentOrganization();
+
+    $ids = array_column(ListServerProviderCards::run($org), 'id');
+
+    expect($ids)->not->toContain('hetzner');
+    expect(ServerProviderGate::enabled('hetzner'))->toBeFalse();
 });
 
 test('credentials nav includes hetzner when enabled', function () {

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class RoadmapSuggestion extends Model
@@ -29,6 +30,7 @@ class RoadmapSuggestion extends Model
         'name',
         'status',
         'admin_notes',
+        'promoted_roadmap_item_id',
         'ip_address',
     ];
 
@@ -62,6 +64,14 @@ class RoadmapSuggestion extends Model
                 ->orWhereRaw('LOWER(email) LIKE ?', [$term])
                 ->orWhereRaw('LOWER(name) LIKE ?', [$term]);
         });
+    }
+
+    /**
+     * @return BelongsTo<RoadmapItem, $this>
+     */
+    public function promotedRoadmapItem(): BelongsTo
+    {
+        return $this->belongsTo(RoadmapItem::class, 'promoted_roadmap_item_id');
     }
 
     public function statusLabel(): string

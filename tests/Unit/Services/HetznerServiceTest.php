@@ -97,3 +97,48 @@ test('destroy instance deletes server by id', function () {
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && $request->url() === 'https://api.hetzner.cloud/v1/servers/555');
 });
+
+test('zone exists checks hetzner cloud dns zones', function () {
+    Http::fake([
+        'https://api.hetzner.cloud/v1/zones*' => Http::response([
+            'zones' => [
+                ['id' => 'z-1', 'name' => 'example.com'],
+            ],
+        ], 200),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'hetzner',
+        'credentials' => ['api_token' => 'hzn_test'],
+    ]);
+
+    expect((new HetznerService($credential))->zoneExists('example.com'))->toBeTrue();
+    expect((new HetznerService($credential))->zoneExists('missing.test'))->toBeFalse();
+});
+
+test('upsert zone record creates rrset when missing', function () {
+    Http::fake([
+        'https://api.hetzner.cloud/v1/zones/example.com/rrsets/preview/A' => Http::response([], 404),
+        'https://api.hetzner.cloud/v1/zones/example.com/rrsets' => Http::response([
+            'rrset' => ['id' => 'rr-1', 'name' => 'preview', 'type' => 'A'],
+        ], 201),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'hetzner',
+        'credentials' => ['api_token' => 'hzn_test'],
+    ]);
+
+    $rrset = (new HetznerService($credential))->upsertZoneRecord('example.com', 'A', 'preview', '203.0.113.1');
+
+    expect($rrset['name'] ?? null)->toBe('preview');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with($request->url(), '/zones/example.com/rrsets')
+        && ($request->data()['records'][0]['value'] ?? null) === '203.0.113.1');
+});
+
+test('normalize rrset name maps apex hostnames to at sign', function () {
+    expect(HetznerService::normalizeRrsetName('example.com', 'example.com'))->toBe('@');
+    expect(HetznerService::normalizeRrsetName('preview', 'example.com'))->toBe('preview');
+});

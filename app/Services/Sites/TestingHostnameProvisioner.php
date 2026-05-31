@@ -270,6 +270,16 @@ class TestingHostnameProvisioner
                 return;
             }
             (new CloudflareDnsService($credential))->deleteDnsRecord($zone, $recordId);
+        } elseif (in_array($providerType, ['hetzner', 'linode', 'akamai'], true)) {
+            $credential = $site->dnsAutomationCredential();
+            if ($credential === null || $credential->provider !== $providerType) {
+                return;
+            }
+            $recordId = (string) ($testingMeta['record_id'] ?? $previewRow?->provider_record_id ?? '');
+            if ($recordId === '') {
+                return;
+            }
+            SiteDnsProviderFactory::forCredential($credential)->deleteRecord($zone, $recordId);
         } else {
             $service = new DigitalOceanService($this->tokenForSite($site));
             $recordId = (int) ($testingMeta['record_id'] ?? 0);

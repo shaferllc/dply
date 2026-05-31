@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Roadmap;
 
 use App\Models\RoadmapItem;
+use App\Models\RoadmapRelease;
 use App\Models\RoadmapSuggestion;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\RateLimiter;
@@ -16,6 +17,9 @@ class Index extends Component
 {
     #[Url(history: true)]
     public string $area = 'all';
+
+    #[Url(history: true)]
+    public string $release = 'all';
 
     public string $suggestionName = '';
 
@@ -31,6 +35,13 @@ class Index extends Component
     {
         if ($value !== 'all' && ! in_array($value, RoadmapItem::areaKeys(), true)) {
             $this->area = 'all';
+        }
+    }
+
+    public function updatedRelease(string $value): void
+    {
+        if ($value !== 'all' && ! RoadmapRelease::query()->published()->whereKey($value)->exists()) {
+            $this->release = 'all';
         }
     }
 
@@ -83,15 +94,40 @@ class Index extends Component
                 ->published()
                 ->status($status)
                 ->area($this->area)
+                ->releaseFilter($this->release)
+                ->with(['targetRelease', 'shippedRelease'])
                 ->ordered()
                 ->get();
         }
+
+        $recentlyShipped = RoadmapItem::query()
+            ->recentlyShipped()
+            ->when($this->area !== 'all', fn ($query) => $query->area($this->area))
+            ->releaseFilter($this->release)
+            ->with('shippedRelease')
+            ->limit((int) config('roadmap.recently_shipped_limit', 5))
+            ->get();
+
+        $publishedReleases = RoadmapRelease::query()
+            ->published()
+            ->ordered()
+            ->with(['shippedItems' => fn ($query) => $query->published()->area($this->area)->ordered()])
+            ->get()
+            ->filter(fn (RoadmapRelease $train): bool => $train->shippedItems->isNotEmpty());
+
+        $activeRelease = $this->release !== 'all'
+            ? RoadmapRelease::query()->published()->with(['shippedItems' => fn ($query) => $query->published()->area($this->area)->ordered()])->find($this->release)
+            : null;
 
         return view('livewire.roadmap.index', [
             'itemsByStatus' => $itemsByStatus,
             'statusLabels' => config('roadmap.statuses', []),
             'areaLabels' => config('roadmap.areas', []),
+            'publishedReleaseTrains' => RoadmapRelease::query()->published()->ordered()->get(),
+            'releaseTimeline' => $publishedReleases,
+            'activeRelease' => $activeRelease,
             'hasPublishedItems' => collect($itemsByStatus)->flatten(1)->isNotEmpty(),
+            'recentlyShipped' => $recentlyShipped,
         ])->layout('layouts.status-public', [
             'title' => Str::of(__('Product roadmap'))->append(' – ', config('app.name'))->value(),
         ]);

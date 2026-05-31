@@ -12,8 +12,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\DigitalOceanService;
+use App\Services\HetznerService;
 use App\Services\Imports\StepHandler;
 use App\Services\Imports\WaitForTargetServerException;
+use App\Services\LinodeService;
+use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -124,6 +127,8 @@ class CutoverDnsSwapHandler implements StepHandler
         return match ($credential->provider) {
             'digitalocean' => (new DigitalOceanService($credential->getApiToken() ?? ''))
                 ->domainExistsInAccount($zone),
+            'hetzner' => (new HetznerService($credential))->zoneExists($zone),
+            'linode', 'akamai' => (new LinodeService($credential))->domainExists($zone),
             'cloudflare' => (new CloudflareDnsService($credential))->zoneExists($zone),
             default => false, // gandi/namecheap/vercel_dns/route53 — not yet wired
         };
@@ -163,6 +168,7 @@ class CutoverDnsSwapHandler implements StepHandler
 
         return match ($credential->provider) {
             'digitalocean' => $this->swapViaDigitalOcean($credential, $domain, $zone, $relative, $newIp),
+            'hetzner', 'linode', 'akamai' => $this->swapViaDnsProvider($credential, $zone, $relative, $newIp),
             'cloudflare' => $this->swapViaCloudflare($credential, $domain, $zone, $relative, $newIp),
             default => [
                 'strategy' => 'instructions',
@@ -170,6 +176,22 @@ class CutoverDnsSwapHandler implements StepHandler
                 'records' => [['type' => 'A', 'name' => $relative, 'value' => $newIp]],
             ],
         };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function swapViaDnsProvider(ProviderCredential $credential, string $zone, string $relative, string $newIp): array
+    {
+        $record = SiteDnsProviderFactory::forCredential($credential)->upsertRecord($zone, 'A', $relative, $newIp);
+
+        return [
+            'zone' => $zone,
+            'record' => $relative,
+            'record_id' => (string) ($record['id'] ?? ''),
+            'new_ip' => $newIp,
+            'attempted_at' => now()->toIso8601String(),
+        ];
     }
 
     /**

@@ -141,6 +141,233 @@ class LinodeService
         $this->assertSuccess($response, 'validate token');
     }
 
+    /**
+     * Whether a DNS domain exists in this Linode account.
+     */
+    public function domainExists(string $domainName): bool
+    {
+        return $this->findDomain($domainName) !== null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findDomain(string $domainName): ?array
+    {
+        $domainName = strtolower(trim($domainName));
+        if ($domainName === '') {
+            return null;
+        }
+
+        foreach ($this->getDomains() as $domain) {
+            if (! is_array($domain)) {
+                continue;
+            }
+
+            $name = strtolower((string) ($domain['domain'] ?? ''));
+            if ($name === $domainName) {
+                return $domain;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getDomains(): array
+    {
+        $all = [];
+        $page = 1;
+
+        do {
+            $response = $this->request('get', '/domains', ['page' => $page, 'page_size' => 100]);
+            $this->assertSuccess($response, 'list domains');
+            $payload = $response->json();
+            $batch = $payload['data'] ?? [];
+            if (is_array($batch)) {
+                foreach ($batch as $domain) {
+                    if (is_array($domain)) {
+                        $all[] = $domain;
+                    }
+                }
+            }
+            $pages = (int) ($payload['pages'] ?? 1);
+            $page++;
+        } while ($page <= $pages && $page <= 50);
+
+        return $all;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findDomainRecord(int $domainId, string $type, string $name, string $zoneName, ?string $target = null): ?array
+    {
+        $type = strtoupper(trim($type));
+        $name = self::normalizeRecordName($name, $zoneName);
+
+        foreach ($this->getDomainRecords($domainId) as $record) {
+            if (! is_array($record)) {
+                continue;
+            }
+
+            if (strtoupper((string) ($record['type'] ?? '')) !== $type) {
+                continue;
+            }
+
+            if (self::normalizeRecordName((string) ($record['name'] ?? ''), $zoneName) !== $name) {
+                continue;
+            }
+
+            if ($target !== null && (string) ($record['target'] ?? '') !== $target) {
+                continue;
+            }
+
+            return $record;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function getDomainRecords(int $domainId): array
+    {
+        $all = [];
+        $page = 1;
+
+        do {
+            $response = $this->request('get', "/domains/{$domainId}/records", [
+                'page' => $page,
+                'page_size' => 100,
+            ]);
+            $this->assertSuccess($response, 'list domain records');
+            $payload = $response->json();
+            $batch = $payload['data'] ?? [];
+            if (is_array($batch)) {
+                foreach ($batch as $record) {
+                    if (is_array($record)) {
+                        $all[] = $record;
+                    }
+                }
+            }
+            $pages = (int) ($payload['pages'] ?? 1);
+            $page++;
+        } while ($page <= $pages && $page <= 50);
+
+        return $all;
+    }
+
+    /**
+     * Create or update a domain record and return the Linode record payload.
+     *
+     * @return array<string, mixed>
+     */
+    public function upsertDomainRecord(
+        string $domainName,
+        string $type,
+        string $recordName,
+        string $target,
+        int $ttl = 60
+    ): array {
+        $domain = $this->findDomain($domainName);
+        if ($domain === null) {
+            throw new \RuntimeException("Linode domain {$domainName} was not found.");
+        }
+
+        $domainId = (int) ($domain['id'] ?? 0);
+        if ($domainId <= 0) {
+            throw new \RuntimeException('Linode domain payload did not include an id.');
+        }
+
+        $type = strtoupper(trim($type));
+        $name = self::normalizeRecordName($recordName, $domainName);
+        $existing = $this->findDomainRecord($domainId, $type, $name, $domainName);
+
+        if ($existing !== null) {
+            $recordId = (int) ($existing['id'] ?? 0);
+            if ($recordId <= 0) {
+                throw new \RuntimeException('Linode record payload did not include an id.');
+            }
+
+            $response = $this->request('put', "/domains/{$domainId}/records/{$recordId}", [
+                'type' => $type,
+                'name' => $name,
+                'target' => $target,
+                'ttl_sec' => $ttl,
+            ]);
+            $this->assertSuccess($response, 'update domain record');
+
+            $record = $response->json('data') ?? $response->json();
+            if (! is_array($record) || $record === []) {
+                throw new \RuntimeException('Linode API did not return an updated domain record.');
+            }
+
+            return $record;
+        }
+
+        $response = $this->request('post', "/domains/{$domainId}/records", [
+            'type' => $type,
+            'name' => $name,
+            'target' => $target,
+            'ttl_sec' => $ttl,
+        ]);
+        $this->assertSuccess($response, 'create domain record');
+
+        $record = $response->json('data') ?? $response->json();
+        if (! is_array($record) || $record === []) {
+            throw new \RuntimeException('Linode API did not return a domain record.');
+        }
+
+        return $record;
+    }
+
+    public function deleteDomainRecord(string $domainName, int $recordId): void
+    {
+        if ($recordId <= 0) {
+            return;
+        }
+
+        $domain = $this->findDomain($domainName);
+        if ($domain === null) {
+            return;
+        }
+
+        $domainId = (int) ($domain['id'] ?? 0);
+        if ($domainId <= 0) {
+            return;
+        }
+
+        $response = $this->request('delete', "/domains/{$domainId}/records/{$recordId}");
+        if ($response->status() === 404) {
+            return;
+        }
+
+        $this->assertSuccess($response, 'delete domain record');
+    }
+
+    /**
+     * Map dply relative record names to Linode record names (empty string for apex).
+     */
+    public static function normalizeRecordName(string $recordName, string $zoneName): string
+    {
+        $recordName = strtolower(trim($recordName));
+        $zoneName = strtolower(trim($zoneName));
+
+        if ($recordName === '' || $recordName === '@' || ($zoneName !== '' && $recordName === $zoneName)) {
+            return '';
+        }
+
+        if ($zoneName !== '' && str_ends_with($recordName, '.'.$zoneName)) {
+            $recordName = substr($recordName, 0, -1 * (strlen($zoneName) + 1));
+        }
+
+        return $recordName;
+    }
+
     protected function request(string $method, string $path, array $body = []): Response
     {
         $url = $this->baseUrl.$path;
@@ -156,6 +383,9 @@ class LinodeService
         }
         if (strtolower($method) === 'post') {
             return $request->post($url, $body);
+        }
+        if (strtolower($method) === 'put') {
+            return $request->put($url, $body);
         }
         if (strtolower($method) === 'delete') {
             return $request->delete($url);

@@ -101,6 +101,7 @@ return [
             'groups' => array_merge([
                 'Providers' => [
                     'provider.digitalocean' => 'DigitalOcean',
+                    'provider.hetzner' => 'Hetzner Cloud',
                     'provider.aws' => 'AWS EC2',
                     'provider.linode' => 'Linode',
                     'provider.vultr' => 'Vultr',

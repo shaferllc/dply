@@ -12,7 +12,7 @@
 |   Layer                         | Question                           | Where
 |   ------------------------------|------------------------------------|------------------------------
 |   features.php (here) + Pennant | Org gets this product/tab/engine?  | FEATURE_* env; admin org override on `features` table; scope = current org (`global.*` = platform kill switches, read config not DB)
-|   server_providers.php          | Is provider integration in build?  | DPLY_SERVER_PROVIDER_* (catalog; Hetzner/custom have no provider.* flag)
+|   server_providers.php          | Is provider integration in build?  | DPLY_SERVER_PROVIDER_* (catalog; custom has no provider.* flag)
 |   ServerProviderGate            | Org can add creds / create server?   | catalog AND provider.* when mapped in PENNANT_FLAGS
 |   server_workspace.php          | Global engine UI not ready yet?      | webserver_coming_soon / edge_proxy_coming_soon (not Pennant)
 |   server_workspace.php nav      | Show sidebar row for this server?    | requires_any_tags, except_host_kinds, requires_min_sites (not Pennant)
@@ -48,15 +48,17 @@
 return [
 
     /*
-    | Cloud providers. MVP ships DigitalOcean + Hetzner + Vultr + Linode
-    | globally; every other provider is per-org gated for design partners.
+    | Cloud providers. MVP ships DigitalOcean + Hetzner + Linode globally;
+    | Vultr, UpCloud, Scaleway, and AWS stay per-org gated for design partners.
     */
     'provider' => [
         // exit: keep on; flagship MVP provider — flag exists for per-org pause / emergency cutoff
         'digitalocean' => env('FEATURE_PROVIDER_DIGITALOCEAN', true),
+        // exit: keep on; full BYO compute + Cloud DNS — flag exists for per-org pause / emergency cutoff
+        'hetzner' => env('FEATURE_PROVIDER_HETZNER', true),
         // exit: ship to all orgs once we've had 5+ successful AWS provisions in prod
         'aws' => env('FEATURE_PROVIDER_AWS', false),
-        // exit: ship to all orgs once Linode cost-catalog parity is verified
+        // exit: keep on; full BYO compute + Linode DNS Manager — flag for per-org pause / emergency cutoff
         'linode' => env('FEATURE_PROVIDER_LINODE', true),
         // exit: ship to all orgs once we've had 5+ successful Vultr provisions in prod
         'vultr' => env('FEATURE_PROVIDER_VULTR', false),

@@ -17,6 +17,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\ServerProviderGate;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -50,6 +51,19 @@ test('list server provider cards includes linode when enabled', function () {
     $ids = array_column(ListServerProviderCards::run($org), 'id');
 
     expect($ids)->toContain('linode');
+});
+
+test('linode is omitted when pennant flag is off', function () {
+    Feature::define('provider.linode', fn (): bool => false);
+    Feature::flushCache();
+
+    $user = linodeTestUser();
+    $org = $user->currentOrganization();
+
+    $ids = array_column(ListServerProviderCards::run($org), 'id');
+
+    expect($ids)->not->toContain('linode');
+    expect(ServerProviderGate::enabled('linode'))->toBeFalse();
 });
 
 test('credentials nav includes linode when enabled', function () {

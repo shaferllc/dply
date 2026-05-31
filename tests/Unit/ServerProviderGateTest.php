@@ -6,7 +6,7 @@ use App\Support\ServerProviderGate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
-usesFeatures('provider.vultr', 'provider.upcloud', 'provider.linode');
+usesFeatures('provider.vultr', 'provider.upcloud', 'provider.linode', 'provider.hetzner');
 
 test('defaults enable digitalocean hetzner vultr linode upcloud and custom', function () {
     expect(ServerProviderGate::enabled('digitalocean'))->toBeTrue();

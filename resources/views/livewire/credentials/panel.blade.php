@@ -185,6 +185,19 @@
     @case('hetzner')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Hetzner Cloud uses project API tokens — there is no OAuth sign-in for third-party apps. Sign in to the Hetzner Console, create a read/write token, then paste it below.') }}</p>
+                    <a
+                        href="https://console.hetzner.cloud/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#D50C2D] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#B00A26] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Hetzner Console') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your API token') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="hetzner_name" :value="__('Label (optional)')" />
@@ -193,7 +206,7 @@
                     <div>
                         <x-input-label for="hetzner_api_token" :value="__('API token')" />
                         <x-text-input id="hetzner_api_token" wire:model="hetzner_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://console.hetzner.cloud/" target="_blank" rel="noopener" class="'.$link.'">Hetzner Cloud Console → Security → API Tokens</a>']) !!}</p>
+                        <p class="{{ $hint }}">{!! __('Create a token at :link (Project → Security → API Tokens). The same token powers servers and DNS zones in that project.', ['link' => '<a href="https://console.hetzner.cloud/" target="_blank" rel="noopener" class="'.$link.'">Hetzner Cloud Console</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('hetzner_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeHetzner" wire:loading.attr="disabled" wire:target="storeHetzner">
@@ -211,15 +224,28 @@
     @case('linode')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Linode uses personal access tokens — there is no OAuth sign-in for third-party apps. Sign in to Cloud Manager, create a token with Linodes and Domains access, then paste it below.') }}</p>
+                    <a
+                        href="https://cloud.linode.com/profile/tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#009A44] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#007A36] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Linode Cloud Manager') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your API token') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="linode_name" :value="__('Label (optional)')" />
-                        <x-text-input id="linode_name" wire:model="linode_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="linode_name" wire:model="linode_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production account') }}" />
                     </div>
                     <div>
                         <x-input-label for="linode_api_token" :value="__('API token')" />
                         <x-text-input id="linode_api_token" wire:model="linode_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://cloud.linode.com/profile/tokens" target="_blank" rel="noopener" class="'.$link.'">Linode Cloud Manager → Profile → API Tokens</a>']) !!}</p>
+                        <p class="{{ $hint }}">{!! __('Create a token at :link with read/write access to Linodes and Domains. The same token powers compute and DNS.', ['link' => '<a href="https://cloud.linode.com/profile/tokens" target="_blank" rel="noopener" class="'.$link.'">Linode → Profile → API Tokens</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('linode_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeLinode" wire:loading.attr="disabled" wire:target="storeLinode">

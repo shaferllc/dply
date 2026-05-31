@@ -85,6 +85,9 @@ enum ServerProvider: string
     {
         return match ($this) {
             self::DigitalOcean,
+            self::Hetzner,
+            self::Linode,
+            self::Akamai,
             self::Cloudflare,
             self::Aws,
             self::Gandi,
