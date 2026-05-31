@@ -8,6 +8,7 @@ use App\Models\EdgeDeployment;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Support\Edge\EdgeDeliveryContext;
+use App\Support\Edge\EdgeEffectiveCrons;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -105,9 +106,9 @@ class EdgeMiddlewareBundleUploader
      * upsert doesn't fail the whole deploy — the worker is live by
      * this point, only cron is missing.
      */
-    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, \App\Models\Site $site, EdgeDeployment $deployment): void
+    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, Site $site, EdgeDeployment $deployment): void
     {
-        $schedules = \App\Support\Edge\EdgeEffectiveCrons::schedulesFor($site, $deployment);
+        $schedules = EdgeEffectiveCrons::schedulesFor($site, $deployment);
 
         try {
             $client->setDispatchScriptSchedules($namespace, $scriptName, $schedules);

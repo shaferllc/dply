@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\SiteDeployment;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
 
@@ -202,7 +203,7 @@ class OrganizationComplianceExportController extends Controller
      *
      * @param  list<string>  $header
      * @param  Builder<*>  $query
-     * @param  callable(\Illuminate\Database\Eloquent\Model): list<string|int>  $mapper
+     * @param  callable(Model): list<string|int>  $mapper
      */
     private function streamCsv(array $header, Builder $query, callable $mapper): string
     {

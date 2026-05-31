@@ -7,8 +7,8 @@ namespace App\Services\Servers;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\SshConnection;
 use App\Services\Sites\SiteEdgeBackendProvisioner;
+use App\Services\SshConnection;
 
 /**
  * Operator-tunable nginx/OpenResty globals merged into

@@ -12,6 +12,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Cloud\CloudRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
@@ -26,7 +27,7 @@ function containerSite(string $backend = 'digitalocean_app_platform'): Site
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => ['api_token' => 'tok', 'github_connection_arn' => 'arn:x'],
     ]);

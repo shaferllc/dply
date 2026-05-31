@@ -113,7 +113,7 @@ class EvaluateEdgeGuardrailsCommand extends Command
             : __('Edge site approaching monthly quota: :name', ['name' => $site->name]);
 
         $body = sprintf(
-            "Requests %d%% of cap (%d / %d) · Bandwidth %d%% of cap (%s / %s)",
+            'Requests %d%% of cap (%d / %d) · Bandwidth %d%% of cap (%s / %s)',
             $status->requestsPercent(),
             $status->requests,
             $status->requestsCap,

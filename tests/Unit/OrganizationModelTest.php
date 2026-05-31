@@ -3,6 +3,8 @@
 namespace Tests\Unit\OrganizationModelTest;
 
 use App\Models\Organization;
+use App\Models\Server;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -178,9 +180,9 @@ test('site ceiling follows the plan resolved from billable server count', functi
     expect($org->maxSitesDisplay())->toBe('1');
 
     // Two aged, ready VM servers move the org onto Starter (≤3 servers).
-    \App\Models\Server::factory()->count(2)->create([
+    Server::factory()->count(2)->create([
         'organization_id' => $org->id,
-        'status' => \App\Models\Server::STATUS_READY,
+        'status' => Server::STATUS_READY,
         'created_at' => now()->subDays(3),
     ]);
 
@@ -201,12 +203,12 @@ test('canCreateSite hard-blocks at the plan site ceiling', function () {
     expect($org->canCreateSite())->toBeTrue();
     expect($org->siteLimitReached())->toBeFalse();
 
-    $server = \App\Models\Server::factory()->create([
+    $server = Server::factory()->create([
         'organization_id' => $org->id,
-        'status' => \App\Models\Server::STATUS_READY,
+        'status' => Server::STATUS_READY,
         'created_at' => now()->subDays(3),
     ]);
-    \App\Models\Site::factory()->create([
+    Site::factory()->create([
         'organization_id' => $org->id,
         'server_id' => $server->id,
     ]);

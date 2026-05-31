@@ -8,6 +8,7 @@ use App\Actions\Edge\CancelStuckEdgeDeployment;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\EdgeDeployment;
+use App\Services\Edge\EdgeBuildRunner;
 use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -21,7 +22,7 @@ use Livewire\Component;
  * pnpm/build → installing row).
  *
  * Splits the tailed build log by `[dply:step] <name>` markers emitted by
- * {@see \App\Services\Edge\EdgeBuildRunner} so each step shows only the
+ * {@see EdgeBuildRunner} so each step shows only the
  * lines that belong to it. Stops polling automatically once the
  * deployment leaves BUILDING / PUBLISHING.
  */

@@ -6,6 +6,7 @@ namespace App\Actions\Cloud;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
+use App\Models\CloudDeployTask;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -45,7 +46,7 @@ class CreateCloudSiteFromSource
         $port = (int) ($payload['port'] ?? 8080);
         $instances = max(1, (int) ($payload['instances'] ?? 1));
         $sizeTier = (string) ($payload['size_tier'] ?? 'small');
-        if (! array_key_exists($sizeTier, \App\Models\CloudDeployTask::SIZE_TIERS)) {
+        if (! array_key_exists($sizeTier, CloudDeployTask::SIZE_TIERS)) {
             $sizeTier = 'small';
         }
         $region = (string) ($payload['region'] ?? '');

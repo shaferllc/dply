@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 
 /**
  * Walk a Cloud site's most-recent deployment on DO and persist a
@@ -146,13 +147,13 @@ class SyncCloudDeployTaskRunsJob implements ShouldQueue
         };
     }
 
-    private function parseTimestamp(mixed $value): ?\Illuminate\Support\Carbon
+    private function parseTimestamp(mixed $value): ?Carbon
     {
         if (! is_string($value) || $value === '') {
             return null;
         }
         try {
-            return \Illuminate\Support\Carbon::parse($value);
+            return Carbon::parse($value);
         } catch (\Throwable $e) {
             return null;
         }

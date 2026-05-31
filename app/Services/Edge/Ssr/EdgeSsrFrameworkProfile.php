@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Edge\Ssr;
 
+use App\Services\Edge\EdgeBuildRunner;
+
 /**
  * Build profile for a single SSR-capable framework. Drives the SSR
- * branch in {@see \App\Services\Edge\EdgeBuildRunner} — what to run,
+ * branch in {@see EdgeBuildRunner} — what to run,
  * what worker output to look for, what assets to copy.
  *
  * Add a framework: append a profile to {@see EdgeSsrFrameworkRegistry}.
@@ -15,12 +17,12 @@ namespace App\Services\Edge\Ssr;
 final class EdgeSsrFrameworkProfile
 {
     /**
-     * @param  list<string>  $detectDependencies     Any one match in package.json triggers this profile.
-     * @param  ?string       $adapterDependency      Required adapter package for the build to succeed (null when the framework itself is the adapter, e.g. Next.js relies on OpenNext run by dply).
-     * @param  ?string       $buildCommandOverride   Shell command dply runs in place of the user's build_command. Null = run the user's command unchanged.
-     * @param  string        $workerPath             File or directory (relative to checkout) where the bundled Worker lands.
-     * @param  string        $assetsPath             Relative path containing the static assets layer.
-     * @param  string        $entryModule            Module file name inside $workerPath when it's a directory (ignored when $workerPath is a single file).
+     * @param  list<string>  $detectDependencies  Any one match in package.json triggers this profile.
+     * @param  ?string  $adapterDependency  Required adapter package for the build to succeed (null when the framework itself is the adapter, e.g. Next.js relies on OpenNext run by dply).
+     * @param  ?string  $buildCommandOverride  Shell command dply runs in place of the user's build_command. Null = run the user's command unchanged.
+     * @param  string  $workerPath  File or directory (relative to checkout) where the bundled Worker lands.
+     * @param  string  $assetsPath  Relative path containing the static assets layer.
+     * @param  string  $entryModule  Module file name inside $workerPath when it's a directory (ignored when $workerPath is a single file).
      */
     public function __construct(
         public readonly string $slug,

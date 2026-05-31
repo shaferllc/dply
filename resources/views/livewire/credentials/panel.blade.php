@@ -697,16 +697,45 @@
     @case('gcp')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Google Cloud uses service account JSON keys. Create a service account with Compute Engine and Cloud DNS access, download the key JSON, then paste it below.') }}</p>
+                    <a
+                        href="https://console.cloud.google.com/iam-admin/serviceaccounts"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1A73E8] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#155DC1] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Google Cloud Console') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your service account JSON') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="gcp_name" :value="__('Label (optional)')" />
-                        <x-text-input id="gcp_name" wire:model="gcp_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="gcp_name" wire:model="gcp_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production project') }}" />
                     </div>
                     <div>
-                        <x-input-label for="gcp_api_token" :value="__('API token / key material')" />
-                        <x-text-input id="gcp_api_token" wire:model="gcp_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-label for="gcp_api_token" :value="__('Service account JSON')" />
+                        <textarea
+                            id="gcp_api_token"
+                            wire:model="gcp_api_token"
+                            rows="10"
+                            class="mt-1 block w-full rounded-xl border-brand-ink/15 bg-brand-cream/30 px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            placeholder='{"type":"service_account","project_id":"..."}'
+                            required
+                            autocomplete="off"
+                        ></textarea>
+                        <p class="{{ $hint }}">{!! __('Create and download a key from :link (IAM & Admin → Service Accounts). Use least-privilege roles needed for Compute and Cloud DNS automation.', ['link' => '<a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener" class="'.$link.'">Google Cloud Console</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('gcp_api_token')" class="mt-2" />
                     </div>
-                    <x-primary-button type="button" wire:click="storeGcp" wire:loading.attr="disabled" wire:target="storeGcp">{{ __('Save') }}</x-primary-button>
+                    <x-primary-button type="button" wire:click="storeGcp" wire:loading.attr="disabled" wire:target="storeGcp">
+                        <span wire:loading.remove wire:target="storeGcp">{{ __('Connect Google Cloud') }}</span>
+                        <span wire:loading wire:target="storeGcp" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>
@@ -715,14 +744,43 @@
     @case('azure')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Azure uses an Entra app (service principal) for API automation. Create an app registration, grant it VM + DNS permissions, then paste Tenant ID, Client ID, Client Secret, and Subscription ID below.') }}</p>
+                    <a
+                        href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078D4] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#005EA2] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Azure Portal') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste service principal details') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="azure_name" :value="__('Label (optional)')" />
                         <x-text-input id="azure_name" wire:model="azure_name" type="text" class="mt-1 block w-full" />
                     </div>
                     <div>
-                        <x-input-label for="azure_api_token" :value="__('API token')" />
-                        <x-text-input id="azure_api_token" wire:model="azure_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-label for="azure_tenant_id" :value="__('Tenant ID')" />
+                        <x-text-input id="azure_tenant_id" wire:model="azure_tenant_id" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_tenant_id')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="azure_client_id" :value="__('Client ID')" />
+                        <x-text-input id="azure_client_id" wire:model="azure_client_id" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_client_id')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="azure_client_secret" :value="__('Client secret')" />
+                        <x-text-input id="azure_client_secret" wire:model="azure_client_secret" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_client_secret')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="azure_subscription_id" :value="__('Subscription ID')" />
+                        <x-text-input id="azure_subscription_id" wire:model="azure_subscription_id" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_subscription_id')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeAzure" wire:loading.attr="disabled" wire:target="storeAzure">{{ __('Save') }}</x-primary-button>
                 </div>
@@ -733,14 +791,43 @@
     @case('oracle')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect Oracle Cloud Infrastructure using your tenancy/user OCIDs and API signing key. The compartment defaults to your tenancy OCID when left blank.') }}
+                </p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="oracle_name" :value="__('Label (optional)')" />
                         <x-text-input id="oracle_name" wire:model="oracle_name" type="text" class="mt-1 block w-full" />
                     </div>
                     <div>
-                        <x-input-label for="oracle_api_token" :value="__('API token')" />
-                        <x-text-input id="oracle_api_token" wire:model="oracle_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-label for="oracle_tenancy_ocid" :value="__('Tenancy OCID')" />
+                        <x-text-input id="oracle_tenancy_ocid" wire:model="oracle_tenancy_ocid" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_tenancy_ocid')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_user_ocid" :value="__('User OCID')" />
+                        <x-text-input id="oracle_user_ocid" wire:model="oracle_user_ocid" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_user_ocid')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_fingerprint" :value="__('API key fingerprint')" />
+                        <x-text-input id="oracle_fingerprint" wire:model="oracle_fingerprint" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_fingerprint')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_private_key" :value="__('Private key (PEM)')" />
+                        <textarea id="oracle_private_key" wire:model="oracle_private_key" rows="8" class="mt-1 block w-full rounded-xl border-brand-ink/20 bg-white/90 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sky focus:ring-brand-sky" required autocomplete="off"></textarea>
+                        <x-input-error :messages="$errors->get('oracle_private_key')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_region" :value="__('Region')" />
+                        <x-text-input id="oracle_region" wire:model="oracle_region" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="us-ashburn-1" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_region')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_compartment_id" :value="__('Compartment OCID (optional)')" />
+                        <x-text-input id="oracle_compartment_id" wire:model="oracle_compartment_id" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_compartment_id')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOracle" wire:loading.attr="disabled" wire:target="storeOracle">{{ __('Save') }}</x-primary-button>
                 </div>

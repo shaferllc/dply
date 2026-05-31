@@ -22,10 +22,13 @@ final class ServerProviderGate
         'digitalocean' => 'provider.digitalocean',
         'hetzner' => 'provider.hetzner',
         'aws' => 'provider.aws',
+        'gcp' => 'provider.gcp',
         'aws_app_runner' => 'provider.aws_app_runner',
         'aws_kubernetes' => 'provider.aws_eks',
         'linode' => 'provider.linode',
         'vultr' => 'provider.vultr',
+        'azure' => 'provider.azure',
+        'oracle' => 'provider.oracle',
         'fly_io' => 'provider.fly_io',
         'upcloud' => 'provider.upcloud',
         'scaleway' => 'provider.scaleway',
@@ -48,6 +51,9 @@ final class ServerProviderGate
         'equinix_metal',
         'fly_io',
         'aws',
+        'gcp',
+        'azure',
+        'oracle',
         'aws_app_runner',
         'aws_kubernetes',
         'aws_lambda',
@@ -67,6 +73,9 @@ final class ServerProviderGate
      */
     private const COMING_SOON = [
         'aws',
+        'gcp',
+        'azure',
+        'oracle',
     ];
 
     public static function enabled(string $provider): bool

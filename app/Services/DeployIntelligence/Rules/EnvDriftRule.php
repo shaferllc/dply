@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\DeployIntelligence\AlertFinding;
 use App\Services\DeployIntelligence\Contracts\IntelligenceRule;
+use Illuminate\Support\Collection;
 
 /**
  * Flags Edge sites where the preview scope and production scope have
@@ -63,7 +64,7 @@ class EnvDriftRule implements IntelligenceRule
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, EdgeSiteEnvVar>  $vars
+     * @param  Collection<int, EdgeSiteEnvVar>  $vars
      */
     private function evaluateSite(Site $site, $vars): ?AlertFinding
     {

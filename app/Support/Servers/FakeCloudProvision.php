@@ -22,6 +22,9 @@ final class FakeCloudProvision
         ServerProvider::UpCloud,
         ServerProvider::EquinixMetal,
         ServerProvider::Aws,
+        ServerProvider::Gcp,
+        ServerProvider::Azure,
+        ServerProvider::Oracle,
     ];
 
     public static function enabled(): bool

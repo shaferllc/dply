@@ -86,6 +86,7 @@ class EdgeBindingsAutoResolver
             $value = trim($value);
             if (! $autoCreate || $this->looksLikeResolvedId($kind, $value)) {
                 $out[$name] = $value;
+
                 continue;
             }
 

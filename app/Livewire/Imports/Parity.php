@@ -104,7 +104,7 @@ class Parity extends Component
 
     /**
      * @param  Collection<int, ForgeServer>  $forgeServers  keyed by source_id
-     * @param  Collection<int, PloiServer>  $ploiServers   keyed by source_id
+     * @param  Collection<int, PloiServer>  $ploiServers  keyed by source_id
      * @return array<string, mixed>
      */
     /**
@@ -150,7 +150,7 @@ class Parity extends Component
 
     /**
      * @param  Collection<int, ForgeServer>  $forgeServers  keyed by source_id
-     * @param  Collection<int, PloiServer>  $ploiServers   keyed by source_id
+     * @param  Collection<int, PloiServer>  $ploiServers  keyed by source_id
      * @return array<string, mixed>
      */
     private function buildVmRow(

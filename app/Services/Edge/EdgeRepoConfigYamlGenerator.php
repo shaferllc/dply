@@ -6,6 +6,12 @@ namespace App\Services\Edge;
 
 use App\Models\EdgeDeployment;
 use App\Models\Site;
+use App\Support\Edge\EdgeEffectiveCrons;
+use App\Support\Edge\EdgeEffectiveErrorPages;
+use App\Support\Edge\EdgeEffectiveFirewall;
+use App\Support\Edge\EdgeEffectiveImages;
+use App\Support\Edge\EdgeEffectiveOrigin;
+use App\Support\Edge\EdgeEffectiveRouting;
 
 /**
  * Generates a `dply.yaml` snippet from a site's most recent live
@@ -40,14 +46,14 @@ final class EdgeRepoConfigYamlGenerator
 
         $spaFallback = $repo['spa_fallback'] ?? null;
         if (is_bool($spaFallback)) {
-            $sections[] = sprintf("spa_fallback: %s", $spaFallback ? 'true' : 'false');
+            $sections[] = sprintf('spa_fallback: %s', $spaFallback ? 'true' : 'false');
         }
 
         // Routing — merge repo + dashboard overrides via
         // EdgeEffectiveRouting so dashboard-added rules round-trip
         // into the generated file. Source labels are stripped since
         // the YAML is the canonical record once committed.
-        $effRouting = \App\Support\Edge\EdgeEffectiveRouting::for($site, $deployment);
+        $effRouting = EdgeEffectiveRouting::for($site, $deployment);
         $stripSource = static fn (array $r): array => array_diff_key($r, ['source' => true]);
         if ($effRouting['redirects'] !== []) {
             $sections[] = $this->renderRedirects(array_map($stripSource, $effRouting['redirects']));
@@ -63,7 +69,7 @@ final class EdgeRepoConfigYamlGenerator
         // overrides round-trip into the generated YAML alongside the
         // repo-declared ones. Source labels are stripped here since
         // the file is meant to be the canonical record once committed.
-        $effective = \App\Support\Edge\EdgeEffectiveCrons::for($site, $deployment);
+        $effective = EdgeEffectiveCrons::for($site, $deployment);
         $crons = array_map(
             static fn (array $e): array => array_filter([
                 'schedule' => $e['schedule'],
@@ -78,7 +84,7 @@ final class EdgeRepoConfigYamlGenerator
         // Firewall: same merge model as crons (repo + dashboard). Skip
         // when mode is off OR countries empty so we don't emit a stub
         // section that adds nothing.
-        $effFirewall = \App\Support\Edge\EdgeEffectiveFirewall::for($site, $deployment);
+        $effFirewall = EdgeEffectiveFirewall::for($site, $deployment);
         if ($effFirewall['country_mode'] !== 'off' && $effFirewall['countries'] !== []) {
             $sections[] = $this->renderFirewall($effFirewall);
         }
@@ -87,14 +93,14 @@ final class EdgeRepoConfigYamlGenerator
         // site has a non-empty merged origin url. Skip auth_secret —
         // that's environment-sensitive and should be set via the
         // dashboard, not committed to the repo.
-        $effOrigin = \App\Support\Edge\EdgeEffectiveOrigin::for($site, $deployment);
+        $effOrigin = EdgeEffectiveOrigin::for($site, $deployment);
         if (is_string($effOrigin['url']) && $effOrigin['url'] !== '') {
             $sections[] = $this->renderOrigin($effOrigin);
         }
 
         // Image optimization (P55-followup): emit allowed_hosts only —
         // signing_secret never round-trips into the repo file.
-        $effImages = \App\Support\Edge\EdgeEffectiveImages::for($site, $deployment);
+        $effImages = EdgeEffectiveImages::for($site, $deployment);
         if ($effImages['allowed_hosts'] !== []) {
             $sections[] = $this->renderImages($effImages['allowed_hosts']);
         }
@@ -141,7 +147,7 @@ final class EdgeRepoConfigYamlGenerator
         // effective resolver (dashboard wins on conflict). HTML bodies
         // are inlined when present; we keep them ≤ a sane size to keep
         // the generated file readable.
-        $effErrors = \App\Support\Edge\EdgeEffectiveErrorPages::for($site, $deployment);
+        $effErrors = EdgeEffectiveErrorPages::for($site, $deployment);
         if (is_string($effErrors['html_404']) || is_string($effErrors['html_500'])) {
             $sections[] = $this->renderErrorPages($effErrors['html_404'], $effErrors['html_500']);
         }
@@ -172,7 +178,7 @@ final class EdgeRepoConfigYamlGenerator
             }
         }
         if (is_string($origin['failover_html']) && $origin['failover_html'] !== '') {
-            $escaped = str_replace(["\\", "\""], ["\\\\", "\\\""], $origin['failover_html']);
+            $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $origin['failover_html']);
             $lines[] = '  failover_html: "'.$escaped.'"';
         }
 
@@ -381,6 +387,7 @@ final class EdgeRepoConfigYamlGenerator
         if ($value === '') {
             return '""';
         }
+
         // Always double-quote so we don't have to second-guess YAML
         // parsing of strings that happen to look like booleans, numbers,
         // or contain special characters.

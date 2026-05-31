@@ -6,7 +6,9 @@ namespace App\Actions\Cloud;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCloudSiteJob;
+use App\Models\CloudDeployTask;
 use App\Models\Organization;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
@@ -34,7 +36,7 @@ class CreateCloudSite
         $port = (int) ($payload['port'] ?? 8080);
         $instances = max(1, (int) ($payload['instances'] ?? 1));
         $sizeTier = (string) ($payload['size_tier'] ?? 'small');
-        if (! array_key_exists($sizeTier, \App\Models\CloudDeployTask::SIZE_TIERS)) {
+        if (! array_key_exists($sizeTier, CloudDeployTask::SIZE_TIERS)) {
             $sizeTier = 'small';
         }
         $region = (string) ($payload['region'] ?? '');
@@ -82,7 +84,7 @@ class CreateCloudSite
         // time, which is the surface the user already sees in propose.
         $imageCredentialId = null;
         if (str_starts_with(strtolower((string) ($payload['image'] ?? '')), 'ghcr.io/')) {
-            $ghcr = \App\Models\ProviderCredential::query()
+            $ghcr = ProviderCredential::query()
                 ->where('organization_id', $organization->id)
                 ->where('provider', 'ghcr')
                 ->orderBy('created_at')

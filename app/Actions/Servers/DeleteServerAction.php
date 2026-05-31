@@ -9,12 +9,15 @@ use App\Models\Server;
 use App\Models\User;
 use App\Notifications\ServerRemovalExecutedNotification;
 use App\Services\AwsEc2ServiceFactory;
+use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\Notifications\NotificationPublisher;
+use App\Services\OracleComputeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -233,6 +236,58 @@ final class DeleteServerAction
                     }
                 } catch (\Throwable $e) {
                     Log::warning('Failed to destroy AWS EC2 instance on server delete.', [
+                        'server_id' => $server->id,
+                        'provider_id' => $server->provider_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        if ($server->provider === ServerProvider::Azure && ! empty($server->provider_id)) {
+            $credential = $server->providerCredential;
+            if ($credential) {
+                $azureMeta = is_array($server->meta['azure'] ?? null) ? $server->meta['azure'] : [];
+                $resourceGroup = (string) ($azureMeta['resource_group'] ?? ($credential->credentials['resource_group'] ?? config('services.azure.default_resource_group', 'dply')));
+                $vmName = (string) ($azureMeta['vm_name'] ?? $server->provider_id);
+                if ($resourceGroup !== '' && $vmName !== '') {
+                    try {
+                        (new AzureComputeService($credential))->deleteVm($resourceGroup, $vmName);
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to destroy Azure VM on server delete.', [
+                            'server_id' => $server->id,
+                            'provider_id' => $server->provider_id,
+                            'resource_group' => $resourceGroup,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        if ($server->provider === ServerProvider::Oracle && ! empty($server->provider_id)) {
+            $credential = $server->providerCredential;
+            if ($credential) {
+                try {
+                    (new OracleComputeService($credential))->terminateInstance($server->provider_id);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to destroy Oracle instance on server delete.', [
+                        'server_id' => $server->id,
+                        'provider_id' => $server->provider_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        if ($server->provider === ServerProvider::Gcp && ! empty($server->provider_id)) {
+            $credential = $server->providerCredential;
+            if ($credential) {
+                try {
+                    $gcp = new GcpComputeService($credential);
+                    $gcp->deleteInstance($server->region, $server->provider_id);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to destroy GCP instance on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
                         'error' => $e->getMessage(),

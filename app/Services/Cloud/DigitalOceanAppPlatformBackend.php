@@ -78,7 +78,7 @@ class DigitalOceanAppPlatformBackend implements CloudBackend
             return null;
         }
 
-        $cred = \App\Models\ProviderCredential::query()->find($credId);
+        $cred = ProviderCredential::query()->find($credId);
         if ($cred === null || $cred->organization_id !== $site->organization_id) {
             return null;
         }

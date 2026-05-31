@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Scaffold;
 
+use App\Livewire\Sites\ChooseApp;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
@@ -12,6 +13,7 @@ use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Services\Sites\AppCatalog;
 use App\Support\Scaffold\DatabaseConnectionEnv;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
@@ -23,8 +25,8 @@ use Throwable;
  * (Statamic, Symfony, Craft, Drupal, …). Mirrors {@see ScaffoldLaravelPipeline}'s
  * proven machinery but parameterizes the package + post-install behaviour via a
  * recipe stashed on the Site at meta.scaffold.recipe by
- * {@see \App\Livewire\Sites\ChooseApp}. Adding a new auto-install is a catalog
- * entry in {@see \App\Services\Sites\AppCatalog} — no new pipeline class.
+ * {@see ChooseApp}. Adding a new auto-install is a catalog
+ * entry in {@see AppCatalog} — no new pipeline class.
  *
  * Recipe shape (array):
  *   package           string  composer create-project target (e.g. "statamic/statamic")

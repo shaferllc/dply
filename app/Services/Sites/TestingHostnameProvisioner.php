@@ -270,7 +270,7 @@ class TestingHostnameProvisioner
                 return;
             }
             (new CloudflareDnsService($credential))->deleteDnsRecord($zone, $recordId);
-        } elseif (in_array($providerType, ['hetzner', 'linode', 'akamai', 'vultr'], true)) {
+        } elseif (in_array($providerType, ['hetzner', 'linode', 'akamai', 'vultr', 'gcp', 'azure'], true)) {
             $credential = $site->dnsAutomationCredential();
             if ($credential === null || $credential->provider !== $providerType) {
                 return;

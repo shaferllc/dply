@@ -6,9 +6,9 @@ namespace App\Livewire\Sites\Edge\Workspace;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\MountsEdgeWorkspaceSection;
+use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\EdgeDeployment;
 use App\Services\Edge\EdgeHostMapPublisher;
 use App\Support\Sites\EdgeSiteViewData;
 use Illuminate\Contracts\View\View;

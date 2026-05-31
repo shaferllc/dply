@@ -29,12 +29,14 @@ use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Models\Snapshot;
 use App\Models\Workspace;
+use App\Services\AzureDnsService;
 use App\Services\Certificates\CertificateRepairService;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\DigitalOceanService;
+use App\Services\GcpDnsService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\Notifications\AssignableNotificationChannels;
@@ -1574,7 +1576,7 @@ class Settings extends Show
             $appDoToken = trim((string) config('services.digitalocean.token'));
 
             if ($credForApi === null && $appDoToken === '') {
-                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, Vultr, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
+                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, Vultr, Google Cloud, Azure, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
 
                 return;
             }
@@ -1606,6 +1608,20 @@ class Settings extends Show
                         $vultr = new VultrService($credForApi);
                         if (! $vultr->domainExists($zone)) {
                             $this->addError('settings_dns_zone', __('That domain was not found in this Vultr account. Add it under Vultr → DNS first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'gcp') {
+                        $gcpDns = new GcpDnsService($credForApi);
+                        if (! $gcpDns->zoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That zone was not found in this Google Cloud project. Add a Cloud DNS managed zone first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'azure') {
+                        $azure = new AzureDnsService($credForApi);
+                        if (! $azure->zoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That zone was not found in this Azure account. Add it under Azure DNS first.'));
 
                             return;
                         }

@@ -8,6 +8,7 @@ use App\Models\EdgeDeployment;
 use App\Models\EdgeSiteEnvVar;
 use App\Models\Site;
 use App\Support\Edge\EdgeDeliveryContext;
+use App\Support\Edge\EdgeEffectiveCrons;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -111,9 +112,9 @@ class EdgeSsrBundleUploader
      * script. Empty list clears schedules when a redeploy removes the
      * crons block. Best-effort — never throws.
      */
-    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, \App\Models\Site $site, EdgeDeployment $deployment): void
+    private function syncCronSchedules(EdgeCloudflareClient $client, string $namespace, string $scriptName, Site $site, EdgeDeployment $deployment): void
     {
-        $schedules = \App\Support\Edge\EdgeEffectiveCrons::schedulesFor($site, $deployment);
+        $schedules = EdgeEffectiveCrons::schedulesFor($site, $deployment);
 
         try {
             $client->setDispatchScriptSchedules($namespace, $scriptName, $schedules);

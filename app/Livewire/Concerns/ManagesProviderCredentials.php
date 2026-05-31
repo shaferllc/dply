@@ -6,18 +6,22 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
 use App\Services\AwsEc2ServiceFactory;
+use App\Services\AzureComputeService;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\Imports\Forge\ForgeImportDriver;
 use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
+use App\Services\OracleComputeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
+use App\Support\Cloud\GcpAccessToken;
 use App\Support\Edge\EdgeOrgCredentialConfig;
 use App\Support\ServerProviderGate;
 
@@ -117,11 +121,27 @@ trait ManagesProviderCredentials
 
     public string $azure_name = '';
 
-    public string $azure_api_token = '';
+    public string $azure_tenant_id = '';
+
+    public string $azure_client_id = '';
+
+    public string $azure_client_secret = '';
+
+    public string $azure_subscription_id = '';
 
     public string $oracle_name = '';
 
-    public string $oracle_api_token = '';
+    public string $oracle_tenancy_ocid = '';
+
+    public string $oracle_user_ocid = '';
+
+    public string $oracle_fingerprint = '';
+
+    public string $oracle_private_key = '';
+
+    public string $oracle_region = '';
+
+    public string $oracle_compartment_id = '';
 
     public string $aws_app_runner_name = '';
 
@@ -680,10 +700,63 @@ trait ManagesProviderCredentials
         if (! $this->ensureProviderEnabled('gcp')) {
             return;
         }
-        $this->validate(['gcp_name' => 'nullable|string|max:255', 'gcp_api_token' => 'required|string'], [], ['gcp_api_token' => 'API token']);
-        if ($this->storeProviderCredential('gcp', $this->gcp_name, $this->gcp_api_token, 'gcp_api_token')) {
-            $this->reset('gcp_name', 'gcp_api_token');
+        $this->validate([
+            'gcp_name' => 'nullable|string|max:255',
+            'gcp_api_token' => 'required|string',
+        ], [], [
+            'gcp_api_token' => 'Service account JSON',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+
+        try {
+            $serviceAccount = GcpAccessToken::normalizeServiceAccount($this->gcp_api_token);
+        } catch (\Throwable $e) {
+            $msg = 'Invalid service account JSON: '.$e->getMessage();
+            $this->addError('gcp_api_token', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $projectId = trim((string) ($serviceAccount['project_id'] ?? ''));
+        if ($projectId === '') {
+            $msg = 'The service account JSON must include project_id.';
+            $this->addError('gcp_api_token', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'gcp',
+            'name' => trim($this->gcp_name) ?: 'Google Cloud',
+            'credentials' => [
+                'project_id' => $projectId,
+                'service_account' => $serviceAccount,
+            ],
+        ]);
+
+        try {
+            (new GcpComputeService($credential))->validateCredentials();
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid service account or API error: '.$e->getMessage();
+            $this->addError('gcp_api_token', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $this->toastSuccess('Provider connected.');
+        $this->reset('gcp_name', 'gcp_api_token');
+        $this->notifyProviderCredentialStored('gcp');
     }
 
     public function storeAzure(): void
@@ -691,10 +764,49 @@ trait ManagesProviderCredentials
         if (! $this->ensureProviderEnabled('azure')) {
             return;
         }
-        $this->validate(['azure_name' => 'nullable|string|max:255', 'azure_api_token' => 'required|string'], [], ['azure_api_token' => 'API token']);
-        if ($this->storeProviderCredential('azure', $this->azure_name, $this->azure_api_token, 'azure_api_token')) {
-            $this->reset('azure_name', 'azure_api_token');
+        $this->validate([
+            'azure_name' => 'nullable|string|max:255',
+            'azure_tenant_id' => 'required|string|max:255',
+            'azure_client_id' => 'required|string|max:255',
+            'azure_client_secret' => 'required|string',
+            'azure_subscription_id' => 'required|string|max:255',
+        ], [], [
+            'azure_tenant_id' => 'Tenant ID',
+            'azure_client_id' => 'Client ID',
+            'azure_client_secret' => 'Client secret',
+            'azure_subscription_id' => 'Subscription ID',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'azure',
+            'name' => trim($this->azure_name) ?: 'Azure',
+            'credentials' => [
+                'tenant_id' => trim($this->azure_tenant_id),
+                'client_id' => trim($this->azure_client_id),
+                'client_secret' => $this->azure_client_secret,
+                'subscription_id' => trim($this->azure_subscription_id),
+            ],
+        ]);
+        try {
+            (new AzureComputeService($credential))->validateCredentials();
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid Azure credentials or API error: '.$e->getMessage();
+            $this->addError('azure_client_secret', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+        $this->toastSuccess('Provider connected.');
+        $this->reset('azure_name', 'azure_tenant_id', 'azure_client_id', 'azure_client_secret', 'azure_subscription_id');
+        $this->notifyProviderCredentialStored('azure');
     }
 
     public function storeOracle(): void
@@ -702,10 +814,66 @@ trait ManagesProviderCredentials
         if (! $this->ensureProviderEnabled('oracle')) {
             return;
         }
-        $this->validate(['oracle_name' => 'nullable|string|max:255', 'oracle_api_token' => 'required|string'], [], ['oracle_api_token' => 'API token']);
-        if ($this->storeProviderCredential('oracle', $this->oracle_name, $this->oracle_api_token, 'oracle_api_token')) {
-            $this->reset('oracle_name', 'oracle_api_token');
+        $this->validate([
+            'oracle_name' => 'nullable|string|max:255',
+            'oracle_tenancy_ocid' => 'required|string|max:255',
+            'oracle_user_ocid' => 'required|string|max:255',
+            'oracle_fingerprint' => 'required|string|max:255',
+            'oracle_private_key' => 'required|string',
+            'oracle_region' => 'required|string|max:100',
+            'oracle_compartment_id' => 'nullable|string|max:255',
+        ], [], [
+            'oracle_tenancy_ocid' => 'Tenancy OCID',
+            'oracle_user_ocid' => 'User OCID',
+            'oracle_fingerprint' => 'API key fingerprint',
+            'oracle_private_key' => 'Private key',
+            'oracle_region' => 'Region',
+            'oracle_compartment_id' => 'Compartment OCID',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'oracle',
+            'name' => trim($this->oracle_name) ?: 'Oracle Cloud',
+            'credentials' => [
+                'tenancy_ocid' => trim($this->oracle_tenancy_ocid),
+                'user_ocid' => trim($this->oracle_user_ocid),
+                'fingerprint' => trim($this->oracle_fingerprint),
+                'private_key' => $this->oracle_private_key,
+                'region' => trim($this->oracle_region),
+                'compartment_id' => trim($this->oracle_compartment_id) !== ''
+                    ? trim($this->oracle_compartment_id)
+                    : trim($this->oracle_tenancy_ocid),
+            ],
+        ]);
+        try {
+            (new OracleComputeService($credential))->validateCredentials();
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid Oracle credentials or API error: '.$e->getMessage();
+            $this->addError('oracle_private_key', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $this->toastSuccess('Provider connected.');
+        $this->reset(
+            'oracle_name',
+            'oracle_tenancy_ocid',
+            'oracle_user_ocid',
+            'oracle_fingerprint',
+            'oracle_private_key',
+            'oracle_region',
+            'oracle_compartment_id',
+        );
+        $this->notifyProviderCredentialStored('oracle');
     }
 
     public function storeGandi(): void
@@ -846,7 +1014,7 @@ trait ManagesProviderCredentials
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
                 ForgeImportDriver::for($credential)->validateConnection();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'gandi', 'ghcr'], true)) {
+            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gandi', 'ghcr'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");
@@ -884,7 +1052,7 @@ trait ManagesProviderCredentials
     {
         return in_array($provider, [
             'digitalocean', 'cloudflare', 'hetzner', 'linode', 'akamai', 'vultr',
-            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws', 'ploi', 'forge',
+            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws', 'gcp', 'azure', 'oracle', 'ploi', 'forge',
         ], true);
     }
 
@@ -920,6 +1088,9 @@ trait ManagesProviderCredentials
                 'scaleway' => (new ScalewayService($credential))->validateToken(),
                 'fly_io' => (new FlyIoService($credential))->validateToken($credential->credentials['org_slug'] ?? 'personal'),
                 'aws' => (new AwsEc2Service($credential))->validateCredentials(),
+                'gcp' => (new GcpComputeService($credential))->validateCredentials(),
+                'azure' => (new AzureComputeService($credential))->validateCredentials(),
+                'oracle' => (new OracleComputeService($credential))->validateCredentials(),
                 'ploi' => PloiImportDriver::for($credential)->validateConnection(),
                 'forge' => ForgeImportDriver::for($credential)->validateConnection(),
                 default => throw new \RuntimeException(__('Unknown provider.')),

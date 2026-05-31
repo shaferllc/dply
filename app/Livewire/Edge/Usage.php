@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Edge;
 
+use App\Models\EdgeUsageSnapshot;
+use App\Models\Site;
 use App\Services\Billing\EdgeOrganizationUsageReader;
 use App\Services\Billing\EdgeSiteBillingAnalytics;
 use Illuminate\Contracts\View\View;
@@ -54,7 +56,7 @@ class Usage extends Component
             //     until the teardown job fires, but for billing they
             //     don't count).
             //   - server row missing (orphaned site, can't actually serve).
-            ->filter(function (\App\Models\Site $site): bool {
+            ->filter(function (Site $site): bool {
                 if (! empty($site->edgeMeta()['scheduled_deletion_at'] ?? null)) {
                     return false;
                 }
@@ -77,7 +79,7 @@ class Usage extends Component
             // consume bandwidth + requests too, just don't carry a
             // platform fee).
             if ($perSite === null) {
-                $totals = \App\Models\EdgeUsageSnapshot::query()
+                $totals = EdgeUsageSnapshot::query()
                     ->where('site_id', $site->id)
                     ->where('period_start', '>=', $periodStart->toDateString())
                     ->where('period_start', '<=', $periodEnd->toDateString())

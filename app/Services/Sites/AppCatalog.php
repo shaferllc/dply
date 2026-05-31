@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Jobs\RunLaravelScaffoldJob;
+use App\Jobs\RunWordPressScaffoldJob;
+use App\Livewire\Sites\ChooseApp;
 use App\Models\Server;
 
 /**
  * Data-driven registry of applications the choose-app flow can install on a
  * site. Each entry is a tile rendered on sites.choose-app; the entry's
- * `kind` tells {@see \App\Livewire\Sites\ChooseApp} how to act on it.
+ * `kind` tells {@see ChooseApp} how to act on it.
  *
  * Adding a new app is (mostly) a matter of adding an array entry here — no
  * new component code — except for `scaffold` kinds, which need a backing
@@ -88,7 +91,7 @@ class AppCatalog
                 'needs_admin_email' => true,
                 'framework' => 'wordpress',
                 'web_subdir' => '',
-                'pipeline_job' => \App\Jobs\RunWordPressScaffoldJob::class,
+                'pipeline_job' => RunWordPressScaffoldJob::class,
             ],
             [
                 'key' => 'laravel',
@@ -100,7 +103,7 @@ class AppCatalog
                 'needs_admin_email' => true,
                 'framework' => 'laravel',
                 'web_subdir' => '/public',
-                'pipeline_job' => \App\Jobs\RunLaravelScaffoldJob::class,
+                'pipeline_job' => RunLaravelScaffoldJob::class,
             ],
             [
                 'key' => 'statamic',

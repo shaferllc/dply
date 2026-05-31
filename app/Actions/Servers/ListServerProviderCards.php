@@ -60,6 +60,9 @@ final class ListServerProviderCards
             ['id' => 'equinix_metal', 'label' => 'Equinix Metal'],
             ['id' => 'fly_io', 'label' => 'Fly.io'],
             ['id' => 'aws', 'label' => 'Amazon EC2'],
+            ['id' => 'gcp', 'label' => 'Google Cloud'],
+            ['id' => 'azure', 'label' => 'Azure'],
+            ['id' => 'oracle', 'label' => 'Oracle Cloud'],
             ['id' => 'aws_lambda', 'label' => 'AWS Lambda'],
             ['id' => 'custom', 'label' => __('Custom server')],
         ];

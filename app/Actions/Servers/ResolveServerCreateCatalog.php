@@ -8,11 +8,14 @@ use App\Actions\Concerns\AsObject;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
+use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
+use App\Services\OracleComputeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -89,6 +92,9 @@ final class ResolveServerCreateCatalog
             'upcloud' => $this->catalogUpcloud($credentials, $credential),
             'equinix_metal' => $this->catalogEquinixMetal($credentials, $credential),
             'aws' => $this->catalogAws($credentials, $credential),
+            'gcp' => $this->catalogGcp($credentials, $credential, $selectedRegion),
+            'azure' => $this->catalogAzure($credentials, $credential, $selectedRegion),
+            'oracle' => $this->catalogOracle($credentials, $credential),
             default => array_merge($empty, ['credentials' => $credentials]),
         };
     }
@@ -750,6 +756,214 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Instance type'),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>, region_label: string, size_label: string}
+     */
+    private function catalogOracle(Collection $credentials, ProviderCredential $credential): array
+    {
+        $regions = [];
+        foreach (OracleComputeService::defaultRegions() as $region) {
+            $id = (string) ($region['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+
+            $regions[] = [
+                'value' => $id,
+                'label' => (string) ($region['name'] ?? $id),
+            ];
+        }
+
+        $sizes = [];
+        try {
+            $service = new OracleComputeService($credential);
+            $availabilityDomains = $service->listAvailabilityDomains();
+            $firstAd = (string) ($availabilityDomains[0]['name'] ?? $availabilityDomains[0]['id'] ?? '');
+            foreach ($service->listShapes($firstAd !== '' ? $firstAd : null) as $shape) {
+                $id = (string) ($shape['shape'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+
+                $memoryGb = $this->extractFloat($shape, ['memoryInGBs']);
+                $ocpus = $this->extractFloat($shape, ['ocpus']);
+                $label = $id;
+                if ($ocpus !== null || $memoryGb !== null) {
+                    $label .= ' — ';
+                    if ($ocpus !== null) {
+                        $label .= rtrim(rtrim((string) $ocpus, '0'), '.').' OCPU';
+                    }
+                    if ($memoryGb !== null) {
+                        if ($ocpus !== null) {
+                            $label .= ' / ';
+                        }
+                        $label .= rtrim(rtrim((string) $memoryGb, '0'), '.').' GB';
+                    }
+                }
+
+                $sizes[] = [
+                    'value' => $id,
+                    'label' => $label,
+                    'memory_mb' => $memoryGb !== null ? (int) round($memoryGb * 1024) : null,
+                    'vcpus' => $ocpus !== null ? (int) round($ocpus) : null,
+                    'disk_gb' => null,
+                ];
+            }
+        } catch (\Throwable) {
+            foreach (OracleComputeService::defaultShapes() as $shape) {
+                $id = (string) ($shape['shape'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+
+                $memoryGb = isset($shape['memoryInGBs']) ? (float) $shape['memoryInGBs'] : null;
+                $ocpus = isset($shape['ocpus']) ? (float) $shape['ocpus'] : null;
+                $sizes[] = [
+                    'value' => $id,
+                    'label' => $id,
+                    'memory_mb' => $memoryGb !== null ? (int) round($memoryGb * 1024) : null,
+                    'vcpus' => $ocpus !== null ? (int) round($ocpus) : null,
+                    'disk_gb' => null,
+                ];
+            }
+        }
+
+        return [
+            'credentials' => $credentials,
+            'regions' => $regions,
+            'sizes' => $sizes,
+            'region_label' => __('Region'),
+            'size_label' => __('Shape'),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>, region_label: string, size_label: string}
+     */
+    private function catalogGcp(Collection $credentials, ProviderCredential $credential, string $selectedRegion = ''): array
+    {
+        $regions = [];
+        $sizes = [];
+
+        $service = new GcpComputeService($credential);
+
+        foreach ($service->getZones() as $zone) {
+            $id = (string) ($zone['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+
+            $regions[] = [
+                'value' => $id,
+                'label' => (string) ($zone['name'] ?? $id),
+            ];
+        }
+
+        $selectedZone = trim($selectedRegion) !== ''
+            ? trim($selectedRegion)
+            : (string) ($regions[0]['value'] ?? config('services.gcp.default_zone', 'us-central1-a'));
+        foreach ($service->getMachineTypes($selectedZone) as $size) {
+            $id = (string) ($size['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+
+            $memoryMb = is_numeric($size['memory_mb'] ?? null) ? (int) $size['memory_mb'] : null;
+            $vcpus = is_numeric($size['vcpus'] ?? null) ? (int) $size['vcpus'] : null;
+            $label = (string) ($size['name'] ?? $id);
+            if ($memoryMb !== null && $vcpus !== null) {
+                $label .= sprintf(' (%d vCPU, %dMB RAM)', $vcpus, $memoryMb);
+            }
+
+            $sizes[] = [
+                'value' => $id,
+                'label' => $label,
+                'memory_mb' => $memoryMb,
+                'vcpus' => $vcpus,
+                'disk_gb' => null,
+            ];
+        }
+
+        return [
+            'credentials' => $credentials,
+            'regions' => $regions,
+            'sizes' => $sizes,
+            'region_label' => __('Zone'),
+            'size_label' => __('Machine type'),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>, region_label: string, size_label: string}
+     */
+    private function catalogAzure(Collection $credentials, ProviderCredential $credential, string $selectedRegion = ''): array
+    {
+        $regions = [];
+        $sizes = [];
+
+        try {
+            $service = new AzureComputeService($credential);
+            foreach ($service->listLocations() as $region) {
+                $id = (string) ($region['id'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+                $regions[] = [
+                    'value' => $id,
+                    'label' => (string) ($region['name'] ?? $id),
+                ];
+            }
+        } catch (\Throwable) {
+            foreach (AzureComputeService::defaultLocations() as $region) {
+                $regions[] = [
+                    'value' => (string) $region['id'],
+                    'label' => (string) $region['name'],
+                ];
+            }
+        }
+
+        try {
+            $service = isset($service) ? $service : new AzureComputeService($credential);
+            $regionForSizes = trim($selectedRegion) !== '' ? trim($selectedRegion) : (string) ($regions[0]['value'] ?? '');
+            foreach ($service->listVmSizes($regionForSizes) as $size) {
+                $id = (string) ($size['id'] ?? '');
+                if ($id === '') {
+                    continue;
+                }
+                $memoryMb = is_numeric($size['memory_mb'] ?? null) ? (int) $size['memory_mb'] : null;
+                $vcpus = is_numeric($size['vcpus'] ?? null) ? (int) $size['vcpus'] : null;
+                $sizes[] = [
+                    'value' => $id,
+                    'label' => (string) ($size['name'] ?? $id),
+                    'memory_mb' => $memoryMb,
+                    'vcpus' => $vcpus,
+                    'disk_gb' => null,
+                ];
+            }
+        } catch (\Throwable) {
+            foreach (AzureComputeService::defaultVmSizes() as $size) {
+                $sizes[] = [
+                    'value' => (string) $size['id'],
+                    'label' => (string) $size['name'],
+                    'memory_mb' => (int) ($size['memory_mb'] ?? 0) ?: null,
+                    'vcpus' => (int) ($size['vcpus'] ?? 0) ?: null,
+                    'disk_gb' => null,
+                ];
+            }
+        }
+
+        return [
+            'credentials' => $credentials,
+            'regions' => $regions,
+            'sizes' => $sizes,
+            'region_label' => __('Region'),
+            'size_label' => __('VM size'),
         ];
     }
 

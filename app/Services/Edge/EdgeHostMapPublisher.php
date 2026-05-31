@@ -7,6 +7,11 @@ namespace App\Services\Edge;
 use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Support\Edge\EdgeDeliveryContext;
+use App\Support\Edge\EdgeEffectiveErrorPages;
+use App\Support\Edge\EdgeEffectiveFirewall;
+use App\Support\Edge\EdgeEffectiveImages;
+use App\Support\Edge\EdgeEffectiveOrigin;
+use App\Support\Edge\EdgeEffectiveRouting;
 use App\Support\Edge\FakeEdgeProvision;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -145,9 +150,9 @@ class EdgeHostMapPublisher
         if ($isPreview && ! $widgetEnabled) {
             $parentId = $edgeMeta['preview_parent_site_id'] ?? null;
             if (is_string($parentId)) {
-                $parentLive = \App\Models\EdgeDeployment::query()
+                $parentLive = EdgeDeployment::query()
                     ->where('site_id', $parentId)
-                    ->where('status', \App\Models\EdgeDeployment::STATUS_LIVE)
+                    ->where('status', EdgeDeployment::STATUS_LIVE)
                     ->latest('id')
                     ->first();
                 $repoCommentCfg = is_array($parentLive?->repo_config['comment_widget'] ?? null) ? $parentLive->repo_config['comment_widget'] : [];
@@ -211,7 +216,7 @@ class EdgeHostMapPublisher
         // appends run after. The Worker applies redirects first
         // (308/301/etc.), then rewrites (to internal paths), then
         // layers matching header rules onto the final response.
-        $effRouting = \App\Support\Edge\EdgeEffectiveRouting::for($site, $deployment);
+        $effRouting = EdgeEffectiveRouting::for($site, $deployment);
         $stripSource = static fn (array $r): array => array_diff_key($r, ['source' => true]);
         if ($effRouting['redirects'] !== []) {
             $payload['repo_redirects'] = array_map($stripSource, $effRouting['redirects']);
@@ -240,7 +245,7 @@ class EdgeHostMapPublisher
         // Allowed-hosts list merges repo (dply.yaml `images.allowed_hosts`)
         // with the dashboard list via EdgeEffectiveImages; the signing
         // secret stays dashboard-only (never round-trips to dply.yaml).
-        $effImages = \App\Support\Edge\EdgeEffectiveImages::for($site, $deployment);
+        $effImages = EdgeEffectiveImages::for($site, $deployment);
         if ($effImages['enabled']) {
             $payload['image_signing_secret'] = $effImages['signing_secret'];
             $payload['image_allowed_hosts'] = $effImages['allowed_hosts'];
@@ -293,7 +298,7 @@ class EdgeHostMapPublisher
         // before any other processing. Merges repo-declared rules
         // (dply.yaml `firewall:`) with dashboard overrides via
         // EdgeEffectiveFirewall.
-        $effFirewall = \App\Support\Edge\EdgeEffectiveFirewall::for($site, $deployment);
+        $effFirewall = EdgeEffectiveFirewall::for($site, $deployment);
         if ($effFirewall['country_mode'] !== 'off' && $effFirewall['countries'] !== []) {
             $payload['firewall_country_mode'] = $effFirewall['country_mode'];
             $payload['firewall_countries'] = $effFirewall['countries'];
@@ -303,7 +308,7 @@ class EdgeHostMapPublisher
         // repo-declared (dply.yaml) values with dashboard overrides via
         // EdgeEffectiveErrorPages — dashboard wins on conflict so an
         // operator can adjust during an incident without a redeploy.
-        $effErrors = \App\Support\Edge\EdgeEffectiveErrorPages::for($site, $deployment);
+        $effErrors = EdgeEffectiveErrorPages::for($site, $deployment);
         if (is_string($effErrors['html_404'])) {
             $payload['error_404_html'] = $effErrors['html_404'];
         }
@@ -322,7 +327,7 @@ class EdgeHostMapPublisher
             // dply.yaml merges with dashboard origin meta via the
             // EdgeEffectiveOrigin helper. Dashboard wins for url +
             // failover_html (commonly env-specific); routes are unioned.
-            $effOrigin = \App\Support\Edge\EdgeEffectiveOrigin::for($site, $deployment);
+            $effOrigin = EdgeEffectiveOrigin::for($site, $deployment);
             if (is_string($effOrigin['url']) && $effOrigin['url'] !== '') {
                 $payload['origin_url'] = $effOrigin['url'];
                 $payload['origin_routes'] = $effOrigin['routes'];

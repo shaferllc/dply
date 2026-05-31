@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,11 +21,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
  * @property string $title
  * @property ?string $summary
  * @property ?array $payload
- * @property ?\Carbon\Carbon $first_observed_at
- * @property ?\Carbon\Carbon $last_observed_at
- * @property ?\Carbon\Carbon $resolved_at
+ * @property ?Carbon $first_observed_at
+ * @property ?Carbon $last_observed_at
+ * @property ?Carbon $resolved_at
  * @property ?string $dismissed_by_user_id
- * @property ?\Carbon\Carbon $dismissed_at
+ * @property ?Carbon $dismissed_at
  */
 class DeployIntelligenceAlert extends Model
 {

@@ -97,6 +97,33 @@ class ServerFactory extends Factory
         ]);
     }
 
+    public function gcp(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Gcp,
+            'region' => 'us-central1-a',
+            'size' => 'e2-micro',
+        ]);
+    }
+
+    public function azure(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Azure,
+            'region' => 'eastus',
+            'size' => 'Standard_B1s',
+        ]);
+    }
+
+    public function oracle(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Oracle,
+            'region' => 'us-ashburn-1',
+            'size' => 'VM.Standard.E2.1.Micro',
+        ]);
+    }
+
     public function scaleway(): static
     {
         return $this->state(fn (array $attributes) => [

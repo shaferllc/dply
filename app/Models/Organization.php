@@ -138,7 +138,7 @@ class Organization extends Model
      * True when the org's current fleet bills to nothing this cycle: a Free
      * plan (within the free server ceiling) with no managed products and no
      * Edge delivery usage. Memoized per request — recomputing on every
-     * {@see trialState} call would be wasteful.
+     * {@see TrialState} call would be wasteful.
      */
     public function owesNothingThisCycle(): bool
     {

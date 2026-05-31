@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Cloud\AwsAppRunnerBackend;
+use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\DigitalOceanAppPlatformBackend;
 use App\Services\Cloud\FakeCloudBackend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -213,7 +214,7 @@ function makeSite(string $backend, ?string $backendId, array $credentials): arra
     $credential = ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cred',
         'credentials' => $credentials,
     ]);

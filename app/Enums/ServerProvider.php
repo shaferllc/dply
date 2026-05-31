@@ -91,9 +91,12 @@ enum ServerProvider: string
             self::Vultr,
             self::Cloudflare,
             self::Aws,
+            self::Gcp,
+            self::Azure,
             self::Gandi,
             self::Namecheap,
             self::VercelDns => true,
+            self::Oracle => false,
             default => false,
         };
     }
@@ -235,7 +238,10 @@ enum ServerProvider: string
             self::EquinixMetal,
             self::Akamai,
             self::FlyIo,
-            self::Aws => true,
+            self::Aws,
+            self::Gcp,
+            self::Azure,
+            self::Oracle => true,
             self::Cloudflare => false,
             default => false,
         };

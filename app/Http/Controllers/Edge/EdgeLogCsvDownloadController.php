@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Support\Edge\EdgeAccessLogQuery;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -60,7 +61,7 @@ class EdgeLogCsvDownloadController extends Controller
             ]);
 
             $query->chunkById(500, function ($chunk) use ($handle): void {
-                /** @var \Illuminate\Support\Collection<int, EdgeAccessLog> $chunk */
+                /** @var Collection<int, EdgeAccessLog> $chunk */
                 foreach ($chunk as $log) {
                     fputcsv($handle, [
                         $log->occurred_at?->toIso8601String() ?? '',

@@ -256,7 +256,7 @@ trait ServerCreateActions
             $cards,
             fn (array $card): bool => in_array($card['id'], [
                 'digitalocean', 'hetzner', 'vultr', 'linode', 'akamai',
-                'scaleway', 'upcloud', 'equinix_metal', 'fly_io', 'aws',
+                'scaleway', 'upcloud', 'equinix_metal', 'fly_io', 'aws', 'gcp', 'azure', 'oracle',
             ], true)
         ));
     }

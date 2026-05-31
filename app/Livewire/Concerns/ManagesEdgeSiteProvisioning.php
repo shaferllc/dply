@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Actions\Edge\RedeployEdgeSite;
+use App\Models\EdgeDeployment;
+use App\Models\Site;
 use App\Services\Edge\EdgeSiteCanceller;
 use App\Services\Sites\SiteProvisioner;
 use Livewire\Attributes\On;
@@ -111,18 +113,18 @@ trait ManagesEdgeSiteProvisioning
     {
         $this->site->refresh();
 
-        $deployment = \App\Models\EdgeDeployment::query()
+        $deployment = EdgeDeployment::query()
             ->where('site_id', $this->site->id)
             ->whereIn('status', [
-                \App\Models\EdgeDeployment::STATUS_BUILDING,
-                \App\Models\EdgeDeployment::STATUS_PUBLISHING,
+                EdgeDeployment::STATUS_BUILDING,
+                EdgeDeployment::STATUS_PUBLISHING,
             ])
             ->orderByDesc('created_at')
             ->first();
 
         if ($deployment !== null) {
             $deployment->update([
-                'status' => \App\Models\EdgeDeployment::STATUS_FAILED,
+                'status' => EdgeDeployment::STATUS_FAILED,
                 'failed_at' => now(),
                 'failure_reason' => __('Cancelled by user.'),
             ]);
@@ -131,7 +133,7 @@ trait ManagesEdgeSiteProvisioning
         // Site stays "active" — the previous successful deployment is
         // still serving on the edge.
         $this->site->update([
-            'status' => \App\Models\Site::STATUS_EDGE_ACTIVE,
+            'status' => Site::STATUS_EDGE_ACTIVE,
         ]);
 
         if (method_exists($this, 'toastSuccess')) {

@@ -12,6 +12,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Cloud\CloudRouter;
 use App\Services\Cloud\CloudScalingConfig;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -25,7 +26,7 @@ function cloudSiteWithBackend(string $backend = 'digitalocean_app_platform'): Si
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cloud',
         'credentials' => ['api_token' => 'tok'],
     ]);

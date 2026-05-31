@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Forms;
 
+use App\Livewire\Edge\Create;
 use App\Support\Edge\EdgeRepoRoot;
 use Livewire\Form;
 
@@ -18,7 +19,7 @@ class EdgeCreateForm extends Form
     /**
      * Git reference type the user is targeting — 'branch' (default), 'tag'
      * (clone via --branch <tag>), or 'commit' (full clone + checkout SHA).
-     * The single ref text input writes to {@see \App\Livewire\Edge\Create::$branch}
+     * The single ref text input writes to {@see Create::$branch}
      * regardless; the deploy step interprets the value based on this kind.
      */
     public string $ref_kind = 'branch';

@@ -15,6 +15,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Cloud\CloudRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -35,7 +36,7 @@ function resourcesFixture(string $backend = 'digitalocean_app_platform'): array
     ProviderCredential::query()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
-        'provider' => \App\Services\Cloud\CloudRouter::credentialProviderFor($backend),
+        'provider' => CloudRouter::credentialProviderFor($backend),
         'name' => 'cloud',
         'credentials' => ['api_token' => 'tok'],
     ]);

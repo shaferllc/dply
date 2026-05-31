@@ -9,11 +9,14 @@ use App\Enums\ServerProvider;
 use App\Jobs\PollDoksClusterStatusJob;
 use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\ProvisionAwsEc2ServerJob;
+use App\Jobs\ProvisionAzureServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
 use App\Jobs\ProvisionEquinixMetalServerJob;
 use App\Jobs\ProvisionFlyIoServerJob;
+use App\Jobs\ProvisionGcpServerJob;
 use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionLinodeServerJob;
+use App\Jobs\ProvisionOracleServerJob;
 use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
@@ -101,6 +104,9 @@ final class StoreServerFromCreateForm
             'equinix_metal' => $this->storeEquinixMetal($user, $org, $form, $scriptKeys),
             'fly_io' => $this->storeFlyIo($user, $org, $form, $scriptKeys),
             'aws' => $this->storeAws($user, $org, $form, $scriptKeys),
+            'azure' => $this->storeAzure($user, $org, $form, $scriptKeys),
+            'oracle' => $this->storeOracle($user, $org, $form, $scriptKeys),
+            'gcp' => $this->storeGcp($user, $org, $form, $scriptKeys),
             'custom' => $this->storeCustom($user, $org, $form),
             default => throw ValidationException::withMessages(['form.type' => __('Invalid server type.')]),
         };
@@ -923,6 +929,147 @@ final class StoreServerFromCreateForm
         ]);
 
         ProvisionAwsEc2ServerJob::dispatch($server);
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    /**
+     * @param  list<string>  $scriptKeys
+     */
+    private function storeAzure(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'region' => $form->region,
+                'size' => $form->size,
+                'setup_script_key' => $form->setup_script_key,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'region' => 'required|string|max:100',
+                'size' => 'required|string|max:100',
+                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'azure')
+            ->findOrFail($form->provider_credential_id);
+
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Azure,
+            'provider_credential_id' => $credential->id,
+            'region' => $form->region,
+            'size' => $form->size,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
+            'meta' => $this->meta($form),
+            'status' => Server::STATUS_PENDING,
+        ]);
+
+        ProvisionAzureServerJob::dispatch($server);
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    /**
+     * @param  list<string>  $scriptKeys
+     */
+    private function storeOracle(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'region' => $form->region,
+                'size' => $form->size,
+                'setup_script_key' => $form->setup_script_key,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'region' => 'required|string|max:100',
+                'size' => 'required|string|max:120',
+                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'oracle')
+            ->findOrFail($form->provider_credential_id);
+
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Oracle,
+            'provider_credential_id' => $credential->id,
+            'region' => $form->region,
+            'size' => $form->size,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
+            'meta' => $this->meta($form),
+            'status' => Server::STATUS_PENDING,
+        ]);
+
+        ProvisionOracleServerJob::dispatch($server);
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    /**
+     * @param  list<string>  $scriptKeys
+     */
+    private function storeGcp(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'region' => $form->region,
+                'size' => $form->size,
+                'setup_script_key' => $form->setup_script_key,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'region' => 'required|string|max:100',
+                'size' => 'required|string|max:100',
+                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'gcp')
+            ->findOrFail($form->provider_credential_id);
+
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Gcp,
+            'provider_credential_id' => $credential->id,
+            'region' => $form->region,
+            'size' => $form->size,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
+            'meta' => $this->meta($form),
+            'status' => Server::STATUS_PENDING,
+        ]);
+
+        ProvisionGcpServerJob::dispatch($server);
         audit_log($org, $user, 'server.created', $server);
 
         return $server;

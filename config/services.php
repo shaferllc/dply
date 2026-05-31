@@ -155,15 +155,26 @@ return [
 
     'gcp' => [
         'default_zone' => env('GCP_DEFAULT_ZONE', 'us-central1-a'),
+        'default_machine_type' => env('GCP_DEFAULT_MACHINE_TYPE', 'e2-micro'),
+        'default_image' => env('GCP_DEFAULT_IMAGE', 'projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64'),
         'ssh_user' => env('GCP_SSH_USER', 'ubuntu'),
     ],
 
     'azure' => [
         'ssh_user' => env('AZURE_SSH_USER', 'azureuser'),
+        'default_resource_group' => env('AZURE_DEFAULT_RESOURCE_GROUP', 'dply'),
+        'image_publisher' => env('AZURE_IMAGE_PUBLISHER', 'Canonical'),
+        'image_offer' => env('AZURE_IMAGE_OFFER', 'ubuntu-24_04-lts'),
+        'image_sku' => env('AZURE_IMAGE_SKU', 'server'),
+        'image_version' => env('AZURE_IMAGE_VERSION', 'latest'),
+        'os_disk_type' => env('AZURE_OS_DISK_TYPE', 'Standard_LRS'),
     ],
 
     'oracle' => [
         'ssh_user' => env('ORACLE_SSH_USER', 'ubuntu'),
+        'default_shape' => env('ORACLE_DEFAULT_SHAPE', 'VM.Standard.E2.1.Micro'),
+        'default_availability_domain' => env('ORACLE_DEFAULT_AVAILABILITY_DOMAIN', ''),
+        'default_image_id' => env('ORACLE_DEFAULT_IMAGE_ID', ''),
     ],
 
     'github' => [

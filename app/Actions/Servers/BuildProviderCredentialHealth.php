@@ -7,11 +7,14 @@ namespace App\Actions\Servers;
 use App\Actions\Concerns\AsObject;
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
+use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
 use App\Services\EquinixMetalService;
 use App\Services\FlyIoService;
+use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
+use App\Services\OracleComputeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -91,6 +94,9 @@ final class BuildProviderCredentialHealth
             'upcloud' => (new UpCloudService($credential))->validateToken(),
             'equinix_metal' => (new EquinixMetalService($credential))->validateToken(),
             'aws', 'aws_lambda' => (new AwsEc2Service($credential))->validateCredentials(),
+            'gcp' => (new GcpComputeService($credential))->validateCredentials(),
+            'azure' => (new AzureComputeService($credential))->validateCredentials(),
+            'oracle' => (new OracleComputeService($credential))->validateCredentials(),
             'fly_io' => (new FlyIoService($credential))->validateToken((string) (($credential->credentials ?? [])['org_slug'] ?? '')),
             default => throw new \InvalidArgumentException('Unsupported provider type for health check.'),
         };
@@ -103,7 +109,12 @@ final class BuildProviderCredentialHealth
     {
         $message = strtolower(trim($e->getMessage()));
 
-        if (str_contains($message, 'required') || str_contains($message, 'project id') || str_contains($message, 'org slug')) {
+        if (str_contains($message, 'required')
+            || str_contains($message, 'project id')
+            || str_contains($message, 'org slug')
+            || str_contains($message, 'ocid')
+            || str_contains($message, 'fingerprint')
+            || str_contains($message, 'private key')) {
             return ['misconfigured', 'error', __('Credential setup is incomplete'), __('This provider credential is missing required configuration, so dply cannot verify or use it yet.')];
         }
 

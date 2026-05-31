@@ -30,7 +30,7 @@ class EnsureDefaultEdgeBindings
     ) {}
 
     /**
-     * @return array{kv: ?string}  resolved CF namespace id for the default KV
+     * @return array{kv: ?string} resolved CF namespace id for the default KV
      */
     public function ensure(Site $site, ?\Closure $log = null): array
     {

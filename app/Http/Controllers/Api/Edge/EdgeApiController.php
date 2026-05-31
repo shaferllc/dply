@@ -54,5 +54,4 @@ abstract class EdgeApiController extends Controller
     {
         return response()->json(['message' => $message], 404);
     }
-
 }
