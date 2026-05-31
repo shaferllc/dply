@@ -1,8 +1,8 @@
 @php
     $card = 'dply-card overflow-hidden';
     $functionsHost = $functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy();
-    $stepCount = $site->deploySteps->count();
-    $hookCount = $site->deployHooks->count();
+    $stepCount = $pipelineOverviewStepCount ?? $editingDeployPipeline?->steps?->count() ?? $site->deploySteps->count();
+    $hookCount = $pipelineOverviewHookCount ?? $editingDeployPipeline?->hooks?->count() ?? $site->deployHooks->count();
     $strategyLabel = $site->deploy_strategy === 'atomic' ? __('Zero downtime (atomic)') : __('Simple (in-place)');
 @endphp
 

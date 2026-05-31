@@ -192,6 +192,7 @@ trait ManagesSiteDeployPipelines
             return;
         }
         $this->closeApplyTemplateModal();
+        $this->syncEditingPipelineSnapshot();
         $this->toastSuccess(__('Pipeline updated from template.'));
     }
 
@@ -338,6 +339,7 @@ trait ManagesSiteDeployPipelines
             'Safety bundle applied (:hooks hook(s), :steps step(s) added).',
             ['hooks' => $result['hooks_added'], 'steps' => $result['steps_added']],
         ));
+        $this->syncEditingPipelineSnapshot();
     }
 
     protected function syncEditingPipelineBranches(): void
@@ -383,5 +385,26 @@ trait ManagesSiteDeployPipelines
             $this->site,
             $this->editingPipelineId !== '' ? $this->editingPipelineId : null,
         );
+    }
+
+    /**
+     * Reload the editing pipeline's steps/hooks into the primed site collection so
+     * the timeline and overview reflect DB changes after add/edit/delete actions.
+     */
+    protected function syncEditingPipelineSnapshot(): void
+    {
+        $pipelineId = (string) $this->editingDeployPipeline()->id;
+
+        $fresh = SiteDeployPipeline::query()
+            ->with(['steps', 'hooks.notificationChannel'])
+            ->find($pipelineId);
+
+        if ($fresh === null) {
+            app(SiteDeployPipelineManager::class)->invalidatePrimedPipelines($this->site);
+
+            return;
+        }
+
+        app(SiteDeployPipelineManager::class)->mergePrimedPipeline($this->site, $fresh);
     }
 }

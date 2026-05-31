@@ -157,7 +157,7 @@ class WorkspacePipeline extends Show
     public function render(): View
     {
         $this->site->loadMissing(['deployHooks', 'previewDomains', 'certificates']);
-        $editingPipeline = $this->editingDeployPipeline();
+        $editingPipeline = $this->editingDeployPipeline()->loadMissing(['steps', 'hooks']);
 
         $deploymentContract = app(DeploymentContractBuilder::class)->build($this->site);
         $deploymentPreflight = app(DeploymentPreflightValidator::class)->validate($this->site, $deploymentContract);
@@ -212,6 +212,10 @@ class WorkspacePipeline extends Show
                 'pipelineStarters' => app(DeployPipelineStarterCatalog::class)->startersForSite($this->site),
                 'pipelineBashFull' => app(DeployPipelineScriptExporter::class)->toFullBash($editingPipeline),
                 'pipelineBashCommands' => app(DeployPipelineScriptExporter::class)->toCommandsOnly($editingPipeline),
+                'pipelineOverviewStepCount' => $editingPipeline->steps->count(),
+                'pipelineOverviewHookCount' => $editingPipeline->hooks->count(),
+                'pipelineOverviewName' => $editingPipeline->name,
+                'pipelineOverviewIsActive' => $editingPipeline->isActiveFor($this->site),
             ],
         ));
     }

@@ -1,6 +1,18 @@
+@php
+    $overviewStepCount = $pipelineOverviewStepCount ?? $editingDeployPipeline?->steps?->count() ?? $site->deploySteps->count();
+    $overviewHookCount = $pipelineOverviewHookCount ?? $editingDeployPipeline?->hooks?->count() ?? $site->deployHooks->count();
+    $overviewPipelineName = $pipelineOverviewName ?? $editingDeployPipeline?->name ?? __('Default');
+    $overviewPipelineIsActive = $pipelineOverviewIsActive ?? $editingDeployPipeline?->isActiveFor($site) ?? true;
+@endphp
+
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <p class="text-sm leading-relaxed text-brand-moss">{{ __('Summary of how this site deploys. Edit each area from the tabs above.') }}</p>
+        @unless ($overviewPipelineIsActive)
+            <p class="mt-2 text-sm text-brand-moss">
+                {{ __('Counts below are for “:name”—not the pipeline marked Deploy.', ['name' => $overviewPipelineName]) }}
+            </p>
+        @endunless
     </div>
     <dl class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-8">
         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
@@ -9,11 +21,11 @@
         </div>
         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
             <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Pipeline steps') }}</dt>
-            <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ trans_choice('{0} None|{1} :count step|[2,*] :count steps', $site->deploySteps->count(), ['count' => $site->deploySteps->count()]) }}</dd>
+            <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ trans_choice('{0} None|{1} :count step|[2,*] :count steps', $overviewStepCount, ['count' => $overviewStepCount]) }}</dd>
         </div>
         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
             <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Deploy hooks') }}</dt>
-            <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ trans_choice('{0} None|{1} :count hook|[2,*] :count hooks', $site->deployHooks->count(), ['count' => $site->deployHooks->count()]) }}</dd>
+            <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ trans_choice('{0} None|{1} :count hook|[2,*] :count hooks', $overviewHookCount, ['count' => $overviewHookCount]) }}</dd>
         </div>
         <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 p-4">
             <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Post-deploy health check') }}</dt>

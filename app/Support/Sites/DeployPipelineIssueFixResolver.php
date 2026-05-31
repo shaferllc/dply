@@ -19,23 +19,141 @@ final class DeployPipelineIssueFixResolver
      */
     public static function actionableChecks(Site $site, Server $server, Collection $checks): Collection
     {
-        $url = route('sites.pipeline', [
-            'server' => $server,
-            'site' => $site,
-            'tab' => 'steps',
-        ]);
-
         return $checks
             ->filter(fn (array $check): bool => in_array((string) ($check['level'] ?? ''), ['warning', 'error'], true))
-            ->map(fn (array $check): array => [
-                'key' => (string) ($check['key'] ?? 'check'),
-                'level' => (string) ($check['level'] ?? 'warning'),
-                'message' => (string) ($check['message'] ?? ''),
-                'fix' => [
-                    'label' => __('Edit pipeline'),
-                    'url' => $url,
-                ],
-            ])
+            ->map(function (array $check) use ($site, $server): array {
+                $key = (string) ($check['key'] ?? 'check');
+
+                return [
+                    'key' => $key,
+                    'level' => (string) ($check['level'] ?? 'warning'),
+                    'message' => (string) ($check['message'] ?? ''),
+                    'fix' => self::fixFor($site, $server, $key),
+                ];
+            })
             ->values();
+    }
+
+    /**
+     * @return array{label: string, url: string}|null
+     */
+    public static function fixFor(Site $site, Server $server, string $key): ?array
+    {
+        if ($key === 'simple_deploy_migrations') {
+            return self::link(
+                __('Enable zero downtime'),
+                self::pipelineTab($site, $server, 'rollout'),
+            );
+        }
+
+        if ($key === 'migrate_without_backup') {
+            return self::link(
+                __('Open database backups'),
+                route('servers.databases', $server),
+            );
+        }
+
+        if ($key === 'empty_pipeline') {
+            return self::link(
+                __('Add build steps'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if ($key === 'empty_step_command') {
+            return self::link(
+                __('Edit step command'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if (str_starts_with($key, 'empty_shell_hook_')
+            || str_starts_with($key, 'empty_webhook_')
+            || str_starts_with($key, 'empty_notification_')
+            || str_starts_with($key, 'orphan_hook_')
+            || str_starts_with($key, 'maintenance_down_late_')
+            || str_starts_with($key, 'maintenance_up_early_')
+            || $key === 'migrate_without_maintenance_down'
+            || $key === 'maintenance_down_without_up') {
+            return self::link(
+                __('Edit hooks'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if (str_starts_with($key, 'release_step_in_build_')) {
+            return self::link(
+                __('Move to release'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if (str_starts_with($key, 'build_step_in_release_')) {
+            return self::link(
+                __('Move to build'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if (in_array($key, [
+            'seed_without_migrate',
+            'optimize_before_migrate',
+            'queue_before_migrate',
+            'horizon_before_migrate',
+            'pretend_after_migrate',
+            'backup_after_pretend',
+        ], true)) {
+            return self::link(
+                __('Fix release order'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if ($key === 'migrate_without_pretend') {
+            return self::link(
+                __('Review release safety'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if (in_array($key, ['multiple_node_installers', 'npm_install_before_ci', 'cache_clear_before_warm'], true)
+            || str_starts_with($key, 'scaffolding_')) {
+            return self::link(
+                __('Edit build steps'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        if (str_starts_with($key, 'duplicate_step_')) {
+            return self::link(
+                __('Remove duplicate'),
+                self::pipelineTab($site, $server, 'steps'),
+            );
+        }
+
+        return self::link(
+            __('Edit pipeline'),
+            self::pipelineTab($site, $server, 'steps'),
+        );
+    }
+
+    private static function pipelineTab(Site $site, Server $server, string $tab): string
+    {
+        return route('sites.pipeline', [
+            'server' => $server,
+            'site' => $site,
+            'tab' => $tab,
+        ]);
+    }
+
+    /**
+     * @return array{label: string, url: string}
+     */
+    private static function link(string $label, string $url): array
+    {
+        return [
+            'label' => $label,
+            'url' => $url,
+        ];
     }
 }

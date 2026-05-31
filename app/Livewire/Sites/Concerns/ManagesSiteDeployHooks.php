@@ -248,6 +248,7 @@ trait ManagesSiteDeployHooks
         ]);
 
         $this->closeAddPipelineHookForm();
+        $this->syncEditingPipelineSnapshot();
         $this->toastSuccess(__('Pipeline hook added.'));
     }
 
@@ -326,6 +327,7 @@ trait ManagesSiteDeployHooks
         ]);
 
         $this->closeAddPipelineHookForm();
+        $this->syncEditingPipelineSnapshot();
         $this->toastSuccess(__('Pipeline hook updated.'));
     }
 
@@ -336,6 +338,7 @@ trait ManagesSiteDeployHooks
             ->where('pipeline_id', $this->editingDeployPipeline()->id)
             ->whereKey($id)
             ->delete();
+        $this->syncEditingPipelineSnapshot();
         $this->toastSuccess(__('Hook removed.'));
     }
 

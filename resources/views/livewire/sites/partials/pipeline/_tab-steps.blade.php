@@ -265,7 +265,7 @@
                 aria-label="{{ __('Deploy pipeline order') }}"
                 wire:key="pipeline-timeline-{{ $editingPipeline->id }}-{{ $stepCount }}-{{ $hookCount }}"
                 wire:loading.class.delay="opacity-50 pointer-events-none"
-                wire:target="addDeployPipelineStepFromPalette,reorderDeployPipelineBuildSteps,reorderDeployPipelineReleaseSteps,addDeployPipelineHookFromPalette,confirmAddDuplicatePipelineStep,openApplyStarterModal,confirmApplyStarterPipeline"
+                wire:target="addDeployPipelineStep,saveDeployPipelineStep,updateDeployPipelineStep,addDeployPipelineStepFromPalette,reorderDeployPipelineBuildSteps,reorderDeployPipelineReleaseSteps,addDeployPipelineHookFromPalette,saveDeployPipelineHook,addDeployPipelineHook,deleteDeployPipelineStep,appendQuickCommands,confirmAddDuplicatePipelineStep,openApplyStarterModal,confirmApplyStarterPipeline,confirmApplyDeployPipelineTemplate,applyLaravelSafetyPresetBundle"
             >
                 <div class="hidden flex-wrap items-center gap-2 pb-1 sm:flex" aria-hidden="true">
                     <span class="rounded-full bg-stone-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-800">1 {{ __('Clone') }}</span>

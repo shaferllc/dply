@@ -22,6 +22,7 @@
     $notificationTablesReady = \App\Support\NotificationTablesReady::all();
     $featuresActive = $active === 'features' || request()->routeIs('features');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
+    $roadmapActive = $active === 'roadmap' || request()->routeIs('roadmap');
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
     $hi = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
@@ -32,6 +33,7 @@
         || request()->routeIs('scripts.*')
         || $featuresActive
         || $pricingActive
+        || $roadmapActive
         || request()->routeIs('docs.*');
     $adminMenuActive = auth()->check()
         && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
@@ -110,6 +112,13 @@
                     >
                         <x-heroicon-o-sparkles class="{{ $hiGuest }}" />
                         {{ __('Features') }}
+                    </a>
+                    <a
+                        href="{{ route('roadmap') }}"
+                        class="inline-flex items-center gap-1.5 {{ $roadmapActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
+                    >
+                        <x-heroicon-o-map class="{{ $hiGuest }}" />
+                        {{ __('Roadmap') }}
                     </a>
                     <a
                         href="{{ route('pricing') }}"
@@ -405,6 +414,12 @@
                                     </x-slot>
                                     {{ __('Features') }}
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('roadmap')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-map class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Roadmap') }}
+                                </x-dropdown-link>
                                 <x-dropdown-link :href="route('pricing')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-credit-card class="{{ $hi }}" />
@@ -641,6 +656,10 @@
                 <a href="{{ route('features') }}" class="flex items-center gap-2.5 border-l-4 {{ $featuresActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-sparkles class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Features') }}
+                </a>
+                <a href="{{ route('roadmap') }}" class="flex items-center gap-2.5 border-l-4 {{ $roadmapActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
+                    <x-heroicon-o-map class="h-5 w-5 shrink-0 opacity-90" />
+                    {{ __('Roadmap') }}
                 </a>
                 <a href="{{ route('pricing') }}" class="flex items-center gap-2.5 border-l-4 {{ $pricingActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-credit-card class="h-5 w-5 shrink-0 opacity-90" />

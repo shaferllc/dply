@@ -85,6 +85,7 @@ trait ManagesSiteDeployPipelineShare
         }
 
         $this->quick_commands_text = '';
+        $this->syncEditingPipelineSnapshot();
         $this->toastSuccess(__(':count command(s) added to :phase.', [
             'count' => $added,
             'phase' => $this->quick_commands_phase === SiteDeployStep::PHASE_RELEASE ? __('Release') : __('Build'),

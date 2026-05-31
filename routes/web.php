@@ -37,6 +37,7 @@ use App\Livewire\Admin\Operations as AdminOperations;
 use App\Livewire\Admin\Organizations\Index as AdminOrganizationsIndex;
 use App\Livewire\Admin\Organizations\Show as AdminOrganizationsShow;
 use App\Livewire\Admin\Overview as AdminOverview;
+use App\Livewire\Admin\Roadmap\Index as AdminRoadmapIndex;
 use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
@@ -91,6 +92,7 @@ use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
 use App\Livewire\Profile\Referrals as ProfileReferrals;
 use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
+use App\Livewire\Roadmap\Index as RoadmapIndex;
 use App\Livewire\Scripts\Create as ScriptsCreate;
 use App\Livewire\Scripts\Edit as ScriptsEdit;
 use App\Livewire\Scripts\Index as ScriptsIndex;
@@ -303,6 +305,10 @@ Route::get('/features', function () {
     return view('features');
 })->name('features');
 
+Route::livewire('/roadmap', RoadmapIndex::class)
+    ->middleware(['throttle:60,1'])
+    ->name('roadmap');
+
 Route::get('/migrate', function () {
     return view('migrate.index', [
         'sources' => config('migration_sources', []),
@@ -381,6 +387,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/', AdminOverview::class)->name('overview');
             Route::livewire('/operations', AdminOperations::class)->name('operations');
             Route::livewire('/audit', AdminAuditLog::class)->name('audit');
+            Route::livewire('/roadmap', AdminRoadmapIndex::class)->name('roadmap.index');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');

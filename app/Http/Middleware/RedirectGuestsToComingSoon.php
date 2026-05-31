@@ -63,6 +63,7 @@ class RedirectGuestsToComingSoon
     {
         return $request->routeIs([
             'coming-soon',
+            'roadmap',
             'login',
             'password.request',
             'password.reset',

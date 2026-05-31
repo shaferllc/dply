@@ -11,7 +11,9 @@ use App\Models\SiteDeployStep;
 use App\Models\User;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineAdvisor;
+use App\Support\Sites\DeployPipelineJsonExporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -146,6 +148,35 @@ test('duplicate pipeline step opens confirmation before adding', function () {
         ->assertSet('show_duplicate_pipeline_step_modal', false);
 
     expect($pipeline->fresh()->steps()->where('step_type', SiteDeployStep::TYPE_COMPOSER_INSTALL)->count())->toBe(2);
+});
+
+test('adding custom command via step form refreshes pipeline timeline', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+    app(SiteDeployPipelineManager::class)->primeSiteForPipelineWorkspace($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('editingPipelineId', (string) $pipeline->id)
+        ->call('openAddPipelineStepForm', 'custom', 'build')
+        ->set('new_deploy_step_command', 'npm run build')
+        ->call('addDeployPipelineStep')
+        ->assertSet('show_pipeline_step_form', false)
+        ->assertSee('npm run build');
+
+    expect($pipeline->fresh()->steps()->where('step_type', SiteDeployStep::TYPE_CUSTOM)->count())->toBe(1);
 });
 
 test('pipeline workspace can edit custom deploy step', function () {
@@ -708,4 +739,185 @@ test('pipeline workspace shows share pipeline section', function () {
         ->assertSee('Share pipeline')
         ->assertSee('Quick commands')
         ->assertSee('Copy full script');
+});
+
+test('pipeline overview counts reflect the pipeline being edited', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $manager = app(SiteDeployPipelineManager::class);
+    $default = $manager->ensureDefaultPipeline($site);
+    $manager->addStep($default, SiteDeployStep::TYPE_COMPOSER_INSTALL, null, 600);
+
+    $staging = $manager->createPipeline($site, 'Staging build');
+    $manager->addStep($staging, SiteDeployStep::TYPE_NPM_CI, null, 900);
+    $manager->addStep($staging, SiteDeployStep::TYPE_NPM_RUN, 'build', 900);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('editingPipelineId', (string) $staging->id)
+        ->set('pipelineTab', 'overview')
+        ->assertSee('2 steps')
+        ->assertSee('Staging build')
+        ->assertSee(__('Counts below are for “:name”—not the pipeline marked Deploy.', ['name' => 'Staging build']));
+});
+
+function minimalPipelineImportJson(array $steps = [], array $hooks = []): string
+{
+    return json_encode([
+        'version' => 1,
+        'pipeline' => [
+            'steps' => $steps,
+            'hooks' => $hooks,
+        ],
+    ], JSON_THROW_ON_ERROR);
+}
+
+test('pipeline workspace json import opens modal on non-empty pipeline', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
+        'phase' => SiteDeployStep::PHASE_BUILD,
+        'timeout_seconds' => 600,
+    ]);
+
+    $json = minimalPipelineImportJson([
+        [
+            'step_type' => SiteDeployStep::TYPE_NPM_CI,
+            'phase' => SiteDeployStep::PHASE_BUILD,
+            'sort_order' => 10,
+            'timeout_seconds' => 900,
+        ],
+        [
+            'step_type' => SiteDeployStep::TYPE_NPM_RUN,
+            'phase' => SiteDeployStep::PHASE_BUILD,
+            'custom_command' => 'build',
+            'sort_order' => 20,
+            'timeout_seconds' => 900,
+        ],
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('pipeline.json', $json);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('pipeline_import_file', $file)
+        ->assertSet('show_import_pipeline_modal', true)
+        ->assertSee('Import pipeline?')
+        ->call('confirmImportPipelineJson')
+        ->assertSet('show_import_pipeline_modal', false);
+
+    $types = $pipeline->fresh()->steps()->orderBy('sort_order')->pluck('step_type')->all();
+
+    expect($types)->toBe([
+        SiteDeployStep::TYPE_NPM_CI,
+        SiteDeployStep::TYPE_NPM_RUN,
+    ]);
+});
+
+test('pipeline workspace json import applies immediately on empty pipeline', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    $json = minimalPipelineImportJson([
+        [
+            'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
+            'phase' => SiteDeployStep::PHASE_BUILD,
+            'sort_order' => 10,
+            'timeout_seconds' => 600,
+        ],
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('pipeline.json', $json);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('pipeline_import_file', $file)
+        ->assertSet('show_import_pipeline_modal', false);
+
+    expect($pipeline->fresh()->steps)->toHaveCount(1)
+        ->and($pipeline->fresh()->steps->first()->step_type)->toBe(SiteDeployStep::TYPE_COMPOSER_INSTALL);
+});
+
+test('pipeline workspace json import can create a new pipeline from modal', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
+        'phase' => SiteDeployStep::PHASE_BUILD,
+        'timeout_seconds' => 600,
+    ]);
+
+    $json = app(DeployPipelineJsonExporter::class)->export(
+        $site,
+        $pipeline->fresh(['steps', 'hooks']),
+    );
+
+    $file = UploadedFile::fake()->createWithContent('pipeline.json', $json);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('pipeline_import_file', $file)
+        ->assertSet('show_import_pipeline_modal', true)
+        ->set('import_create_new_pipeline', true)
+        ->set('import_new_pipeline_name', 'From JSON')
+        ->call('confirmImportPipelineJson')
+        ->assertHasNoErrors();
+
+    $imported = $site->fresh()->deployPipelines()->where('name', 'From JSON')->first();
+
+    expect($imported)->not->toBeNull()
+        ->and((string) $site->fresh()->active_deploy_pipeline_id)->toBe((string) $imported->id)
+        ->and($imported->steps)->toHaveCount(1)
+        ->and($pipeline->fresh()->steps)->toHaveCount(1);
 });

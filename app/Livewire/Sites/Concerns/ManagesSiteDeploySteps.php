@@ -257,6 +257,7 @@ trait ManagesSiteDeploySteps
             $this->new_deploy_step_phase,
         );
 
+        $this->syncEditingPipelineSnapshot();
         $this->closePipelineStepForm();
         $this->toastSuccess(__('Pipeline step saved.'));
     }
@@ -380,6 +381,7 @@ trait ManagesSiteDeploySteps
                     $this->pending_duplicate_step_phase,
                 );
             }
+            $this->syncEditingPipelineSnapshot();
             $this->closePipelineStepForm();
             $this->toastSuccess(__('Pipeline step saved.'));
         } else {
@@ -413,6 +415,7 @@ trait ManagesSiteDeploySteps
                 $this->editingDeployPipeline(),
                 $orderedStepIds,
             );
+            $this->syncEditingPipelineSnapshot();
         } catch (\InvalidArgumentException) {
             return;
         }
@@ -429,6 +432,7 @@ trait ManagesSiteDeploySteps
                 $this->editingDeployPipeline(),
                 $orderedStepIds,
             );
+            $this->syncEditingPipelineSnapshot();
         } catch (\InvalidArgumentException) {
             return;
         }
@@ -444,6 +448,7 @@ trait ManagesSiteDeploySteps
             ->where('pipeline_id', $this->editingDeployPipeline()->id)
             ->whereKey($id)
             ->delete();
+        $this->syncEditingPipelineSnapshot();
         $this->toastSuccess(__('Pipeline step removed.'));
     }
 
@@ -458,6 +463,7 @@ trait ManagesSiteDeploySteps
         }
         [$ids[$pos - 1], $ids[$pos]] = [$ids[$pos], $ids[$pos - 1]];
         app(SiteDeployPipelineManager::class)->reorderSteps($pipeline, $ids);
+        $this->syncEditingPipelineSnapshot();
     }
 
     public function moveDeployStepDown(string $id): void
@@ -471,6 +477,7 @@ trait ManagesSiteDeploySteps
         }
         [$ids[$pos + 1], $ids[$pos]] = [$ids[$pos], $ids[$pos + 1]];
         app(SiteDeployPipelineManager::class)->reorderSteps($pipeline, $ids);
+        $this->syncEditingPipelineSnapshot();
     }
 
     /**
@@ -556,5 +563,6 @@ trait ManagesSiteDeploySteps
             $insertIndex,
             $phase,
         );
+        $this->syncEditingPipelineSnapshot();
     }
 }
