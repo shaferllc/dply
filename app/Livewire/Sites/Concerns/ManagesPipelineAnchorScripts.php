@@ -90,7 +90,7 @@ trait ManagesPipelineAnchorScripts
 
     protected function syncPipelineAnchorScriptsFromEditingPipeline(): void
     {
-        $pipeline = $this->editingDeployPipeline()->fresh();
+        $pipeline = $this->editingDeployPipeline();
         $this->pipeline_clone_script = (string) ($pipeline->clone_script ?? '');
         $this->pipeline_activate_script = (string) ($pipeline->activate_script ?? '');
     }

@@ -20,6 +20,7 @@ trait ManagesSiteDeploySteps
 {
     use ManagesPipelineAnchorScripts;
     use ManagesSiteDeployPipelines;
+    use ManagesSiteDeployPipelineShare;
 
     public string $new_deploy_step_type = SiteDeployStep::TYPE_COMPOSER_INSTALL;
 

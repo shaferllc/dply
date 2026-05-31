@@ -22,7 +22,9 @@ final class DeployPipelineTimeline
      */
     public static function items(SiteDeployPipeline $pipeline): array
     {
-        $steps = $pipeline->steps()->orderBy('sort_order')->get();
+        $steps = $pipeline->relationLoaded('steps')
+            ? $pipeline->steps
+            : $pipeline->steps()->orderBy('sort_order')->get();
         $hooks = $pipeline->relationLoaded('hooks')
             ? $pipeline->hooks
             : $pipeline->hooks()->orderBy('sort_order')->get();
@@ -82,7 +84,10 @@ final class DeployPipelineTimeline
      *     suffix: list<array{type: string, key: string, hook?: SiteDeployHook}>
      * }
      */
-    public static function splitForUi(SiteDeployPipeline $pipeline): array
+    /**
+     * @param  list<array{type: string, key: string, step?: SiteDeployStep, hook?: SiteDeployHook}>|null  $items
+     */
+    public static function splitForUi(SiteDeployPipeline $pipeline, ?array $items = null): array
     {
         $prefix = [];
         $buildBlocks = [];
@@ -92,7 +97,7 @@ final class DeployPipelineTimeline
         $current = null;
         $zone = 'prefix';
 
-        foreach (self::items($pipeline) as $item) {
+        foreach ($items ?? self::items($pipeline) as $item) {
             if ($item['type'] === 'anchor' && $item['key'] === 'activate') {
                 if ($current !== null) {
                     $buildBlocks[] = $current;

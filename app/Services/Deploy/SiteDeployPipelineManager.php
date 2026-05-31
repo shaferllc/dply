@@ -34,7 +34,10 @@ final class SiteDeployPipelineManager
 
     public function ensureDefaultPipeline(Site $site): SiteDeployPipeline
     {
-        $existing = $site->deployPipelines()->where('slug', 'default')->first();
+        $existing = $site->relationLoaded('deployPipelines')
+            ? $site->deployPipelines->firstWhere('slug', 'default')
+            : $site->deployPipelines()->where('slug', 'default')->first();
+
         if ($existing) {
             if (! $site->active_deploy_pipeline_id) {
                 $site->forceFill(['active_deploy_pipeline_id' => $existing->id])->save();
@@ -56,22 +59,119 @@ final class SiteDeployPipelineManager
         return $pipeline;
     }
 
+    /**
+     * Eager-load pipelines (with steps/hooks) and align activeDeployPipeline from the collection when possible.
+     */
+    public function primeSiteForPipelineWorkspace(Site $site): void
+    {
+        if ($this->deployPipelinesAreWorkspacePrimed($site)) {
+            $this->syncActiveDeployPipelineRelation($site);
+
+            return;
+        }
+
+        if ($site->relationLoaded('deployPipelines')) {
+            $site->loadMissing([
+                'deployPipelines.steps',
+                'deployPipelines.hooks.notificationChannel',
+            ]);
+        } else {
+            $site->load([
+                'deployPipelines' => static fn ($query) => $query->with([
+                    'steps',
+                    'hooks.notificationChannel',
+                ]),
+            ]);
+        }
+
+        $this->syncActiveDeployPipelineRelation($site);
+    }
+
+    private function deployPipelinesAreWorkspacePrimed(Site $site): bool
+    {
+        if (! $site->relationLoaded('deployPipelines') || $site->deployPipelines->isEmpty()) {
+            return false;
+        }
+
+        return $site->deployPipelines->every(
+            fn (SiteDeployPipeline $pipeline): bool => $pipeline->relationLoaded('steps')
+                && $pipeline->relationLoaded('hooks'),
+        );
+    }
+
     public function resolveEditing(Site $site, ?string $pipelineId): SiteDeployPipeline
     {
-        $site->loadMissing(['deployPipelines', 'activeDeployPipeline']);
+        $this->primeSiteForPipelineWorkspace($site);
 
-        if ($pipelineId) {
+        if ($pipelineId !== null && $pipelineId !== '') {
             $pipeline = $site->deployPipelines->firstWhere('id', $pipelineId);
             if ($pipeline) {
                 return $pipeline;
             }
         }
 
-        if ($site->activeDeployPipeline) {
+        if ($site->relationLoaded('activeDeployPipeline') && $site->activeDeployPipeline) {
             return $site->activeDeployPipeline;
         }
 
-        return $this->ensureDefaultPipeline($site->fresh(['deployPipelines']));
+        return $this->ensureDefaultPipeline($site);
+    }
+
+    public function invalidatePrimedPipelines(Site $site): void
+    {
+        $site->unsetRelation('deployPipelines');
+        $site->unsetRelation('activeDeployPipeline');
+    }
+
+    /**
+     * Swap one pipeline (with fresh steps/hooks) into an already-loaded deployPipelines collection.
+     */
+    public function mergePrimedPipeline(Site $site, SiteDeployPipeline $pipeline): void
+    {
+        $pipeline->loadMissing(['steps', 'hooks.notificationChannel']);
+
+        if (! $site->relationLoaded('deployPipelines')) {
+            return;
+        }
+
+        $pipelines = $site->deployPipelines;
+        $index = $pipelines->search(
+            fn (SiteDeployPipeline $candidate): bool => (string) $candidate->id === (string) $pipeline->id,
+        );
+
+        if ($index === false) {
+            $pipelines->push($pipeline);
+        } else {
+            $pipelines[$index] = $pipeline;
+        }
+
+        $site->setRelation('deployPipelines', $pipelines->values());
+
+        if ((string) $site->active_deploy_pipeline_id === (string) $pipeline->id) {
+            $site->setRelation('activeDeployPipeline', $pipeline);
+        }
+    }
+
+    private function syncActiveDeployPipelineRelation(Site $site): void
+    {
+        if (! $site->active_deploy_pipeline_id || $site->relationLoaded('activeDeployPipeline')) {
+            return;
+        }
+
+        $active = $site->deployPipelines->firstWhere('id', $site->active_deploy_pipeline_id);
+
+        if ($active) {
+            $site->setRelation('activeDeployPipeline', $active);
+
+            return;
+        }
+
+        $site->loadMissing([
+            'activeDeployPipeline' => static fn ($query) => $query->with([
+                'steps',
+                'hooks.notificationChannel',
+            ]),
+        ]);
     }
 
     public function createPipeline(Site $site, string $name, ?string $duplicateFromId = null): SiteDeployPipeline

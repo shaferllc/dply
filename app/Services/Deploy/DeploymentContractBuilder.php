@@ -17,7 +17,7 @@ final class DeploymentContractBuilder
 
     public function build(Site $site): DeploymentContract
     {
-        $site->loadMissing(['server', 'domains', 'workspace.variables']);
+        $site->loadMissing(['server', 'domains', 'workspace.variables', 'previewDomains']);
 
         $environment = $this->runtimeEnvironment($site);
         $defaultPath = '/var/www/'.trim((string) ($site->slug ?: $site->name ?: 'site'), '/');

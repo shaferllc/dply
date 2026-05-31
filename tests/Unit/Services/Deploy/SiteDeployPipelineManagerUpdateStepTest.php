@@ -6,6 +6,7 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -28,4 +29,24 @@ test('updateStep moves step to release phase at end of release block', function 
     $ordered = $pipeline->fresh()->steps()->orderBy('sort_order')->pluck('id')->map(fn ($id) => (string) $id)->all();
 
     expect($ordered)->toBe([(string) $migrate->id, (string) $build->id]);
+});
+
+test('resolveEditing does not reload deploy pipelines when already primed', function () {
+    $site = Site::factory()->create();
+    $manager = app(SiteDeployPipelineManager::class);
+    $manager->ensureDefaultPipeline($site);
+
+    $site = $site->fresh();
+    $manager->primeSiteForPipelineWorkspace($site);
+
+    DB::enableQueryLog();
+
+    $manager->resolveEditing($site, null);
+    $manager->resolveEditing($site, null);
+
+    $pipelineListQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) ($query['query'] ?? ''), 'site_deploy_pipelines')
+            && str_contains((string) ($query['query'] ?? ''), 'site_id'));
+
+    expect($pipelineListQueries)->toBeEmpty();
 });

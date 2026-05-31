@@ -8,6 +8,7 @@ use App\Models\SiteDeployStep;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineTimeline;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -64,6 +65,29 @@ test('timeline places migrate in release zone after activate anchor', function (
     expect($split['buildBlocks'])->toHaveCount(1)
         ->and($split['releaseBlocks'])->toHaveCount(1)
         ->and($split['releaseBlocks'][0]['step']->step_type)->toBe(SiteDeployStep::TYPE_ARTISAN_MIGRATE);
+});
+
+test('items uses eager loaded steps without querying', function () {
+    $site = Site::factory()->create();
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
+        'phase' => SiteDeployStep::PHASE_BUILD,
+        'timeout_seconds' => 600,
+    ]);
+
+    $pipeline->load(['steps', 'hooks']);
+
+    DB::enableQueryLog();
+
+    DeployPipelineTimeline::items($pipeline);
+
+    $stepQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) ($query['query'] ?? ''), 'site_deploy_steps'));
+
+    expect($stepQueries)->toBeEmpty();
 });
 
 test('before activate hooks appear in mid section', function () {

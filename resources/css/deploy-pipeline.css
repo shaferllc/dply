@@ -20,6 +20,24 @@
     margin-top: 0;
 }
 
+.dply-pipeline-step-row {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(104 132 121 / 0.45) transparent;
+}
+
+.dply-pipeline-step-row::-webkit-scrollbar {
+    height: 6px;
+}
+
+.dply-pipeline-step-row::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: rgb(104 132 121 / 0.35);
+}
+
+.dply-pipeline-release-tail {
+    flex-shrink: 0;
+}
+
 [data-palette-type] .dply-palette-drag-handle:hover {
     background-color: rgb(224 242 254 / 0.9);
 }

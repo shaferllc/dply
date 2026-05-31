@@ -90,7 +90,7 @@ test('pipeline workspace supports creating pipeline and applying template', func
         ->get(route('sites.pipeline', ['server' => $server, 'site' => $site, 'tab' => 'steps'], false))
         ->assertOk()
         ->assertSee('Pipelines')
-        ->assertSee('Dply templates')
+        ->assertSee('Steps only (advanced)')
         ->assertSee('Hook types')
         ->assertSee('Browse all steps');
 
@@ -527,4 +527,185 @@ test('pipeline workspace applies laravel safety bundle', function () {
 
     expect($pipeline->hooks)->toHaveCount(2)
         ->and($pipeline->steps->where('step_type', SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND)->count())->toBe(1);
+});
+
+test('pipeline workspace shows starter pipelines for laravel site', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
+    ]);
+
+    app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->assertSee('Starter pipelines')
+        ->assertSee('Laravel · zero downtime')
+        ->assertSee('Simple deploy');
+});
+
+test('pipeline workspace applies starter to empty pipeline without modal', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'deploy_strategy' => 'simple',
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->call('openApplyStarterModal', 'laravel-zero-downtime')
+        ->assertSet('show_apply_starter_modal', false)
+        ->assertSet('deploy_strategy', 'atomic');
+
+    expect($pipeline->fresh()->steps)->not->toBeEmpty();
+});
+
+test('pipeline workspace applies zero downtime starter with release steps for php site without detection', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'runtime' => 'php',
+        'deploy_strategy' => 'simple',
+        'meta' => [],
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->call('openApplyStarterModal', 'zero-downtime')
+        ->assertSet('show_apply_starter_modal', false)
+        ->assertSet('deploy_strategy', 'atomic');
+
+    $steps = $pipeline->fresh()->steps;
+    expect($steps->where('phase', SiteDeployStep::PHASE_RELEASE)->count())->toBeGreaterThan(0);
+});
+
+test('pipeline workspace starter modal create new pipeline activates it', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => [
+            'vm_runtime' => [
+                'detected' => ['framework' => 'laravel', 'language' => 'php'],
+            ],
+        ],
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+    $pipeline->steps()->create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_COMPOSER_INSTALL,
+        'phase' => SiteDeployStep::PHASE_BUILD,
+        'timeout_seconds' => 600,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->call('openApplyStarterModal', 'laravel-simple')
+        ->assertSet('show_apply_starter_modal', true)
+        ->set('starter_create_new_pipeline', true)
+        ->set('starter_new_pipeline_name', 'Staging simple')
+        ->call('confirmApplyStarterPipeline')
+        ->assertHasNoErrors();
+
+    expect($site->fresh()->active_deploy_pipeline_id)->not->toBe($pipeline->id)
+        ->and($site->deployPipelines()->where('name', 'Staging simple')->exists())->toBeTrue()
+        ->and($site->deploy_strategy)->toBe('simple');
+});
+
+test('pipeline workspace quick commands append custom build steps', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->set('quick_commands_text', "npm ci\n# ignored\nnpm run build")
+        ->set('quick_commands_phase', SiteDeployStep::PHASE_BUILD)
+        ->call('appendQuickCommands')
+        ->assertHasNoErrors();
+
+    $commands = $pipeline->fresh()->steps()->where('step_type', SiteDeployStep::TYPE_CUSTOM)->pluck('custom_command')->all();
+
+    expect($commands)->toBe(['npm ci', 'npm run build']);
+});
+
+test('pipeline workspace shows share pipeline section', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
+
+    Livewire::actingAs($user)
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->set('pipelineTab', 'steps')
+        ->assertSee('Share pipeline')
+        ->assertSee('Quick commands')
+        ->assertSee('Copy full script');
 });

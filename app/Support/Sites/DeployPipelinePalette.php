@@ -170,6 +170,7 @@ final class DeployPipelinePalette
             'node' => __('Node'),
             'php' => __('PHP'),
             'ruby' => __('Ruby'),
+            'static' => __('Static'),
             default => str($requires)->headline()->toString(),
         };
     }
@@ -227,6 +228,7 @@ final class DeployPipelinePalette
             'node' => $site->runtimeKey() === 'node',
             'php' => $site->runtimeKey() === 'php',
             'ruby' => $site->runtimeKey() === 'ruby',
+            'static' => $site->runtimeKey() === 'static',
             default => true,
         };
     }

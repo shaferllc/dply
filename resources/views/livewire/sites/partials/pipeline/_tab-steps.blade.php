@@ -6,7 +6,6 @@
     $editingPipeline = $editingDeployPipeline ?? null;
     $isActiveDeployPipeline = $editingPipeline?->isActiveFor($site) ?? true;
     $pipelineCount = $site->deployPipelines->count();
-    $timeline = $pipelineTimeline ?? [];
     $timelineSplit = $pipelineTimelineSplit ?? [
         'prefix' => [],
         'buildBlocks' => [],
@@ -183,6 +182,28 @@
             @endif
         </div>
 
+        @if (($pipelineStarters ?? []) !== [])
+            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Starter pipelines') }}</p>
+                <p class="mt-1 text-sm text-brand-moss">
+                    {{ __('Full recipes: deploy strategy, health check defaults, steps, and hooks (safe Laravel). Replaces the target pipeline.') }}
+                </p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach ($pipelineStarters as $starter)
+                        <button
+                            type="button"
+                            wire:click="openApplyStarterModal('{{ $starter['key'] }}')"
+                            title="{{ $starter['description'] }}"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-sage/40 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:border-brand-forest/40 hover:bg-brand-sage/10"
+                        >
+                            <x-dynamic-component :component="$starter['icon']" class="h-3.5 w-3.5 text-brand-forest" />
+                            {{ $starter['label'] }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @if ($pipelineSafetyBundleVisible ?? false)
             <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Safety presets') }}</p>
@@ -207,9 +228,14 @@
         @endif
 
         @if (($deployPipelineTemplates ?? []) !== [])
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Dply templates') }}</p>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Replace all steps on this pipeline with a starter recipe.') }}</p>
+            <details class="group border-b border-brand-ink/10 px-6 py-4 sm:px-8">
+                <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist marker:content-none">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-m-chevron-right class="h-3.5 w-3.5 transition group-open:rotate-90" />
+                        {{ __('Steps only (advanced)') }}
+                    </span>
+                </summary>
+                <p class="mt-2 text-sm text-brand-moss">{{ __('Replace steps on this pipeline without changing deploy strategy or health check settings.') }}</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     @foreach ($deployPipelineTemplates as $template)
                         <button
@@ -223,8 +249,13 @@
                         </button>
                     @endforeach
                 </div>
-            </div>
+            </details>
         @endif
+
+        <div class="space-y-4 px-6 pt-4 sm:px-8">
+            @include('livewire.sites.partials.pipeline._pipeline-quick-commands')
+            @include('livewire.sites.partials.pipeline._pipeline-share')
+        </div>
 
         <div class="space-y-6 p-6 sm:p-8">
             <div class="relative">
@@ -232,8 +263,9 @@
                 class="dply-pipeline-timeline space-y-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:p-5"
                 role="list"
                 aria-label="{{ __('Deploy pipeline order') }}"
+                wire:key="pipeline-timeline-{{ $editingPipeline->id }}-{{ $stepCount }}-{{ $hookCount }}"
                 wire:loading.class.delay="opacity-50 pointer-events-none"
-                wire:target="addDeployPipelineStepFromPalette,reorderDeployPipelineBuildSteps,reorderDeployPipelineReleaseSteps,addDeployPipelineHookFromPalette,confirmAddDuplicatePipelineStep"
+                wire:target="addDeployPipelineStepFromPalette,reorderDeployPipelineBuildSteps,reorderDeployPipelineReleaseSteps,addDeployPipelineHookFromPalette,confirmAddDuplicatePipelineStep,openApplyStarterModal,confirmApplyStarterPipeline"
             >
                 <div class="hidden flex-wrap items-center gap-2 pb-1 sm:flex" aria-hidden="true">
                     <span class="rounded-full bg-stone-200/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-800">1 {{ __('Clone') }}</span>
@@ -277,14 +309,18 @@
                     <div
                         x-ref="buildSortZone"
                         @class([
-                            'inline-flex min-h-[2.75rem] min-w-0 flex-1 flex-wrap items-center gap-2 rounded-xl px-1 py-1 transition-colors',
+                            'dply-pipeline-step-row inline-flex min-h-[2.75rem] min-w-0 max-w-full flex-nowrap items-center gap-2 overflow-x-auto rounded-xl px-1 py-1 transition-colors',
                             'border border-dashed border-sky-300/60 bg-sky-50/50' => count($timelineSplit['buildBlocks']) === 0,
                             'border border-transparent' => count($timelineSplit['buildBlocks']) > 0,
                         ])
                         data-pipeline-drop-zone="build"
                     >
-                        @forelse ($timelineSplit['buildBlocks'] as $block)
+                        @php $buildBlockCount = count($timelineSplit['buildBlocks']); @endphp
+                        @forelse ($timelineSplit['buildBlocks'] as $blockIndex => $block)
                             @include('livewire.sites.partials.pipeline._timeline-step-block', ['block' => $block])
+                            @if ($blockIndex < $buildBlockCount - 1)
+                                @include('livewire.sites.partials.pipeline._timeline-flow-connector')
+                            @endif
                         @empty
                             <span class="px-2 text-xs text-brand-moss">{{ __('Drop build steps from the palette below') }}</span>
                         @endforelse
@@ -314,27 +350,43 @@
                     :description="__('Commands on the live path after activate — migrations, cache warmers, etc.')"
                     tone="release"
                 >
-                    <div
-                        x-ref="releaseSortZone"
-                        @class([
-                            'inline-flex min-h-[2.75rem] min-w-0 flex-1 flex-wrap items-center gap-2 rounded-xl px-1 py-1 transition-colors',
-                            'border border-dashed border-emerald-300/60 bg-emerald-50/50' => count($timelineSplit['releaseBlocks']) === 0,
-                            'border border-transparent' => count($timelineSplit['releaseBlocks']) > 0,
-                        ])
-                        data-pipeline-drop-zone="release"
-                    >
-                        @forelse ($timelineSplit['releaseBlocks'] as $block)
-                            @include('livewire.sites.partials.pipeline._timeline-step-block', ['block' => $block])
-                        @empty
-                            <span class="px-2 text-xs text-brand-moss">{{ __('Drop release steps from the palette below') }}</span>
-                        @endforelse
+                    <div class="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:gap-2">
+                        <div
+                            x-ref="releaseSortZone"
+                            @class([
+                                'dply-pipeline-step-row inline-flex min-h-[2.75rem] min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto rounded-xl px-1 py-1 transition-colors',
+                                'border border-dashed border-emerald-300/60 bg-emerald-50/50' => count($timelineSplit['releaseBlocks']) === 0,
+                                'border border-transparent' => count($timelineSplit['releaseBlocks']) > 0,
+                            ])
+                            data-pipeline-drop-zone="release"
+                        >
+                            @php $releaseBlockCount = count($timelineSplit['releaseBlocks']); @endphp
+                            @forelse ($timelineSplit['releaseBlocks'] as $blockIndex => $block)
+                                @php $isLastReleaseStep = $blockIndex === $releaseBlockCount - 1; @endphp
+                                @include('livewire.sites.partials.pipeline._timeline-step-block', [
+                                    'block' => $block,
+                                    'showAfterStepHookZone' => ! $isLastReleaseStep || count($block['hooks']) > 0,
+                                ])
+                                @if ($blockIndex < $releaseBlockCount - 1)
+                                    @include('livewire.sites.partials.pipeline._timeline-flow-connector')
+                                @endif
+                            @empty
+                                <span class="px-2 text-xs text-brand-moss">{{ __('Drop release steps from the palette below') }}</span>
+                            @endforelse
+                        </div>
+                        <div class="dply-pipeline-release-tail inline-flex shrink-0 items-center gap-2">
+                            @if ($releaseBlockCount > 0)
+                                @include('livewire.sites.partials.pipeline._timeline-flow-connector')
+                            @endif
+                            @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
+                                'anchor' => 'after_activate',
+                                'items' => $hooksAfterActivate,
+                                'empty' => count($hooksAfterActivate) === 0
+                                    ? (\App\Models\SiteDeployHook::anchorLabels()['after_activate'] ?? __('After activate'))
+                                    : null,
+                            ])
+                        </div>
                     </div>
-                    @include('livewire.sites.partials.pipeline._timeline-flow-connector')
-                    @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
-                        'anchor' => 'after_activate',
-                        'items' => $hooksAfterActivate,
-                        'empty' => __('Hook'),
-                    ])
                 </x-pipeline-timeline-section>
 
                 @if ($stepCount === 0 && $hookCount === 0)

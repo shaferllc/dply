@@ -762,12 +762,10 @@ class Site extends Model
 
     public function primaryPreviewDomain(): ?SitePreviewDomain
     {
-        $previewDomains = $this->relationLoaded('previewDomains')
-            ? $this->previewDomains
-            : $this->previewDomains()->get();
+        $this->loadMissing('previewDomains');
 
-        return $previewDomains->firstWhere('is_primary', true)
-            ?? $previewDomains->first();
+        return $this->previewDomains->firstWhere('is_primary', true)
+            ?? $this->previewDomains->first();
     }
 
     public function currentSslSummary(): string

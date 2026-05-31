@@ -22,7 +22,13 @@ Run deploys from **Deployments**, not Pipeline. Pipeline is configuration only.
 
 Each site can keep **alternate pipelines** (for example Default vs Staging build). The pipeline marked **Deploy** is what runs on the next deployment; others are recipes you can switch to or duplicate.
 
-**Dply templates** (Laravel, Node SSR, static site, Ruby/Rails, plus runtime defaults) replace all steps on the pipeline you are editing — use them to bootstrap a new pipeline quickly.
+**Starter pipelines** (Simple deploy, Zero downtime, and runtime-specific pairs) apply **Rollout + steps + hooks** in one action. Empty pipelines apply in one click; non-empty pipelines show a confirm modal with an optional **Create new pipeline** (new pipelines become **Deploy** automatically).
+
+**Steps only (advanced)** — collapsed **Dply templates** (Laravel, Node SSR, static site, Ruby/Rails) replace steps on the current pipeline without changing deploy strategy or health checks.
+
+**Quick commands** — paste one shell command per line and append as custom Build or Release steps.
+
+**Share pipeline** — copy or download a **full commented bash script** or **commands-only** export (reference; Dply still runs the visual pipeline). **Download JSON** / **upload JSON** (`.dply-pipeline.json`) for backup and import; optional **apply rollout** and **create new pipeline** on import (same rules as starter pipelines).
 
 Drag pills in the **build** zone (before activate) or **release** zone (after activate) to set order. Palettes below mirror those zones — **Migrate** and **Optimize** default to release so they run on the live `current` path after the symlink flip.
 

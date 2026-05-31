@@ -18,6 +18,8 @@ use App\Support\Sites\DeployPipelineAdvisor;
 use App\Support\Sites\DeployPipelineIssueFixResolver;
 use App\Support\Sites\DeployPipelinePalette;
 use App\Support\Sites\DeployPipelineSafetyPresets;
+use App\Support\Sites\DeployPipelineScriptExporter;
+use App\Support\Sites\DeployPipelineStarterCatalog;
 use App\Support\Sites\DeployPipelineTimeline;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
@@ -154,12 +156,11 @@ class WorkspacePipeline extends Show
 
     public function render(): View
     {
-        $this->site->load(['deployHooks', 'deployPipelines', 'activeDeployPipeline']);
+        $this->site->loadMissing(['deployHooks', 'previewDomains', 'certificates']);
         $editingPipeline = $this->editingDeployPipeline();
-        $editingPipeline->load(['steps', 'hooks.notificationChannel']);
 
         $deploymentContract = app(DeploymentContractBuilder::class)->build($this->site);
-        $deploymentPreflight = app(DeploymentPreflightValidator::class)->validate($this->site);
+        $deploymentPreflight = app(DeploymentPreflightValidator::class)->validate($this->site, $deploymentContract);
         $pipelineAdvisor = app(DeployPipelineAdvisor::class)->analyze($this->site, $editingPipeline);
         $pipelineAdvisorChecks = collect($pipelineAdvisor['checks']);
         $pipelineActionableChecks = DeployPipelineIssueFixResolver::actionableChecks(
@@ -191,7 +192,6 @@ class WorkspacePipeline extends Show
                 'deployPipelineTemplates' => app(DeployPipelineTemplateCatalog::class)->templatesForSite($this->site),
                 'editingDeployPipeline' => $editingPipeline,
                 'editingDeploySteps' => $editingPipeline->steps,
-                'pipelineTimeline' => DeployPipelineTimeline::items($editingPipeline),
                 'pipelineTimelineSplit' => DeployPipelineTimeline::splitForUi($editingPipeline),
                 'notificationChannels' => $this->notificationChannelsForSite(),
                 'deployHookAnchors' => SiteDeployHook::anchorLabels(),
@@ -209,6 +209,9 @@ class WorkspacePipeline extends Show
                     $this->site,
                     DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1,
                 ),
+                'pipelineStarters' => app(DeployPipelineStarterCatalog::class)->startersForSite($this->site),
+                'pipelineBashFull' => app(DeployPipelineScriptExporter::class)->toFullBash($editingPipeline),
+                'pipelineBashCommands' => app(DeployPipelineScriptExporter::class)->toCommandsOnly($editingPipeline),
             ],
         ));
     }

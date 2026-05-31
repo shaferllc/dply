@@ -8,6 +8,8 @@ use App\Models\Site;
 use App\Models\SiteDeployPipeline;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Support\Sites\DeployPipelineSafetyPresets;
+use App\Support\Sites\DeployPipelineStarterApplier;
+use App\Support\Sites\DeployPipelineStarterCatalog;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -35,6 +37,17 @@ trait ManagesSiteDeployPipelines
     public ?string $pending_delete_pipeline_id = null;
 
     public string $editing_pipeline_branches = '';
+
+    public bool $show_apply_starter_modal = false;
+
+    public string $pending_starter_key = '';
+
+    public bool $starter_create_new_pipeline = false;
+
+    public string $starter_new_pipeline_name = '';
+
+    /** @var list<string> */
+    public array $starter_preview_lines = [];
 
     public function setEditingPipeline(string $pipelineId): void
     {
@@ -195,6 +208,114 @@ trait ManagesSiteDeployPipelines
         ]);
         $this->site->load('deployPipelines');
         $this->toastSuccess(__('Git branch mapping saved.'));
+    }
+
+    public function openApplyStarterModal(string $starterKey): void
+    {
+        $this->authorize('update', $this->site);
+        $catalog = app(DeployPipelineStarterCatalog::class);
+        if (! $catalog->visibleForSite($this->site, key: $starterKey)) {
+            return;
+        }
+
+        $this->pending_starter_key = $starterKey;
+        $this->starter_create_new_pipeline = false;
+        $this->starter_new_pipeline_name = $catalog->defaultNewPipelineName($starterKey);
+
+        $pipeline = $this->editingDeployPipeline();
+        $applier = app(DeployPipelineStarterApplier::class);
+
+        if ($applier->pipelineIsEmpty($pipeline)) {
+            $this->confirmApplyStarterPipeline();
+
+            return;
+        }
+
+        $this->starter_preview_lines = $applier->previewSummaryLines($this->site, $pipeline, $starterKey);
+        $this->show_apply_starter_modal = true;
+    }
+
+    public function closeApplyStarterModal(): void
+    {
+        $this->show_apply_starter_modal = false;
+        $this->pending_starter_key = '';
+        $this->starter_preview_lines = [];
+        $this->starter_create_new_pipeline = false;
+        $this->starter_new_pipeline_name = '';
+    }
+
+    public function confirmApplyStarterPipeline(): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->pending_starter_key === '') {
+            return;
+        }
+
+        $catalog = app(DeployPipelineStarterCatalog::class);
+        if (! $catalog->visibleForSite($this->site, key: $this->pending_starter_key)) {
+            $this->closeApplyStarterModal();
+
+            return;
+        }
+
+        if ($this->starter_create_new_pipeline) {
+            $this->validate([
+                'starter_new_pipeline_name' => 'required|string|max:120',
+            ]);
+        }
+
+        try {
+            $manager = app(SiteDeployPipelineManager::class);
+            $activate = $this->starter_create_new_pipeline;
+
+            if ($this->starter_create_new_pipeline) {
+                $pipeline = $manager->createPipeline(
+                    $this->site,
+                    $this->starter_new_pipeline_name,
+                );
+                $this->editingPipelineId = (string) $pipeline->id;
+                $manager->invalidatePrimedPipelines($this->site);
+            } else {
+                $pipeline = $this->editingDeployPipeline();
+            }
+
+            $result = app(DeployPipelineStarterApplier::class)->apply(
+                $this->site,
+                $pipeline,
+                $this->pending_starter_key,
+                $activate,
+            );
+
+            $manager->mergePrimedPipeline($this->site, $result['pipeline']);
+
+            if (! $this->site->relationLoaded('deployPipelines')) {
+                $manager->primeSiteForPipelineWorkspace($this->site);
+            }
+        } catch (\InvalidArgumentException $e) {
+            $this->toastError($e->getMessage());
+            $this->closeApplyStarterModal();
+
+            return;
+        }
+
+        if ($result['steps_count'] === 0) {
+            $this->closeApplyStarterModal();
+            $this->toastError(__('This starter has no build or release steps for this site runtime. Set the site runtime under Repository, or add steps from the palette.'));
+
+            return;
+        }
+
+        $starterKey = $this->pending_starter_key;
+        $label = (string) ($catalog->starterMeta($starterKey)['label'] ?? $starterKey);
+
+        $this->syncFormFromSite();
+        $this->syncEditingPipelineBranches();
+        $this->closeApplyStarterModal();
+
+        $this->toastSuccess(__(':label applied (:count steps).', [
+            'label' => $label,
+            'count' => $result['steps_count'],
+        ]));
     }
 
     public function applyLaravelSafetyPresetBundle(): void

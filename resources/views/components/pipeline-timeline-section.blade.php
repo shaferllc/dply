@@ -57,7 +57,7 @@
         </div>
     </header>
     <div class="border-l-2 px-4 py-4 sm:px-5 {{ $t['accent'] }}">
-        <div class="flex min-h-[2.75rem] flex-wrap items-center gap-2">
+        <div class="flex min-h-[2.75rem] min-w-0 flex-wrap items-center gap-2">
             {{ $slot }}
         </div>
     </div>

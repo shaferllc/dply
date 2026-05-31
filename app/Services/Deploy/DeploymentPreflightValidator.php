@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Models\Site;
+use App\Support\Deployment\DeploymentContract;
 
 final class DeploymentPreflightValidator
 {
@@ -20,9 +21,9 @@ final class DeploymentPreflightValidator
      *     checks: list<array{key: string, level: string, message: string}>
      * }
      */
-    public function validate(Site $site): array
+    public function validate(Site $site, ?DeploymentContract $contract = null): array
     {
-        $contract = $this->contractBuilder->build($site);
+        $contract ??= $this->contractBuilder->build($site);
         $errors = [];
         $warnings = [];
         $checks = [];
