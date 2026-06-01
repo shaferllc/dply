@@ -978,7 +978,7 @@
                                  fetch was in flight, making it look like the click was a
                                  no-op. Skeleton rows mirror the real table shape so the swap
                                  to the result list lands without a layout jump. --}}
-                            <div wire:loading wire:target="loadCacheClients">
+                            <div wire:loading.block wire:target="loadCacheClients">
                                 <div class="flex w-full items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
                                     <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                                         <circle cx="12" cy="12" r="10" opacity="0.25" />
