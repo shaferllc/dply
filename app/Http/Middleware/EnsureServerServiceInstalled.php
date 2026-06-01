@@ -101,6 +101,10 @@ class EnsureServerServiceInstalled
             return true;
         }
 
+        if ($this->roleExplicitlyAllowsKey($server, $item)) {
+            return true;
+        }
+
         foreach ($required as $tag) {
             if (is_string($tag) && array_key_exists($tag, $installed)) {
                 return true;
@@ -108,5 +112,21 @@ class EnsureServerServiceInstalled
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function roleExplicitlyAllowsKey(Server $server, array $item): bool
+    {
+        $role = (string) ($server->meta['server_role'] ?? '');
+        $allowedKeys = config('server_workspace.role_nav_keys.'.$role.'.keys');
+        if (! is_array($allowedKeys) || $allowedKeys === []) {
+            return false;
+        }
+
+        $key = $item['key'] ?? null;
+
+        return is_string($key) && in_array($key, $allowedKeys, true);
     }
 }

@@ -539,7 +539,38 @@ class WorkspaceDatabases extends Component
     {
         $this->authorize('update', $this->server);
         $capabilities->forget($this->server);
-        $this->toastSuccess(__('Rechecked the server for database engines.'));
+
+        // Seed ServerDatabaseEngine rows for any engines running on the server that
+        // dply doesn't have a record for yet (e.g. installed during provisioning or
+        // manually via SSH — the "provision seeding gap").
+        $detected = $capabilities->probe($this->server);
+        $seededEngines = [];
+        foreach ($detected as $engine => $running) {
+            if (! $running || $engine === 'sqlite') {
+                continue;
+            }
+            $exists = ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->where('engine', $engine)
+                ->exists();
+            if (! $exists) {
+                ServerDatabaseEngine::query()->create([
+                    'server_id' => $this->server->id,
+                    'engine' => $engine,
+                    'status' => ServerDatabaseEngine::STATUS_RUNNING,
+                    'is_default' => ServerDatabaseEngine::query()->where('server_id', $this->server->id)->doesntExist(),
+                    'port' => ServerDatabaseEngine::defaultPortFor($engine),
+                ]);
+                $seededEngines[] = $engine;
+            }
+        }
+
+        if ($seededEngines !== []) {
+            $labels = implode(', ', array_map(fn ($e) => ucfirst($e), $seededEngines));
+            $this->toastSuccess(__('Rechecked engines — adopted :engines as already installed.', ['engines' => $labels]));
+        } else {
+            $this->toastSuccess(__('Rechecked the server for database engines.'));
+        }
     }
 
     public function generateNewDbPassword(): void

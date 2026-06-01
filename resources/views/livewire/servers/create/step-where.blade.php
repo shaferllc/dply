@@ -208,15 +208,49 @@
                                         </span>
                                     </button>
                                     @if ($card['linked'])
-                                        <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-brand-ink/8 pt-3 text-[11px] text-brand-moss">
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
-                                                {{ trans_choice(':count server|:count servers', $card['server_count'], ['count' => $card['server_count']]) }}
-                                            </span>
-                                            <span class="inline-flex items-center gap-1">
-                                                <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
-                                                {{ trans_choice(':count site|:count sites', $card['site_count'], ['count' => $card['site_count']]) }}
-                                            </span>
+                                        <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-[11px] text-brand-moss">
+                                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                <span class="inline-flex items-center gap-1">
+                                                    <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                                    {{ trans_choice(':count server|:count servers', $card['server_count'], ['count' => $card['server_count']]) }}
+                                                </span>
+                                                <span class="inline-flex items-center gap-1">
+                                                    <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                                    {{ trans_choice(':count site|:count sites', $card['site_count'], ['count' => $card['site_count']]) }}
+                                                </span>
+                                            </div>
+                                            @if (($card['installed_roles'] ?? []) !== [])
+                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                    @foreach ($card['installed_roles'] as $role)
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink ring-1 ring-brand-ink/8">
+                                                            @if ($role['count'] > 1)
+                                                                {{ $role['count'] }}× {{ $role['label'] }}
+                                                            @else
+                                                                {{ $role['label'] }}
+                                                            @endif
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                            @if (($card['installed_locations'] ?? []) !== [])
+                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-brand-moss">
+                                                    <span class="inline-flex items-center gap-1 font-medium text-brand-mist">
+                                                        <x-heroicon-o-map-pin class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                        {{ __('Installed in') }}
+                                                    </span>
+                                                    @foreach ($card['installed_locations'] as $location)
+                                                        <span class="font-medium text-brand-ink">
+                                                            {{ $location['label'] }}
+                                                            @if ($location['count'] > 1)
+                                                                <span class="text-brand-moss">({{ $location['count'] }})</span>
+                                                            @endif
+                                                        </span>
+                                                        @if (! $loop->last)
+                                                            <span class="text-brand-mist">·</span>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </div>
                                     @endif
                                     @unless ($card['linked'])
@@ -297,6 +331,11 @@
 
                 {{-- Server purpose (sizes recommendations key off server_role). --}}
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
+                    @include('livewire.servers.create._existing-provider-servers', [
+                        'existingProviderServers' => $existingProviderServers,
+                        'regionLabels' => $regionLabels,
+                    ])
+
                     @include('livewire.servers.create._server-purpose-picker', [
                         'provisionOptions' => $provisionOptions,
                         'form' => $form,
@@ -322,7 +361,9 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 sm:items-start sm:p-7">
-                            @include('livewire.servers.create._provider-region-picker')
+                            @include('livewire.servers.create._provider-region-picker', [
+                                'existingServersByRegion' => $existingServersByRegion ?? [],
+                            ])
                             @include('livewire.servers.create._provider-size-picker', [
                                 'selectedServerRole' => $selectedServerRole,
                             ])

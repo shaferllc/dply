@@ -6,6 +6,7 @@ namespace App\Livewire\Servers\Create;
 
 use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\GetProviderCredentialsForServerType;
+use App\Actions\Servers\ListExistingProviderServers;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
@@ -388,11 +389,24 @@ class StepWhere extends Component
     {
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
+        $catalog = $context['catalog'];
+        $regionLabels = collect(is_array($catalog['regions'] ?? null) ? $catalog['regions'] : [])
+            ->mapWithKeys(fn (array $region): array => [(string) ($region['value'] ?? '') => (string) ($region['label'] ?? '')])
+            ->filter(fn (string $label, string $value): bool => $value !== '')
+            ->all();
+
+        $existingProviderServers = ($org !== null && $this->form->type !== '' && $this->form->type !== 'custom')
+            ? ListExistingProviderServers::run($org, $this->form->type)
+            : [];
+
+        $existingServersByRegion = ($org !== null && $this->form->type !== '' && $this->form->type !== 'custom')
+            ? ListExistingProviderServers::make()->regionCounts($org, $this->form->type)
+            : [];
 
         return view('livewire.servers.create.step-where', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
             'reachedStep' => $this->currentDraft()?->step ?? 2,
-            'catalog' => $context['catalog'],
+            'catalog' => $catalog,
             'preflight' => $context['preflight'],
             'provisionOptions' => $context['provisionOptions'],
             'hasAnyProviderCredentials' => $context['hasAnyProviderCredentials'],
@@ -402,6 +416,9 @@ class StepWhere extends Component
             'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
                 ->firstWhere('id', $this->form->server_role),
             'roleSizingTip' => $this->roleSizingTip($this->form->server_role),
+            'existingProviderServers' => $existingProviderServers,
+            'existingServersByRegion' => $existingServersByRegion,
+            'regionLabels' => $regionLabels,
         ]);
     }
 }

@@ -7,11 +7,13 @@ namespace App\Actions\Servers;
 use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\ServerCacheService;
+use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerFirewallRule;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +42,7 @@ use Illuminate\Support\Facades\DB;
 class SeedProvisionedEnginesForServer
 {
     /**
-     * @return array{cache_created: bool, database_created: bool} What was newly inserted.
+     * @return array{cache_created: bool, database_created: bool, database_row_created: bool} What was newly inserted.
      */
     public function execute(Server $server): array
     {
@@ -49,10 +51,12 @@ class SeedProvisionedEnginesForServer
         return DB::transaction(function () use ($server, $meta): array {
             $cacheCreated = $this->seedCacheService($server, (string) ($meta['cache_service'] ?? ''), $meta);
             $dbCreated = $this->seedDatabaseEngine($server, (string) ($meta['database'] ?? ''));
+            $dbRowCreated = $this->seedInitialDatabase($server, $meta);
 
             return [
                 'cache_created' => $cacheCreated,
                 'database_created' => $dbCreated,
+                'database_row_created' => $dbRowCreated,
             ];
         });
     }
@@ -159,9 +163,11 @@ class SeedProvisionedEnginesForServer
             return false;
         }
 
+        $engineFamily = DedicatedDatabaseServerProvisionConfig::engineFamily($engine);
+
         $exists = ServerDatabaseEngine::query()
             ->where('server_id', $server->id)
-            ->where('engine', $engine)
+            ->where('engine', $engineFamily)
             ->exists();
 
         if ($exists) {
@@ -177,12 +183,115 @@ class SeedProvisionedEnginesForServer
 
         ServerDatabaseEngine::query()->create([
             'server_id' => $server->id,
-            'engine' => $engine,
+            'engine' => $engineFamily,
             'is_default' => $isFirstEngine,
             'status' => ServerDatabaseEngine::STATUS_RUNNING,
-            'port' => ServerDatabaseEngine::defaultPortFor($engine),
+            'port' => ServerDatabaseEngine::defaultPortFor($engineFamily),
         ]);
 
         return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function seedInitialDatabase(Server $server, array $meta): bool
+    {
+        $databaseServer = is_array($meta['database_server'] ?? null) ? $meta['database_server'] : null;
+        if ($databaseServer === null) {
+            return false;
+        }
+
+        $wizardDatabase = (string) ($meta['database'] ?? '');
+        $engine = DedicatedDatabaseServerProvisionConfig::engineFamily($wizardDatabase);
+        if ($engine === 'sqlite' || $engine === '') {
+            return false;
+        }
+
+        $name = trim((string) ($databaseServer['database_name'] ?? ''));
+        $username = trim((string) ($databaseServer['username'] ?? ''));
+        if ($name === '' || $username === '') {
+            return false;
+        }
+
+        $exists = ServerDatabase::query()
+            ->where('server_id', $server->id)
+            ->where('name', $name)
+            ->exists();
+
+        if ($exists) {
+            return false;
+        }
+
+        $password = null;
+        $encrypted = $databaseServer['password_encrypted'] ?? null;
+        if (is_string($encrypted) && $encrypted !== '') {
+            try {
+                $password = Crypt::decryptString($encrypted);
+            } catch (DecryptException) {
+                return false;
+            }
+        }
+
+        if ($password === null || $password === '') {
+            return false;
+        }
+
+        ServerDatabase::query()->create([
+            'server_id' => $server->id,
+            'name' => $name,
+            'engine' => $engine,
+            'username' => $username,
+            'password' => $password,
+            'host' => ($databaseServer['remote_access'] ?? false) ? '0.0.0.0' : '127.0.0.1',
+            'description' => __('Initial database from server create wizard'),
+        ]);
+
+        $this->seedDatabaseFirewallRuleFromMeta($server, $wizardDatabase, $databaseServer);
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $databaseServerMeta
+     */
+    private function seedDatabaseFirewallRuleFromMeta(Server $server, string $wizardDatabase, array $databaseServerMeta): void
+    {
+        if (! ($databaseServerMeta['remote_access'] ?? false)) {
+            return;
+        }
+
+        if (! DedicatedDatabaseServerProvisionConfig::engineSupportsRemoteAccess($wizardDatabase)) {
+            return;
+        }
+
+        $source = trim((string) ($databaseServerMeta['allowed_from'] ?? ''));
+        if (! DedicatedDatabaseServerProvisionConfig::isAllowedSourceCidr($source)) {
+            return;
+        }
+
+        $port = DedicatedDatabaseServerProvisionConfig::fromServer($server, $wizardDatabase)->defaultPort();
+        $tag = 'dply-database-'.DedicatedDatabaseServerProvisionConfig::engineFamily($wizardDatabase);
+
+        $exists = ServerFirewallRule::query()
+            ->where('server_id', $server->id)
+            ->whereJsonContains('tags', $tag)
+            ->exists();
+
+        if ($exists) {
+            return;
+        }
+
+        ServerFirewallRule::query()->create([
+            'server_id' => $server->id,
+            'name' => sprintf('Database · %s', DedicatedDatabaseServerProvisionConfig::engineFamily($wizardDatabase)),
+            'port' => $port,
+            'protocol' => 'tcp',
+            'source' => $source,
+            'action' => 'allow',
+            'enabled' => true,
+            'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
+            'tags' => ['dply-database', $tag],
+        ]);
     }
 }

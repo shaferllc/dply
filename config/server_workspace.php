@@ -124,6 +124,15 @@ return [
                 'redis-snapshots' => ['group' => 'admin'],
             ],
         ],
+        'database' => [
+            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'overrides' => [
+                'databases' => ['label' => 'Database', 'group' => 'overview'],
+                'logs' => ['group' => 'monitor'],
+                'cron' => ['group' => 'admin'],
+                'backups' => ['group' => 'admin'],
+            ],
+        ],
     ],
 
     /*

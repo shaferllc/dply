@@ -272,6 +272,31 @@
                                     <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
                                 </span>
                             @endif
+                            @if ($form->server_role === 'database' && ($form->database_remote_access || $form->database_initial_name !== ''))
+                                @if ($form->database_initial_name !== '')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB name') }}</span>
+                                        <span class="font-medium font-mono text-brand-ink">{{ $form->database_initial_name }}</span>
+                                    </span>
+                                @endif
+                                @if ($form->database_username !== '')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB user') }}</span>
+                                        <span class="font-medium font-mono text-brand-ink">{{ $form->database_username }}</span>
+                                    </span>
+                                @endif
+                                @if ($form->database_remote_access && $form->database_allowed_from !== '')
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB access') }}</span>
+                                        <span class="font-medium font-mono text-brand-ink">{{ $form->database_allowed_from }}</span>
+                                    </span>
+                                @elseif ($form->database_remote_access)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB access') }}</span>
+                                        <span class="font-medium text-brand-ink">{{ __('Remote (CIDR pending)') }}</span>
+                                    </span>
+                                @endif
+                            @endif
                             @if (in_array($form->server_role, ['redis', 'valkey'], true) && ($form->cache_remote_access || $form->cache_require_password))
                                 @if ($form->cache_remote_access && $form->cache_allowed_from !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">

@@ -708,7 +708,11 @@
                                         {{-- Step-specific output is the primary view; offer the raw task tail
                                              behind a toggle for users who want the full firehose. --}}
                                         <details
-                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            wire:key="full-task-tail"
+                                            wire:ignore.self
+                                            x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            x-bind:open="open"
+                                            @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
                                             class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">

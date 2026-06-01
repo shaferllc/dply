@@ -63,6 +63,18 @@ class ServerCreateForm extends Form
 
     public string $cache_password = '';
 
+    /** Dedicated database host: allow app servers on the VPC to connect. */
+    public bool $database_remote_access = true;
+
+    public string $database_allowed_from = '';
+
+    /** Initial database name provisioned on the dedicated database host. */
+    public string $database_initial_name = 'app';
+
+    public string $database_username = 'dply_app';
+
+    public string $database_password = '';
+
     public string $webserver = 'nginx';
 
     public string $php_version = '8.3';

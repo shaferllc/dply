@@ -21,8 +21,10 @@ use App\Services\SshConnectionFactory;
 use App\Support\ServerProviderGate;
 use App\Support\Servers\CacheEngineAvailability;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -228,7 +230,14 @@ trait ServerCreateActions
     }
 
     /**
-     * @return list<array{id: string, label: string, linked: bool, server_count: int, site_count: int}>
+     * @return list<array{
+     *     id: string,
+     *     label: string,
+     *     linked: bool,
+     *     server_count: int,
+     *     site_count: int,
+     *     installed_roles: list<array{id: string, label: string, count: int}>
+     * }>
      */
     protected function listServerProviderCards(): array
     {
@@ -251,7 +260,14 @@ trait ServerCreateActions
 
     /**
      * @param  list<array{id: string, label: string, linked: bool}>  $cards
-     * @return list<array{id: string, label: string, linked: bool, server_count: int, site_count: int}>
+     * @return list<array{
+     *     id: string,
+     *     label: string,
+     *     linked: bool,
+     *     server_count: int,
+     *     site_count: int,
+     *     installed_roles: list<array{id: string, label: string, count: int}>
+     * }>
      */
     protected function provisionProviderCardsFromList(array $cards): array
     {
@@ -622,6 +638,8 @@ trait ServerCreateActions
             }
         }
 
+        $this->normalizeDedicatedCacheServerForm();
+        $this->normalizeDatabaseServerForm();
         $this->syncProvisionPreferenceFields();
     }
 
@@ -631,6 +649,10 @@ trait ServerCreateActions
             $this->normalizeDedicatedCacheServerForm();
 
             return;
+        }
+
+        if ($this->form->server_role === 'database') {
+            $this->normalizeDatabaseServerForm();
         }
 
         $matching = collect(config('server_provision_options.install_profiles', []))->first(function (array $profile): bool {
@@ -663,6 +685,11 @@ trait ServerCreateActions
         return in_array($role ?? $this->form->server_role, ['redis', 'valkey'], true);
     }
 
+    protected function isDedicatedDatabaseServerPurposeRole(?string $role = null): bool
+    {
+        return ($role ?? $this->form->server_role) === 'database';
+    }
+
     protected function normalizeDedicatedCacheServerForm(): void
     {
         if (! $this->isDedicatedCacheServerPurposeRole()) {
@@ -690,6 +717,35 @@ trait ServerCreateActions
         }
 
         $this->form->install_profile = 'redis_server';
+    }
+
+    protected function normalizeDatabaseServerForm(): void
+    {
+        if ($this->form->server_role !== 'database') {
+            return;
+        }
+
+        $this->form->cache_service = 'none';
+        $this->form->webserver = 'none';
+        $this->form->php_version = 'none';
+        $this->form->install_profile = 'database_node';
+
+        if ($this->form->database_initial_name === '') {
+            $this->form->database_initial_name = 'app';
+        }
+
+        if ($this->form->database_username === '') {
+            $this->form->database_username = 'dply_app';
+        }
+
+        if (! DedicatedDatabaseServerProvisionConfig::engineSupportsRemoteAccess($this->form->database)) {
+            $this->form->database_remote_access = false;
+            $this->form->database_allowed_from = '';
+        }
+
+        if ($this->form->database_password === '') {
+            $this->form->database_password = Str::password(32, symbols: false);
+        }
     }
 
     /**
@@ -794,6 +850,7 @@ trait ServerCreateActions
                     }
                 }
                 $this->normalizeDedicatedCacheServerForm();
+                $this->normalizeDatabaseServerForm();
                 $this->syncProvisionPreferenceFields();
 
                 return;

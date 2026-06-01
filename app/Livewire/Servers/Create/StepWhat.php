@@ -19,6 +19,7 @@ use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use App\Services\Servers\ServerCreatePresetCatalog;
 use App\Support\Servers\CacheEngineAvailability;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -294,6 +295,25 @@ class StepWhat extends Component
                 }
             }
 
+            if ($this->isDedicatedDatabaseServerPurposeRole()) {
+                $identifierRule = ['required', 'string', 'max:63', 'regex:/^[a-zA-Z][a-zA-Z0-9_]*$/'];
+                $rules['form.database_initial_name'] = $identifierRule;
+                $rules['form.database_username'] = $identifierRule;
+                $rules['form.database_password'] = ['required', 'string', 'min:12', 'max:256', 'regex:/^[\x21-\x7E]+$/'];
+
+                if ($this->form->database_remote_access) {
+                    $rules['form.database_allowed_from'] = [
+                        'required',
+                        'string',
+                        'max:64',
+                        function (string $attribute, mixed $value, \Closure $fail): void {
+                            if (! DedicatedDatabaseServerProvisionConfig::isAllowedSourceCidr((string) $value)) {
+                                $fail(__('Pick a specific CIDR (e.g. 10.0.0.0/8 for VPC peers). Exposing a database to the public internet is not allowed here.'));
+                            }
+                        },
+                    ];
+                }
+            }
 
             $attributes = [
                 'form.install_profile' => __('install profile'),
@@ -304,6 +324,10 @@ class StepWhat extends Component
                 'form.cache_service' => __('cache service'),
                 'form.cache_allowed_from' => __('allowed source'),
                 'form.cache_password' => __('cache password'),
+                'form.database_initial_name' => __('database name'),
+                'form.database_username' => __('database username'),
+                'form.database_password' => __('database password'),
+                'form.database_allowed_from' => __('allowed source'),
             ];
 
             if ($this->showsOsImagePicker()) {
@@ -404,6 +428,57 @@ class StepWhat extends Component
         }
     }
 
+    public function generateDedicatedDatabasePassword(): void
+    {
+        if (! $this->isDedicatedDatabaseServerPurposeRole()) {
+            return;
+        }
+
+        $this->form->database_password = Str::password(32, symbols: false);
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function chooseDatabaseNetworkAccess(string $mode): void
+    {
+        if (! $this->isDedicatedDatabaseServerPurposeRole()) {
+            return;
+        }
+
+        $remote = $mode === 'remote';
+        if ($remote && ! DedicatedDatabaseServerProvisionConfig::engineSupportsRemoteAccess($this->form->database)) {
+            return;
+        }
+
+        $this->form->database_remote_access = $remote;
+        if (! $remote) {
+            $this->form->database_allowed_from = '';
+        }
+
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function updatedFormDatabase(): void
+    {
+        if (! $this->isDedicatedDatabaseServerPurposeRole()) {
+            return;
+        }
+
+        $this->normalizeDatabaseServerForm();
+
+        if ($this->form->database_password === '') {
+            $this->form->database_password = Str::password(32, symbols: false);
+        }
+
+        $this->saveDraftFromForm($this->form);
+    }
+
+    public function updatedFormDatabaseRemoteAccess(bool $value): void
+    {
+        if (! $value) {
+            $this->form->database_allowed_from = '';
+        }
+    }
+
     protected function stepNumber(): int
     {
         return 3;
@@ -488,6 +563,8 @@ class StepWhat extends Component
         $this->selectedPreset = '';
         $this->selectedBlueprintId = $blueprintId;
         $applier->applyToForm($this->form, $blueprint);
+        $this->normalizeDedicatedCacheServerForm();
+        $this->normalizeDatabaseServerForm();
         $this->saveDraftFromForm($this->form);
     }
 
@@ -642,7 +719,35 @@ class StepWhat extends Component
             && $this->form->database !== ''
             && $this->form->cache_service !== ''
             && (! $this->isDedicatedCacheServerPurposeRole() || $this->form->cache_service !== 'none')
-            && $this->dedicatedCacheAccessFieldsValid();
+            && $this->dedicatedCacheAccessFieldsValid()
+            && $this->dedicatedDatabaseAccessFieldsValid();
+    }
+
+    private function dedicatedDatabaseAccessFieldsValid(): bool
+    {
+        if (! $this->isDedicatedDatabaseServerPurposeRole()) {
+            return true;
+        }
+
+        if (! preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $this->form->database_initial_name)) {
+            return false;
+        }
+
+        if (! preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $this->form->database_username)) {
+            return false;
+        }
+
+        if (strlen($this->form->database_password) < 12) {
+            return false;
+        }
+
+        if ($this->form->database_remote_access) {
+            if (! DedicatedDatabaseServerProvisionConfig::isAllowedSourceCidr($this->form->database_allowed_from)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function dedicatedCacheAccessFieldsValid(): bool
@@ -689,6 +794,16 @@ class StepWhat extends Component
                 && strlen($this->form->cache_password) < 12
             ) {
                 return __('Set a cache password (at least 12 characters) or choose No password.');
+            }
+        }
+
+        if ($this->isDedicatedDatabaseServerPurposeRole()) {
+            if ($this->form->database_remote_access && ! DedicatedDatabaseServerProvisionConfig::isAllowedSourceCidr($this->form->database_allowed_from)) {
+                return __('Enter a private network CIDR (e.g. 10.0.0.0/8) for cross-server access, or switch back to Localhost only.');
+            }
+
+            if (strlen($this->form->database_password) < 12) {
+                return __('Set a database password (at least 12 characters).');
             }
         }
 

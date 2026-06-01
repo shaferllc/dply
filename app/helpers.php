@@ -185,15 +185,24 @@ if (! function_exists('server_workspace_nav_for_server')) {
 
             $required = $item['requires_any_tags'] ?? null;
             if (is_array($required) && $required !== [] && ! $unknownStack) {
-                $hasRequiredTag = false;
-                foreach ($required as $tag) {
-                    if (is_string($tag) && array_key_exists($tag, $installed)) {
-                        $hasRequiredTag = true;
-                        break;
+                // Role-focused sidebars explicitly list tag-gated rows (e.g.
+                // databases/backups on a database-role box) — show them even
+                // before installed-service tags catch up after provision.
+                $roleBypassesTagGate = $roleKeyPositions !== null
+                    && is_string($key)
+                    && isset($roleKeyPositions[$key]);
+
+                if (! $roleBypassesTagGate) {
+                    $hasRequiredTag = false;
+                    foreach ($required as $tag) {
+                        if (is_string($tag) && array_key_exists($tag, $installed)) {
+                            $hasRequiredTag = true;
+                            break;
+                        }
                     }
-                }
-                if (! $hasRequiredTag) {
-                    continue;
+                    if (! $hasRequiredTag) {
+                        continue;
+                    }
                 }
             }
 

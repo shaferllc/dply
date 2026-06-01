@@ -96,6 +96,11 @@
                     ])
                 </div>
             </div>
+
+            @include('livewire.servers.create._dedicated-database-options', [
+                'form' => $form,
+                'operatorPublicIp' => $operatorPublicIp ?? null,
+            ])
         @endif
 
         @if ($showPhpPicker)

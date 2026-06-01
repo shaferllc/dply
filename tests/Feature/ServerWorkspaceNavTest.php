@@ -201,6 +201,49 @@ test('route gate fails open when stack summary is unknown', function () {
         ->assertOk();
 });
 
+test('database role server gets focused sidebar without sites or webserver', function () {
+    $server = serverWithoutProvisionArtifact();
+    $server->update([
+        'meta' => array_merge(is_array($server->meta) ? $server->meta : [], [
+            'server_role' => 'database',
+            'install_profile' => 'database_node',
+            'database' => 'postgres17',
+        ]),
+    ]);
+
+    $keys = array_column(server_workspace_nav_for_server($server->fresh()), 'key');
+    $items = collect(server_workspace_nav_for_server($server->fresh()))->keyBy('key');
+
+    expect($keys)->toContain('overview', 'databases', 'backups', 'monitor', 'firewall', 'settings');
+    expect($keys)->not->toContain('sites', 'webserver', 'caches', 'php', 'daemons', 'cert-inventory');
+    expect($items['databases']['label'] ?? null)->toBe('Database');
+    expect($items['databases']['group'] ?? null)->toBe('overview');
+});
+
+test('route gate allows databases for database role before engine tags exist', function () {
+    $server = serverWithStack([
+        'webserver' => 'none',
+        'php_version' => 'none',
+        'database' => 'none',
+        'cache_service' => 'none',
+        'expected_services' => ['ufw'],
+    ]);
+    $server->update([
+        'meta' => array_merge(is_array($server->meta) ? $server->meta : [], [
+            'server_role' => 'database',
+            'install_profile' => 'database_node',
+        ]),
+    ]);
+
+    $this->actingAs($server->user)
+        ->get(route('servers.databases', $server->fresh()))
+        ->assertOk();
+
+    $this->actingAs($server->user)
+        ->get(route('servers.sites', $server->fresh()))
+        ->assertNotFound();
+});
+
 function serverWithoutProvisionArtifact(): Server
 {
     $user = User::factory()->create();

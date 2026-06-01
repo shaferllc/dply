@@ -21,7 +21,15 @@ final class ListServerProviderCards
     use AsObject;
 
     /**
-     * @return list<array{id: string, label: string, linked: bool, server_count: int, site_count: int}>
+     * @return list<array{
+     *     id: string,
+     *     label: string,
+     *     linked: bool,
+     *     server_count: int,
+     *     site_count: int,
+     *     installed_roles: list<array{id: string, label: string, count: int}>,
+     *     installed_locations: list<array{region: string, label: string, count: int}>
+     * }>
      */
     public function handle(?Organization $org): array
     {
@@ -31,6 +39,9 @@ final class ListServerProviderCards
 
         $serverCounts = $this->serverCountsByProvider($org);
         $siteCounts = $this->siteCountsByProvider($org);
+        $existingServers = ListExistingProviderServers::make();
+        $installedRoles = $existingServers->rolesByProvider($org);
+        $installedLocations = $existingServers->locationsByProvider($org);
 
         $cards = [];
         foreach ($this->definitions() as $def) {
@@ -45,6 +56,8 @@ final class ListServerProviderCards
                 'linked' => $def['id'] === 'custom' || ($pkey !== null && $grouped->has($pkey)),
                 'server_count' => (int) ($serverCounts[$countKey] ?? 0),
                 'site_count' => (int) ($siteCounts[$countKey] ?? 0),
+                'installed_roles' => $installedRoles[$countKey] ?? [],
+                'installed_locations' => $installedLocations[$countKey] ?? [],
             ];
         }
 

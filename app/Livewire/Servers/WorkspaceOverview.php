@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseBackup;
+use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteFileBackup;
@@ -26,6 +27,7 @@ use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\CacheServiceStats;
+use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\SharedHostReport;
 use App\Support\Servers\SupervisorQueueProgramTypes;
@@ -271,6 +273,8 @@ class WorkspaceOverview extends Component
         );
         $serverRole = (string) ($this->server->meta['server_role'] ?? '');
         $isCacheRoleHost = in_array($serverRole, ['redis', 'valkey'], true);
+        $isDatabaseRoleHost = $serverRole === 'database';
+        $isDedicatedServiceRoleHost = $isCacheRoleHost || $isDatabaseRoleHost;
         $monitorInstalled = $latestMetricSnapshot !== null
             && is_array($latestMetricSnapshot->payload ?? null)
             && isset($latestMetricSnapshot->payload['cpu_pct']);
@@ -306,6 +310,52 @@ class WorkspaceOverview extends Component
             }
         }
 
+        // Tile pack for database-role Overview (server_role database). Uses
+        // control-plane rows only — no SSH probe — so the page stays fast
+        // and works before the engine finishes installing.
+        $databaseTileData = null;
+        if ($isDatabaseRoleHost) {
+            $installedStack = InstalledStack::fromMeta($this->server);
+            $engineRows = ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('status', [
+                    ServerDatabaseEngine::STATUS_RUNNING,
+                    ServerDatabaseEngine::STATUS_STOPPED,
+                    ServerDatabaseEngine::STATUS_INSTALLING,
+                    ServerDatabaseEngine::STATUS_PENDING,
+                ])
+                ->get();
+            $engineRow = $engineRows
+                ->sortByDesc(fn (ServerDatabaseEngine $row) => $row->status === ServerDatabaseEngine::STATUS_RUNNING ? 1 : 0)
+                ->first();
+            $engineKey = $engineRow?->engine
+                ?? (is_string($installedStack->database) && $installedStack->database !== 'none'
+                    ? strtolower((string) preg_replace('/\d+$/', '', $installedStack->database))
+                    : null);
+            $engineLabel = $engineKey !== null
+                ? (DatabaseEngineInfo::for($engineKey)['label'] ?? ucfirst($engineKey))
+                : __('Database engine');
+            $databaseTileData = [
+                'engine' => $engineKey,
+                'engine_label' => $engineLabel,
+                'version' => $engineRow?->version ?? $installedStack->databaseVersion,
+                'status' => $engineRow?->status,
+                'database_count' => $databaseSummary['count'],
+                'active_schedules' => $backgroundSummary['active_schedules'],
+                'paused_schedules' => $backgroundSummary['paused_schedules'],
+                'failed_backups_7d' => $backgroundSummary['failed_backups_7d'],
+            ];
+        }
+        $databaseEngineInstalled = $isDatabaseRoleHost
+            ? ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('status', [
+                    ServerDatabaseEngine::STATUS_RUNNING,
+                    ServerDatabaseEngine::STATUS_STOPPED,
+                ])
+                ->exists()
+            : false;
+
         $onboardingSteps = [];
         if (! $isContainerHostForChecklist) {
             $onboardingSteps[] = [
@@ -329,6 +379,16 @@ class WorkspaceOverview extends Component
                 'done' => $cacheEngineInstalled,
                 'cta_label' => __('Open Caches'),
                 'cta_route' => route('servers.caches', $this->server),
+            ];
+        } elseif ($isDatabaseRoleHost) {
+            $engineLabel = $databaseTileData['engine_label'] ?? __('Database engine');
+            $onboardingSteps[] = [
+                'key' => 'first_database_engine',
+                'label' => __('Install :engine', ['engine' => $engineLabel]),
+                'help' => __('Provision the database engine apt + systemd on this host.'),
+                'done' => $databaseEngineInstalled,
+                'cta_label' => __('Open Database'),
+                'cta_route' => route('servers.databases', $this->server),
             ];
         } else {
             $onboardingSteps[] = [
@@ -452,6 +512,9 @@ class WorkspaceOverview extends Component
                 : null,
             'cacheTileData' => $cacheTileData,
             'cacheTileEngine' => $cacheTileEngine,
+            'databaseTileData' => $databaseTileData,
+            'isDedicatedServiceRoleHost' => $isDedicatedServiceRoleHost,
+            'isDatabaseRoleHost' => $isDatabaseRoleHost,
         ]);
     }
 

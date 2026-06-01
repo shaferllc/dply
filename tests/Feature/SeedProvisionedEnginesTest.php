@@ -15,6 +15,40 @@ use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
+test('seeds initial database row and firewall rule from database_server meta', function () {
+    $password = 'SeedDb-Password12';
+    $server = makeServer([
+        'meta' => [
+            'server_role' => 'database',
+            'database' => 'postgres17',
+            'database_server' => [
+                'remote_access' => true,
+                'allowed_from' => '10.20.0.0/16',
+                'database_name' => 'analytics',
+                'username' => 'dply_app',
+                'password_encrypted' => Crypt::encryptString($password),
+            ],
+        ],
+    ]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['database_row_created'])->toBeTrue();
+
+    $this->assertDatabaseHas('server_databases', [
+        'server_id' => $server->id,
+        'name' => 'analytics',
+        'engine' => 'postgres',
+        'username' => 'dply_app',
+    ]);
+
+    $this->assertDatabaseHas('server_firewall_rules', [
+        'server_id' => $server->id,
+        'port' => 5432,
+        'source' => '10.20.0.0/16',
+        'action' => 'allow',
+    ]);
+});
 test('seeds cache auth password and firewall rule from meta', function () {
     $password = 'SeedCache-Password12';
     $server = makeServer([
@@ -64,7 +98,7 @@ test('seeds cache and database rows from meta', function () {
     ]);
     $this->assertDatabaseHas('server_database_engines', [
         'server_id' => $server->id,
-        'engine' => 'postgres18',
+        'engine' => 'postgres',
         'is_default' => true,
         'status' => ServerDatabaseEngine::STATUS_RUNNING,
         'port' => 5432,
@@ -157,12 +191,12 @@ test('uses correct default port per database engine', function () {
 
     $this->assertDatabaseHas('server_database_engines', [
         'server_id' => $sqliteServer->id,
-        'engine' => 'sqlite3',
+        'engine' => 'sqlite',
         'port' => 0,
     ]);
     $this->assertDatabaseHas('server_database_engines', [
         'server_id' => $mariadbServer->id,
-        'engine' => 'mariadb1011',
+        'engine' => 'mariadb',
         'port' => 3306,
     ]);
 });
@@ -189,7 +223,7 @@ test('backfill command seeds matching server only', function () {
 
     expect($exit)->toBe(0);
     $this->assertDatabaseHas('server_cache_services', ['server_id' => $target->id, 'engine' => 'redis']);
-    $this->assertDatabaseHas('server_database_engines', ['server_id' => $target->id, 'engine' => 'postgres18']);
+    $this->assertDatabaseHas('server_database_engines', ['server_id' => $target->id, 'engine' => 'postgres']);
     $this->assertDatabaseMissing('server_cache_services', ['server_id' => $other->id]);
     $this->assertDatabaseMissing('server_database_engines', ['server_id' => $other->id]);
 });
@@ -205,7 +239,7 @@ test('backfill command seeds all ready servers', function () {
 
     expect($exit)->toBe(0);
     $this->assertDatabaseHas('server_cache_services', ['server_id' => $first->id, 'engine' => 'redis']);
-    $this->assertDatabaseHas('server_database_engines', ['server_id' => $second->id, 'engine' => 'postgres18']);
+    $this->assertDatabaseHas('server_database_engines', ['server_id' => $second->id, 'engine' => 'postgres']);
 
     // Only servers in setup_status=done get seeded — pending/running servers are mid-provision
     // and will be handled by the post-provision hook when they finish.

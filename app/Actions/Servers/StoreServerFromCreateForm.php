@@ -166,6 +166,11 @@ final class StoreServerFromCreateForm
             cacheAllowedFrom: $form->cache_allowed_from,
             cacheRequirePassword: $form->cache_require_password,
             cachePassword: $form->cache_password !== '' ? $form->cache_password : null,
+            databaseRemoteAccess: $form->database_remote_access,
+            databaseAllowedFrom: $form->database_allowed_from,
+            databaseInitialName: $form->database_initial_name,
+            databaseUsername: $form->database_username,
+            databasePassword: $form->database_password !== '' ? $form->database_password : null,
         );
 
         // Provider-mode Docker hosts: tag the meta so Server::hostKind() returns

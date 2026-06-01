@@ -42,6 +42,7 @@ class ServerDatabaseHostCapabilities
     {
         Cache::forget('server.'.$server->id.'.database_host_capabilities_v3');
         Cache::forget('server.'.$server->id.'.database_host_capabilities_v4');
+        Cache::forget('server.'.$server->id.'.database_host_capabilities_v5');
     }
 
     /**

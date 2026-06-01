@@ -408,3 +408,53 @@ test('build uses operational public key for deploy user bootstrap when present',
     $this->assertStringContainsString(base64_encode((string) $server->openSshPublicKeyFromOperationalPrivate()), $joined);
     $this->assertStringNotContainsString(base64_encode((string) $server->openSshPublicKeyFromRecoveryPrivate()), $joined);
 });
+
+test('build database role installs postgres only and ignores stale cache meta', function () {
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::Hetzner,
+        'meta' => [
+            'server_role' => 'database',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'postgres18',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    $commands = app(ServerProvisionCommandBuilder::class)->build($server);
+    $joined = implode("\n", $commands);
+
+    expect($joined)->toContain('postgresql')
+        ->and($joined)->toContain('cache=none')
+        ->and($joined)->not->toContain('redis-server')
+        ->and($joined)->not->toContain('redis-cli ping');
+});
+
+test('build database role with remote access opens port and bootstraps credentials', function () {
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::Hetzner,
+        'meta' => [
+            'server_role' => 'database',
+            'webserver' => 'none',
+            'php_version' => 'none',
+            'database' => 'postgres17',
+            'cache_service' => 'none',
+            'database_server' => [
+                'remote_access' => true,
+                'allowed_from' => '10.0.0.0/8',
+                'database_name' => 'app',
+                'username' => 'dply_app',
+                'password_encrypted' => encrypt('RemoteDb-Password12'),
+            ],
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    expect($joined)->toContain('dply_write_file')
+        ->and($joined)->toContain('host all all 10.0.0.0/8 scram-sha-256')
+        ->and($joined)->toContain('ufw allow from')
+        ->and($joined)->toContain('5432')
+        ->and($joined)->toContain('CREATE DATABASE app')
+        ->and($joined)->not->toContain('ufw deny 5432/tcp');
+});

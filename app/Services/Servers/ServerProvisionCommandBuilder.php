@@ -8,6 +8,7 @@ use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
 use App\Models\UserSshKey;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 
 /**
  * Builds a bash script (list of lines) from servers.meta stack fields set at create time.
@@ -69,6 +70,9 @@ final class ServerProvisionCommandBuilder
         $php = $this->coalesceId('php_versions', $meta['php_version'] ?? null, '8.3');
         $database = $this->coalesceId('databases', $meta['database'] ?? null, 'mysql84');
         $cache = $this->coalesceId('cache_services', $meta['cache_service'] ?? null, 'redis');
+        if ($role === 'database') {
+            $cache = 'none';
+        }
         $layout = $this->deployLayout($server);
 
         $lines = [];
@@ -732,11 +736,23 @@ final class ServerProvisionCommandBuilder
      */
     private function roleDatabase(string $database, array $layout): array
     {
+        $config = DedicatedDatabaseServerProvisionConfig::fromServer($this->server, $database);
+
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
-        $lines[] = 'ufw deny 3306/tcp || true';
-        $lines[] = 'ufw deny 5432/tcp || true';
+
+        if ($config->remoteAccess && DedicatedDatabaseServerProvisionConfig::engineSupportsRemoteAccess($database)) {
+            $lines = array_merge($lines, $config->bootstrapLines());
+            $lines = array_merge($lines, $config->ufwAllowLines());
+        } else {
+            $lines[] = 'ufw deny 3306/tcp || true';
+            $lines[] = 'ufw deny 5432/tcp || true';
+            if (DedicatedDatabaseServerProvisionConfig::supportsBootstrapCredentials($database)) {
+                $lines = array_merge($lines, $config->bootstrapLines());
+            }
+        }
+
         $lines = array_merge($lines, $this->writeRenderedConfigs('database', 'none', 'none', $layout));
 
         return $lines;
@@ -1704,16 +1720,18 @@ APACHE,
             $checks['mysql'] = 'systemctl is-active mysql || systemctl is-active mariadb';
         }
 
-        if ($cache === 'redis') {
-            $checks['redis'] = 'redis-cli ping';
-        } elseif ($cache === 'valkey') {
-            $checks['valkey'] = 'valkey-cli ping || redis-cli ping';
-        } elseif ($cache === 'memcached') {
-            $checks['memcached'] = 'systemctl is-active memcached';
-        } elseif ($cache === 'keydb') {
-            $checks['keydb'] = 'keydb-cli ping 2>/dev/null || redis-cli ping';
-        } elseif ($cache === 'dragonfly') {
-            $checks['dragonfly'] = 'systemctl is-active dragonfly && redis-cli ping';
+        if ($role !== 'database') {
+            if ($cache === 'redis') {
+                $checks['redis'] = 'redis-cli ping';
+            } elseif ($cache === 'valkey') {
+                $checks['valkey'] = 'valkey-cli ping || redis-cli ping';
+            } elseif ($cache === 'memcached') {
+                $checks['memcached'] = 'systemctl is-active memcached';
+            } elseif ($cache === 'keydb') {
+                $checks['keydb'] = 'keydb-cli ping 2>/dev/null || redis-cli ping';
+            } elseif ($cache === 'dragonfly') {
+                $checks['dragonfly'] = 'systemctl is-active dragonfly && redis-cli ping';
+            }
         }
 
         if ($role === 'load_balancer') {

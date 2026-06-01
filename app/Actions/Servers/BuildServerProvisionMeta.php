@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 use Illuminate\Support\Facades\Crypt;
 
 /**
@@ -32,6 +33,11 @@ final class BuildServerProvisionMeta
         string $cacheAllowedFrom = '',
         bool $cacheRequirePassword = false,
         ?string $cachePassword = null,
+        bool $databaseRemoteAccess = false,
+        string $databaseAllowedFrom = '',
+        string $databaseInitialName = 'app',
+        string $databaseUsername = 'dply_app',
+        ?string $databasePassword = null,
     ): array {
         $meta = [
             'install_profile' => $installProfile,
@@ -59,6 +65,21 @@ final class BuildServerProvisionMeta
             }
 
             $meta['cache_server'] = $cacheServerMeta;
+        }
+
+        if ($serverRole === 'database' && DedicatedDatabaseServerProvisionConfig::supportsBootstrapCredentials($database)) {
+            $databaseServerMeta = [
+                'remote_access' => $databaseRemoteAccess,
+                'allowed_from' => trim($databaseAllowedFrom),
+                'database_name' => trim($databaseInitialName),
+                'username' => trim($databaseUsername),
+            ];
+
+            if (is_string($databasePassword) && $databasePassword !== '') {
+                $databaseServerMeta['password_encrypted'] = Crypt::encryptString($databasePassword);
+            }
+
+            $meta['database_server'] = $databaseServerMeta;
         }
 
         return $meta;

@@ -6,6 +6,7 @@
 @php
     $regionOptions = collect($catalog['regions'] ?? [])->values();
     $selectedRegionOption = $regionOptions->firstWhere('value', $form->region);
+    $existingServersByRegion = $existingServersByRegion ?? [];
     $digitalOceanRegionMarkers = collect([
         ['value' => 'nyc1', 'label' => 'New York', 'top' => '34%', 'left' => '29%'],
         ['value' => 'nyc2', 'label' => 'New York', 'top' => '34%', 'left' => '29%'],
@@ -153,6 +154,12 @@
                                     <div class="min-w-0">
                                         <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
                                         <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                        @if (($existingServersByRegion[$regionOption['value']] ?? 0) > 0)
+                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest ring-1 ring-brand-sage/20">
+                                                <x-heroicon-o-server-stack class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ trans_choice(':count server here|:count servers here', $existingServersByRegion[$regionOption['value']], ['count' => $existingServersByRegion[$regionOption['value']]]) }}
+                                            </div>
+                                        @endif
                                     </div>
                                 </div>
                             </button>
@@ -211,6 +218,12 @@
                                                     <div class="min-w-0">
                                                         <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
                                                         <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                                        @if (($existingServersByRegion[$regionOption['value']] ?? 0) > 0)
+                                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest ring-1 ring-brand-sage/20">
+                                                                <x-heroicon-o-server-stack class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                                {{ trans_choice(':count server here|:count servers here', $existingServersByRegion[$regionOption['value']], ['count' => $existingServersByRegion[$regionOption['value']]]) }}
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                 </div>
                                             </button>
