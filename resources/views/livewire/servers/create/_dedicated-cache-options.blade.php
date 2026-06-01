@@ -285,32 +285,42 @@
 
         @if ($networkMode === 'remote' && $supportsRemote)
             <div class="mt-4 rounded-xl border border-brand-sage/25 bg-white p-4">
-                <x-input-label for="cache_allowed_from" :value="__('Allow from (CIDR)')" />
-                <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <x-input-label for="cache_allowed_from" :value="__('Allow from (CIDRs / IPs)')" />
+                <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start">
                     <x-text-input
                         id="cache_allowed_from"
                         wire:model.live.debounce.400ms="form.cache_allowed_from"
                         type="text"
                         @class([
-                            'block w-full font-mono text-sm sm:max-w-xs',
+                            'block w-full font-mono text-sm sm:max-w-sm',
                             'border-amber-400 ring-amber-200/80' => $form->cache_allowed_from === '' || ! \App\Support\Servers\DedicatedCacheServerProvisionConfig::isAllowedSourceCidr($form->cache_allowed_from),
                         ])
-                        placeholder="10.0.0.0/8"
+                        placeholder="10.0.0.0/8, 203.0.113.42/32"
                         autocomplete="off"
                     />
                     <div class="flex flex-wrap gap-1.5">
                         @foreach (['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'] as $exampleCidr)
                             <button
                                 type="button"
-                                wire:click="$set('form.cache_allowed_from', '{{ $exampleCidr }}')"
+                                wire:click="$set('form.cache_allowed_from', trim('{{ $form->cache_allowed_from }}' === '' ? '{{ $exampleCidr }}' : '{{ $form->cache_allowed_from }}, {{ $exampleCidr }}', ', '))"
                                 class="rounded-full bg-brand-sand/40 px-2.5 py-1 font-mono text-[11px] font-medium text-brand-forest transition hover:bg-brand-sage/15 hover:ring-1 hover:ring-brand-sage/30"
                             >
-                                {{ $exampleCidr }}
+                                + {{ $exampleCidr }}
                             </button>
                         @endforeach
+                        @if (! empty($operatorPublicIp ?? null))
+                            <button
+                                type="button"
+                                wire:click="$set('form.cache_allowed_from', trim('{{ $form->cache_allowed_from }}' === '' ? '{{ $operatorPublicIp }}/32' : '{{ $form->cache_allowed_from }}, {{ $operatorPublicIp }}/32', ', '))"
+                                class="rounded-full bg-emerald-50 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-200 transition hover:bg-emerald-100"
+                                title="{{ __('Add this browser\'s current public IP') }}"
+                            >
+                                + {{ __('your IP') }} ({{ $operatorPublicIp }}/32)
+                            </button>
+                        @endif
                     </div>
                 </div>
-                <p class="mt-2 text-xs text-brand-mist">{{ __('Private ranges only — 0.0.0.0/0 is blocked from this wizard.') }}</p>
+                <p class="mt-2 text-xs text-brand-mist">{{ __('Comma- or space-separated. Each entry can be an IP (203.0.113.42) or CIDR (10.0.0.0/8). Private ranges work too. 0.0.0.0/0 is blocked from this wizard — to open to the world, set the rule manually after provision.') }}</p>
                 @if ($form->cache_allowed_from === '')
                     <p class="mt-2 inline-flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950 ring-1 ring-amber-200/80">
                         <x-heroicon-m-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

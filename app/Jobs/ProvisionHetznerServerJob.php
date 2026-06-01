@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\HetznerService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\HetznerCloudFirewallRules;
 use App\Support\Servers\ServerHostingPlatformContext;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -72,13 +73,42 @@ class ProvisionHetznerServerJob implements ShouldQueue
                 : (ServerImageCatalog::resolveForServer($this->server, 'hetzner')
                     ?? config('services.hetzner.default_image', 'ubuntu-24.04'));
 
+            // Ensure a dply-managed Cloud Firewall that allows SSH (and the
+            // server's service ports) BEFORE create, then attach it at boot so
+            // the box is reachable atomically. Hetzner projects that carry any
+            // Cloud Firewall otherwise drop inbound 22 at the edge — UFW on the
+            // box never sees the packets. Best-effort: a firewall hiccup must
+            // not fail the whole provision, so we fall back to no managed
+            // firewall (same reachability as before this feature).
+            $firewallId = null;
+            if ((bool) config('services.hetzner.manage_cloud_firewall', true)) {
+                try {
+                    $firewallName = 'dply-'.$this->server->id;
+                    $rules = HetznerCloudFirewallRules::forServer($this->server);
+                    $existing = $hetzner->findFirewallByName($firewallName);
+                    if ($existing !== null && isset($existing['id'])) {
+                        $firewallId = (int) $existing['id'];
+                        $hetzner->setFirewallRules($firewallId, $rules);
+                    } else {
+                        $firewallId = $hetzner->createFirewall($firewallName, $rules);
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('Hetzner cloud firewall ensure failed; provisioning without managed firewall', [
+                        'server_id' => $this->server->id,
+                        'message' => $e->getMessage(),
+                    ]);
+                    $firewallId = null;
+                }
+            }
+
             $id = $hetzner->createInstance(
                 name: $this->server->name,
                 location: $this->server->region,
                 serverType: $this->server->size,
                 image: $image,
                 sshKeyIds: [$sshKeyId],
-                userData: ''
+                userData: '',
+                firewallIds: $firewallId !== null ? [$firewallId] : []
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));
@@ -95,11 +125,13 @@ class ProvisionHetznerServerJob implements ShouldQueue
             'ssh_user' => config('services.hetzner.ssh_user', 'root'),
         ]);
 
-        if (isset($this->server->meta['provision_error'])) {
-            $cleared = $this->server->meta;
-            unset($cleared['provision_error']);
-            $this->server->update(['meta' => $cleared]);
+        $metaUpdates = is_array($this->server->meta) ? $this->server->meta : [];
+        unset($metaUpdates['provision_error']);
+        if ($firewallId !== null) {
+            // Recorded so DeleteServerAction can tear the firewall down with the server.
+            $metaUpdates['hetzner_firewall_id'] = $firewallId;
         }
+        $this->server->update(['meta' => $metaUpdates]);
 
         PollHetznerIpJob::dispatch($this->server)->delay(now()->addSeconds(15));
     }

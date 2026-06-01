@@ -18,6 +18,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerCacheServiceAuditEvent;
+use App\Models\ServerCacheServiceReplication;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -32,10 +33,14 @@ use App\Support\Servers\CacheServiceKeyExplorer;
 use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServiceNetworkExposure;
+use App\Support\Servers\CacheServicePersistence;
 use App\Support\Servers\CacheServicePort;
+use App\Support\Servers\CacheServiceReplicaSetup;
+use App\Support\Servers\CacheServiceReplication;
 use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\CacheWorkspaceViewData;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -118,6 +123,18 @@ class WorkspaceCaches extends Component
     public ?string $cacheClientsError = null;
 
     /**
+     * Slowlog entries for the Stats subtab card, populated by {@see loadSlowlog}.
+     * Null until first load; `[]` when the engine returns an empty ring buffer
+     * (the operationally happy case — no commands have crossed the slowlog
+     * threshold). Errors surface via $slowlogError.
+     *
+     * @var list<array{id: int, at: CarbonImmutable, duration_us: int, command: string, client_addr: string, client_name: string}>|null
+     */
+    public ?array $slowlogEntries = null;
+
+    public ?string $slowlogError = null;
+
+    /**
      * Page size + current page for the CLIENT LIST table. Pagination is
      * client-side (we already have the full list in memory) so prev/next
      * doesn't re-SSH — the snapshot is cheap to slice. Reset to page 1 on
@@ -136,6 +153,61 @@ class WorkspaceCaches extends Component
     public string $cache_maxmemory_policy = 'noeviction';
 
     public ?string $cacheMemoryError = null;
+
+    /**
+     * Live persistence state for the Configure-subtab card (RDB save schedule,
+     * AOF status, last save time, BGSAVE in progress). Null until first load via
+     * {@see loadPersistenceState}. Errors surface via $persistenceError.
+     *
+     * @var array{
+     *     reachable: bool,
+     *     aof_enabled: ?bool,
+     *     aof_size_bytes: ?int,
+     *     aof_last_rewrite_at: ?CarbonImmutable,
+     *     rdb_last_save_at: ?CarbonImmutable,
+     *     rdb_bgsave_in_progress: ?bool,
+     *     save_schedule: list<array{seconds: int, changes: int}>,
+     *     raw_save: ?string,
+     * }|null
+     */
+    public ?array $persistenceState = null;
+
+    public ?string $persistenceError = null;
+
+    /**
+     * Live replication state for the Stats-subtab card: role (master/replica),
+     * connected replicas, master link status if this engine is a replica.
+     * Loaded lazily via wire:init on the Stats subtab; refreshed by wire:poll.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $replicationState = null;
+
+    public ?string $replicationError = null;
+
+    /** Modal: candidate replica server picker (server_id of target). */
+    public string $addReplicaTargetServerId = '';
+
+    /** Modal: operator-confirmed wipe of target if it has keys. */
+    public bool $addReplicaWipeAcknowledged = false;
+
+    /**
+     * Form input for the CACHE_PREFIX editor on the Connection Details card.
+     * Persisted on the row's cache_prefix column via {@see setCachePrefix}.
+     * Client-side concern only — Laravel's cache driver prepends this to every
+     * key before writing/reading; Redis itself doesn't enforce or know about it.
+     * Common values: app slug ("acme_") for single-app, env tag ("prod_cache_")
+     * for env separation.
+     */
+    public string $cache_prefix_input = '';
+
+    /**
+     * RDB save-schedule editor input. Space-separated `seconds changes` pairs —
+     * e.g. "3600 1 300 100" snapshots every 3600s after 1 change or every 300s
+     * after 100 changes. Empty disables RDB entirely. Populated from
+     * persistence state on subtab mount.
+     */
+    public string $rdb_save_schedule = '';
 
     /** Current REPL input value (cleared after each successful run). */
     public string $replInput = '';
@@ -364,6 +436,15 @@ class WorkspaceCaches extends Component
             $this->cacheConfigDraft = '';
             $this->cacheClients = null;
             $this->cacheClientsError = null;
+            $this->slowlogEntries = null;
+            $this->slowlogError = null;
+            $this->persistenceState = null;
+            $this->persistenceError = null;
+            $this->rdb_save_schedule = '';
+            $this->replicationState = null;
+            $this->replicationError = null;
+            $this->addReplicaTargetServerId = '';
+            $this->addReplicaWipeAcknowledged = false;
             $this->cacheMemoryLoaded = false;
             $this->cache_maxmemory = '';
             $this->cache_maxmemory_policy = 'noeviction';
@@ -1389,6 +1470,560 @@ BASH,
         $this->cacheClients = null;
         $this->cacheClientsError = null;
         $this->cacheClientsPage = 1;
+    }
+
+    /**
+     * Pull the engine's top-32 slowlog entries (SLOWLOG GET 32). Cached server-side
+     * for {@see CacheServiceSlowlog} TTL so a wire:poll cycle doesn't hammer SSH.
+     * Empty result + null error = engine is healthy; no commands have crossed the
+     * `slowlog-log-slower-than` threshold (10ms default) in the ring buffer.
+     */
+    public function loadSlowlog(\App\Support\Servers\CacheServiceSlowlog $slowlog): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->slowlogError = __('Switch to an engine tab to view its slowlog.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->slowlogError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->slowlogError = __(':engine has no slowlog equivalent.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $this->slowlogError = null;
+        $this->slowlogEntries = $slowlog->entries($row->server, $row);
+    }
+
+    /**
+     * Clear the engine's slowlog ring buffer. Audited via EVENT_SLOWLOG_RESET so an
+     * operator's "clean state, start observing fresh" intent is recoverable from
+     * the audit log if a perf investigation follows.
+     */
+    public function resetSlowlog(\App\Support\Servers\CacheServiceSlowlog $slowlog, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to reset its slowlog.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__(':engine has no slowlog equivalent.', ['engine' => $row->engine]));
+
+            return;
+        }
+
+        if (! $slowlog->reset($row->server, $row)) {
+            $this->toastError(__('Slowlog reset failed. Engine may be unreachable.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_SLOWLOG_RESET,
+            ['engine' => $row->engine, 'name' => $row->name],
+            auth()->user(),
+        );
+
+        $this->slowlogEntries = [];
+        $this->slowlogError = null;
+        $this->toastSuccess(__('Slowlog cleared on :engine.', ['engine' => $row->engine]));
+    }
+
+    /**
+     * Lazy-load the persistence card data (RDB schedule, AOF on/off, last save).
+     * Called via wire:init from the persistence card template.
+     */
+    public function loadPersistenceState(CacheServicePersistence $persistence): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->persistenceError = __('Switch to an engine tab to view its persistence state.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->persistenceError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->persistenceError = __(':engine has no persistence model.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $state = $persistence->state($row->server, $row);
+        $this->persistenceState = $state;
+        $this->persistenceError = null;
+        if ($state['raw_save'] !== null && $this->rdb_save_schedule === '') {
+            $this->rdb_save_schedule = $state['raw_save'];
+        }
+    }
+
+    public function triggerBgsave(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to trigger BGSAVE.'));
+
+            return;
+        }
+
+        if (! $persistence->bgsave($row->server, $row)) {
+            $this->toastError(__('BGSAVE failed. Engine may be unreachable.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_BGSAVE,
+            ['engine' => $row->engine, 'name' => $row->name],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess(__('BGSAVE queued on :engine.', ['engine' => $row->engine]));
+    }
+
+    public function triggerBgrewriteaof(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to trigger BGREWRITEAOF.'));
+
+            return;
+        }
+
+        if (! $persistence->bgrewriteaof($row->server, $row)) {
+            $this->toastError(__('BGREWRITEAOF failed. Engine may be unreachable.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_BGREWRITEAOF,
+            ['engine' => $row->engine, 'name' => $row->name],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess(__('BGREWRITEAOF queued on :engine.', ['engine' => $row->engine]));
+    }
+
+    public function toggleAofPersistence(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to toggle AOF.'));
+
+            return;
+        }
+
+        $current = (bool) ($this->persistenceState['aof_enabled'] ?? false);
+        $next = ! $current;
+
+        if (! $persistence->setAofEnabled($row->server, $row, $next)) {
+            $this->toastError(__('AOF toggle failed. Check the engine logs.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_AOF_TOGGLED,
+            ['engine' => $row->engine, 'name' => $row->name, 'enabled' => $next],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess($next
+            ? __('AOF enabled on :engine.', ['engine' => $row->engine])
+            : __('AOF disabled on :engine.', ['engine' => $row->engine])
+        );
+    }
+
+    public function saveRdbSchedule(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to edit the RDB schedule.'));
+
+            return;
+        }
+
+        // Parse space-separated `secs changes` pairs from the textarea. Validate
+        // each pair before sending — easier than apologising to a Redis that
+        // refused the new config and restarted with the old one.
+        $raw = trim($this->rdb_save_schedule);
+        $tokens = $raw === '' ? [] : (preg_split('/\s+/', $raw) ?: []);
+        if (count($tokens) % 2 !== 0) {
+            $this->addError('rdb_save_schedule', __('Schedule must be space-separated <seconds> <changes> pairs.'));
+
+            return;
+        }
+        $schedule = [];
+        for ($i = 0, $n = count($tokens); $i < $n; $i += 2) {
+            $secs = (int) $tokens[$i];
+            $changes = (int) $tokens[$i + 1];
+            if ($secs <= 0 || $changes <= 0) {
+                $this->addError('rdb_save_schedule', __('Each <seconds> and <changes> must be positive integers.'));
+
+                return;
+            }
+            $schedule[] = ['seconds' => $secs, 'changes' => $changes];
+        }
+
+        if (! $persistence->setSaveSchedule($row->server, $row, $schedule)) {
+            $this->toastError(__('RDB schedule save failed. Check the engine logs.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_RDB_SCHEDULE_SAVED,
+            ['engine' => $row->engine, 'name' => $row->name, 'schedule' => $schedule],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess(__('RDB schedule saved on :engine.', ['engine' => $row->engine]));
+    }
+
+    /**
+     * Read-only INFO replication parse. Renders the Stats-subtab Replication card —
+     * role (master/replica), connected replicas (master side), master link status
+     * (replica side). Mutating actions (REPLICAOF, add-replica wizard) come in 4b.
+     */
+    public function loadReplicationState(CacheServiceReplication $replication): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->replicationError = __('Switch to an engine tab to view its replication state.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->replicationError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->replicationError = __(':engine has no replication.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $this->replicationError = null;
+        $this->replicationState = $replication->snapshot($row->server, $row);
+    }
+
+    /**
+     * Submit the Add-Replica modal: validate the target, then attach via the
+     * orchestrator (network exposure → REPLICAOF → poll for master_link_status=up).
+     * On any step failure the orchestrator rolls back the replica config.
+     */
+    public function submitAddReplica(
+        CacheServiceReplicaSetup $setup,
+        CacheServiceAuditLogger $audits,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $masterRow = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $masterRow || ! ServerCacheService::engineSupportsAuth($masterRow->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab on the master to add a replica.'));
+
+            return;
+        }
+
+        if ($this->addReplicaTargetServerId === '') {
+            $this->addError('addReplicaTargetServerId', __('Pick a target server.'));
+
+            return;
+        }
+
+        // Resolve the target server within the org. The picker scopes to
+        // redis/valkey role hosts so a stray app server can't be selected.
+        $targetServer = Server::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->whereKey($this->addReplicaTargetServerId)
+            ->first();
+        if (! $targetServer) {
+            $this->addError('addReplicaTargetServerId', __('Target server not found in your organization.'));
+
+            return;
+        }
+        if ($targetServer->id === $this->server->id) {
+            $this->addError('addReplicaTargetServerId', __('Cannot use the master as its own replica.'));
+
+            return;
+        }
+
+        // Find the matching engine row on the target.
+        $replicaRow = ServerCacheService::query()
+            ->where('server_id', $targetServer->id)
+            ->where('engine', $masterRow->engine)
+            ->first();
+        if (! $replicaRow) {
+            $this->addError('addReplicaTargetServerId', __('Target server has no :engine instance installed.', ['engine' => $masterRow->engine]));
+
+            return;
+        }
+
+        if (ServerCacheServiceReplication::query()->where('replica_cache_service_id', $replicaRow->id)->exists()) {
+            $this->addError('addReplicaTargetServerId', __('Target is already replicating from another master.'));
+
+            return;
+        }
+
+        // DBSIZE pre-check: refuse to wipe a non-empty target unless the
+        // operator ticked the acknowledgement checkbox. REPLICAOF flushes
+        // the target — operators have lost data this way before.
+        $dbsize = $this->checkReplicaDbSize($targetServer, $replicaRow);
+        if ($dbsize > 0 && ! $this->addReplicaWipeAcknowledged) {
+            $this->addError('addReplicaWipeAcknowledged', __('Target has :n keys. Replication WILL wipe them on attach. Tick the box to acknowledge.', ['n' => number_format($dbsize)]));
+
+            return;
+        }
+
+        try {
+            $row = $setup->attach($this->server, $masterRow, $targetServer, $replicaRow, (string) auth()->id());
+
+            $audits->record(
+                $this->server,
+                ServerCacheServiceAuditEvent::EVENT_REPLICA_ATTACHED,
+                [
+                    'master_cache_service_id' => $masterRow->id,
+                    'replica_cache_service_id' => $replicaRow->id,
+                    'replica_server_id' => $targetServer->id,
+                ],
+                auth()->user(),
+            );
+
+            $this->addReplicaTargetServerId = '';
+            $this->addReplicaWipeAcknowledged = false;
+            $this->replicationState = null;
+            $this->dispatch('close-modal', 'add-replica-modal');
+            $this->toastSuccess(__('Replica attached on :host.', ['host' => $targetServer->name]));
+        } catch (\Throwable $e) {
+            $audits->record(
+                $this->server,
+                ServerCacheServiceAuditEvent::EVENT_REPLICA_ATTACH_FAILED,
+                [
+                    'master_cache_service_id' => $masterRow->id,
+                    'replica_cache_service_id' => $replicaRow->id,
+                    'error' => $e->getMessage(),
+                ],
+                auth()->user(),
+            );
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    /**
+     * Detach a replica from this master. Caller invokes via the Replication
+     * card row's "Detach" button with the replication row id.
+     */
+    public function removeReplica(
+        string $replicationRowId,
+        CacheServiceReplicaSetup $setup,
+        CacheServiceAuditLogger $audits,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        $masterRow = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $masterRow) {
+            return;
+        }
+
+        $row = ServerCacheServiceReplication::query()
+            ->where('master_cache_service_id', $masterRow->id)
+            ->whereKey($replicationRowId)
+            ->first();
+        if (! $row) {
+            return;
+        }
+
+        $replica = $row->replicaCacheService;
+        $replicaServer = $replica?->server;
+        if (! $replica || ! $replicaServer) {
+            $row->delete();
+
+            return;
+        }
+
+        try {
+            $setup->detach($replicaServer, $replica, $row);
+            $audits->record(
+                $this->server,
+                ServerCacheServiceAuditEvent::EVENT_REPLICA_DETACHED,
+                [
+                    'master_cache_service_id' => $masterRow->id,
+                    'replica_cache_service_id' => $replica->id,
+                ],
+                auth()->user(),
+            );
+
+            $this->replicationState = null;
+            $this->toastSuccess(__('Replica detached.'));
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    /**
+     * Seed {@see $cache_prefix_input} with the row's current cache_prefix so the
+     * form shows the saved value on first render. Called via wire:init from the
+     * Connection Details card; no-op when the row is missing or the input has
+     * already been touched.
+     */
+    public function primeCachePrefix(): void
+    {
+        if ($this->cache_prefix_input !== '') {
+            return;
+        }
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if ($row && filled($row->cache_prefix)) {
+            $this->cache_prefix_input = (string) $row->cache_prefix;
+        }
+    }
+
+    /**
+     * Persist a Laravel-style cache key prefix on the current engine row. Surfaced
+     * via the Connection Details card on the Overview subtab; reflected in the
+     * Laravel `.env` and Docker Compose connection snippets as `CACHE_PREFIX=...`.
+     * No remote action — this is a label dply stores so the snippet operators
+     * paste matches the prefix they intend to use.
+     */
+    public function setCachePrefix(CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row) {
+            $this->toastError(__('Switch to an engine tab to set its cache prefix.'));
+
+            return;
+        }
+
+        $this->validate([
+            'cache_prefix_input' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-:]*$/'],
+        ], [], [
+            'cache_prefix_input' => __('cache prefix'),
+        ]);
+
+        $normalised = trim($this->cache_prefix_input);
+        $row->update(['cache_prefix' => $normalised === '' ? null : $normalised]);
+
+        $audits->record(
+            $row->server,
+            \App\Models\ServerCacheServiceAuditEvent::EVENT_CACHE_PREFIX_UPDATED,
+            ['engine' => $row->engine, 'name' => $row->name, 'value' => $normalised],
+            auth()->user(),
+        );
+
+        $this->toastSuccess($normalised === ''
+            ? __('Cache prefix cleared.')
+            : __('Cache prefix set to :v', ['v' => $normalised])
+        );
+    }
+
+    private function checkReplicaDbSize(Server $server, ServerCacheService $row): int
+    {
+        $cli = CacheServiceStats::binaryFor($row->engine);
+        $authFlag = filled($row->auth_password ?? null)
+            ? '-a '.escapeshellarg((string) $row->auth_password).' '
+            : '';
+
+        try {
+            $output = app(ExecuteRemoteTaskOnServer::class)->runInlineBash(
+                $server,
+                'cache-service:replica-dbsize:'.$row->engine,
+                $authFlag.escapeshellarg($cli).' -p '.(int) $row->port.' DBSIZE 2>/dev/null',
+                timeoutSeconds: 30,
+                asRoot: false,
+            );
+        } catch (\Throwable) {
+            return 0;
+        }
+
+        return $output->exitCode === 0 ? (int) trim($output->buffer) : 0;
     }
 
     /**
@@ -2665,6 +3300,32 @@ BASH;
             ->orderByDesc('created_at')
             ->first();
 
+        // Candidate replica servers for the Add-Replica modal: org-owned,
+        // redis/valkey role, READY, and not yet replicating from another master.
+        $availableReplicaServers = collect();
+        $activeReplications = collect();
+        if ($this->engine_subtab === 'stats') {
+            $availableReplicaServers = Server::query()
+                ->where('organization_id', $this->server->organization_id)
+                ->where('id', '!=', $this->server->id)
+                ->where('status', Server::STATUS_READY)
+                ->where(function ($q): void {
+                    $q->whereJsonContains('meta->server_role', 'redis')
+                        ->orWhereJsonContains('meta->server_role', 'valkey');
+                })
+                ->orderBy('name')
+                ->get();
+
+            $masterEngine = $this->currentEngineTab();
+            $masterRow = $masterEngine ? $this->cacheServiceFor($masterEngine) : null;
+            if ($masterRow) {
+                $activeReplications = ServerCacheServiceReplication::query()
+                    ->where('master_cache_service_id', $masterRow->id)
+                    ->with(['replicaCacheService.server'])
+                    ->get();
+            }
+        }
+
         return view('livewire.servers.workspace-caches', array_merge(
             CacheWorkspaceViewData::for($this->server, $this, $services),
             [
@@ -2680,6 +3341,8 @@ BASH;
                 'serviceActions' => config('server_manage.service_actions', []),
                 'manageActionRun' => $manageActionRun,
                 'deletionSummary' => null,
+                'availableReplicaServers' => $availableReplicaServers,
+                'activeReplications' => $activeReplications,
             ],
         ));
     }
@@ -2742,6 +3405,11 @@ BASH;
         $this->cache_maxmemory_policy = 'noeviction';
         $this->cacheMemoryError = null;
         $this->new_auth_password = '';
+        // Reset the cache_prefix editor so the next engine tab re-seeds from
+        // its own row via primeCachePrefix(). Without this, jumping from a
+        // Redis instance with prefix "app_a_" to a Valkey instance with no
+        // prefix would carry "app_a_" into the Valkey form by mistake.
+        $this->cache_prefix_input = '';
 
         // REPL + dashboard + key browser are scoped to the current engine, so
         // their buffers go away on tab change. The unlock toggle deliberately

@@ -16,7 +16,7 @@
     // worked when the app was co-located. Loopback stays as the fallback for
     // non-exposed engines and as the development pattern on app servers.
     $snippetIsExposed = false;
-    $snippetHost = '{{ $snippetHost }}';
+    $snippetHost = '127.0.0.1';
     if ($cacheService && in_array($engineKey, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
         try {
             $snippetIsExposed = app(\App\Support\Servers\CacheServiceNetworkExposure::class)->isExposed($cacheService);
@@ -28,6 +28,13 @@
             $snippetHost = $remoteHost;
         }
     }
+
+    // CACHE_PREFIX is a Laravel client-side concern — surfaced when the operator
+    // set one on the row via the Connection Details card. Empty string ("no
+    // prefix") renders as a placeholder comment so the .env template still tells
+    // the operator the variable exists.
+    $cachePrefixValue = $cacheService ? (string) ($cacheService->cache_prefix ?? '') : '';
+    $hasPrefix = $cachePrefixValue !== '';
 @endphp
 @if ($cacheService)
     <div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8" x-data="{ tab: 'laravel' }">
@@ -96,6 +103,10 @@ services:
                 $redisAuthArg = $hasAuth ? ", password: '".$authValue."'" : '';
                 $pyAuthArg = $hasAuth ? ", password='".$authValue."'" : '';
                 $dockerPasswordLine = $hasAuth ? "      REDIS_PASSWORD: '".$authValue."'" : '      # REDIS_PASSWORD not set on the engine';
+                $envCachePrefixLine = $hasPrefix ? 'CACHE_PREFIX='.$cachePrefixValue : '# CACHE_PREFIX=  # optional — Laravel prepends to every key, e.g. acme_cache_';
+                $dockerCachePrefixLine = $hasPrefix ? "      CACHE_PREFIX: '".$cachePrefixValue."'" : "      # CACHE_PREFIX: 'acme_cache_'  # optional Laravel key namespace";
+                $ioredisPrefixArg = $hasPrefix ? ", keyPrefix: '".$cachePrefixValue."'" : '';
+                $pyPrefixComment = $hasPrefix ? "\n# Apply prefix in-app: r.set(f'{prefix}{key}', v) — redis-py has no built-in prefix.\nprefix = '".$cachePrefixValue."'" : '';
             @endphp
             <div x-show="tab === 'laravel'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
@@ -103,6 +114,7 @@ CACHE_STORE=redis
 REDIS_HOST={{ $snippetHost }}
 REDIS_PORT={{ $cacheService->port }}
 REDIS_PASSWORD={{ $redisPassword }}
+{{ $envCachePrefixLine }}
 SESSION_DRIVER=redis
 QUEUE_CONNECTION=redis</pre>
             </div>
@@ -112,7 +124,7 @@ QUEUE_CONNECTION=redis</pre>
 import Redis from 'ioredis';
 const redis = new Redis({
     host: '{{ $snippetHost }}',
-    port: {{ $cacheService->port }}{{ $redisAuthArg }},
+    port: {{ $cacheService->port }}{{ $redisAuthArg }}{{ $ioredisPrefixArg }},
 });</pre>
             </div>
             <div x-show="tab === 'python'" x-cloak>
@@ -123,7 +135,7 @@ r = redis.Redis(
     host='{{ $snippetHost }}',
     port={{ $cacheService->port }}{{ $pyAuthArg }},
     decode_responses=True,
-)</pre>
+){{ $pyPrefixComment }}</pre>
             </div>
             <div x-show="tab === 'docker'" x-cloak>
                 <pre class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10 bg-zinc-50 p-4 font-mono text-xs text-brand-ink"># Engine: {{ $engineLabel }} on {{ $snippetHost }}:{{ $cacheService->port }}
@@ -134,7 +146,8 @@ services:
     environment:
       REDIS_HOST: {{ $snippetHost }}
       REDIS_PORT: '{{ $cacheService->port }}'
-{{ $dockerPasswordLine }}</pre>
+{{ $dockerPasswordLine }}
+{{ $dockerCachePrefixLine }}</pre>
             </div>
         @endif
 

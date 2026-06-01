@@ -8,9 +8,9 @@
     $isRedisFamily = in_array($row->engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true);
 
     if ($isRedisFamily) {
-        $networkExposure = app(\App\Support\Servers\CacheServiceNetworkExposure::class);
-        $isExposed = $networkExposure->isExposed($row);
-        $exposedRule = $isExposed ? $networkExposure->findManagedRule($row) : null;
+        $cacheExposure = app(\App\Support\Servers\CacheServiceNetworkExposure::class)->resolveExposure($row);
+        $isExposed = $cacheExposure['exposed'];
+        $exposedRule = $cacheExposure['rule'];
         $hasAuth = filled($row->auth_password ?? null);
         $remoteHost = trim((string) ($server->ip_address ?? ''));
         $effectiveHost = $isExposed && $remoteHost !== '' ? $remoteHost : '127.0.0.1';
@@ -167,6 +167,44 @@
                             </button>
                         </div>
                     @endif
+                </dd>
+            </div>
+            <div class="sm:col-span-2" wire:init="primeCachePrefix">
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CACHE_PREFIX') }}</dt>
+                <dd class="mt-1">
+                    <div class="flex flex-wrap items-stretch gap-2">
+                        <div class="min-w-0 flex-1">
+                            <x-text-input
+                                id="cache_prefix_input"
+                                type="text"
+                                wire:model="cache_prefix_input"
+                                class="block w-full font-mono text-sm"
+                                placeholder="{{ __('e.g. acme_cache_') }}"
+                            />
+                            <x-input-error :messages="$errors->get('cache_prefix_input')" class="mt-1" />
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="setCachePrefix"
+                            wire:loading.attr="disabled"
+                            wire:target="setCachePrefix"
+                            class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
+                        >
+                            <span wire:loading.remove wire:target="setCachePrefix">{{ __('Save') }}</span>
+                            <span wire:loading wire:target="setCachePrefix">{{ __('Saving…') }}</span>
+                        </button>
+                        @if (filled($row->cache_prefix))
+                            <button
+                                type="button"
+                                x-on:click="copy(@js((string) $row->cache_prefix), @js(__('Prefix')))"
+                                class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink"
+                                title="{{ __('Copy current') }}"
+                            >
+                                <x-heroicon-o-clipboard class="h-4 w-4" />
+                            </button>
+                        @endif
+                    </div>
+                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Laravel prepends this string to every key (CACHE_PREFIX env). Letters, digits, "_", "-", ":" only; max 64 chars. Leave blank for no prefix.') }}</p>
                 </dd>
             </div>
         </dl>

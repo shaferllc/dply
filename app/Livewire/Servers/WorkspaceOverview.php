@@ -14,6 +14,7 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
+use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -24,6 +25,7 @@ use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerPatchAdvisor;
 use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\CacheServiceStats;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\SharedHostReport;
 use App\Support\Servers\SupervisorQueueProgramTypes;
@@ -277,13 +279,32 @@ class WorkspaceOverview extends Component
         // An "installed" cache engine is one that's past the install pipeline
         // (running or stopped). Pending/installing/uninstalling/failed rows
         // are mid-flight and don't satisfy the onboarding step yet.
-        $cacheEngineInstalled = \App\Models\ServerCacheService::query()
+        $cacheRows = ServerCacheService::query()
             ->where('server_id', $this->server->id)
             ->whereIn('status', [
-                \App\Models\ServerCacheService::STATUS_RUNNING,
-                \App\Models\ServerCacheService::STATUS_STOPPED,
+                ServerCacheService::STATUS_RUNNING,
+                ServerCacheService::STATUS_STOPPED,
             ])
-            ->exists();
+            ->get();
+        $cacheEngineInstalled = $cacheRows->isNotEmpty();
+
+        // Tile pack for the cache-role Overview (server_role redis/valkey). Pulls
+        // a short-TTL INFO snapshot from the highest-priority running redis-family
+        // engine — most boxes have exactly one. Returns null when this isn't a
+        // cache-role host so the view falls through to the generic tiles.
+        $cacheTileData = null;
+        $cacheTileEngine = null;
+        if ($isCacheRoleHost) {
+            $cacheTileRow = $cacheRows
+                ->filter(fn ($row) => in_array($row->engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true))
+                ->sortByDesc(fn ($row) => $row->status === ServerCacheService::STATUS_RUNNING ? 1 : 0)
+                ->first();
+            if ($cacheTileRow !== null) {
+                $cacheTileData = app(CacheServiceStats::class)
+                    ->overviewSnapshot($this->server, $cacheTileRow);
+                $cacheTileEngine = $cacheTileRow->engine;
+            }
+        }
 
         $onboardingSteps = [];
         if (! $isContainerHostForChecklist) {
@@ -429,6 +450,8 @@ class WorkspaceOverview extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'cacheTileData' => $cacheTileData,
+            'cacheTileEngine' => $cacheTileEngine,
         ]);
     }
 

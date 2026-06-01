@@ -408,17 +408,19 @@
                             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                                 <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
                                     <tr>
-                                        <th class="w-10 px-3 py-3" scope="col">
+                                        <th class="w-10 px-3 py-2.5" scope="col">
                                             <span class="sr-only">{{ __('Select') }}</span>
                                         </th>
-                                        <th class="px-4 py-3">{{ __('Name') }}</th>
-                                        <th class="px-4 py-3">{{ __('Profile') }}</th>
-                                        <th class="px-4 py-3">{{ __('Action') }}</th>
-                                        <th class="px-4 py-3">{{ __('Port') }}</th>
-                                        <th class="px-4 py-3">{{ __('Proto') }}</th>
-                                        <th class="px-4 py-3">{{ __('Source') }}</th>
-                                        <th class="px-4 py-3">{{ __('On') }}</th>
-                                        <th class="px-4 py-3 text-right">{{ __('') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('Name') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('Profile') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('Action') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('Port') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('Proto') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('Source') }}</th>
+                                        <th class="px-3 py-2.5">{{ __('On') }}</th>
+                                        <th class="px-3 py-2.5 text-right">
+                                            <span class="sr-only">{{ __('Actions') }}</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-brand-ink/10 bg-white">
@@ -431,7 +433,7 @@
                                     @endif
                     @foreach ($filteredRules as $fr)
                                         <tr wire:key="fw-{{ $fr->id }}" class="text-brand-ink">
-                                            <td class="px-3 py-3 align-top">
+                                            <td class="px-3 py-2.5 align-top">
                                                 <input
                                                     type="checkbox"
                                                     wire:model.live="firewall_bulk_ids"
@@ -439,17 +441,17 @@
                                                     class="rounded border-brand-ink/20 text-brand-forest focus:ring-brand-forest"
                                                 />
                                             </td>
-                                            <td class="whitespace-nowrap px-4 py-3 font-medium">
+                                            <td class="whitespace-nowrap px-3 py-2.5 font-medium">
                                                 {{ $fr->name ?: '—' }}
                                             </td>
-                                            <td class="px-4 py-3 text-xs text-brand-moss">
+                                            <td class="px-3 py-2.5 text-xs text-brand-moss">
                                                 {{ $fr->profile ?: '—' }}
                                                 @if (is_array($fr->tags) && $fr->tags !== [])
                                                     <span class="mt-1 block font-mono text-[0.65rem] text-brand-ink/80">{{ implode(', ', $fr->tags) }}</span>
                                                 @endif
                                             </td>
-                                            <td class="px-4 py-3 capitalize">{{ $fr->action }}</td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-2.5 capitalize">{{ $fr->action }}</td>
+                                            <td class="px-3 py-2.5">
                                                 @if (! empty($fr->app_profile))
                                                     <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-brand-moss" title="{{ __('UFW application profile') }}">
                                                         app
@@ -458,14 +460,14 @@
                                                     {{ $fr->port ?? '—' }}
                                                 @endif
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-2.5">
                                                 @if (! empty($fr->app_profile))
                                                     <span class="font-mono text-xs">{{ $fr->app_profile }}</span>
                                                 @else
                                                     {{ $fr->protocol }}
                                                 @endif
                                             </td>
-                                            <td class="max-w-[12rem] truncate px-4 py-3 font-mono text-xs" title="{{ $fr->source }}{{ ! empty($fr->iface) ? ' · '.$fr->iface_direction.' on '.$fr->iface : '' }}">
+                                            <td class="max-w-[12rem] truncate px-3 py-2.5 font-mono text-xs" title="{{ $fr->source }}{{ ! empty($fr->iface) ? ' · '.$fr->iface_direction.' on '.$fr->iface : '' }}">
                                                 {{ $fr->source }}
                                                 @if (! empty($fr->iface))
                                                     <span class="mt-0.5 block text-[10px] uppercase tracking-wide text-brand-mist">
@@ -473,7 +475,7 @@
                                                     </span>
                                                 @endif
                                             </td>
-                                            <td class="px-4 py-3">
+                                            <td class="px-3 py-2.5">
                                                 <button
                                                     type="button"
                                                     wire:click="toggleFirewallRuleEnabled('{{ $fr->id }}')"
@@ -485,71 +487,64 @@
                                                     </span>
                                                     <span wire:loading wire:target="toggleFirewallRuleEnabled('{{ $fr->id }}')" class="inline-flex items-center gap-1">
                                                         <x-spinner variant="forest" size="sm" />
-                                                        {{ __('Saving…') }}
                                                     </span>
                                                 </button>
                                             </td>
-                                            <td class="whitespace-nowrap px-4 py-3 text-right">
-                                                <div class="inline-flex flex-wrap items-center justify-end gap-2">
-                                                    @php
-                                                        // When a filter is active, hide reorder buttons — they'd be confusing
-                                                        // because $loop->first/last are relative to the filtered slice, not the
-                                                        // full rule list that determines actual sort_order.
-                                                        $isFirst = $loop->first;
-                                                        $isLast = $loop->last;
-                                                        $reorderDisabled = $hasActiveFilter;
-                                                    @endphp
+                                            <td class="whitespace-nowrap px-3 py-2.5 text-right">
+                                                @php
+                                                    // Reorder hidden when filtered: $loop->first/last reference the
+                                                    // filtered slice, not full sort_order. Re-enabled when filter cleared.
+                                                    $isFirst = $loop->first;
+                                                    $isLast = $loop->last;
+                                                    $reorderDisabled = $hasActiveFilter;
+                                                @endphp
+                                                <div class="inline-flex items-center justify-end gap-0.5">
                                                     @if (! $reorderDisabled)
-                                                        <div class="inline-flex items-center rounded-md border border-brand-ink/10 bg-white" role="group" aria-label="{{ __('Reorder rule') }}">
-                                                            <button
-                                                                type="button"
-                                                                wire:click="moveFirewallRule('{{ $fr->id }}', 'up')"
-                                                                wire:loading.attr="disabled"
-                                                                @disabled($isFirst)
-                                                                class="inline-flex h-6 w-6 items-center justify-center text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-30"
-                                                                title="{{ __('Move up — earlier rules match first') }}"
-                                                                aria-label="{{ __('Move rule up') }}"
-                                                            >
-                                                                <x-heroicon-m-chevron-up class="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <span class="block h-4 w-px bg-brand-ink/10" aria-hidden="true"></span>
-                                                            <button
-                                                                type="button"
-                                                                wire:click="moveFirewallRule('{{ $fr->id }}', 'down')"
-                                                                wire:loading.attr="disabled"
-                                                                @disabled($isLast)
-                                                                class="inline-flex h-6 w-6 items-center justify-center text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-30"
-                                                                title="{{ __('Move down — later rules match after this one') }}"
-                                                                aria-label="{{ __('Move rule down') }}"
-                                                            >
-                                                                <x-heroicon-m-chevron-down class="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="moveFirewallRule('{{ $fr->id }}', 'up')"
+                                                            wire:loading.attr="disabled"
+                                                            @disabled($isFirst)
+                                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-30"
+                                                            title="{{ __('Move up') }}"
+                                                            aria-label="{{ __('Move rule up') }}"
+                                                        >
+                                                            <x-heroicon-m-chevron-up class="h-3.5 w-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="moveFirewallRule('{{ $fr->id }}', 'down')"
+                                                            wire:loading.attr="disabled"
+                                                            @disabled($isLast)
+                                                            class="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-30"
+                                                            title="{{ __('Move down') }}"
+                                                            aria-label="{{ __('Move rule down') }}"
+                                                        >
+                                                            <x-heroicon-m-chevron-down class="h-3.5 w-3.5" />
+                                                        </button>
                                                     @endif
                                                     <button
                                                         type="button"
                                                         wire:click="startEditRule('{{ $fr->id }}')"
                                                         wire:loading.attr="disabled"
                                                         x-on:click="$dispatch('open-modal', 'add-firewall-rule-modal')"
-                                                        class="text-xs font-medium text-brand-forest hover:underline"
+                                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md text-brand-forest hover:bg-brand-sand/40"
+                                                        title="{{ __('Edit') }}"
+                                                        aria-label="{{ __('Edit rule') }}"
                                                     >
-                                                        <span wire:loading.remove wire:target="startEditRule('{{ $fr->id }}')">{{ __('Edit') }}</span>
-                                                        <span wire:loading wire:target="startEditRule('{{ $fr->id }}')" class="inline-flex items-center gap-1">
-                                                            <x-spinner variant="forest" size="sm" />
-                                                            {{ __('Loading…') }}
-                                                        </span>
+                                                        <span wire:loading.remove wire:target="startEditRule('{{ $fr->id }}')"><x-heroicon-m-pencil-square class="h-3.5 w-3.5" /></span>
+                                                        <span wire:loading wire:target="startEditRule('{{ $fr->id }}')"><x-spinner variant="forest" size="sm" /></span>
                                                     </button>
                                                     <button
                                                         type="button"
                                                         wire:click="openConfirmActionModal('deleteFirewallRule', ['{{ $fr->id }}'], @js(__('Delete firewall rule')), @js(__('Remove this rule from the panel and try to delete the matching UFW entry?')), @js(__('Delete rule')), true)"
                                                         wire:loading.attr="disabled"
-                                                        class="text-xs font-medium text-red-600 hover:underline"
+                                                        class="inline-flex h-7 w-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50"
+                                                        title="{{ __('Remove') }}"
+                                                        aria-label="{{ __('Remove rule') }}"
                                                     >
-                                                        <span wire:loading.remove wire:target="deleteFirewallRule('{{ $fr->id }}')">{{ __('Remove') }}</span>
-                                                        <span wire:loading wire:target="deleteFirewallRule('{{ $fr->id }}')" class="inline-flex items-center gap-1">
-                                                            <x-spinner variant="forest" size="sm" />
-                                                            {{ __('Removing…') }}
-                                                        </span>
+                                                        <span wire:loading.remove wire:target="deleteFirewallRule('{{ $fr->id }}')"><x-heroicon-m-trash class="h-3.5 w-3.5" /></span>
+                                                        <span wire:loading wire:target="deleteFirewallRule('{{ $fr->id }}')"><x-spinner variant="forest" size="sm" /></span>
                                                     </button>
                                                 </div>
                                             </td>

@@ -64,13 +64,18 @@ class HetznerService
      *
      * @param  array<int|string>  $sshKeyIds  Hetzner SSH key IDs or names
      */
+    /**
+     * @param  array<int|string>  $sshKeyIds  Hetzner SSH key IDs or names
+     * @param  list<int>  $firewallIds  Cloud Firewall IDs to attach at boot (atomic — no unreachable window)
+     */
     public function createInstance(
         string $name,
         string $location,
         string $serverType,
         string $image,
         array $sshKeyIds = [],
-        string $userData = ''
+        string $userData = '',
+        array $firewallIds = []
     ): int {
         $body = [
             'name' => $name,
@@ -83,6 +88,12 @@ class HetznerService
         }
         if ($userData !== '') {
             $body['user_data'] = $userData;
+        }
+        if ($firewallIds !== []) {
+            $body['firewalls'] = array_map(
+                static fn ($id) => ['firewall' => (int) $id],
+                array_values($firewallIds)
+            );
         }
 
         $response = $this->request('post', '/servers', $body);
@@ -315,6 +326,88 @@ class HetznerService
         }
 
         return $recordName !== '' ? $recordName : '@';
+    }
+
+    /**
+     * Find a Cloud Firewall by exact name. Hetzner permits duplicate names, so
+     * this returns the first exact match — fine for our per-server naming
+     * (`dply-<server id>`), and makes provision-job retries idempotent.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function findFirewallByName(string $name): ?array
+    {
+        $response = $this->request('get', '/firewalls', ['name' => $name]);
+        $this->assertSuccess($response, 'list firewalls');
+
+        foreach (($response->json('firewalls') ?? []) as $firewall) {
+            if (($firewall['name'] ?? null) === $name) {
+                return $firewall;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create a Cloud Firewall with the given inbound rules. Returns its id.
+     *
+     * @param  list<array<string,mixed>>  $rules
+     */
+    public function createFirewall(string $name, array $rules): int
+    {
+        $response = $this->request('post', '/firewalls', [
+            'name' => $name,
+            'rules' => $rules,
+        ]);
+        $this->assertSuccess($response, 'create firewall');
+
+        $id = $response->json('firewall.id');
+        if ($id === null) {
+            throw new \RuntimeException('Hetzner API did not return firewall id.');
+        }
+
+        return (int) $id;
+    }
+
+    /**
+     * Replace the rule set on an existing firewall (idempotent on retries).
+     *
+     * @param  list<array<string,mixed>>  $rules
+     */
+    public function setFirewallRules(int $firewallId, array $rules): void
+    {
+        $response = $this->request('post', "/firewalls/{$firewallId}/actions/set_rules", [
+            'rules' => $rules,
+        ]);
+        $this->assertSuccess($response, 'set firewall rules');
+    }
+
+    /**
+     * Attach a firewall to an existing server. New servers attach atomically via
+     * createInstance(firewallIds:) instead; this covers after-the-fact backfill.
+     */
+    public function applyFirewallToServer(int $firewallId, int $serverId): void
+    {
+        $response = $this->request('post', "/firewalls/{$firewallId}/actions/apply_to_resources", [
+            'apply_to' => [[
+                'type' => 'server',
+                'server' => ['id' => $serverId],
+            ]],
+        ]);
+        $this->assertSuccess($response, 'apply firewall to server');
+    }
+
+    /**
+     * Delete a Cloud Firewall. A 404 (already gone) is treated as success.
+     */
+    public function deleteFirewall(int $firewallId): void
+    {
+        $response = $this->request('delete', "/firewalls/{$firewallId}");
+        if ($response->status() === 404) {
+            return;
+        }
+        $this->assertSuccess($response, 'delete firewall');
     }
 
     protected function request(string $method, string $path, array $body = []): Response

@@ -80,6 +80,10 @@ return [
     'hetzner' => [
         'default_image' => env('HETZNER_DEFAULT_IMAGE', 'ubuntu-24.04'),
         'ssh_user' => env('HETZNER_SSH_USER', 'root'),
+        // Create + attach a dply-managed Cloud Firewall at provision time so SSH
+        // (and service ports) are reachable at Hetzner's edge. Disable to rely on
+        // the project's own firewall posture.
+        'manage_cloud_firewall' => env('HETZNER_MANAGE_CLOUD_FIREWALL', true),
     ],
 
     'linode' => [

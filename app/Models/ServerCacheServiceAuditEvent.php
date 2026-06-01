@@ -65,6 +65,24 @@ class ServerCacheServiceAuditEvent extends Model
 
     public const EVENT_MONITOR_FAILED = 'cache_service_monitor_failed';
 
+    public const EVENT_SLOWLOG_RESET = 'cache_service_slowlog_reset';
+
+    public const EVENT_BGSAVE = 'cache_service_bgsave';
+
+    public const EVENT_BGREWRITEAOF = 'cache_service_bgrewriteaof';
+
+    public const EVENT_AOF_TOGGLED = 'cache_service_aof_toggled';
+
+    public const EVENT_RDB_SCHEDULE_SAVED = 'cache_service_rdb_schedule_saved';
+
+    public const EVENT_REPLICA_ATTACHED = 'cache_service_replica_attached';
+
+    public const EVENT_REPLICA_DETACHED = 'cache_service_replica_detached';
+
+    public const EVENT_REPLICA_ATTACH_FAILED = 'cache_service_replica_attach_failed';
+
+    public const EVENT_CACHE_PREFIX_UPDATED = 'cache_service_cache_prefix_updated';
+
     protected $table = 'server_cache_service_audit_events';
 
     protected $fillable = [

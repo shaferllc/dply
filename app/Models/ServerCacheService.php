@@ -87,6 +87,7 @@ class ServerCacheService extends Model
         'install_output',
         'cancel_requested_at',
         'auth_password',
+        'cache_prefix',
     ];
 
     protected $hidden = [

@@ -75,8 +75,45 @@ final class DedicatedCacheServerProvisionConfig
 
     /**
      * Reject obvious foot-guns — mirrors {@see CacheServiceNetworkExposure::guardSource()}.
+     * Accepts a single CIDR/IP OR a comma-separated list of CIDRs/IPs. Returns true
+     * only when EVERY part validates so a typo in one entry can't sneak past.
      */
     public static function isAllowedSourceCidr(string $source): bool
+    {
+        $value = trim($source);
+        if ($value === '') {
+            return false;
+        }
+
+        $parts = self::splitAllowedFrom($value);
+        if ($parts === []) {
+            return false;
+        }
+
+        foreach ($parts as $part) {
+            if (! self::isAllowedSingleSourceCidr($part)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Split a comma- or whitespace-separated allowlist into normalised parts.
+     * The wizard accepts both delimiter styles so an operator can paste any
+     * shape they have on hand. Empty entries are dropped.
+     *
+     * @return list<string>
+     */
+    public static function splitAllowedFrom(string $source): array
+    {
+        $tokens = preg_split('/[,\s]+/', trim($source)) ?: [];
+
+        return array_values(array_filter(array_map('trim', $tokens), fn (string $t): bool => $t !== ''));
+    }
+
+    private static function isAllowedSingleSourceCidr(string $source): bool
     {
         $value = trim($source);
         $lower = strtolower($value);
@@ -201,9 +238,19 @@ final class DedicatedCacheServerProvisionConfig
         }
 
         $port = ServerCacheService::defaultPortFor($this->engine);
-        $source = escapeshellarg($this->allowedFrom);
 
-        return ["ufw allow from {$source} to any port {$port} proto tcp"];
+        // One UFW rule per CIDR so operators can paste "home_ip, office_cidr, vpn_exit"
+        // at provision time and connect from any of them. UFW dedupes inserts so a
+        // re-run with the same list is idempotent.
+        $lines = [];
+        foreach (self::splitAllowedFrom($this->allowedFrom) as $cidr) {
+            if (! self::isAllowedSingleSourceCidr($cidr)) {
+                continue;
+            }
+            $lines[] = 'ufw allow from '.escapeshellarg($cidr).' to any port '.$port.' proto tcp';
+        }
+
+        return $lines;
     }
 
     private function requirePassLine(string $engine): string

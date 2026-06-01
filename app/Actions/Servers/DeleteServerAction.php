@@ -119,6 +119,23 @@ final class DeleteServerAction
                         'error' => $e->getMessage(),
                     ]);
                 }
+
+                // Tear down the dply-managed Cloud Firewall alongside the server
+                // so it doesn't orphan in the project. Best-effort — destroying
+                // the server detaches it; a brief in-use race just leaves it for
+                // the next sweep rather than blocking the delete.
+                $firewallId = data_get($server->meta, 'hetzner_firewall_id');
+                if (! empty($firewallId)) {
+                    try {
+                        $hetzner->deleteFirewall((int) $firewallId);
+                    } catch (\Throwable $e) {
+                        Log::warning('Failed to delete Hetzner cloud firewall on server delete.', [
+                            'server_id' => $server->id,
+                            'firewall_id' => $firewallId,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
         }
 

@@ -660,9 +660,9 @@
                              allow rule for the configured source CIDR. Refuses to expose without
                              an AUTH password set first. --}}
                         @php
-                            $networkExposure = app(\App\Support\Servers\CacheServiceNetworkExposure::class);
-                            $isExposed = $networkExposure->isExposed($row);
-                            $exposedRule = $isExposed ? $networkExposure->findManagedRule($row) : null;
+                            $cacheExposure = app(\App\Support\Servers\CacheServiceNetworkExposure::class)->resolveExposure($row);
+                            $isExposed = $cacheExposure['exposed'];
+                            $exposedRule = $cacheExposure['rule'];
                             $hasAuth = filled($row->auth_password ?? null);
                         @endphp
                         <div class="{{ $card }} p-6 sm:p-8">
@@ -826,7 +826,19 @@
                                 </form>
                             @endif
                         </div>
-                        @endif {{-- /configure subtab (auth + memory) --}}
+
+                        {{-- Persistence card (redis-family only, Configure subtab).
+                             RDB save schedule + AOF toggle + one-shot BGSAVE/BGREWRITEAOF
+                             triggers. CONFIG REWRITE is used internally so the change
+                             survives restart. --}}
+                        @include('livewire.servers.partials.cache.persistence-card', [
+                            'row' => $row,
+                            'card' => $card,
+                            'engineLabels' => $engineLabels,
+                            'persistenceState' => $persistenceState,
+                            'persistenceError' => $persistenceError,
+                        ])
+                        @endif {{-- /configure subtab (auth + memory + persistence) --}}
 
                         {{-- Redis system snapshot — live INFO stats + raw INFO action.
                              Reads $server->meta['manage_redis']['info_raw'], populated by the
@@ -1164,7 +1176,33 @@
                             'replUnlocked' => $replUnlocked,
                             'card' => $card,
                         ])
-                        @endif {{-- /stats subtab (clients + keyspace + key browser + monitor) --}}
+
+                        {{-- Slowlog viewer — redis-family only, Stats subtab.
+                             Polls SLOWLOG GET 32 every 10s with a 5s server-side
+                             cache so SSH isn't hammered. Reset button audits via
+                             EVENT_SLOWLOG_RESET. --}}
+                        @include('livewire.servers.partials.cache.slowlog-card', [
+                            'row' => $row,
+                            'card' => $card,
+                            'engineLabels' => $engineLabels,
+                            'slowlogEntries' => $slowlogEntries,
+                            'slowlogError' => $slowlogError,
+                        ])
+
+                        {{-- Replication status + add-replica wizard — redis-family
+                             only, Stats subtab. Master view surfaces an "Add
+                             replica" button that opens the modal; replica view
+                             shows upstream link health only. --}}
+                        @include('livewire.servers.partials.cache.replication-card', [
+                            'row' => $row,
+                            'card' => $card,
+                            'engineLabels' => $engineLabels,
+                            'replicationState' => $replicationState,
+                            'replicationError' => $replicationError,
+                            'availableReplicaServers' => $availableReplicaServers ?? collect(),
+                            'activeReplications' => $activeReplications ?? collect(),
+                        ])
+                        @endif {{-- /stats subtab (clients + keyspace + key browser + monitor + slowlog + replication) --}}
 
                         {{-- Interactive console (REPL) — redis-family only, Console subtab. --}}
                         @if ($activeSubtab === 'console')

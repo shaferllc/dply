@@ -3,6 +3,7 @@
 namespace Tests;
 
 use App\Actions\Servers\GetProviderCredentialsForServerType;
+use App\Support\Servers\CacheServiceNetworkExposure;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +62,7 @@ abstract class TestCase extends BaseTestCase
         }
 
         GetProviderCredentialsForServerType::flushMemo();
+        CacheServiceNetworkExposure::flushManagedRuleMemo();
 
         parent::tearDown();
     }

@@ -906,13 +906,22 @@ final class ServerProvisionCommandBuilder
         $keydbConf = $config?->configFileContent('keydb') ?? "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n";
         $memcachedConf = $config?->configFileContent('memcached') ?? "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n";
 
+        // `systemctl enable --now` is a no-op when the unit is already running
+        // — it does NOT pick up a freshly-written config. apt-get install for
+        // redis/valkey/keydb/memcached auto-starts the daemon on the package's
+        // default config (loopback only), so the dply config we write next is
+        // only applied after an explicit restart. Without the restart step
+        // operators provisioning a remote-access cache box end up with bind
+        // 127.0.0.1 in the file but a process listening on 127.0.0.1 only —
+        // exactly the bug we saw on dply-redis-1.
         return match ($cache) {
             'none' => [],
             'valkey' => $this->withStep('Installing Valkey', [
                 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
                 'if command -v redis-cli >/dev/null 2>&1; then echo "[dply] redis-cli already available."; else apt-get install -y --no-install-recommends redis-tools || true; fi',
                 $this->writeFileWithRollback('/etc/valkey/valkey.conf', $valkeyConf),
-                'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
+                'systemctl enable valkey-server 2>/dev/null || systemctl enable valkey 2>/dev/null || true',
+                'systemctl restart valkey-server 2>/dev/null || systemctl restart valkey 2>/dev/null || true',
             ]),
             'memcached' => $this->withStep('Installing Memcached', [
                 ...$this->ensurePackagesInstalled(
@@ -920,7 +929,8 @@ final class ServerProvisionCommandBuilder
                     '[dply] memcached already installed; skipping package install.'
                 ),
                 $this->writeFileWithRollback('/etc/memcached.conf', $memcachedConf),
-                'systemctl enable --now memcached',
+                'systemctl enable memcached',
+                'systemctl restart memcached',
             ]),
             'keydb' => $this->withStep('Installing KeyDB', [
                 'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
@@ -929,7 +939,8 @@ final class ServerProvisionCommandBuilder
                     .'apt-get update -y && '
                     .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
                 $this->writeFileWithRollback('/etc/keydb/keydb.conf', $keydbConf),
-                'systemctl enable --now keydb-server 2>/dev/null || systemctl enable --now keydb 2>/dev/null || true',
+                'systemctl enable keydb-server 2>/dev/null || systemctl enable keydb 2>/dev/null || true',
+                'systemctl restart keydb-server 2>/dev/null || systemctl restart keydb 2>/dev/null || true',
             ]),
             'dragonfly' => $this->installDragonfly(),
             default => $this->withStep('Installing Redis', [
@@ -938,7 +949,8 @@ final class ServerProvisionCommandBuilder
                     '[dply] redis-server already installed; skipping package install.'
                 ),
                 $this->writeFileWithRollback('/etc/redis/redis.conf', $redisConf),
-                'systemctl enable --now redis-server',
+                'systemctl enable redis-server',
+                'systemctl restart redis-server',
             ]),
         };
     }

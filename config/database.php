@@ -142,6 +142,14 @@ return [
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 
+        /*
+        | Tight default timeouts: when REDIS_HOST points at a remote box (or the
+        | local Redis is down), the page must fail fast with a RedisException
+        | rather than wedging PHP-FPM until the proxy returns 502. 2s connect /
+        | 2s read is generous for a healthy Redis on the same LAN and short
+        | enough that a dead host produces a proper Laravel error response.
+        | Override via env if you have a slow link; do not raise beyond ~5s.
+        */
         'default' => [
             'url' => env('REDIS_URL'),
             'host' => env('REDIS_HOST', '127.0.0.1'),
@@ -149,7 +157,9 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_DB', '0'),
-            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'timeout' => env('REDIS_TIMEOUT', 2.0),
+            'read_timeout' => env('REDIS_READ_TIMEOUT', 2.0),
+            'max_retries' => env('REDIS_MAX_RETRIES', 0),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
@@ -162,7 +172,9 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_CACHE_DB', '1'),
-            'max_retries' => env('REDIS_MAX_RETRIES', 3),
+            'timeout' => env('REDIS_TIMEOUT', 2.0),
+            'read_timeout' => env('REDIS_READ_TIMEOUT', 2.0),
+            'max_retries' => env('REDIS_MAX_RETRIES', 0),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),

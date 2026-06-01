@@ -304,5 +304,37 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Friendly handler for cache/queue backend connection failures. With
+        // CACHE_STORE=redis (or QUEUE_CONNECTION=redis) pointing at a managed
+        // Redis box, an outage means every page render touches a dead Redis
+        // connection. config/database.php sets a 2s timeout so this surfaces
+        // FAST as a RedisException — without this render handler the operator
+        // sees a raw stack trace; with it they get a diagnostic page that
+        // names which env vars to inspect.
+        $exceptions->render(function (\RedisException $e, \Illuminate\Http\Request $request) {
+            $payload = [
+                'error' => 'redis_unreachable',
+                'message' => $e->getMessage(),
+                'host' => (string) env('REDIS_HOST', '127.0.0.1'),
+                'port' => (string) env('REDIS_PORT', '6379'),
+                'cacheStore' => (string) env('CACHE_STORE', 'database'),
+                'queueConnection' => (string) env('QUEUE_CONNECTION', 'sync'),
+                'timeout' => (string) env('REDIS_TIMEOUT', '2.0'),
+            ];
+
+            // True API callers (Accept: application/json, no X-Livewire) get
+            // the raw payload so they can act programmatically. Everything
+            // else — GET pages, plain POSTs, AND Livewire updates — gets the
+            // rendered HTML diagnostic. Livewire's POST returning HTML 503
+            // surfaces in the browser as a navigation to the response body,
+            // which is what we want here: a self-contained error page the
+            // operator can read regardless of how the request originated.
+            $isApiClient = $request->expectsJson() && ! $request->hasHeader('X-Livewire');
+
+            if ($isApiClient) {
+                return response()->json($payload, 503);
+            }
+
+            return response()->view('errors.redis-unreachable', $payload, 503);
+        });
     })->create();

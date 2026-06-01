@@ -146,6 +146,7 @@ use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
+use App\Livewire\Servers\WorkspaceRedisSnapshots;
 use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Livewire\Servers\WorkspaceReleaseHygienePreview;
 use App\Livewire\Servers\WorkspaceRun;
@@ -214,6 +215,21 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Broadcast::routes(['middleware' => ['web', 'auth']]);
+
+// Standalone diagnostic page for Redis-backend failures. Lives outside the
+// `web` middleware group on purpose — StartSession/CSRF/Pennant all touch
+// Cache, so if Redis is down a normal route would recurse on the very error
+// it tries to render. This handler reads env vars only.
+Route::get('/_redis-unreachable', function () {
+    return response()->view('errors.redis-unreachable', [
+        'message' => __('Connection timed out — see config block below.'),
+        'host' => (string) env('REDIS_HOST', '127.0.0.1'),
+        'port' => (string) env('REDIS_PORT', '6379'),
+        'cacheStore' => (string) env('CACHE_STORE', 'database'),
+        'queueConnection' => (string) env('QUEUE_CONNECTION', 'sync'),
+        'timeout' => (string) env('REDIS_TIMEOUT', '2.0'),
+    ], 503);
+})->withoutMiddleware(['web']);
 
 Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhookController::class)
     ->middleware(['throttle:site-webhook'])
@@ -828,6 +844,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // is on (else 404). The service.installed gate still applies.
     Route::livewire('servers/{server}/backups', WorkspaceBackups::class)->name('servers.backups');
     Route::livewire('servers/{server}/backups-preview', WorkspaceBackupsPreview::class)->name('servers.backups-preview');
+    // Redis-mode snapshots surface. Visible on the sidebar only for
+    // role_nav_keys[redis|valkey] hosts; the middleware 404s for other roles.
+    Route::livewire('servers/{server}/redis-snapshots', WorkspaceRedisSnapshots::class)->name('servers.redis-snapshots');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::middleware('feature:workspace.system_users')->group(function (): void {
