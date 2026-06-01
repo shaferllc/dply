@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -59,7 +60,8 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                 return;
             }
 
-            $image = config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
+            $image = ServerImageCatalog::resolveForServer($this->server, 'digitalocean')
+                ?? config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
 
             $meta = $this->server->meta ?? [];
             $doOpts = is_array($meta['digitalocean'] ?? null) ? $meta['digitalocean'] : [];

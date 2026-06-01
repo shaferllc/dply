@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\ScalewayService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -43,7 +44,8 @@ class ProvisionScalewayServerJob implements ShouldQueue
             $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
             $tagValue = 'AUTHORIZED_KEY='.str_replace(' ', '_', trim($keys['recovery_public_key']));
 
-            $image = config('services.scaleway.default_image', 'ubuntu_jammy');
+            $image = ServerImageCatalog::resolveForServer($this->server, 'scaleway')
+                ?? config('services.scaleway.default_image', 'ubuntu_jammy');
 
             $id = $scw->createServer(
                 zone: $this->server->region,
