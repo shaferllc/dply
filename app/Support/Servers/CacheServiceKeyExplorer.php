@@ -155,21 +155,21 @@ BASH;
 
                 continue;
             }
-            // SCAN's --no-raw output for keys looks like `1) "foo"` / `2) "bar"`;
-            // we strip the `N) ` prefix and the surrounding quotes.
-            $captured = null;
+            // With --raw, each key is emitted as a bare line (no `N) "..."`
+            // wrapper). Use the line as the key. We still tolerate the old
+            // --no-raw shape in case any caller passes a script that doesn't
+            // include --raw.
+            $captured = $trim;
             if (preg_match('/^\d+\)\s*"(.*)"\s*$/', $trim, $m) === 1) {
                 $captured = $m[1];
             } elseif (preg_match('/^\d+\)\s*(.*)$/', $trim, $m) === 1) {
-                // Fallback when --no-raw emitted an unquoted token (e.g. an
-                // integer-shaped key); take it as-is.
                 $captured = $m[1];
             }
 
-            // redis-cli --no-raw emits human-friendly markers for empty results / nil values
-            // (`(empty array)`, `(empty list or set)`, `(nil)`); drop them so they don't show
-            // up as bogus keys in the browser.
-            if ($captured !== null && ! self::isEmptyMarker($captured)) {
+            // redis-cli emits human-friendly markers for empty results / nil
+            // values (`(empty array)`, `(empty list or set)`, `(nil)`); drop
+            // them so they don't show up as bogus keys in the browser.
+            if (! self::isEmptyMarker($captured)) {
                 $keys[] = $captured;
             }
         }

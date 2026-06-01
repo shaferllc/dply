@@ -42,10 +42,39 @@
         </div>
     </div>
 
+    @if (! empty($replicationFromCache) && is_array($state))
+        <p class="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+            <x-heroicon-o-clock class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{{ __('Showing cached snapshot') }}@if (! empty($replicationCachedAt)) {{ __('from :time', ['time' => \Illuminate\Support\Carbon::parse($replicationCachedAt)->diffForHumans()]) }}@endif. {{ __('Refreshing in the background — values update on the next poll tick.') }}</span>
+        </p>
+    @endif
+
     @if ($error)
         <p class="mt-4 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-900">{{ $error }}</p>
     @elseif ($state === null)
-        <p class="mt-4 text-xs text-brand-mist">{{ __('Loading…') }}</p>
+        {{-- First-load state: blue banner + skeleton role/metric tiles.
+             Matches the clients/keyspace cards so an SSH round-trip in flight
+             reads as a deliberate "we're working on it" instead of a stale
+             tab. wire:poll.15s on the card root keeps re-dispatching until
+             the worker writes the snapshot to cache. --}}
+        <div class="mt-4 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
+            <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" opacity="0.25" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+            </svg>
+            <div class="min-w-0 flex-1">
+                <p class="font-semibold">{{ __('Reading INFO replication over SSH…') }}</p>
+                <p class="mt-0.5 text-sky-800/90">{{ __('Pulls master/replica role + link state from the engine. Typically 1–2 seconds; the dashboard auto-refreshes every 15 seconds.') }}</p>
+            </div>
+        </div>
+        <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+            @foreach (['Role', 'Replication ID', 'Connected replicas'] as $label)
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-3">
+                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
+                    <div class="mt-2 h-5 w-24 animate-pulse rounded bg-brand-ink/10"></div>
+                </div>
+            @endforeach
+        </dl>
     @elseif (! $state['reachable'])
         <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">{{ __('Engine unreachable — start the service from the Overview subtab to populate replication state.') }}</p>
     @else
@@ -115,7 +144,13 @@
                     </table>
                 </div>
             @else
-                <p class="mt-4 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-xs text-brand-moss">{{ __('No replicas connected. Standalone master — operating without redundancy.') }}</p>
+                <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No replicas connected') }}</p>
+                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ __('Standalone master — operating without redundancy. Use Add replica above to attach one from your fleet.') }}</p>
+                </div>
             @endif
 
             {{-- dply-tracked replications (rows in server_cache_service_replications).

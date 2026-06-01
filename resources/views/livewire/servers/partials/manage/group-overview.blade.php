@@ -242,7 +242,16 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2 px-6 py-5 sm:px-7">
-                @foreach (['reload_nginx', 'restart_php_fpm', 'apt_update'] as $key)
+                @php
+                    // Quick-actions list is gated server-side: WorkspaceManage::render() filters
+                    // service_actions config keys against the systemd inventory so we don't
+                    // surface "Reload NGINX" on a Valkey-only box. apt_update has no service
+                    // prerequisite so it always passes through. Order here biases reload/restart
+                    // before package + reboot for muscle-memory consistency.
+                    $quickActionOrder = ['reload_nginx', 'restart_nginx', 'restart_php_fpm', 'reload_php_fpm', 'restart_redis', 'apt_update'];
+                    $orderedKeys = array_values(array_filter($quickActionOrder, fn ($k) => in_array($k, $quickActionKeys ?? [], true)));
+                @endphp
+                @forelse ($orderedKeys as $key)
                     @if (! empty($serviceActions[$key]))
                         @php $action = $serviceActions[$key]; @endphp
                         <button
@@ -254,7 +263,8 @@
                             {{ $action['label'] }}
                         </button>
                     @endif
-                @endforeach
+                @empty
+                @endforelse
                 @if (! empty($dangerousActions['reboot']))
                     @php $rebootAction = $dangerousActions['reboot']; @endphp
                     <button

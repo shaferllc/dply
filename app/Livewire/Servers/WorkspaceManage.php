@@ -1846,6 +1846,48 @@ BASH;
 
         $serviceActions = config('server_manage.service_actions', []);
 
+        // Quick-actions allowlist for the overview tile. Each key maps to one
+        // or more systemd unit prefixes; the button is hidden if none of the
+        // matching units exist on this server (e.g. a Valkey-only host
+        // shouldn't surface "Reload NGINX" or "Restart PHP-FPM"). Lookup is
+        // O(1) via the systemd-state table — populated by the inventory probe.
+        $serviceActionUnitMatchers = [
+            'reload_nginx' => ['nginx.service'],
+            'restart_nginx' => ['nginx.service'],
+            'restart_php_fpm' => ['php8.3-fpm.service', 'php8.2-fpm.service', 'php8.1-fpm.service', 'php8.4-fpm.service', 'php8.0-fpm.service', 'php7.4-fpm.service'],
+            'reload_php_fpm' => ['php8.3-fpm.service', 'php8.2-fpm.service', 'php8.1-fpm.service', 'php8.4-fpm.service', 'php8.0-fpm.service', 'php7.4-fpm.service'],
+            'restart_redis' => ['redis-server.service', 'redis.service'],
+            // 'apt_update' has no service prerequisite — always available on Debian/Ubuntu.
+        ];
+
+        $installedUnits = \App\Models\ServerSystemdServiceState::query()
+            ->where('server_id', $this->server->id)
+            ->where(function ($q) {
+                $q->whereNull('unit_file_state')
+                    ->orWhere('unit_file_state', '!=', 'not-found');
+            })
+            ->pluck('unit')
+            ->all();
+        $installedUnitsSet = array_flip($installedUnits);
+
+        $quickActionKeys = array_values(array_filter(
+            array_keys($serviceActions),
+            function (string $key) use ($serviceActionUnitMatchers, $installedUnitsSet): bool {
+                if (! isset($serviceActionUnitMatchers[$key])) {
+                    // No prerequisite declared (e.g. apt_update) — let it
+                    // through, falls under "universal" maintenance actions.
+                    return true;
+                }
+                foreach ($serviceActionUnitMatchers[$key] as $unit) {
+                    if (isset($installedUnitsSet[$unit])) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+        ));
+
         $activeMiseRuntimeOps = $this->section === 'tools'
             ? $this->activeMiseRuntimeOperations()
             : [];
@@ -1857,6 +1899,7 @@ BASH;
         return view('livewire.servers.workspace-manage', [
             'configPreviews' => config('server_manage.config_previews', []),
             'serviceActions' => $serviceActions,
+            'quickActionKeys' => $quickActionKeys,
             'dangerousActions' => config('server_manage.dangerous_actions', []),
             'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
             'recentActions' => $recentActions,

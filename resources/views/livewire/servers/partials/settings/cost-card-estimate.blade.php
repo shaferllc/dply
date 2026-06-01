@@ -139,8 +139,13 @@
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Dply tier fee') }}</p>
-                <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $report['dply']['formatted'] ?? '—' }}</p>
-                <p class="mt-1 text-[11px] text-brand-moss">{{ __(':tier from detected specs', ['tier' => $report['dply']['tier_label'] ?? '—']) }}</p>
+                @if ($summary['charges_tier_fee'] ?? true)
+                    <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">{{ $report['dply']['formatted'] ?? '—' }}</p>
+                    <p class="mt-1 text-[11px] text-brand-moss">{{ __(':tier from detected specs', ['tier' => $report['dply']['tier_label'] ?? '—']) }}</p>
+                @else
+                    <p class="mt-1 font-mono text-2xl font-semibold tabular-nums text-brand-ink">$0.00<span class="text-xs font-normal text-brand-moss">/mo</span></p>
+                    <p class="mt-1 text-[11px] text-brand-moss">{{ __('No tier fee — :hosting', ['hosting' => $server->hostingBackendLabel()]) }}</p>
+                @endif
             </div>
             <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Per site (est.)') }}</p>

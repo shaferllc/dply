@@ -123,6 +123,17 @@ class WorkspaceCaches extends Component
     public ?string $cacheClientsError = null;
 
     /**
+     * True when {@see $cacheClients} was hydrated from the result cache on
+     * mount/tab-switch rather than from a fresh worker write this session.
+     * The view shows a "showing cached snapshot" banner while this is set;
+     * the next poll tick that lands a job result clears it.
+     */
+    public bool $cacheClientsFromCache = false;
+
+    /** ISO8601 timestamp of the cached payload's `at` field, surfaced in the banner. */
+    public ?string $cacheClientsCachedAt = null;
+
+    /**
      * Slowlog entries for the Stats subtab card, populated by {@see loadSlowlog}.
      * Null until first load; `[]` when the engine returns an empty ring buffer
      * (the operationally happy case — no commands have crossed the slowlog
@@ -133,6 +144,11 @@ class WorkspaceCaches extends Component
     public ?array $slowlogEntries = null;
 
     public ?string $slowlogError = null;
+
+    /** See {@see $cacheClientsFromCache} — same pattern for the slowlog ring buffer. */
+    public bool $slowlogFromCache = false;
+
+    public ?string $slowlogCachedAt = null;
 
     /**
      * Page size + current page for the CLIENT LIST table. Pagination is
@@ -153,6 +169,11 @@ class WorkspaceCaches extends Component
     public string $cache_maxmemory_policy = 'noeviction';
 
     public ?string $cacheMemoryError = null;
+
+    /** See {@see $cacheClientsFromCache} — same pattern for the memory-settings card. */
+    public bool $cacheMemoryFromCache = false;
+
+    public ?string $cacheMemoryCachedAt = null;
 
     /**
      * Live persistence state for the Configure-subtab card (RDB save schedule,
@@ -184,6 +205,11 @@ class WorkspaceCaches extends Component
     public ?array $replicationState = null;
 
     public ?string $replicationError = null;
+
+    /** See {@see $cacheClientsFromCache} — same pattern for the replication snapshot. */
+    public bool $replicationFromCache = false;
+
+    public ?string $replicationCachedAt = null;
 
     /** Modal: candidate replica server picker (server_id of target). */
     public string $addReplicaTargetServerId = '';
@@ -237,6 +263,9 @@ class WorkspaceCaches extends Component
     public bool $keyspaceLoaded = false;
 
     public ?string $keyspaceError = null;
+
+    /** See {@see $cacheClientsFromCache} — set when samples come from cache, cleared on first fresh sample. */
+    public bool $keyspaceFromCache = false;
 
     public const KEYSPACE_SAMPLE_LIMIT = 60;
 
@@ -334,6 +363,121 @@ class WorkspaceCaches extends Component
     {
         $this->bootWorkspace($server);
         $this->hydrateKeyBrowserFromSession();
+        $this->hydrateKeyspaceSamplesFromCache();
+        $this->hydrateCacheStatsFromResultCache();
+    }
+
+    /**
+     * Read the last-known clients / slowlog / replication snapshots out of the
+     * refresh-job result cache so the Stats subtab lands populated instead of
+     * showing "No snapshot yet" until the first poll tick completes. The
+     * accompanying `*FromCache` flags drive a "showing cached — refreshing in
+     * the background" banner on each card; the next poll tick that lands a
+     * fresh worker write clears them.
+     */
+    protected function hydrateCacheStatsFromResultCache(): void
+    {
+        $engine = $this->workspace_tab;
+        if (! in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row || ! $row->server) {
+            return;
+        }
+
+        $clients = Cache::get(\App\Jobs\RefreshCacheClientsJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($clients) && ($clients['ok'] ?? false) === true) {
+            $this->cacheClients = array_values(array_filter((array) ($clients['clients'] ?? []), 'is_array'));
+            $this->cacheClientsFromCache = true;
+            $this->cacheClientsCachedAt = isset($clients['at']) ? (string) $clients['at'] : null;
+        }
+
+        $slowlog = Cache::get(\App\Jobs\RefreshSlowlogJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($slowlog) && ($slowlog['ok'] ?? false) === true) {
+            $this->slowlogEntries = array_values(array_filter((array) ($slowlog['entries'] ?? []), 'is_array'));
+            $this->slowlogFromCache = true;
+            $this->slowlogCachedAt = isset($slowlog['at']) ? (string) $slowlog['at'] : null;
+        }
+
+        $replication = Cache::get(\App\Jobs\RefreshReplicationStateJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($replication) && ($replication['ok'] ?? false) === true) {
+            $this->replicationState = is_array($replication['state'] ?? null) ? $replication['state'] : null;
+            $this->replicationFromCache = true;
+            $this->replicationCachedAt = isset($replication['at']) ? (string) $replication['at'] : null;
+        }
+
+        $memory = Cache::get(\App\Jobs\RefreshCacheMemorySettingsJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($memory) && ($memory['ok'] ?? false) === true) {
+            $this->cache_maxmemory = (string) ($memory['maxmemory'] ?? '');
+            $this->cache_maxmemory_policy = (string) ($memory['maxmemory_policy'] ?? 'noeviction');
+            $this->cacheMemoryLoaded = true;
+            $this->cacheMemoryFromCache = true;
+            $this->cacheMemoryCachedAt = isset($memory['at']) ? (string) $memory['at'] : null;
+        }
+    }
+
+    /**
+     * Pull the recent keyspace samples for the active engine out of the cache so
+     * the dashboard lands with at least one prior sample on the buffer — that
+     * lets the very first ops/sec + hit-rate window compute on the next poll
+     * tick instead of showing "—" until two fresh samples accumulate.
+     *
+     * Cross-user (uses Cache, not session) so the data is "warm" regardless of
+     * which operator opens the page. Sampler delta math uses real timestamps,
+     * so a stale previous sample produces a correct (just-wider) window.
+     */
+    protected function hydrateKeyspaceSamplesFromCache(): void
+    {
+        $key = $this->keyspaceSamplesCacheKey();
+        if ($key === null) {
+            return;
+        }
+
+        $cached = Cache::get($key);
+        if (! is_array($cached) || $cached === []) {
+            return;
+        }
+
+        $this->keyspaceSamples = array_values(array_filter($cached, 'is_array'));
+        $this->keyspaceLoaded = $this->keyspaceSamples !== [];
+        $this->keyspaceFromCache = $this->keyspaceSamples !== [];
+    }
+
+    /**
+     * Persist the current keyspace sample buffer to cache so the next page load
+     * (any user / any session) can re-hydrate it. Scoped per (server, engine)
+     * so engine tabs don't bleed into each other.
+     */
+    protected function persistKeyspaceSamplesToCache(): void
+    {
+        $key = $this->keyspaceSamplesCacheKey();
+        if ($key === null) {
+            return;
+        }
+
+        if ($this->keyspaceSamples === []) {
+            Cache::forget($key);
+
+            return;
+        }
+
+        Cache::put($key, $this->keyspaceSamples, now()->addHour());
+    }
+
+    /**
+     * Cache key namespace for keyspace samples — per (server, engine) so
+     * switching engines doesn't carry the wrong buffer across.
+     */
+    protected function keyspaceSamplesCacheKey(): ?string
+    {
+        $engine = $this->workspace_tab;
+        if (! in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
+            return null;
+        }
+
+        return sprintf('dply.cache_workspace.keyspace_samples.%s.%s', $this->server->id, $engine);
     }
 
     /**
@@ -417,6 +561,11 @@ class WorkspaceCaches extends Component
         }
 
         $this->workspace_tab = $next;
+
+        // Re-hydrate the keyspace sample buffer from cache for the new engine
+        // tab so the dashboard's ops/sec + hit-rate tiles aren't stuck on "—"
+        // until two fresh samples accumulate post-switch.
+        $this->hydrateKeyspaceSamplesFromCache();
     }
 
     public function setEngineSubtab(string $subtab): void
@@ -1436,7 +1585,14 @@ BASH,
         }
     }
 
-    public function loadCacheClients(CacheServiceStats $stats): void
+    /**
+     * Trigger a CLIENT LIST refresh. SSH happens in {@see \App\Jobs\RefreshCacheClientsJob}
+     * so the Livewire commit returns immediately — no risk of PHP's 30s
+     * max_execution_time biting a slow SSH link. The result lands in cache and
+     * {@see pollCacheClients()} (the wire:poll tick) hydrates the component
+     * from there.
+     */
+    public function loadCacheClients(): void
     {
         $this->authorize('update', $this->server);
 
@@ -1461,8 +1617,8 @@ BASH,
         }
 
         $this->cacheClientsError = null;
-        $this->cacheClients = $stats->clients($row->server, $row);
-        $this->cacheClientsPage = 1;
+        \App\Jobs\RefreshCacheClientsJob::dispatch($row->id);
+        $this->pollCacheClients();
     }
 
     public function hideCacheClients(): void
@@ -1473,12 +1629,69 @@ BASH,
     }
 
     /**
+     * Read the latest CLIENT LIST result that {@see \App\Jobs\RefreshCacheClientsJob}
+     * wrote to cache and apply it to the component. Called both inline by
+     * loadCacheClients (so the first paint shows last-known-good immediately
+     * after a dispatch) and by wire:poll every 10s for live refresh.
+     *
+     * No SSH here — read-only against the cache.
+     */
+    public function pollCacheClients(): void
+    {
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            return;
+        }
+
+        // Re-dispatch a refresh on each poll tick so the cached result stays
+        // current. Dispatching is non-blocking; the SSH work runs on a queue
+        // worker. The next poll picks up the new value (or the same value if
+        // the job hasn't finished yet — the UI stays on last-known-good).
+        \App\Jobs\RefreshCacheClientsJob::dispatch($row->id);
+
+        $payload = Cache::get(\App\Jobs\RefreshCacheClientsJob::resultCacheKey($row->server->id, $row->engine));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        if (($payload['ok'] ?? false) === true) {
+            $this->cacheClients = array_values(array_filter((array) ($payload['clients'] ?? []), 'is_array'));
+            $this->cacheClientsError = null;
+
+            $pageCount = max(1, (int) ceil(count($this->cacheClients) / self::CACHE_CLIENTS_PAGE_SIZE));
+            $this->cacheClientsPage = max(1, min($this->cacheClientsPage, $pageCount));
+
+            // Clear the "cached snapshot" banner once a write newer than the
+            // hydrated `at` lands — that means the worker completed this
+            // session and the data is fresh, not last-known-good.
+            $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+            if ($newAt !== '' && $newAt !== $this->cacheClientsCachedAt) {
+                $this->cacheClientsFromCache = false;
+                $this->cacheClientsCachedAt = $newAt;
+            }
+        } else {
+            $this->cacheClientsError = (string) ($payload['error'] ?? __('Could not load clients.'));
+        }
+    }
+
+    /**
      * Pull the engine's top-32 slowlog entries (SLOWLOG GET 32). Cached server-side
      * for {@see CacheServiceSlowlog} TTL so a wire:poll cycle doesn't hammer SSH.
      * Empty result + null error = engine is healthy; no commands have crossed the
      * `slowlog-log-slower-than` threshold (10ms default) in the ring buffer.
      */
-    public function loadSlowlog(\App\Support\Servers\CacheServiceSlowlog $slowlog): void
+    /**
+     * Trigger a SLOWLOG refresh. SSH happens in {@see \App\Jobs\RefreshSlowlogJob}
+     * — Livewire never blocks on it, so the 30s PHP timeout is impossible by
+     * construction. Each tick re-dispatches; the next poll reads whatever the
+     * worker has finished.
+     */
+    public function loadSlowlog(): void
     {
         $this->authorize('update', $this->server);
 
@@ -1503,7 +1716,22 @@ BASH,
         }
 
         $this->slowlogError = null;
-        $this->slowlogEntries = $slowlog->entries($row->server, $row);
+        \App\Jobs\RefreshSlowlogJob::dispatch($row->id);
+
+        $payload = Cache::get(\App\Jobs\RefreshSlowlogJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($payload)) {
+            if (($payload['ok'] ?? false) === true) {
+                $this->slowlogEntries = array_values(array_filter((array) ($payload['entries'] ?? []), 'is_array'));
+
+                $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+                if ($newAt !== '' && $newAt !== $this->slowlogCachedAt) {
+                    $this->slowlogFromCache = false;
+                    $this->slowlogCachedAt = $newAt;
+                }
+            } else {
+                $this->slowlogError = (string) ($payload['error'] ?? __('Could not load slowlog.'));
+            }
+        }
     }
 
     /**
@@ -1758,7 +1986,12 @@ BASH,
      * role (master/replica), connected replicas (master side), master link status
      * (replica side). Mutating actions (REPLICAOF, add-replica wizard) come in 4b.
      */
-    public function loadReplicationState(CacheServiceReplication $replication): void
+    /**
+     * Trigger an INFO-replication refresh. SSH happens in
+     * {@see \App\Jobs\RefreshReplicationStateJob} — Livewire reads the result
+     * from cache so the request never blocks on SSH.
+     */
+    public function loadReplicationState(): void
     {
         $this->authorize('update', $this->server);
 
@@ -1783,7 +2016,22 @@ BASH,
         }
 
         $this->replicationError = null;
-        $this->replicationState = $replication->snapshot($row->server, $row);
+        \App\Jobs\RefreshReplicationStateJob::dispatch($row->id);
+
+        $payload = Cache::get(\App\Jobs\RefreshReplicationStateJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($payload)) {
+            if (($payload['ok'] ?? false) === true) {
+                $this->replicationState = is_array($payload['state'] ?? null) ? $payload['state'] : null;
+
+                $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+                if ($newAt !== '' && $newAt !== $this->replicationCachedAt) {
+                    $this->replicationFromCache = false;
+                    $this->replicationCachedAt = $newAt;
+                }
+            } else {
+                $this->replicationError = (string) ($payload['error'] ?? __('Could not load replication state.'));
+            }
+        }
     }
 
     /**
@@ -2043,7 +2291,13 @@ BASH,
         $this->cacheClientsPage = max(1, min($page, max(1, $pageCount)));
     }
 
-    public function loadCacheMemorySettings(CacheServiceMemoryConfig $memory): void
+    /**
+     * Trigger a refresh of the maxmemory + maxmemory-policy values from the
+     * engine. SSH happens in {@see \App\Jobs\RefreshCacheMemorySettingsJob} —
+     * the Livewire commit returns immediately and reads whatever the worker
+     * has written to cache. PHP's 30s ceiling is never in play.
+     */
+    public function loadCacheMemorySettings(): void
     {
         $this->authorize('update', $this->server);
 
@@ -2067,18 +2321,23 @@ BASH,
             return;
         }
 
-        try {
-            $current = $memory->read($row->server, $row);
-        } catch (\Throwable $e) {
-            $this->cacheMemoryError = $e->getMessage();
+        \App\Jobs\RefreshCacheMemorySettingsJob::dispatch($row->id);
 
-            return;
+        $payload = Cache::get(\App\Jobs\RefreshCacheMemorySettingsJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($payload) && ($payload['ok'] ?? false) === true) {
+            $this->cache_maxmemory = (string) ($payload['maxmemory'] ?? '');
+            $this->cache_maxmemory_policy = (string) ($payload['maxmemory_policy'] ?? 'noeviction');
+            $this->cacheMemoryLoaded = true;
+            $this->cacheMemoryError = null;
+
+            $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+            if ($newAt !== '' && $newAt !== $this->cacheMemoryCachedAt) {
+                $this->cacheMemoryFromCache = false;
+                $this->cacheMemoryCachedAt = $newAt;
+            }
+        } elseif (is_array($payload) && ($payload['ok'] ?? true) === false) {
+            $this->cacheMemoryError = (string) ($payload['error'] ?? __('Could not load memory settings.'));
         }
-
-        $this->cache_maxmemory = (string) ($current['maxmemory'] ?? '');
-        $this->cache_maxmemory_policy = (string) ($current['maxmemory_policy'] ?? 'noeviction');
-        $this->cacheMemoryLoaded = true;
-        $this->cacheMemoryError = null;
     }
 
     public function hideCacheMemorySettings(): void
@@ -2087,6 +2346,63 @@ BASH,
         $this->cache_maxmemory = '';
         $this->cache_maxmemory_policy = 'noeviction';
         $this->cacheMemoryError = null;
+    }
+
+    /**
+     * Read-only poll for the cached memory-settings result. Called by
+     * wire:poll on the idle state so the UI can pick up the worker write
+     * shortly after {@see loadCacheMemorySettings} dispatched the job —
+     * without this the operator clicks Load, nothing visible changes, and
+     * they have to click again to see the result. No SSH, no dispatch here.
+     *
+     * Steady-state no-op once values are loaded — pollers fire every 1.5s
+     * but we only touch component state when the cached payload's `at`
+     * differs from what we last applied, so re-renders stop after hydration.
+     */
+    public function pollCacheMemorySettings(): void
+    {
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row || ! $row->server) {
+            return;
+        }
+
+        // Self-healing: if the memory has never loaded this session, dispatch
+        // a refresh on every poll tick. The job writes to cache and the next
+        // tick picks it up. This ensures the card eventually loads even if
+        // the click handler never fired the dispatch for any reason.
+        if (! $this->cacheMemoryLoaded && $this->cacheMemoryError === null
+            && ServerCacheService::engineSupportsAuth($row->engine)
+        ) {
+            \App\Jobs\RefreshCacheMemorySettingsJob::dispatch($row->id);
+        }
+
+        $payload = Cache::get(\App\Jobs\RefreshCacheMemorySettingsJob::resultCacheKey($row->server->id, $row->engine));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+        if ($newAt !== '' && $newAt === $this->cacheMemoryCachedAt) {
+            // Same payload we already applied — nothing to do.
+            return;
+        }
+
+        if (($payload['ok'] ?? false) === true) {
+            $this->cache_maxmemory = (string) ($payload['maxmemory'] ?? '');
+            $this->cache_maxmemory_policy = (string) ($payload['maxmemory_policy'] ?? 'noeviction');
+            $this->cacheMemoryLoaded = true;
+            $this->cacheMemoryError = null;
+            $this->cacheMemoryFromCache = false;
+            $this->cacheMemoryCachedAt = $newAt;
+        } elseif (($payload['ok'] ?? true) === false) {
+            $this->cacheMemoryError = (string) ($payload['error'] ?? __('Could not load memory settings.'));
+            $this->cacheMemoryCachedAt = $newAt;
+        }
     }
 
     public function saveCacheMemorySettings(
@@ -2661,7 +2977,17 @@ BASH,
      * sampler computes deltas relative to the previous sample for ops/sec and hit-rate
      * windows; absolute values for memory and clients come straight from the latest INFO.
      */
-    public function loadKeyspaceDashboard(CacheServiceStats $stats, CacheServiceKeyspaceSampler $sampler): void
+    /**
+     * Trigger a fresh INFO sample. SSH + sampler delta math happen in
+     * {@see \App\Jobs\RefreshKeyspaceSampleJob}; this method only dispatches
+     * and reads the cached result. PHP's 30s timeout never applies because we
+     * don't wait on SSH inside the Livewire commit.
+     *
+     * The previous sample (used by the sampler to compute ops/sec + hit-rate
+     * window deltas) is passed into the job so the worker has everything it
+     * needs without re-querying component state.
+     */
+    public function loadKeyspaceDashboard(): void
     {
         $this->authorize('update', $this->server);
 
@@ -2685,15 +3011,54 @@ BASH,
             return;
         }
 
-        $raw = $stats->rawInfo($row->server, $row);
-        if ($raw === null) {
-            $this->keyspaceError = __('Could not read INFO from :engine. Is it running?', ['engine' => $row->engine, 'name' => $row->name]);
+        $previous = end($this->keyspaceSamples) ?: null;
+        \App\Jobs\RefreshKeyspaceSampleJob::dispatch($row->id, $previous ?: null);
+
+        $this->ingestKeyspaceSampleFromCache($row->server->id, $row->engine);
+    }
+
+    public function pollKeyspaceDashboard(): void
+    {
+        // Polling tick: silently re-dispatch + ingest. wire:poll fires this
+        // every 10s while the dashboard is open; transient failures stay quiet
+        // so the operator keeps seeing the last-known-good buffer.
+        try {
+            $this->loadKeyspaceDashboard();
+        } catch (\Throwable) {
+            // swallow
+        }
+    }
+
+    /**
+     * Hydrate {@see $keyspaceSamples} from the cached result that
+     * {@see \App\Jobs\RefreshKeyspaceSampleJob} writes. Appends the sample
+     * (capped at KEYSPACE_SAMPLE_LIMIT) only when the job's `at` timestamp is
+     * newer than the latest buffered sample — so back-to-back polls before a
+     * worker has finished don't double-append the same sample.
+     */
+    protected function ingestKeyspaceSampleFromCache(string $serverId, string $engine): void
+    {
+        $payload = Cache::get(\App\Jobs\RefreshKeyspaceSampleJob::resultCacheKey($serverId, $engine));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        if (($payload['ok'] ?? false) !== true) {
+            $this->keyspaceError = (string) ($payload['error'] ?? __('Could not read INFO.'));
 
             return;
         }
 
-        $previous = end($this->keyspaceSamples) ?: null;
-        $sample = $sampler->sample($raw, $previous ?: null);
+        $sample = is_array($payload['sample'] ?? null) ? $payload['sample'] : null;
+        if (! $sample) {
+            return;
+        }
+
+        $latest = end($this->keyspaceSamples) ?: null;
+        if (is_array($latest) && isset($latest['ts'], $sample['ts']) && (int) $sample['ts'] <= (int) $latest['ts']) {
+            // Same or older sample — worker hasn't produced a new one yet.
+            return;
+        }
 
         $this->keyspaceSamples[] = $sample;
         if (count($this->keyspaceSamples) > self::KEYSPACE_SAMPLE_LIMIT) {
@@ -2705,16 +3070,10 @@ BASH,
 
         $this->keyspaceLoaded = true;
         $this->keyspaceError = null;
-    }
+        // Fresh sample landed this session — drop the "cached snapshot" banner.
+        $this->keyspaceFromCache = false;
 
-    public function pollKeyspaceDashboard(CacheServiceStats $stats, CacheServiceKeyspaceSampler $sampler): void
-    {
-        // Same call as load, but silent on failure — a poll tick shouldn't toast.
-        try {
-            $this->loadKeyspaceDashboard($stats, $sampler);
-        } catch (\Throwable) {
-            // swallow
-        }
+        $this->persistKeyspaceSamplesToCache();
     }
 
     public function hideKeyspaceDashboard(): void

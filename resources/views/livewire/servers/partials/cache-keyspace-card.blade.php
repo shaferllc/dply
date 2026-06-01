@@ -67,11 +67,14 @@
             @else
                 <button
                     type="button"
-                    wire:click="hideKeyspaceDashboard"
-                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                    wire:click="loadKeyspaceDashboard"
+                    wire:loading.attr="disabled"
+                    wire:target="loadKeyspaceDashboard"
+                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                 >
-                    <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
-                    {{ __('Hide') }}
+                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                    <span wire:loading.remove wire:target="loadKeyspaceDashboard">{{ __('Rescan') }}</span>
+                    <span wire:loading wire:target="loadKeyspaceDashboard">{{ __('Scanning…') }}</span>
                 </button>
             @endif
         </div>
@@ -83,36 +86,50 @@
         <p>{{ __('Sampling continues at 10s intervals while this card is open; closing the card pauses sampling and discards the buffer. The first sample shows windowed values as "—" because there\'s nothing to delta against yet.') }}</p>
     </x-explainer>
 
-    {{-- In-body active-load indicator. The "Show dashboard" button only shows
-         a spinner up top while loadKeyspaceDashboard is in flight; without
-         this block the body stayed on the "Dashboard is paused" idle hint
-         during the 1-3s SSH round-trip, making the click look like a no-op.
-         When the response lands, wire:loading clears and the @if branch below
-         takes over with real samples (or the "first sample in flight"
-         skeleton for the initial render). --}}
-    <div wire:loading wire:target="loadKeyspaceDashboard" class="mt-4">
-        <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
-            <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" opacity="0.25" />
-                <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
-            </svg>
-            <div class="min-w-0">
-                <p class="font-semibold">{{ __('Starting the keyspace dashboard…') }}</p>
-                <p class="mt-0.5 text-sky-800/90">{{ __('Captures the first INFO sample over SSH, then samples every 10s while this card stays open. Ops/sec and hit-rate need a second sample to compute deltas, so those tiles fill in on the next refresh.') }}</p>
+    {{-- In-body active-load indicator. Two flavors:
+           - First load (no $latest yet): big banner + 4-tile skeleton replaces
+             whatever idle state was showing, so the click isn't a 1-3s no-op.
+           - Rescan (stats already on screen): subtle "Rescanning…" pill above
+             the stats; the stats themselves get dimmed via wire:loading.class
+             below so the operator sees a value-preserving refresh rather than
+             a layout jump.
+         Both target ONLY loadKeyspaceDashboard — the 10s wire:poll uses
+         pollKeyspaceDashboard, so auto-refresh ticks stay invisible. --}}
+    @if ($latest)
+        <div wire:loading.block wire:target="loadKeyspaceDashboard" class="mt-4">
+            <div class="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-xs text-sky-900">
+                <svg class="h-3.5 w-3.5 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+                </svg>
+                <span class="font-semibold">{{ __('Rescanning — pulling a fresh INFO sample over SSH…') }}</span>
             </div>
         </div>
-        <div class="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            @foreach (['Memory', 'Connected clients', 'Ops / sec (window)', 'Hit rate (window)'] as $label)
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
-                    <div class="mt-2 h-5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
-                    <div class="mt-3 h-4 w-full animate-pulse rounded bg-brand-ink/5"></div>
+    @else
+        <div wire:loading.block wire:target="loadKeyspaceDashboard" class="mt-4">
+            <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
+                <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+                </svg>
+                <div class="min-w-0 flex-1">
+                    <p class="font-semibold">{{ __('Starting the keyspace dashboard…') }}</p>
+                    <p class="mt-0.5 text-sky-800/90">{{ __('Captures the first INFO sample over SSH, then samples every 10s while this card stays open. Ops/sec and hit-rate need a second sample to compute deltas, so those tiles fill in on the next refresh.') }}</p>
                 </div>
-            @endforeach
+            </div>
+            <div class="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                @foreach (['Memory', 'Connected clients', 'Ops / sec (window)', 'Hit rate (window)'] as $label)
+                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
+                        <div class="mt-2 h-5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
+                        <div class="mt-3 h-4 w-full animate-pulse rounded bg-brand-ink/5"></div>
+                    </div>
+                @endforeach
+            </div>
         </div>
-    </div>
+    @endif
 
-    <div wire:loading.remove wire:target="loadKeyspaceDashboard">
+    <div @if (! $latest) wire:loading.remove wire:target="loadKeyspaceDashboard" @endif>
     @if ($error)
         <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $error }}</p>
     @elseif ($loaded && ! $latest)
@@ -138,6 +155,12 @@
             <span>{{ __('Waiting for the first INFO sample from the engine — runs over SSH, ~1-3s typical.') }}</span>
         </p>
     @elseif ($loaded && $latest)
+        @if (! empty($fromCache))
+            <p class="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+                <x-heroicon-o-clock class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{{ __('Showing cached snapshot from :time', ['time' => \Illuminate\Support\Carbon::createFromTimestamp((int) ($latest['ts'] ?? time()))->diffForHumans()]) }}. {{ __('Refreshing in the background — the next sample lands within 10 seconds.') }}</span>
+            </p>
+        @endif
         <div wire:poll.10000ms="pollKeyspaceDashboard" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory') }}</p>

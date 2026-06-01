@@ -75,7 +75,7 @@ final class ServerManageToolsReport
                 continue;
             }
 
-            if (! $this->toolVisible($def, $phpAvailable, $redisRelevant)) {
+            if (! $this->toolVisible($def, $phpAvailable, $redisRelevant, $server)) {
                 continue;
             }
 
@@ -214,7 +214,7 @@ final class ServerManageToolsReport
     /**
      * @param  array<string, mixed>  $def
      */
-    private function toolVisible(array $def, bool $phpAvailable, bool $redisRelevant): bool
+    private function toolVisible(array $def, bool $phpAvailable, bool $redisRelevant, Server $server): bool
     {
         if (! empty($def['requires_php']) && ! $phpAvailable) {
             return false;
@@ -222,6 +222,17 @@ final class ServerManageToolsReport
 
         if (! empty($def['show_when_redis_relevant']) && ! $redisRelevant) {
             return false;
+        }
+
+        // Service-only boxes (server_role of redis / database) shouldn't get
+        // app-shaped tools surfaced — they exist to host cache or DB engines,
+        // not container runtimes or wp-cli installs.
+        if (! empty($def['hide_for_server_roles']) && is_array($def['hide_for_server_roles'])) {
+            $serverMeta = is_array($server->meta) ? $server->meta : [];
+            $role = (string) ($serverMeta['server_role'] ?? '');
+            if ($role !== '' && in_array($role, $def['hide_for_server_roles'], true)) {
+                return false;
+            }
         }
 
         return true;

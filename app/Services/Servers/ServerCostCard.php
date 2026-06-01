@@ -27,7 +27,14 @@ final class ServerCostCard
         $server->loadMissing(['providerCredential', 'sites']);
         $provider = $this->costObservatory->providerEstimateForServer($server);
         $tier = $server->billingTier();
-        $dplyCents = $tier->priceCents();
+        // Spec-tiered per-server fee only applies to VMs dply runs on its own
+        // provider account (HOSTING_BACKEND_DPLY). BYO servers — where the
+        // customer brings their own credential/SSH key and pays the provider
+        // directly — don't get tier-priced; same for managed-product hosts
+        // (serverless / dply-cloud / dply-edge), which have their own
+        // per-product pricing models.
+        $chargesTierFee = $server->usesManagedHosting() && ! $server->isManagedProductHost();
+        $dplyCents = $chargesTierFee ? $tier->priceCents() : 0;
         $siteCount = $server->sites->count();
         $capacity = $this->capacity($server);
         $hardware = $this->hardware($server, $tier);
@@ -44,6 +51,7 @@ final class ServerCostCard
             'stack_cents' => $stackCents,
             'provider_cents' => $providerCents,
             'dply_cents' => $dplyCents,
+            'charges_tier_fee' => $chargesTierFee,
             'site_count' => $siteCount,
             'per_site_cents' => $perSiteCents,
             'forge_baseline_cents' => $forgePerServer,

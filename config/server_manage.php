@@ -2039,6 +2039,9 @@ BASH
             'present_action_key' => 'repair_docker',
             'show_docker_workspace_link' => true,
             'card' => 'generic',
+            // Service-only boxes (dedicated cache/db) shouldn't get an "install
+            // Docker" prompt — they're not for running containers.
+            'hide_for_server_roles' => ['redis', 'database'],
         ],
         'wp_cli' => [
             'slug' => 'wp_cli',
@@ -2052,6 +2055,7 @@ BASH
             'present_action_key' => 'update_wp_cli',
             'show_run_link' => true,
             'card' => 'generic',
+            'hide_for_server_roles' => ['redis', 'database'],
         ],
         'redis_cli' => [
             'slug' => 'redis_cli',

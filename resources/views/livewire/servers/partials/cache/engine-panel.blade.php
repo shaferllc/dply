@@ -775,32 +775,59 @@
                             </form>
                         </x-modal>
 
-                        {{-- Memory limits card (redis-family only). --}}
-                        <div class="{{ $card }} p-6 sm:p-8">
+                        {{-- Memory limits card (redis-family only).
+                             wire:poll lives on the card itself and always
+                             fires; pollCacheMemorySettings early-returns once
+                             the values are loaded so the polling tick is a
+                             cheap no-op steady-state. Conditionally-rendered
+                             wire:poll attributes were unreliable — Livewire
+                             didn't always re-register the timer after the
+                             attribute reappeared post-re-render. --}}
+                        <div class="{{ $card }} p-6 sm:p-8" wire:poll.2s="pollCacheMemorySettings">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
                                     <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — memory limits', ['engine' => $engineLabels[$engine]]) }}</h3>
                                     <p class="mt-2 text-sm text-brand-moss">{{ __('Cap the engine\'s memory usage and pick what happens when the cap is hit. Backed by maxmemory + maxmemory-policy in the config file.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-                                    @if (! $cacheMemoryLoaded && $cacheMemoryError === null)
-                                        <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                    <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                        @if ($cacheMemoryLoaded)
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Reload') }}</span>
+                                        @else
                                             <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Load current settings') }}</span>
-                                            <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
-                                        </button>
-                                    @else
-                                        <button type="button" wire:click="hideCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
-                                            <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
-                                            {{ __('Hide') }}
-                                        </button>
-                                    @endif
+                                        @endif
+                                        <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Active-load banner. Fires while the dispatch + cache
+                                 read is in flight; the worker writes the values to
+                                 cache and the next render swaps to the form. --}}
+                            <div wire:loading.block wire:target="loadCacheMemorySettings" class="mt-4">
+                                <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
+                                    <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10" opacity="0.25" />
+                                        <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+                                    </svg>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold">{{ __('Reading maxmemory + maxmemory-policy from the engine…') }}</p>
+                                        <p class="mt-0.5 text-sky-800/90">{{ __('CONFIG GET over SSH; typically 1–2 seconds.') }}</p>
+                                    </div>
                                 </div>
                             </div>
 
                             @if ($cacheMemoryError)
                                 <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheMemoryError }}</p>
                             @elseif ($cacheMemoryLoaded)
+                                @if ($cacheMemoryFromCache)
+                                    <p class="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+                                        <x-heroicon-o-clock class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <span>{{ __('Showing cached values') }}@if ($cacheMemoryCachedAt) {{ __('from :time', ['time' => \Illuminate\Support\Carbon::parse($cacheMemoryCachedAt)->diffForHumans()]) }}@endif. {{ __('Click') }} <strong>{{ __('Load current settings') }}</strong> {{ __('to read live values from the engine.') }}</span>
+                                    </p>
+                                @endif
                                 <form wire:submit="saveCacheMemorySettings" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
                                         <x-input-label for="cache_maxmemory" :value="__('maxmemory')" />
@@ -824,6 +851,35 @@
                                         </x-primary-button>
                                     </div>
                                 </form>
+                            @else
+                                {{-- Idle empty state — matches the keyspace/clients
+                                     idle tiles. Whole panel is the button so clicking
+                                     anywhere triggers loadCacheMemorySettings. The
+                                     wire:poll that drives "check cache for the
+                                     worker's write" lives on the outer card div so
+                                     it isn't disrupted by wire:loading.remove. --}}
+                                <div wire:loading.remove wire:target="loadCacheMemorySettings">
+                                    <button
+                                        type="button"
+                                        wire:click="loadCacheMemorySettings"
+                                        wire:loading.attr="disabled"
+                                        wire:target="loadCacheMemorySettings"
+                                        class="mt-4 block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
+                                        </span>
+                                        <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('Memory settings not loaded') }}</p>
+                                        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                                            {{ __('Click here (or') }}
+                                            <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                                                <x-heroicon-o-arrow-down-tray class="h-3 w-3" aria-hidden="true" />
+                                                {{ __('Load current settings') }}
+                                            </span>
+                                            {{ __('above) to read the current maxmemory + maxmemory-policy from the engine via CONFIG GET.') }}
+                                        </p>
+                                    </button>
+                                </div>
                             @endif
                         </div>
 
@@ -959,7 +1015,7 @@
                                 <div class="min-w-0 flex-1">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Clients') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand — refresh to see who\'s connected right now.') }}</p>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand, then kept live — auto-refreshes every 10 seconds once loaded.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     @if ($cacheClients === null && $cacheClientsError === null)
@@ -972,10 +1028,6 @@
                                         <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
                                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
                                             {{ __('Refresh') }}
-                                        </button>
-                                        <button type="button" wire:click="hideCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
-                                            <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
-                                            {{ __('Hide') }}
                                         </button>
                                     @endif
                                 </div>
@@ -1038,6 +1090,20 @@
                             @if ($cacheClientsError)
                                 <p class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheClientsError }}</p>
                             @elseif ($cacheClients !== null)
+                                {{-- wire:poll keeps the snapshot live once the operator has
+                                     manually loaded once. Gated on $cacheClients !== null
+                                     so we never auto-fire SSH for someone who just landed
+                                     on the Stats subtab and didn't ask for a snapshot —
+                                     they still see the idle "No snapshot yet" tile.
+                                     pollCacheClients swallows transient errors so a single
+                                     hiccup doesn't blow away the last known-good list. --}}
+                                <div wire:poll.10s="pollCacheClients">
+                                @if ($cacheClientsFromCache)
+                                    <p class="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+                                        <x-heroicon-o-clock class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <span>{{ __('Showing cached snapshot') }}@if ($cacheClientsCachedAt) {{ __('from :time', ['time' => \Illuminate\Support\Carbon::parse($cacheClientsCachedAt)->diffForHumans()]) }}@endif. {{ __('Refreshing in the background — values update on the next poll tick.') }}</span>
+                                    </p>
+                                @endif
                                 @if (count($cacheClients) === 0)
                                     <p class="text-sm text-brand-moss">{{ __('No clients connected.') }}</p>
                                 @else
@@ -1111,25 +1177,35 @@
                                         </div>
                                     @endif
                                 @endif
+                                </div>{{-- /wire:poll wrapper --}}
                             @else
                                 {{-- Idle empty state — matches the keyspace dashboard
                                      and snapshots empty-states: dashed border, centered
-                                     icon + title + helper text so it doesn't look like
-                                     a forgotten plain paragraph. --}}
-                                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+                                     icon + title + helper text. The whole tile is the
+                                     button — clicking anywhere on it triggers the same
+                                     loadCacheClients that the top-right action does, so
+                                     the wire:loading.block banner + skeleton above takes
+                                     over while the SSH round-trip is in flight. --}}
+                                <button
+                                    type="button"
+                                    wire:click="loadCacheClients"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadCacheClients"
+                                    class="block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
                                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                         <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
                                     </span>
                                     <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No snapshot yet') }}</p>
                                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                                        {{ __('Hit') }}
+                                        {{ __('Click here (or') }}
                                         <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
                                             <x-heroicon-o-users class="h-3 w-3" aria-hidden="true" />
                                             {{ __('Load clients') }}
                                         </span>
-                                        {{ __('above to capture a one-time CLIENT LIST snapshot — connection IDs, peer addresses, names, age, and active DB index for everything talking to this engine right now.') }}
+                                        {{ __('above) to capture a one-time CLIENT LIST snapshot — connection IDs, peer addresses, names, age, and active DB index for everything talking to this engine right now.') }}
                                     </p>
-                                </div>
+                                </button>
                             @endif
                             </div>{{-- /wire:loading.remove wrapper for cacheClients body --}}
                             </div>
@@ -1143,6 +1219,7 @@
                             'samples' => $keyspaceSamples,
                             'loaded' => $keyspaceLoaded,
                             'error' => $keyspaceError,
+                            'fromCache' => $keyspaceFromCache,
                             'card' => $card,
                         ])
 
@@ -1187,6 +1264,8 @@
                             'engineLabels' => $engineLabels,
                             'slowlogEntries' => $slowlogEntries,
                             'slowlogError' => $slowlogError,
+                            'slowlogFromCache' => $slowlogFromCache,
+                            'slowlogCachedAt' => $slowlogCachedAt,
                         ])
 
                         {{-- Replication status + add-replica wizard — redis-family
@@ -1199,6 +1278,8 @@
                             'engineLabels' => $engineLabels,
                             'replicationState' => $replicationState,
                             'replicationError' => $replicationError,
+                            'replicationFromCache' => $replicationFromCache,
+                            'replicationCachedAt' => $replicationCachedAt,
                             'availableReplicaServers' => $availableReplicaServers ?? collect(),
                             'activeReplications' => $activeReplications ?? collect(),
                         ])
@@ -1242,10 +1323,70 @@
                                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                                 >
                                     <x-heroicon-o-document-text class="h-3.5 w-3.5" aria-hidden="true" />
-                                    <span wire:loading.remove wire:target="loadCacheConfig">{{ __('View config') }}</span>
+                                    <span wire:loading.remove wire:target="loadCacheConfig">@if ($cacheConfigContent !== null){{ __('Reopen viewer') }}@else{{ __('View config') }}@endif</span>
                                     <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
                                 </button>
                             </div>
+                        </div>
+
+                        {{-- Loading state — fires while loadCacheConfig is in flight.
+                             Mirrors the clients/keyspace/persistence pattern: sky-blue
+                             banner with spinner + a body-text skeleton pre-block so the
+                             swap into the modal lands without a layout jolt below the
+                             header. --}}
+                        <div wire:loading.block wire:target="loadCacheConfig" class="mt-4">
+                            <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
+                                <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10" opacity="0.25" />
+                                    <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+                                </svg>
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-semibold">{{ __('Reading config file over SSH…') }}</p>
+                                    <p class="mt-0.5 text-sky-800/90">{{ __('Pulls the engine\'s main config from disk. Typically 1–2 seconds; longer on a slow link.') }}</p>
+                                </div>
+                            </div>
+                            <div class="mt-3 space-y-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                                @foreach (range(1, 6) as $i)
+                                    <div class="h-3 w-{{ $i % 2 === 0 ? 'full' : '3/4' }} animate-pulse rounded bg-brand-ink/10"></div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        {{-- Idle empty state — when the config has never been loaded
+                             this session. Dashed-border clickable tile matches the
+                             clients/memory idle tiles; whole panel triggers the same
+                             load + modal-open as the top-right button. --}}
+                        <div wire:loading.remove wire:target="loadCacheConfig">
+                            @if ($cacheConfigContent === null && $cacheConfigError === null)
+                                <button
+                                    type="button"
+                                    wire:click="loadCacheConfig"
+                                    wire:loading.attr="disabled"
+                                    wire:target="loadCacheConfig"
+                                    x-on:click="$dispatch('open-modal', @js($configModalName))"
+                                    class="mt-4 block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                                    </span>
+                                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('Config not loaded') }}</p>
+                                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                                        {{ __('Click here (or') }}
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                                            <x-heroicon-o-document-text class="h-3 w-3" aria-hidden="true" />
+                                            {{ __('View config') }}
+                                        </span>
+                                        {{ __('above) to pull the engine\'s main config from disk over SSH and open it in the viewer.') }}
+                                    </p>
+                                </button>
+                            @elseif ($cacheConfigError !== null)
+                                <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheConfigError }}</p>
+                            @else
+                                <p class="mt-4 flex items-center gap-2 text-xs text-brand-moss">
+                                    <x-heroicon-o-check-circle class="h-3.5 w-3.5 text-brand-forest" aria-hidden="true" />
+                                    {{ __('Config loaded — click') }} <strong>{{ __('Reopen viewer') }}</strong> {{ __('above to inspect or edit.') }}
+                                </p>
+                            @endif
                         </div>
                     </div>
 

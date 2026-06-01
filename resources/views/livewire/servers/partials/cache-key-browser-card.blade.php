@@ -41,12 +41,6 @@
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — key browser', ['engine' => $engineLabel]) }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.') }}</p>
         </div>
-        @if ($loaded)
-            <button type="button" wire:click="hideKeyBrowser" class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
-                <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
-                {{ __('Hide') }}
-            </button>
-        @endif
     </div>
 
     <div class="px-6 py-6 sm:px-7">
