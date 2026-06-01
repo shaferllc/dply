@@ -8,6 +8,7 @@ use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\DplyRuntime;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 
@@ -44,6 +45,7 @@ class DplyAboutCommand extends Command
                 'environment' => app()->environment(),
                 'database_driver' => config('database.default'),
             ],
+            'runtime' => DplyRuntime::aboutPayload(),
             'commands' => [
                 'dply_total' => $this->dplyCommandCount(),
             ],
@@ -116,6 +118,20 @@ class DplyAboutCommand extends Command
         $this->line('<fg=cyan;options=bold>dply</> '.$about['dply']['version']);
         $this->line('  Laravel '.$about['dply']['laravel'].' on PHP '.$about['dply']['php']);
         $this->line('  database: '.$about['dply']['database_driver'].'   environment: '.$about['dply']['environment']);
+
+        $runtime = $about['runtime'];
+        $this->newLine();
+        $this->line('<fg=cyan>Runtime</>');
+        $this->line('  mode                             '.($runtime['mode'] ?? 'all'));
+        if (($runtime['worker_role'] ?? null) !== null) {
+            $this->line('  worker_role                      '.$runtime['worker_role']);
+        }
+        $this->line('  runs_scheduler                   '.($runtime['runs_scheduler'] ? 'yes' : 'no'));
+        $this->line('  expects_horizon                  '.($runtime['expects_horizon'] ? 'yes' : 'no'));
+        $this->line('  expects_reverb                   '.($runtime['expects_reverb'] ? 'yes' : 'no'));
+        foreach ($runtime['configuration_issues'] ?? [] as $issue) {
+            $this->line('  <fg=yellow>warning:</> '.$issue);
+        }
 
         $this->newLine();
         $this->line('<fg=cyan>Commands</>');

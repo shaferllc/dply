@@ -46,10 +46,12 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Services\Servers\ServerMetricsGuestScript;
+use App\Support\DplyRuntime;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 
@@ -62,12 +64,16 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
+        if (! DplyRuntime::runsScheduler()) {
+            return;
+        }
+
         $schedule->call(function (): void {
             Server::query()
                 ->where('status', Server::STATUS_READY)
                 ->whereNotNull('ip_address')
                 ->each(fn (Server $server) => CheckServerHealthJob::dispatch($server));
-        })->everyFiveMinutes();
+        })->everyFiveMinutes()->name('dispatch-server-health-checks');
 
         $schedule->call(function (): void {
             if (! config('dply.site_health_check_enabled', true)) {
@@ -84,7 +90,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->whereHas('domains')
                 ->pluck('id')
                 ->each(fn (int $id) => CheckSiteUrlHealthJob::dispatch($id));
-        })->everyTenMinutes();
+        })->everyTenMinutes()->name('dispatch-site-url-health-checks');
 
         $schedule->call(function (): void {
             if (! config('site_uptime.enabled', true)) {
@@ -93,7 +99,7 @@ return Application::configure(basePath: dirname(__DIR__))
             SiteUptimeMonitor::query()
                 ->pluck('id')
                 ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
-        })->everyFiveMinutes();
+        })->everyFiveMinutes()->name('dispatch-site-uptime-checks');
 
         // SSH login notifications. Dispatches a per-server scan job only for
         // servers that actually have a `server.ssh_login` subscriber — there's
@@ -103,7 +109,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->call(function (): void {
             ScanServerSshLoginsJob::eligibleServers()
                 ->each(fn (Server $server) => ScanServerSshLoginsJob::dispatch((string) $server->id));
-        })->everyFiveMinutes();
+        })->everyFiveMinutes()->name('dispatch-ssh-login-scans');
 
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
@@ -190,7 +196,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->whereNotNull('ip_address')
                 ->pluck('id')
                 ->each(fn (string $id) => RunServerInsightsJob::dispatch($id));
-        })->hourly();
+        })->hourly()->name('dispatch-server-insights');
 
         $schedule->call(function (): void {
             Site::query()
@@ -203,7 +209,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ])
                 ->pluck('id')
                 ->each(fn (string $id) => RunSiteInsightsJob::dispatch($id));
-        })->everyTwoHours();
+        })->everyTwoHours()->name('dispatch-site-insights');
 
         $schedule->call(function (): void {
             if (! (bool) config('server_services.systemd_inventory_schedule_enabled', true)) {
@@ -218,7 +224,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->whereNotNull('ssh_private_key')
                 ->pluck('id')
                 ->each(fn (string $id) => SyncServerSystemdServicesJob::dispatch($id));
-        })->everyFiveMinutes();
+        })->everyFiveMinutes()->name('dispatch-systemd-inventory-sync');
 
         $schedule->command(FlushServerSystemdNotificationDigestCommand::class)
             ->hourlyAt(12)
@@ -251,7 +257,13 @@ return Application::configure(basePath: dirname(__DIR__))
                     }
                     UpgradeGuestMetricsScriptJob::dispatch($server->id, $bundledSha);
                 });
-        })->hourly();
+        })->hourly()->name('dispatch-guest-metrics-script-upgrades');
+
+        if (DplyRuntime::isSplitDeployment()) {
+            foreach ($schedule->events() as $event) {
+                $event->onOneServer();
+            }
+        }
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));
@@ -311,7 +323,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // FAST as a RedisException — without this render handler the operator
         // sees a raw stack trace; with it they get a diagnostic page that
         // names which env vars to inspect.
-        $exceptions->render(function (\RedisException $e, \Illuminate\Http\Request $request) {
+        $exceptions->render(function (RedisException $e, Request $request) {
             $payload = [
                 'error' => 'redis_unreachable',
                 'message' => $e->getMessage(),

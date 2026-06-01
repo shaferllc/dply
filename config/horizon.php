@@ -244,7 +244,9 @@ return [
     'environments' => [
         'production' => [
             'supervisor-1' => [
-                'maxProcesses' => 10,
+                'connection' => 'redis',
+                'queue' => $horizonWorkerQueues,
+                'maxProcesses' => max(1, (int) env('HORIZON_MAX_PROCESSES', 10)),
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
                 'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', 720),
