@@ -8,6 +8,7 @@ use App\Services\HetznerService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\ServerHostingPlatformContext;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -68,7 +69,8 @@ class ProvisionHetznerServerJob implements ShouldQueue
 
             $image = $managed
                 ? $platform->defaultImage
-                : config('services.hetzner.default_image', 'ubuntu-24.04');
+                : (ServerImageCatalog::resolveForServer($this->server, 'hetzner')
+                    ?? config('services.hetzner.default_image', 'ubuntu-24.04'));
 
             $id = $hetzner->createInstance(
                 name: $this->server->name,

@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\LinodeService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -42,7 +43,8 @@ class ProvisionLinodeServerJob implements ShouldQueue
 
             $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
-            $image = config('services.linode.default_image', 'linode/ubuntu24.04');
+            $image = ServerImageCatalog::resolveForServer($this->server, 'linode')
+                ?? config('services.linode.default_image', 'linode/ubuntu24.04');
 
             $id = $linode->createInstance(
                 label: $this->server->name,

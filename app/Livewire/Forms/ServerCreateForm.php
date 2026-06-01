@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Support\Servers\ServerImageCatalog;
 use Livewire\Form;
 
 class ServerCreateForm extends Form
@@ -21,6 +22,13 @@ class ServerCreateForm extends Form
     public string $region = '';
 
     public string $size = '';
+
+    /**
+     * Provider-agnostic OS image key (e.g. "ubuntu-24-04") chosen on Step 3 for
+     * provider VM hosts. Empty means "use the provider default"; resolved to a
+     * native slug at provision time via {@see ServerImageCatalog}.
+     */
+    public string $os_image = '';
 
     public string $setup_script_key = '';
 
