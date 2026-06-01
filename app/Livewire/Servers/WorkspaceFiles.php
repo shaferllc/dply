@@ -127,7 +127,7 @@ class WorkspaceFiles extends Component
             $this->path = FileBrowserPathPolicy::join($this->path, $name);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -138,7 +138,7 @@ class WorkspaceFiles extends Component
             $this->path = FileBrowserPathPolicy::normalize($absolute);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -153,7 +153,7 @@ class WorkspaceFiles extends Component
     public function toggleViewAsRoot(): void
     {
         if (! $this->canViewAsRoot()) {
-            $this->dispatchToast('error', __('Only org owners or admins can view as root.'));
+            $this->toastError(__('Only org owners or admins can view as root.'));
 
             return;
         }
@@ -173,7 +173,7 @@ class WorkspaceFiles extends Component
         try {
             $target = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -260,7 +260,7 @@ class WorkspaceFiles extends Component
                 $this->filter !== '' ? $this->filter : null,
             );
         } catch (\Throwable $e) {
-            $this->dispatchToast('error', __('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
+            $this->toastError(__('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
 
             return null;
         }

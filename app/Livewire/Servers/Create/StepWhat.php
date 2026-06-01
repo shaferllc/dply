@@ -294,8 +294,7 @@ class StepWhat extends Component
                 }
             }
 
-            $this->validate($rules, attributes: [
-            ];
+
             $attributes = [
                 'form.install_profile' => __('install profile'),
                 'form.server_role' => __('server role'),
@@ -305,7 +304,6 @@ class StepWhat extends Component
                 'form.cache_service' => __('cache service'),
                 'form.cache_allowed_from' => __('allowed source'),
                 'form.cache_password' => __('cache password'),
-            ]);
             ];
 
             if ($this->showsOsImagePicker()) {

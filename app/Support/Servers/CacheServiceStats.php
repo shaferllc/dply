@@ -85,15 +85,21 @@ class CacheServiceStats
         }
 
         $cli = self::binaryFor($cacheService->engine);
+        // AUTH flag must come AFTER the cli binary — `-a 'pw' valkey-cli …`
+        // makes bash treat `-a` as the program. `--no-auth-warning` keeps the
+        // safety message off stderr (which we 2>&1 below) so the parser
+        // doesn't see "Warning: …" prefixed onto the INFO buffer.
         $authFlag = filled($cacheService->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $cacheService->auth_password).' '
+            ? ' -a '.escapeshellarg((string) $cacheService->auth_password).' --no-auth-warning'
             : '';
+        $cliPath = escapeshellarg($cli);
+        $port = (int) $cacheService->port;
 
         try {
             $output = $this->executor->runInlineBash(
                 $server,
                 'cache-service:info-raw:'.$cacheService->engine,
-                'command -v '.escapeshellarg($cli).' >/dev/null && '.$authFlag.escapeshellarg($cli).' -p '.(int) $cacheService->port.' INFO 2>/dev/null || '.$authFlag.'redis-cli -p '.(int) $cacheService->port.' INFO 2>/dev/null',
+                'command -v '.$cliPath.' >/dev/null && '.$cliPath.$authFlag.' -p '.$port.' INFO 2>/dev/null || redis-cli'.$authFlag.' -p '.$port.' INFO 2>/dev/null',
                 timeoutSeconds: 30,
                 asRoot: false,
             );
@@ -129,14 +135,16 @@ class CacheServiceStats
         $cli = self::binaryFor($cacheService->engine);
 
         $authFlag = filled($cacheService->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $cacheService->auth_password).' '
+            ? ' -a '.escapeshellarg((string) $cacheService->auth_password).' --no-auth-warning'
             : '';
+        $cliPath = escapeshellarg($cli);
+        $port = (int) $cacheService->port;
 
         try {
             $output = $this->executor->runInlineBash(
                 $server,
                 'cache-service:clients:'.$cacheService->engine,
-                'command -v '.escapeshellarg($cli).' >/dev/null && '.$authFlag.escapeshellarg($cli).' -p '.(int) $cacheService->port.' CLIENT LIST 2>/dev/null || '.$authFlag.'redis-cli -p '.(int) $cacheService->port.' CLIENT LIST 2>/dev/null',
+                'command -v '.$cliPath.' >/dev/null && '.$cliPath.$authFlag.' -p '.$port.' CLIENT LIST 2>/dev/null || redis-cli'.$authFlag.' -p '.$port.' CLIENT LIST 2>/dev/null',
                 timeoutSeconds: 30,
                 asRoot: false,
             );
@@ -188,11 +196,19 @@ class CacheServiceStats
     private function redisInfo(Server $server, ServerCacheService $cacheService): array
     {
         $cli = self::binaryFor($cacheService->engine);
+        // Missing AUTH here is why the Status-grid `snapshot()` row used to
+        // come back empty whenever requirepass was set — the INFO call hit
+        // NOAUTH and we silently dropped the buffer on the floor.
+        $authFlag = filled($cacheService->auth_password ?? null)
+            ? ' -a '.escapeshellarg((string) $cacheService->auth_password).' --no-auth-warning'
+            : '';
+        $cliPath = escapeshellarg($cli);
+        $port = (int) $cacheService->port;
 
         $output = $this->executor->runInlineBash(
             $server,
             'cache-service:info:'.$cacheService->engine,
-            'command -v '.escapeshellarg($cli).' >/dev/null && '.escapeshellarg($cli).' -p '.(int) $cacheService->port.' INFO 2>/dev/null || redis-cli -p '.(int) $cacheService->port.' INFO 2>/dev/null',
+            'command -v '.$cliPath.' >/dev/null && '.$cliPath.$authFlag.' -p '.$port.' INFO 2>/dev/null || redis-cli'.$authFlag.' -p '.$port.' INFO 2>/dev/null',
             timeoutSeconds: 30,
             asRoot: false,
         );

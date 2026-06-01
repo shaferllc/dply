@@ -97,8 +97,13 @@ class TailCacheServiceMonitorJob implements ShouldQueue
         }
 
         $cli = CacheServiceStats::binaryFor($row->engine);
+        // AUTH flag must come AFTER the cli binary, not before — otherwise
+        // bash/timeout sees `-a 'pw' valkey-cli` as "run `-a` with these args"
+        // and errors with "timeout: failed to run command '-a': No such file
+        // or directory". `--no-auth-warning` keeps the safety warning off
+        // stderr so it doesn't show up in the MONITOR stream.
         $authFlag = filled($row->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $row->auth_password).' '
+            ? ' -a '.escapeshellarg((string) $row->auth_password).' --no-auth-warning'
             : '';
 
         // `timeout <N>` ensures we ALWAYS exit after the bounded window,
@@ -113,8 +118,8 @@ class TailCacheServiceMonitorJob implements ShouldQueue
         $script = sprintf(
             'stdbuf -oL -eL timeout --preserve-status %d %s%s -p %d MONITOR 2>&1 || true',
             $duration,
-            $authFlag,
             escapeshellarg($cli),
+            $authFlag,
             (int) $row->port,
         );
 

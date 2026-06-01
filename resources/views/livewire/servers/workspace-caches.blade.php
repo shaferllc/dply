@@ -43,6 +43,25 @@
         <p>{{ __('It is independent of how apps deployed here are configured to use cache: this page installs and operates the server, not your app\'s client code. The engine badges are read live from the server; install state lives in the dply database.') }}</p>
     </x-explainer>
 
+    {{-- Top-of-page console banner — Debug, Restart/Stop/Start/Disable/Enable
+         and the rest stream into the shared ConsoleAction partial here so it
+         lives next to the page header alongside every other workspace's banner
+         (PHP / Manage / Databases / etc.). The banner shows the most recent
+         run for the currently active engine tab; the redundant per-engine
+         render inside engine-panel.blade.php was removed so the operator
+         doesn't have to scroll past the status grid to see action output. --}}
+    @php
+        $topConsoleRun = isset($cacheRunsByEngine[$workspace_tab])
+            ? $cacheRunsByEngine[$workspace_tab]
+            : ($manageActionRun ?? null);
+    @endphp
+    @if ($topConsoleRun)
+        @include('livewire.partials.console-action-banner-static', [
+            'run' => $topConsoleRun,
+            'kindLabels' => (array) config('console_actions.kinds', []),
+        ])
+    @endif
+
     @if ($opsReady)
         @if ($cacheBusy)
             @include('livewire.servers.partials.cache._banner')

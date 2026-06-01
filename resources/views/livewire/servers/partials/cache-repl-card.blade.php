@@ -14,7 +14,12 @@
     $commandModalName = 'cache-command-reference-'.$engine;
 @endphp
 
-<div class="{{ $card }}" wire:key="cache-repl-{{ $engine }}">
+{{-- See cache-key-browser-card for the rationale: overflow-hidden on the root
+     card clips the autocomplete dropdown (positioned bottom-full above the
+     input) so it appears "hidden behind" neighboring cards. Strip it so the
+     dropdown can paint past the card boundary while keeping the rounded
+     header/footer visuals intact. --}}
+<div class="{{ str_replace('overflow-hidden', 'overflow-visible', $card) }}" wire:key="cache-repl-{{ $engine }}">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
@@ -83,9 +88,29 @@
         </span>
     </div>
 
-    <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100">
+    <div
+        class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"
+        x-data="{ pendingCmd: '' }"
+        x-on:repl-submitting.window="pendingCmd = $event.detail?.cmd || ''"
+    >
         @if (empty($replHistory))
-            <p class="px-1 py-2 text-brand-mist/80">{{ __('No commands run yet. Try INFO server or PING.') }}</p>
+            {{-- Empty state hides while a command is mid-flight so the pending block (below) can take the spotlight. --}}
+            {{-- Dark-theme variant of the same empty-state pattern the
+                 light cards use: dashed border, centered icon, bold title,
+                 helper copy with inline command chips. --}}
+            <div class="rounded-lg border border-dashed border-emerald-100/15 bg-emerald-100/[0.03] px-6 py-8 text-center" wire:loading.remove wire:target="runReplCommand">
+                <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100/10 text-emerald-200 ring-1 ring-emerald-100/15">
+                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <p class="mt-3 text-sm font-semibold text-emerald-100">{{ __('No commands run yet') }}</p>
+                <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-emerald-100/70">
+                    {{ __('Type a redis command below to send it over SSH. Try') }}
+                    <code class="rounded bg-emerald-100/10 px-1 py-0.5 font-mono text-amber-200 ring-1 ring-emerald-100/10">INFO server</code>
+                    {{ __('for engine details, or') }}
+                    <code class="rounded bg-emerald-100/10 px-1 py-0.5 font-mono text-amber-200 ring-1 ring-emerald-100/10">PING</code>
+                    {{ __('to check the round-trip.') }}
+                </p>
+            </div>
         @else
             <div class="max-h-96 space-y-2 overflow-auto" x-data x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">
                 @foreach ($replHistory as $entry)
@@ -104,6 +129,26 @@
                 @endforeach
             </div>
         @endif
+
+        {{-- Pending entry — appears the moment the form is submitted (via the
+             form's x-on:submit hook capturing the typed command into Alpine
+             state) and stays visible for as long as wire:loading on the
+             runReplCommand action is true. When Livewire returns, wire:loading
+             clears, this div hides, and the freshly-pushed history entry above
+             takes its place. Operator never sees a frozen output area while SSH
+             round-trips. --}}
+        <div class="mt-2 {{ empty($replHistory) ? '' : 'border-t border-emerald-100/10 pt-2' }}" wire:loading wire:target="runReplCommand">
+            <p class="text-amber-300/90">
+                <span class="text-emerald-200/80 select-none">&gt;&nbsp;</span><span x-text="pendingCmd || '…'"></span>
+            </p>
+            <p class="mt-1 flex items-center gap-1.5 pl-4 text-sky-200">
+                <svg class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+                </svg>
+                <span>{{ __('running over SSH…') }}</span>
+            </p>
+        </div>
     </div>
 
     {{-- Autocomplete state lives in Alpine; the actual input is bound to Livewire. When a
@@ -159,7 +204,12 @@
         }"
         x-on:click.outside="open = false"
     >
-        <form wire:submit.prevent="runReplCommand" class="flex items-stretch gap-2">
+        <form
+            wire:submit.prevent="runReplCommand"
+            x-on:submit="$dispatch('repl-submitting', { cmd: $refs.replInput.value })"
+            x-on:livewire-update.window="$dispatch('repl-finished')"
+            class="flex items-stretch gap-2"
+        >
             <span class="inline-flex items-center px-2 font-mono text-sm text-brand-mist select-none">&gt;</span>
             <x-text-input
                 x-ref="replInput"

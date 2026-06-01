@@ -299,20 +299,13 @@
                             </p>
                         @endif
 
-                        {{-- Command-output banner — Debug, Restart/Stop/Start/Disable/Enable all
-                             route through the shared ConsoleAction banner so the operator sees the
-                             actual shell output with consistent chrome, tone-coded lines, copy-output
-                             and "open in modal" affordances. Subject is the ServerCacheService row;
-                             kind is `cache_*` (filtered in render() via `latestConsoleActionFor`). --}}
-                        @php $cacheRun = $cacheRunsByEngine[$engine] ?? null; @endphp
-                        @if ($cacheRun)
-                            <div class="mt-4">
-                                @include('livewire.partials.console-action-banner-static', [
-                                    'run' => $cacheRun,
-                                    'kindLabels' => [],
-                                ])
-                            </div>
-                        @endif
+                        {{-- Command-output banner now renders at the top of the
+                             workspace page (workspace-caches.blade.php) so it's
+                             aligned with every other workspace's banner placement
+                             and the operator doesn't have to scroll past the
+                             status grid to see action output. The render() method
+                             still computes $cacheRunsByEngine — workspace-caches
+                             picks the entry matching the active engine tab. --}}
 
                         @if ($cacheBusy)
                             <p class="mt-6 rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 flex items-start gap-2">
@@ -939,13 +932,22 @@
                             </div>
                         @endif
 
-                        {{-- Connected clients (redis-family only, Stats subtab). --}}
+                        {{-- Connected clients (redis-family only, Stats subtab).
+                             Header restyled to match the keyspace / replication
+                             cards — sand-tinted header strip with an icon avatar,
+                             eyebrow label, title, description, and action buttons
+                             on the right; body lives in its own padded section
+                             below a border-b separator. --}}
                         @if ($activeSubtab === 'stats')
-                        <div class="{{ $card }} p-6 sm:p-8">
-                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                    <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
-                                    <p class="mt-2 text-sm text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand — refresh to see who\'s connected right now.') }}</p>
+                        <div class="{{ $card }}">
+                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Clients') }}</p>
+                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
+                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Snapshot of CLIENT LIST. Pulled on demand — refresh to see who\'s connected right now.') }}</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     @if ($cacheClients === null && $cacheClientsError === null)
@@ -967,13 +969,81 @@
                                 </div>
                             </div>
 
+                            <div class="px-6 py-6 sm:px-7">
+
+                            {{-- In-body loading indicator. CLIENT LIST takes 1-2s over SSH
+                                 (longer with --no-auth-warning'd retries) and the button only
+                                 shows "Loading…" up top — without this the body kept showing
+                                 the stale idle hint ("Hit Load clients above…") while the
+                                 fetch was in flight, making it look like the click was a
+                                 no-op. Skeleton rows mirror the real table shape so the swap
+                                 to the result list lands without a layout jump. --}}
+                            <div wire:loading wire:target="loadCacheClients">
+                                <div class="flex w-full items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
+                                    <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10" opacity="0.25" />
+                                        <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+                                    </svg>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="font-semibold">{{ __('Pulling CLIENT LIST over SSH…') }}</p>
+                                        <p class="mt-0.5 text-sky-800/90">{{ __('Snapshot is captured at the engine and parsed client-side. Typical round-trip is 1–2 seconds; longer on a slow link.') }}</p>
+                                    </div>
+                                </div>
+                                {{-- Render an actual <table> with the same wrapper /
+                                     header markup the real result uses so the
+                                     skeleton occupies the same horizontal footprint
+                                     and swaps in place without any width shift when
+                                     CLIENT LIST returns. --}}
+                                <div class="mt-3 overflow-x-auto rounded-xl border border-brand-ink/10">
+                                    <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                                        <thead class="bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                                            <tr>
+                                                <th class="px-4 py-3">{{ __('ID') }}</th>
+                                                <th class="px-4 py-3">{{ __('Address') }}</th>
+                                                <th class="px-4 py-3">{{ __('Name') }}</th>
+                                                <th class="px-4 py-3">{{ __('Age (s)') }}</th>
+                                                <th class="px-4 py-3">{{ __('Idle (s)') }}</th>
+                                                <th class="px-4 py-3">{{ __('DB') }}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-brand-ink/10 bg-white">
+                                            @foreach (range(1, 6) as $i)
+                                                <tr>
+                                                    <td class="px-4 py-3"><div class="h-3 w-8 animate-pulse rounded bg-brand-ink/10"></div></td>
+                                                    <td class="px-4 py-3"><div class="h-3 w-40 animate-pulse rounded bg-brand-ink/10"></div></td>
+                                                    <td class="px-4 py-3"><div class="h-3 w-16 animate-pulse rounded bg-brand-ink/10"></div></td>
+                                                    <td class="px-4 py-3"><div class="h-3 w-10 animate-pulse rounded bg-brand-ink/10"></div></td>
+                                                    <td class="px-4 py-3"><div class="h-3 w-10 animate-pulse rounded bg-brand-ink/10"></div></td>
+                                                    <td class="px-4 py-3"><div class="h-3 w-4 animate-pulse rounded bg-brand-ink/10"></div></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div wire:loading.remove wire:target="loadCacheClients">
                             @if ($cacheClientsError)
-                                <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheClientsError }}</p>
+                                <p class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheClientsError }}</p>
                             @elseif ($cacheClients !== null)
                                 @if (count($cacheClients) === 0)
-                                    <p class="mt-4 text-sm text-brand-moss">{{ __('No clients connected.') }}</p>
+                                    <p class="text-sm text-brand-moss">{{ __('No clients connected.') }}</p>
                                 @else
-                                    <div class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10">
+                                    @php
+                                        // Client-side pagination — full snapshot is already in memory
+                                        // (the SSH CLIENT LIST returns everything), so slicing is cheap
+                                        // and prev/next never re-hits the engine. Page is bounded by
+                                        // {@see setCacheClientsPage()} so prev/next can't overshoot.
+                                        $pageSize = \App\Livewire\Servers\WorkspaceCaches::CACHE_CLIENTS_PAGE_SIZE;
+                                        $clientsCount = count($cacheClients);
+                                        $pageCount = max(1, (int) ceil($clientsCount / $pageSize));
+                                        $currentPage = max(1, min((int) ($cacheClientsPage ?? 1), $pageCount));
+                                        $startIndex = ($currentPage - 1) * $pageSize;
+                                        $pageSlice = array_slice($cacheClients, $startIndex, $pageSize);
+                                        $rangeStart = $startIndex + 1;
+                                        $rangeEnd = min($startIndex + $pageSize, $clientsCount);
+                                    @endphp
+                                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
                                         <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                                             <thead class="bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                                 <tr>
@@ -986,7 +1056,7 @@
                                                 </tr>
                                             </thead>
                                             <tbody class="divide-y divide-brand-ink/10 bg-white">
-                                                @foreach ($cacheClients as $client)
+                                                @foreach ($pageSlice as $client)
                                                     <tr>
                                                         <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-ink">{{ $client['id'] }}</td>
                                                         <td class="whitespace-nowrap px-4 py-3 font-mono text-brand-ink">{{ $client['addr'] }}</td>
@@ -999,8 +1069,58 @@
                                             </tbody>
                                         </table>
                                     </div>
+
+                                    @if ($pageCount > 1)
+                                        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                            <p class="text-brand-moss">
+                                                {{ __('Showing :start–:end of :total clients', ['start' => $rangeStart, 'end' => $rangeEnd, 'total' => $clientsCount]) }}
+                                            </p>
+                                            <div class="inline-flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    wire:click="setCacheClientsPage({{ $currentPage - 1 }})"
+                                                    @disabled($currentPage <= 1)
+                                                    class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    <x-heroicon-m-chevron-left class="h-3 w-3" />
+                                                    {{ __('Prev') }}
+                                                </button>
+                                                <span class="px-2 font-mono text-brand-moss">{{ $currentPage }} / {{ $pageCount }}</span>
+                                                <button
+                                                    type="button"
+                                                    wire:click="setCacheClientsPage({{ $currentPage + 1 }})"
+                                                    @disabled($currentPage >= $pageCount)
+                                                    class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    {{ __('Next') }}
+                                                    <x-heroicon-m-chevron-right class="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endif
                                 @endif
+                            @else
+                                {{-- Idle empty state — matches the keyspace dashboard
+                                     and snapshots empty-states: dashed border, centered
+                                     icon + title + helper text so it doesn't look like
+                                     a forgotten plain paragraph. --}}
+                                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+                                    <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                        <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
+                                    </span>
+                                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No snapshot yet') }}</p>
+                                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                                        {{ __('Hit') }}
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                                            <x-heroicon-o-users class="h-3 w-3" aria-hidden="true" />
+                                            {{ __('Load clients') }}
+                                        </span>
+                                        {{ __('above to capture a one-time CLIENT LIST snapshot — connection IDs, peer addresses, names, age, and active DB index for everything talking to this engine right now.') }}
+                                    </p>
+                                </div>
                             @endif
+                            </div>{{-- /wire:loading.remove wrapper for cacheClients body --}}
+                            </div>
                         </div>
 
                         {{-- Live keyspace dashboard — redis-family only, Stats subtab. --}}
@@ -1029,6 +1149,8 @@
                             'error' => $keyBrowserError,
                             'replUnlocked' => $replUnlocked,
                             'card' => $card,
+                            'keysTablePage' => $keysTablePage,
+                            'fromCache' => $keyBrowserFromCache,
                         ])
 
                         {{-- Live MONITOR tail — redis-family only, Stats subtab. --}}

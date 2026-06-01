@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Admin;
 
 use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
-use App\Models\AuditLog;
+use App\Models\AuditLog as AuditLogModel;
 use App\Models\Organization;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -93,7 +93,7 @@ class AuditLog extends Component
             ->latest('created_at')
             ->paginate(25);
 
-        $actions = AuditLog::query()
+        $actions = AuditLogModel::query()
             ->select('action')
             ->distinct()
             ->orderBy('action')
@@ -107,11 +107,11 @@ class AuditLog extends Component
     }
 
     /**
-     * @return Builder<AuditLog>
+     * @return Builder<AuditLogModel>
      */
     protected function auditQuery()
     {
-        $query = AuditLog::query()
+        $query = AuditLogModel::query()
             ->with(['subject', 'user:id,name,email', 'organization:id,name']);
 
         if ($this->actionFilter !== '') {

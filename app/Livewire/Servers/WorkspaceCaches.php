@@ -117,6 +117,17 @@ class WorkspaceCaches extends Component
 
     public ?string $cacheClientsError = null;
 
+    /**
+     * Page size + current page for the CLIENT LIST table. Pagination is
+     * client-side (we already have the full list in memory) so prev/next
+     * doesn't re-SSH — the snapshot is cheap to slice. Reset to page 1 on
+     * every fresh `loadCacheClients` so a refresh doesn't strand the operator
+     * on a page that no longer exists.
+     */
+    public const CACHE_CLIENTS_PAGE_SIZE = 10;
+
+    public int $cacheClientsPage = 1;
+
     /** True after `loadCacheMemorySettings` populates the form below. */
     public bool $cacheMemoryLoaded = false;
 
@@ -178,6 +189,25 @@ class WorkspaceCaches extends Component
     /** True when the last SCAN page reported cursor=0 (no more keys to fetch). */
     public bool $keyBrowserComplete = false;
 
+    /**
+     * Client-side pagination of the in-memory key list. The SCAN buffer can
+     * accumulate hundreds of keys across "Load more" presses; rendering them
+     * all at once creates a scrolling wall — paginating in slices of 25 keeps
+     * the result table readable and prev/next is free (just an array slice).
+     */
+    public const KEYS_TABLE_PAGE_SIZE = 25;
+
+    public int $keysTablePage = 1;
+
+    /**
+     * Marker set when we hydrated keys from the user's session on mount —
+     * indicates the data is from a previous visit, not a fresh SCAN. The
+     * card shows a soft "from cache · Search to refresh" banner so the
+     * operator knows what they're looking at without leaving the page blank
+     * waiting for them to re-run Search.
+     */
+    public bool $keyBrowserFromCache = false;
+
     public ?string $keyBrowserSelected = null;
 
     /** @var array{type: string, ttl: int, value: string|list<string>, truncated: bool}|null */
@@ -231,6 +261,75 @@ class WorkspaceCaches extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->hydrateKeyBrowserFromSession();
+    }
+
+    /**
+     * Pull the most-recent key browser snapshot out of the user's session if
+     * one exists for this server + engine. Keeps the table populated on page
+     * reload / back-button so the operator never lands on an empty card and
+     * has to re-run Search just to remind themselves what they were looking
+     * at. The `keyBrowserFromCache` flag drives a "click Search to refresh"
+     * banner in the view.
+     */
+    protected function hydrateKeyBrowserFromSession(): void
+    {
+        $key = $this->keyBrowserSessionKey();
+        if ($key === null) {
+            return;
+        }
+
+        $snapshot = session($key);
+        if (! is_array($snapshot) || empty($snapshot['keys'])) {
+            return;
+        }
+
+        $this->keyBrowserKeys = array_values(array_filter((array) $snapshot['keys'], 'is_string'));
+        $this->keyBrowserCursor = (string) ($snapshot['cursor'] ?? '0');
+        $this->keyBrowserComplete = (bool) ($snapshot['complete'] ?? false);
+        $this->keyBrowserPattern = (string) ($snapshot['pattern'] ?? ($this->keyBrowserPattern ?: '*'));
+        $this->keyBrowserLoaded = true;
+        $this->keyBrowserFromCache = true;
+        $this->keysTablePage = 1;
+    }
+
+    /**
+     * Persist the current key-browser state into the session so the next
+     * page load (mount) can re-hydrate. Scoped to the workspace_tab (engine)
+     * so switching engines doesn't carry the wrong list across.
+     */
+    protected function persistKeyBrowserToSession(): void
+    {
+        $key = $this->keyBrowserSessionKey();
+        if ($key === null) {
+            return;
+        }
+
+        session([$key => [
+            'keys' => array_values(array_filter($this->keyBrowserKeys, 'is_string')),
+            'cursor' => $this->keyBrowserCursor,
+            'complete' => $this->keyBrowserComplete,
+            'pattern' => $this->keyBrowserPattern ?: '*',
+            'saved_at' => now()->toIso8601String(),
+        ]]);
+    }
+
+    /**
+     * Session key namespace — per-server + per-engine so listings don't mix.
+     * The `v2` version tag forces the previous session payload to be ignored:
+     * v1 stored keys that came from `redis-cli --no-raw SCAN`, which wrapped
+     * names in `1) "…"` array-index quotes; any inspect attempt on that
+     * malformed key returned `none` because the literal `1) "name"` doesn't
+     * exist. Bumping the version invalidates those caches on first mount.
+     */
+    protected function keyBrowserSessionKey(): ?string
+    {
+        $engine = $this->workspace_tab;
+        if (! in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
+            return null;
+        }
+
+        return sprintf('dply.cache_workspace.key_browser_v2.%s.%s', $this->server->id, $engine);
     }
 
     public function setWorkspaceTab(string $tab): void
@@ -362,10 +461,8 @@ class WorkspaceCaches extends Component
      * doesn't have to chase the badge to verify. Cheaper than installing /
      * uninstalling something to bust the cache.
      */
-    public function recheckCacheServiceInstance(
-        string $engine,
-        ServerCacheServiceHostCapabilities $capabilities,
-    ): void {
+    public function recheckCacheServiceInstance(string $engine): void
+    {
         $this->authorize('update', $this->server);
         if (! $this->validateEngine($engine)) {
             return;
@@ -378,18 +475,22 @@ class WorkspaceCaches extends Component
             return;
         }
 
-        $reachable = $capabilities->probeInstance($this->server, $engine, (int) $row->port);
-        $capabilities->forget($this->server);
+        // Two-step pattern so the banner appears IMMEDIATELY in QUEUED state
+        // and the operator sees progress as the job runs — instead of clicking
+        // and staring at a still page for 2-3s while a synchronous SSH probe
+        // blocks the response. seedConsoleActionRun() creates the row up
+        // front; the queued job flips it through RUNNING → COMPLETED while
+        // emitting probe output. wire:poll on the banner picks up each state
+        // transition.
+        $consoleActionId = $this->seedConsoleActionRun(
+            $row,
+            'cache_recheck',
+            __('Recheck :engine instance :name on :host', [
+                'engine' => $engine, 'name' => $row->name, 'host' => $this->server->name,
+            ])
+        );
 
-        if ($reachable) {
-            $this->toastSuccess(__(':engine instance :name on port :port is reachable.', [
-                'engine' => $engine, 'name' => $row->name, 'port' => $row->port,
-            ]));
-        } else {
-            $this->toastError(__(':engine instance :name on port :port is NOT reachable. Click Debug to see why.', [
-                'engine' => $engine, 'name' => $row->name, 'port' => $row->port,
-            ]));
-        }
+        \App\Jobs\RecheckCacheServiceJob::dispatch($consoleActionId, $row->id);
     }
 
     /**
@@ -475,30 +576,65 @@ BASH,
                     $this->emitExecutorBuffer($emit, $output->buffer, 0, 'debug');
                 },
             );
-            $this->toastSuccess(__('Diagnostics captured. See the console banner below.'));
+            $this->toastSuccess(__('Diagnostics captured. See the console banner at the top of the page.'));
         } catch (\Throwable $e) {
-            $this->toastError(__('Diagnostic run failed — see the console banner below for details.'));
+            $this->toastError(__('Diagnostic run failed — see the console banner at the top for details.'));
         }
     }
 
     /**
-     * Open the per-instance Status/Logs modal on its `systemctl status` view.
-     * The modal scope is the engine + currently-active instance: `cacheServiceFor()`
-     * already filters by `$active_instance`, so operators switch instances via
-     * the chip row and then click Status/Logs on the toolbar.
+     * Trigger a systemctl-status probe for the active instance. Now routes
+     * through the queued StatusCacheServiceJob so the result lands in the
+     * top-of-page console banner — same pattern as Recheck / Debug. Replaces
+     * the previous modal flow; the operator sees the result inline with every
+     * other action and can hit "Open" on the banner to expand the full output.
      */
-    public function showCacheInstanceStatus(string $engine, ExecuteRemoteTaskOnServer $executor): void
+    public function showCacheInstanceStatus(string $engine): void
     {
-        $this->openCacheStatusModal($engine, 'status', $executor);
+        $this->dispatchCacheStatusJob($engine, 'status');
     }
 
     /**
-     * Open the per-instance Status/Logs modal on its `journalctl -u` view.
-     * Same scope as `showCacheInstanceStatus` — operates on the active instance.
+     * Trigger a journalctl -u probe for the active instance — same banner-based
+     * flow as `showCacheInstanceStatus`.
      */
-    public function showCacheInstanceLogs(string $engine, ExecuteRemoteTaskOnServer $executor): void
+    public function showCacheInstanceLogs(string $engine): void
     {
-        $this->openCacheStatusModal($engine, 'logs', $executor);
+        $this->dispatchCacheStatusJob($engine, 'logs');
+    }
+
+    /**
+     * Shared seed+dispatch path for Status and Logs. Seeds a ConsoleAction row
+     * up front (banner appears in QUEUED) and dispatches the queued job which
+     * flips through RUNNING → COMPLETED while emitting output lines.
+     */
+    protected function dispatchCacheStatusJob(string $engine, string $view): void
+    {
+        $this->authorize('update', $this->server);
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if ($row === null) {
+            $this->toastError(__('No :engine instance to inspect.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('SSH must be ready before viewing status or logs.'));
+
+            return;
+        }
+
+        $kind = $view === 'logs' ? 'cache_logs' : 'cache_status';
+        $label = $view === 'logs'
+            ? __('Logs for :engine instance :name on :host', ['engine' => $engine, 'name' => $row->name, 'host' => $this->server->name])
+            : __('Status of :engine instance :name on :host', ['engine' => $engine, 'name' => $row->name, 'host' => $this->server->name]);
+
+        $consoleActionId = $this->seedConsoleActionRun($row, $kind, $label);
+        \App\Jobs\StatusCacheServiceJob::dispatch($consoleActionId, $row->id, $view);
     }
 
     /**
@@ -1245,12 +1381,31 @@ BASH,
 
         $this->cacheClientsError = null;
         $this->cacheClients = $stats->clients($row->server, $row);
+        $this->cacheClientsPage = 1;
     }
 
     public function hideCacheClients(): void
     {
         $this->cacheClients = null;
         $this->cacheClientsError = null;
+        $this->cacheClientsPage = 1;
+    }
+
+    /**
+     * Set the CLIENT LIST table page. Bounded to [1, pageCount] so a malformed
+     * payload from a stale URL or back-button race can't strand the operator
+     * on an empty slice.
+     */
+    public function setCacheClientsPage(int $page): void
+    {
+        if (! is_array($this->cacheClients) || $this->cacheClients === []) {
+            $this->cacheClientsPage = 1;
+
+            return;
+        }
+
+        $pageCount = (int) ceil(count($this->cacheClients) / self::CACHE_CLIENTS_PAGE_SIZE);
+        $this->cacheClientsPage = max(1, min($page, max(1, $pageCount)));
     }
 
     public function loadCacheMemorySettings(CacheServiceMemoryConfig $memory): void
@@ -1955,8 +2110,28 @@ BASH,
         $this->keyBrowserValue = null;
         $this->keyBrowserValueError = null;
         $this->keyBrowserError = null;
+        $this->keyBrowserFromCache = false;
+        $this->keysTablePage = 1;
 
         $this->loadKeyBrowserPage($explorer);
+    }
+
+    /**
+     * Set the current page of the in-memory keys table. Bounded to
+     * [1, pageCount] so a stale URL or back-button can't strand the
+     * operator on an empty slice.
+     */
+    public function setKeysTablePage(int $page): void
+    {
+        $count = count($this->keyBrowserKeys);
+        if ($count === 0) {
+            $this->keysTablePage = 1;
+
+            return;
+        }
+
+        $pageCount = max(1, (int) ceil($count / self::KEYS_TABLE_PAGE_SIZE));
+        $this->keysTablePage = max(1, min($page, $pageCount));
     }
 
     /**
@@ -1991,6 +2166,9 @@ BASH,
         $this->keyBrowserComplete = $page['complete'];
         $this->keyBrowserLoaded = true;
         $this->keyBrowserError = null;
+        // Fresh data — clear the "from cache" badge and persist for next visit.
+        $this->keyBrowserFromCache = false;
+        $this->persistKeyBrowserToSession();
     }
 
     /**

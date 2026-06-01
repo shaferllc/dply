@@ -113,7 +113,7 @@ class Files extends Component
             $this->path = FileBrowserPathPolicy::join($this->path, $name);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -123,7 +123,7 @@ class Files extends Component
             $this->path = FileBrowserPathPolicy::normalize($absolute);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -138,7 +138,7 @@ class Files extends Component
         try {
             $target = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -175,7 +175,7 @@ class Files extends Component
         try {
             $target = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -186,19 +186,19 @@ class Files extends Component
         try {
             $read = $reader->read($this->server, $target, $editCap, $this->effectiveLoginUser());
         } catch (\Throwable $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
 
         if ($read->contentTruncated) {
-            $this->dispatchToast('error', __('File is larger than the inline edit cap.'));
+            $this->toastError(__('File is larger than the inline edit cap.'));
 
             return;
         }
 
         if ($read->isBinary) {
-            $this->dispatchToast('error', __('Binary files cannot be edited inline.'));
+            $this->toastError(__('Binary files cannot be edited inline.'));
 
             return;
         }
@@ -269,14 +269,14 @@ class Files extends Component
         }
 
         if ($result->missing()) {
-            $this->dispatchToast('error', __('File no longer exists on the server.'));
+            $this->toastError(__('File no longer exists on the server.'));
             $this->closeEditModal();
 
             return;
         }
 
         if (! $result->ok) {
-            $this->dispatchToast('error', __('Save failed (:reason).', ['reason' => $result->conflictReason ?? 'UNKNOWN']));
+            $this->toastError(__('Save failed (:reason).', ['reason' => $result->conflictReason ?? 'UNKNOWN']));
 
             return;
         }
@@ -300,7 +300,7 @@ class Files extends Component
         $this->editingMtime = $result->newMtime;
         $this->editingSize = $newBytes;
 
-        $this->dispatchToast('success', __('Saved.'));
+        $this->toastSuccess(__('Saved.'));
         $this->closeEditModal();
     }
 
@@ -325,7 +325,7 @@ class Files extends Component
                 $this->filter !== '' ? $this->filter : null,
             );
         } catch (\Throwable $e) {
-            $this->dispatchToast('error', __('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
+            $this->toastError(__('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
 
             return null;
         }
