@@ -19,8 +19,10 @@ use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use App\Services\Servers\ServerCreatePresetCatalog;
 use App\Support\Servers\CacheEngineAvailability;
 use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -79,12 +81,44 @@ class StepWhat extends Component
         $this->ensureDefaultEksRegion();
         $this->autoSelectSingletonKubernetesCluster();
         $this->ensureDefaultNewClusterName();
+        $this->ensureDefaultOsImage();
 
         if (! $skipsStack) {
             $this->syncInstallProfileForServerRole();
         }
 
         return null;
+    }
+
+    /**
+     * Whether the OS image picker applies: a provider-provisioned VM (not custom,
+     * not Docker, not Kubernetes) whose provider offers images in the catalog.
+     */
+    private function showsOsImagePicker(): bool
+    {
+        return $this->form->mode === 'provider'
+            && $this->form->provider_host_kind === 'vm'
+            && ServerImageCatalog::supportsProvider($this->form->type);
+    }
+
+    /**
+     * Pre-select an OS image when the picker applies and the form has none (or a
+     * stale one left over from a different provider the user backed out of). Lets
+     * the picker show a sensible default (Ubuntu LTS) without forcing a click.
+     */
+    private function ensureDefaultOsImage(): void
+    {
+        if (! $this->showsOsImagePicker()) {
+            return;
+        }
+
+        if ($this->form->os_image !== ''
+            && ServerImageCatalog::isValidForProvider($this->form->type, $this->form->os_image)) {
+            return;
+        }
+
+        $this->form->os_image = ServerImageCatalog::defaultKeyForProvider($this->form->type);
+        $this->saveDraftFromForm($this->form);
     }
 
     /**
@@ -261,6 +295,8 @@ class StepWhat extends Component
             }
 
             $this->validate($rules, attributes: [
+            ];
+            $attributes = [
                 'form.install_profile' => __('install profile'),
                 'form.server_role' => __('server role'),
                 'form.webserver' => __('web server'),
@@ -270,6 +306,14 @@ class StepWhat extends Component
                 'form.cache_allowed_from' => __('allowed source'),
                 'form.cache_password' => __('cache password'),
             ]);
+            ];
+
+            if ($this->showsOsImagePicker()) {
+                $rules['form.os_image'] = ['required', 'string', Rule::in(ServerImageCatalog::allowedKeysForProvider($this->form->type))];
+                $attributes['form.os_image'] = __('operating system');
+            }
+
+            $this->validate($rules, attributes: $attributes);
         }
 
         $this->saveDraftFromForm($this->form, advanceTo: 4);
@@ -528,6 +572,10 @@ class StepWhat extends Component
             'orgBlueprints' => $orgBlueprints,
             'selectedBlueprintId' => $this->selectedBlueprintId,
             'isKubernetes' => $isKubernetes,
+            'showOsImagePicker' => $this->showsOsImagePicker(),
+            'osImageOptions' => $this->showsOsImagePicker()
+                ? ServerImageCatalog::optionsForProvider($this->form->type)
+                : [],
             'kubernetesClusters' => $this->kubernetesClusters(),
             'kubernetesProvider' => $this->form->type,
             'kubernetesRegions' => is_array($catalog['regions'] ?? null) ? $catalog['regions'] : [],
@@ -582,6 +630,11 @@ class StepWhat extends Component
             }
 
             return $this->form->do_kubernetes_cluster_name !== '';
+        }
+
+        if ($this->showsOsImagePicker()
+            && ! ServerImageCatalog::isValidForProvider($this->form->type, $this->form->os_image)) {
+            return false;
         }
 
         return $this->form->install_profile !== ''

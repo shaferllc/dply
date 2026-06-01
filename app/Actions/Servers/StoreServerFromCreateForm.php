@@ -174,6 +174,12 @@ final class StoreServerFromCreateForm
             $meta['host_kind'] = Server::HOST_KIND_DOCKER;
         }
 
+        // Chosen OS image (provider VM hosts only). Resolved to a provider-native
+        // slug at provision time; absent means "use the provider default".
+        if ($form->os_image !== '') {
+            $meta['os_image'] = $form->os_image;
+        }
+
         return $meta;
     }
 

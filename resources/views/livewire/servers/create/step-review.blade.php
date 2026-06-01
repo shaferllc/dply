@@ -218,6 +218,13 @@
                                         <span class="font-medium text-brand-ink">{{ $form->size }}</span>
                                     </span>
                                 @endif
+                                @php $osImageLabel = \App\Support\Servers\ServerImageCatalog::labelFor($form->os_image); @endphp
+                                @if ($osImageLabel !== null)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
+                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('OS') }}</span>
+                                        <span class="font-medium text-brand-ink">{{ $osImageLabel }}</span>
+                                    </span>
+                                @endif
                             @endif
                         @else
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">

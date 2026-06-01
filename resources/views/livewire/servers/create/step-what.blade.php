@@ -531,6 +531,36 @@
             </section>
         @endif
 
+        {{-- 2b. OPERATING SYSTEM: only for provider-provisioned VMs (catalog-backed). --}}
+        @if ($showOsImagePicker)
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Operating system') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Choose an OS image') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The base image the VM boots from. Ubuntu LTS is the dply default — pick Debian or an older Ubuntu if your app needs it.') }}</p>
+                </div>
+            </div>
+            <div class="p-6 sm:p-7">
+                <div class="sm:max-w-md">
+                    @include('livewire.servers.create._rich-select', [
+                        'id' => 'os_image',
+                        'label' => __('OS image'),
+                        'field' => 'form.os_image',
+                        'value' => $form->os_image,
+                        'options' => $osImageOptions,
+                        'errorKey' => 'form.os_image',
+                        'eyebrow' => __('Image'),
+                        'placeholder' => __('Choose an image'),
+                    ])
+                </div>
+            </div>
+        </section>
+        @endif
+
         {{-- 3. POWER-USER OVERRIDES: collapsed by default. --}}
         <section class="dply-card overflow-hidden">
             <details
