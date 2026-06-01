@@ -248,12 +248,20 @@
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Probe') }}</dt>
                                 <dd class="mt-1">
-                                    {{-- Compact reachability badge only. The probe-related action
-                                         buttons (Recheck, Debug, Status, Logs, Repair port) live in
-                                         the Diagnose toolbar group below so the status grid stays
-                                         scannable. --}}
+                                    {{-- Three-state badge. "Status: Running, Probe: Not reachable"
+                                         used to surface because the SSH-probe couldn't get a PONG
+                                         back (AUTH password mismatch, port firewalled from inside,
+                                         distro-default cli not in PATH). When the dply row says
+                                         RUNNING but the probe couldn't verify, we say so explicitly
+                                         rather than claiming the engine is down — the operator
+                                         clicks Recheck/Debug below to dig in. --}}
+                                    @php
+                                        $rowSaysRunning = $row && $row->status === \App\Models\ServerCacheService::STATUS_RUNNING;
+                                    @endphp
                                     @if ($probeRunning)
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Reachable') }}</span>
+                                    @elseif ($rowSaysRunning)
+                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700" title="{{ __('Engine is running per dply state, but the SSH probe couldn\'t get a PONG back. Click Recheck/Debug below to see why — common causes are AUTH password mismatch, in-host firewall, or missing cli in PATH.') }}">{{ __('Couldn\'t verify') }}</span>
                                     @else
                                         <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Not reachable') }}</span>
                                     @endif

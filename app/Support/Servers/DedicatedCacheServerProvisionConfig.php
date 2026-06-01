@@ -115,9 +115,39 @@ final class DedicatedCacheServerProvisionConfig
         $bind = $this->bindDirective();
         $authLine = $this->requirePassLine($engine);
 
+        // Per-engine data directory. Without an explicit `dir`, redis/valkey/keydb
+        // fall back to `./` which under systemd hardening resolves to `/` —
+        // unwritable, BGSAVE fails, and `stop-writes-on-bgsave-error yes`
+        // (default) freezes ALL writes including SET. We hit exactly that on
+        // dply-redis-1: the minimal 4-line config we generated dropped the
+        // package default's `dir /var/lib/<engine>` and broke writes on the
+        // first BGSAVE attempt. Fix here is to always emit it explicitly.
+        //
+        // `save ""` disables RDB snapshots — appropriate for a dedicated cache
+        // box where the workload is volatile and persistence ergonomics aren't
+        // worth the disk write loop. Operators who want persistence can flip
+        // it on later via the Persistence card (Phase 3a) and the existing
+        // schedule editor; the snapshot pipeline (Phase 3b) handles backups
+        // explicitly and doesn't need the engine's own RDB schedule.
+        //
+        // `stop-writes-on-bgsave-error no` is belt-and-suspenders for the rare
+        // case an operator turns RDB back on and then hits a transient disk
+        // error — writes keep flowing, the engine logs the BGSAVE failure for
+        // diagnosis, instead of the whole cache going read-only.
+        $dataDir = match ($engine) {
+            'valkey' => '/var/lib/valkey',
+            'keydb' => '/var/lib/keydb',
+            default => '/var/lib/redis',
+        };
+
         return match ($engine) {
             'valkey' => implode("\n", array_filter([
                 "bind {$bind}",
+                "dir {$dataDir}",
+                'dbfilename dump.rdb',
+                'save ""',
+                'stop-writes-on-bgsave-error no',
+                'appendonly no',
                 'maxmemory 256mb',
                 'maxmemory-policy allkeys-lru',
                 $authLine,
@@ -132,7 +162,12 @@ final class DedicatedCacheServerProvisionConfig
             ])."\n",
             'keydb' => implode("\n", array_filter([
                 "bind {$bind}",
+                "dir {$dataDir}",
+                'dbfilename dump.rdb',
                 'protected-mode yes',
+                'save ""',
+                'stop-writes-on-bgsave-error no',
+                'appendonly no',
                 'maxmemory 256mb',
                 'maxmemory-policy allkeys-lru',
                 'port 6379',
@@ -140,6 +175,11 @@ final class DedicatedCacheServerProvisionConfig
             ]))."\n",
             default => implode("\n", array_filter([
                 "bind {$bind}",
+                "dir {$dataDir}",
+                'dbfilename dump.rdb',
+                'save ""',
+                'stop-writes-on-bgsave-error no',
+                'appendonly no',
                 'maxmemory 256mb',
                 'maxmemory-policy allkeys-lru',
                 $authLine,

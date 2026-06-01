@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Servers;
 
 use App\Models\Server;
+use App\Models\ServerCacheService;
 use App\Services\Servers\ServerSshConnectionRunner;
 use Illuminate\Support\Facades\Cache;
 
@@ -60,7 +61,17 @@ class ServerCacheServiceHostCapabilities
 
     public function forget(Server $server): void
     {
-        Cache::forget('server.'.$server->id.'.cache_service_capabilities_v1');
+        // Best-effort — when the dply control plane's CACHE_STORE points at
+        // the very Redis box being managed and that box is in MISCONF (BGSAVE
+        // failed → writes refused), the DEL itself throws RedisException and
+        // crashes the page. Swallow it: the cache entry expires on its TTL
+        // anyway, so failing to bust it just means slightly stale capability
+        // data until the next natural expiry.
+        try {
+            Cache::forget('server.'.$server->id.'.cache_service_capabilities_v1');
+        } catch (\Throwable) {
+            // swallow — see above
+        }
     }
 
     /**
@@ -77,10 +88,10 @@ class ServerCacheServiceHostCapabilities
         // need a single bool per row (the per-card reachability badge) but is now functionally
         // equivalent to a lookup into this map for any row with a default port.
         return [
-            'redis' => $this->probeWith($server, $this->portPingCommand('redis', 6379), 'PONG'),
-            'valkey' => $this->probeWith($server, $this->portPingCommand('valkey', 6379), 'PONG'),
+            'redis' => $this->probeWith($server, $this->portPingCommand($server, 'redis', 6379), 'PONG'),
+            'valkey' => $this->probeWith($server, $this->portPingCommand($server, 'valkey', 6379), 'PONG'),
             'memcached' => $this->probeWith($server, 'systemctl is-active memcached 2>/dev/null', 'active'),
-            'keydb' => $this->probeWith($server, $this->portPingCommand('keydb', 6379), 'PONG'),
+            'keydb' => $this->probeWith($server, $this->portPingCommand($server, 'keydb', 6379), 'PONG'),
             'dragonfly' => $this->probeWith($server, 'systemctl is-active dragonfly 2>/dev/null', 'active'),
         ];
     }
@@ -99,7 +110,7 @@ class ServerCacheServiceHostCapabilities
         }
 
         return match ($engine) {
-            'redis', 'valkey', 'keydb' => $this->probeWith($server, $this->portPingCommand($engine, $port), 'PONG'),
+            'redis', 'valkey', 'keydb' => $this->probeWith($server, $this->portPingCommand($server, $engine, $port), 'PONG'),
             'memcached' => $this->probeWith($server, 'systemctl is-active memcached 2>/dev/null', 'active'),
             'dragonfly' => $this->probeWith($server, 'systemctl is-active dragonfly 2>/dev/null', 'active'),
             default => false,
@@ -109,9 +120,12 @@ class ServerCacheServiceHostCapabilities
     /**
      * Resolve the right `*-cli -p <port> ping` command for a Redis-family engine.
      * Each engine's cli is preferred; redis-cli is the universal fallback because
-     * all three (Redis, Valkey, KeyDB) speak RESP.
+     * all three (Redis, Valkey, KeyDB) speak RESP. When the engine has an AUTH
+     * password configured on its {@see ServerCacheService} row, the `-a` flag is
+     * appended with `--no-auth-warning` — without it the engine returns NOAUTH
+     * and the probe reports the engine as unreachable even when it's healthy.
      */
-    private function portPingCommand(string $engine, int $port): string
+    private function portPingCommand(Server $server, string $engine, int $port): string
     {
         $primary = match ($engine) {
             'redis' => 'redis-cli',
@@ -120,11 +134,21 @@ class ServerCacheServiceHostCapabilities
             default => 'redis-cli',
         };
 
+        $authFlag = '';
+        $row = ServerCacheService::query()
+            ->where('server_id', $server->id)
+            ->where('engine', $engine)
+            ->first();
+        if ($row && filled($row->auth_password ?? null)) {
+            $authFlag = '-a '.escapeshellarg((string) $row->auth_password).' --no-auth-warning ';
+        }
+
         return sprintf(
-            '(command -v %1$s >/dev/null && %1$s -p %2$d ping 2>/dev/null) '
-            .'|| (command -v redis-cli >/dev/null && redis-cli -p %2$d ping 2>/dev/null)',
+            '(command -v %1$s >/dev/null && %1$s %3$s-p %2$d ping 2>/dev/null) '
+            .'|| (command -v redis-cli >/dev/null && redis-cli %3$s-p %2$d ping 2>/dev/null)',
             $primary,
             $port,
+            $authFlag,
         );
     }
 
