@@ -106,6 +106,9 @@ class ServerCreateForm extends Form
 
     public string $do_vpc_uuid = '';
 
+    /** Hetzner private network ID to attach at creation (gives a private IP on that network). */
+    public string $hetzner_network_id = '';
+
     public string $do_tags = '';
 
     public string $do_user_data = '';

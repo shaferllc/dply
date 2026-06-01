@@ -135,6 +135,8 @@ use App\Livewire\Servers\WorkspaceEdgeProxy;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFilesPreview;
 use App\Livewire\Servers\WorkspaceFirewall;
+use App\Livewire\Servers\WorkspaceLoadBalancers;
+use App\Livewire\Servers\WorkspaceNetworking;
 use App\Livewire\Servers\WorkspaceHealth;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceInsightsPreview;
@@ -848,6 +850,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // role_nav_keys[redis|valkey] hosts; the middleware 404s for other roles.
     Route::livewire('servers/{server}/redis-snapshots', WorkspaceRedisSnapshots::class)->name('servers.redis-snapshots');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
+    Route::livewire('servers/{server}/networking', WorkspaceNetworking::class)->name('servers.networking');
+    Route::livewire('servers/{server}/load-balancers', WorkspaceLoadBalancers::class)->name('servers.load-balancers');
     Route::livewire('servers/{server}/ssh-keys', WorkspaceSshKeys::class)->name('servers.ssh-keys');
     Route::middleware('feature:workspace.system_users')->group(function (): void {
         Route::livewire('servers/{server}/system-users', WorkspaceSystemUsers::class)->name('servers.system-users');

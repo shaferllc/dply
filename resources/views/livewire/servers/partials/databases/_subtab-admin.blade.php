@@ -30,7 +30,7 @@
         <div class="px-6 py-6 sm:px-7">
             <form wire:submit="saveAdminCredentials('{{ $engine }}')" class="max-w-2xl space-y-6">
                 @if (\App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($engine))
-                    <div class="grid gap-6 sm:grid-cols-2">
+                    <div class="grid gap-6 sm:grid-cols-2 sm:items-end">
                         <div>
                             <x-input-label for="admin_mysql_root_username" value="{{ $engine === 'mariadb' ? __('MariaDB root username') : __('MySQL root username') }}" />
                             <x-text-input id="admin_mysql_root_username" wire:model="admin_mysql_root_username" class="mt-1 block w-full font-mono text-sm" />
@@ -54,7 +54,7 @@
                         <button type="button" wire:click="clearStoredMysqlRootPassword" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Clear MySQL password') }}</button>
                     </div>
                 @elseif ($engine === 'postgres')
-                    <div class="grid gap-6 sm:grid-cols-2">
+                    <div class="grid gap-6 sm:grid-cols-2 sm:items-end">
                         <div>
                             <x-input-label for="admin_postgres_superuser" value="{{ __('PostgreSQL superuser') }}" />
                             <x-text-input id="admin_postgres_superuser" wire:model="admin_postgres_superuser" class="mt-1 block w-full font-mono text-sm" />
@@ -82,7 +82,7 @@
                         <button type="button" wire:click="clearStoredPostgresPassword" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Clear PostgreSQL password') }}</button>
                     </div>
                 @elseif ($engine === 'mongodb')
-                    <div class="grid gap-6 sm:grid-cols-2">
+                    <div class="grid gap-6 sm:grid-cols-2 sm:items-end">
                         <div>
                             <x-input-label for="admin_mongodb_username" value="{{ __('MongoDB admin username') }}" />
                             <x-text-input id="admin_mongodb_username" wire:model="admin_mongodb_username" class="mt-1 block w-full font-mono text-sm" placeholder="admin" />
@@ -107,7 +107,7 @@
                         <button type="button" wire:click="clearStoredMongodbPassword" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Clear MongoDB password') }}</button>
                     </div>
                 @elseif ($engine === 'clickhouse')
-                    <div class="grid gap-6 sm:grid-cols-2">
+                    <div class="grid gap-6 sm:grid-cols-2 sm:items-end">
                         <div>
                             <x-input-label for="admin_clickhouse_username" value="{{ __('ClickHouse username') }}" />
                             <x-text-input id="admin_clickhouse_username" wire:model="admin_clickhouse_username" class="mt-1 block w-full font-mono text-sm" placeholder="default" />

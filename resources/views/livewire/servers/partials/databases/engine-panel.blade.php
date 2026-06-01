@@ -21,6 +21,8 @@
         @include('livewire.servers.partials.databases._subtab-connections', compact('engine', 'engineDatabases', 'engineSampleDatabase', 'showEngineWorkspace', 'card', 'dbEngineInfoForTab'))
     @elseif ($engine_subtab === 'backups')
         @include('livewire.servers.partials.databases._subtab-backups', compact('engine', 'showEngineWorkspace', 'card', 'dbEngineInfoForTab'))
+    @elseif ($engine_subtab === 'networking' && \App\Support\Servers\DatabaseEngineInstallScripts::supportsRemoteAccess($engine))
+        @include('livewire.servers.partials.databases._subtab-networking', compact('engine', 'engineRow', 'engineDatabases', 'showEngineWorkspace', 'card', 'dbEngineInfoForTab'))
     @elseif ($engine_subtab === 'extensions' && $engine === 'postgres')
         @include('livewire.servers.partials.databases._subtab-extensions', compact('engine', 'showEngineWorkspace', 'card'))
     @elseif ($engine_subtab === 'danger')

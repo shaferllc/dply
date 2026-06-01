@@ -215,6 +215,11 @@
                             <span class="inline-flex items-center whitespace-nowrap rounded-md border border-white/10 bg-white/5 px-2.5 py-1">
                                 {{ __('IP') }}: <span class="ml-1.5 font-mono font-semibold text-white">{{ $server->ip_address ?? '—' }}</span>
                             </span>
+                            @if ($server->private_ip_address)
+                                <span class="inline-flex items-center whitespace-nowrap rounded-md border border-white/10 bg-white/5 px-2.5 py-1">
+                                    {{ __('Private IP') }}: <span class="ml-1.5 font-mono font-semibold text-white">{{ $server->private_ip_address }}</span>
+                                </span>
+                            @endif
                             <span class="inline-flex items-center whitespace-nowrap rounded-md border border-white/10 bg-white/5 px-2.5 py-1">
                                 {{ __('Setup') }}: <span class="ml-1.5 font-semibold text-white">{{ ucfirst($server->setup_status ?? __('Pending')) }}</span>
                             </span>
@@ -325,6 +330,14 @@
                                 <dd class="mt-0.5 truncate font-mono text-xs font-semibold text-brand-ink">{{ $heroIp }}</dd>
                             </div>
                         </x-tooltip>
+                        @if ($server->private_ip_address)
+                            <x-tooltip :label="__('Private IP').': '.$server->private_ip_address" class="w-full">
+                                <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Private IP') }}</dt>
+                                    <dd class="mt-0.5 truncate font-mono text-xs font-semibold text-brand-ink">{{ $server->private_ip_address }}</dd>
+                                </div>
+                            </x-tooltip>
+                        @endif
                         <x-tooltip :label="__('Size').': '.$heroSize" class="w-full">
                             <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
                                 <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>

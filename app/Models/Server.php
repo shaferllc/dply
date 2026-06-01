@@ -84,6 +84,8 @@ class Server extends Model
         'hosting_backend',
         'provider_id',
         'ip_address',
+        'private_ip_address',
+        'hetzner_network_id',
         'ssh_port',
         'ssh_user',
         'ssh_private_key',
@@ -372,6 +374,12 @@ class Server extends Model
     public function isReady(): bool
     {
         return $this->status === self::STATUS_READY;
+    }
+
+    /** Whether this server has a known private/VPC IP it can be reached on by peers. */
+    public function hasPrivateNetwork(): bool
+    {
+        return filled($this->private_ip_address);
     }
 
     public function hostKind(): string

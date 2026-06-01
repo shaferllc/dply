@@ -5,6 +5,7 @@
     $showAdminTab = \App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($engine)
         || in_array($engine, ['postgres', 'mongodb', 'clickhouse'], true);
     $showExtensionsTab = $engine === 'postgres';
+    $showNetworkingTab = \App\Support\Servers\DatabaseEngineInstallScripts::supportsRemoteAccess($engine);
 @endphp
 {{-- Per-engine sub-tabs — always visible (like webserver), with empty states when not installed. --}}
 <x-server-workspace-tablist
@@ -46,6 +47,16 @@
             wire:click="setEngineSubtab('extensions')"
         >
             {{ __('Extensions') }}
+        </x-server-workspace-tab>
+    @endif
+    @if ($showNetworkingTab)
+        <x-server-workspace-tab
+            :id="'db-subtab-'.$engine.'-networking'"
+            icon="heroicon-o-share"
+            :active="$activeSubtab === 'networking'"
+            wire:click="setEngineSubtab('networking')"
+        >
+            {{ __('Networking') }}
         </x-server-workspace-tab>
     @endif
     <x-server-workspace-tab

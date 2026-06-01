@@ -41,10 +41,17 @@ class PollDropletIpJob implements ShouldQueue
         $ip = DigitalOceanService::getDropletPublicIp($droplet);
 
         if ($ip) {
-            $this->server->update([
+            $updates = [
                 'ip_address' => $ip,
                 'status' => Server::STATUS_READY,
-            ]);
+            ];
+
+            $privateIp = DigitalOceanService::getDropletPrivateIp($droplet);
+            if ($privateIp !== null) {
+                $updates['private_ip_address'] = $privateIp;
+            }
+
+            $this->server->update($updates);
 
             $this->dispatchServerProvisionIfNeeded($this->server);
 

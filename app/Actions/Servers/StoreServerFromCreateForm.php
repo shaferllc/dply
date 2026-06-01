@@ -588,6 +588,8 @@ final class StoreServerFromCreateForm
 
         [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
 
+        $networkId = $form->hetzner_network_id !== '' ? (int) $form->hetzner_network_id : null;
+
         $server = $user->servers()->create([
             'organization_id' => $org->id,
             'name' => $form->name,
@@ -598,6 +600,7 @@ final class StoreServerFromCreateForm
             'setup_script_key' => $setupScriptKey,
             'setup_status' => $setupStatus,
             'meta' => $this->meta($form),
+            'hetzner_network_id' => $networkId !== null ? (string) $networkId : null,
             'status' => Server::STATUS_PENDING,
         ]);
 

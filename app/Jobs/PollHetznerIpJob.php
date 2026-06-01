@@ -41,10 +41,17 @@ class PollHetznerIpJob implements ShouldQueue
         $ip = HetznerService::getPublicIp($instance);
 
         if ($ip) {
-            $this->server->update([
+            $updates = [
                 'ip_address' => $ip,
                 'status' => Server::STATUS_READY,
-            ]);
+            ];
+
+            $privateIp = HetznerService::getPrivateIp($instance);
+            if ($privateIp !== null) {
+                $updates['private_ip_address'] = $privateIp;
+            }
+
+            $this->server->update($updates);
 
             $this->dispatchServerProvisionIfNeeded($this->server);
 

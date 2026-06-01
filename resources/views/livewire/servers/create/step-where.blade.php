@@ -371,6 +371,56 @@
                     </section>
                 @endif
 
+                {{-- Private network picker (DO VPC UUID / Hetzner Network ID) --}}
+                @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner'], true))
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Networking') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Private network') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Attach this server to a private network so it can reach other servers (Redis, database, workers) on a private IP without exposing ports to the internet. Optional — leave blank to skip.') }}
+                                </p>
+                            </div>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
+                        </div>
+                        <div class="p-6 sm:p-7">
+                            @if ($form->type === 'digitalocean')
+                                <div>
+                                    <x-input-label for="do_vpc_uuid" :value="__('VPC UUID')" />
+                                    <x-text-input
+                                        id="do_vpc_uuid"
+                                        wire:model.live.debounce.300ms="form.do_vpc_uuid"
+                                        type="text"
+                                        class="mt-1 block w-full font-mono"
+                                        placeholder="e.g. 3a92ae2d-f1ef-11e8-87be-3cfdfea9f160"
+                                        autocomplete="off"
+                                    />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Find this in your DigitalOcean control panel → Networking → VPCs. Servers in the same VPC get private IPs on the 10.x subnet and can reach each other without firewall rules.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.do_vpc_uuid')" class="mt-1" />
+                                </div>
+                            @elseif ($form->type === 'hetzner')
+                                <div>
+                                    <x-input-label for="hetzner_network_id" :value="__('Private Network ID')" />
+                                    <x-text-input
+                                        id="hetzner_network_id"
+                                        wire:model.live.debounce.300ms="form.hetzner_network_id"
+                                        type="text"
+                                        class="mt-1 block w-full font-mono"
+                                        placeholder="e.g. 1234567"
+                                        autocomplete="off"
+                                    />
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Find this in your Hetzner Cloud console → Networks. The server will be attached at boot and receive a private IP on that network\'s subnet. Create the Network in Hetzner first if you haven\'t yet.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.hetzner_network_id')" class="mt-1" />
+                                </div>
+                            @endif
+                        </div>
+                    </section>
+                @endif
+
                 {{-- K8s hint --}}
                 @if ($form->provider_host_kind === 'kubernetes' && $form->provider_credential_id !== '')
                     @php $k8sProviderLabel = $form->type === 'aws_kubernetes' ? __('AWS EKS') : __('DigitalOcean DOKS'); @endphp

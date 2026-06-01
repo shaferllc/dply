@@ -72,6 +72,8 @@ return [
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'redis-snapshots', 'route' => 'servers.redis-snapshots', 'icon' => 'archive-box', 'label' => 'Snapshots', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'networking', 'route' => 'servers.networking', 'icon' => 'share', 'label' => 'Networking', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'load-balancers', 'route' => 'servers.load-balancers', 'icon' => 'arrows-right-left', 'label' => 'Load balancers', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh', 'route' => 'servers.ssh-keys', 'icon' => 'key', 'label' => 'SSH keys', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'ssh-access', 'route' => 'servers.ssh-access', 'preview_route' => 'servers.ssh-access', 'icon' => 'finger-print', 'label' => 'Access graph', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.ssh_access_graph', 'preview_feature' => 'workspace.ssh_access_graph_preview'],
         ['key' => 'system-users', 'route' => 'servers.system-users', 'icon' => 'user-group', 'label' => 'System users', 'group' => 'access', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.system_users'],
@@ -107,7 +109,7 @@ return [
         // different group than its base config entry; `overrides[key].label`
         // swaps the displayed label.
         'redis' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'redis-snapshots', 'firewall', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'redis-snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Redis', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -116,7 +118,7 @@ return [
             ],
         ],
         'valkey' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'redis-snapshots', 'firewall', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'redis-snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Valkey', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -125,7 +127,7 @@ return [
             ],
         ],
         'database' => [
-            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'networking', 'load-balancers', 'ssh', 'cron', 'files', 'manage', 'settings'],
             'overrides' => [
                 'databases' => ['label' => 'Database', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],

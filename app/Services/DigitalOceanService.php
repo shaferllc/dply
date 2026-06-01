@@ -196,6 +196,26 @@ class DigitalOceanService
     }
 
     /**
+     * Get private IPv4 from a droplet array (VPC / private network interface).
+     */
+    public static function getDropletPrivateIp(array $droplet): ?string
+    {
+        $networks = $droplet['networks'] ?? [];
+        if (isset($networks['v4']) && is_array($networks['v4'])) {
+            foreach ($networks['v4'] as $n) {
+                if (($n['type'] ?? '') === 'private') {
+                    $ip = $n['ip_address'] ?? null;
+                    if (is_string($ip) && $ip !== '') {
+                        return $ip;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Get available regions.
      *
      * @return array<int, array<string, mixed>>

@@ -1,0 +1,271 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Servers;
+
+use App\Jobs\ConfigureHAProxyLoadBalancerJob;
+use App\Jobs\ProvisionHetznerLoadBalancerJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
+use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Models\LoadBalancer;
+use App\Models\LoadBalancerService;
+use App\Models\LoadBalancerTarget;
+use App\Models\Server;
+use App\Services\HetznerService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Str;
+use Livewire\Component;
+
+class WorkspaceLoadBalancers extends Component
+{
+    use AuthorizesRequests;
+    use ConfirmsActionWithModal;
+    use HandlesServerRemovalFlow;
+    use InteractsWithServerWorkspace;
+
+    public Server $server;
+
+    // ── Create form ───────────────────────────────────────────────────────────
+    public string $lb_name = '';
+    public string $lb_type = 'lb11';
+    public string $lb_algorithm = 'round_robin';
+    public string $lb_network_id = '';
+    /** @var list<string> Server IDs to add as targets */
+    public array $lb_target_server_ids = [];
+    /** @var list<array{protocol:string,listen_port:string,destination_port:string}> */
+    public array $lb_services = [
+        ['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80'],
+    ];
+
+    // ── HAProxy (software) create form ───────────────────────────────────────
+    public string $haproxy_server_id = '';
+
+    // ── Manage: add target ────────────────────────────────────────────────────
+    public string $add_target_lb_id = '';
+    public string $add_target_server_id = '';
+
+    public function mount(Server $server): void
+    {
+        $this->server = $server;
+        $this->lb_name = $server->name.'-lb';
+    }
+
+    public function addServiceRow(): void
+    {
+        $this->lb_services[] = ['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80'];
+    }
+
+    public function removeServiceRow(int $index): void
+    {
+        array_splice($this->lb_services, $index, 1);
+        $this->lb_services = array_values($this->lb_services);
+    }
+
+    public function createLoadBalancer(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $this->validate([
+            'lb_name' => 'required|string|max:255',
+            'lb_type' => 'required|in:'.implode(',', LoadBalancer::TYPES),
+            'lb_algorithm' => 'required|in:round_robin,least_connections',
+            'lb_services' => 'required|array|min:1',
+            'lb_services.*.protocol' => 'required|in:http,https,tcp',
+            'lb_services.*.listen_port' => 'required|integer|min:1|max:65535',
+            'lb_services.*.destination_port' => 'required|integer|min:1|max:65535',
+        ]);
+
+        if ($this->server->provider->value !== 'hetzner') {
+            $this->toastError(__('Load balancers are currently supported for Hetzner servers only.'));
+
+            return;
+        }
+
+        $credential = $this->server->providerCredential;
+        if (! $credential) {
+            $this->toastError(__('No provider credential found for this server.'));
+
+            return;
+        }
+
+        $lb = LoadBalancer::query()->create([
+            'organization_id' => $this->server->organization_id,
+            'provider_credential_id' => $credential->id,
+            'name' => trim($this->lb_name),
+            'provider' => 'hetzner',
+            'region' => $this->server->region,
+            'load_balancer_type' => $this->lb_type,
+            'algorithm' => $this->lb_algorithm,
+            'status' => LoadBalancer::STATUS_PROVISIONING,
+            'hetzner_network_id' => $this->lb_network_id !== '' ? $this->lb_network_id : $this->server->hetzner_network_id,
+        ]);
+
+        // Seed targets.
+        $targetServerIds = array_filter(array_unique($this->lb_target_server_ids));
+        foreach ($targetServerIds as $serverId) {
+            $s = Server::query()->where('organization_id', $this->server->organization_id)->find($serverId);
+            if ($s) {
+                LoadBalancerTarget::query()->create([
+                    'load_balancer_id' => $lb->id,
+                    'server_id' => $s->id,
+                    'provider_server_id' => $s->provider_id,
+                ]);
+            }
+        }
+
+        // Seed services.
+        foreach ($this->lb_services as $svc) {
+            LoadBalancerService::query()->create([
+                'load_balancer_id' => $lb->id,
+                'protocol' => $svc['protocol'],
+                'listen_port' => (int) $svc['listen_port'],
+                'destination_port' => (int) $svc['destination_port'],
+                'health_check_port' => (int) $svc['destination_port'],
+                'health_check_protocol' => in_array($svc['protocol'], ['http', 'https'], true) ? 'http' : 'tcp',
+            ]);
+        }
+
+        ProvisionHetznerLoadBalancerJob::dispatch($lb->id);
+
+        $this->dispatch('close-modal', 'create-lb-modal');
+        $this->lb_name = $this->server->name.'-lb';
+        $this->lb_target_server_ids = [];
+        $this->lb_services = [['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80']];
+
+        $this->toastSuccess(__('Load balancer ":name" is being provisioned — it will appear here once the IP is assigned (~30 s).', ['name' => $lb->name]));
+    }
+
+    public function addTarget(string $lbId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $lb = LoadBalancer::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->find($lbId);
+
+        $target = Server::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->find($this->add_target_server_id);
+
+        if (! $lb || ! $target) {
+            $this->toastError(__('Load balancer or server not found.'));
+
+            return;
+        }
+
+        $exists = LoadBalancerTarget::query()
+            ->where('load_balancer_id', $lb->id)
+            ->where('server_id', $target->id)
+            ->exists();
+
+        if ($exists) {
+            $this->toastError(__(':name is already a target on this load balancer.', ['name' => $target->name]));
+
+            return;
+        }
+
+        try {
+            $hetzner = new HetznerService($lb->providerCredential);
+            $hetzner->addLoadBalancerTarget(
+                (int) $lb->provider_id,
+                (int) $target->provider_id,
+                filled($lb->hetzner_network_id),
+            );
+        } catch (\Throwable $e) {
+            $this->toastError(Str::limit($e->getMessage(), 200));
+
+            return;
+        }
+
+        LoadBalancerTarget::query()->create([
+            'load_balancer_id' => $lb->id,
+            'server_id' => $target->id,
+            'provider_server_id' => $target->provider_id,
+        ]);
+
+        $this->add_target_server_id = '';
+        $this->toastSuccess(__(':name added as a target.', ['name' => $target->name]));
+    }
+
+    public function removeTarget(string $targetId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $target = LoadBalancerTarget::query()
+            ->whereHas('loadBalancer', fn ($q) => $q->where('organization_id', $this->server->organization_id))
+            ->with(['loadBalancer.providerCredential', 'server'])
+            ->find($targetId);
+
+        if (! $target) {
+            return;
+        }
+
+        try {
+            if ($target->loadBalancer->provider_id && $target->server?->provider_id) {
+                $hetzner = new HetznerService($target->loadBalancer->providerCredential);
+                $hetzner->removeLoadBalancerTarget(
+                    (int) $target->loadBalancer->provider_id,
+                    (int) $target->server->provider_id,
+                );
+            }
+        } catch (\Throwable $e) {
+            $this->toastError(Str::limit($e->getMessage(), 200));
+
+            return;
+        }
+
+        $target->delete();
+        $this->toastSuccess(__('Target removed.'));
+    }
+
+    public function deleteLoadBalancer(string $lbId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $lb = LoadBalancer::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->find($lbId);
+
+        if (! $lb) {
+            return;
+        }
+
+        if ($lb->provider_id && $lb->providerCredential) {
+            try {
+                $hetzner = new HetznerService($lb->providerCredential);
+                $hetzner->deleteLoadBalancer((int) $lb->provider_id);
+            } catch (\Throwable $e) {
+                $this->toastError(Str::limit($e->getMessage(), 200));
+
+                return;
+            }
+        }
+
+        $lb->delete();
+        $this->toastSuccess(__('Load balancer deleted.'));
+    }
+
+    public function render(): View
+    {
+        $loadBalancers = LoadBalancer::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->with(['targets.server', 'services'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $orgServers = Server::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->where('status', Server::STATUS_READY)
+            ->whereNotIn('provider', ['digitalocean_functions', 'aws_lambda'])
+            ->orderBy('name')
+            ->get();
+
+        return view('livewire.servers.workspace-load-balancers', [
+            'loadBalancers' => $loadBalancers,
+            'orgServers' => $orgServers,
+        ]);
+    }
+}

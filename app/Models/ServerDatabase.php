@@ -25,12 +25,15 @@ class ServerDatabase extends Model
         'description',
         'mysql_charset',
         'mysql_collation',
+        'remote_access',
+        'allowed_from',
     ];
 
     protected function casts(): array
     {
         return [
             'password' => 'encrypted',
+            'remote_access' => 'boolean',
         ];
     }
 

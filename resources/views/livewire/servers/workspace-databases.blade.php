@@ -485,6 +485,249 @@
             </x-modal>
         @endif
 
+        {{-- Credentials modal — opens automatically when a database is created --}}
+        <x-modal name="database-credentials-modal" max-width="xl" focusable>
+            @if ($generated_database_credentials)
+                @php
+                    $creds = $generated_database_credentials;
+                    $credPlainPw = $creds['password'] ?? null;
+                    $credPwHidden = (bool) ($creds['password_hidden'] ?? false);
+                    $credEmailed = (bool) ($creds['credentials_emailed'] ?? false);
+                    $credShowPw = filled($credPlainPw) && ! $credPwHidden;
+                    $credPort = (int) ($creds['port'] ?? 5432);
+                    $credUser = $creds['username'] ?? '';
+                    $credDb = $creds['name'] ?? '';
+                    $credEngine = $creds['engine'] ?? 'postgres';
+                    $credPrivateIp = $creds['server_private_ip'] ?? null;
+                    $credPublicIp = $creds['server_public_ip'] ?? null;
+                    $credRemoteAccess = (bool) ($creds['remote_access'] ?? false);
+
+                    // Build connection URLs for local and remote.
+                    $userEnc = rawurlencode($credUser);
+                    $passEnc = $credShowPw ? rawurlencode((string) $credPlainPw) : '●●●●●●●●';
+                    $localConnStr = match ($credEngine) {
+                        'postgres' => "postgresql://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}",
+                        'mongodb' => "mongodb://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}?authSource={$credDb}",
+                        'clickhouse' => "clickhouse://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}",
+                        default => "mysql://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}",
+                    };
+                    $remoteHost = $credPrivateIp ?? $credPublicIp;
+                    $remoteConnStr = $remoteHost ? match ($credEngine) {
+                        'postgres' => "postgresql://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}",
+                        'mongodb' => "mongodb://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}?authSource={$credDb}",
+                        'clickhouse' => "clickhouse://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}",
+                        default => "mysql://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}",
+                    } : null;
+
+                    // TablePlus deep link — uses the connection URL scheme.
+                    // Requires TablePlus 4.0+ on macOS/Windows.
+                    $tpDriver = match ($credEngine) {
+                        'postgres' => 'PostgreSQL',
+                        'mongodb' => 'MongoDB',
+                        'clickhouse' => 'ClickHouse',
+                        'mariadb' => 'MariaDB',
+                        default => 'MySQL',
+                    };
+                    $tpLocalUrl = 'tableplus://open?driver='.$tpDriver
+                        .'&name='.rawurlencode($server->name.' / '.$credDb.' (local)')
+                        .'&host=127.0.0.1&port='.$credPort
+                        .'&user='.rawurlencode($credUser)
+                        .($credShowPw ? '&password='.rawurlencode((string) $credPlainPw) : '')
+                        .'&database='.rawurlencode($credDb);
+                    $tpRemoteUrl = $remoteHost && $credRemoteAccess
+                        ? 'tableplus://open?driver='.$tpDriver
+                            .'&name='.rawurlencode($server->name.' / '.$credDb.' (remote)')
+                            .'&host='.rawurlencode($remoteHost).'&port='.$credPort
+                            .'&user='.rawurlencode($credUser)
+                            .($credShowPw ? '&password='.rawurlencode((string) $credPlainPw) : '')
+                            .'&database='.rawurlencode($credDb)
+                        : null;
+                @endphp
+                <div
+                    class="bg-white"
+                    x-data="{
+                        copiedKey: null,
+                        async copy(text, key) {
+                            try {
+                                await navigator.clipboard.writeText(text);
+                                this.copiedKey = key;
+                                setTimeout(() => this.copiedKey = null, 1800);
+                            } catch (e) {}
+                        },
+                    }"
+                >
+                    {{-- Header --}}
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database created') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':name credentials', ['name' => $credDb]) }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                @if ($credEmailed)
+                                    {{ __('Emailed to you. Copy the password now — it hides when you close this.') }}
+                                @else
+                                    {{ __('Copy the password now — it hides when you close this.') }}
+                                @endif
+                            </p>
+                        </div>
+                        <button type="button" x-on:click="$dispatch('close-modal', 'database-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <x-heroicon-o-x-mark class="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <div class="divide-y divide-brand-ink/5 overflow-y-auto" style="max-height: 70vh">
+                        {{-- Core credentials --}}
+                        <div class="grid gap-3 p-6 sm:grid-cols-2">
+                            @if (filled($credUser))
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
+                                        <button type="button" class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($credUser), 'user')">
+                                            <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $credUser }}</dd>
+                                </div>
+                            @endif
+                            @if (filled($credPlainPw) || $credPwHidden)
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
+                                        @if ($credShowPw)
+                                            <button type="button" class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($credPlainPw), 'pw')">
+                                                <span x-show="copiedKey !== 'pw'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'pw'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @if ($credShowPw)
+                                        <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $credPlainPw }}</dd>
+                                    @else
+                                        <dd class="mt-0.5 font-mono text-sm tracking-widest text-brand-mist">••••••••••••••••</dd>
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Retrieve from Credentials on the database row.') }}</p>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- Local connection --}}
+                        @if ($credEngine !== 'sqlite')
+                            <div class="px-6 py-5">
+                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Local connection') }} <span class="ml-1 font-normal normal-case text-brand-mist">{{ __('— for apps running on this server') }}</span></p>
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
+                                            <code class="font-mono text-sm font-semibold text-brand-ink">127.0.0.1:{{ $credPort }}</code>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                            <code class="break-all font-mono text-xs text-brand-ink">{{ $localConnStr }}</code>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($localConnStr), 'local_url')">
+                                            <span x-show="copiedKey !== 'local_url'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'local_url'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <a href="{{ $tpLocalUrl }}" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-table-cells class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Open in TablePlus') }}
+                                    </a>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Remote connection --}}
+                        @if ($remoteConnStr)
+                            <div class="px-6 py-5">
+                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    {{ __('Remote connection') }}
+                                    @if ($credPrivateIp)
+                                        <span class="ml-1 font-normal normal-case text-emerald-600">{{ __('— via private network') }}</span>
+                                    @else
+                                        <span class="ml-1 font-normal normal-case text-amber-700">{{ __('— via public IP') }}</span>
+                                    @endif
+                                </p>
+                                @if (! $credRemoteAccess)
+                                    <p class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        {{ __('Remote access is not yet enabled for this database. Go to Networking → enable remote access first.') }}
+                                    </p>
+                                @endif
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
+                                            <code class="font-mono text-sm font-semibold text-brand-ink">{{ $remoteHost }}:{{ $credPort }}</code>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($remoteHost.':'.$credPort), 'remote_host')">
+                                            <span x-show="copiedKey !== 'remote_host'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'remote_host'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                            <code class="break-all font-mono text-xs text-brand-ink">{{ $remoteConnStr }}</code>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($remoteConnStr), 'remote_url')">
+                                            <span x-show="copiedKey !== 'remote_url'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'remote_url'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    @if ($tpRemoteUrl)
+                                        <a href="{{ $tpRemoteUrl }}" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-table-cells class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Open in TablePlus (remote)') }}
+                                        </a>
+                                    @endif
+                                </div>
+                            </div>
+                        @elseif ($credEngine !== 'sqlite')
+                            <div class="px-6 py-4">
+                                <p class="text-xs text-brand-mist">
+                                    {{ __('No remote connection available — attach this server to a private network (Networking workspace) to get a private IP for external access.') }}
+                                </p>
+                            </div>
+                        @endif
+
+                        {{-- SQLite path --}}
+                        @if ($credEngine === 'sqlite' && filled($creds['host'] ?? null))
+                            <div class="px-6 py-5">
+                                <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
+                                        <code class="break-all font-mono text-sm font-semibold text-brand-ink">{{ $creds['host'] }}</code>
+                                    </div>
+                                    <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($creds['host']), 'sqlite_path')">
+                                        <span x-show="copiedKey !== 'sqlite_path'">{{ __('Copy') }}</span>
+                                        <span x-show="copiedKey === 'sqlite_path'" x-cloak>{{ __('Copied!') }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="flex items-center justify-between border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4">
+                        <p class="text-[11px] text-brand-mist">{{ __('Password hides when you close this dialog.') }}</p>
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('close-modal', 'database-credentials-modal')"
+                            wire:click="hideGeneratedDatabasePassword"
+                            class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                        >
+                            {{ __('Done') }}
+                        </button>
+                    </div>
+                </div>
+            @endif
+        </x-modal>
+
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

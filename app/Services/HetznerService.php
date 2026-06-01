@@ -75,7 +75,8 @@ class HetznerService
         string $image,
         array $sshKeyIds = [],
         string $userData = '',
-        array $firewallIds = []
+        array $firewallIds = [],
+        ?int $networkId = null,
     ): int {
         $body = [
             'name' => $name,
@@ -94,6 +95,9 @@ class HetznerService
                 static fn ($id) => ['firewall' => (int) $id],
                 array_values($firewallIds)
             );
+        }
+        if ($networkId !== null) {
+            $body['networks'] = [$networkId];
         }
 
         $response = $this->request('post', '/servers', $body);
@@ -140,12 +144,232 @@ class HetznerService
     }
 
     /**
+     * Get the private IP assigned by a Hetzner private network.
+     * Returns the first private_net IP found on the server object.
+     */
+    public static function getPrivateIp(array $server): ?string
+    {
+        $privateNets = $server['private_net'] ?? [];
+        foreach ($privateNets as $net) {
+            $ip = $net['ip'] ?? null;
+            if (is_string($ip) && $ip !== '') {
+                return $ip;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create a new Hetzner private network and return its ID.
+     *
+     * @param  array<int>  $serverIds  Provider server IDs to attach immediately
+     */
+    public function createNetwork(string $name, string $ipRange = '10.0.0.0/8', array $serverIds = []): int
+    {
+        $body = [
+            'name' => $name,
+            'ip_range' => $ipRange,
+        ];
+
+        if ($serverIds !== []) {
+            $body['subnets'] = [
+                [
+                    'type' => 'cloud',
+                    'network_zone' => 'eu-central',
+                    'ip_range' => $ipRange,
+                ],
+            ];
+        }
+
+        $response = $this->request('post', '/networks', $body);
+        $this->assertSuccess($response, 'create network');
+
+        $data = $response->json();
+        $networkId = (int) ($data['network']['id'] ?? 0);
+        if ($networkId === 0) {
+            throw new \RuntimeException('Hetzner API did not return network id.');
+        }
+
+        return $networkId;
+    }
+
+    /**
+     * Attach a server to a Hetzner private network after creation.
+     * The API is async; callers that need the assigned IP should re-fetch
+     * getInstance() after a short delay.
+     */
+    public function attachServerToNetwork(int $serverId, int $networkId): void
+    {
+        $response = $this->request('post', "/servers/{$serverId}/actions/attach_to_network", [
+            'network' => $networkId,
+        ]);
+        $this->assertSuccess($response, 'attach server to network');
+    }
+
+    /**
+     * List private networks available in this account.
+     *
+     * @return array<int, array{id: int, name: string, ip_range: string}>
+     */
+    public function listNetworks(): array
+    {
+        $response = $this->request('get', '/networks');
+        $this->assertSuccess($response, 'list networks');
+        $data = $response->json();
+
+        return array_map(static fn ($n) => [
+            'id' => (int) ($n['id'] ?? 0),
+            'name' => (string) ($n['name'] ?? ''),
+            'ip_range' => (string) ($n['ip_range'] ?? ''),
+        ], $data['networks'] ?? []);
+    }
+
+    /**
      * Destroy (delete) an instance by ID.
      */
     public function destroyInstance(int $id): void
     {
         $response = $this->request('delete', "/servers/{$id}");
         $this->assertSuccess($response, 'delete server');
+    }
+
+    // ─── Load Balancers ───────────────────────────────────────────────────────
+
+    /**
+     * Create a load balancer and return its ID.
+     *
+     * @param  array<int>  $targetServerProviderIds  Hetzner server IDs to add as targets immediately
+     * @param  list<array{protocol:string,listen_port:int,destination_port:int}>  $services
+     */
+    public function createLoadBalancer(
+        string $name,
+        string $loadBalancerType,
+        string $location,
+        string $algorithm = 'round_robin',
+        ?int $networkId = null,
+        array $targetServerProviderIds = [],
+        array $services = [],
+    ): array {
+        $body = [
+            'name' => $name,
+            'load_balancer_type' => $loadBalancerType,
+            'location' => $location,
+            'algorithm' => ['type' => $algorithm],
+            'public_interface' => true,
+        ];
+
+        if ($networkId !== null) {
+            $body['network'] = $networkId;
+        }
+
+        if ($targetServerProviderIds !== []) {
+            $body['targets'] = array_map(static fn ($id) => [
+                'type' => 'server',
+                'server' => ['id' => (int) $id],
+                'use_private_ip' => $networkId !== null,
+            ], array_values($targetServerProviderIds));
+        }
+
+        if ($services !== []) {
+            $body['services'] = array_map(static fn ($svc) => [
+                'protocol' => $svc['protocol'],
+                'listen_port' => (int) $svc['listen_port'],
+                'destination_port' => (int) $svc['destination_port'],
+                'health_check' => [
+                    'protocol' => in_array($svc['protocol'], ['http', 'https'], true) ? 'http' : 'tcp',
+                    'port' => (int) $svc['destination_port'],
+                    'interval' => 15,
+                    'timeout' => 10,
+                    'retries' => 3,
+                    'http' => in_array($svc['protocol'], ['http', 'https'], true)
+                        ? ['path' => '/', 'status_codes' => ['2??', '3??'], 'tls' => false]
+                        : null,
+                ],
+                'sticky_sessions' => ['enabled' => (bool) ($svc['sticky_sessions'] ?? false)],
+            ], $services);
+        }
+
+        $response = $this->request('post', '/load_balancers', $body);
+        $this->assertSuccess($response, 'create load balancer');
+
+        $data = $response->json();
+        $lb = $data['load_balancer'] ?? null;
+        if (! $lb || ! isset($lb['id'])) {
+            throw new \RuntimeException('Hetzner API did not return load balancer id.');
+        }
+
+        return $lb;
+    }
+
+    public function getLoadBalancer(int $id): array
+    {
+        $response = $this->request('get', "/load_balancers/{$id}");
+        $this->assertSuccess($response, 'get load balancer');
+
+        return $response->json()['load_balancer'] ?? throw new \RuntimeException('Hetzner API did not return load balancer.');
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function listLoadBalancers(): array
+    {
+        $response = $this->request('get', '/load_balancers');
+        $this->assertSuccess($response, 'list load balancers');
+
+        return $response->json()['load_balancers'] ?? [];
+    }
+
+    public function deleteLoadBalancer(int $id): void
+    {
+        $response = $this->request('delete', "/load_balancers/{$id}");
+        if ($response->status() === 404) {
+            return; // Already gone — idempotent.
+        }
+        $this->assertSuccess($response, 'delete load balancer');
+    }
+
+    public function addLoadBalancerTarget(int $lbId, int $serverProviderId, bool $usePrivateIp = false): void
+    {
+        $response = $this->request('post', "/load_balancers/{$lbId}/actions/add_target", [
+            'type' => 'server',
+            'server' => ['id' => $serverProviderId],
+            'use_private_ip' => $usePrivateIp,
+        ]);
+        $this->assertSuccess($response, 'add load balancer target');
+    }
+
+    public function removeLoadBalancerTarget(int $lbId, int $serverProviderId): void
+    {
+        $response = $this->request('post', "/load_balancers/{$lbId}/actions/remove_target", [
+            'type' => 'server',
+            'server' => ['id' => $serverProviderId],
+        ]);
+        if ($response->status() === 404) {
+            return;
+        }
+        $this->assertSuccess($response, 'remove load balancer target');
+    }
+
+    public static function getLbPublicIpv4(array $lb): ?string
+    {
+        foreach ($lb['public_net']['ipv4'] ?? [] as $entry) {
+            if (isset($entry['ip'])) {
+                return $entry['ip'];
+            }
+        }
+
+        return $lb['public_net']['ipv4']['ip'] ?? null;
+    }
+
+    public static function getLbPrivateIp(array $lb): ?string
+    {
+        foreach ($lb['private_net'] ?? [] as $net) {
+            if (isset($net['ip'])) {
+                return $net['ip'];
+            }
+        }
+
+        return null;
     }
 
     /**

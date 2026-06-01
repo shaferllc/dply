@@ -186,6 +186,212 @@ BASH,
         };
     }
 
+    /**
+     * Bash that enables remote access for a specific database (pg_hba / mysql user grant).
+     *
+     * Postgres: ensures listen_addresses = '*', then upserts a pg_hba.conf rule scoped
+     *   to the named database tagged # dply-db-{dbname}. Restarts postgres.
+     *
+     * MySQL/MariaDB: sets bind-address = 0.0.0.0, restarts, then re-GRANTs the
+     *   database user from the given CIDR host pattern.
+     */
+    public static function enableDatabaseRemoteAccessScript(
+        string $engine,
+        string $dbName,
+        string $dbUser,
+        string $allowedCidr,
+    ): string {
+        $escapedDb = escapeshellarg($dbName);
+        $escapedUser = escapeshellarg($dbUser);
+        $escapedCidr = escapeshellarg($allowedCidr);
+        $tag = 'dply-db-'.preg_replace('/[^a-zA-Z0-9_-]/', '_', $dbName);
+        $escapedTag = escapeshellarg($tag);
+
+        return match (true) {
+            $engine === 'postgres' => <<<BASH
+set -e
+PG_VER=\$(pg_lsclusters --no-header 2>/dev/null | awk '{print \$1}' | sort -rn | head -1)
+if [ -z "\$PG_VER" ]; then
+  PG_VER=\$(ls /etc/postgresql/ 2>/dev/null | sort -rn | head -1)
+fi
+if [ -z "\$PG_VER" ]; then
+  echo "[dply] ERROR: could not detect PostgreSQL version" >&2; exit 1
+fi
+CONF_DIR="/etc/postgresql/\${PG_VER}/main/conf.d"
+HBA="/etc/postgresql/\${PG_VER}/main/pg_hba.conf"
+mkdir -p "\${CONF_DIR}"
+cat > "\${CONF_DIR}/99-dply.conf" <<'EOF'
+listen_addresses = '*'
+shared_buffers = '256MB'
+max_connections = 200
+EOF
+DB={$escapedDb}
+CIDR={$escapedCidr}
+TAG={$escapedTag}
+sed -i "/# \${TAG}\$/d" "\${HBA}"
+echo "host \${DB} all \${CIDR} scram-sha-256 # \${TAG}" >> "\${HBA}"
+systemctl restart postgresql
+echo "database_remote_access_enabled"
+BASH,
+            in_array($engine, ['mysql', 'mariadb'], true) => <<<BASH
+set -e
+cat > /etc/mysql/mariadb.conf.d/99-dply.cnf <<'EOF'
+[mysqld]
+bind-address = 0.0.0.0
+EOF
+systemctl restart mysql 2>/dev/null || systemctl restart mariadb
+DB={$escapedDb}
+USER={$escapedUser}
+CIDR={$escapedCidr}
+HOST_PATTERN=\$(echo "\${CIDR}" | sed 's|/.*||')
+mysql -u root -e "GRANT ALL PRIVILEGES ON \`\${DB}\`\.* TO '\${USER}'@'\${HOST_PATTERN}'; FLUSH PRIVILEGES;" 2>/dev/null || true
+echo "database_remote_access_enabled"
+BASH,
+            default => throw new \InvalidArgumentException("Per-database remote access not supported for engine: {$engine}"),
+        };
+    }
+
+    /**
+     * Bash that removes remote access for a specific database.
+     * Removes the pg_hba rule (postgres) or revokes the remote GRANT (mysql/mariadb).
+     * Does NOT revert listen_addresses — other databases may still need remote access.
+     */
+    public static function disableDatabaseRemoteAccessScript(
+        string $engine,
+        string $dbName,
+        string $dbUser,
+    ): string {
+        $tag = 'dply-db-'.preg_replace('/[^a-zA-Z0-9_-]/', '_', $dbName);
+        $escapedTag = escapeshellarg($tag);
+        $escapedDb = escapeshellarg($dbName);
+        $escapedUser = escapeshellarg($dbUser);
+
+        return match (true) {
+            $engine === 'postgres' => <<<BASH
+set -e
+PG_VER=\$(pg_lsclusters --no-header 2>/dev/null | awk '{print \$1}' | sort -rn | head -1)
+if [ -z "\$PG_VER" ]; then
+  PG_VER=\$(ls /etc/postgresql/ 2>/dev/null | sort -rn | head -1)
+fi
+if [ -z "\$PG_VER" ]; then
+  echo "[dply] ERROR: could not detect PostgreSQL version" >&2; exit 1
+fi
+HBA="/etc/postgresql/\${PG_VER}/main/pg_hba.conf"
+TAG={$escapedTag}
+sed -i "/# \${TAG}\$/d" "\${HBA}"
+systemctl reload postgresql
+echo "database_remote_access_disabled"
+BASH,
+            in_array($engine, ['mysql', 'mariadb'], true) => <<<BASH
+set -e
+DB={$escapedDb}
+USER={$escapedUser}
+mysql -u root -e "REVOKE ALL PRIVILEGES ON \`\${DB}\`\.* FROM '\${USER}'@'%'; FLUSH PRIVILEGES;" 2>/dev/null || true
+echo "database_remote_access_disabled"
+BASH,
+            default => throw new \InvalidArgumentException("Per-database remote access not supported for engine: {$engine}"),
+        };
+    }
+
+    /**
+     * Bash that enables remote access for the given engine.
+     *
+     * Postgres: finds the active cluster version, writes listen_addresses = '*'
+     *   to conf.d/99-dply.conf, and appends a scram-sha-256 pg_hba rule for the
+     *   given CIDR (or 0.0.0.0/0 for open internet). Then restarts the service.
+     *
+     * MySQL/MariaDB: sets bind-address = 0.0.0.0 in the dply CNF override and
+     *   restarts. Existing user grants remain host-specific — the operator must
+     *   create/update users via the Databases workspace.
+     */
+    public static function enableRemoteAccessScript(string $engine, string $allowedCidr = '0.0.0.0/0'): string
+    {
+        $escapedCidr = escapeshellarg($allowedCidr);
+
+        return match ($engine) {
+            'postgres' => <<<BASH
+set -e
+PG_VER=\$(pg_lsclusters --no-header 2>/dev/null | awk '{print \$1}' | sort -rn | head -1)
+if [ -z "\$PG_VER" ]; then
+  PG_VER=\$(ls /etc/postgresql/ 2>/dev/null | sort -rn | head -1)
+fi
+if [ -z "\$PG_VER" ]; then
+  echo "[dply] ERROR: could not detect PostgreSQL version" >&2; exit 1
+fi
+CONF_DIR="/etc/postgresql/\${PG_VER}/main/conf.d"
+HBA="/etc/postgresql/\${PG_VER}/main/pg_hba.conf"
+mkdir -p "\${CONF_DIR}"
+cat > "\${CONF_DIR}/99-dply.conf" <<'EOF'
+listen_addresses = '*'
+shared_buffers = '256MB'
+max_connections = 200
+EOF
+CIDR={$escapedCidr}
+# Remove any existing dply-managed remote rule then append the new one
+sed -i '/# dply-remote/d' "\${HBA}"
+echo "host all all \${CIDR} scram-sha-256 # dply-remote" >> "\${HBA}"
+systemctl restart postgresql
+echo "remote_access_enabled"
+BASH,
+            'mysql', 'mariadb' => <<<'BASH'
+set -e
+cat > /etc/mysql/mariadb.conf.d/99-dply.cnf <<'EOF'
+[mysqld]
+bind-address = 0.0.0.0
+EOF
+systemctl restart mysql 2>/dev/null || systemctl restart mariadb
+echo "remote_access_enabled"
+BASH,
+            default => throw new \InvalidArgumentException("Remote access not supported for engine: {$engine}"),
+        };
+    }
+
+    /**
+     * Bash that reverts remote access: restores localhost-only binding and
+     * removes the dply-managed pg_hba rule, then restarts the service.
+     */
+    public static function disableRemoteAccessScript(string $engine): string
+    {
+        return match ($engine) {
+            'postgres' => <<<'BASH'
+set -e
+PG_VER=$(pg_lsclusters --no-header 2>/dev/null | awk '{print $1}' | sort -rn | head -1)
+if [ -z "$PG_VER" ]; then
+  PG_VER=$(ls /etc/postgresql/ 2>/dev/null | sort -rn | head -1)
+fi
+if [ -z "$PG_VER" ]; then
+  echo "[dply] ERROR: could not detect PostgreSQL version" >&2; exit 1
+fi
+CONF_DIR="/etc/postgresql/${PG_VER}/main/conf.d"
+HBA="/etc/postgresql/${PG_VER}/main/pg_hba.conf"
+mkdir -p "${CONF_DIR}"
+cat > "${CONF_DIR}/99-dply.conf" <<'EOF'
+listen_addresses = '127.0.0.1'
+shared_buffers = '256MB'
+max_connections = 200
+EOF
+sed -i '/# dply-remote/d' "${HBA}"
+systemctl restart postgresql
+echo "remote_access_disabled"
+BASH,
+            'mysql', 'mariadb' => <<<'BASH'
+set -e
+cat > /etc/mysql/mariadb.conf.d/99-dply.cnf <<'EOF'
+[mysqld]
+bind-address = 127.0.0.1
+EOF
+systemctl restart mysql 2>/dev/null || systemctl restart mariadb
+echo "remote_access_disabled"
+BASH,
+            default => throw new \InvalidArgumentException("Remote access not supported for engine: {$engine}"),
+        };
+    }
+
+    public static function supportsRemoteAccess(string $engine): bool
+    {
+        return in_array($engine, ['postgres', 'mysql', 'mariadb'], true);
+    }
+
     public static function timescaledbRepoBootstrapScript(): string
     {
         return <<<'BASH'

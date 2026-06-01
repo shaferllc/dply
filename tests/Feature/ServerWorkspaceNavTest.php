@@ -49,6 +49,7 @@ test('nav hides php and databases when stack excludes them', function () {
 
     // Always-on / non-gated tabs stay.
     expect($keys)->toContain('firewall');
+    expect($keys)->toContain('networking');
     expect($keys)->toContain('settings');
     expect($keys)->toContain('services');
 });
@@ -214,7 +215,7 @@ test('database role server gets focused sidebar without sites or webserver', fun
     $keys = array_column(server_workspace_nav_for_server($server->fresh()), 'key');
     $items = collect(server_workspace_nav_for_server($server->fresh()))->keyBy('key');
 
-    expect($keys)->toContain('overview', 'databases', 'backups', 'monitor', 'firewall', 'settings');
+    expect($keys)->toContain('overview', 'databases', 'backups', 'monitor', 'firewall', 'networking', 'settings');
     expect($keys)->not->toContain('sites', 'webserver', 'caches', 'php', 'daemons', 'cert-inventory');
     expect($items['databases']['label'] ?? null)->toBe('Database');
     expect($items['databases']['group'] ?? null)->toBe('overview');

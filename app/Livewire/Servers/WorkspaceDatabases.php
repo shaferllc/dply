@@ -4,6 +4,8 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\InstallDatabaseEngineJob;
+use App\Jobs\ToggleDatabaseEngineRemoteAccessJob;
+use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
@@ -35,6 +37,7 @@ use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\DatabaseWorkspaceViewData;
+use App\Services\Servers\PostgresExtensionManager;
 use App\Support\Servers\PostgresExtensionCatalog;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Contracts\View\View;
@@ -125,6 +128,13 @@ class WorkspaceDatabases extends Component
     public string $admin_clickhouse_username = 'default';
 
     public string $admin_clickhouse_password = '';
+
+    public string $remote_access_engine = '';
+
+    public string $remote_access_allowed_from = '0.0.0.0/0';
+
+    /** Keyed by database ID — the CIDR input value for each row's networking form. */
+    public array $db_networking_allowed_from = [];
 
     public string $extra_db_id = '';
 
@@ -255,10 +265,11 @@ class WorkspaceDatabases extends Component
      * Mirrors the same pattern used by WorkspaceCaches + WorkspaceWebserver so
      * operators learn one navigation idiom across workspaces.
      */
+    #[Url(as: 'subtab', except: 'overview', history: true)]
     public string $engine_subtab = 'overview';
 
     /** @var list<string> */
-    public const ENGINE_SUBTABS = ['overview', 'databases', 'admin', 'connections', 'backups', 'extensions', 'info', 'danger'];
+    public const ENGINE_SUBTABS = ['overview', 'databases', 'admin', 'networking', 'connections', 'backups', 'extensions', 'info', 'danger'];
 
     public function setWorkspaceTab(string $tab): void
     {
@@ -497,6 +508,150 @@ class WorkspaceDatabases extends Component
 
         UninstallDatabaseEngineJob::dispatch($row->id, auth()->id());
         $this->toastSuccess(__('Uninstalling :engine — progress shows in the banner above.', ['engine' => $engineLabel]));
+    }
+
+    /**
+     * Enable or disable remote access (public/CIDR-gated port exposure) for a
+     * database engine. Dispatches {@see ToggleDatabaseEngineRemoteAccessJob} which
+     * updates listen_addresses / pg_hba / bind-address over SSH, restarts the
+     * service, and syncs the UFW-backed firewall rule.
+     */
+    public function toggleDatabaseEngineRemoteAccess(string $engine, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        if (! DatabaseEngineInstallScripts::supportsRemoteAccess($engine)) {
+            $this->toastError(__('Remote access configuration is not supported for :engine.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->where('status', ServerDatabaseEngine::STATUS_RUNNING)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__(':engine is not running on this server.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $allowedFrom = $enable ? trim($this->remote_access_allowed_from) : '';
+
+        if ($enable) {
+            if ($allowedFrom === '') {
+                $allowedFrom = '0.0.0.0/0';
+            }
+
+            // Basic CIDR sanity — must look like x.x.x.x/n or x::/n or 0.0.0.0/0.
+            if (! $this->isValidRemoteCidr($allowedFrom)) {
+                $this->addError('remote_access_allowed_from', __('Enter a valid CIDR (e.g. 0.0.0.0/0, 10.0.0.0/8).'));
+
+                return;
+            }
+        }
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_remote_access',
+            $enable
+                ? __('Enabling remote access for :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name])
+                : __('Disabling remote access for :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name]),
+        );
+
+        // Optimistically update the row so the UI flips immediately.
+        $row->update([
+            'remote_access' => $enable,
+            'allowed_from' => $enable ? $allowedFrom : null,
+        ]);
+
+        ToggleDatabaseEngineRemoteAccessJob::dispatch($row->id, $enable, $allowedFrom, auth()->id());
+
+        $this->toastSuccess(
+            $enable
+                ? __('Enabling remote access for :engine — progress shows in the banner above.', ['engine' => $engineLabel])
+                : __('Disabling remote access for :engine — progress shows in the banner above.', ['engine' => $engineLabel])
+        );
+    }
+
+    /**
+     * Enable or disable remote network access for a specific database.
+     * Updates pg_hba (postgres) or bind-address + GRANT (mysql/mariadb) over SSH,
+     * then syncs the engine-level UFW rule.
+     */
+    public function toggleDatabaseNetworking(string $databaseId, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->find($databaseId);
+
+        if (! $db) {
+            $this->toastError(__('Database not found.'));
+
+            return;
+        }
+
+        if (! DatabaseEngineInstallScripts::supportsRemoteAccess($db->engine)) {
+            $this->toastError(__('Remote access is not supported for :engine.', ['engine' => $db->engine]));
+
+            return;
+        }
+
+        $allowedFrom = $enable ? trim($this->db_networking_allowed_from[$databaseId] ?? '0.0.0.0/0') : '';
+
+        if ($enable) {
+            if ($allowedFrom === '') {
+                $allowedFrom = '0.0.0.0/0';
+            }
+            if (! $this->isValidRemoteCidr($allowedFrom)) {
+                $this->addError('db_networking_allowed_from.'.$databaseId, __('Enter a valid CIDR (e.g. 0.0.0.0/0, 10.0.0.0/8).'));
+
+                return;
+            }
+        }
+
+        // Optimistically update so the UI flips immediately.
+        $db->update([
+            'remote_access' => $enable,
+            'allowed_from' => $enable ? $allowedFrom : null,
+        ]);
+
+        ToggleDatabaseNetworkingJob::dispatch($databaseId, $enable, $allowedFrom, auth()->id());
+
+        $this->toastSuccess(
+            $enable
+                ? __('Enabling remote access for :name — progress shows in the banner above.', ['name' => $db->name])
+                : __('Disabling remote access for :name — progress shows in the banner above.', ['name' => $db->name])
+        );
+    }
+
+    private function isValidRemoteCidr(string $value): bool
+    {
+        if ($value === '' || $value === 'any') {
+            return false;
+        }
+
+        $parts = array_filter(array_map('trim', explode(',', $value)));
+        foreach ($parts as $part) {
+            if (! str_contains($part, '/')) {
+                return false;
+            }
+            [$ip, $prefix] = explode('/', $part, 2);
+            if (! filter_var($ip, FILTER_VALIDATE_IP)) {
+                return false;
+            }
+            if (! is_numeric($prefix) || (int) $prefix < 0 || (int) $prefix > 128) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -1505,6 +1660,11 @@ class WorkspaceDatabases extends Component
                 'username' => $db->username,
                 'password' => $isSqlite ? null : (string) $password,
                 'host' => $db->host,
+                'port' => $db->defaultPort(),
+                'server_public_ip' => $this->server->ip_address,
+                'server_private_ip' => $this->server->private_ip_address,
+                'remote_access' => (bool) $db->remote_access,
+                'allowed_from' => $db->allowed_from,
                 'username_generated' => $usernameGenerated,
                 'password_generated' => $passwordGenerated,
                 'credentials_emailed' => $credentialsEmailed,
@@ -1513,6 +1673,7 @@ class WorkspaceDatabases extends Component
             $this->engine_create_form_open = false;
             $this->engine_subtab = 'databases';
             $this->resetCreateDatabaseFormFields();
+            $this->dispatch('open-modal', 'database-credentials-modal');
         } catch (UniqueConstraintViolationException) {
             $this->addError('new_db_name', __('A database named :name is already tracked on this server.', ['name' => $this->new_db_name]));
         } catch (\Throwable $e) {

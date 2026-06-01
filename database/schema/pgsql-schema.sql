@@ -862,7 +862,7 @@ CREATE TABLE public.organizations (
     services_preferences json,
     database_workspace_settings json,
     email_server_credentials_enabled boolean DEFAULT false NOT NULL,
-    email_database_credentials_enabled boolean DEFAULT false NOT NULL
+    email_database_credentials_enabled boolean DEFAULT true NOT NULL
 );
 
 

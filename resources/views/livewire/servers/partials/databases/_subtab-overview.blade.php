@@ -182,6 +182,8 @@
             @endif
         </div>
     </div>
+
+    {{-- Remote access is managed per-database on the Networking tab. --}}
 @elseif ($engine === 'sqlite' && ($capabilities['sqlite'] ?? false))
     <div class="{{ $card }} overflow-hidden px-6 py-6 sm:px-8">
         <div class="flex flex-wrap items-start justify-between gap-4">

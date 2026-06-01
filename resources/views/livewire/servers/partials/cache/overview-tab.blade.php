@@ -1,9 +1,25 @@
             @if ($cacheServices->isEmpty())
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <h2 class="text-base font-semibold text-brand-ink">{{ __('No cache services installed') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('Pick an engine from the tabs above to install one. Redis is available today; additional engines are marked "Soon" and are on the way.') }}
-                    </p>
+                <div class="{{ $card }} overflow-hidden">
+                    <div class="px-6 py-6 sm:px-8">
+                        <x-empty-state
+                            borderless
+                            icon="heroicon-o-bolt"
+                            tone="sage"
+                            :title="__('No cache engines installed')"
+                            :description="__('Pick an engine from the tabs above to install one. Redis is available today; additional engines are marked &quot;Soon&quot; and are on the way.')"
+                        >
+                            <x-slot:actions>
+                                <button
+                                    type="button"
+                                    wire:click="setWorkspaceTab('redis')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                                >
+                                    <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Install Redis') }}
+                                </button>
+                            </x-slot:actions>
+                        </x-empty-state>
+                    </div>
                 </div>
             @else
                 @foreach ($cacheServices as $row)

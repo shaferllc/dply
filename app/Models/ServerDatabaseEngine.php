@@ -45,6 +45,8 @@ class ServerDatabaseEngine extends Model
         'status',
         'port',
         'error_message',
+        'remote_access',
+        'allowed_from',
     ];
 
     protected function casts(): array
@@ -52,6 +54,7 @@ class ServerDatabaseEngine extends Model
         return [
             'is_default' => 'boolean',
             'port' => 'integer',
+            'remote_access' => 'boolean',
         ];
     }
 
