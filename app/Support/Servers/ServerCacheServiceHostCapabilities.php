@@ -122,8 +122,8 @@ class ServerCacheServiceHostCapabilities
      * Each engine's cli is preferred; redis-cli is the universal fallback because
      * all three (Redis, Valkey, KeyDB) speak RESP. When the engine has an AUTH
      * password configured on its {@see ServerCacheService} row, the `-a` flag is
-     * appended with `--no-auth-warning` — without it the engine returns NOAUTH
-     * and the probe reports the engine as unreachable even when it's healthy.
+     * appended — without it the engine returns NOAUTH and the probe wrongly
+     * reports the engine as unreachable.
      */
     private function portPingCommand(Server $server, string $engine, int $port): string
     {

@@ -135,18 +135,6 @@ class WorkspaceCaches extends Component
     public ?string $slowlogError = null;
 
     /**
-     * Slowlog entries for the Stats subtab card, populated by {@see loadSlowlog}.
-     * Null until first load; `[]` when the engine returns an empty ring buffer
-     * (the operationally happy case — no commands have crossed the slowlog
-     * threshold). Errors surface via $slowlogError.
-     *
-     * @var list<array{id: int, at: CarbonImmutable, duration_us: int, command: string, client_addr: string, client_name: string}>|null
-     */
-    public ?array $slowlogEntries = null;
-
-    public ?string $slowlogError = null;
-
-    /**
      * Page size + current page for the CLIENT LIST table. Pagination is
      * client-side (we already have the full list in memory) so prev/next
      * doesn't re-SSH — the snapshot is cheap to slice. Reset to page 1 on
