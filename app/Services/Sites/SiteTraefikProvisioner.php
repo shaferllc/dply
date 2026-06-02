@@ -43,6 +43,7 @@ class SiteTraefikProvisioner extends AbstractSiteWebserverProvisioner implements
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
         $this->syncAccessGateFiles($site, $ssh, $emit);
         if ($this->writeSystemFileIfChanged($server, $ssh, $caddyConfig, $this->caddyBuilder->build($site, $backendPort))) {

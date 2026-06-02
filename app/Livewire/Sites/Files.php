@@ -12,6 +12,7 @@ use App\Services\Servers\ServerFileBrowserAuditLogger;
 use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Support\Servers\FileBrowserListing;
 use App\Support\Servers\FileBrowserPathPolicy;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -88,23 +89,45 @@ class Files extends Component
         $this->server = $server;
         $this->site = $site;
 
-        if ($this->path === '' || $this->path[0] !== '/') {
-            $this->path = FileBrowserPathPolicy::normalize($site->effectiveRepositoryPath());
-        }
+        // Locked to the site directory: an out-of-root ?path (manual URL or a
+        // stale link) snaps back to the repository root rather than exposing
+        // the wider box like the server-wide browser does.
+        $root = $this->siteRoot();
+        $this->path = ($this->path !== '' && $this->path[0] === '/' && FileBrowserPathPolicy::isInside($this->path, $root))
+            ? FileBrowserPathPolicy::normalize($this->path)
+            : $root;
     }
 
     public function render(): View
     {
         $listing = $this->safeList();
+        $runtimeMode = $this->site->runtimeTargetMode();
+        $runtimeTarget = $this->site->runtimeTarget();
 
         return view('livewire.sites.files', [
             'listing' => $listing,
             'effectiveLoginUser' => $this->effectiveLoginUser(),
-            'siteRoot' => FileBrowserPathPolicy::normalize($this->site->effectiveRepositoryPath()),
+            'siteRoot' => $this->siteRoot(),
             'isAtomic' => $this->site->isAtomicDeploys(),
             'editMaxBytes' => (int) config('server_file_browser.edit_max_bytes', 1_048_576),
             'downloadMaxBytes' => (int) config('server_file_browser.download_max_bytes', 26_214_400),
+            // Settings shell (sidebar + breadcrumb) — same vars the sibling
+            // workspace pages (Monitor, Web server config) feed the partial.
+            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
+            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
+            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
+            'routingTab' => 'domains',
+            'laravel_tab' => 'commands',
+            'section' => 'files',
+            'runtimeMode' => $runtimeMode,
+            'runtimePublication' => is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [],
         ]);
+    }
+
+    /** Normalized repository root — the hard boundary for all navigation. */
+    private function siteRoot(): string
+    {
+        return FileBrowserPathPolicy::normalize($this->site->effectiveRepositoryPath());
     }
 
     public function openEntry(string $name): void
@@ -120,16 +143,29 @@ class Files extends Component
     public function jumpTo(string $absolute): void
     {
         try {
-            $this->path = FileBrowserPathPolicy::normalize($absolute);
-            $this->filter = '';
+            $target = FileBrowserPathPolicy::normalize($absolute);
         } catch (\InvalidArgumentException $e) {
             $this->toastError($e->getMessage());
+
+            return;
         }
+
+        if (! FileBrowserPathPolicy::isInside($target, $this->siteRoot())) {
+            $this->toastError(__('That path is outside this site\'s directory.'));
+
+            return;
+        }
+
+        $this->path = $target;
+        $this->filter = '';
     }
 
     public function goUp(): void
     {
-        $this->path = FileBrowserPathPolicy::parent($this->path);
+        // Never climb above the site root — clamp there instead.
+        $root = $this->siteRoot();
+        $parent = FileBrowserPathPolicy::parent($this->path);
+        $this->path = FileBrowserPathPolicy::isInside($parent, $root) ? $parent : $root;
         $this->filter = '';
     }
 

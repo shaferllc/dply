@@ -10,6 +10,7 @@ use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use Illuminate\Support\Str;
 
 abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -172,6 +173,25 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $emit?->step($this->emitterSource(), 'ensuring suspended page');
         $builder = new SiteSuspendedPageBuilder;
         $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
+    }
+
+    /**
+     * Writes the managed 500-series HTML page under {@see Site::managedErrorPagesRoot()}.
+     */
+    protected function ensureManagedErrorPages(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        if ($site->type === SiteType::Custom) {
+            return;
+        }
+
+        $dir = rtrim($site->managedErrorPagesRoot(), '/');
+        if ($dir === '') {
+            return;
+        }
+
+        $emit?->step($this->emitterSource(), 'ensuring managed error pages');
+        $builder = new SiteServerErrorPageBuilder;
+        $this->writeSystemFile($ssh, $dir.'/'.SiteManagedErrorPageSupport::ERROR_FILENAME, $builder->render($site));
     }
 
     /**

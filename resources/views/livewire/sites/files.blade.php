@@ -34,28 +34,24 @@
             <span class="text-sm font-medium text-brand-ink">{{ __('Loading…') }}</span>
         </div>
     </div>
-    <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[10rem]">{{ $server->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', [$server, $site]) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[10rem]">{{ $site->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Files') }}</li>
-        </ol>
-    </nav>
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Files'),
+        'currentIcon' => 'folder',
+    ])
 
-    <div class="mb-8 border-b border-brand-ink/10 pb-6">
-        <x-page-header
-            :title="__('Files')"
-            :description="__('Browse the site tree over SSH as :user. Edit text files (≤:edit MB), download anything (≤:dl MB).', ['user' => $effectiveLoginUser, 'edit' => (int) ($editMaxBytes / 1024 / 1024), 'dl' => (int) ($downloadMaxBytes / 1024 / 1024)])"
-            flush
-            compact
-        />
-    </div>
+    <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+        @include('livewire.sites.settings.partials.sidebar')
+
+        <main class="min-w-0 space-y-6 lg:col-span-9">
+            <x-page-header
+                :title="__('Files')"
+                :description="__('Browse the site tree over SSH as :user. Edit text files (≤:edit MB), download anything (≤:dl MB).', ['user' => $effectiveLoginUser, 'edit' => (int) ($editMaxBytes / 1024 / 1024), 'dl' => (int) ($downloadMaxBytes / 1024 / 1024)])"
+                :show-documentation="false"
+                flush
+                compact
+            />
 
     <div class="{{ $card }} p-4 sm:p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -80,7 +76,7 @@
                     <button type="button" wire:click="jumpTo('{{ $crumb['path'] }}')" class="rounded-md bg-brand-ink/5 px-2 py-1 font-mono hover:bg-brand-ink/10">{{ $crumb['name'] }}</button>
                 @endif
             @endforeach
-            <button type="button" wire:click="goUp" class="ml-2 rounded-md border border-brand-ink/15 px-2 py-1 font-semibold hover:bg-brand-sand/40">{{ __('Up') }}</button>
+            <button type="button" wire:click="goUp" @disabled($path === $siteRoot) class="ml-2 rounded-md border border-brand-ink/15 px-2 py-1 font-semibold hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40">{{ __('Up') }}</button>
         </div>
 
         <div class="mt-4">
@@ -185,6 +181,9 @@
             </div>
         </div>
     @endif
+
+        </main>
+    </div>
 
     {{-- View modal --}}
     @if ($showViewModal)

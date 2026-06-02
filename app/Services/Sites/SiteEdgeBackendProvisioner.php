@@ -74,6 +74,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
         $this->syncAccessGateFiles($site, $ssh, $emit);
 
@@ -202,6 +203,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
                 $this->installPlaceholderPage($site, $ssh, $emit);
             }
             $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
             $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
             $this->syncAccessGateFiles($site, $ssh, $emit);
 

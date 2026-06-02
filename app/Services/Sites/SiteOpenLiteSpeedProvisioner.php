@@ -44,6 +44,7 @@ class SiteOpenLiteSpeedProvisioner extends AbstractSiteWebserverProvisioner impl
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
         $this->syncAccessGateFiles($site, $ssh, $emit);
         if ($this->writeSystemFileIfChanged($server, $ssh, $configFile, $this->builder->build($site))) {

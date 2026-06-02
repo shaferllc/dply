@@ -18,6 +18,7 @@ class CollectEdgeUsageCommand extends Command
 {
     protected $signature = 'dply:edge:collect-usage
                             {--date= : UTC date (Y-m-d) to collect; defaults to yesterday}
+                            {--today : Collect for today (UTC) instead of yesterday}
                             {--dry-run : Report counts without writing snapshots}';
 
     protected $description = 'Collect Edge delivery usage snapshots for usage-based billing.';
@@ -25,9 +26,11 @@ class CollectEdgeUsageCommand extends Command
     public function handle(EdgeUsageCollector $collector): int
     {
         $dateInput = $this->option('date');
-        $date = is_string($dateInput) && $dateInput !== ''
-            ? now()->parse($dateInput)->startOfDay()
-            : now()->subDay()->startOfDay();
+        $date = match (true) {
+            (bool) $this->option('today') => now()->startOfDay(),
+            is_string($dateInput) && $dateInput !== '' => now()->parse($dateInput)->startOfDay(),
+            default => now()->subDay()->startOfDay(),
+        };
 
         $dryRun = (bool) $this->option('dry-run');
 

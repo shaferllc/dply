@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\SiteType;
 use App\Jobs\CleanupCustomSiteJob;
+use App\Jobs\RelocateSiteFilesJob;
 use App\Livewire\Sites\Settings;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\LaravelComposerPackageDetector;
@@ -928,16 +929,26 @@ class Site extends Model
 
     public function isReadyForTraffic(): bool
     {
-        return in_array($this->status, [
+        return in_array($this->status, self::webserverActiveStatuses(), true)
+            || in_array($this->status, [
+                self::STATUS_DOCKER_ACTIVE,
+                self::STATUS_KUBERNETES_ACTIVE,
+                self::STATUS_FUNCTIONS_ACTIVE,
+            ], true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function webserverActiveStatuses(): array
+    {
+        return [
             self::STATUS_NGINX_ACTIVE,
             self::STATUS_APACHE_ACTIVE,
             self::STATUS_CADDY_ACTIVE,
             self::STATUS_OPENLITESPEED_ACTIVE,
             self::STATUS_TRAEFIK_ACTIVE,
-            self::STATUS_DOCKER_ACTIVE,
-            self::STATUS_KUBERNETES_ACTIVE,
-            self::STATUS_FUNCTIONS_ACTIVE,
-        ], true);
+        ];
     }
 
     public function isReadyForWorkspace(): bool
@@ -2516,7 +2527,7 @@ class Site extends Model
      * The canonical on-disk location for a site's files: /home/dply/<domain>,
      * keyed on the primary hostname (DNS-safe chars only), falling back to the
      * slug when no domain is set. This is the convention new sites default to
-     * and the target {@see \App\Jobs\RelocateSiteFilesJob} relocates toward.
+     * and the target {@see RelocateSiteFilesJob} relocates toward.
      */
     public function conventionalRepositoryPath(): string
     {
@@ -2897,6 +2908,14 @@ class Site extends Model
     public function suspendedStaticRoot(): string
     {
         return rtrim($this->effectiveEnvDirectory(), '/').'/.dply/suspended';
+    }
+
+    /**
+     * Static files for managed 5xx error pages (outside public/).
+     */
+    public function managedErrorPagesRoot(): string
+    {
+        return rtrim($this->effectiveEnvDirectory(), '/').'/.dply/errors';
     }
 
     /**

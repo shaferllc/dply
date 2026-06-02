@@ -10,6 +10,7 @@ use App\Services\Servers\ServerPhpManager;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
 use App\Support\Sites\SiteAccessGateConfigSupport;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use App\Support\Sites\VmDockerSiteConfigSupport;
 use Illuminate\Support\Collection;
 
@@ -65,6 +66,7 @@ class CaddySiteConfigBuilder
         $basicAuth = $this->caddyBasicAuthBlocks($site);
         $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
         $dotfileDeny = $this->caddyDotfileDenyBlock();
+        $managedErrors = SiteManagedErrorPageSupport::caddyBlock($site);
 
         if ($site->type === SiteType::Php && $site->octane_port) {
             $port = (int) $site->octane_port;
@@ -72,7 +74,7 @@ class CaddySiteConfigBuilder
 
             return <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverb}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
+{$managedErrors}{$redirectLines}{$reverb}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -86,7 +88,7 @@ CADDY;
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverbPhp}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
+{$managedErrors}{$redirectLines}{$reverbPhp}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -97,7 +99,7 @@ CADDY;
 CADDY,
             SiteType::Static => <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
+{$managedErrors}{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -107,7 +109,7 @@ CADDY,
 CADDY,
             SiteType::Node => <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
+{$managedErrors}{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -313,6 +315,7 @@ CADDY;
         $basicAuth = $this->caddyBasicAuthBlocks($site);
         $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
         $dotfileDeny = $this->caddyDotfileDenyBlock();
+        $managedErrors = SiteManagedErrorPageSupport::caddyBlock($site);
 
         if ($site->isSuspended()) {
             return $this->suspendedSiteBlock($hosts, $basename, $site);
@@ -320,7 +323,7 @@ CADDY;
 
         return <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
+{$managedErrors}{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }

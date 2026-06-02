@@ -60,6 +60,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->ensureNginxEngineHttpCacheInfrastructure($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
         $this->syncAccessGateFiles($site, $ssh, $emit);

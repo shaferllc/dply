@@ -10,6 +10,7 @@ use App\Models\SiteWebserverConfigProfile;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
 use App\Support\Sites\SiteAccessGateConfigSupport;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use App\Support\Sites\VmDockerSiteConfigSupport;
 
 class NginxSiteConfigBuilder
@@ -240,10 +241,12 @@ NGINX;
             $port = (int) $site->octane_port;
             $reverb = $this->reverbProxyLocationBlock($site);
             $octaneProxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
-            $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
-            $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
+        $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
+        $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
+        $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
+        $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
 
-            return <<<NGINX
+        return <<<NGINX
 # Managed by Dply — {$basename} (Laravel Octane)
 server {
     listen 80;
@@ -253,12 +256,12 @@ server {
     index index.php index.html;
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$poolNote}{$redirectBlock}{$reverb}{$octaneBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}    location / {
+{$managedErrors}{$layerPrefix}{$poolNote}{$redirectBlock}{$reverb}{$octaneBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}    location / {
 {$octaneBa['location_slash_auth']}{$formGate['location_slash_auth']}        try_files \$uri @octane;
     }
 
     location @octane {
-{$octaneBa['named_location_auth']}        proxy_http_version 1.1;
+{$octaneBa['named_location_auth']}{$proxyIntercept}        proxy_http_version 1.1;
         proxy_set_header Host \$http_host;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
@@ -281,6 +284,8 @@ NGINX;
             : '';
         $phpBa = $this->nginxBasicAuthPhpFragments($site, $root, $phpSock, $fcgiEngine);
         $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
+        $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
+        $fastcgiIntercept = SiteManagedErrorPageSupport::nginxFastcgiInterceptErrors();
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -292,7 +297,7 @@ server {
     index index.php index.html;
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}
+{$managedErrors}{$layerPrefix}
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
 {$poolNote}{$redirectBlock}{$reverbPlain}{$phpBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$phpBa['prefix_locations']}    location / {
@@ -302,7 +307,7 @@ server {
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:{$phpSock};
-{$fcgiEngine}
+{$fastcgiIntercept}{$fcgiEngine}
     }
 
     location ~ /\.(?!well-known).* {
@@ -325,6 +330,7 @@ NGINX;
         $openFile = app(SiteCacheDirectivesBuilder::class)->nginxOpenFileCacheBlock($site);
         $staticBa = $this->nginxBasicAuthStaticFragments($site, $root);
         $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
+        $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -336,7 +342,7 @@ server {
     index index.html;
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$openFile}{$redirectBlock}{$staticBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$staticBa['prefix_locations']}
+{$managedErrors}{$layerPrefix}{$openFile}{$redirectBlock}{$staticBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$staticBa['prefix_locations']}
     location / {
 {$staticBa['location_slash_auth']}{$formGate['location_slash_auth']}        try_files \$uri \$uri/ =404;
     }
@@ -362,6 +368,8 @@ NGINX;
         $webRoot = rtrim($site->effectiveDocumentRootForNginx(), '/');
         $nodeBa = $this->nginxBasicAuthNodeFragments($site, $webRoot);
         $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $webRoot);
+        $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
+        $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -371,9 +379,9 @@ server {
     server_name {$serverNames};
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$nodeBa['prefix_locations']}
+{$managedErrors}{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$nodeBa['prefix_locations']}
     location / {
-{$nodeBa['location_slash_auth']}{$formGate['location_slash_auth']}        proxy_http_version 1.1;
+{$nodeBa['location_slash_auth']}{$formGate['location_slash_auth']}{$proxyIntercept}        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -662,6 +670,8 @@ NGINX;
         $webRoot = rtrim($site->effectiveDocumentRootForNginx(), '/');
         $nodeBa = $this->nginxBasicAuthNodeFragments($site, $webRoot);
         $proxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
+        $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
+        $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
 
         $config = <<<NGINX
 # Managed by Dply — {$basename} (vm docker)
@@ -671,9 +681,9 @@ server {
     server_name {$names};
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$nodeBa['prefix_locations']}
+{$managedErrors}{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$nodeBa['prefix_locations']}
     location / {
-{$nodeBa['location_slash_auth']}        proxy_http_version 1.1;
+{$nodeBa['location_slash_auth']}{$proxyIntercept}        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;

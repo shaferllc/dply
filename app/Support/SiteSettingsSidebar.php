@@ -87,6 +87,10 @@ final class SiteSettingsSidebar
                 ['id' => 'rails-stack', 'label' => __('Rails'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
                 ['id' => 'wordpress', 'label' => __('WordPress'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'runtime'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
+                // SSH file browser, locked to the site's directory root. Has its
+                // own dedicated route; gated below so it's hidden on hosts without
+                // SSH (where the browser can't read anything).
+                ['id' => 'files', 'label' => __('Files'), 'icon' => 'heroicon-o-folder', 'group' => 'runtime', 'route' => 'sites.files'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor'],
@@ -163,6 +167,7 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services' || Site::supportsSystemdServices($site, $server))
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'files' || $supportsSsh)
                 // Hide gated items when neither the full feature nor its coming-soon
                 // preview is active (e.g. Schedule, Backups).
                 ->filter(fn (array $item): bool => self::sidebarItemVisible($item))

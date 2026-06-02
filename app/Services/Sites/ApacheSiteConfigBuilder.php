@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\SiteAccessGateConfigSupport;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use Illuminate\Support\Collection;
 
 class ApacheSiteConfigBuilder
@@ -54,6 +55,8 @@ class ApacheSiteConfigBuilder
             $reverb = $this->reverbProxyDirectives($site);
             $octBa = $this->apacheRootLocationBasicAuth($site);
             $formGate = SiteAccessGateConfigSupport::apacheBlocks($site);
+            $managedErrors = SiteManagedErrorPageSupport::apacheVirtualHostBlock($site);
+            $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride();
 
             return $this->applyListenPort(<<<APACHE
 # Managed by Dply — {$basename} (Laravel Octane)
@@ -62,9 +65,9 @@ class ApacheSiteConfigBuilder
 {$aliasLines}    DocumentRoot {$root}
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
-    ProxyPreserveHost On
+{$managedErrors}    ProxyPreserveHost On
     RequestHeader set X-Forwarded-Proto "http"
-{$redirectLines}{$formGate['rewrite']}{$reverb}{$octBa}{$formGate['locations']}    ProxyPass / http://127.0.0.1:{$port}/
+{$proxyErrorOverride}{$redirectLines}{$formGate['rewrite']}{$reverb}{$octBa}{$formGate['locations']}    ProxyPass / http://127.0.0.1:{$port}/
     ProxyPassReverse / http://127.0.0.1:{$port}/
 </VirtualHost>
 APACHE, $listenPort);
@@ -77,6 +80,8 @@ APACHE, $listenPort);
         $nodeBa = $this->apacheRootLocationBasicAuth($site);
         $formGateNode = SiteAccessGateConfigSupport::apacheBlocks($site);
         $dotfileDeny = $this->apacheDotfileDenyBlock();
+        $managedErrors = SiteManagedErrorPageSupport::apacheVirtualHostBlock($site);
+        $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride();
 
         $config = match ($site->type) {
             SiteType::Php => <<<APACHE
@@ -86,7 +91,7 @@ APACHE, $listenPort);
 {$aliasLines}    DocumentRoot {$root}
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
-    ProxyPreserveHost On
+{$managedErrors}    ProxyPreserveHost On
 {$dotfileDeny}{$engineApache}{$redirectLines}{$phpBa['rewrite']}{$reverbPhp}    <Directory {$root}>
         AllowOverride All
 {$phpBa['directory']}
@@ -107,7 +112,7 @@ APACHE,
 {$aliasLines}    DocumentRoot {$root}
     ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
-
+{$managedErrors}
 {$dotfileDeny}{$redirectLines}{$staticBa['rewrite']}    <Directory {$root}>
         AllowOverride All
 {$staticBa['directory']}
@@ -124,8 +129,8 @@ APACHE,
     ServerName {$primary}
 {$aliasLines}    ErrorLog \${APACHE_LOG_DIR}/{$basename}-error.log
     CustomLog \${APACHE_LOG_DIR}/{$basename}-access.log combined
-    ProxyPreserveHost On
-{$dotfileDeny}{$redirectLines}{$nodeBa}{$formGateNode['rewrite']}{$formGateNode['locations']}    ProxyPass / http://127.0.0.1:{$site->app_port}/
+{$managedErrors}    ProxyPreserveHost On
+{$proxyErrorOverride}{$dotfileDeny}{$redirectLines}{$nodeBa}{$formGateNode['rewrite']}{$formGateNode['locations']}    ProxyPass / http://127.0.0.1:{$site->app_port}/
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,

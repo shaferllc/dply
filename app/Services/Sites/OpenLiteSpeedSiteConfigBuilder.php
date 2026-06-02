@@ -9,6 +9,7 @@ use App\Models\SiteBasicAuthUser;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
 use App\Support\Sites\SiteAccessGateConfigSupport;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use Illuminate\Support\Collection;
 
 class OpenLiteSpeedSiteConfigBuilder
@@ -56,6 +57,7 @@ class OpenLiteSpeedSiteConfigBuilder
         $tlsPaths = $listenPort === null ? OpenLiteSpeedTlsPaths::resolve($site) : null;
         $tlsBlock = $tlsPaths !== null ? OpenLiteSpeedTlsPaths::vhsslBlock($tlsPaths)."\n" : '';
         $lsapiHandler = $this->olsLsapiHandlerName($site);
+        $managedErrors = SiteManagedErrorPageSupport::openLiteSpeedBlock($site);
 
         return match ($site->type) {
             SiteType::Php => <<<CONF
@@ -64,7 +66,7 @@ vhDomain                  {$hostnames->implode(',')}
 vhAliases                 www.{$hostnames->first()}
 adminEmails               root@localhost
 enableGzip                1
-{$tlsBlock}index  {
+{$tlsBlock}{$managedErrors}index  {
   useServer               0
   indexFiles              index.html, index.php
 }
@@ -90,7 +92,7 @@ docRoot                   {$root}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-{$tlsBlock}index  {
+{$tlsBlock}{$managedErrors}index  {
   useServer               0
   indexFiles              index.html
 }
@@ -113,7 +115,7 @@ docRoot                   {$vhostRoot}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-{$tlsBlock}{$this->rewriteBlock($site, $site->app_port, $tlsPaths !== null)}
+{$tlsBlock}{$managedErrors}{$this->rewriteBlock($site, $site->app_port, $tlsPaths !== null)}
 errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN
@@ -159,6 +161,7 @@ CONF;
         $rootAuthLines = $this->olsBasicAuthRootContextLines($site);
         $tlsPaths = OpenLiteSpeedTlsPaths::resolve($site);
         $tlsBlock = $tlsPaths !== null ? OpenLiteSpeedTlsPaths::vhsslBlock($tlsPaths)."\n" : '';
+        $managedErrors = SiteManagedErrorPageSupport::openLiteSpeedBlock($site);
         // OLS Octane proxies every request through the vhost rewrite block. To
         // gate that with basic auth we wrap the proxy in a context / { ... }
         // and let OLS evaluate auth before the rewrite fires. Per-prefix
@@ -173,7 +176,7 @@ docRoot                   {$vhostRoot}/
 vhDomain                  {$hostnames->implode(',')}
 adminEmails               root@localhost
 enableGzip                1
-{$tlsBlock}{$authRealms}{$this->rewriteBlock($site, $oct, $tlsPaths !== null)}
+{$tlsBlock}{$managedErrors}{$authRealms}{$this->rewriteBlock($site, $oct, $tlsPaths !== null)}
 {$authPrefixContexts}{$rootContext}errorlog {$vhostRoot}/logs/error.log {
   useServer               0
   logLevel                WARN

@@ -57,24 +57,30 @@ class RelocateSiteFilesJob implements ShouldQueue
         if ($old !== $new) {
             $user = trim((string) $server->ssh_user) ?: (string) config('server_provision.deploy_ssh_user', 'dply');
             $userEsc = escapeshellarg($user);
-            $webUser = $this->webServerUser();
-            $webUserEsc = escapeshellarg($webUser);
+            $webGroup = $this->webServerGroup();
+            $groupEsc = escapeshellarg($webGroup);
 
-            // Keep /home/dply private (750) and instead add the web-server
-            // user to the deploy user's group, then group-own the tree and
-            // make it group-readable (g+rX) — so nginx/Caddy can traverse and
-            // serve the files without making the home directory world-readable.
+            // Group-own /home/dply and the site tree by the web-server group
+            // (e.g. www-data, which both nginx and the caddy user belong to) so
+            // the serving process can traverse and read the files without making
+            // the deploy user's home world-accessible. The setgid bit on the
+            // parent (2750) keeps files written by later deploys group-owned by
+            // the web group. This mirrors the group model in
+            // ServerSystemUserService::resetSiteFilePermissions().
+            //
+            // NB: relying on the *group* (not adding a specific web user to the
+            // deploy group) is what makes this work on Caddy hosts, where the
+            // serving user is `caddy` rather than the configured `www-data`.
             // The move is idempotent: only moves when the target is clear.
             $script = sprintf(
-                'mkdir -p %1$s && chown %4$s:%4$s %1$s && chmod 750 %1$s && '
-                .'usermod -aG %4$s %5$s 2>/dev/null || true; '
+                'mkdir -p %1$s && chown %4$s:%5$s %1$s && chmod 2750 %1$s && '
                 .'if [ -e %2$s ] && [ ! -e %3$s ]; then mv %2$s %3$s; else mkdir -p %3$s; fi && '
-                .'chown -R %4$s:%4$s %3$s && chmod -R g+rX %3$s',
+                .'chown -R %4$s:%5$s %3$s && chmod -R g+rX %3$s',
                 escapeshellarg(dirname($new)),
                 escapeshellarg($old),
                 escapeshellarg($new),
                 $userEsc,
-                $webUserEsc,
+                $groupEsc,
             );
 
             $ssh = $sshFactory->forServer($server);
@@ -104,15 +110,16 @@ class RelocateSiteFilesJob implements ShouldQueue
     }
 
     /**
-     * The web-server user/group that needs read access to the served files,
-     * matching the provisioners' default (www-data). Validated to a safe
-     * passwd-style name before it goes into a shell command.
+     * The web-server group that owns the served files so the web server (nginx
+     * as www-data, or Caddy as the caddy user — both members of this group) can
+     * read them. Matches the provisioners' default (www-data). Validated to a
+     * safe passwd-style name before it goes into a shell command.
      */
-    private function webServerUser(): string
+    private function webServerGroup(): string
     {
-        $user = trim((string) config('site_settings.vm_site_file_web_group', 'www-data'));
+        $group = trim((string) config('site_settings.vm_site_file_web_group', 'www-data'));
 
-        return preg_match('/^[a-z_][a-z0-9_-]*$/', $user) === 1 ? $user : 'www-data';
+        return preg_match('/^[a-z_][a-z0-9_-]*$/', $group) === 1 ? $group : 'www-data';
     }
 
     /**
