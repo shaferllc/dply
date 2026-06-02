@@ -732,15 +732,31 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
         $lines = array_merge($lines, $this->maybeInstallMise());
         $lines = array_merge($lines, $this->writeRenderedConfigs('application', $web, $php, $layout));
-
-        if (config('server_provision.install_composer', true) && $php !== 'none') {
-            $lines[] = $this->stepMarker('Installing Composer');
-            $lines[] = $this->forceReinstall()
-                ? 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer'
-                : 'if command -v composer >/dev/null 2>&1; then echo "[dply] composer already installed; skipping installer."; else curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; fi';
-        }
+        $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 
         return $lines;
+    }
+
+    /**
+     * Install Composer system-wide when PHP is present. Shared by every role
+     * that installs PHP (application, worker) so deploys never land on a box
+     * with PHP but no Composer — otherwise the deploy-time self-heal kicks in
+     * and installs it per-user under ~/.local/bin instead.
+     *
+     * @return list<string>
+     */
+    private function installComposerIfNeeded(string $php): array
+    {
+        if (! config('server_provision.install_composer', true) || $php === 'none') {
+            return [];
+        }
+
+        return [
+            $this->stepMarker('Installing Composer'),
+            $this->forceReinstall()
+                ? 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer'
+                : 'if command -v composer >/dev/null 2>&1; then echo "[dply] composer already installed; skipping installer."; else curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; fi',
+        ];
     }
 
     /**
@@ -778,6 +794,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
         $lines = array_merge($lines, $this->maybeInstallMise());
         $lines = array_merge($lines, $this->writeRenderedConfigs('worker', $web, $php, $layout));
+        $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 
         return $lines;
     }

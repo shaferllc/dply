@@ -2509,7 +2509,26 @@ class Site extends Model
         // Container sites have neither a repo path nor a document
         // root — return a stable placeholder so callers that derive
         // sub-paths (basic-auth dir, etc.) can still build strings.
-        return $this->document_root ?? '/var/www/'.($this->slug ?: 'site');
+        return $this->document_root ?? $this->conventionalRepositoryPath();
+    }
+
+    /**
+     * The canonical on-disk location for a site's files: /home/dply/<domain>,
+     * keyed on the primary hostname (DNS-safe chars only), falling back to the
+     * slug when no domain is set. This is the convention new sites default to
+     * and the target {@see \App\Jobs\RelocateSiteFilesJob} relocates toward.
+     */
+    public function conventionalRepositoryPath(): string
+    {
+        $host = strtolower(trim((string) optional($this->primaryDomain())->hostname));
+        $host = (string) preg_replace('/[^a-z0-9.-]+/', '', $host);
+        $host = trim($host, '.-');
+
+        if ($host === '') {
+            $host = $this->slug ?: 'site';
+        }
+
+        return '/home/dply/'.$host;
     }
 
     /**

@@ -1,6 +1,11 @@
 @php
     $latest = $latestDeployment ?? null;
     $isRunning = $latest && $latest->status === 'running';
+    // A deploy is "in progress" whenever the latest run is running or the
+    // deploy lock is held (e.g. a queued run on a worker). Drive the deploy
+    // button off this so it reads "Deploying…" for the whole run, not just
+    // the brief request that dispatches it.
+    $deployInProgress = $isRunning || (bool) ($this->deployLockInfo ?? null);
     $deployedSha = $latest?->git_sha;
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
@@ -9,7 +14,7 @@
     $timelinePhases = \App\Support\Sites\SiteDeployTimeline::forDeployment($site, $latest);
 @endphp
 
-<div class="space-y-6" @if ($isRunning) wire:poll.5s @endif>
+<div class="space-y-6" @if ($deployInProgress) wire:poll.5s @endif>
     @if ($this->deployLockInfo ?? null)
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <div class="flex flex-wrap items-center gap-2">
@@ -53,11 +58,16 @@
                 </p>
             </div>
             <div class="flex shrink-0 flex-wrap gap-2 sm:ml-auto">
-                <button type="button" wire:click="deployNow" wire:loading.attr="disabled" wire:target="deployNow" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
-                    <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
-                    <span wire:loading wire:target="deployNow"><x-spinner variant="white" size="sm" /></span>
-                    <span wire:loading.remove wire:target="deployNow">{{ __('Deploy now') }}</span>
-                    <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
+                <button type="button" wire:click="deployNow" wire:loading.attr="disabled" wire:target="deployNow" @disabled($deployInProgress) class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
+                    @if ($deployInProgress)
+                        <x-spinner variant="white" size="sm" />
+                        <span>{{ __('Deploying…') }}</span>
+                    @else
+                        <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
+                        <span wire:loading wire:target="deployNow"><x-spinner variant="white" size="sm" /></span>
+                        <span wire:loading.remove wire:target="deployNow">{{ __('Deploy now') }}</span>
+                        <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
+                    @endif
                 </button>
                 <button type="button" wire:click="queueDeploy" wire:loading.attr="disabled" wire:target="queueDeploy" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-50">
                     <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
@@ -112,7 +122,26 @@
         </dl>
 
         <div class="px-6 py-6 sm:px-8">
-            @if ($latest === null)
+            {{-- While a deploy request is in flight, clear the previous run's
+                 timeline right away and show a starting placeholder. The deploy
+                 runs synchronously, so this state holds for the whole request
+                 instead of flashing for a frame. --}}
+            <div wire:loading.flex wire:target="deployNow,queueDeploy" class="hidden items-center justify-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-8 text-sm text-brand-moss">
+                <x-spinner size="sm" />
+                <span>{{ __('Starting deploy — clearing the previous run…') }}</span>
+            </div>
+
+            <div wire:loading.remove wire:target="deployNow,queueDeploy">
+            @if ($deployInProgress && ! $isRunning)
+                {{-- Queued on a worker but the run hasn't recorded its first
+                     phase yet — show a starting placeholder instead of the
+                     previous run's timeline. Flips to the live timeline below
+                     once the worker creates the running deployment record. --}}
+                <div class="flex items-center justify-center gap-3 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-8 text-sm text-brand-moss">
+                    <x-spinner size="sm" />
+                    <span>{{ __('Deploy queued — starting on a worker…') }}</span>
+                </div>
+            @elseif ($latest === null)
                 <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-8 text-center text-sm text-brand-moss">
                     {{ __('No phase timeline yet — your first deploy will appear here.') }}
                 </div>
@@ -222,6 +251,7 @@
                     <p class="mt-4 font-mono text-xs text-rose-700">{{ __('exit :code', ['code' => $latest->exit_code]) }}</p>
                 @endif
             @endif
+            </div>
         </div>
     </section>
 </div>

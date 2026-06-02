@@ -255,6 +255,6 @@ class DeployPhaseRunner
     {
         $base = trim((string) ($site->repository_path ?? ''));
 
-        return $base !== '' ? rtrim($base, '/') : '/var/www/'.$site->slug;
+        return $base !== '' ? rtrim($base, '/') : rtrim($site->conventionalRepositoryPath(), '/');
     }
 }

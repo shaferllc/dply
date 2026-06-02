@@ -6,7 +6,7 @@ use Livewire\Form;
 
 class SiteCreateForm extends Form
 {
-    public const DEFAULT_DEPLOY_PATH = '/var/www/app';
+    public const DEFAULT_DEPLOY_PATH = '/home/dply/app';
 
     public const DEFAULT_FUNCTIONS_BUILD_COMMAND = 'npm install && npm run build';
 
@@ -44,7 +44,7 @@ class SiteCreateForm extends Form
      */
     public string $deploy_stack = 'native';
 
-    public string $document_root = '/var/www/app/public';
+    public string $document_root = '/home/dply/app/public';
 
     public string $repository_path = self::DEFAULT_DEPLOY_PATH;
 
@@ -214,17 +214,14 @@ class SiteCreateForm extends Form
 
     public function defaultDeployPath(): string
     {
+        // Sites live at /home/dply/<domain>, using the primary hostname
+        // verbatim (DNS-safe chars only) rather than a slug.
         $hostname = strtolower(trim($this->primary_hostname));
+        $hostname = (string) preg_replace('/[^a-z0-9.-]+/', '', $hostname);
+        $hostname = trim($hostname, '.-');
 
-        if ($hostname === '') {
-            return self::DEFAULT_DEPLOY_PATH;
-        }
-
-        $slug = preg_replace('/[^a-z0-9]+/', '-', $hostname);
-        $slug = trim((string) $slug, '-');
-
-        return $slug !== ''
-            ? '/var/www/'.$slug
+        return $hostname !== ''
+            ? '/home/dply/'.$hostname
             : self::DEFAULT_DEPLOY_PATH;
     }
 

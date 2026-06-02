@@ -44,6 +44,36 @@ class SiteEnvPusher
         $parent = dirname($path);
         $ssh = new SshConnection($server);
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
+
+        try {
+            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent);
+        } finally {
+            // Defence-in-depth: the success path rm's $tmp inside the sudo
+            // script below, but any throw before that point would otherwise
+            // leave a world-readable (644) copy of the .env in /tmp. The tmp
+            // is owned by the SSH user (putFile created it), so this plain rm
+            // can remove it. Best-effort — never mask the original error.
+            try {
+                $ssh->exec('rm -f '.escapeshellarg($tmp));
+            } catch (\Throwable) {
+                // ignore — cleanup is best-effort
+            }
+        }
+    }
+
+    /**
+     * Stages the env blob to $tmp and copies it into place as root. Split out
+     * so {@see push()} can guarantee tmp cleanup in a finally regardless of
+     * where this throws.
+     */
+    private function writeViaTmp(
+        SshConnection $ssh,
+        Site $site,
+        string $content,
+        string $tmp,
+        string $path,
+        string $parent,
+    ): string {
         $ssh->putFile($tmp, $content);
         // Stage the tmp file world-readable so root's `cp` (below) can read
         // it regardless of who owns /tmp/<file>. Exit-code-checked so a
@@ -71,7 +101,7 @@ class SiteEnvPusher
         // If the site has no effective system user, fall back to root (the
         // file ends up root:root 640 — only root can read, which is fine for
         // root-run runtimes and surfaces clearly when it isn't).
-        $siteUser = trim($site->effectiveSystemUser($server));
+        $siteUser = trim($site->effectiveSystemUser($site->server));
         if ($siteUser === '') {
             $siteUser = 'root';
         }

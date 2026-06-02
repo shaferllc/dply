@@ -101,9 +101,12 @@ class SiteDeployPipelineRunner
             // SSH exec does not surface non-zero exit codes, so append an exit
             // marker and read it back — otherwise a failed build/migration
             // would be recorded (and shown on the timeline) as success.
+            // The recorded `command` stays clean; only the executed command is
+            // prefixed with any tooling guard (e.g. ensure Composer is present).
+            $runCmd = $this->ensureToolingPrefix($step, $cmd).$cmd;
             $start = microtime(true);
             $stepOut = $ssh->exec(
-                sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $cmd),
+                sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $runCmd),
                 $timeout
             );
             $durationMs = (int) round((microtime(true) - $start) * 1000);
@@ -158,5 +161,41 @@ class SiteDeployPipelineRunner
             $step->step_type,
             trim((string) ($step->custom_command ?? ''))
         );
+    }
+
+    /**
+     * Guard prefix prepended (with `&&`) to a step that invokes Composer.
+     *
+     * A PHP deploy can land on a box without Composer — a BYO server, a host
+     * provisioned with php=none, or one where `install_composer` was off —
+     * or with Composer installed outside the non-interactive SSH PATH. Either
+     * way the step dies with "composer: command not found" (exit 127). This
+     * puts the relevant bin dirs on PATH and installs Composer from
+     * getcomposer.org if it is still missing, so the step can self-heal
+     * instead of failing. Returns '' for non-Composer steps.
+     *
+     * Deploy steps run as the unprivileged deploy user (e.g. `dply`), which
+     * cannot write to /usr/local/bin — the official installer aborts there
+     * with "installation directory is not writable" (exit 1). So we only use
+     * /usr/local/bin when it is actually writable (root/provisioning) and
+     * otherwise install into the user-local ~/.local/bin, which we add to
+     * PATH so the freshly installed binary is found within the same step.
+     */
+    protected function ensureToolingPrefix(SiteDeployStep $step, string $cmd): string
+    {
+        $usesComposer = $step->step_type === SiteDeployStep::TYPE_COMPOSER_INSTALL
+            || preg_match('/\bcomposer\s/', $cmd) === 1;
+
+        if (! $usesComposer) {
+            return '';
+        }
+
+        return '{ export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"; '
+            .'command -v composer >/dev/null 2>&1 || { '
+            .'echo "[dply] composer not found — installing…"; '
+            .'if [ -w /usr/local/bin ]; then DPLY_COMPOSER_DIR=/usr/local/bin; '
+            .'else DPLY_COMPOSER_DIR="$HOME/.local/bin"; mkdir -p "$DPLY_COMPOSER_DIR"; fi; '
+            .'curl -fsSL https://getcomposer.org/installer | php -- --install-dir="$DPLY_COMPOSER_DIR" --filename=composer; '
+            .'}; } && ';
     }
 }

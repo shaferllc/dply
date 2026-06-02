@@ -2,6 +2,11 @@
                 $serverWebserver = (string) ($server->meta['webserver'] ?? '');
                 $headlessHostNoCaddy = $serverWebserver === 'none' && ! $site->usesEdgeRuntime();
                 $caddyInstallPending = (bool) ($server->meta['webserver_install_pending'] ?? false);
+                // True while a deploy is actually running (or queued behind the
+                // deploy lock) — keeps the Deploy button reading "Deploying…"
+                // for the whole run, not just the dispatch request.
+                $deployInProgress = (($latestDeployment->status ?? null) === 'running')
+                    || (bool) ($this->deployLockInfo ?? null);
             @endphp
 
             @if ($headlessHostNoCaddy)
@@ -103,18 +108,24 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    <div class="flex shrink-0 flex-wrap items-center gap-2" @if ($deployInProgress) wire:poll.5s @endif>
                         <button
                             type="button"
                             wire:click="deployNow"
                             wire:loading.attr="disabled"
                             wire:target="deployNow"
+                            @disabled($deployInProgress)
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
-                            <span wire:loading wire:target="deployNow" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
-                            <span wire:loading.remove wire:target="deployNow">{{ __('Deploy now') }}</span>
-                            <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
+                            @if ($deployInProgress)
+                                <span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                                <span>{{ __('Deploying…') }}</span>
+                            @else
+                                <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
+                                <span wire:loading wire:target="deployNow" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                                <span wire:loading.remove wire:target="deployNow">{{ __('Deploy now') }}</span>
+                                <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
+                            @endif
                         </button>
                         <button
                             type="button"

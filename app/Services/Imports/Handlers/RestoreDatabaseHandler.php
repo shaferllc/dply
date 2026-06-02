@@ -92,8 +92,12 @@ class RestoreDatabaseHandler extends SshDependentHandler
         // is the conventional database name for dply-managed sites. dply's mysql_root
         // credentials live in /root/.my.cnf on the target server (dply convention).
         $dplyDbName = $this->dplyDatabaseNameFor($site);
+        // Remove the staged dump whether or not mysql succeeds (it holds the
+        // full source database). `; rm -f` instead of `&& rm -f` so a failed
+        // restore doesn't leave the dump sitting in /tmp; `( exit $rc )`
+        // preserves mysql's exit status as the command's overall status.
         $restore = sprintf(
-            'mysql --defaults-extra-file=/root/.my.cnf %s < %s 2>&1 && rm -f %s',
+            'mysql --defaults-extra-file=/root/.my.cnf %s < %s 2>&1; __dply_rc=$?; rm -f %s; ( exit $__dply_rc )',
             escapeshellarg($dplyDbName),
             escapeshellarg($dplyDumpPath),
             escapeshellarg($dplyDumpPath),

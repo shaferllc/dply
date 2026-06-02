@@ -29,7 +29,7 @@ test('existing import fields unchanged by scaffold addition', function () {
     // Sanity: the import-mode defaults must not have shifted when
     // the scaffold fields were added. Catches accidental field churn.
     expect(defaultFor('type'))->toBe('php');
-    expect(defaultFor('document_root'))->toBe('/var/www/app/public');
+    expect(defaultFor('document_root'))->toBe('/home/dply/app/public');
     expect(defaultFor('repository_path'))->toBe(SiteCreateForm::DEFAULT_DEPLOY_PATH);
     expect(defaultFor('git_branch'))->toBe('main');
 });

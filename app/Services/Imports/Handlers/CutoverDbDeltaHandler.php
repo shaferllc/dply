@@ -86,8 +86,10 @@ class CutoverDbDeltaHandler extends SshDependentHandler
         $dplyDb = str_replace('-', '_', $site->slug);
         $dplyShell->putFile($dplyDumpPath, $dump);
 
+        // `; rm -f` (not `&& rm -f`) so a failed restore still clears the
+        // staged delta dump from /tmp; `( exit $rc )` keeps mysql's status.
         $restore = sprintf(
-            'mysql --defaults-extra-file=/root/.my.cnf %s < %s 2>&1 && rm -f %s',
+            'mysql --defaults-extra-file=/root/.my.cnf %s < %s 2>&1; __dply_rc=$?; rm -f %s; ( exit $__dply_rc )',
             escapeshellarg($dplyDb),
             escapeshellarg($dplyDumpPath),
             escapeshellarg($dplyDumpPath),

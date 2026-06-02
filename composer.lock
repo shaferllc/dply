@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "50b39b65e6761561fe6ca2cf8aa6c2d9",
+    "content-hash": "5b474101482017c5953d657b7c9c025b",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -6716,10 +6716,16 @@
         {
             "name": "shaferllc/dply-php-lambda",
             "version": "dev-master",
-            "dist": {
-                "type": "path",
-                "url": "../dply-php-lambda",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/shaferllc/dply-php-lambda.git",
                 "reference": "81728d94475a785c71eec1a635e1e5572edcb228"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/shaferllc/dply-php-lambda/zipball/81728d94475a785c71eec1a635e1e5572edcb228",
+                "reference": "81728d94475a785c71eec1a635e1e5572edcb228",
+                "shasum": ""
             },
             "require": {
                 "bref/bref": "^2.1",
@@ -6728,6 +6734,7 @@
             "require-dev": {
                 "phpunit/phpunit": "^11.0"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "psr-4": {
@@ -6751,10 +6758,11 @@
                 "php",
                 "serverless"
             ],
-            "transport-options": {
-                "symlink": true,
-                "relative": true
-            }
+            "support": {
+                "source": "https://github.com/shaferllc/dply-php-lambda/tree/master",
+                "issues": "https://github.com/shaferllc/dply-php-lambda/issues"
+            },
+            "time": "2026-05-20T03:51:11+00:00"
         },
         {
             "name": "spatie/temporary-directory",

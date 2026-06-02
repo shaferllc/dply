@@ -519,7 +519,7 @@ class ChooseApp extends Component
     {
         $base = $this->site->repository_path !== null && $this->site->repository_path !== ''
             ? rtrim((string) $this->site->repository_path, '/')
-            : '/var/www/'.$this->site->slug;
+            : $this->site->conventionalRepositoryPath();
 
         return $base.((string) ($tile['web_subdir'] ?? ''));
     }

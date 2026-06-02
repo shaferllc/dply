@@ -29,15 +29,21 @@ trait ManagesSiteDeployExecution
     public function deployNow(): void
     {
         $this->authorize('update', $this->site);
-        try {
-            RunSiteDeploymentJob::dispatchSync($this->site, SiteDeployment::TRIGGER_MANUAL);
-            $this->site->refresh();
-            $this->toastSuccess(config('insights.queue_after_deploy', true)
-                ? __('Deployment finished. Server and site insight runs have been queued.')
-                : __('Deployment finished.'));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
+
+        // Queue the deploy on a worker instead of running it inline. SSH must
+        // never block a Livewire/HTTP request (PHP max_execution_time), so the
+        // job runs the clone/build/release steps off-request. Seed the active
+        // marker now so the panel immediately reads "Deploying…" and starts
+        // polling; the job overwrites it with the real deployment id once it
+        // creates the running record.
+        Cache::put('site-deploy-active:'.$this->site->id, [
+            'started_at' => now()->toIso8601String(),
+            'deployment_id' => null,
+        ], 600);
+
+        RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+
+        $this->toastSuccess(__('Deployment queued. Watch the phase timeline below.'));
     }
 
     public function queueDeploy(SiteDeploySyncCoordinator $coordinator): void

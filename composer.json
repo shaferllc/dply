@@ -7,9 +7,8 @@
     "license": "MIT",
     "repositories": [
         {
-            "type": "path",
-            "url": "../dply-php-lambda",
-            "options": { "symlink": true }
+            "type": "vcs",
+            "url": "https://github.com/shaferllc/dply-php-lambda.git"
         }
     ],
     "require": {

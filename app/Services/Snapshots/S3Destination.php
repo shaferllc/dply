@@ -60,8 +60,11 @@ class S3Destination implements SnapshotDestination
 
         // The server streams the gzipped dump straight to S3 via curl
         // PUT. --fail-with-body so curl exits non-zero on 4xx/5xx.
+        // `; rm -f` (not `&& rm -f`) so a failed upload still clears the
+        // dump — it holds the full database — from /tmp; `( exit $rc )`
+        // preserves curl's exit status for the check below.
         $uploadCmd = sprintf(
-            'curl --silent --show-error --fail-with-body --request PUT --upload-file %s --header %s %s && rm -f %s',
+            'curl --silent --show-error --fail-with-body --request PUT --upload-file %s --header %s %s; __dply_rc=$?; rm -f %s; ( exit $__dply_rc )',
             escapeshellarg($dumpRemotePath),
             escapeshellarg('Content-Type: application/gzip'),
             escapeshellarg($presignedUrl),

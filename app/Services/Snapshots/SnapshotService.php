@@ -75,15 +75,29 @@ class SnapshotService
                 resultStatus: SiteAuditEvent::RESULT_FAILURE,
             );
 
+            // A failed/partial dump can still leave a file behind.
+            $this->removeRemoteTmp($site, $tmpPath);
+
             throw $e;
         }
 
         if ($out->getExitCode() !== 0) {
+            $this->removeRemoteTmp($site, $tmpPath);
+
             throw new \RuntimeException("Dump command exited {$out->getExitCode()}: {$out->getBuffer()}");
         }
 
-        $bytes = $this->fileSizeOnServer($site, $tmpPath);
-        $snapshot = $destination->persist($site, $reason, $tmpPath, $bytes, $engine, $userId);
+        // On success the destination consumes $tmpPath (local mv / S3
+        // upload-then-rm); on any failure here the dump — a full copy of the
+        // database — would linger in /tmp, so remove it before rethrowing.
+        try {
+            $bytes = $this->fileSizeOnServer($site, $tmpPath);
+            $snapshot = $destination->persist($site, $reason, $tmpPath, $bytes, $engine, $userId);
+        } catch (Throwable $e) {
+            $this->removeRemoteTmp($site, $tmpPath);
+
+            throw $e;
+        }
 
         $this->audit->record(
             site: $site,
@@ -197,5 +211,24 @@ class SnapshotService
         }
 
         return (int) trim($out->getBuffer());
+    }
+
+    /**
+     * Best-effort removal of a /tmp dump after a failed snapshot, so a full
+     * copy of the database doesn't linger on the server. Never throws — it
+     * must not mask the original failure it's cleaning up after.
+     */
+    private function removeRemoteTmp(Site $site, string $tmpPath): void
+    {
+        try {
+            $this->executor->runInlineBash(
+                server: $site->server,
+                name: 'snapshot:cleanup-tmp',
+                inlineBash: 'rm -f '.escapeshellarg($tmpPath),
+                timeoutSeconds: 30,
+            );
+        } catch (Throwable) {
+            // best-effort
+        }
     }
 }

@@ -97,10 +97,10 @@ class SiteSystemdUnitBuilder
     {
         $base = trim((string) ($site->repository_path ?? ''));
         if ($base === '') {
-            // Falls back to the conventional /var/www/{slug} when the path
-            // hasn't been set explicitly on the row. The provisioner will
-            // make sure this exists on disk before starting the unit.
-            $base = '/var/www/'.$site->slug;
+            // Falls back to the conventional /home/dply/{domain} when the
+            // path hasn't been set explicitly on the row. The provisioner
+            // will make sure this exists on disk before starting the unit.
+            $base = $site->conventionalRepositoryPath();
         }
 
         // Atomic-deploy sites run their command from the active release
