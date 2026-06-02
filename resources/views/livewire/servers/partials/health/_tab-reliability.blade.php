@@ -70,7 +70,7 @@
         </span>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workers') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Daemons') }}</h3>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workers') }}</h3>
             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Supervisor programs marked inactive.') }}</p>
         </div>
     </div>
@@ -88,7 +88,7 @@
             @endforeach
         </ul>
         <div class="border-t border-brand-ink/10 px-6 py-3 sm:px-7">
-            <a href="{{ route('servers.daemons', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open daemons') }}</a>
+            <a href="{{ route('servers.daemons', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open workers') }}</a>
         </div>
     @endif
 </section>

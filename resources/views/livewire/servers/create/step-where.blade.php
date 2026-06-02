@@ -430,17 +430,45 @@
                                     <x-input-error :messages="$errors->get('form.do_vpc_uuid')" class="mt-1" />
                                 </div>
                             @elseif ($form->type === 'hetzner')
-                                <div>
-                                    <x-input-label for="hetzner_network_id" :value="__('Private Network ID')" />
-                                    <x-text-input
-                                        id="hetzner_network_id"
-                                        wire:model.live.debounce.300ms="form.hetzner_network_id"
-                                        type="text"
-                                        class="mt-1 block w-full font-mono"
-                                        placeholder="e.g. 1234567"
-                                        autocomplete="off"
-                                    />
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Find this in your Hetzner Cloud console → Networks. The server will be attached at boot and receive a private IP on that network\'s subnet. Create the Network in Hetzner first if you haven\'t yet.') }}</p>
+                                <div x-data="{ manual: @js($privateNetworks->isEmpty()) }">
+                                    <x-input-label for="hetzner_network_id" :value="__('Private network')" />
+
+                                    @if ($privateNetworks->isNotEmpty())
+                                        <select
+                                            x-show="! manual"
+                                            id="hetzner_network_id"
+                                            wire:model.live="form.hetzner_network_id"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                        >
+                                            <option value="">{{ __('None — don\'t attach a private network') }}</option>
+                                            @foreach ($privateNetworks as $network)
+                                                <option value="{{ $network->provider_id }}">
+                                                    {{ $network->name }}@if ($network->ip_range) — {{ $network->ip_range }}@endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <p x-show="! manual" class="mt-1 text-xs text-brand-mist">
+                                            {{ __('Pick a network you already created in Dply. The server is attached at boot and gets a private IP on that subnet.') }}
+                                            <button type="button" x-on:click="manual = true" class="font-medium text-brand-sage hover:underline">{{ __('Enter an ID manually') }}</button>
+                                        </p>
+                                    @endif
+
+                                    <div x-show="manual" @if ($privateNetworks->isNotEmpty()) x-cloak @endif>
+                                        <x-text-input
+                                            wire:model.live.debounce.300ms="form.hetzner_network_id"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono"
+                                            placeholder="e.g. 1234567"
+                                            autocomplete="off"
+                                        />
+                                        <p class="mt-1 text-xs text-brand-mist">
+                                            {{ __('Find this in your Hetzner Cloud console → Networks. The server will be attached at boot and receive a private IP on that network\'s subnet.') }}
+                                            @if ($privateNetworks->isNotEmpty())
+                                                <button type="button" x-on:click="manual = false" class="font-medium text-brand-sage hover:underline">{{ __('Choose from your networks') }}</button>
+                                            @endif
+                                        </p>
+                                    </div>
+
                                     <x-input-error :messages="$errors->get('form.hetzner_network_id')" class="mt-1" />
                                 </div>
                             @endif

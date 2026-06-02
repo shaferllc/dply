@@ -32,7 +32,7 @@
         @include('livewire.sites.partials.workspace-breadcrumb-bar', [
             'server' => $server,
             'site' => $site,
-            'currentLabel' => __('Daemons'),
+            'currentLabel' => __('Workers'),
             'currentIcon' => 'server-stack',
             'contextualDocSlug' => app(\App\Support\Docs\ContextualDocResolver::class)->resolveForSiteSection($site, 'daemons'),
         ])
@@ -43,7 +43,7 @@
             <main class="min-w-0 space-y-6 lg:col-span-9">
                 <x-page-header
                     :eyebrow="__('Background')"
-                    :title="__('Daemons')"
+                    :title="__('Workers')"
                     :description="__('Supervisor-managed worker processes for this site (queue workers, websocket servers, long-running binaries).')"
                     :show-documentation="false"
                     flush
@@ -60,7 +60,7 @@
     <x-server-workspace-layout
         :server="$server"
         active="daemons"
-        :title="__('Daemons')"
+        :title="__('Workers')"
         :description="__('Supervisor-managed queue workers and background daemons — health snapshot, program CRUD, sync, and logs.')"
         :context-site="null"
     >

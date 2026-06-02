@@ -217,7 +217,7 @@
                         wire:navigate
                         class="text-sm font-medium text-brand-forest underline"
                     >
-                        {{ __('Open Daemons with Octane preset') }}
+                        {{ __('Open Workers with Octane preset') }}
                     </a>
                     <x-primary-button type="button" wire:click="saveLaravelOctaneTab">{{ __('Save Octane settings') }}</x-primary-button>
                 </div>
@@ -237,7 +237,7 @@
                         wire:navigate
                         class="text-sm font-medium text-brand-forest underline"
                     >
-                        {{ __('Open Daemons with Reverb preset') }}
+                        {{ __('Open Workers with Reverb preset') }}
                     </a>
                     <x-primary-button type="button" wire:click="saveLaravelReverbTab">{{ __('Save Reverb settings') }}</x-primary-button>
                 </div>

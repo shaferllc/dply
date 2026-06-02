@@ -34,6 +34,6 @@
                 <x-input-error :messages="$errors->get('laravel_reverb_ws_path')" class="mt-1" />
             </div>
         </div>
-        <a href="{{ $daemonsUrl }}" wire:navigate class="inline-flex text-xs font-medium text-brand-forest underline">{{ __('Open Daemons for this site') }}</a>
+        <a href="{{ $daemonsUrl }}" wire:navigate class="inline-flex text-xs font-medium text-brand-forest underline">{{ __('Open Workers for this site') }}</a>
     </div>
 @endif

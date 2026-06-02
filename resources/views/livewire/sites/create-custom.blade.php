@@ -93,7 +93,7 @@
                         @else
                             <li>{{ __('No code is fetched. Push code to the server yourself (rsync, scp, etc.) and trigger deploys via webhook or the Deploy button.') }}</li>
                         @endif
-                        <li>{{ __('Cron, Daemons, and Queue Workers tabs are available for your processes.') }}</li>
+                        <li>{{ __('Cron and Workers tabs are available for your processes.') }}</li>
                         <li>{{ __('No nginx vhost, no SSL, no domain are created.') }}</li>
                     </ul>
                 </section>

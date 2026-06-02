@@ -20,6 +20,8 @@
     // flows that don't apply. Each role renders its own focused tile pack.
     $isCacheRoleHost = in_array((string) ($server->meta['server_role'] ?? ''), ['redis', 'valkey'], true);
     $isDatabaseRoleHost = (string) ($server->meta['server_role'] ?? '') === 'database';
+    $isWorkerRoleHost = (string) ($server->meta['server_role'] ?? '') === 'worker';
+    // Worker keeps site/deploy cards — it runs queue workers from the deployed code.
     $isDedicatedServiceRoleHost = $isCacheRoleHost || $isDatabaseRoleHost;
     $setupIncomplete = $server->isVmHost() && (
         $server->status !== \App\Models\Server::STATUS_READY
@@ -542,9 +544,10 @@
             {{-- Container launch progress partial. --}}
             @include('livewire.servers.partials._container-launch-progress')
 
-            {{-- First container app CTA. --}}
-            @if ($isContainerHost && $siteCount === 0 && ! $containerLaunch)
-                <section data-testid="add-first-container-cta" class="dply-card overflow-hidden">
+            {{-- First site / container app CTA. Shown on hosts that run site code
+                 (container hosts + VM app/worker hosts) — not dedicated cache/db boxes. --}}
+            @if ($siteCount === 0 && ! $containerLaunch && ! $isDedicatedServiceRoleHost)
+                <section data-testid="add-first-site-cta" class="dply-card overflow-hidden">
                     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
@@ -553,13 +556,21 @@
                                 </span>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Next step') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first container app') }}</h3>
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
+                                    @if ($isContainerHost)
+                                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first container app') }}</h3>
+                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
+                                    @elseif ($isWorkerRoleHost)
+                                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy your app code') }}</h3>
+                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('A worker runs your queue workers and scheduled jobs from the deployed code. Connect a Git repo to install it, then start a worker from the Workers tab.') }}</p>
+                                    @else
+                                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first site') }}</h3>
+                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a Git repo, configure the web root, and deploy. You can add more sites any time.') }}</p>
+                                    @endif
                                 </div>
                             </div>
                             <a href="{{ route('sites.create', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700">
                                 <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                {{ __('Add container app') }}
+                                {{ $isContainerHost ? __('Add container app') : __('Add site') }}
                             </a>
                         </div>
                     </div>

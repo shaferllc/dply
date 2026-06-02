@@ -307,8 +307,8 @@ final class ServicesWorkspaceViewData
                 'shown' => $databasesShown,
             ],
             [
-                'key' => 'daemons',
-                'label' => __('Daemons'),
+                'key' => 'workers',
+                'label' => __('Workers'),
                 'icon' => 'heroicon-o-server-stack',
                 'href' => route('servers.daemons', $server),
                 'detail' => __('Supervisor-managed processes'),

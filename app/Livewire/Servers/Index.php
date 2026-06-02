@@ -285,8 +285,6 @@ class Index extends Component
         }
 
         $query = Server::query()
-            ->with(['sites', 'organization', 'team', 'workspace'])
-            ->withCount('sites')
             ->where(function (Builder $q) use ($org) {
                 $q->where('organization_id', $org->id)
                     ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));
@@ -336,7 +334,10 @@ class Index extends Component
         $tagOptions = ServerTags::collectFromServers($allInScope);
         $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
         $servers = $base
-            ? $this->applyFilters(clone $base)->get()
+            ? $this->applyFilters(clone $base)
+                ->with(['sites', 'organization', 'team', 'workspace'])
+                ->withCount('sites')
+                ->get()
             : collect();
 
         $groupedServers = $this->groupedServers($servers);

@@ -274,6 +274,10 @@ class WorkspaceOverview extends Component
         $serverRole = (string) ($this->server->meta['server_role'] ?? '');
         $isCacheRoleHost = in_array($serverRole, ['redis', 'valkey'], true);
         $isDatabaseRoleHost = $serverRole === 'database';
+        $isWorkerRoleHost = $serverRole === 'worker';
+        // Dedicated cache/db boxes never host site code, so their site/stack/deploy
+        // cards are hidden. A worker IS an app host (it runs queue workers from the
+        // deployed code), so it keeps sites/deploys — it just doesn't serve web traffic.
         $isDedicatedServiceRoleHost = $isCacheRoleHost || $isDatabaseRoleHost;
         $monitorInstalled = $latestMetricSnapshot !== null
             && is_array($latestMetricSnapshot->payload ?? null)
@@ -404,6 +408,18 @@ class WorkspaceOverview extends Component
                 'cta_route' => route('sites.create', $this->server),
             ];
         }
+        if ($isWorkerRoleHost) {
+            // A worker runs queue workers from the deployed code — once the site
+            // is on the box, the next step is starting a worker on the Workers tab.
+            $onboardingSteps[] = [
+                'key' => 'first_worker',
+                'label' => __('Start a queue worker'),
+                'help' => __('Run your queue workers and scheduled jobs from the Workers tab.'),
+                'done' => ($backgroundSummary['active_workers'] ?? 0) > 0,
+                'cta_label' => __('Open Workers'),
+                'cta_route' => route('servers.daemons', $this->server),
+            ];
+        }
         if (! $isContainerHostForChecklist) {
             $onboardingSteps[] = [
                 'key' => 'monitor',
@@ -417,7 +433,7 @@ class WorkspaceOverview extends Component
             // hidden from the Redis sidebar via role_nav_keys — skip the step
             // entirely on cache-role hosts so the checklist doesn't dangle on
             // a CTA route that 404s.
-            if (! $isCacheRoleHost) {
+            if (! $isCacheRoleHost && ! $isWorkerRoleHost) {
                 $onboardingSteps[] = [
                     'key' => 'backups',
                     'label' => __('Schedule backups'),

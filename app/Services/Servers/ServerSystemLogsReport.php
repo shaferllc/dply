@@ -144,7 +144,7 @@ final class ServerSystemLogsReport
             'php' => __('PHP'),
             'database' => __('Database'),
             'services' => __('Services'),
-            'daemons' => __('Daemons'),
+            'workers' => __('Workers'),
             'system' => __('System'),
             'security' => __('Security'),
             'ssl' => __('SSL'),

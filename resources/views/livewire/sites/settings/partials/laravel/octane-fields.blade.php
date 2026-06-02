@@ -3,7 +3,7 @@
 @if ($site->shouldShowPhpOctaneRolloutSettings() && $site->shouldShowOctaneRuntimeUi())
     <div class="space-y-3">
         @if ($site->shouldShowOctaneRuntimeUi())
-            <p class="text-sm text-brand-moss">{{ __('Inspection found `laravel/octane` in composer.json. Set the Octane port to match your reverse proxy (managed configs proxy to 127.0.0.1). Use the Supervisor preset on the server’s Daemons tab—align `--port` and `--server` with the values below.') }}</p>
+            <p class="text-sm text-brand-moss">{{ __('Inspection found `laravel/octane` in composer.json. Set the Octane port to match your reverse proxy (managed configs proxy to 127.0.0.1). Use the Supervisor preset on the server’s Workers tab—align `--port` and `--server` with the values below.') }}</p>
         @endif
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>

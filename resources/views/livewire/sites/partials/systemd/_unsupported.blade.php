@@ -8,14 +8,14 @@
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Systemd services not used for this site') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 @if (in_array((string) ($site->runtime ?? ''), ['php', 'static'], true))
-                    {{ __('PHP and static sites are served by PHP-FPM or nginx directly. Queue workers and schedulers belong on Daemons (Supervisor) and Cron — not systemd units.') }}
+                    {{ __('PHP and static sites are served by PHP-FPM or nginx directly. Queue workers and schedulers belong on Workers (Supervisor) and Cron — not systemd units.') }}
                 @else
                     {{ __('Container and serverless apps manage processes in the platform runtime, not host systemd.') }}
                 @endif
             </p>
             <div class="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
                 <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">
-                    {{ __('Open Daemons') }} →
+                    {{ __('Open Workers') }} →
                 </a>
                 <a href="{{ route('sites.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">
                     {{ __('Open Cron jobs') }} →

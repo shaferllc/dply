@@ -143,6 +143,19 @@ return [
                 'backups' => ['group' => 'admin'],
             ],
         ],
+        'worker' => [
+            // A worker host runs queue workers + scheduled jobs (PHP installed,
+            // no webserver/cache/database). Surface daemons (the workers) next to
+            // Overview; hide the stack tabs that don't apply (databases, caches,
+            // webserver, backups, snapshots, load balancers).
+            'keys' => ['overview', 'daemons', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
+            'overrides' => [
+                'daemons' => ['label' => 'Workers', 'group' => 'overview'],
+                'schedule' => ['group' => 'background'],
+                'cron' => ['group' => 'background'],
+                'logs' => ['group' => 'monitor'],
+            ],
+        ],
     ],
 
     /*

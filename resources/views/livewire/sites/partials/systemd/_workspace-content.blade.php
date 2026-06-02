@@ -14,7 +14,7 @@
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Systemd') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed units') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Workers and schedulers run as separate systemd units. PHP/Laravel queue workers use Daemons (Supervisor) instead.') }}</p>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Workers and schedulers run as separate systemd units. PHP/Laravel queue workers use Workers (Supervisor) instead.') }}</p>
             </div>
         </div>
         <button
@@ -149,7 +149,7 @@
 
             <p class="text-xs text-brand-moss">
                 {{ __('Laravel Horizon, queue:work, and most Rails workers run under') }}
-                <a href="{{ $daemonsUrl }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Daemons') }}</a>
+                <a href="{{ $daemonsUrl }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Workers') }}</a>
                 {{ __('(Supervisor), not systemd.') }}
             </p>
         </div>

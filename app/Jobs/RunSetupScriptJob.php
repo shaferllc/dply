@@ -618,7 +618,7 @@ class RunSetupScriptJob implements ShouldQueue
             '/Temporary failure resolving/i',
             '/Could not resolve host/i',
             '/Failed to fetch /i',
-            '/E: Unable to (?:fetch|locate) /i',
+            '/E: Unable to fetch /i',
             '/Sub-process .* returned an error code/i',
             '/Hash Sum mismatch/i',
             '/network is unreachable/i',
@@ -643,6 +643,15 @@ class RunSetupScriptJob implements ShouldQueue
             if (preg_match($pattern, $output) === 1) {
                 return false;
             }
+        }
+
+        // "Unable to locate package X" means the package name isn't in any
+        // configured repo — a hard error that retrying won't fix. The same
+        // message also appears when the apt index download failed (a transient
+        // network blip), so only treat it as hard when there's NO fetch failure.
+        if (preg_match('/E: Unable to locate package/i', $output) === 1
+            && preg_match('/(Failed to fetch|Could not connect|Temporary failure resolving|Could not resolve host|InRelease)/i', $output) !== 1) {
+            return false;
         }
 
         foreach ($transientPatterns as $pattern) {

@@ -428,6 +428,18 @@ class StepWhere extends Component
             ? ListExistingProviderServers::make()->regionCounts($org, $this->form->type)
             : [];
 
+        // Private networks we already track for this account — let the user pick
+        // one instead of hunting for the ID in the Hetzner console.
+        $privateNetworks = ($org !== null && $this->form->type === 'hetzner' && $this->form->provider_credential_id !== '')
+            ? \App\Models\PrivateNetwork::query()
+                ->where('organization_id', $org->id)
+                ->where('provider', \App\Models\PrivateNetwork::PROVIDER_HETZNER)
+                ->where('provider_credential_id', $this->form->provider_credential_id)
+                ->whereNotNull('provider_id')
+                ->orderBy('name')
+                ->get()
+            : collect();
+
         return view('livewire.servers.create.step-where', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
             'reachedStep' => $this->currentDraft()?->step ?? 2,
@@ -444,6 +456,7 @@ class StepWhere extends Component
             'existingProviderServers' => $existingProviderServers,
             'existingServersByRegion' => $existingServersByRegion,
             'regionLabels' => $regionLabels,
+            'privateNetworks' => $privateNetworks,
         ]);
     }
 }

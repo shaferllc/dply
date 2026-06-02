@@ -106,7 +106,7 @@
     <div @if ($server->supervisor_package_status === null) wire:init="refreshSupervisorInstallStatus" @endif>
         @include('livewire.servers.partials.daemons._banner')
 
-        <x-server-workspace-tablist :aria-label="__('Daemons workspace sections')">
+        <x-server-workspace-tablist :aria-label="__('Workers workspace sections')">
             <x-server-workspace-tab id="daemons-tab-programs" :active="$daemons_workspace_tab === 'programs'" wire:click="setDaemonsWorkspaceTab('programs')">
                 <span class="inline-flex items-center gap-1.5">
                     <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />

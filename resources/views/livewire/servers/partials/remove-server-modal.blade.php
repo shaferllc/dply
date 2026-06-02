@@ -31,7 +31,7 @@
             ['label' => __('Sites'), 'count' => (int) ($summary['sites'] ?? 0)],
             ['label' => __('Databases'), 'count' => (int) ($summary['databases'] ?? 0)],
             ['label' => __('Cron jobs'), 'count' => (int) ($summary['cron_jobs'] ?? 0)],
-            ['label' => __('Daemons'), 'count' => (int) ($summary['supervisor_programs'] ?? 0)],
+            ['label' => __('Workers'), 'count' => (int) ($summary['supervisor_programs'] ?? 0)],
             ['label' => __('Firewall rules'), 'count' => (int) ($summary['firewall_rules'] ?? 0)],
             ['label' => __('Stored SSH keys'), 'count' => (int) ($summary['authorized_keys'] ?? 0)],
             ['label' => __('Recipes'), 'count' => (int) ($summary['recipes'] ?? 0)],

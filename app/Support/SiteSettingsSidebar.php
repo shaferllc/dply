@@ -181,7 +181,7 @@ final class SiteSettingsSidebar
         $background = [
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
             ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'servers.schedule', 'route_params' => 'server_with_site', 'feature' => 'workspace.schedule'],
-            ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
+            ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'services', 'label' => __('Services'), 'icon' => 'heroicon-o-cpu-chip', 'group' => 'background', 'route' => 'sites.services'],
             ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'sites.backups', 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ];
@@ -275,7 +275,7 @@ final class SiteSettingsSidebar
             ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
-            ['id' => 'daemons', 'label' => __('Daemons'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
+            ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
         ];
 

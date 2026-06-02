@@ -665,7 +665,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
-    Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
+    Route::livewire('servers/{server}/sites/{site}/workers', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
     Route::get('servers/{server}/sites/{site}/queue-workers', function (Server $server, Site $site) {
         return redirect()->route('sites.daemons', ['server' => $server, 'site' => $site] + request()->query());
@@ -771,7 +771,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // off but workspace.release_hygiene_preview is on (else 404).
     Route::livewire('servers/{server}/hygiene', WorkspaceReleaseHygiene::class)->name('servers.hygiene');
     Route::livewire('servers/{server}/hygiene-preview', WorkspaceReleaseHygienePreview::class)->name('servers.hygiene-preview');
-    Route::livewire('servers/{server}/daemon-slo', WorkspaceDaemonSlo::class)->name('servers.daemon-slo');
+    Route::livewire('servers/{server}/worker-slo', WorkspaceDaemonSlo::class)->name('servers.worker-slo');
     Route::middleware('feature:workspace.cert_inventory')->group(function (): void {
         Route::livewire('servers/{server}/cert-inventory', WorkspaceCertInventory::class)->name('servers.cert-inventory');
     });
@@ -835,9 +835,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/docker', WorkspaceDocker::class)->name('servers.docker');
     Route::livewire('servers/{server}/docker-preview', WorkspaceDockerPreview::class)->name('servers.docker-preview');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
-    Route::livewire('servers/{server}/daemons', WorkspaceDaemons::class)->name('servers.daemons');
+    Route::livewire('servers/{server}/workers', WorkspaceDaemons::class)->name('servers.workers');
     Route::get('servers/{server}/queue-workers', function (Server $server) {
-        return redirect()->route('servers.daemons', array_merge(['server' => $server], request()->query()));
+        return redirect()->route('servers.workers', array_merge(['server' => $server], request()->query()));
     })->name('servers.queue-workers');
     Route::middleware('feature:workspace.schedule')->group(function (): void {
         Route::livewire('servers/{server}/schedule', WorkspaceSchedule::class)->name('servers.schedule');

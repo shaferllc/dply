@@ -47,7 +47,7 @@ return [
             'label' => 'Queue worker',
             'summary' => 'Background worker host focused on queues and scheduled jobs.',
             'server_role' => 'worker',
-            'cache_service' => 'redis',
+            'cache_service' => 'none',
             'webserver' => 'none',
             'php_version' => '8.3',
             'database' => 'none',

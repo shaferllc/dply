@@ -1098,8 +1098,14 @@ final class ServerProvisionCommandBuilder
             $stem.'-zip',
             $stem.'-intl',
             $stem.'-bcmath',
-            $stem.'-opcache',
         ];
+
+        // OPcache is a standalone phpX.Y-opcache package up to 8.4; from 8.5 it
+        // ships bundled with the core build (no separate package in ondrej/php),
+        // so requesting it aborts the apt install with "Unable to locate package".
+        if (version_compare($php, '8.5', '<')) {
+            $pkgs[] = $stem.'-opcache';
+        }
 
         if (str_starts_with($database, 'postgres')) {
             $pkgs[] = $stem.'-pgsql';

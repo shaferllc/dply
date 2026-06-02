@@ -184,15 +184,15 @@
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workers & schedulers') }}</h2>
             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                 @if (in_array((string) ($site->runtime ?? ''), ['php'], true) || $site->isLaravelFrameworkDetected())
-                    {{ __('Queue workers and Horizon run under Daemons (Supervisor). Scheduled tasks use Cron or the Laravel tab.') }}
+                    {{ __('Queue workers and Horizon run under Workers (Supervisor). Scheduled tasks use Cron or the Laravel tab.') }}
                 @elseif ($site->isRailsFrameworkDetected())
-                    {{ __('Sidekiq and Solid Queue run under Daemons (Supervisor). Optional systemd workers are on the Services page.') }}
+                    {{ __('Sidekiq and Solid Queue run under Workers (Supervisor). Optional systemd workers are on the Services page.') }}
                 @else
-                    {{ __('App servers: set start command and port above. Workers can use systemd (Services) or Supervisor (Daemons).') }}
+                    {{ __('App servers: set start command and port above. Workers can use systemd (Services) or Supervisor (Workers).') }}
                 @endif
             </p>
             <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
-                <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Daemons') }} →</a>
+                <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Workers') }} →</a>
                 <a href="{{ route('sites.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Cron jobs') }} →</a>
                 @if (\App\Models\Site::supportsSystemdServices($site, $server))
                     <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Services (systemd)') }} →</a>
