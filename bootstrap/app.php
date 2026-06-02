@@ -55,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => EnsureFeaturesAreActive::class,
             'vm.platform' => EnsureVmPlatformEnabled::class,
         ]);
-        $middleware->validateCsrfTokens(except: [
+        $middleware->preventRequestForgery(except: [
             'hooks/*',
             'webhook/*',
             'webauthn/*',

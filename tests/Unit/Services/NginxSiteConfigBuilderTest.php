@@ -82,6 +82,26 @@ test('per site access and error log paths are included', function () {
     $this->assertStringContainsString('error_log /var/log/nginx/'.$basename.'-error.log;', $nginx);
 });
 
+test('static nginx config includes managed 500 error page directives', function () {
+    $site = Site::factory()->create([
+        'slug' => 'error-pages',
+        'type' => SiteType::Static,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'errors.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+
+    $site->refresh()->load('domains', 'redirects');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    expect($nginx)
+        ->toContain('error_page 500 502 503 504 /__dply__/errors/500.html;')
+        ->toContain($site->managedErrorPagesRoot().'/500.html');
+});
+
 test('webserver hostnames include aliases tenants and preview domains', function () {
     $site = Site::factory()->create([
         'slug' => 'my-app',

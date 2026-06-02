@@ -255,4 +255,26 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Local workspace pruning
+    |--------------------------------------------------------------------------
+    |
+    | Control-plane build scratch under storage/app accumulates and never self-
+    | prunes: serverless build artifacts (one zip per deploy), per-site git
+    | checkout caches, and task-runner temp. The scheduled command
+    | `dply:prune-local-workspaces` removes entries older than these ages.
+    */
+    'local_workspace_prune' => [
+        'enabled' => filter_var(env('DPLY_LOCAL_WORKSPACE_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        // Built artifact zips are byproducts once uploaded to the provider; keep
+        // a short window for post-mortem on a failed deploy, then reclaim.
+        'artifacts_max_age_hours' => max(1, (int) env('DPLY_LOCAL_ARTIFACTS_MAX_AGE_HOURS', 48)),
+        // Git checkout caches speed up incremental redeploys; prune ones no
+        // deploy has touched in a week (they re-clone on next use).
+        'repositories_max_age_hours' => max(1, (int) env('DPLY_LOCAL_REPOSITORIES_MAX_AGE_HOURS', 168)),
+        // Task-runner temp is short-lived scratch.
+        'task_runner_max_age_hours' => max(1, (int) env('DPLY_LOCAL_TASK_RUNNER_MAX_AGE_HOURS', 24)),
+    ],
+
 ];

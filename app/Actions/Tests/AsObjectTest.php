@@ -10,16 +10,6 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-class AsObjectTestAction extends Actions
-{
-    public string $commandSignature = 'test:object-action';
-
-    public function handle(string $value): string
-    {
-        return strtoupper($value);
-    }
-}
-
 test('run executes action and returns result', function () {
     $result = AsObjectTestAction::run('hello');
 

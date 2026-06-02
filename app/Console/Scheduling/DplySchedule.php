@@ -29,6 +29,7 @@ use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
+use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
@@ -107,6 +108,16 @@ final class DplySchedule
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(ExpirePausedImportMigrationsCommand::class)->hourly();
+
+        // Local control-plane build scratch (serverless artifacts / repo caches /
+        // task-runner temp). Local filesystem work, so it runs in the background
+        // rather than blocking the scheduler tick. Per-box files — see the
+        // onOneServer caveat in the class docblock for split deployments.
+        $schedule->command(PruneLocalWorkspaceArtifactsCommand::class)
+            ->dailyAt('04:10')
+            ->runInBackground()
+            ->when(fn (): bool => (bool) config('dply.local_workspace_prune.enabled', true))
+            ->name('prune-local-workspaces');
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()

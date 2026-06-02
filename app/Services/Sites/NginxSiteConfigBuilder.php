@@ -241,12 +241,12 @@ NGINX;
             $port = (int) $site->octane_port;
             $reverb = $this->reverbProxyLocationBlock($site);
             $octaneProxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
-        $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
-        $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
-        $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
-        $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
+            $octaneBa = $this->nginxBasicAuthOctaneFragments($site, $root);
+            $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
+            $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
+            $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
 
-        return <<<NGINX
+            return <<<NGINX
 # Managed by Dply — {$basename} (Laravel Octane)
 server {
     listen 80;
