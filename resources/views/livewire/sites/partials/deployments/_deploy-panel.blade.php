@@ -1,18 +1,12 @@
 @php
-    use App\Models\SiteDeployStep;
-
-    $phases = [
-        SiteDeployStep::PHASE_BUILD   => __('Build'),
-        SiteDeployStep::PHASE_SWAP    => __('Swap'),
-        SiteDeployStep::PHASE_RELEASE => __('Release'),
-        SiteDeployStep::PHASE_RESTART => __('Restart'),
-    ];
-
     $latest = $latestDeployment ?? null;
     $isRunning = $latest && $latest->status === 'running';
     $deployedSha = $latest?->git_sha;
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
+    // Phase timeline derived from the site's pipeline (Clone → Build →
+    // Activate → Release) overlaid with this deployment's recorded steps.
+    $timelinePhases = \App\Support\Sites\SiteDeployTimeline::forDeployment($site, $latest);
 @endphp
 
 <div class="space-y-6" @if ($isRunning) wire:poll.5s @endif>
@@ -135,62 +129,91 @@
                     </a>
                 </div>
 
-                <ol class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    @foreach ($phases as $phaseKey => $phaseLabel)
+                <ol class="mt-3 space-y-2">
+                    @foreach ($timelinePhases as $phase)
                         @php
-                            $hasPhase = $latest->hasPhase($phaseKey);
-                            $phaseOk = $hasPhase && $latest->phaseOk($phaseKey);
-                            $phaseSteps = $latest->phaseSteps($phaseKey);
-                            $phaseDurationMs = 0;
-                            foreach ($phaseSteps as $step) {
-                                $phaseDurationMs += (int) ($step['duration_ms'] ?? 0);
-                            }
-                            $isLastPhase = ! $hasPhase && $isRunning && (
-                                $phaseKey === SiteDeployStep::PHASE_BUILD
-                                || ($phaseKey === SiteDeployStep::PHASE_SWAP && $latest->hasPhase(SiteDeployStep::PHASE_BUILD))
-                                || ($phaseKey === SiteDeployStep::PHASE_RELEASE && $latest->hasPhase(SiteDeployStep::PHASE_SWAP))
-                                || ($phaseKey === SiteDeployStep::PHASE_RESTART && $latest->hasPhase(SiteDeployStep::PHASE_RELEASE))
-                            );
+                            $st = $phase['status'];
+                            $stepCount = count($phase['steps']);
+                            $durTxt = $phase['duration_ms'] > 0 ? number_format($phase['duration_ms'] / 1000, 1).'s' : null;
                         @endphp
                         <li @class([
-                            'relative flex items-start gap-3 rounded-2xl border px-4 py-3 transition-colors',
-                            'border-emerald-200 bg-emerald-50/60' => $hasPhase && $phaseOk,
-                            'border-rose-200 bg-rose-50/60' => $hasPhase && ! $phaseOk,
-                            'border-amber-200 bg-amber-50/60' => $isLastPhase,
-                            'border-brand-ink/10 bg-brand-sand/15' => ! $hasPhase && ! $isLastPhase,
+                            'rounded-2xl border px-4 py-3 transition-colors',
+                            'border-emerald-200 bg-emerald-50/50' => $st === 'success',
+                            'border-rose-200 bg-rose-50/50' => $st === 'failed',
+                            'border-amber-200 bg-amber-50/50' => $st === 'running',
+                            'border-brand-ink/10 bg-brand-sand/10' => in_array($st, ['skipped', 'pending'], true),
                         ])>
-                            <span @class([
-                                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-inset font-semibold text-xs',
-                                'bg-emerald-100 text-emerald-800 ring-emerald-200' => $hasPhase && $phaseOk,
-                                'bg-rose-100 text-rose-800 ring-rose-200' => $hasPhase && ! $phaseOk,
-                                'bg-amber-100 text-amber-800 ring-amber-200 animate-pulse' => $isLastPhase,
-                                'bg-white text-brand-mist ring-brand-ink/10' => ! $hasPhase && ! $isLastPhase,
-                            ])>
-                                @if ($hasPhase && $phaseOk)
-                                    <x-heroicon-m-check class="h-4 w-4" aria-hidden="true" />
-                                @elseif ($hasPhase)
-                                    <x-heroicon-m-x-mark class="h-4 w-4" aria-hidden="true" />
-                                @elseif ($isLastPhase)
-                                    <x-heroicon-m-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
-                                @else
-                                    {{ $loop->iteration }}
-                                @endif
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-semibold text-brand-ink">{{ $phaseLabel }}</p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">
-                                    @if ($hasPhase)
-                                        {{ trans_choice('{1} :count step|[2,*] :count steps', count($phaseSteps), ['count' => count($phaseSteps)]) }}
-                                        @if ($phaseDurationMs > 0)
-                                            · <span class="font-mono">{{ number_format($phaseDurationMs / 1000, 1) }}s</span>
-                                        @endif
-                                    @elseif ($isLastPhase)
-                                        {{ __('Running…') }}
-                                    @else
-                                        {{ __('Not started') }}
-                                    @endif
-                                </p>
+                            <div class="flex items-center gap-3">
+                                <span @class([
+                                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-inset font-semibold text-xs',
+                                    'bg-emerald-100 text-emerald-800 ring-emerald-200' => $st === 'success',
+                                    'bg-rose-100 text-rose-800 ring-rose-200' => $st === 'failed',
+                                    'bg-amber-100 text-amber-800 ring-amber-200' => $st === 'running',
+                                    'bg-white text-brand-mist ring-brand-ink/10' => in_array($st, ['skipped', 'pending'], true),
+                                ])>
+                                    @switch ($st)
+                                        @case('success')
+                                            <x-heroicon-m-check class="h-4 w-4" aria-hidden="true" />
+                                            @break
+                                        @case('failed')
+                                            <x-heroicon-m-x-mark class="h-4 w-4" aria-hidden="true" />
+                                            @break
+                                        @case('running')
+                                            <x-heroicon-m-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
+                                            @break
+                                        @case('skipped')
+                                            <x-heroicon-m-minus class="h-4 w-4" aria-hidden="true" />
+                                            @break
+                                        @default
+                                            {{ $loop->iteration }}
+                                    @endswitch
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="flex flex-wrap items-baseline gap-x-2 text-sm">
+                                        <span class="font-semibold text-brand-ink">{{ $phase['label'] }}</span>
+                                        <span class="text-[11px] text-brand-moss">
+                                            @switch ($st)
+                                                @case('success')
+                                                    {{ trans_choice('{1} :count step|[2,*] :count steps', $stepCount, ['count' => $stepCount]) }}@if ($durTxt) · <span class="font-mono">{{ $durTxt }}</span>@endif
+                                                    @break
+                                                @case('failed')
+                                                    <span class="font-semibold text-rose-700">{{ __('Failed') }}</span>@if ($durTxt) · <span class="font-mono">{{ $durTxt }}</span>@endif
+                                                    @break
+                                                @case('running')
+                                                    {{ __('Running…') }}
+                                                    @break
+                                                @case('skipped')
+                                                    {{ __('No steps') }}
+                                                    @break
+                                                @default
+                                                    {{ __('Not started') }}
+                                            @endswitch
+                                        </span>
+                                    </p>
+                                </div>
                             </div>
+
+                            @if ($phase['steps'] !== [])
+                                <ul class="mt-2 space-y-1 pl-11">
+                                    @foreach ($phase['steps'] as $step)
+                                        @php($stepFailed = ! $step['ok'] && ! $step['skipped'])
+                                        <li>
+                                            <div class="flex items-center gap-2 text-xs">
+                                                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
+                                                <span class="min-w-0 truncate {{ $stepFailed ? 'font-medium text-rose-800' : 'text-brand-ink' }}">{{ $step['label'] }}</span>
+                                                @if ($step['skipped'])
+                                                    <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-900">{{ __('skipped') }}</span>
+                                                @elseif ($step['duration_ms'] > 0)
+                                                    <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
+                                                @endif
+                                            </div>
+                                            @if ($stepFailed && $step['output'] !== '')
+                                                <pre class="mt-1.5 max-h-48 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $step['output'] }}</pre>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </li>
                     @endforeach
                 </ol>

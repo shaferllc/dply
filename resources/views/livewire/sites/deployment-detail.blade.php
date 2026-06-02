@@ -130,7 +130,10 @@
                 </section>
             @else
                 @foreach ($phases as $phase)
-                    @if ($deployment->hasPhase($phase))
+                    {{-- Skip recorded-but-empty phases (e.g. a build phase with no
+                         configured steps); they have nothing to show and phaseOk()
+                         reports false for an empty step list. --}}
+                    @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                         @php($phaseOk = $deployment->phaseOk($phase))
                         @php($phaseSteps = $deployment->phaseSteps($phase))
                         @php($phaseDurationMs = collect($phaseSteps)->sum(fn ($s) => (int) ($s['duration_ms'] ?? 0)))

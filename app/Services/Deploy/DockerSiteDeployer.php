@@ -75,7 +75,11 @@ final class DockerSiteDeployer
         $log .= "\n--- docker runtime files ---\n";
         $log .= "Wrote docker-compose.dply.yml and Dockerfile.dply\n";
 
-        $log .= $this->pipelineRunner->runBuild($ssh, $site, $path);
+        $build = $this->pipelineRunner->runBuild($ssh, $site, $path);
+        $log .= $build['log'];
+        if (! $build['ok']) {
+            throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
+        }
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'before_activate');
@@ -98,7 +102,11 @@ final class DockerSiteDeployer
             );
         }
 
-        $log .= $this->pipelineRunner->runRelease($ssh, $site, $path);
+        $release = $this->pipelineRunner->runRelease($ssh, $site, $path);
+        $log .= $release['log'];
+        if (! $release['ok']) {
+            throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
+        }
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');

@@ -24,20 +24,18 @@
                             <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}" wire:navigate class="ml-auto rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 hover:bg-slate-200 hover:text-slate-700" title="{{ __('Open deployment detail') }}">{{ $deployment->id }}</a>
                         </div>
                         <div class="mt-1 flex flex-wrap gap-1.5 text-[10px]">
-                            @foreach (['build', 'swap', 'release', 'restart'] as $phase)
-                                @if ($deployment->hasPhase($phase))
+                            @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
+                                @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                     <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold uppercase tracking-[0.12em] {{ $deployment->phaseOk($phase) ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800' }}">
                                         {{ $phase }} ({{ count($deployment->phaseSteps($phase)) }})
                                     </span>
-                                @else
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 font-semibold uppercase tracking-[0.12em] text-slate-500">{{ $phase }} —</span>
                                 @endif
                             @endforeach
                         </div>
                     </summary>
                     <div class="mt-3 space-y-3">
-                        @foreach (['build', 'swap', 'release', 'restart'] as $phase)
-                            @if ($deployment->hasPhase($phase))
+                        @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
+                            @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                 <div>
                                     <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{{ $phase }}</p>
                                     <ul class="mt-1 space-y-1">

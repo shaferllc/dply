@@ -122,8 +122,8 @@
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap gap-1">
-                                    @foreach (['build', 'swap', 'release', 'restart'] as $phase)
-                                        @if ($deployment->hasPhase($phase))
+                                    @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
+                                        @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
                                             <span @class([
                                                 'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
                                                 'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->phaseOk($phase),

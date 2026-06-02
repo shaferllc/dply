@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Models\SiteDeployment;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
@@ -17,10 +18,10 @@ class SiteGitDeployer
         protected SshConnectionFactory $sshFactory
     ) {}
 
-    public function run(Site $site): array
+    public function run(Site $site, ?SiteDeployment $deployment = null): array
     {
         if (($site->deploy_strategy ?? 'simple') === 'atomic') {
-            return app(AtomicSiteDeployer::class)->deploy($site);
+            return app(AtomicSiteDeployer::class)->deploy($site, $deployment);
         }
 
         $server = $site->server;
@@ -52,45 +53,112 @@ class SiteGitDeployer
         $log = '';
         $pathEsc = escapeshellarg($path);
 
-        $log .= $ssh->exec(
-            sprintf('mkdir -p %s', $pathEsc),
-            60
-        );
-
-        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $path);
-        $this->hookRunner->assertHooksSucceeded($log, 'before_clone');
+        // ── CLONE ── mkdir + before/after-clone hooks + the git checkout.
+        $cloneStart = microtime(true);
+        $cloneLog = $ssh->exec(sprintf('mkdir -p %s', $pathEsc), 60);
+        $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $path);
+        $this->hookRunner->assertHooksSucceeded($cloneLog, 'before_clone');
 
         $checkGit = trim($ssh->exec(sprintf('if [ -d %1$s/.git ]; then echo yes; else echo no; fi', $pathEsc), 30)) === 'yes';
 
-        $log .= $this->anchorRunner->runClone($ssh, $site, $path, $gitSsh, $repo, $branch, false, $checkGit);
-        $this->hookRunner->assertHooksSucceeded($log, 'clone');
+        $cloneLog .= $this->anchorRunner->runClone($ssh, $site, $path, $gitSsh, $repo, $branch, false, $checkGit);
+        $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
 
-        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
-        $this->hookRunner->assertHooksSucceeded($log, 'after_clone');
+        $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
+        $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');
 
-        $log .= $this->pipelineRunner->runBuild($ssh, $site, $path);
+        $log .= $cloneLog;
+        // SSH exec does not surface non-zero exit codes, so a failed clone
+        // (bad repo URL, unreachable host, missing/wrong deploy key, or
+        // branch) would otherwise sail through as a no-op "success". An empty
+        // SHA means no commit was checked out — treat that as a real failure.
+        $cloneOk = $sha !== '';
+        $deployment?->recordPhaseResults('clone', [[
+            'step_id' => 'clone',
+            'step_type' => 'clone',
+            'command' => null,
+            'ok' => $cloneOk,
+            'output' => $cloneLog,
+            'duration_ms' => (int) round((microtime(true) - $cloneStart) * 1000),
+            'skipped' => false,
+        ]]);
+        if (! $cloneOk) {
+            throw new \RuntimeException(sprintf(
+                'Deploy failed: no Git checkout at %s after clone. Check the repository URL, branch (%s), and deploy key — see the clone output above.%s',
+                $path,
+                $branch,
+                "\n\n".$log
+            ));
+        }
 
-        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $path);
-        $this->hookRunner->assertHooksSucceeded($log, 'before_activate');
+        // ── BUILD ── install deps / compile assets from the build steps.
+        $build = $this->pipelineRunner->runBuild($ssh, $site, $path);
+        $log .= $build['log'];
+        $deployment?->recordPhaseResults('build', $build['steps']);
+        if (! $build['ok']) {
+            throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
+        }
 
-        $log .= $this->anchorRunner->runActivate($ssh, $site, $path, $gitSsh, $repo, $branch);
-        $this->hookRunner->assertHooksSucceeded($log, 'activate');
+        // ── ACTIVATE ── before-activate hooks + the activate anchor (a no-op
+        // for simple deploys, which serve straight from the repo path).
+        $activateStart = microtime(true);
+        $activateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $path);
+        $this->hookRunner->assertHooksSucceeded($activateLog, 'before_activate');
+        $activateOut = $this->anchorRunner->runActivate($ssh, $site, $path, $gitSsh, $repo, $branch);
+        $activateLog .= $activateOut;
+        $this->hookRunner->assertHooksSucceeded($activateLog, 'activate');
+        $log .= $activateLog;
+        $deployment?->recordPhaseResults('activate', [[
+            'step_id' => 'activate',
+            'step_type' => 'activate',
+            'command' => null,
+            'ok' => true,
+            'output' => $activateLog,
+            'duration_ms' => (int) round((microtime(true) - $activateStart) * 1000),
+            'skipped' => trim($activateOut) === '',
+        ]]);
+
+        // ── RELEASE ── release steps, then after-activate hooks, then the
+        // post-deploy command (recorded as a final release step). Results are
+        // recorded before any failure is raised so the timeline shows them.
+        $release = $this->pipelineRunner->runRelease($ssh, $site, $path);
+        $releaseLog = $release['log'];
+        $releaseSteps = $release['steps'];
+        $releaseOk = $release['ok'];
+
+        $afterActivateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
+        $releaseLog .= $afterActivateLog;
 
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {
-            $log .= "\n--- post deploy ---\n";
-            $log .= $ssh->exec(
-                sprintf('cd %s && %s', $pathEsc, $post),
+            $postStart = microtime(true);
+            $releaseLog .= "\n--- post deploy ---\n";
+            $postOut = $ssh->exec(
+                sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $pathEsc, $post),
                 900
             );
+            $releaseLog .= $postOut;
+            $postOk = ! (preg_match('/DPLY_STEP_EXIT:(\d+)/', $postOut, $m) && (int) $m[1] !== 0);
+            $releaseSteps[] = [
+                'step_id' => 'post_deploy',
+                'step_type' => 'post_deploy',
+                'command' => $post,
+                'ok' => $postOk,
+                'output' => $postOut,
+                'duration_ms' => (int) round((microtime(true) - $postStart) * 1000),
+                'skipped' => false,
+            ];
+            $releaseOk = $releaseOk && $postOk;
         }
 
-        $log .= $this->pipelineRunner->runRelease($ssh, $site, $path);
-
-        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
-        $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
+        $log .= $releaseLog;
+        $deployment?->recordPhaseResults('release', $releaseSteps);
+        $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
+        if (! $releaseOk) {
+            throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
+        }
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 

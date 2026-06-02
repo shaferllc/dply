@@ -179,6 +179,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                     trigger: $this->trigger,
                     apiIdempotencyHash: $this->apiIdempotencyHash,
                     auditUserId: $this->auditUserId,
+                    deployment: $deployment,
                 ));
                 $redacted = DeployLogRedactor::redact($result['output']);
                 $deployment->update([

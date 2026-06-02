@@ -95,23 +95,37 @@ final class PipelineAnchorScriptRunner
             );
         }
 
+        // Initialise the repository in place rather than `git clone`. Clone
+        // refuses to write into a non-empty directory ("destination path …
+        // already exists and is not an empty directory") — which happens when
+        // the target holds a provisioning placeholder or leftovers from a
+        // previous failed deploy. init + fetch + hard-reset is idempotent and
+        // overwrites tracked files without choking on a pre-existing folder.
         $log = "\n--- git clone ---\n";
 
+        $initRemote = sprintf(
+            'cd %1$s && git init -q && { git remote add origin %2$s 2>/dev/null || git remote set-url origin %2$s; } && ',
+            $releaseEsc,
+            $repoEsc
+        );
+
         if ($isCommit) {
-            $log .= $ssh->exec(
-                $gitSshPrefix.sprintf('git clone %s %s 2>&1', $repoEsc, $releaseEsc),
+            // Arbitrary SHAs need full history — fetch everything, then reset.
+            return $log.$ssh->exec(
+                $gitSshPrefix.$initRemote.sprintf('git fetch origin 2>&1 && git reset --hard %s 2>&1', $branchEsc),
                 600
             );
-            $log .= "\n--- git checkout ---\n";
+        }
 
+        if ($refKind === 'tag') {
             return $log.$ssh->exec(
-                sprintf('cd %s && %s git checkout %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
-                120
+                $gitSshPrefix.$initRemote.sprintf('git fetch origin %1$s 2>&1 && git reset --hard FETCH_HEAD 2>&1', $branchEsc),
+                600
             );
         }
 
         return $log.$ssh->exec(
-            $gitSshPrefix.sprintf('git clone --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $releaseEsc),
+            $gitSshPrefix.$initRemote.sprintf('git fetch origin %1$s 2>&1 && git reset --hard FETCH_HEAD 2>&1 && git checkout -B %1$s FETCH_HEAD 2>&1', $branchEsc),
             600
         );
     }
