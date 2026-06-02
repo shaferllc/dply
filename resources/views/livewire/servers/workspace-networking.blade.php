@@ -135,8 +135,66 @@
                             </div>
                         @endif
 
-                        @if (! $s->private_ip_address)
-                            @if ($s->provider->value === 'hetzner')
+                        @if ($s->private_ip_address)
+                            {{-- SSH tunnel helper (#8) --}}
+                            @php
+                                $tunnelCmds = [];
+                                $localPort = 15400;
+                                foreach ($databaseEnginesByServer->get($s->id, collect()) as $eng) {
+                                    $tunnelCmds[] = [
+                                        'label' => ($eng->engine === 'postgres' ? 'PostgreSQL' : ucfirst($eng->engine)).' port '.$eng->port,
+                                        'cmd' => "ssh -L {$localPort}:{$s->private_ip_address}:{$eng->port} deploy@{$s->ip_address}",
+                                        'local_port' => $localPort,
+                                    ];
+                                    $localPort += 100;
+                                }
+                                foreach ($cacheServicesByServer->get($s->id, collect()) as $cache) {
+                                    $tunnelCmds[] = [
+                                        'label' => ucfirst($cache->engine).' port '.$cache->port,
+                                        'cmd' => "ssh -L {$localPort}:{$s->private_ip_address}:{$cache->port} deploy@{$s->ip_address}",
+                                        'local_port' => $localPort,
+                                    ];
+                                    $localPort += 100;
+                                }
+                            @endphp
+                            @if (! empty($tunnelCmds))
+                                <details class="mt-3 group">
+                                    <summary class="cursor-pointer text-[11px] font-medium text-brand-sage hover:underline list-none flex items-center gap-1">
+                                        <x-heroicon-m-arrow-right class="h-3 w-3 transition group-open:rotate-90" aria-hidden="true" />
+                                        {{ __('SSH tunnel commands') }}
+                                    </summary>
+                                    <div class="mt-2 space-y-1.5">
+                                        @foreach ($tunnelCmds as $t)
+                                            <div class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
+                                                <x-heroicon-o-command-line class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="text-[10px] text-brand-mist">{{ $t['label'] }} → localhost:{{ $t['local_port'] }}</p>
+                                                    <code class="block truncate font-mono text-[11px] text-brand-ink">{{ $t['cmd'] }}</code>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </details>
+                            @endif
+                            @if ($s->provider->value === 'hetzner' && $s->hetzner_network_id)
+                                <div class="mt-2 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        wire:click="openConfirmActionModal('detachFromNetwork', ['{{ $s->id }}'], @js(__('Detach :name from network?', ['name' => $s->name])), @js(__('The private IP will be removed. Services using it will lose connectivity.')), @js(__('Detach')), true)"
+                                        class="text-[11px] font-medium text-rose-600 hover:underline"
+                                    >{{ __('Detach from network') }}</button>
+                                </div>
+                            @endif
+                        @elseif ($s->provider->value === 'hetzner')
+                            @if ($s->hetzner_network_id && ! $s->private_ip_address)
+                                <div class="mt-3 flex items-center gap-2" wire:poll.5s>
+                                    <svg class="h-3.5 w-3.5 animate-spin text-brand-sage" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    <span class="text-[11px] text-brand-sage">{{ __('Assigning private IP on network :id…', ['id' => $s->hetzner_network_id]) }}</span>
+                                </div>
+                            @else
                                 <div class="mt-3 flex flex-wrap items-center gap-2">
                                     <span class="text-[11px] text-brand-mist">{{ __('No private network') }}</span>
                                     <span class="text-[11px] text-brand-mist">·</span>
@@ -149,15 +207,25 @@
                                     <button
                                         type="button"
                                         x-data
-                                        x-on:click="$dispatch('open-modal', 'attach-network-modal-{{ $s->id }}')"
+                                        x-on:click="$dispatch('open-modal', 'attach-network-modal-{{ $s->id }}'); $wire.loadHetznerNetworks()"
                                         class="text-[11px] font-medium text-brand-sage hover:underline"
                                     >{{ __('Attach to existing') }}</button>
                                 </div>
-                            @else
-                                <p class="mt-2 text-[11px] text-brand-mist">
-                                    {{ __('No private IP — DigitalOcean VPCs must be set at create time.') }}
-                                </p>
                             @endif
+                        @elseif ($s->provider->value === 'digitalocean')
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <p class="text-[11px] text-brand-mist">{{ __('No private IP — must be in a VPC.') }}</p>
+                                <button
+                                    type="button"
+                                    wire:click="syncPrivateIp('{{ $s->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="syncPrivateIp('{{ $s->id }}')"
+                                    class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                >
+                                    <span wire:loading.remove wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Sync from DO') }}</span>
+                                    <span wire:loading wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Syncing…') }}</span>
+                                </button>
+                            </div>
                         @endif
                     </div>
                 @endforeach
@@ -262,33 +330,219 @@
             </section>
         @endif
 
-        {{-- ─── CACHE ENGINES (read-only pointer) ─────────────────────────── --}}
-        @foreach ($cacheServices as $cache)
-            @php
-                $cacheLabel = match ($cache->engine) {
-                    'redis' => 'Redis', 'valkey' => 'Valkey',
-                    'keydb' => 'KeyDB', 'dragonfly' => 'Dragonfly',
-                    default => ucfirst($cache->engine),
-                };
-            @endphp
+        {{-- ─── CACHE ENGINES — inline expose / lockdown controls (#3) ───── --}}
+        @if ($cacheServices->isNotEmpty())
             <section class="dply-card overflow-hidden">
-                <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-7">
-                    <div class="flex items-center gap-3">
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
-                        </span>
-                        <div>
-                            <p class="text-sm font-semibold text-brand-ink">{{ $cacheLabel }} <span class="font-mono text-xs font-normal text-brand-mist">· port {{ $cache->port }}</span></p>
-                            <p class="text-xs text-brand-moss">{{ __('Remote access is configured in the Caches workspace.') }}</p>
-                        </div>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('This server') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cache remote access') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                            {{ __('Expose Redis-family caches to a VPC subnet. An AUTH password must be set first. Full config (port, auth, switch engine) is in the Caches workspace.') }}
+                        </p>
                     </div>
-                    <a href="{{ route('servers.caches', $server) }}" wire:navigate
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                        {{ __('Open Caches workspace') }}
+                </div>
+                <div class="divide-y divide-brand-ink/5">
+                    @foreach ($cacheServices as $cache)
+                        @php
+                            $cacheLabel = match ($cache->engine) {
+                                'redis' => 'Redis', 'valkey' => 'Valkey', 'keydb' => 'KeyDB', 'dragonfly' => 'Dragonfly',
+                                default => ucfirst($cache->engine),
+                            };
+                            $isExposed = $cacheExposureByService[$cache->id]['exposed'] ?? false;
+                            $exposedCidr = $cacheExposureByService[$cache->id]['rule']?->source ?? null;
+                            $supportsExpose = \App\Models\ServerCacheService::engineSupportsAuth($cache->engine);
+                        @endphp
+                        <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 sm:px-7" wire:key="net-cache-{{ $cache->id }}">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-semibold text-brand-ink">{{ $cacheLabel }} <span class="font-mono text-xs font-normal text-brand-mist">· port {{ $cache->port }}</span></p>
+                                </div>
+                                @if ($isExposed)
+                                    <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                        <span aria-hidden="true" class="inline-block h-1 w-1 rounded-full bg-amber-500"></span>
+                                        {{ $exposedCidr ?? 'exposed' }}
+                                    </span>
+                                @else
+                                    <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                        {{ __('localhost') }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            @if (! $supportsExpose)
+                                <span class="text-xs text-brand-mist">{{ __('Expose not supported for :engine.', ['engine' => $cacheLabel]) }}</span>
+                            @elseif ($isExposed)
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('lockdownCache', ['{{ $cache->id }}'], @js(__('Lock down :engine?', ['engine' => $cacheLabel])), @js(__('The bind will revert to 127.0.0.1 and the firewall rule will be removed.')), @js(__('Lock down')), true)"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                                >
+                                    <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                    {{ __('Lock down') }}
+                                </button>
+                            @else
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <input
+                                        type="text"
+                                        wire:model="cache_networking_allowed_from.{{ $cache->id }}"
+                                        placeholder="10.0.0.0/8"
+                                        class="w-36 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 font-mono text-xs text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                    />
+                                    @error('cache_networking_allowed_from.'.$cache->id)
+                                        <p class="w-full text-xs text-rose-700">{{ $message }}</p>
+                                    @enderror
+                                    <button
+                                        type="button"
+                                        wire:click="exposeCacheToNetwork('{{ $cache->id }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="exposeCacheToNetwork('{{ $cache->id }}')"
+                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                                    >
+                                        <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+                                        <span wire:loading.remove wire:target="exposeCacheToNetwork('{{ $cache->id }}')">{{ __('Expose') }}</span>
+                                        <span wire:loading wire:target="exposeCacheToNetwork('{{ $cache->id }}')">{{ __('…') }}</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                <div class="border-t border-brand-ink/5 px-6 py-3 sm:px-7">
+                    <a href="{{ route('servers.caches', $server) }}" wire:navigate class="text-[11px] font-medium text-brand-sage hover:underline">
+                        {{ __('Full cache configuration →') }}
                     </a>
                 </div>
             </section>
-        @endforeach
+        @endif
+
+        {{-- ─── NETWORK ROUTES ─────────────────────────────────────────────── --}}
+        @if ($networkId > 0 && $server->provider->value === 'hetzner')
+            <section class="dply-card overflow-hidden">
+                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="flex items-center gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-map class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Network routes') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                {{ $networkInfo ? $networkInfo['name'] : 'Network '.$networkId }}
+                                @if ($networkInfo)
+                                    <span class="ml-1.5 font-mono text-xs font-normal text-brand-mist">{{ $networkInfo['ip_range'] }}</span>
+                                @endif
+                            </h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('Routes tell the network fabric where to forward packets for a given destination. Add a route when a server on this network should act as a gateway — e.g. routing your office CIDR through a WireGuard server, or bridging two subnets.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Existing routes --}}
+                @if (! empty($networkRoutes))
+                    <div class="divide-y divide-brand-ink/5">
+                        @foreach ($networkRoutes as $route)
+                            @php
+                                $gw = $route['gateway'];
+                                $gwServer = $allServers->first(fn ($s) => $s->private_ip_address === $gw);
+                            @endphp
+                            <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
+                                <div class="flex min-w-0 items-center gap-4">
+                                    <div>
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destination') }}</p>
+                                        <code class="font-mono text-sm font-semibold text-brand-ink">{{ $route['destination'] }}</code>
+                                    </div>
+                                    <x-heroicon-o-arrow-right class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
+                                    <div>
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Gateway') }}</p>
+                                        <p class="font-mono text-sm font-semibold text-brand-ink">
+                                            {{ $gw }}
+                                            @if ($gwServer)
+                                                <span class="ml-1 font-sans text-[11px] font-normal text-brand-mist">({{ $gwServer->name }})</span>
+                                            @endif
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('deleteRoute', [{{ json_encode($route['destination']) }}, {{ json_encode($route['gateway']) }}], @js(__('Delete route :dest?', ['dest' => $route['destination']])), @js(__('Removes this route from the Hetzner network. Traffic to :dest will no longer be forwarded to :gw.', ['dest' => $route['destination'], 'gw' => $route['gateway']])), @js(__('Delete route')), true)"
+                                    class="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                >
+                                    {{ __('Delete') }}
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="px-6 py-5 sm:px-7">
+                        <p class="text-sm text-brand-moss">{{ __('No routes yet. Add one below — most setups don\'t need routes unless you\'re running a VPN gateway or bridging subnets.') }}</p>
+                    </div>
+                @endif
+
+                {{-- Add route form --}}
+                <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-5 sm:px-7">
+                    <p class="mb-4 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add route') }}</p>
+                    <div class="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                        <div>
+                            <x-input-label for="route_destination" :value="__('Destination (CIDR)')" />
+                            <x-text-input
+                                id="route_destination"
+                                wire:model="route_destination"
+                                class="mt-1 block w-full font-mono"
+                                placeholder="192.168.1.0/24"
+                                autocomplete="off"
+                            />
+                            @error('route_destination')
+                                <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                            @enderror
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('The CIDR you want routed through this network.') }}</p>
+                        </div>
+                        <div>
+                            <x-input-label for="route_gateway" :value="__('Gateway (private IP)')" />
+                            <div class="relative mt-1">
+                                <x-text-input
+                                    id="route_gateway"
+                                    wire:model="route_gateway"
+                                    class="block w-full font-mono"
+                                    placeholder="10.0.0.2"
+                                    autocomplete="off"
+                                    list="gateway-suggestions"
+                                />
+                                {{-- Datalist pre-fills from servers that have a private IP on this network --}}
+                                <datalist id="gateway-suggestions">
+                                    @foreach ($allServers->where('private_ip_address', '!=', null) as $s)
+                                        <option value="{{ $s->private_ip_address }}" label="{{ $s->name }}">
+                                    @endforeach
+                                </datalist>
+                            </div>
+                            @error('route_gateway')
+                                <p class="mt-1 text-xs text-rose-700">{{ $message }}</p>
+                            @enderror
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('The private IP of the server that will forward this traffic.') }}</p>
+                        </div>
+                        <div>
+                            <button
+                                type="button"
+                                wire:click="addRoute"
+                                wire:loading.attr="disabled"
+                                wire:target="addRoute"
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50 sm:w-auto"
+                            >
+                                <span wire:loading.remove wire:target="addRoute">{{ __('Add route') }}</span>
+                                <span wire:loading wire:target="addRoute" class="inline-flex items-center gap-2">
+                                    <x-spinner variant="white" size="sm" />
+                                    {{ __('Adding…') }}
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        @endif
 
     </div>
 
@@ -383,17 +637,46 @@
             <div class="bg-white">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Attach :name to network', ['name' => $s->name]) }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Enter an existing Hetzner Network ID to attach this server.') }}</p>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Choose an existing private network in your Hetzner account.') }}</p>
                 </div>
                 <div class="space-y-4 p-6">
                     <div>
-                        <x-input-label for="attach_net_inline_{{ $s->id }}" :value="__('Network ID')" />
-                        <x-text-input
-                            id="attach_net_inline_{{ $s->id }}"
-                            wire:model="attach_network_id.{{ $s->id }}"
-                            class="mt-1 block w-full font-mono"
-                            placeholder="e.g. 1234567"
-                        />
+                        <div class="flex items-center justify-between">
+                            <x-input-label for="attach_net_inline_{{ $s->id }}" :value="__('Network')" />
+                            <button
+                                type="button"
+                                wire:click="loadHetznerNetworks"
+                                wire:loading.attr="disabled"
+                                wire:target="loadHetznerNetworks"
+                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                            >
+                                <span wire:loading.remove wire:target="loadHetznerNetworks">{{ __('Refresh') }}</span>
+                                <span wire:loading wire:target="loadHetznerNetworks">{{ __('Loading…') }}</span>
+                            </button>
+                        </div>
+
+                        @if ($hetzner_networks_loading)
+                            <p class="mt-2 text-sm text-brand-mist">{{ __('Loading networks…') }}</p>
+                        @elseif (! empty($hetzner_networks))
+                            <select
+                                id="attach_net_inline_{{ $s->id }}"
+                                wire:model="attach_network_id.{{ $s->id }}"
+                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                            >
+                                <option value="">{{ __('— pick a network —') }}</option>
+                                @foreach ($hetzner_networks as $net)
+                                    <option value="{{ $net['id'] }}">{{ $net['name'] }} — {{ $net['ip_range'] }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <x-text-input
+                                id="attach_net_inline_{{ $s->id }}"
+                                wire:model="attach_network_id.{{ $s->id }}"
+                                class="mt-1 block w-full font-mono"
+                                placeholder="e.g. 1234567"
+                            />
+                            <p class="mt-1 text-xs text-brand-mist">{{ __('Click Refresh to load networks from your Hetzner account, or enter an ID manually.') }}</p>
+                        @endif
                         @error('attach_network_id.'.$s->id) <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                     </div>
                 </div>

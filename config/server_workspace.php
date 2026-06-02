@@ -126,6 +126,14 @@ return [
                 'redis-snapshots' => ['group' => 'admin'],
             ],
         ],
+        'load_balancer' => [
+            'keys' => ['overview', 'load-balancers', 'console', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'cron', 'manage', 'settings'],
+            'overrides' => [
+                'load-balancers' => ['label' => 'Load balancer', 'group' => 'overview'],
+                'logs' => ['group' => 'monitor'],
+                'cron' => ['group' => 'admin'],
+            ],
+        ],
         'database' => [
             'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'networking', 'load-balancers', 'ssh', 'cron', 'files', 'manage', 'settings'],
             'overrides' => [

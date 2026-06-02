@@ -28,6 +28,7 @@ class AttachServerToNetworkJob implements ShouldQueue
     public function __construct(
         public string $serverId,
         public int $networkId,
+        public ?string $privateNetworkId = null,
     ) {}
 
     public function handle(): void
@@ -62,7 +63,11 @@ class AttachServerToNetworkJob implements ShouldQueue
         }
 
         // Save the network ID on the server row.
-        $server->update(['hetzner_network_id' => (string) $this->networkId]);
+        $updates = ['hetzner_network_id' => (string) $this->networkId];
+        if ($this->privateNetworkId) {
+            $updates['private_network_id'] = $this->privateNetworkId;
+        }
+        $server->update($updates);
 
         // Poll for the private IP — Hetzner assigns it asynchronously.
         $instance = $hetzner->getInstance($providerId);

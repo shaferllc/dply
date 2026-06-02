@@ -86,6 +86,7 @@ class Server extends Model
         'ip_address',
         'private_ip_address',
         'hetzner_network_id',
+        'private_network_id',
         'ssh_port',
         'ssh_user',
         'ssh_private_key',
@@ -374,6 +375,11 @@ class Server extends Model
     public function isReady(): bool
     {
         return $this->status === self::STATUS_READY;
+    }
+
+    public function privateNetwork(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(PrivateNetwork::class, 'private_network_id');
     }
 
     /** Whether this server has a known private/VPC IP it can be reached on by peers. */

@@ -138,6 +138,81 @@ class WorkspaceLoadBalancers extends Component
         $this->toastSuccess(__('Load balancer ":name" is being provisioned — it will appear here once the IP is assigned (~30 s).', ['name' => $lb->name]));
     }
 
+    /**
+     * Create a software (HAProxy) load balancer on a server provisioned with
+     * the load_balancer role. No cloud API calls — just SSH config writes.
+     */
+    public function createHAProxyLoadBalancer(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $this->validate([
+            'lb_name' => 'required|string|max:255',
+            'lb_algorithm' => 'required|in:round_robin,least_connections',
+            'lb_services' => 'required|array|min:1',
+            'lb_services.*.protocol' => 'required|in:http,https,tcp',
+            'lb_services.*.listen_port' => 'required|integer|min:1|max:65535',
+            'lb_services.*.destination_port' => 'required|integer|min:1|max:65535',
+            'haproxy_server_id' => 'required|string',
+        ]);
+
+        $haproxyServer = Server::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->where('status', Server::STATUS_READY)
+            ->find($this->haproxy_server_id);
+
+        if (! $haproxyServer) {
+            $this->addError('haproxy_server_id', __('Server not found.'));
+
+            return;
+        }
+
+        $lb = LoadBalancer::query()->create([
+            'organization_id' => $this->server->organization_id,
+            'server_id' => $haproxyServer->id,
+            'name' => trim($this->lb_name),
+            'provider' => LoadBalancer::PROVIDER_HAPROXY,
+            'region' => $haproxyServer->region,
+            'load_balancer_type' => 'haproxy',
+            'algorithm' => $this->lb_algorithm,
+            'status' => LoadBalancer::STATUS_PROVISIONING,
+        ]);
+
+        foreach (array_filter(array_unique($this->lb_target_server_ids)) as $serverId) {
+            $s = Server::query()->where('organization_id', $this->server->organization_id)->find($serverId);
+            if ($s) {
+                LoadBalancerTarget::query()->create([
+                    'load_balancer_id' => $lb->id,
+                    'server_id' => $s->id,
+                ]);
+            }
+        }
+
+        foreach ($this->lb_services as $svc) {
+            LoadBalancerService::query()->create([
+                'load_balancer_id' => $lb->id,
+                'protocol' => $svc['protocol'],
+                'listen_port' => (int) $svc['listen_port'],
+                'destination_port' => (int) $svc['destination_port'],
+                'health_check_port' => (int) $svc['destination_port'],
+                'health_check_protocol' => in_array($svc['protocol'], ['http', 'https'], true) ? 'http' : 'tcp',
+            ]);
+        }
+
+        ConfigureHAProxyLoadBalancerJob::dispatch($lb->id);
+
+        $this->dispatch('close-modal', 'create-haproxy-lb-modal');
+        $this->lb_name = $this->server->name.'-lb';
+        $this->lb_target_server_ids = [];
+        $this->lb_services = [['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80']];
+        $this->haproxy_server_id = '';
+
+        $this->toastSuccess(__('Software load balancer ":name" being configured on :server.', [
+            'name' => $lb->name,
+            'server' => $haproxyServer->name,
+        ]));
+    }
+
     public function addTarget(string $lbId): void
     {
         $this->authorize('update', $this->server);
@@ -167,24 +242,33 @@ class WorkspaceLoadBalancers extends Component
             return;
         }
 
-        try {
-            $hetzner = new HetznerService($lb->providerCredential);
-            $hetzner->addLoadBalancerTarget(
-                (int) $lb->provider_id,
-                (int) $target->provider_id,
-                filled($lb->hetzner_network_id),
-            );
-        } catch (\Throwable $e) {
-            $this->toastError(Str::limit($e->getMessage(), 200));
+        if ($lb->isSoftware()) {
+            // HAProxy — just add to DB and re-apply config.
+            LoadBalancerTarget::query()->create([
+                'load_balancer_id' => $lb->id,
+                'server_id' => $target->id,
+            ]);
+            ConfigureHAProxyLoadBalancerJob::dispatch($lb->id);
+        } else {
+            try {
+                $hetzner = new HetznerService($lb->providerCredential);
+                $hetzner->addLoadBalancerTarget(
+                    (int) $lb->provider_id,
+                    (int) $target->provider_id,
+                    filled($lb->hetzner_network_id),
+                );
+            } catch (\Throwable $e) {
+                $this->toastError(Str::limit($e->getMessage(), 200));
 
-            return;
+                return;
+            }
+
+            LoadBalancerTarget::query()->create([
+                'load_balancer_id' => $lb->id,
+                'server_id' => $target->id,
+                'provider_server_id' => $target->provider_id,
+            ]);
         }
-
-        LoadBalancerTarget::query()->create([
-            'load_balancer_id' => $lb->id,
-            'server_id' => $target->id,
-            'provider_server_id' => $target->provider_id,
-        ]);
 
         $this->add_target_server_id = '';
         $this->toastSuccess(__(':name added as a target.', ['name' => $target->name]));
@@ -203,21 +287,27 @@ class WorkspaceLoadBalancers extends Component
             return;
         }
 
-        try {
-            if ($target->loadBalancer->provider_id && $target->server?->provider_id) {
-                $hetzner = new HetznerService($target->loadBalancer->providerCredential);
-                $hetzner->removeLoadBalancerTarget(
-                    (int) $target->loadBalancer->provider_id,
-                    (int) $target->server->provider_id,
-                );
-            }
-        } catch (\Throwable $e) {
-            $this->toastError(Str::limit($e->getMessage(), 200));
+        if ($target->loadBalancer->isSoftware()) {
+            $target->delete();
+            ConfigureHAProxyLoadBalancerJob::dispatch($target->loadBalancer->id);
+        } else {
+            try {
+                if ($target->loadBalancer->provider_id && $target->server?->provider_id) {
+                    $hetzner = new HetznerService($target->loadBalancer->providerCredential);
+                    $hetzner->removeLoadBalancerTarget(
+                        (int) $target->loadBalancer->provider_id,
+                        (int) $target->server->provider_id,
+                    );
+                }
+            } catch (\Throwable $e) {
+                $this->toastError(Str::limit($e->getMessage(), 200));
 
-            return;
+                return;
+            }
+
+            $target->delete();
         }
 
-        $target->delete();
         $this->toastSuccess(__('Target removed.'));
     }
 
@@ -230,6 +320,14 @@ class WorkspaceLoadBalancers extends Component
             ->find($lbId);
 
         if (! $lb) {
+            return;
+        }
+
+        if ($lb->isSoftware()) {
+            ConfigureHAProxyLoadBalancerJob::dispatch($lb->id, remove: true);
+            $lb->delete();
+            $this->toastSuccess(__('Load balancer deleted.'));
+
             return;
         }
 
@@ -250,8 +348,11 @@ class WorkspaceLoadBalancers extends Component
 
     public function render(): View
     {
+        // Filtered read-only view — only LBs that target THIS server.
         $loadBalancers = LoadBalancer::query()
             ->where('organization_id', $this->server->organization_id)
+            ->whereHas('targets', fn ($q) => $q->where('server_id', $this->server->id))
+            ->orWhere('server_id', $this->server->id) // HAProxy server itself
             ->with(['targets.server', 'services'])
             ->orderBy('created_at', 'desc')
             ->get();

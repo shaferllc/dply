@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Jobs\Concerns\WritesConsoleAction;
-use App\Models\ConsoleAction;
 use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseEngine;
 use App\Models\ServerFirewallRule;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -34,9 +33,12 @@ use Illuminate\Support\Str;
 class ToggleDatabaseNetworkingJob implements ShouldQueue
 {
     use Queueable;
-    use WritesConsoleAction;
 
     public int $timeout = 300;
+
+    public int $tries = 2;
+
+    public int $backoff = 10;
 
     public function __construct(
         public string $serverDatabaseId,
@@ -50,107 +52,76 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
         }
     }
 
-    protected function consoleSubject(): Model
-    {
-        return ServerDatabase::query()->with('server')->findOrFail($this->serverDatabaseId);
-    }
-
-    protected function consoleKind(): string
-    {
-        return 'db_networking';
-    }
-
-    protected function triggeringUserId(): ?string
-    {
-        return $this->userId;
-    }
-
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
         ServerFirewallProvisioner $firewall,
     ): void {
         /** @var ServerDatabase|null $db */
         $db = ServerDatabase::query()->with('server')->find($this->serverDatabaseId);
-        if (! $db) {
+        if (! $db || ! $db->server) {
             return;
         }
 
-        $emit = $this->beginConsoleAction();
-        $action = $this->enable ? 'Enabling' : 'Disabling';
-
-        $emit->step('db', __(':action remote access for database :name …', [
-            'action' => $action,
-            'name' => $db->name,
-        ]));
+        $script = $this->enable
+            ? DatabaseEngineInstallScripts::enableDatabaseRemoteAccessScript(
+                $db->engine,
+                $db->name,
+                (string) ($db->username ?? ''),
+                $this->allowedCidr,
+            )
+            : DatabaseEngineInstallScripts::disableDatabaseRemoteAccessScript(
+                $db->engine,
+                $db->name,
+                (string) ($db->username ?? ''),
+            );
 
         try {
-            $script = $this->enable
-                ? DatabaseEngineInstallScripts::enableDatabaseRemoteAccessScript(
-                    $db->engine,
-                    $db->name,
-                    (string) ($db->username ?? ''),
-                    $this->allowedCidr,
-                )
-                : DatabaseEngineInstallScripts::disableDatabaseRemoteAccessScript(
-                    $db->engine,
-                    $db->name,
-                    (string) ($db->username ?? ''),
-                );
-
-            $output = $executor->runInlineBashWithOutputCallback(
+            $output = $executor->runInlineBash(
                 $db->server,
                 'database:networking:'.$db->engine.':'.$db->name,
                 $script,
-                function (string $type, string $chunk) use ($emit): void {
-                    foreach (preg_split("/\r?\n/", $chunk) ?: [] as $line) {
-                        $line = trim($line);
-                        if ($line !== '') {
-                            $emit($line, ConsoleAction::LEVEL_INFO, 'ssh');
-                        }
-                    }
-                },
                 timeoutSeconds: 120,
                 asRoot: true,
             );
-
-            if ($output->exitCode !== 0) {
-                throw new \RuntimeException(
-                    Str::limit(trim($output->buffer), 800) ?: 'Networking toggle failed.'
-                );
-            }
-
-            $db->update([
-                'remote_access' => $this->enable,
-                'allowed_from' => $this->enable ? $this->allowedCidr : null,
+        } catch (\Throwable $e) {
+            Log::warning('ToggleDatabaseNetworkingJob: SSH failed', [
+                'db_id' => $this->serverDatabaseId,
+                'error' => $e->getMessage(),
             ]);
 
-            $this->syncEngineFirewallRule($db, $firewall);
-
-            $label = $this->enable
-                ? __('Remote access enabled for :name from :cidr.', ['name' => $db->name, 'cidr' => $this->allowedCidr])
-                : __('Remote access disabled for :name.', ['name' => $db->name]);
-
-            $emit->success('db', $label);
-            $this->completeConsoleAction();
-        } catch (\Throwable $e) {
-            $message = Str::limit($e->getMessage(), 800);
-
-            // Roll back optimistic flag.
             $db->update([
                 'remote_access' => ! $this->enable,
                 'allowed_from' => $this->enable ? null : $db->allowed_from,
             ]);
 
-            $emit->error('db', $message);
-            $this->failConsoleAction($message);
+            throw $e; // Let the queue retry.
         }
+
+        if ($output->exitCode !== 0) {
+            $message = Str::limit(trim($output->buffer), 800) ?: 'Networking toggle failed.';
+
+            Log::warning('ToggleDatabaseNetworkingJob: script failed', [
+                'db_id' => $this->serverDatabaseId,
+                'output' => $message,
+            ]);
+
+            $db->update([
+                'remote_access' => ! $this->enable,
+                'allowed_from' => $this->enable ? null : $db->allowed_from,
+            ]);
+
+            return;
+        }
+
+        $db->update([
+            'remote_access' => $this->enable,
+            'allowed_from' => $this->enable ? $this->allowedCidr : null,
+        ]);
+
+        $this->syncEngineFirewallRule($db, $firewall);
+        // Hetzner cloud firewall is synced inside ServerFirewallProvisioner::applyRule.
     }
 
-    /**
-     * Manages a single UFW rule per engine on this server. The rule stays open
-     * as long as at least one database on the engine has remote_access = true.
-     * When the last database disables remote access, the rule is removed.
-     */
     private function syncEngineFirewallRule(ServerDatabase $db, ServerFirewallProvisioner $firewall): void
     {
         $server = $db->server;
@@ -172,7 +143,6 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
                 try {
                     $firewall->removeFromHost($server, $existing);
                 } catch (\Throwable) {
-                    // Best-effort.
                 }
                 $existing->delete();
             }
@@ -180,14 +150,14 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
             return;
         }
 
-        $port = \App\Models\ServerDatabaseEngine::query()
+        if ($existing) {
+            return;
+        }
+
+        $port = ServerDatabaseEngine::query()
             ->where('server_id', $server->id)
             ->where('engine', $db->engine)
-            ->value('port') ?? \App\Models\ServerDatabaseEngine::defaultPortFor($db->engine);
-
-        if ($existing) {
-            return; // Rule already open for this engine — no change needed.
-        }
+            ->value('port') ?? ServerDatabaseEngine::defaultPortFor($db->engine);
 
         $rule = ServerFirewallRule::query()->create([
             'server_id' => $server->id,
@@ -204,7 +174,6 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
         try {
             $firewall->applyRule($server, $rule);
         } catch (\Throwable) {
-            // Best-effort — the row is saved; operator can reconcile from Firewall tab.
         }
     }
 }

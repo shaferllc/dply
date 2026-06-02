@@ -2,62 +2,43 @@
     :server="$server"
     active="load-balancers"
     :title="__('Load Balancers')"
-    :description="__('Hetzner load balancers in this workspace — create, configure targets, and monitor status.')"
+    :description="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <div class="space-y-6">
 
-        {{-- ─── HEADER ─────────────────────────────────────────────────────── --}}
-        <div class="flex items-center justify-between">
-            <div>
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Load balancers') }}</h2>
-                <p class="mt-0.5 text-sm text-brand-moss">{{ __('Distribute traffic across your servers. Hetzner LBs support HTTP, HTTPS, and TCP.') }}</p>
+        {{-- ─── SECTION HEADER (always shown) ──────────────────────────────── --}}
+        <section class="dply-card overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Load balancers') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manage load balancers') }}</h3>
+                    </div>
+                </div>
+                <a href="{{ route('networking.index') }}?tab=load-balancers" wire:navigate
+                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    <x-heroicon-o-arrows-right-left class="h-4 w-4" />
+                    {{ __('Manage in Networking →') }}
+                </a>
             </div>
-            @if ($server->provider->value === 'hetzner')
-                <button
-                    type="button"
-                    x-on:click="$dispatch('open-modal', 'create-lb-modal')"
-                    class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
-                >
-                    <x-heroicon-o-plus class="h-4 w-4" />
-                    {{ __('Create load balancer') }}
-                </button>
-            @endif
-        </div>
-
-        {{-- ─── EMPTY STATE ─────────────────────────────────────────────────── --}}
-        @if ($loadBalancers->isEmpty())
-            <section class="dply-card overflow-hidden">
-                <div class="px-6 py-8 sm:px-8">
+            @if ($loadBalancers->isEmpty())
+                <div class="px-6 py-8 sm:px-7">
                     <x-empty-state
                         borderless
                         icon="heroicon-o-arrows-right-left"
                         tone="sage"
                         :title="__('No load balancers yet')"
-                        :description="__('Create a Hetzner load balancer to distribute HTTP, HTTPS, or TCP traffic across your servers. Targets can be any server in this workspace.')"
-                    >
-                        @if ($server->provider->value === 'hetzner')
-                            <x-slot:actions>
-                                <button
-                                    type="button"
-                                    x-on:click="$dispatch('open-modal', 'create-lb-modal')"
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
-                                >
-                                    <x-heroicon-o-plus class="h-4 w-4" />
-                                    {{ __('Create load balancer') }}
-                                </button>
-                            </x-slot:actions>
-                        @else
-                            <x-slot:actions>
-                                <span class="text-sm text-brand-mist">{{ __('Load balancers are currently available for Hetzner servers only.') }}</span>
-                            </x-slot:actions>
-                        @endif
-                    </x-empty-state>
+                        :description="__('Software (HAProxy) load balancers run on any server — free. Managed (Hetzner) LBs are fully redundant but cost extra.')"
+                    />
                 </div>
-            </section>
-        @endif
+            @endif
+        </section>
 
         {{-- ─── LOAD BALANCER CARDS ─────────────────────────────────────────── --}}
         @foreach ($loadBalancers as $lb)
@@ -94,6 +75,11 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
+                        @if ($lb->isSoftware())
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">HAProxy · {{ $lb->server?->name }}</span>
+                        @else
+                            <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Hetzner managed</span>
+                        @endif
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $statusPill['text'] }}">
                             @if ($lb->status === 'provisioning')
                                 <x-spinner variant="forest" size="sm" />
@@ -214,6 +200,152 @@
         @endforeach
 
     </div>
+
+    {{-- ─── CREATE SOFTWARE (HAPROXY) LOAD BALANCER MODAL ────────────────────── --}}
+    <x-modal name="create-haproxy-lb-modal" max-width="2xl" focusable>
+        <div class="bg-white">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Free · HAProxy') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create software load balancer') }}</h3>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Runs HAProxy on a server you already own. No extra cost — just the server. Dply writes the config and reloads over SSH.') }}</p>
+                </div>
+                <button type="button" x-on:click="$dispatch('close-modal', 'create-haproxy-lb-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                    <x-heroicon-o-x-mark class="h-5 w-5" />
+                </button>
+            </div>
+
+            <div class="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+
+                {{-- Name + algorithm --}}
+                <div class="grid gap-5 sm:grid-cols-2 sm:items-end">
+                    <div>
+                        <x-input-label for="haproxy_lb_name" :value="__('Name')" />
+                        <x-text-input id="haproxy_lb_name" wire:model="lb_name" class="mt-1 block w-full" />
+                        @error('lb_name') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <x-input-label for="haproxy_lb_algorithm" :value="__('Algorithm')" />
+                        <select id="haproxy_lb_algorithm" wire:model="lb_algorithm" class="dply-input mt-1 block w-full">
+                            <option value="round_robin">{{ __('Round robin') }}</option>
+                            <option value="least_connections">{{ __('Least connections') }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                {{-- HAProxy server picker --}}
+                <div>
+                    <x-input-label for="haproxy_server_id" :value="__('HAProxy server')" />
+                    <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Pick any server with the "Load balancer" role (HAProxy pre-installed). Or create one from the server wizard first.') }}</p>
+                    <select id="haproxy_server_id" wire:model="haproxy_server_id" class="dply-input mt-2 block w-full">
+                        <option value="">{{ __('Select a server…') }}</option>
+                        @foreach ($orgServers as $s)
+                            @php $role = data_get($s->meta, 'server_role', ''); @endphp
+                            <option value="{{ $s->id }}" {{ $role === 'load_balancer' ? '' : '' }}>
+                                {{ $s->name }}
+                                @if ($role === 'load_balancer') ({{ __('load balancer role') }}) @endif
+                                — {{ $s->ip_address }} · {{ $s->region }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('haproxy_server_id') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Services --}}
+                <div>
+                    <div class="mb-3 flex items-center justify-between">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Services') }}</p>
+                        <button type="button" wire:click="addServiceRow" class="text-xs font-medium text-brand-sage hover:underline">
+                            + {{ __('Add service') }}
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        @foreach ($lb_services as $i => $svc)
+                            <div class="grid gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-4 sm:grid-cols-4 sm:items-end">
+                                <div>
+                                    <x-input-label :value="__('Protocol')" />
+                                    <select wire:model="lb_services.{{ $i }}.protocol" class="dply-input mt-1 block w-full">
+                                        <option value="http">HTTP</option>
+                                        <option value="https">HTTPS</option>
+                                        <option value="tcp">TCP</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <x-input-label :value="__('Listen port')" />
+                                    <x-text-input wire:model="lb_services.{{ $i }}.listen_port" class="mt-1 block w-full font-mono" placeholder="80" />
+                                    @error("lb_services.{$i}.listen_port") <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <x-input-label :value="__('Destination port')" />
+                                    <x-text-input wire:model="lb_services.{{ $i }}.destination_port" class="mt-1 block w-full font-mono" placeholder="8080" />
+                                    @error("lb_services.{$i}.destination_port") <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
+                                </div>
+                                <div class="flex items-end">
+                                    @if (count($lb_services) > 1)
+                                        <button type="button" wire:click="removeServiceRow({{ $i }})" class="text-xs font-medium text-rose-600 hover:underline">{{ __('Remove') }}</button>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Target servers --}}
+                <div>
+                    <p class="mb-3 text-sm font-semibold text-brand-ink">{{ __('Backend servers') }}</p>
+                    <p class="mb-3 text-xs text-brand-mist">{{ __('HAProxy will forward traffic to these servers. If they share a private network, the private IP is used automatically.') }}</p>
+                    <div class="space-y-2">
+                        @foreach ($orgServers as $s)
+                            <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 hover:bg-brand-sand/10">
+                                <input
+                                    type="checkbox"
+                                    wire:model="lb_target_server_ids"
+                                    value="{{ $s->id }}"
+                                    class="rounded border-brand-ink/30 text-brand-forest focus:ring-brand-sage"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-semibold text-brand-ink">{{ $s->name }}
+                                        @if ($s->id === $server->id)
+                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest">{{ __('this server') }}</span>
+                                        @endif
+                                    </p>
+                                    <p class="font-mono text-[11px] text-brand-mist">
+                                        {{ $s->private_ip_address ?? $s->ip_address }} · {{ $s->region }}
+                                        @if ($s->private_ip_address)
+                                            <span class="text-emerald-600">· {{ __('private') }}</span>
+                                        @endif
+                                    </p>
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="flex justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4">
+                <button type="button" x-on:click="$dispatch('close-modal', 'create-haproxy-lb-modal')" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
+                    {{ __('Cancel') }}
+                </button>
+                <button
+                    type="button"
+                    wire:click="createHAProxyLoadBalancer"
+                    wire:loading.attr="disabled"
+                    wire:target="createHAProxyLoadBalancer"
+                    class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
+                >
+                    <span wire:loading.remove wire:target="createHAProxyLoadBalancer">{{ __('Create load balancer') }}</span>
+                    <span wire:loading wire:target="createHAProxyLoadBalancer" class="inline-flex items-center gap-2">
+                        <x-spinner variant="white" size="sm" />
+                        {{ __('Configuring…') }}
+                    </span>
+                </button>
+            </div>
+        </div>
+    </x-modal>
 
     {{-- ─── CREATE LOAD BALANCER MODAL ─────────────────────────────────────── --}}
     <x-modal name="create-lb-modal" max-width="2xl" focusable>

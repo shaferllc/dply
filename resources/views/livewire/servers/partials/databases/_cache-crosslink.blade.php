@@ -1,7 +1,7 @@
 @php
-    $cachesEnabled = \Laravel\Pennant\Feature::active('workspace.caches');
+    $cachesInNav = collect(server_workspace_nav_for_server($server))->contains('key', 'caches');
 @endphp
-@if ($cachesEnabled && ($opsReady ?? false))
+@if ($cachesInNav && ($opsReady ?? false))
     <div class="rounded-xl border border-brand-sage/25 bg-brand-sage/10 px-4 py-4 sm:px-5">
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="min-w-0">

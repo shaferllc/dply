@@ -4,37 +4,25 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Jobs\Concerns\WritesConsoleAction;
-use App\Models\ConsoleAction;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerFirewallRule;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
-/**
- * Enable or disable remote access for a database engine on a server.
- *
- * Enable path: writes listen_addresses / pg_hba (postgres) or bind-address
- *   (mysql/mariadb) over SSH, restarts the service, and creates a UFW-backed
- *   ServerFirewallRule for the engine's port from the given CIDR.
- *
- * Disable path: reverts to localhost-only binding, removes the dply-managed
- *   pg_hba rule, and deletes the tagged firewall rule.
- *
- * The engine row's `remote_access` + `allowed_from` fields are updated
- * optimistically before the job runs and confirmed/rolled-back on completion.
- */
 class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
 {
     use Queueable;
-    use WritesConsoleAction;
 
     public int $timeout = 300;
+
+    public int $tries = 2;
+
+    public int $backoff = 10;
 
     public function __construct(
         public string $serverDatabaseEngineId,
@@ -48,91 +36,61 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
         }
     }
 
-    protected function consoleSubject(): Model
-    {
-        return ServerDatabaseEngine::query()->findOrFail($this->serverDatabaseEngineId);
-    }
-
-    protected function consoleKind(): string
-    {
-        return 'db_engine_remote_access';
-    }
-
-    protected function triggeringUserId(): ?string
-    {
-        return $this->userId;
-    }
-
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
         ServerFirewallProvisioner $firewall,
     ): void {
-        /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
-        if (! $row) {
+        if (! $row || ! $row->server) {
             return;
         }
 
-        $emit = $this->beginConsoleAction();
-
-        $action = $this->enable ? 'Enabling' : 'Disabling';
-        $emit->step('db', __(':action remote access for :engine …', [
-            'action' => $action,
-            'engine' => $row->engine,
-        ]));
+        $script = $this->enable
+            ? DatabaseEngineInstallScripts::enableRemoteAccessScript($row->engine, $this->allowedCidr)
+            : DatabaseEngineInstallScripts::disableRemoteAccessScript($row->engine);
 
         try {
-            $script = $this->enable
-                ? DatabaseEngineInstallScripts::enableRemoteAccessScript($row->engine, $this->allowedCidr)
-                : DatabaseEngineInstallScripts::disableRemoteAccessScript($row->engine);
-
-            $output = $executor->runInlineBashWithOutputCallback(
+            $output = $executor->runInlineBash(
                 $row->server,
                 'database-engine:remote-access:'.$row->engine,
                 $script,
-                function (string $type, string $chunk) use ($emit): void {
-                    foreach (preg_split("/\r?\n/", $chunk) ?: [] as $line) {
-                        $line = trim($line);
-                        if ($line !== '') {
-                            $emit($line, ConsoleAction::LEVEL_INFO, 'ssh');
-                        }
-                    }
-                },
                 timeoutSeconds: 120,
                 asRoot: true,
             );
-
-            if ($output->exitCode !== 0) {
-                throw new \RuntimeException(
-                    Str::limit(trim($output->buffer), 800) ?: 'Remote access toggle failed.'
-                );
-            }
-
-            $this->syncFirewallRule($row, $firewall);
-
-            $row->update([
-                'remote_access' => $this->enable,
-                'allowed_from' => $this->enable ? $this->allowedCidr : null,
+        } catch (\Throwable $e) {
+            Log::warning('ToggleDatabaseEngineRemoteAccessJob: SSH failed', [
+                'engine_id' => $this->serverDatabaseEngineId,
+                'error' => $e->getMessage(),
             ]);
 
-            $label = $this->enable
-                ? __('Remote access enabled from :cidr.', ['cidr' => $this->allowedCidr])
-                : __('Remote access disabled — engine is localhost-only.');
-
-            $emit->success('db', $label);
-            $this->completeConsoleAction();
-        } catch (\Throwable $e) {
-            $message = Str::limit($e->getMessage(), 800);
-
-            // Roll back optimistic flag so the UI reflects the real state.
             $row->update([
                 'remote_access' => ! $this->enable,
                 'allowed_from' => $this->enable ? null : $row->allowed_from,
             ]);
 
-            $emit->error('db', $message);
-            $this->failConsoleAction($message);
+            throw $e;
         }
+
+        if ($output->exitCode !== 0) {
+            Log::warning('ToggleDatabaseEngineRemoteAccessJob: script failed', [
+                'engine_id' => $this->serverDatabaseEngineId,
+                'output' => Str::limit(trim($output->buffer), 500),
+            ]);
+
+            $row->update([
+                'remote_access' => ! $this->enable,
+                'allowed_from' => $this->enable ? null : $row->allowed_from,
+            ]);
+
+            return;
+        }
+
+        $row->update([
+            'remote_access' => $this->enable,
+            'allowed_from' => $this->enable ? $this->allowedCidr : null,
+        ]);
+
+        $this->syncFirewallRule($row, $firewall);
     }
 
     private function syncFirewallRule(ServerDatabaseEngine $row, ServerFirewallProvisioner $firewall): void
@@ -150,7 +108,6 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
                 try {
                     $firewall->removeFromHost($server, $existing);
                 } catch (\Throwable) {
-                    // Best-effort — the rule row is deleted regardless.
                 }
                 $existing->delete();
             }
@@ -159,11 +116,12 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
         }
 
         if ($existing) {
-            // Update the source CIDR if it changed.
             if ($existing->source !== $this->allowedCidr) {
-                $before = $existing->replicate();
                 $existing->update(['source' => $this->allowedCidr]);
-                $firewall->applyRule($server, $existing, $before);
+                try {
+                    $firewall->applyRule($server, $existing);
+                } catch (\Throwable) {
+                }
             }
 
             return;
@@ -181,6 +139,9 @@ class ToggleDatabaseEngineRemoteAccessJob implements ShouldQueue
             'tags' => ['dply-database', $tag],
         ]);
 
-        $firewall->applyRule($server, $rule);
+        try {
+            $firewall->applyRule($server, $rule);
+        } catch (\Throwable) {
+        }
     }
 }

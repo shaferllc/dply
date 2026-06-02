@@ -394,6 +394,7 @@ Route::prefix('cli')->middleware('throttle:60,1')->group(function (): void {
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
+    Route::livewire('/networking', \App\Livewire\OrgNetworking::class)->name('networking.index');
     // OAuth-style device-flow approval page for the dply CLI. The CLI
     // prints a short code; user lands here (deep link or paste),
     // confirms scopes + org, and we mint an ApiToken that the polling

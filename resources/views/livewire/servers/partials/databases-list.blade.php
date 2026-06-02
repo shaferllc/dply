@@ -103,24 +103,6 @@
                                             <span>{{ __('See credentials') }}</span>
                                         </button>
                                     @endif
-                                    <button
-                                        type="button"
-                                        wire:click="openConnectionUrlModal(@js($db->id))"
-                                        class="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40"
-                                    >
-                                        <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-moss group-hover:text-brand-forest" />
-                                        <span>{{ __('Show Connection URL') }}</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        x-data="{ copied: false }"
-                                        @click="navigator.clipboard.writeText(@js($db->connectionUrl())); copied = true; clearTimeout(window._dplyDbCopyT); window._dplyDbCopyT = setTimeout(() => copied = false, 2000)"
-                                        class="group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40"
-                                    >
-                                        <x-heroicon-o-clipboard-document class="h-4 w-4 shrink-0 text-brand-moss group-hover:text-brand-forest" />
-                                        <span x-show="!copied" x-cloak>{{ __('Copy Connection URL') }}</span>
-                                        <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                                    </button>
                                     @if ($db->engine === 'sqlite' && filled($db->host))
                                         <button
                                             type="button"

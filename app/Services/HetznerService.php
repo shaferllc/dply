@@ -165,22 +165,27 @@ class HetznerService
      *
      * @param  array<int>  $serverIds  Provider server IDs to attach immediately
      */
-    public function createNetwork(string $name, string $ipRange = '10.0.0.0/8', array $serverIds = []): int
+    /**
+     * @param  list<string>  $zones  Network zones to add subnets for (e.g. ['eu-central', 'us-east']).
+     *                                At least one is required — Hetzner will not assign private IPs without a subnet.
+     */
+    public function createNetwork(string $name, string $ipRange = '10.0.0.0/8', array $zones = ['eu-central']): int
     {
+        if (empty($zones)) {
+            $zones = ['eu-central'];
+        }
+
+        $subnets = array_values(array_map(static fn (string $zone) => [
+            'type' => 'cloud',
+            'network_zone' => $zone,
+            'ip_range' => $ipRange,
+        ], array_unique($zones)));
+
         $body = [
             'name' => $name,
             'ip_range' => $ipRange,
+            'subnets' => $subnets,
         ];
-
-        if ($serverIds !== []) {
-            $body['subnets'] = [
-                [
-                    'type' => 'cloud',
-                    'network_zone' => 'eu-central',
-                    'ip_range' => $ipRange,
-                ],
-            ];
-        }
 
         $response = $this->request('post', '/networks', $body);
         $this->assertSuccess($response, 'create network');
@@ -205,6 +210,80 @@ class HetznerService
             'network' => $networkId,
         ]);
         $this->assertSuccess($response, 'attach server to network');
+    }
+
+    public function detachServerFromNetwork(int $serverId, int $networkId): void
+    {
+        $response = $this->request('post', "/servers/{$serverId}/actions/detach_from_network", [
+            'network' => $networkId,
+        ]);
+        $this->assertSuccess($response, 'detach server from network');
+    }
+
+    /**
+     * Map a Hetzner location code to its network zone.
+     * Used when creating subnets so the zone matches the server's region.
+     */
+    public static function networkZoneForRegion(string $region): string
+    {
+        return match (strtolower($region)) {
+            'ash' => 'us-east',
+            'hil' => 'us-west',
+            'sin' => 'ap-southeast',
+            default => 'eu-central', // fsn1, nbg1, hel1
+        };
+    }
+
+    /**
+     * Get a single private network by ID, including its routes.
+     *
+     * @return array{id:int,name:string,ip_range:string,routes:list<array{destination:string,gateway:string}>}
+     */
+    public function getNetwork(int $id): array
+    {
+        $response = $this->request('get', "/networks/{$id}");
+        $this->assertSuccess($response, 'get network');
+
+        $network = $response->json()['network'] ?? null;
+        if (! $network) {
+            throw new \RuntimeException('Hetzner API did not return network.');
+        }
+
+        return [
+            'id'       => (int) $network['id'],
+            'name'     => (string) ($network['name'] ?? ''),
+            'ip_range' => (string) ($network['ip_range'] ?? ''),
+            'routes'   => array_map(static fn ($r) => [
+                'destination' => (string) ($r['destination'] ?? ''),
+                'gateway'     => (string) ($r['gateway'] ?? ''),
+            ], $network['routes'] ?? []),
+        ];
+    }
+
+    /**
+     * Add a static route to a private network.
+     * destination — CIDR the route covers (e.g. "192.168.1.0/24")
+     * gateway     — IP of the server on the network that forwards the traffic
+     */
+    public function addNetworkRoute(int $networkId, string $destination, string $gateway): void
+    {
+        $response = $this->request('post', "/networks/{$networkId}/actions/add_route", [
+            'destination' => $destination,
+            'gateway'     => $gateway,
+        ]);
+        $this->assertSuccess($response, 'add network route');
+    }
+
+    /**
+     * Remove a static route from a private network.
+     */
+    public function deleteNetworkRoute(int $networkId, string $destination, string $gateway): void
+    {
+        $response = $this->request('post', "/networks/{$networkId}/actions/delete_route", [
+            'destination' => $destination,
+            'gateway'     => $gateway,
+        ]);
+        $this->assertSuccess($response, 'delete network route');
     }
 
     /**

@@ -106,6 +106,11 @@ class ServerCreateForm extends Form
 
     public string $do_vpc_uuid = '';
 
+    /** Cached VPC list for the DO VPC dropdown — populated by loadDoVpcs(). */
+    public array $do_vpcs = [];
+
+    public bool $do_vpcs_loading = false;
+
     /** Hetzner private network ID to attach at creation (gives a private IP on that network). */
     public string $hetzner_network_id = '';
 

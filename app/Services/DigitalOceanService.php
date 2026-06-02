@@ -429,6 +429,37 @@ class DigitalOceanService
     }
 
     /**
+     * List VPCs in the account, optionally filtered by region.
+     *
+     * @return array<int, array{id: string, name: string, region: string, ip_range: string}>
+     */
+    public function listVpcs(?string $region = null): array
+    {
+        $response = $this->request('get', '/vpcs');
+        $this->assertSuccess($response, 'list vpcs');
+        $data = $response->json();
+        $vpcs = $data['vpcs'] ?? [];
+        if (! is_array($vpcs)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($vpcs as $v) {
+            if ($region !== null && ($v['region'] ?? '') !== $region) {
+                continue;
+            }
+            $out[] = [
+                'id' => (string) ($v['id'] ?? ''),
+                'name' => (string) ($v['name'] ?? ''),
+                'region' => (string) ($v['region'] ?? ''),
+                'ip_range' => (string) ($v['ip_range'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Create a DigitalOcean Functions (serverless) namespace. The returned
      * api_host + access_key are the OpenWhisk credentials a function deploy
      * needs — stored on the serverless host Server's meta.

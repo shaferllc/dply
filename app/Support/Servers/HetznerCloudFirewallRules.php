@@ -6,6 +6,8 @@ namespace App\Support\Servers;
 
 use App\Models\Server;
 use App\Models\ServerCacheService;
+use App\Models\ServerDatabase;
+use App\Models\ServerDatabaseEngine;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 
 /**
@@ -56,6 +58,33 @@ final class HetznerCloudFirewallRules
                     [$config->allowedFrom],
                 );
             }
+        }
+
+        // Database engines with at least one database that has remote_access enabled.
+        // Open the engine port to any CIDR that any of its databases is exposed to.
+        // This mirrors what ToggleDatabaseNetworkingJob writes to UFW.
+        $exposedEngines = ServerDatabase::query()
+            ->where('server_id', $server->id)
+            ->where('remote_access', true)
+            ->whereNotNull('allowed_from')
+            ->get()
+            ->groupBy('engine');
+
+        foreach ($exposedEngines as $engineName => $dbs) {
+            $engineRow = ServerDatabaseEngine::query()
+                ->where('server_id', $server->id)
+                ->where('engine', $engineName)
+                ->first();
+
+            $port = $engineRow?->port ?? ServerDatabaseEngine::defaultPortFor($engineName);
+
+            // Collect the unique CIDRs from the exposed databases.
+            $cidrs = $dbs->pluck('allowed_from')->filter()->unique()->values()->all();
+            if (empty($cidrs)) {
+                $cidrs = ['0.0.0.0/0', '::/0'];
+            }
+
+            $rules[] = self::tcp((string) $port, $cidrs);
         }
 
         return $rules;

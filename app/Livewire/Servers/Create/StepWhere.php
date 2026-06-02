@@ -11,8 +11,10 @@ use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
+use App\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -273,6 +275,29 @@ class StepWhere extends Component
         $this->active_provider = $provider;
         $this->applyCloudDefaults($provider);
         $this->autoSelectSingleOptions();
+    }
+
+    public function loadDoVpcs(): void
+    {
+        if ($this->form->type !== 'digitalocean' || $this->form->region === '' || $this->form->provider_credential_id === '') {
+            return;
+        }
+
+        $credential = ProviderCredential::query()->find($this->form->provider_credential_id);
+        if (! $credential) {
+            return;
+        }
+
+        $this->form->do_vpcs_loading = true;
+
+        try {
+            $do = new DigitalOceanService($credential);
+            $this->form->do_vpcs = $do->listVpcs($this->form->region);
+        } catch (\Throwable) {
+            $this->form->do_vpcs = [];
+        }
+
+        $this->form->do_vpcs_loading = false;
     }
 
     #[On('personal-ssh-key-created')]

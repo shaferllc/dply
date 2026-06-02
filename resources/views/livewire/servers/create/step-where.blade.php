@@ -390,16 +390,43 @@
                         <div class="p-6 sm:p-7">
                             @if ($form->type === 'digitalocean')
                                 <div>
-                                    <x-input-label for="do_vpc_uuid" :value="__('VPC UUID')" />
-                                    <x-text-input
-                                        id="do_vpc_uuid"
-                                        wire:model.live.debounce.300ms="form.do_vpc_uuid"
-                                        type="text"
-                                        class="mt-1 block w-full font-mono"
-                                        placeholder="e.g. 3a92ae2d-f1ef-11e8-87be-3cfdfea9f160"
-                                        autocomplete="off"
-                                    />
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Find this in your DigitalOcean control panel → Networking → VPCs. Servers in the same VPC get private IPs on the 10.x subnet and can reach each other without firewall rules.') }}</p>
+                                    <div class="flex items-center justify-between">
+                                        <x-input-label for="do_vpc_uuid" :value="__('VPC')" />
+                                        @if ($form->region !== '' && $form->provider_credential_id !== '')
+                                            <button
+                                                type="button"
+                                                wire:click="loadDoVpcs"
+                                                wire:loading.attr="disabled"
+                                                wire:target="loadDoVpcs"
+                                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                            >
+                                                <span wire:loading.remove wire:target="loadDoVpcs">{{ empty($form->do_vpcs) ? __('Load VPCs') : __('Refresh') }}</span>
+                                                <span wire:loading wire:target="loadDoVpcs">{{ __('Loading…') }}</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @if (! empty($form->do_vpcs))
+                                        <select
+                                            id="do_vpc_uuid"
+                                            wire:model.live="form.do_vpc_uuid"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                        >
+                                            <option value="">{{ __('None (default VPC)') }}</option>
+                                            @foreach ($form->do_vpcs as $vpc)
+                                                <option value="{{ $vpc['id'] }}">{{ $vpc['name'] }} — {{ $vpc['ip_range'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <x-text-input
+                                            id="do_vpc_uuid"
+                                            wire:model.live.debounce.300ms="form.do_vpc_uuid"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono"
+                                            placeholder="e.g. 3a92ae2d-f1ef-11e8-87be-3cfdfea9f160"
+                                            autocomplete="off"
+                                        />
+                                    @endif
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Servers in the same VPC get private IPs and can reach each other without firewall rules. Click "Load VPCs" to pick from your account\'s VPCs.') }}</p>
                                     <x-input-error :messages="$errors->get('form.do_vpc_uuid')" class="mt-1" />
                                 </div>
                             @elseif ($form->type === 'hetzner')

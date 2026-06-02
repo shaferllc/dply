@@ -186,6 +186,12 @@
                                         </x-slot>
                                         {{ __('Servers') }}
                                     </x-dropdown-link>
+                                    <x-dropdown-link :href="route('networking.index')" :active="request()->routeIs('networking.*')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-share class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Networking') }}
+                                    </x-dropdown-link>
                                     @feature('surface.cloud')
                                         <x-dropdown-link :href="route('cloud.index')">
                                             <x-slot name="icon">

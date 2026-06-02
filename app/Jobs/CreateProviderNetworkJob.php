@@ -11,17 +11,19 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Create a Hetzner private network and attach every Hetzner server in the
- * organisation to it, then poll until each server's private IP is assigned
- * and persist it to the server row.
+ * Create a Hetzner private network and attach the selected servers.
  *
- * Dispatched from WorkspaceNetworking::createNetwork().
+ * Subnets are created for every unique network zone across the selected servers
+ * so multi-region networks work without a second create-network pass (#7).
+ *
+ * IP polling is handled by {@see AttachServerToNetworkJob} (tries=10, backoff=8s)
+ * dispatched per server, replacing the old inline sleep-loop (#6).
  */
 class CreateProviderNetworkJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 300;
+    public int $timeout = 60;
 
     public int $tries = 1;
 
@@ -31,6 +33,7 @@ class CreateProviderNetworkJob implements ShouldQueue
         public string $networkName,
         public string $ipRange,
         public array $serverIds,
+        public ?string $privateNetworkId = null,
     ) {}
 
     public function handle(): void
@@ -53,46 +56,29 @@ class CreateProviderNetworkJob implements ShouldQueue
             return;
         }
 
+        // Derive subnets from the unique zones of the selected servers (#7).
+        $zones = $servers
+            ->map(fn (Server $s) => HetznerService::networkZoneForRegion((string) ($s->region ?? '')))
+            ->unique()
+            ->values()
+            ->all();
+
         $hetzner = new HetznerService($credential);
+        $hetznerNetworkId = $hetzner->createNetwork($this->networkName, $this->ipRange, $zones);
 
-        // Create the network.
-        $networkId = $hetzner->createNetwork($this->networkName, $this->ipRange);
+        // Store the Hetzner provider ID on the PrivateNetwork row if one was pre-created.
+        if ($this->privateNetworkId) {
+            \App\Models\PrivateNetwork::query()
+                ->where('id', $this->privateNetworkId)
+                ->update(['provider_id' => (string) $hetznerNetworkId]);
+        }
 
-        // Attach each server and poll for its private IP.
+        // Dispatch one attach job per server — each polls independently with backoff (#6).
         foreach ($servers as $server) {
-            $providerId = (int) $server->provider_id;
-            if ($providerId === 0) {
+            if ((int) $server->provider_id === 0) {
                 continue;
             }
-
-            try {
-                $hetzner->attachServerToNetwork($providerId, $networkId);
-            } catch (\Throwable $e) {
-                if (! str_contains($e->getMessage(), '409') && ! str_contains(strtolower($e->getMessage()), 'already')) {
-                    Log::warning('CreateProviderNetworkJob: attach failed for server', [
-                        'server_id' => $server->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                    continue;
-                }
-            }
-
-            $server->update(['hetzner_network_id' => (string) $networkId]);
-
-            // Poll up to ~30 s for the private IP to be assigned.
-            $privateIp = null;
-            for ($i = 0; $i < 6; $i++) {
-                sleep(5);
-                $instance = $hetzner->getInstance($providerId);
-                $privateIp = HetznerService::getPrivateIp($instance);
-                if ($privateIp) {
-                    break;
-                }
-            }
-
-            if ($privateIp) {
-                $server->update(['private_ip_address' => $privateIp]);
-            }
+            AttachServerToNetworkJob::dispatch($server->id, $hetznerNetworkId, $this->privateNetworkId);
         }
     }
 }
